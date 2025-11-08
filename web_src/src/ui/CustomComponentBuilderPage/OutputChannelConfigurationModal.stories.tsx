@@ -60,9 +60,7 @@ export const AddNewOutputChannel: Story = {
 
     return (
       <div>
-        <Button onClick={() => setIsOpen(true)}>
-          Open Add Output Channel Modal
-        </Button>
+        <Button onClick={() => setIsOpen(true)}>Open Add Output Channel Modal</Button>
         <OutputChannelConfigurationModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
@@ -88,9 +86,7 @@ export const EditOutputChannel: Story = {
 
     return (
       <div>
-        <Button onClick={() => setIsOpen(true)}>
-          Open Edit Output Channel Modal
-        </Button>
+        <Button onClick={() => setIsOpen(true)}>Open Edit Output Channel Modal</Button>
         <OutputChannelConfigurationModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
@@ -117,9 +113,7 @@ export const EditWithDefaultChannel: Story = {
 
     return (
       <div>
-        <Button onClick={() => setIsOpen(true)}>
-          Open Edit Default Channel Modal
-        </Button>
+        <Button onClick={() => setIsOpen(true)}>Open Edit Default Channel Modal</Button>
         <OutputChannelConfigurationModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
@@ -146,9 +140,7 @@ export const EditApprovalChannel: Story = {
 
     return (
       <div>
-        <Button onClick={() => setIsOpen(true)}>
-          Open Edit Approval Channel Modal
-        </Button>
+        <Button onClick={() => setIsOpen(true)}>Open Edit Approval Channel Modal</Button>
         <OutputChannelConfigurationModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
@@ -170,9 +162,7 @@ export const EmptyNodeList: Story = {
 
     return (
       <div>
-        <Button onClick={() => setIsOpen(true)}>
-          Open Modal with No Nodes
-        </Button>
+        <Button onClick={() => setIsOpen(true)}>Open Modal with No Nodes</Button>
         <OutputChannelConfigurationModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}

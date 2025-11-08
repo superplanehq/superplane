@@ -1,18 +1,18 @@
-import { createPortal } from 'react-dom';
-import { useState, useEffect, useRef } from 'react';
+import { createPortal } from "react-dom";
+import { useState, useEffect, useRef } from "react";
+import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from "../Dialog/dialog";
+import { Button } from "../Button/button";
+import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
+import { Link } from "../Link/link";
+import { useIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { useSecrets, useCreateSecret } from "@/hooks/useSecrets";
 import {
-  Dialog,
-  DialogTitle,
-  DialogDescription,
-  DialogBody,
-  DialogActions,
-} from '../Dialog/dialog';
-import { Button } from '../Button/button';
-import { MaterialSymbol } from '../MaterialSymbol/material-symbol';
-import { Link } from '../Link/link';
-import { useIntegrations, useCreateIntegration } from '@/hooks/useIntegrations';
-import { useSecrets, useCreateSecret } from '@/hooks/useSecrets';
-import { GitHubIntegrationForm, SemaphoreIntegrationForm, ApiTokenForm, NEW_SECRET_NAME, useIntegrationForm } from '../IntegrationForm';
+  GitHubIntegrationForm,
+  SemaphoreIntegrationForm,
+  ApiTokenForm,
+  NEW_SECRET_NAME,
+  useIntegrationForm,
+} from "../IntegrationForm";
 
 interface IntegrationModalProps {
   open: boolean;
@@ -23,14 +23,13 @@ interface IntegrationModalProps {
   onSuccess?: (integrationId: string) => void;
 }
 
-
 export function IntegrationModal({
   open,
   onClose,
   integrationType,
   canvasId,
   organizationId: organizationId,
-  onSuccess
+  onSuccess,
 }: IntegrationModalProps) {
   const [isCreating, setIsCreating] = useState(false);
   const orgUrlRef = useRef<HTMLInputElement>(null);
@@ -51,7 +50,7 @@ export function IntegrationModal({
     setErrors,
     validateForm,
     resetForm,
-    config
+    config,
   } = useIntegrationForm({ integrationType, integrations });
 
   useEffect(() => {
@@ -61,7 +60,6 @@ export function IntegrationModal({
       }, 100);
     }
   }, [open]);
-
 
   const handleSaveIntegration = async () => {
     if (!validateForm()) {
@@ -74,28 +72,30 @@ export function IntegrationModal({
       let secretName = integrationData.apiToken.secretName;
       let secretKey = integrationData.apiToken.secretKey;
 
-      if (apiTokenTab === 'new') {
+      if (apiTokenTab === "new") {
         try {
           const secretData = {
             name: `${integrationData.name.trim()}-api-key`,
-            environmentVariables: [{
-              name: NEW_SECRET_NAME,
-              value: newSecretToken
-            }]
+            environmentVariables: [
+              {
+                name: NEW_SECRET_NAME,
+                value: newSecretToken,
+              },
+            ],
           };
 
           await createSecretMutation.mutateAsync(secretData);
           secretName = secretData.name;
           secretKey = NEW_SECRET_NAME;
         } catch {
-          setErrors({ apiToken: 'Failed to create a secret, please try to create secret manually and import' });
+          setErrors({ apiToken: "Failed to create a secret, please try to create secret manually and import" });
           return;
         }
       }
 
       let trimmedUrl = integrationData.orgUrl.trim();
 
-      if (trimmedUrl.endsWith('/')) {
+      if (trimmedUrl.endsWith("/")) {
         trimmedUrl = trimmedUrl.slice(0, -1);
       }
 
@@ -103,41 +103,39 @@ export function IntegrationModal({
         name: integrationData.name.trim(),
         type: integrationType,
         url: trimmedUrl,
-        authType: 'AUTH_TYPE_TOKEN' as const,
+        authType: "AUTH_TYPE_TOKEN" as const,
         tokenSecretName: secretName,
-        tokenSecretKey: secretKey
+        tokenSecretKey: secretKey,
       };
 
       const result = await createIntegrationMutation.mutateAsync(integrationPayload);
 
-      onSuccess?.(result.data?.integration?.metadata?.id || '');
+      onSuccess?.(result.data?.integration?.metadata?.id || "");
       onClose();
       resetForm();
     } catch (error) {
-      console.error('Failed to create integration:', error);
+      console.error("Failed to create integration:", error);
     } finally {
       setIsCreating(false);
     }
   };
 
-
   if (!open) return null;
 
   return createPortal(
-    <Dialog
-      open={open}
-      onClose={() => { }}
-      className="relative z-50"
-      size="md"
-    >
+    <Dialog open={open} onClose={() => {}} className="relative z-50" size="md">
       <DialogTitle>Create {config.displayName} Integration</DialogTitle>
-      <DialogDescription className='text-sm'>
-        New integration will be saved to integrations page. Manage integrations{' '}
-        <Link href={`/${organizationId}/canvas/${canvasId}#integrations`} className='text-blue-600 dark:text-blue-400'> here</Link>.
+      <DialogDescription className="text-sm">
+        New integration will be saved to integrations page. Manage integrations{" "}
+        <Link href={`/${organizationId}/canvas/${canvasId}#integrations`} className="text-blue-600 dark:text-blue-400">
+          {" "}
+          here
+        </Link>
+        .
       </DialogDescription>
 
       <DialogBody className="space-y-6">
-        {integrationType === 'github' ? (
+        {integrationType === "github" ? (
           <GitHubIntegrationForm
             integrationData={integrationData}
             setIntegrationData={setIntegrationData}
@@ -182,28 +180,21 @@ export function IntegrationModal({
       </DialogBody>
 
       <DialogActions>
-        <Button
-          onClick={onClose}
-          disabled={isCreating}
-        >
+        <Button onClick={onClose} disabled={isCreating}>
           Cancel
         </Button>
-        <Button
-          color='blue'
-          onClick={handleSaveIntegration}
-          disabled={isCreating}
-        >
+        <Button color="blue" onClick={handleSaveIntegration} disabled={isCreating}>
           {isCreating ? (
             <>
               <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
               Creating...
             </>
           ) : (
-            'Create'
+            "Create"
           )}
         </Button>
       </DialogActions>
     </Dialog>,
-    document.body
+    document.body,
   );
 }

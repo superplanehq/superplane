@@ -1,15 +1,17 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { Composite, type CompositeProps } from './';
+import type { Meta, StoryObj } from "@storybook/react";
+import { Composite, type CompositeProps } from "./";
 import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
-const createCompositeProps = (baseProps: Omit<CompositeProps, keyof import('../types/componentActions').ComponentActionsProps>): CompositeProps => ({
+const createCompositeProps = (
+  baseProps: Omit<CompositeProps, keyof import("../types/componentActions").ComponentActionsProps>,
+): CompositeProps => ({
   ...baseProps,
-  onRun: () => console.log('Run clicked!'),
-  onDuplicate: () => console.log('Duplicate clicked!'),
-  onEdit: () => console.log('Edit clicked!'),
-  onDeactivate: () => console.log('Deactivate clicked!'),
-  onToggleView: () => console.log('Toggle view clicked!'),
-  onDelete: () => console.log('Delete clicked!'),
+  onRun: () => console.log("Run clicked!"),
+  onDuplicate: () => console.log("Duplicate clicked!"),
+  onEdit: () => console.log("Edit clicked!"),
+  onDeactivate: () => console.log("Deactivate clicked!"),
+  onToggleView: () => console.log("Toggle view clicked!"),
+  onDelete: () => console.log("Delete clicked!"),
 });
 
 const BuildTestDeployStage: CompositeProps = createCompositeProps({
@@ -29,11 +31,11 @@ const BuildTestDeployStage: CompositeProps = createCompositeProps({
     },
     state: "failed",
     values: {
-      "Author": "Bart Willems",
-      "Commit": "FEAT-1234",
-      "Sha": "ef758d40",
-      "Image": "v3.18.217",
-      "Size": "971.5 MB"
+      Author: "Bart Willems",
+      Commit: "FEAT-1234",
+      Sha: "ef758d40",
+      Image: "v3.18.217",
+      Size: "971.5 MB",
     },
   },
   nextInQueue: {
@@ -41,7 +43,7 @@ const BuildTestDeployStage: CompositeProps = createCompositeProps({
     subtitle: "ef758d40",
     receivedAt: new Date(),
   },
-  collapsed: false
+  collapsed: false,
 });
 
 const DeployToEu: CompositeProps = createCompositeProps({
@@ -50,9 +52,7 @@ const DeployToEu: CompositeProps = createCompositeProps({
   iconSrc: KubernetesIcon,
   headerColor: "bg-blue-100",
   iconBackground: "bg-blue-500",
-  parameters: [
-    { icon: "map", items: { "region": "eu-global-1, eu-global-2" } }
-  ],
+  parameters: [{ icon: "map", items: { region: "eu-global-1, eu-global-2" } }],
   lastRunItem: {
     title: "fix: open rejected events",
     subtitle: "ef758d40",
@@ -75,11 +75,11 @@ const DeployToEu: CompositeProps = createCompositeProps({
     },
     state: "running",
     values: {
-      "Author": "Bart Willems",
-      "Commit": "FEAT-1234",
-      "Sha": "ef758d40",
-      "Image": "v3.18.217",
-      "Size": "971.5 MB"
+      Author: "Bart Willems",
+      Commit: "FEAT-1234",
+      Sha: "ef758d40",
+      Image: "v3.18.217",
+      Size: "971.5 MB",
     },
   },
   nextInQueue: {
@@ -87,7 +87,7 @@ const DeployToEu: CompositeProps = createCompositeProps({
     subtitle: "ef758d40",
     receivedAt: new Date(),
   },
-  collapsed: false
+  collapsed: false,
 });
 
 const DeployToUS: CompositeProps = createCompositeProps({
@@ -95,20 +95,18 @@ const DeployToUS: CompositeProps = createCompositeProps({
   iconSrc: KubernetesIcon,
   headerColor: "bg-blue-100",
   iconBackground: "bg-blue-500",
-  parameters: [
-    { icon: "map", items: { "region": "us-west-1, us-east-1" } }
-  ],
+  parameters: [{ icon: "map", items: { region: "us-west-1, us-east-1" } }],
   lastRunItem: {
     title: "FEAT-984: Autocomplete",
     subtitle: "ef758d40",
     receivedAt: new Date(),
     state: "success",
     values: {
-      "Author": "Bart Willems",
-      "Commit": "FEAT-1234",
-      "Sha": "ef758d40",
-      "Image": "v3.18.217",
-      "Size": "971.5 MB"
+      Author: "Bart Willems",
+      Commit: "FEAT-1234",
+      Sha: "ef758d40",
+      Image: "v3.18.217",
+      Size: "971.5 MB",
     },
   },
   nextInQueue: {
@@ -117,7 +115,7 @@ const DeployToUS: CompositeProps = createCompositeProps({
     receivedAt: new Date(),
   },
   startLastValuesOpen: true,
-  collapsed: false
+  collapsed: false,
 });
 
 const DeployToAsia: CompositeProps = createCompositeProps({
@@ -125,24 +123,22 @@ const DeployToAsia: CompositeProps = createCompositeProps({
   iconSrc: KubernetesIcon,
   headerColor: "bg-blue-100",
   iconBackground: "bg-blue-500",
-  parameters: [
-    { icon: "map", items: { "region": "asia-east-1" } }
-  ],
+  parameters: [{ icon: "map", items: { region: "asia-east-1" } }],
   lastRunItem: {
     title: "fix: open rejected events",
     subtitle: "ef758d40",
     receivedAt: new Date(),
     state: "success",
     values: {
-      "Author": "Bart Willems",
-      "Commit": "FEAT-1234",
-      "Sha": "ef758d40",
-      "Image": "v3.18.217",
-      "Size": "971.5 MB"
+      Author: "Bart Willems",
+      Commit: "FEAT-1234",
+      Sha: "ef758d40",
+      Image: "v3.18.217",
+      Size: "971.5 MB",
     },
   },
   startLastValuesOpen: false,
-  collapsed: false
+  collapsed: false,
 });
 
 const NoExecutionsZeroState: CompositeProps = createCompositeProps({
@@ -151,19 +147,17 @@ const NoExecutionsZeroState: CompositeProps = createCompositeProps({
   iconSlug: "play-circle",
   iconColor: "text-gray-600",
   headerColor: "bg-gray-100",
-  parameters: [
-    { icon: "settings", items: { "environment": "production" } }
-  ],
-  collapsed: false
+  parameters: [{ icon: "settings", items: { environment: "production" } }],
+  collapsed: false,
 });
 
 const meta: Meta<typeof Composite> = {
-  title: 'ui/Composite',
+  title: "ui/Composite",
   component: Composite,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 };
 
 export default meta;

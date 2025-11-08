@@ -1,7 +1,7 @@
 import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "./types";
-import githubIcon from '@/assets/icons/integrations/github.svg';
+import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 
 interface GitHubMetadata {
@@ -9,7 +9,7 @@ interface GitHubMetadata {
     id: string;
     name: string;
     url: string;
-  }
+  };
 }
 
 interface GithubConfiguration {
@@ -21,10 +21,10 @@ interface GitHubEventData {
     message?: string;
     id?: string;
     author?: {
-      name?: string,
-      email?: string,
-      username: string
-    }
+      name?: string;
+      email?: string;
+      username: string;
+    };
   };
   pull_request?: {
     title?: string;
@@ -33,11 +33,11 @@ interface GitHubEventData {
     head?: {
       sha: string;
       ref: string;
-    },
+    };
     user?: {
       id: string;
       login: string;
-    }
+    };
   };
 }
 
@@ -52,7 +52,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
       return {
         title: eventData?.pull_request?.title || "",
         subtitle: eventData?.pull_request?.head?.sha || "",
-      }
+      };
     }
 
     return {
@@ -66,16 +66,16 @@ export const githubTriggerRenderer: TriggerRenderer = {
 
     if (eventData.pull_request) {
       return {
-        "Commit": eventData?.pull_request?.title || "",
-        "SHA": eventData?.pull_request?.head?.sha || "",
-        "Author": eventData?.pull_request?.user?.login || "",
-      }
+        Commit: eventData?.pull_request?.title || "",
+        SHA: eventData?.pull_request?.head?.sha || "",
+        Author: eventData?.pull_request?.user?.login || "",
+      };
     }
 
     return {
-      "Commit": eventData?.head_commit?.message || "",
-      "SHA": eventData?.head_commit?.id || "",
-      "Author": eventData?.head_commit?.author?.name || "",
+      Commit: eventData?.head_commit?.message || "",
+      SHA: eventData?.head_commit?.id || "",
+      Author: eventData?.head_commit?.author?.name || "",
     };
   },
 

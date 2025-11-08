@@ -1,75 +1,75 @@
-import { defineConfig } from 'vite'
-import type { ResolvedConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from "@tailwindcss/vite"
-import * as path from 'path';
+import { defineConfig } from "vite";
+import type { ResolvedConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import * as path from "path";
 
 // Plugin that sets HMR port to be the same as server port
 // This is useful when you can't use WebSockets in your proxy
 const setHmrPortFromPortPlugin = {
-  name: 'set-hmr-port-from-port',
+  name: "set-hmr-port-from-port",
   configResolved: (config: ResolvedConfig) => {
     if (!config.server.strictPort) {
-      throw new Error('Should be strictPort=true')
+      throw new Error("Should be strictPort=true");
     }
 
     if (config.server.hmr !== false) {
-      if (config.server.hmr === true) config.server.hmr = {}
-      config.server.hmr ??= {}
-      config.server.hmr.clientPort = config.server.port
-      config.server.hmr.overlay = true 
+      if (config.server.hmr === true) config.server.hmr = {};
+      config.server.hmr ??= {};
+      config.server.hmr.clientPort = config.server.port;
+      config.server.hmr.overlay = true;
     }
-  }
+  },
 };
 
 // https://vite.dev/config/
-export default defineConfig(({ command }: { command: string} ) => {
+export default defineConfig(({ command }: { command: string }) => {
   const isDev = command !== "build";
   const apiPort = process.env.API_PORT || "8000";
 
   return {
-  plugins: [react(), tailwindcss(), setHmrPortFromPortPlugin],
-  base: "/",
-  server: {
-    port: 5173,
-    strictPort: true,
-    host: true,
-    watch: {
-      usePolling: true,
-      interval: 1000,
-    },
-    proxy: {
-      "/api": {
-        target: `http://localhost:${apiPort}`,
-        changeOrigin: true,
-        secure: false,
+    plugins: [react(), tailwindcss(), setHmrPortFromPortPlugin],
+    base: "/",
+    server: {
+      port: 5173,
+      strictPort: true,
+      host: true,
+      watch: {
+        usePolling: true,
+        interval: 1000,
+      },
+      proxy: {
+        "/api": {
+          target: `http://localhost:${apiPort}`,
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
-  },
-  resolve: {
-    alias: {
-      '@/canvas': path.resolve(__dirname, 'src/pages/canvas'),
-      "@": path.resolve(__dirname, 'src'),
+    resolve: {
+      alias: {
+        "@/canvas": path.resolve(__dirname, "src/pages/canvas"),
+        "@": path.resolve(__dirname, "src"),
+      },
     },
-  },
-  build: {
-    commonjsOptions: { transformMixedEsModules: true },
-    target: "es2020",
-    outDir: "../pkg/web/assets/dist", // emit assets to pkg/web/assets/dist
-    emptyOutDir: true,
-    sourcemap: isDev, // enable source map in dev build
-    manifest: false, // do not generate manifest.json
-    // rollupOptions: {
-    //   input: {
-    //     app: path.resolve('./src/main.tsx'),
-    //   },
-    //   // output: {
-    //   //   // remove hashes to match phoenix way of handling asssets
-    //   //   entryFileNames: "[name].js",
-    //   //   chunkFileNames: "[name].js",
-    //   //   assetFileNames: "[name][extname]",
-    //   // },
-    // },
-  }
-};
-})
+    build: {
+      commonjsOptions: { transformMixedEsModules: true },
+      target: "es2020",
+      outDir: "../pkg/web/assets/dist", // emit assets to pkg/web/assets/dist
+      emptyOutDir: true,
+      sourcemap: isDev, // enable source map in dev build
+      manifest: false, // do not generate manifest.json
+      // rollupOptions: {
+      //   input: {
+      //     app: path.resolve('./src/main.tsx'),
+      //   },
+      //   // output: {
+      //   //   // remove hashes to match phoenix way of handling asssets
+      //   //   entryFileNames: "[name].js",
+      //   //   chunkFileNames: "[name].js",
+      //   //   assetFileNames: "[name][extname]",
+      //   // },
+      // },
+    },
+  };
+});

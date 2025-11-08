@@ -1,36 +1,36 @@
-import React from 'react'
-import type { Meta, StoryObj } from '@storybook/react'
-import { Badge } from './badge'
+import React from "react";
+import type { Meta, StoryObj } from "@storybook/react";
+import { Badge } from "./badge";
 
 const meta: Meta<typeof Badge> = {
-  title: 'Components/Badge',
+  title: "Components/Badge",
   component: Badge,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
     color: {
-      control: 'select',
-      options: ['indigo', 'gray', 'blue', 'red', 'green', 'yellow', 'zinc'],
+      control: "select",
+      options: ["indigo", "gray", "blue", "red", "green", "yellow", "zinc"],
     },
     icon: {
-      control: 'text',
+      control: "text",
     },
     truncate: {
-      control: 'boolean',
+      control: "boolean",
     },
   },
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    children: 'Badge',
+    children: "Badge",
   },
-}
+};
 
 export const Colors: Story = {
   render: () => (
@@ -44,21 +44,21 @@ export const Colors: Story = {
       <Badge color="zinc">Zinc</Badge>
     </div>
   ),
-}
+};
 
 export const WithIcon: Story = {
   args: {
-    children: 'With Icon',
-    icon: 'check_circle',
-    color: 'green',
+    children: "With Icon",
+    icon: "check_circle",
+    color: "green",
   },
-}
+};
 
 export const Truncated: Story = {
   args: {
-    children: 'This is a very long badge text that should be truncated',
+    children: "This is a very long badge text that should be truncated",
     truncate: true,
-    color: 'blue',
-    className: 'max-w-32',
+    color: "blue",
+    className: "max-w-32",
   },
-}
+};

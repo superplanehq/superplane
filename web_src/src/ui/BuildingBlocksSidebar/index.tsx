@@ -53,7 +53,7 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
 
   // Initialize showWip from localStorage
   const [showWip, setShowWip] = useState(() => {
-    const storedShowWip = localStorage.getItem('buildingBlocksShowWip');
+    const storedShowWip = localStorage.getItem("buildingBlocksShowWip");
     if (storedShowWip !== null) {
       return JSON.parse(storedShowWip);
     }
@@ -62,7 +62,7 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
 
   // Save showWip to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('buildingBlocksShowWip', JSON.stringify(showWip));
+    localStorage.setItem("buildingBlocksShowWip", JSON.stringify(showWip));
   }, [showWip]);
 
   const categoryOrder: Record<string, number> = {

@@ -23,9 +23,7 @@ const sampleTriggers: BuildingBlock[] = [
     icon: "clock",
     color: "blue",
     outputChannels: [{ name: "default" }],
-    configuration: [
-      { name: "cron", type: "string" },
-    ],
+    configuration: [{ name: "cron", type: "string" }],
   },
   {
     name: "webhook",
@@ -61,9 +59,7 @@ const sampleComponents: BuildingBlock[] = [
     icon: "hand",
     color: "orange",
     outputChannels: [{ name: "approved" }, { name: "rejected" }],
-    configuration: [
-      { name: "approvers", type: "array" },
-    ],
+    configuration: [{ name: "approvers", type: "array" }],
   },
   {
     name: "if",
@@ -73,9 +69,7 @@ const sampleComponents: BuildingBlock[] = [
     icon: "split",
     color: "yellow",
     outputChannels: [{ name: "true" }, { name: "false" }],
-    configuration: [
-      { name: "condition", type: "string" },
-    ],
+    configuration: [{ name: "condition", type: "string" }],
   },
 ];
 
@@ -156,11 +150,7 @@ export const Default: Story = {
 
     return (
       <div className="h-screen w-screen flex bg-gray-100">
-        <BuildingBlocksSidebar
-          {...args}
-          isOpen={isOpen}
-          onToggle={handleToggle}
-        />
+        <BuildingBlocksSidebar {...args} isOpen={isOpen} onToggle={handleToggle} />
       </div>
     );
   },
@@ -181,11 +171,7 @@ export const Closed: Story = {
 
     return (
       <div className="h-screen w-screen flex bg-gray-100 relative">
-        <BuildingBlocksSidebar
-          {...args}
-          isOpen={isOpen}
-          onToggle={handleToggle}
-        />
+        <BuildingBlocksSidebar {...args} isOpen={isOpen} onToggle={handleToggle} />
       </div>
     );
   },
@@ -206,11 +192,7 @@ export const EmptyLists: Story = {
 
     return (
       <div className="h-screen w-screen flex bg-gray-100">
-        <BuildingBlocksSidebar
-          {...args}
-          isOpen={isOpen}
-          onToggle={handleToggle}
-        />
+        <BuildingBlocksSidebar {...args} isOpen={isOpen} onToggle={handleToggle} />
       </div>
     );
   },
@@ -236,11 +218,7 @@ export const OnlyTriggers: Story = {
 
     return (
       <div className="h-screen w-screen flex bg-gray-100">
-        <BuildingBlocksSidebar
-          {...args}
-          isOpen={isOpen}
-          onToggle={handleToggle}
-        />
+        <BuildingBlocksSidebar {...args} isOpen={isOpen} onToggle={handleToggle} />
       </div>
     );
   },

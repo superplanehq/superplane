@@ -1,19 +1,19 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { Checkbox } from '../checkbox';
-import { Label } from './index';
+import { Checkbox } from "../checkbox";
+import { Label } from "./index";
 
 const meta: Meta<typeof Label> = {
-  title: 'shadcn Primitives/Label',
+  title: "shadcn Primitives/Label",
   component: Label,
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
     children: {
-      control: { type: 'text' },
+      control: { type: "text" },
     },
   },
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
 };
 
@@ -22,8 +22,8 @@ type Story = StoryObj<typeof Label>;
 
 export const Default: Story = {
   args: {
-    htmlFor: 'email',
-    children: 'Your email address',
+    htmlFor: "email",
+    children: "Your email address",
   },
 };
 
@@ -35,6 +35,6 @@ export const WithCheckbox: Story = {
     </div>
   ),
   args: {
-    children: 'Accept terms and conditions',
+    children: "Accept terms and conditions",
   },
 };

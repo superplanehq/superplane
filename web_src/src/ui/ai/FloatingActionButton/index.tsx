@@ -17,15 +17,12 @@ export function FloatingActionButton(props: FloatingActionButton.Props) {
     "focus:outline-none",
     "rounded-lg p-2 px-4",
     "gap-2 hover:gap-3",
-    "bg-stone-900"
+    "bg-stone-900",
   );
 
   return (
     <div className="fixed bottom-6 right-6 flex items-center gap-2">
-      <NotificationBubble
-        show={props.showNotification}
-        message={props.notificationMessage}
-      />
+      <NotificationBubble show={props.showNotification} message={props.notificationMessage} />
 
       <button onClick={props.onClick} className={buttonClasses}>
         <BotMessageSquare className="text-white" size={16} />
@@ -35,13 +32,7 @@ export function FloatingActionButton(props: FloatingActionButton.Props) {
   );
 }
 
-function NotificationBubble({
-  show,
-  message,
-}: {
-  show?: boolean;
-  message?: string;
-}) {
+function NotificationBubble({ show, message }: { show?: boolean; message?: string }) {
   if (!show) {
     return null;
   }
@@ -52,7 +43,7 @@ function NotificationBubble({
         className={cn(
           "relative overflow-hidden",
           "border-2 border-yellow-300 bg-white text-sm px-3 py-1.5 rounded-md shadow-md",
-          "flex items-center gap-3"
+          "flex items-center gap-3",
         )}
       >
         <PulsatingSparklesIcon />

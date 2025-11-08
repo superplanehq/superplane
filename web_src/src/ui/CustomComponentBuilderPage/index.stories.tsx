@@ -131,7 +131,6 @@ export const Default: Story = {
   },
 };
 
-
 export const EmptyBlueprint: Story = {
   render: () => {
     const [nodes, setNodes] = useState<Node[]>([]);
@@ -198,4 +197,3 @@ export const EmptyBlueprint: Story = {
     );
   },
 };
-

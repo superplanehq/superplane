@@ -1,16 +1,9 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import { BellRing } from "lucide-react"
+import type { Meta, StoryObj } from "@storybook/react";
+import { BellRing } from "lucide-react";
 
-import { Button } from "../button"
+import { Button } from "../button";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "./index"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./index";
 
 const notifications = [
   {
@@ -25,7 +18,7 @@ const notifications = [
     title: "Your subscription is expiring soon!",
     description: "2 hours ago",
   },
-]
+];
 
 const meta = {
   title: "shadcn Primitives/Card",
@@ -42,11 +35,11 @@ const meta = {
   args: {
     className: "w-96",
   },
-} satisfies Meta<typeof Card>
+} satisfies Meta<typeof Card>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<typeof Card>
+type Story = StoryObj<typeof Card>;
 
 const renderCard = (args: React.ComponentProps<typeof Card>) => (
   <Card {...args}>
@@ -69,8 +62,8 @@ const renderCard = (args: React.ComponentProps<typeof Card>) => (
       <Button variant="link">Close</Button>
     </CardFooter>
   </Card>
-)
+);
 
 export const Default: Story = {
   render: renderCard,
-}
+};

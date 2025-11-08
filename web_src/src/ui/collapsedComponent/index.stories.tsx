@@ -1,16 +1,18 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { CollapsedComponent, type CollapsedComponentProps } from './';
+import type { Meta, StoryObj } from "@storybook/react";
+import { CollapsedComponent, type CollapsedComponentProps } from "./";
 import { resolveIcon } from "@/lib/utils";
-import React from 'react';
+import React from "react";
 
-const createCollapsedProps = (baseProps: Omit<CollapsedComponentProps, keyof import('../types/componentActions').ComponentActionsProps>): CollapsedComponentProps => ({
+const createCollapsedProps = (
+  baseProps: Omit<CollapsedComponentProps, keyof import("../types/componentActions").ComponentActionsProps>,
+): CollapsedComponentProps => ({
   ...baseProps,
-  onRun: () => console.log('Run clicked!'),
-  onDuplicate: () => console.log('Duplicate clicked!'),
-  onEdit: () => console.log('Edit clicked!'),
-  onDeactivate: () => console.log('Deactivate clicked!'),
-  onToggleView: () => console.log('Toggle view clicked!'),
-  onDelete: () => console.log('Delete clicked!'),
+  onRun: () => console.log("Run clicked!"),
+  onDuplicate: () => console.log("Duplicate clicked!"),
+  onEdit: () => console.log("Edit clicked!"),
+  onDeactivate: () => console.log("Deactivate clicked!"),
+  onToggleView: () => console.log("Toggle view clicked!"),
+  onDelete: () => console.log("Delete clicked!"),
 });
 
 const triggerCollapsed: CollapsedComponentProps = createCollapsedProps({
@@ -53,7 +55,7 @@ const triggerWithMetadata: CollapsedComponentProps = createCollapsedProps({
       {[
         { icon: "clock", label: "5min ago" },
         { icon: "database", label: "1.2GB" },
-        { icon: "users", label: "3 approvals" }
+        { icon: "users", label: "3 approvals" },
       ].map((item, index) => {
         const Icon = resolveIcon(item.icon);
         return (
@@ -68,12 +70,12 @@ const triggerWithMetadata: CollapsedComponentProps = createCollapsedProps({
 });
 
 const meta: Meta<typeof CollapsedComponent> = {
-  title: 'ui/CollapsedComponent',
+  title: "ui/CollapsedComponent",
   component: CollapsedComponent,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 };
 
 export default meta;
@@ -120,26 +122,23 @@ const ToggleableCollapsedComponent = (args: CollapsedComponentProps) => {
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="text-sm text-gray-600">
-        Current state: {isCollapsed ? 'Collapsed' : 'Expanded'} | View: {isCompactView ? 'Compact' : 'Detailed'}
+        Current state: {isCollapsed ? "Collapsed" : "Expanded"} | View: {isCompactView ? "Compact" : "Detailed"}
       </div>
       <CollapsedComponent
         {...args}
         isCompactView={isCompactView}
         onToggleView={() => {
           setIsCompactView(!isCompactView);
-          console.log(`Toggled to ${!isCompactView ? 'Compact' : 'Detailed'} view!`);
+          console.log(`Toggled to ${!isCompactView ? "Compact" : "Detailed"} view!`);
         }}
-        onRun={() => console.log('Run action triggered!')}
-        onDuplicate={() => console.log('Duplicate action triggered!')}
-        onEdit={() => console.log('Edit action triggered!')}
-        onDeactivate={() => console.log('Deactivate action triggered!')}
-        onDelete={() => console.log('Delete action triggered!')}
+        onRun={() => console.log("Run action triggered!")}
+        onDuplicate={() => console.log("Duplicate action triggered!")}
+        onEdit={() => console.log("Edit action triggered!")}
+        onDeactivate={() => console.log("Deactivate action triggered!")}
+        onDelete={() => console.log("Delete action triggered!")}
       />
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="px-3 py-1 bg-blue-500 text-white rounded text-sm"
-      >
-        {isCollapsed ? 'Expand' : 'Collapse'} Component
+      <button onClick={() => setIsCollapsed(!isCollapsed)} className="px-3 py-1 bg-blue-500 text-white rounded text-sm">
+        {isCollapsed ? "Expand" : "Collapse"} Component
       </button>
     </div>
   );
@@ -160,11 +159,11 @@ export const WithActionsOnly: Story = {
   args: {
     ...triggerCollapsed,
     title: "Component with Actions",
-    onRun: () => console.log('Run clicked!'),
-    onDuplicate: () => console.log('Duplicate clicked!'),
-    onEdit: () => console.log('Edit clicked!'),
-    onDeactivate: () => console.log('Deactivate clicked!'),
-    onToggleView: () => console.log('Toggle view clicked!'),
-    onDelete: () => console.log('Delete clicked!'),
+    onRun: () => console.log("Run clicked!"),
+    onDuplicate: () => console.log("Duplicate clicked!"),
+    onEdit: () => console.log("Edit clicked!"),
+    onDeactivate: () => console.log("Deactivate clicked!"),
+    onToggleView: () => console.log("Toggle view clicked!"),
+    onDelete: () => console.log("Delete clicked!"),
   },
 };

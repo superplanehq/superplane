@@ -1,71 +1,70 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Button } from '../../../components/Button/button'
-import { Input } from '../../../components/Input/input'
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { Button } from "../../../components/Button/button";
+import { Input } from "../../../components/Input/input";
 import {
   Dropdown,
   DropdownButton,
   DropdownMenu,
   DropdownItem,
   DropdownLabel,
-  DropdownDescription
-} from '../../../components/Dropdown/dropdown'
-import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
-import { Text } from '../../../components/Text/text'
-import { Breadcrumbs } from '../../../components/Breadcrumbs/breadcrumbs'
-import { useCreateGroup, useOrganizationRoles } from '../../../hooks/useOrganizationData'
-import { Heading } from '@/components/Heading/heading'
+  DropdownDescription,
+} from "../../../components/Dropdown/dropdown";
+import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
+import { Text } from "../../../components/Text/text";
+import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
+import { useCreateGroup, useOrganizationRoles } from "../../../hooks/useOrganizationData";
+import { Heading } from "@/components/Heading/heading";
 
 export function CreateGroupPage() {
-  const navigate = useNavigate()
-  const { organizationId } = useParams<{ organizationId: string }>()
-  const orgId = organizationId
+  const navigate = useNavigate();
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const orgId = organizationId;
 
-  const [groupName, setGroupName] = useState('')
-  const [groupDescription, setGroupDescription] = useState('')
-  const [selectedRole, setSelectedRole] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [groupName, setGroupName] = useState("");
+  const [groupDescription, setGroupDescription] = useState("");
+  const [selectedRole, setSelectedRole] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: roles = [], isLoading: loadingRoles } = useOrganizationRoles(orgId || '')
-  const createGroupMutation = useCreateGroup(orgId || '')
+  const { data: roles = [], isLoading: loadingRoles } = useOrganizationRoles(orgId || "");
+  const createGroupMutation = useCreateGroup(orgId || "");
 
   useEffect(() => {
     if (roles.length > 0 && !selectedRole) {
-      setSelectedRole(roles[0].metadata?.name || '')
+      setSelectedRole(roles[0].metadata?.name || "");
     }
-  }, [roles, selectedRole])
+  }, [roles, selectedRole]);
 
   const handleCreateGroup = async () => {
-    if (!groupName.trim() || !selectedRole || !orgId) return
+    if (!groupName.trim() || !selectedRole || !orgId) return;
 
-    setIsCreating(true)
-    setError(null)
+    setIsCreating(true);
+    setError(null);
 
     try {
       await createGroupMutation.mutateAsync({
         organizationId: orgId,
-        groupName: groupName.trim().toLocaleLowerCase().replace(/\s+/g, '_'),
+        groupName: groupName.trim().toLocaleLowerCase().replace(/\s+/g, "_"),
         role: selectedRole,
         displayName: groupName,
-        description: groupDescription
-      })
+        description: groupDescription,
+      });
 
-      navigate(`/${orgId}/settings/groups`)
+      navigate(`/${orgId}/settings/groups`);
     } catch {
-      setError('Failed to create group. Please try again.')
+      setError("Failed to create group. Please try again.");
     } finally {
-      setIsCreating(false)
+      setIsCreating(false);
     }
-  }
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleCreateGroup()
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleCreateGroup();
     }
-  }
-
+  };
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 pt-20 text-left">
@@ -76,13 +75,13 @@ export function CreateGroupPage() {
             <Breadcrumbs
               items={[
                 {
-                  label: 'Groups',
-                  onClick: () => navigate(`/${orgId}/settings/groups`)
+                  label: "Groups",
+                  onClick: () => navigate(`/${orgId}/settings/groups`),
                 },
                 {
-                  label: 'Create new group',
-                  current: true
-                }
+                  label: "Create new group",
+                  current: true,
+                },
               ]}
               showDivider={false}
             />
@@ -110,9 +109,7 @@ export function CreateGroupPage() {
             <div className="space-y-6">
               {/* Group Name */}
               <div>
-                <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-2">
-                  Group Name *
-                </label>
+                <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-2">Group Name *</label>
                 <Input
                   type="text"
                   placeholder="Enter group name"
@@ -139,9 +136,7 @@ export function CreateGroupPage() {
 
               {/* Role Selection */}
               <div>
-                <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-2">
-                  Role *
-                </label>
+                <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-2">Role *</label>
                 {loadingRoles ? (
                   <div className="flex justify-center items-center h-12">
                     <p className="text-zinc-500 dark:text-zinc-400">Loading roles...</p>
@@ -149,11 +144,12 @@ export function CreateGroupPage() {
                 ) : roles.length === 0 ? (
                   <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                     <div className="flex max-w-lg">
-                      <MaterialSymbol name="warning" className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5" />
+                      <MaterialSymbol
+                        name="warning"
+                        className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5"
+                      />
                       <div className="text-sm">
-                        <p className="text-yellow-800 dark:text-yellow-200 font-medium">
-                          No roles available
-                        </p>
+                        <p className="text-yellow-800 dark:text-yellow-200 font-medium">No roles available</p>
                         <p className="text-yellow-700 dark:text-yellow-300 mt-1">
                           Create a role first to assign it to this group.
                         </p>
@@ -170,16 +166,17 @@ export function CreateGroupPage() {
                 ) : (
                   <Dropdown>
                     <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
-                      {roles.find(r => r.metadata?.name === selectedRole)?.spec?.displayName || 'Select Role'}
+                      {roles.find((r) => r.metadata?.name === selectedRole)?.spec?.displayName || "Select Role"}
                       <MaterialSymbol name="keyboard_arrow_down" />
                     </DropdownButton>
                     <DropdownMenu>
                       {roles.map((role) => (
-                        <DropdownItem key={role.metadata?.name} onClick={() => setSelectedRole(role.metadata?.name || '')}>
-                          <DropdownLabel >{role.spec?.displayName}</DropdownLabel>
-                          <DropdownDescription>
-                            {role.spec?.description || ''}
-                          </DropdownDescription>
+                        <DropdownItem
+                          key={role.metadata?.name}
+                          onClick={() => setSelectedRole(role.metadata?.name || "")}
+                        >
+                          <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
+                          <DropdownDescription>{role.spec?.description || ""}</DropdownDescription>
                         </DropdownItem>
                       ))}
                     </DropdownMenu>
@@ -198,17 +195,15 @@ export function CreateGroupPage() {
               className="flex items-center gap-2"
             >
               <MaterialSymbol name="group_add" size="sm" />
-              {isCreating ? 'Creating...' : 'Create Group'}
+              {isCreating ? "Creating..." : "Create Group"}
             </Button>
 
             <Link to={`/${orgId}/settings/groups`}>
-              <Button outline>
-                Cancel
-              </Button>
+              <Button outline>Cancel</Button>
             </Link>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

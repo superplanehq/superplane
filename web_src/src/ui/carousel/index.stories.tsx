@@ -1,14 +1,8 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "./index"
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "./index";
 
-type CarouselArgs = React.ComponentProps<typeof Carousel>
+type CarouselArgs = React.ComponentProps<typeof Carousel>;
 
 const meta = {
   title: "shadcn Primitives/Carousel",
@@ -30,13 +24,13 @@ const meta = {
     orientation: "horizontal",
     className: "w-full max-w-xs",
   },
-} satisfies Meta<CarouselArgs>
+} satisfies Meta<CarouselArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<CarouselArgs>
+type Story = StoryObj<CarouselArgs>;
 
-const slides = Array.from({ length: 5 }).map((_, index) => index + 1)
+const slides = Array.from({ length: 5 }).map((_, index) => index + 1);
 
 const renderCarousel = (args: CarouselArgs) => (
   <Carousel {...args}>
@@ -52,11 +46,11 @@ const renderCarousel = (args: CarouselArgs) => (
     <CarouselPrevious />
     <CarouselNext />
   </Carousel>
-)
+);
 
 export const Default: Story = {
   render: renderCarousel,
-}
+};
 
 export const Vertical: Story = {
   args: {
@@ -64,4 +58,4 @@ export const Vertical: Story = {
     className: "h-96 w-72",
   },
   render: renderCarousel,
-}
+};

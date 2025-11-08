@@ -97,11 +97,7 @@ export const Wait: React.FC<WaitProps> = ({
   const [timeLeft, setTimeLeft] = React.useState<number | null>(null);
 
   React.useEffect(() => {
-    if (
-      lastExecution?.state === "running" &&
-      lastExecution.receivedAt &&
-      lastExecution.expectedDuration
-    ) {
+    if (lastExecution?.state === "running" && lastExecution.receivedAt && lastExecution.expectedDuration) {
       const receivedAt = lastExecution.receivedAt;
       const expectedDuration = lastExecution.expectedDuration;
 
@@ -201,9 +197,7 @@ export const Wait: React.FC<WaitProps> = ({
                         className: getStateIconColor(lastExecution.state),
                       })}
                     </div>
-                    <span className="text-sm font-medium truncate">
-                      {lastExecution.title}
-                    </span>
+                    <span className="text-sm font-medium truncate">{lastExecution.title}</span>
                   </div>
                   <span className="text-xs text-gray-500">
                     {lastExecution.state === "running" && timeLeft !== null

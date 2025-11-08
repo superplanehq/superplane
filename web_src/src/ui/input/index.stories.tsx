@@ -1,33 +1,24 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { Button } from '../button';
-import { Input } from './index';
-import { Label } from '../label';
+import { Button } from "../button";
+import { Input } from "./index";
+import { Label } from "../label";
 
 const meta: Meta<typeof Input> = {
-  title: 'shadcn Primitives/Input',
+  title: "shadcn Primitives/Input",
   component: Input,
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
     type: {
-      control: { type: 'select' },
-      options: [
-        'text',
-        'password',
-        'email',
-        'number',
-        'search',
-        'tel',
-        'url',
-        'file',
-      ],
+      control: { type: "select" },
+      options: ["text", "password", "email", "number", "search", "tel", "url", "file"],
     },
     disabled: {
-      control: { type: 'boolean' },
+      control: { type: "boolean" },
     },
   },
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
 };
 
@@ -36,8 +27,8 @@ type Story = StoryObj<typeof Input>;
 
 export const Default: Story = {
   args: {
-    type: 'text',
-    placeholder: 'Enter text...',
+    type: "text",
+    placeholder: "Enter text...",
     disabled: false,
   },
 };

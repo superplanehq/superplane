@@ -1,16 +1,16 @@
-import { create } from 'zustand';
-import { QueryClient } from '@tanstack/react-query';
+import { create } from "zustand";
+import { QueryClient } from "@tanstack/react-query";
 import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
   WorkflowsWorkflowEvent,
   WorkflowsWorkflow,
-} from '@/api-client';
+} from "@/api-client";
 import {
   nodeExecutionsQueryOptions,
   nodeQueueItemsQueryOptions,
   nodeEventsQueryOptions,
-} from '@/hooks/useWorkflowData';
+} from "@/hooks/useWorkflowData";
 
 interface NodeExecutionData {
   executions: WorkflowsWorkflowNodeExecution[];
@@ -45,25 +45,25 @@ const emptyNodeData: NodeExecutionData = {
 
 /**
  * Updates a child execution within the array of parent executions.
- * 
+ *
  * @param executions The array of parent executions.
  * @param childExecution The child execution to update.
- * @returns 
+ * @returns
  */
 function updateChildExecution(
   executions: WorkflowsWorkflowNodeExecution[],
-  childExecution: WorkflowsWorkflowNodeExecution
+  childExecution: WorkflowsWorkflowNodeExecution,
 ): WorkflowsWorkflowNodeExecution[] {
-  const parentIndex = executions.findIndex(e => e.id === childExecution.parentExecutionId);
+  const parentIndex = executions.findIndex((e) => e.id === childExecution.parentExecutionId);
 
   /*
    * Parent not found yet.
    * Add as top-level temporarily - will be nested when parent arrives.
    */
   if (parentIndex < 0) {
-    const existingIndex = executions.findIndex(e => e.id === childExecution.id);
+    const existingIndex = executions.findIndex((e) => e.id === childExecution.id);
     if (existingIndex >= 0) {
-      return executions.map((e, i) => i === existingIndex ? childExecution : e);
+      return executions.map((e, i) => (i === existingIndex ? childExecution : e));
     }
     return [childExecution, ...executions];
   }
@@ -73,29 +73,28 @@ function updateChildExecution(
    */
   const parent = executions[parentIndex];
   const childExecutions = parent.childExecutions || [];
-  const childIndex = childExecutions.findIndex(ce => ce.id === childExecution.id);
+  const childIndex = childExecutions.findIndex((ce) => ce.id === childExecution.id);
 
-  const updatedChildren = childIndex >= 0
-    ? childExecutions.map((ce, i) => i === childIndex ? childExecution : ce)
-    : [...childExecutions, childExecution];
+  const updatedChildren =
+    childIndex >= 0
+      ? childExecutions.map((ce, i) => (i === childIndex ? childExecution : ce))
+      : [...childExecutions, childExecution];
 
-  return executions.map((e, i) =>
-    i === parentIndex ? { ...e, childExecutions: updatedChildren } : e
-  );
+  return executions.map((e, i) => (i === parentIndex ? { ...e, childExecutions: updatedChildren } : e));
 }
 
 /**
  * Updates a parent execution within the array of parent executions.
- * 
+ *
  * @param executions The array of parent executions.
  * @param parentExecution The parent execution to update.
  * @returns The updated array of parent executions.
  */
 function updateParentExecution(
   executions: WorkflowsWorkflowNodeExecution[],
-  parentExecution: WorkflowsWorkflowNodeExecution
+  parentExecution: WorkflowsWorkflowNodeExecution,
 ): WorkflowsWorkflowNodeExecution[] {
-  const existingIndex = executions.findIndex(e => e.id === parentExecution.id);
+  const existingIndex = executions.findIndex((e) => e.id === parentExecution.id);
 
   /*
    * Update existing parent - preserve childExecutions
@@ -104,9 +103,7 @@ function updateParentExecution(
     const existing = executions[existingIndex];
     const finalChildExecutions = parentExecution.childExecutions || existing.childExecutions || [];
     return executions.map((e, i) =>
-      i === existingIndex
-        ? { ...parentExecution, childExecutions: finalChildExecutions }
-        : e
+      i === existingIndex ? { ...parentExecution, childExecutions: finalChildExecutions } : e,
     );
   }
 
@@ -114,21 +111,18 @@ function updateParentExecution(
    * New parent execution arriving.
    * Check for orphaned children that belong to it
    */
-  const orphanedChildren = executions.filter(e => e.parentExecutionId === parentExecution.id);
+  const orphanedChildren = executions.filter((e) => e.parentExecutionId === parentExecution.id);
   if (orphanedChildren.length === 0) {
-    return [
-      { ...parentExecution, childExecutions: parentExecution.childExecutions || [] },
-      ...executions
-    ];
+    return [{ ...parentExecution, childExecutions: parentExecution.childExecutions || [] }, ...executions];
   }
 
   /*
    * Move orphaned children from top-level into parent
    */
-  const withoutOrphans = executions.filter(e => e.parentExecutionId !== parentExecution.id);
+  const withoutOrphans = executions.filter((e) => e.parentExecutionId !== parentExecution.id);
   const parentWithChildren = {
     ...parentExecution,
-    childExecutions: [...(parentExecution.childExecutions || []), ...orphanedChildren]
+    childExecutions: [...(parentExecution.childExecutions || []), ...orphanedChildren],
   };
 
   return [parentWithChildren, ...withoutOrphans];
@@ -222,7 +216,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         return { data: newData, version: state.version + 1 };
       });
     } catch (error) {
-      console.error('Failed to load node data:', error);
+      console.error("Failed to load node data:", error);
 
       // Mark as not loading on error
       set((state) => {
@@ -278,7 +272,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         return { data: newData, version: state.version + 1 };
       });
     } catch (error) {
-      console.error('Failed to refetch node data:', error);
+      console.error("Failed to refetch node data:", error);
 
       // Mark as not loading on error
       set((state) => {
@@ -320,10 +314,11 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
       const existing = newData.get(nodeId) || emptyNodeData;
 
       // Add or update the event in the list
-      const existingIndex = existing.events.findIndex(e => e.id === event.id);
-      const updatedEvents = existingIndex >= 0
-        ? existing.events.map((e, i) => i === existingIndex ? event : e)
-        : [event, ...existing.events];
+      const existingIndex = existing.events.findIndex((e) => e.id === event.id);
+      const updatedEvents =
+        existingIndex >= 0
+          ? existing.events.map((e, i) => (i === existingIndex ? event : e))
+          : [event, ...existing.events];
 
       newData.set(nodeId, {
         ...existing,

@@ -51,7 +51,11 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
         <div
           className={`w-6 h-6 rounded-full overflow-hidden flex items-center justify-center mr-2 ${iconBackground || ""}`}
         >
-          {iconSrc ? <img src={iconSrc} alt={title} className="max-w-5 max-h-5 object-contain" /> : <Icon size={20} className={iconColor} />}
+          {iconSrc ? (
+            <img src={iconSrc} alt={title} className="max-w-5 max-h-5 object-contain" />
+          ) : (
+            <Icon size={20} className={iconColor} />
+          )}
         </div>
         <h2 className="font-semibold">{title}</h2>
         <div className="absolute top-2 right-2 rounded-sm flex items-center justify-center hover:bg-gray-950/10 nodrag">

@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import { useState } from "react"
+import type { Meta, StoryObj } from "@storybook/react";
+import { useState } from "react";
 
-import { Button } from "../button"
+import { Button } from "../button";
 
 import {
   Drawer,
@@ -12,9 +12,9 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
-} from "./index"
+} from "./index";
 
-type DrawerArgs = React.ComponentProps<typeof Drawer>
+type DrawerArgs = React.ComponentProps<typeof Drawer>;
 
 const meta = {
   title: "shadcn Primitives/Drawer",
@@ -31,14 +31,14 @@ const meta = {
   args: {
     shouldScaleBackground: true,
   },
-} satisfies Meta<DrawerArgs>
+} satisfies Meta<DrawerArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<DrawerArgs>
+type Story = StoryObj<DrawerArgs>;
 
 const DrawerPreview = (args: DrawerArgs) => {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false);
 
   return (
     <Drawer {...args} open={open} onOpenChange={setOpen}>
@@ -49,8 +49,7 @@ const DrawerPreview = (args: DrawerArgs) => {
         <DrawerHeader>
           <DrawerTitle>Plan upgrade</DrawerTitle>
           <DrawerDescription>
-            Upgrade to the Pro plan to unlock advanced analytics, SSO, and SLA
-            support.
+            Upgrade to the Pro plan to unlock advanced analytics, SSO, and SLA support.
           </DrawerDescription>
         </DrawerHeader>
         <div className="space-y-3 px-4 text-sm text-muted-foreground">
@@ -69,9 +68,9 @@ const DrawerPreview = (args: DrawerArgs) => {
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
-  )
-}
+  );
+};
 
 export const Default: Story = {
   render: (args) => <DrawerPreview {...args} />,
-}
+};

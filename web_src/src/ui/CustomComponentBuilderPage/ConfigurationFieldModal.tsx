@@ -1,27 +1,12 @@
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
-import {
-  ConfigurationField,
-  ConfigurationSelectOption,
-} from "@/api-client";
+import { ConfigurationField, ConfigurationSelectOption } from "@/api-client";
 
 interface ConfigurationFieldModalProps {
   isOpen: boolean;
@@ -30,15 +15,8 @@ interface ConfigurationFieldModalProps {
   onSave: (field: ConfigurationField) => void;
 }
 
-export function ConfigurationFieldModal({
-  isOpen,
-  onClose,
-  field,
-  onSave,
-}: ConfigurationFieldModalProps) {
-  const [configFieldForm, setConfigFieldForm] = useState<
-    Partial<ConfigurationField>
-  >({
+export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: ConfigurationFieldModalProps) {
+  const [configFieldForm, setConfigFieldForm] = useState<Partial<ConfigurationField>>({
     name: "",
     label: "",
     type: "string",
@@ -88,9 +66,7 @@ export function ConfigurationFieldModal({
       }
 
       // Validate that all options have both label and value
-      const hasInvalidOption = options.some(
-        (opt) => !opt.label?.trim() || !opt.value?.trim()
-      );
+      const hasInvalidOption = options.some((opt) => !opt.label?.trim() || !opt.value?.trim());
       if (hasInvalidOption) {
         return;
       }
@@ -101,9 +77,7 @@ export function ConfigurationFieldModal({
       }
 
       // Validate that all options have both label and value
-      const hasInvalidOption = options.some(
-        (opt) => !opt.label?.trim() || !opt.value?.trim()
-      );
+      const hasInvalidOption = options.some((opt) => !opt.label?.trim() || !opt.value?.trim());
       if (hasInvalidOption) {
         return;
       }
@@ -142,12 +116,8 @@ export function ConfigurationFieldModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-w-2xl" showCloseButton={false}>
         <VisuallyHidden>
-          <DialogTitle>
-            {field ? "Edit Configuration Field" : "Add Configuration Field"}
-          </DialogTitle>
-          <DialogDescription>
-            Configure the blueprint configuration field
-          </DialogDescription>
+          <DialogTitle>{field ? "Edit Configuration Field" : "Add Configuration Field"}</DialogTitle>
+          <DialogDescription>Configure the blueprint configuration field</DialogDescription>
         </VisuallyHidden>
         <div className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-6">
@@ -157,21 +127,16 @@ export function ConfigurationFieldModal({
           <div className="space-y-4">
             {/* Field Name */}
             <div>
-              <Label className="block text-sm font-medium mb-2">
-                Field Name *
-              </Label>
+              <Label className="block text-sm font-medium mb-2">Field Name *</Label>
               <Input
                 type="text"
                 value={configFieldForm.name || ""}
-                onChange={(e) =>
-                  setConfigFieldForm({ ...configFieldForm, name: e.target.value })
-                }
+                onChange={(e) => setConfigFieldForm({ ...configFieldForm, name: e.target.value })}
                 placeholder="e.g., threshold_expression"
                 autoFocus
               />
               <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                This is the internal name used in templates (e.g.,
-                $config.threshold_expression)
+                This is the internal name used in templates (e.g., $config.threshold_expression)
               </p>
             </div>
 
@@ -189,9 +154,7 @@ export function ConfigurationFieldModal({
                 }
                 placeholder="e.g., Threshold Expression"
               />
-              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                Display name shown in the UI
-              </p>
+              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Display name shown in the UI</p>
             </div>
 
             {/* Field Type */}
@@ -199,9 +162,7 @@ export function ConfigurationFieldModal({
               <Label className="block text-sm font-medium mb-2">Type *</Label>
               <Select
                 value={configFieldForm.type || "string"}
-                onValueChange={(val) =>
-                  setConfigFieldForm({ ...configFieldForm, type: val })
-                }
+                onValueChange={(val) => setConfigFieldForm({ ...configFieldForm, type: val })}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -219,8 +180,7 @@ export function ConfigurationFieldModal({
             </div>
 
             {/* Options Section (for select and multi_select types) */}
-            {(configFieldForm.type === "select" ||
-              configFieldForm.type === "multi_select") && (
+            {(configFieldForm.type === "select" || configFieldForm.type === "multi_select") && (
               <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <Label className="block text-sm font-medium">Options *</Label>
@@ -228,10 +188,7 @@ export function ConfigurationFieldModal({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      updateOptions([
-                        ...currentOptions,
-                        { label: "", value: "" },
-                      ]);
+                      updateOptions([...currentOptions, { label: "", value: "" }]);
                     }}
                   >
                     <Plus />
@@ -275,9 +232,7 @@ export function ConfigurationFieldModal({
                           variant="ghost"
                           size="icon-sm"
                           onClick={() => {
-                            const newOptions = currentOptions.filter(
-                              (_, i: number) => i !== index
-                            );
+                            const newOptions = currentOptions.filter((_, i: number) => i !== index);
                             updateOptions(newOptions);
                           }}
                         >
@@ -296,9 +251,7 @@ export function ConfigurationFieldModal({
 
             {/* Field Description */}
             <div>
-              <Label className="block text-sm font-medium mb-2">
-                Description
-              </Label>
+              <Label className="block text-sm font-medium mb-2">Description</Label>
               <Input
                 type="text"
                 value={configFieldForm.description || ""}
@@ -339,9 +292,7 @@ export function ConfigurationFieldModal({
             <Button
               variant="default"
               onClick={handleSave}
-              disabled={
-                !configFieldForm.name?.trim() || !configFieldForm.label?.trim()
-              }
+              disabled={!configFieldForm.name?.trim() || !configFieldForm.label?.trim()}
             >
               {field ? "Save Changes" : "Add Field"}
             </Button>

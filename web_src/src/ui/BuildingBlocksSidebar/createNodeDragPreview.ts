@@ -9,7 +9,7 @@ export function createNodeDragPreview(
   block: BuildingBlock,
   colorClass: string,
   backgroundColorClass: string,
-  canvasZoom: number
+  canvasZoom: number,
 ) {
   e.dataTransfer.effectAllowed = "move";
   e.dataTransfer.setData("application/reactflow", JSON.stringify(block));

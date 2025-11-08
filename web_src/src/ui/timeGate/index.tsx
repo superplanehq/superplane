@@ -35,7 +35,7 @@ export interface TimeGateProps extends ComponentActionsProps {
   hideLastRun?: boolean;
 }
 
-const daysOfWeekOrder = { "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4, "friday": 5, "saturday": 6, "sunday": 7 };
+const daysOfWeekOrder = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 };
 
 export const TimeGate: React.FC<TimeGateProps> = ({
   title = "Time Gate",
@@ -60,22 +60,30 @@ export const TimeGate: React.FC<TimeGateProps> = ({
   onDelete,
   isCompactView,
 }) => {
-
-  const spec = days ? {
-    title: "day",
-    tooltipTitle: "Days of the week",
-    values: [
-      ...days.split(",").sort((a, b) => daysOfWeekOrder[a.trim() as keyof typeof daysOfWeekOrder] - daysOfWeekOrder[b.trim() as keyof typeof daysOfWeekOrder]).map(day => ({
-        badges: [
-          {
-            label: day.trim(),
-            bgColor: "bg-gray-100",
-            textColor: "text-gray-700"
-          }
-        ]
-      }))
-    ]
-  } : undefined;
+  const spec = days
+    ? {
+        title: "day",
+        tooltipTitle: "Days of the week",
+        values: [
+          ...days
+            .split(",")
+            .sort(
+              (a, b) =>
+                daysOfWeekOrder[a.trim() as keyof typeof daysOfWeekOrder] -
+                daysOfWeekOrder[b.trim() as keyof typeof daysOfWeekOrder],
+            )
+            .map((day) => ({
+              badges: [
+                {
+                  label: day.trim(),
+                  bgColor: "bg-gray-100",
+                  textColor: "text-gray-700",
+                },
+              ],
+            })),
+        ],
+      }
+    : undefined;
 
   const getModeLabel = (mode: string) => {
     switch (mode) {
@@ -88,7 +96,7 @@ export const TimeGate: React.FC<TimeGateProps> = ({
       case "exclude_specific":
         return "Exclude Specific";
       default:
-        return mode.charAt(0).toUpperCase() + mode.slice(1).replace(/_/g, ' ');
+        return mode.charAt(0).toUpperCase() + mode.slice(1).replace(/_/g, " ");
     }
   };
 
@@ -96,14 +104,14 @@ export const TimeGate: React.FC<TimeGateProps> = ({
     const items: MetadataItem[] = [
       {
         icon: "settings",
-        label: getModeLabel(mode)
-      }
+        label: getModeLabel(mode),
+      },
     ];
 
     if (timeWindow) {
       items.push({
         icon: "clock",
-        label: timeWindow
+        label: timeWindow,
       });
     }
 
@@ -111,7 +119,7 @@ export const TimeGate: React.FC<TimeGateProps> = ({
     if (timezone) {
       items.push({
         icon: "globe",
-        label: `Timezone: ${timezone}`
+        label: `Timezone: ${timezone}`,
       });
     }
 

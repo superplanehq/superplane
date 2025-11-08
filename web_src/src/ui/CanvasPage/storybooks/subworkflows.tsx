@@ -18,9 +18,7 @@ export const MainSubWorkflow = {
           iconColor: "text-blue-600",
           headerColor: "bg-blue-100",
           collapsedBackground: "bg-blue-100",
-          parameters: [
-            { icon: "code", items: { "method": "POST", "endpoint": "/api/deploy" } }
-          ],
+          parameters: [{ icon: "code", items: { method: "POST", endpoint: "/api/deploy" } }],
           lastRunItem: {
             title: "Deploy to US West",
             subtitle: "ef758d40",
@@ -56,9 +54,7 @@ export const MainSubWorkflow = {
           iconColor: "text-green-600",
           headerColor: "bg-green-100",
           collapsedBackground: "bg-green-100",
-          parameters: [
-            { icon: "list-checks", items: { "tests": "health-check, smoke-test" } }
-          ],
+          parameters: [{ icon: "list-checks", items: { tests: "health-check, smoke-test" } }],
           lastRunItem: {
             title: "Validation Suite",
             subtitle: "ef758d40",
@@ -99,9 +95,7 @@ export const MainSubWorkflow = {
           iconColor: "text-red-600",
           headerColor: "bg-red-100",
           collapsedBackground: "bg-red-100",
-          parameters: [
-            { icon: "server", items: { "cleanup": "temp-storage, build-cache" } }
-          ],
+          parameters: [{ icon: "server", items: { cleanup: "temp-storage, build-cache" } }],
           lastRunItem: {
             title: "Resource Cleanup",
             subtitle: "ef758d40",
@@ -136,9 +130,7 @@ export const MainSubWorkflow = {
           iconColor: "text-yellow-600",
           headerColor: "bg-yellow-100",
           collapsedBackground: "bg-yellow-100",
-          parameters: [
-            { icon: "mail", items: { "channels": "slack, email" } }
-          ],
+          parameters: [{ icon: "mail", items: { channels: "slack, email" } }],
           lastRunItem: {
             title: "Deployment Notifications",
             subtitle: "ef758d40",
@@ -180,7 +172,7 @@ export const MainSubWorkflow = {
       iconColor: "text-purple-700",
     },
   ],
-}
+};
 
 export const DeployToUS = {
   nodes: [
@@ -197,10 +189,8 @@ export const DeployToUS = {
           iconSlug: "traffic-cone",
           iconColor: "text-amber-600",
           headerColor: "bg-amber-100",
-          collapsedBackground: 'bg-amber-100',
-          parameters: [
-            { icon: "globe", items: { "domain": "us.example.com", "weight": "0%" } }
-          ],
+          collapsedBackground: "bg-amber-100",
+          parameters: [{ icon: "globe", items: { domain: "us.example.com", weight: "0%" } }],
           lastRunItem: {
             title: `Drain complete`,
             subtitle: "ingress/us",
@@ -225,10 +215,8 @@ export const DeployToUS = {
           iconSlug: "git-branch",
           iconColor: "text-blue-700",
           headerColor: "bg-blue-100",
-          collapsedBackground: 'bg-blue-100',
-          parameters: [
-            { icon: "boxes", items: { "app": "us-api", "strategy": "canary" } }
-          ],
+          collapsedBackground: "bg-blue-100",
+          parameters: [{ icon: "boxes", items: { app: "us-api", strategy: "canary" } }],
           lastRunItem: {
             title: `Argo sync`,
             subtitle: "rollout/us-api",
@@ -253,10 +241,8 @@ export const DeployToUS = {
           iconSlug: "database",
           iconColor: "text-emerald-700",
           headerColor: "bg-emerald-100",
-          collapsedBackground: 'bg-emerald-100',
-          parameters: [
-            { icon: "server-cog", items: { "job": "migrate", "concurrency": "1" } }
-          ],
+          collapsedBackground: "bg-emerald-100",
+          parameters: [{ icon: "server-cog", items: { job: "migrate", concurrency: "1" } }],
           lastRunItem: {
             title: `Migrations applied`,
             subtitle: "db/main",
@@ -281,10 +267,8 @@ export const DeployToUS = {
           iconSlug: "heartbeat",
           iconColor: "text-green-700",
           headerColor: "bg-green-100",
-          collapsedBackground: 'bg-green-100',
-          parameters: [
-            { icon: "stethoscope", items: { "endpoint": "/healthz", "threshold": "p95<250ms" } }
-          ],
+          collapsedBackground: "bg-green-100",
+          parameters: [{ icon: "stethoscope", items: { endpoint: "/healthz", threshold: "p95<250ms" } }],
           lastRunItem: {
             title: `Probes`,
             subtitle: "readiness/liveness",
@@ -309,10 +293,8 @@ export const DeployToUS = {
           iconSlug: "toggle-right",
           iconColor: "text-purple-700",
           headerColor: "bg-purple-100",
-          collapsedBackground: 'bg-purple-100',
-          parameters: [
-            { icon: "globe", items: { "domain": "us.example.com", "weight": "100%" } }
-          ],
+          collapsedBackground: "bg-purple-100",
+          parameters: [{ icon: "globe", items: { domain: "us.example.com", weight: "100%" } }],
           lastRunItem: {
             title: `Cutover pending`,
             subtitle: "promotion",
@@ -323,7 +305,7 @@ export const DeployToUS = {
           collapsed: false,
         },
       },
-    }
+    },
   ],
   edges: [
     { id: "us-e1", source: "drain-traffic", target: "argo-rollout" },
@@ -343,10 +325,10 @@ export const DeployToUS = {
     {
       label: "Deploy to US",
       iconSrc: KubernetesIcon,
-      iconBackground: 'bg-blue-500',
+      iconBackground: "bg-blue-500",
     },
   ],
-}
+};
 
 export const DeployToEU = {
   nodes: [
@@ -363,10 +345,8 @@ export const DeployToEU = {
           iconSlug: "traffic-cone",
           iconColor: "text-amber-600",
           headerColor: "bg-amber-100",
-          collapsedBackground: 'bg-amber-100',
-          parameters: [
-            { icon: "globe", items: { "domain": "eu.example.com", "weight": "0%" } }
-          ],
+          collapsedBackground: "bg-amber-100",
+          parameters: [{ icon: "globe", items: { domain: "eu.example.com", weight: "0%" } }],
           lastRunItem: {
             title: `Drain complete`,
             subtitle: "ingress/eu",
@@ -391,10 +371,8 @@ export const DeployToEU = {
           iconSlug: "git-branch",
           iconColor: "text-blue-700",
           headerColor: "bg-blue-100",
-          collapsedBackground: 'bg-blue-100',
-          parameters: [
-            { icon: "boxes", items: { "app": "eu-api", "strategy": "canary" } }
-          ],
+          collapsedBackground: "bg-blue-100",
+          parameters: [{ icon: "boxes", items: { app: "eu-api", strategy: "canary" } }],
           lastRunItem: {
             title: `Argo sync`,
             subtitle: "rollout/eu-api",
@@ -419,10 +397,8 @@ export const DeployToEU = {
           iconSlug: "database",
           iconColor: "text-emerald-700",
           headerColor: "bg-emerald-100",
-          collapsedBackground: 'bg-emerald-100',
-          parameters: [
-            { icon: "server-cog", items: { "job": "migrate", "concurrency": "1" } }
-          ],
+          collapsedBackground: "bg-emerald-100",
+          parameters: [{ icon: "server-cog", items: { job: "migrate", concurrency: "1" } }],
           lastRunItem: {
             title: `Migrations applied`,
             subtitle: "db/main",
@@ -447,10 +423,8 @@ export const DeployToEU = {
           iconSlug: "heartbeat",
           iconColor: "text-green-700",
           headerColor: "bg-green-100",
-          collapsedBackground: 'bg-green-100',
-          parameters: [
-            { icon: "stethoscope", items: { "endpoint": "/healthz", "threshold": "p95<250ms" } }
-          ],
+          collapsedBackground: "bg-green-100",
+          parameters: [{ icon: "stethoscope", items: { endpoint: "/healthz", threshold: "p95<250ms" } }],
           lastRunItem: {
             title: `Probes`,
             subtitle: "readiness/liveness",
@@ -475,10 +449,8 @@ export const DeployToEU = {
           iconSlug: "toggle-right",
           iconColor: "text-purple-700",
           headerColor: "bg-purple-100",
-          collapsedBackground: 'bg-purple-100',
-          parameters: [
-            { icon: "globe", items: { "domain": "eu.example.com", "weight": "100%" } }
-          ],
+          collapsedBackground: "bg-purple-100",
+          parameters: [{ icon: "globe", items: { domain: "eu.example.com", weight: "100%" } }],
           lastRunItem: {
             title: "Cutover pending",
             subtitle: "promotion",
@@ -489,7 +461,7 @@ export const DeployToEU = {
           collapsed: false,
         },
       },
-    }
+    },
   ],
   edges: [
     { id: "eu-e1", source: "eu-drain-traffic", target: "eu-argo-rollout" },
@@ -509,10 +481,10 @@ export const DeployToEU = {
     {
       label: "Deploy to EU",
       iconSrc: KubernetesIcon,
-      iconBackground: 'bg-blue-500',
+      iconBackground: "bg-blue-500",
     },
   ],
-}
+};
 
 export const DeployToAsia = {
   nodes: [
@@ -529,10 +501,8 @@ export const DeployToAsia = {
           iconSlug: "traffic-cone",
           iconColor: "text-amber-600",
           headerColor: "bg-amber-100",
-          collapsedBackground: 'bg-amber-100',
-          parameters: [
-            { icon: "globe", items: { "domain": "asia.example.com", "weight": "0%" } }
-          ],
+          collapsedBackground: "bg-amber-100",
+          parameters: [{ icon: "globe", items: { domain: "asia.example.com", weight: "0%" } }],
           lastRunItem: {
             title: `Drain complete`,
             subtitle: "ingress/asia",
@@ -557,10 +527,8 @@ export const DeployToAsia = {
           iconSlug: "git-branch",
           iconColor: "text-blue-700",
           headerColor: "bg-blue-100",
-          collapsedBackground: 'bg-blue-100',
-          parameters: [
-            { icon: "boxes", items: { "app": "asia-api", "strategy": "canary" } }
-          ],
+          collapsedBackground: "bg-blue-100",
+          parameters: [{ icon: "boxes", items: { app: "asia-api", strategy: "canary" } }],
           lastRunItem: {
             title: `Argo sync`,
             subtitle: "rollout/asia-api",
@@ -585,10 +553,8 @@ export const DeployToAsia = {
           iconSlug: "database",
           iconColor: "text-emerald-700",
           headerColor: "bg-emerald-100",
-          collapsedBackground: 'bg-emerald-100',
-          parameters: [
-            { icon: "server-cog", items: { "job": "migrate", "concurrency": "1" } }
-          ],
+          collapsedBackground: "bg-emerald-100",
+          parameters: [{ icon: "server-cog", items: { job: "migrate", concurrency: "1" } }],
           lastRunItem: {
             title: `Migrations applied`,
             subtitle: "db/main",
@@ -613,10 +579,8 @@ export const DeployToAsia = {
           iconSlug: "heartbeat",
           iconColor: "text-green-700",
           headerColor: "bg-green-100",
-          collapsedBackground: 'bg-green-100',
-          parameters: [
-            { icon: "stethoscope", items: { "endpoint": "/healthz", "threshold": "p95<250ms" } }
-          ],
+          collapsedBackground: "bg-green-100",
+          parameters: [{ icon: "stethoscope", items: { endpoint: "/healthz", threshold: "p95<250ms" } }],
           lastRunItem: {
             title: `Probes`,
             subtitle: "readiness/liveness",
@@ -641,10 +605,8 @@ export const DeployToAsia = {
           iconSlug: "toggle-right",
           iconColor: "text-purple-700",
           headerColor: "bg-purple-100",
-          collapsedBackground: 'bg-purple-100',
-          parameters: [
-            { icon: "globe", items: { "domain": "asia.example.com", "weight": "100%" } }
-          ],
+          collapsedBackground: "bg-purple-100",
+          parameters: [{ icon: "globe", items: { domain: "asia.example.com", weight: "100%" } }],
           lastRunItem: {
             title: "Cutover pending",
             subtitle: "promotion",
@@ -655,7 +617,7 @@ export const DeployToAsia = {
           collapsed: false,
         },
       },
-    }
+    },
   ],
   edges: [
     { id: "asia-e1", source: "asia-drain-traffic", target: "asia-argo-rollout" },
@@ -675,10 +637,10 @@ export const DeployToAsia = {
     {
       label: "Deploy to Asia",
       iconSrc: KubernetesIcon,
-      iconBackground: 'bg-blue-500',
+      iconBackground: "bg-blue-500",
     },
   ],
-}
+};
 
 export const Provisioner = {
   nodes: [
@@ -699,7 +661,7 @@ export const Provisioner = {
             eventTitle: "FEAT: Add new feature",
             eventSubtitle: "ef546d40",
             receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
-          }
+          },
         } as NoopProps,
       },
     },
@@ -720,14 +682,12 @@ export const Provisioner = {
             eventTitle: "FEAT: Add new feature",
             eventSubtitle: "ef546d40",
             receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
-          }
+          },
         } as NoopProps,
       },
-    }
+    },
   ],
-  edges: [
-    { id: "e1", source: "provisioner-action", target: "provisioner-action-2" },
-  ],
+  edges: [{ id: "e1", source: "provisioner-action", target: "provisioner-action-2" }],
   title: "Provisioner",
   breadcrumbs: [
     {
@@ -743,7 +703,7 @@ export const Provisioner = {
       iconColor: "text-blue-600",
     },
   ],
-}
+};
 
 export const Desprovisioner = {
   nodes: [
@@ -764,7 +724,7 @@ export const Desprovisioner = {
             eventTitle: "FEAT: Add new feature",
             eventSubtitle: "ef546d40",
             receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
-          }
+          },
         } as NoopProps,
       },
     },
@@ -785,14 +745,12 @@ export const Desprovisioner = {
             eventTitle: "FEAT: Add new feature",
             eventSubtitle: "ef546d40",
             receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
-          }
+          },
         } as NoopProps,
       },
-    }
+    },
   ],
-  edges: [
-    { id: "e1", source: "desprovisioner-action", target: "desprovisioner-action-2" },
-  ],
+  edges: [{ id: "e1", source: "desprovisioner-action", target: "desprovisioner-action-2" }],
   title: "Provisioner",
   breadcrumbs: [
     {
@@ -808,14 +766,13 @@ export const Desprovisioner = {
       iconColor: "text-blue-600",
     },
   ],
-}
-
+};
 
 export const SubWorkflowsMap = {
   "Build/Test/Deploy Stage": MainSubWorkflow,
   "Deploy to US": DeployToUS,
   "Deploy to EU": DeployToEU,
   "Deploy to Asia": DeployToAsia,
-  "Provisioner": Provisioner,
-  "Desprovisioner": Desprovisioner,
-}
+  Provisioner: Provisioner,
+  Desprovisioner: Desprovisioner,
+};

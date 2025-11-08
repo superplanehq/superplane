@@ -1,45 +1,41 @@
-import { Link } from 'react-router-dom'
-import { Heading } from '../Heading/heading'
-import { Text } from '../Text/text'
-import { Avatar } from '../Avatar/avatar'
+import { Link } from "react-router-dom";
+import { Heading } from "../Heading/heading";
+import { Text } from "../Text/text";
+import { Avatar } from "../Avatar/avatar";
 
 export interface CanvasCardData {
-  id: string
-  name: string
-  description?: string
-  createdAt: string
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
   createdBy: {
-    name: string
-    avatar?: string
-    initials: string
-  }
-  type: 'canvas'
+    name: string;
+    avatar?: string;
+    initials: string;
+  };
+  type: "canvas";
 }
 
 export interface CanvasCardProps {
-  canvas: CanvasCardData
-  organizationId: string
-  variant?: 'grid' | 'list'
+  canvas: CanvasCardData;
+  organizationId: string;
+  variant?: "grid" | "list";
 }
 
-export const CanvasCard = ({
-  canvas,
-  organizationId,
-  variant = 'grid'
-}: CanvasCardProps) => {
-  if (variant === 'grid') {
+export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasCardProps) => {
+  if (variant === "grid") {
     return (
       <div className="max-h-45 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow group">
         <div className="p-6 flex flex-col justify-between h-full">
           <div>
             <div className="flex items-start mb-4">
               <div className="flex items-start justify-between space-x-3 flex-1">
-                <div className='flex flex-col flex-1 min-w-0'>
-                  <Link
-                    to={`/${organizationId}/canvas/${canvas.id}`}
-                    className="block text-left w-full"
-                  >
-                    <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate">
+                <div className="flex flex-col flex-1 min-w-0">
+                  <Link to={`/${organizationId}/canvas/${canvas.id}`} className="block text-left w-full">
+                    <Heading
+                      level={3}
+                      className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                    >
                       {canvas.name}
                     </Heading>
                   </Link>
@@ -49,13 +45,13 @@ export const CanvasCard = ({
 
             <div className="mb-4">
               <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
-                {canvas.description || ''}
+                {canvas.description || ""}
               </Text>
             </div>
           </div>
 
           <div className="flex justify-between items-center">
-            <div className='flex items-center space-x-2'>
+            <div className="flex items-center space-x-2">
               <Avatar
                 src={canvas.createdBy.avatar}
                 initials={canvas.createdBy.initials}
@@ -66,15 +62,13 @@ export const CanvasCard = ({
                 <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none mb-1">
                   Created by <strong>{canvas.createdBy.name}</strong>
                 </p>
-                <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">
-                  Created at {canvas.createdAt}
-                </p>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">Created at {canvas.createdAt}</p>
               </div>
             </div>
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -84,31 +78,29 @@ export const CanvasCard = ({
           <div className="flex items-center space-x-4 flex-1">
             <div className="flex-1 min-w-0">
               <div className="flex items-center space-x-3 mb-1">
-                <Link
-                  to={`/${organizationId}/canvas/${canvas.id}`}
-                  className="block text-left"
-                >
-                  <Heading level={3} className="text-base font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate max-w-[40vw]">
+                <Link to={`/${organizationId}/canvas/${canvas.id}`} className="block text-left">
+                  <Heading
+                    level={3}
+                    className="text-base font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate max-w-[40vw]"
+                  >
                     {canvas.name}
                   </Heading>
                 </Link>
               </div>
 
               <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 mb-2 line-clamp-1 !mb-0">
-                {canvas.description || ''}
+                {canvas.description || ""}
               </Text>
             </div>
           </div>
 
           <div className="flex items-center space-x-2 flex-shrink-0">
-            <div className='flex items-center space-x-2'>
+            <div className="flex items-center space-x-2">
               <div className="text-zinc-500 text-right">
                 <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none mb-1">
                   Created by <strong>{canvas.createdBy.name}</strong>
                 </p>
-                <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">
-                  Created at {canvas.createdAt}
-                </p>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">Created at {canvas.createdAt}</p>
               </div>
               <Avatar
                 src={canvas.createdBy.avatar}
@@ -121,5 +113,5 @@ export const CanvasCard = ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

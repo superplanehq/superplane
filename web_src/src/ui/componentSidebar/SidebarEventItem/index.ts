@@ -1,1 +1,1 @@
-export { SidebarEventItem } from './SidebarEventItem';
+export { SidebarEventItem } from "./SidebarEventItem";

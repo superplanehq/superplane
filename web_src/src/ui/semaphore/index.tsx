@@ -102,19 +102,19 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
   // Convert parameters to spec values for tooltip
   const parameterSpecValues: ComponentBaseSpecValue[] = React.useMemo(() => {
     if (!parameters || parameters.length === 0) return [];
-    return parameters.map(param => ({
+    return parameters.map((param) => ({
       badges: [
         {
           label: param.name,
           bgColor: "bg-purple-100",
-          textColor: "text-purple-800"
+          textColor: "text-purple-800",
         },
         {
           label: param.value,
           bgColor: "bg-gray-100",
-          textColor: "text-gray-800"
-        }
-      ]
+          textColor: "text-gray-800",
+        },
+      ],
     }));
   }, [parameters]);
 
@@ -176,11 +176,7 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
           isCompactView={isCompactView}
         >
           <div className="flex flex-col items-center gap-1">
-            <MetadataList
-              items={metadata}
-              className="flex flex-col gap-1 text-gray-500"
-              iconSize={12}
-            />
+            <MetadataList items={metadata} className="flex flex-col gap-1 text-gray-500" iconSize={12} />
           </div>
         </CollapsedComponent>
       </SelectionWrapper>
@@ -217,11 +213,7 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
         {parameterSpecValues.length > 0 && (
           <div className="px-4 py-3 border-b">
             <div className="flex items-start gap-2">
-              <SpecsTooltip
-                specTitle="parameters"
-                tooltipTitle="workflow parameters"
-                specValues={parameterSpecValues}
-              >
+              <SpecsTooltip specTitle="parameters" tooltipTitle="workflow parameters" specValues={parameterSpecValues}>
                 <span className="text-xs bg-gray-200 px-2 py-1 rounded-md text-gray-800 font-mono font-medium cursor-help">
                   {parameterSpecValues.length} parameter{parameterSpecValues.length > 1 ? "s" : ""}
                 </span>
@@ -251,9 +243,7 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
                         className: getStateIconColor(lastExecution.state),
                       })}
                     </div>
-                    <span className="text-sm font-medium truncate">
-                      {lastExecution.title}
-                    </span>
+                    <span className="text-sm font-medium truncate">{lastExecution.title}</span>
                   </div>
                   <span className="text-xs text-gray-500">
                     {lastExecution.state === "running" && displayDuration !== undefined && displayDuration !== null

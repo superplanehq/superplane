@@ -16,13 +16,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // Wrapper component to manage modal state in stories
-function EmitEventModalWrapper({
-  channels,
-  nodeName,
-}: {
-  channels: string[];
-  nodeName: string;
-}) {
+function EmitEventModalWrapper({ channels, nodeName }: { channels: string[]; nodeName: string }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleEmit = async (channel: string, data: any) => {
@@ -49,17 +43,12 @@ function EmitEventModalWrapper({
 }
 
 export const SingleChannel: Story = {
-  render: () => (
-    <EmitEventModalWrapper channels={["default"]} nodeName="My Test Node" />
-  ),
+  render: () => <EmitEventModalWrapper channels={["default"]} nodeName="My Test Node" />,
 };
 
 export const MultipleChannels: Story = {
   render: () => (
-    <EmitEventModalWrapper
-      channels={["default", "success", "error", "retry"]}
-      nodeName="HTTP Request Node"
-    />
+    <EmitEventModalWrapper channels={["default", "success", "error", "retry"]} nodeName="HTTP Request Node" />
   ),
 };
 

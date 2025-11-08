@@ -1,13 +1,13 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import type { ComponentProps } from "react"
+import type { Meta, StoryObj } from "@storybook/react";
+import type { ComponentProps } from "react";
 
-import githubIcon from "@/assets/icons/integrations/github.svg"
-import kubernetesIcon from "@/assets/icons/integrations/kubernetes.svg"
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg"
-import dataDogIcon from "@/assets/icons/integrations/datadog.svg"
-import scheduleIcon from "@/assets/icons/schedule.svg"
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import kubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
+import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import dataDogIcon from "@/assets/icons/integrations/datadog.svg";
+import scheduleIcon from "@/assets/icons/schedule.svg";
 
-import { EventSource, type EventSourceProps } from "./index"
+import { EventSource, type EventSourceProps } from "./index";
 
 const TYPES = {
   github: {
@@ -144,12 +144,12 @@ const TYPES = {
       },
     ] satisfies EventSourceProps["meta"],
   },
-} as const
+} as const;
 
-type TypeKey = keyof typeof TYPES
+type TypeKey = keyof typeof TYPES;
 type StoryArgs = ComponentProps<typeof EventSource> & {
-  type: TypeKey
-}
+  type: TypeKey;
+};
 
 const meta = {
   title: "ui/Event Source",
@@ -229,8 +229,8 @@ const meta = {
     collapsed: false,
   },
   render: (args) => {
-    const { type, ...rest } = args as StoryArgs
-    const config = TYPES[type] ?? TYPES.github
+    const { type, ...rest } = args as StoryArgs;
+    const config = TYPES[type] ?? TYPES.github;
 
     return (
       <EventSource
@@ -247,15 +247,15 @@ const meta = {
         meta={rest.meta ?? config.meta}
         events={rest.events ?? config.events}
       />
-    )
+    );
   },
-} satisfies Meta<StoryArgs>
+} satisfies Meta<StoryArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<StoryArgs>
+type Story = StoryObj<StoryArgs>;
 
-export const Default: Story = {}
+export const Default: Story = {};
 
 export const ZeroState: Story = {
   args: {
@@ -263,7 +263,7 @@ export const ZeroState: Story = {
     events: [],
     selected: false,
   },
-}
+};
 
 export const Collapsed: Story = {
   args: {
@@ -271,4 +271,4 @@ export const Collapsed: Story = {
     collapsed: true,
     selected: false,
   },
-}
+};

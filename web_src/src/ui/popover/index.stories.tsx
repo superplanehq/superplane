@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { Popover, PopoverContent, PopoverTrigger } from "./index"
+import { Popover, PopoverContent, PopoverTrigger } from "./index";
 
 const meta = {
   title: "shadcn Primitives/Popover",
@@ -18,11 +18,11 @@ const meta = {
   args: {
     modal: false,
   },
-} satisfies Meta<typeof Popover>
+} satisfies Meta<typeof Popover>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<typeof meta>
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   render: (args) => (
@@ -31,4 +31,4 @@ export const Default: Story = {
       <PopoverContent>Place content for the popover here.</PopoverContent>
     </Popover>
   ),
-}
+};

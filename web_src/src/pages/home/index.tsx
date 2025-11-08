@@ -279,9 +279,10 @@ interface PageHeaderProps {
 
 function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
   const heading = activeTab === "custom-components" ? "Components" : "Canvases";
-  const description = activeTab === "custom-components"
-    ? "Overview of all components created and maintained by your team."
-    : "Overview of all mapped automations across your organization.";
+  const description =
+    activeTab === "custom-components"
+      ? "Overview of all components created and maintained by your team."
+      : "Overview of all mapped automations across your organization.";
   const buttonText = activeTab === "custom-components" ? "New Component" : "New Canvas";
 
   return (
@@ -290,9 +291,7 @@ function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
         <Heading level={2} className="!text-2xl mb-2">
           {heading}
         </Heading>
-        <Text className="text-zinc-600 dark:text-zinc-400">
-          {description}
-        </Text>
+        <Text className="text-zinc-600 dark:text-zinc-400">{description}</Text>
       </div>
 
       <Button color="blue" className="flex items-center bg-blue-700 text-white hover:bg-blue-600" onClick={onNewClick}>
@@ -462,7 +461,9 @@ function WorkflowCard({ workflow, organizationId, navigate }: WorkflowCardProps)
         <div className="flex justify-between items-center">
           <div className="text-zinc-500 text-left">
             {workflow.createdBy?.name && (
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none mb-1">Created by <strong>{workflow.createdBy.name}</strong></p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none mb-1">
+                Created by <strong>{workflow.createdBy.name}</strong>
+              </p>
             )}
             <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">Created at {workflow.createdAt}</p>
           </div>
@@ -550,10 +551,7 @@ function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuPr
             <MoreVertical size={16} />
           </DropdownButton>
           <DropdownMenu>
-            <DropdownItem
-              onClick={openDialog}
-              className="text-red-600 dark:text-red-400"
-            >
+            <DropdownItem onClick={openDialog} className="text-red-600 dark:text-red-400">
               <span className="flex items-center gap-2">
                 <Trash2 size={16} />
                 Delete
@@ -570,11 +568,14 @@ function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuPr
         </DialogDescription>
         <DialogBody>
           <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-            Deleting <span className="font-medium text-zinc-900 dark:text-zinc-100">{workflow.name}</span> will remove its automations and history.
+            Deleting <span className="font-medium text-zinc-900 dark:text-zinc-100">{workflow.name}</span> will remove
+            its automations and history.
           </Text>
         </DialogBody>
         <DialogActions>
-          <Button plain onClick={closeDialog}>Cancel</Button>
+          <Button plain onClick={closeDialog}>
+            Cancel
+          </Button>
           <Button
             color="red"
             onClick={handleDelete}
@@ -633,10 +634,7 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
             <MoreVertical size={16} />
           </DropdownButton>
           <DropdownMenu>
-            <DropdownItem
-              onClick={openDialog}
-              className="text-red-600 dark:text-red-400"
-            >
+            <DropdownItem onClick={openDialog} className="text-red-600 dark:text-red-400">
               <span className="flex items-center gap-2">
                 <Trash2 size={16} />
                 Delete
@@ -653,11 +651,14 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
         </DialogDescription>
         <DialogBody>
           <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-            Deleting <span className="font-medium text-zinc-900 dark:text-zinc-100">{blueprint.name}</span> will permanently remove it.
+            Deleting <span className="font-medium text-zinc-900 dark:text-zinc-100">{blueprint.name}</span> will
+            permanently remove it.
           </Text>
         </DialogBody>
         <DialogActions>
-          <Button plain onClick={closeDialog}>Cancel</Button>
+          <Button plain onClick={closeDialog}>
+            Cancel
+          </Button>
           <Button
             color="red"
             onClick={handleDelete}

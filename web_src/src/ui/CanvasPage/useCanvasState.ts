@@ -32,7 +32,7 @@ export interface CanvasPageState {
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
 }
 
-export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
+export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   const { nodes: initialNodes, edges: initialEdges, startCollapsed } = props;
 
   const [loaded, setLoaded] = useState(false);
@@ -46,25 +46,28 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
     if (!initialNodes) return;
     const newCollapsedNodeIds: string[] = [];
 
-    setNodes(initialNodes.map((node) => {
-      const nodeData = { ...node.data };
-      const nodeType = nodeData.type as string;
-      
-      if (nodeType && nodeData[nodeType]) {
+    setNodes(
+      initialNodes.map((node) => {
+        const nodeData = { ...node.data };
+        const nodeType = nodeData.type as string;
 
-        const isCollapsed = loaded ? collapsedNodeIds.includes(node.id) : (nodeData[nodeType] as {collapsed: boolean}).collapsed;
-        nodeData[nodeType] = {
-          ...nodeData[nodeType],
-          collapsed: isCollapsed,
-        };
+        if (nodeType && nodeData[nodeType]) {
+          const isCollapsed = loaded
+            ? collapsedNodeIds.includes(node.id)
+            : (nodeData[nodeType] as { collapsed: boolean }).collapsed;
+          nodeData[nodeType] = {
+            ...nodeData[nodeType],
+            collapsed: isCollapsed,
+          };
 
-        if (!loaded && isCollapsed) {
-          newCollapsedNodeIds.push(node.id);
+          if (!loaded && isCollapsed) {
+            newCollapsedNodeIds.push(node.id);
+          }
         }
-      }
 
-      return { ...node, data: nodeData };
-    }));
+        return { ...node, data: nodeData };
+      }),
+    );
 
     if (!loaded) {
       setCollapsedNodeIds(newCollapsedNodeIds);
@@ -76,9 +79,9 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
   useEffect(() => {
     if (!initialNodes) return;
 
-    setNodes(currentNodes => {
+    setNodes((currentNodes) => {
       return initialNodes.map((newNode) => {
-        const existingNode = currentNodes.find(n => n.id === newNode.id);
+        const existingNode = currentNodes.find((n) => n.id === newNode.id);
         const nodeData = { ...newNode.data };
         const nodeType = nodeData.type as string;
 
@@ -102,7 +105,6 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
     if (initialEdges) setEdges(initialEdges);
   }, [initialEdges]);
 
-
   // Apply initial collapsed state to nodes
   useEffect(() => {
     if (startCollapsed !== undefined && initialNodes) {
@@ -119,35 +121,39 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
           }
 
           return { ...node, data: nodeData };
-        })
+        }),
       );
     }
   }, [startCollapsed, initialNodes]);
 
-  const onNodesChange = useCallback((changes: NodeChange[]) => {
-    // Check for position changes and notify parent
-    changes.forEach((change) => {
-      if (change.type === 'position' && change.position && change.dragging === false && props.onNodePositionChange) {
-        // Only notify when dragging ends (dragging === false)
-        props.onNodePositionChange(change.id, change.position);
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      // Check for position changes and notify parent
+      changes.forEach((change) => {
+        if (change.type === "position" && change.position && change.dragging === false && props.onNodePositionChange) {
+          // Only notify when dragging ends (dragging === false)
+          props.onNodePositionChange(change.id, change.position);
+        }
+      });
+
+      setNodes((nds) => applyNodeChanges(changes, nds));
+    },
+    [props],
+  );
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      // Check for edge removals and notify parent
+      const removedEdgeIds = changes.filter((change) => change.type === "remove").map((change) => (change as any).id);
+
+      if (removedEdgeIds.length > 0 && props.onEdgeDelete) {
+        props.onEdgeDelete(removedEdgeIds);
       }
-    });
 
-    setNodes((nds) => applyNodeChanges(changes, nds));
-  }, [props]);
-
-  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
-    // Check for edge removals and notify parent
-    const removedEdgeIds = changes
-      .filter((change) => change.type === 'remove')
-      .map((change) => (change as any).id);
-
-    if (removedEdgeIds.length > 0 && props.onEdgeDelete) {
-      props.onEdgeDelete(removedEdgeIds);
-    }
-
-    setEdges((eds) => applyEdgeChanges(changes, eds));
-  }, [props]);
+      setEdges((eds) => applyEdgeChanges(changes, eds));
+    },
+    [props],
+  );
 
   const toggleCollapse = useCallback(() => {
     setIsCollapsed((prev) => {
@@ -165,7 +171,7 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
           }
 
           return { ...node, data: nodeData };
-        })
+        }),
       );
       if (newCollapsed) {
         setCollapsedNodeIds(nodes.map((node) => node.id));
@@ -174,39 +180,36 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
       }
       return newCollapsed;
     });
-    
   }, [nodes]);
 
   const toggleNodeCollapse = useCallback((nodeId: string) => {
     setCollapsedNodeIds((prev) => {
       const isCurrentlyCollapsed = prev.includes(nodeId);
 
-      return isCurrentlyCollapsed
-        ? prev.filter((id) => id !== nodeId)
-        : [...prev, nodeId];
+      return isCurrentlyCollapsed ? prev.filter((id) => id !== nodeId) : [...prev, nodeId];
     });
   }, []);
 
   const componentSidebar = useComponentSidebarState();
 
   // Memoize the default ai object to prevent unnecessary re-renders
-  const defaultAi = useMemo<AiProps>(() => ({
-    enabled: false,
-    sidebarOpen: false,
-    setSidebarOpen: () => {},
-    showNotifications: false,
-    notificationMessage: undefined,
-    suggestions: {},
-    onApply: () => {},
-    onDismiss: () => {},
-  }), []);
+  const defaultAi = useMemo<AiProps>(
+    () => ({
+      enabled: false,
+      sidebarOpen: false,
+      setSidebarOpen: () => {},
+      showNotifications: false,
+      notificationMessage: undefined,
+      suggestions: {},
+      onApply: () => {},
+      onDismiss: () => {},
+    }),
+    [],
+  );
 
   return {
     title: props.title || "Untitled Workflow",
-    breadcrumbs: props.breadcrumbs || [
-      { label: "Workflows" },
-      { label: props.title || "Untitled Workflow" },
-    ],
+    breadcrumbs: props.breadcrumbs || [{ label: "Workflows" }, { label: props.title || "Untitled Workflow" }],
     nodes,
     componentSidebar,
     ai: props.ai || defaultAi,
@@ -222,7 +225,7 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
   };
 }
 
-function useComponentSidebarState() : CanvasPageState["componentSidebar"] {
+function useComponentSidebarState(): CanvasPageState["componentSidebar"] {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
@@ -242,6 +245,6 @@ function useComponentSidebarState() : CanvasPageState["componentSidebar"] {
     isOpen,
     selectedNodeId,
     close,
-    open
+    open,
   };
 }

@@ -10,7 +10,7 @@ import { formatTimeAgo } from "@/utils/date";
  */
 export const defaultTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    return {title: event.id!, subtitle: formatTimeAgo(new Date(event.createdAt!))};
+    return { title: event.id!, subtitle: formatTimeAgo(new Date(event.createdAt!)) };
   },
 
   getRootEventValues: (_: WorkflowsWorkflowEvent): Record<string, string> => {
@@ -26,7 +26,7 @@ export const defaultTriggerRenderer: TriggerRenderer = {
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: [],
       zeroStateText: "No events yet",
-    }
+    };
 
     if (lastEvent) {
       props.lastEventData = {

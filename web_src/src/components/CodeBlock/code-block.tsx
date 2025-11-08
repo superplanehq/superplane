@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { useState } from "react";
+import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 
 interface CodeBlockProps {
   children: string;
   className?: string;
 }
 
-export function CodeBlock({ children, className = '' }: CodeBlockProps) {
+export function CodeBlock({ children, className = "" }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -15,7 +15,7 @@ export function CodeBlock({ children, className = '' }: CodeBlockProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy text: ', err);
+      console.error("Failed to copy text: ", err);
     }
   };
 
@@ -23,7 +23,7 @@ export function CodeBlock({ children, className = '' }: CodeBlockProps) {
     <pre
       className={`relative group bg-zinc-100 dark:bg-zinc-900 p-3 rounded text-xs overflow-x-auto mb-2 cursor-pointer ${className}`}
       onClick={handleCopy}
-      title={copied ? 'Copied!' : 'Click to copy'}
+      title={copied ? "Copied!" : "Click to copy"}
     >
       {children}
       <button
@@ -32,9 +32,9 @@ export function CodeBlock({ children, className = '' }: CodeBlockProps) {
           handleCopy();
         }}
         className="absolute! top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-400"
-        title={copied ? 'Copied!' : 'Copy to clipboard'}
+        title={copied ? "Copied!" : "Copy to clipboard"}
       >
-        <MaterialSymbol name={copied ? 'check' : 'content_copy'} size="sm" />
+        <MaterialSymbol name={copied ? "check" : "content_copy"} size="sm" />
       </button>
     </pre>
   );
