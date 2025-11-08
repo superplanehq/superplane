@@ -9,31 +9,23 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./blueprint-canvas-reset.css";
-import { useCallback, useMemo, useState, useEffect } from "react";
 
-import { ComponentsComponent } from "@/api-client";
+import { ComponentsComponent, ConfigurationField, SuperplaneBlueprintsOutputChannel } from "@/api-client";
+import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { Block, BlockData } from "../CanvasPage/Block";
 import { CustomEdge } from "../CanvasPage/CustomEdge";
-import { Header, BreadcrumbItem } from "../CanvasPage/Header";
+import { BreadcrumbItem, Header } from "../CanvasPage/Header";
+import { NodeConfigurationModal } from "../CanvasPage/NodeConfigurationModal";
 import {
-  BuildingBlock,
-  BuildingBlockCategory,
-  BuildingBlocksSidebar,
-} from "../BuildingBlocksSidebar";
-import {
-  CustomComponentConfigurationSidebar,
   BlueprintMetadata,
+  CustomComponentConfigurationSidebar,
   OutputChannel,
 } from "../CustomComponentConfigurationSidebar";
+import { buildBuildingBlockCategories } from "../buildingBlocks";
 import { ConfigurationFieldModal } from "./ConfigurationFieldModal";
 import { OutputChannelConfigurationModal } from "./OutputChannelConfigurationModal";
-import {
-  ConfigurationField,
-  SuperplaneBlueprintsOutputChannel,
-} from "@/api-client";
-import { NodeConfigurationModal } from "../CanvasPage/NodeConfigurationModal";
-import { buildBuildingBlockCategories } from "../buildingBlocks";
 
 export interface NodeEditData {
   nodeId: string;
@@ -79,11 +71,7 @@ export interface CustomComponentBuilderPageProps {
 
   // Node configuration
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
-  onNodeConfigurationSave?: (
-    nodeId: string,
-    configuration: Record<string, any>,
-    nodeName: string
-  ) => void;
+  onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
   onNodeAdd?: (newNodeData: NewNodeData) => void;
   organizationId?: string;
 
@@ -161,7 +149,7 @@ function CanvasContent({
         console.error("Failed to parse building block data:", error);
       }
     },
-    [onBuildingBlockDrop, screenToFlowPosition]
+    [onBuildingBlockDrop, screenToFlowPosition],
   );
 
   const handleMove = useCallback(
@@ -170,7 +158,7 @@ function CanvasContent({
         onZoomChange(viewport.zoom);
       }
     },
-    [onZoomChange]
+    [onZoomChange],
   );
 
   // Initialize: fit to view on mount with zoom constraints
@@ -222,19 +210,12 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
 
   // Modal state management
   const [isConfigFieldModalOpen, setIsConfigFieldModalOpen] = useState(false);
-  const [editingConfigFieldIndex, setEditingConfigFieldIndex] = useState<
-    number | null
-  >(null);
-  const [isOutputChannelModalOpen, setIsOutputChannelModalOpen] =
-    useState(false);
-  const [editingOutputChannelIndex, setEditingOutputChannelIndex] = useState<
-    number | null
-  >(null);
+  const [editingConfigFieldIndex, setEditingConfigFieldIndex] = useState<number | null>(null);
+  const [isOutputChannelModalOpen, setIsOutputChannelModalOpen] = useState(false);
+  const [editingOutputChannelIndex, setEditingOutputChannelIndex] = useState<number | null>(null);
 
   // Node configuration modal state
-  const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(
-    null
-  );
+  const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(null);
   const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
 
   // Modal handlers
@@ -257,19 +238,12 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         props.onConfigurationFieldsChange(newFields);
       } else {
         // Add new field
-        props.onConfigurationFieldsChange([
-          ...props.configurationFields,
-          field as ConfigurationField,
-        ]);
+        props.onConfigurationFieldsChange([...props.configurationFields, field as ConfigurationField]);
       }
       setIsConfigFieldModalOpen(false);
       setEditingConfigFieldIndex(null);
     },
-    [
-      editingConfigFieldIndex,
-      props.configurationFields,
-      props.onConfigurationFieldsChange,
-    ]
+    [editingConfigFieldIndex, props.configurationFields, props.onConfigurationFieldsChange],
   );
 
   const handleAddOutputChannel = useCallback(() => {
@@ -291,19 +265,12 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         props.onOutputChannelsChange(newChannels);
       } else {
         // Add new output channel
-        props.onOutputChannelsChange([
-          ...props.outputChannels,
-          outputChannel as OutputChannel,
-        ]);
+        props.onOutputChannelsChange([...props.outputChannels, outputChannel as OutputChannel]);
       }
       setIsOutputChannelModalOpen(false);
       setEditingOutputChannelIndex(null);
     },
-    [
-      editingOutputChannelIndex,
-      props.outputChannels,
-      props.onOutputChannelsChange,
-    ]
+    [editingOutputChannelIndex, props.outputChannels, props.onOutputChannelsChange],
   );
 
   // Node configuration handlers
@@ -317,7 +284,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         }
       }
     },
-    [props.getNodeEditData]
+    [props.getNodeEditData],
   );
 
   const handleBuildingBlockDrop = useCallback((block: BuildingBlock, position?: { x: number; y: number }) => {
@@ -333,15 +300,11 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, any>, nodeName: string) => {
       if (editingNodeData && props.onNodeConfigurationSave) {
-        props.onNodeConfigurationSave(
-          editingNodeData.nodeId,
-          configuration,
-          nodeName
-        );
+        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName);
       }
       setEditingNodeData(null);
     },
-    [editingNodeData, props]
+    [editingNodeData, props],
   );
 
   const handleSaveNewNode = useCallback(
@@ -356,43 +319,39 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
       }
       setNewNodeData(null);
     },
-    [newNodeData, props]
+    [newNodeData, props],
   );
 
   // Use shared builder (merge mocks + live components)
   const buildingBlockCategories = useMemo<BuildingBlockCategory[]>(
     () => buildBuildingBlockCategories([], props.components, []),
-    [props.components]
+    [props.components],
   );
 
   const handleConnect = useCallback(
     (connection: Connection) => {
       props.onConnect(connection);
     },
-    [props.onConnect]
+    [props.onConnect],
   );
 
   const handleNodeDelete = useCallback(
     (nodeId: string) => {
       props.onNodeDelete?.(nodeId);
     },
-    [props.onNodeDelete]
+    [props.onNodeDelete],
   );
 
   const handleNodeDuplicate = useCallback(
     (nodeId: string) => {
       props.onNodeDuplicate?.(nodeId);
     },
-    [props.onNodeDuplicate]
+    [props.onNodeDuplicate],
   );
 
   const nodeTypes = useMemo(
     () => ({
-      default: (nodeProps: {
-        data: unknown;
-        id: string;
-        selected?: boolean;
-      }) => (
+      default: (nodeProps: { data: unknown; id: string; selected?: boolean }) => (
         <Block
           data={nodeProps.data as BlockData}
           nodeId={nodeProps.id}
@@ -403,20 +362,24 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         />
       ),
     }),
-    [handleNodeEdit, handleNodeDelete, handleNodeDuplicate]
+    [handleNodeEdit, handleNodeDelete, handleNodeDuplicate],
   );
 
-  const edgeTypes = useMemo(() => ({
-    custom: CustomEdge,
-  }), []);
+  const edgeTypes = useMemo(
+    () => ({
+      custom: CustomEdge,
+    }),
+    [],
+  );
 
   // Style edges with custom type
-  const styledEdges = useMemo(() =>
-    props.edges.map((edge) => ({
-      ...edge,
-      type: 'custom',
-    })),
-    [props.edges]
+  const styledEdges = useMemo(
+    () =>
+      props.edges.map((edge) => ({
+        ...edge,
+        type: "custom",
+      })),
+    [props.edges],
   );
 
   const handleLogoClick = useCallback(() => {
@@ -511,9 +474,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         }}
         outputChannel={
           editingOutputChannelIndex !== null
-            ? (props.outputChannels[
-              editingOutputChannelIndex
-            ] as SuperplaneBlueprintsOutputChannel)
+            ? (props.outputChannels[editingOutputChannelIndex] as SuperplaneBlueprintsOutputChannel)
             : undefined
         }
         nodes={props.nodes}
@@ -523,6 +484,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
       {/* Edit existing node modal */}
       {editingNodeData && (
         <NodeConfigurationModal
+          mode="edit"
           isOpen={true}
           onClose={() => setEditingNodeData(null)}
           nodeName={editingNodeData.nodeName}
@@ -538,6 +500,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
       {/* Add new node modal */}
       {newNodeData && (
         <NodeConfigurationModal
+          mode="create"
           isOpen={true}
           onClose={() => setNewNodeData(null)}
           nodeName={newNodeData.nodeName}
