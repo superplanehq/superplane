@@ -190,9 +190,9 @@ func (m *Merge) HandleAction(ctx components.ActionContext) error {
 func (m *Merge) HandleTimeout(ctx components.ActionContext) error {
 	if ctx.ExecutionStateContext.IsFinished() {
 		return nil
-	} else {
-		return ctx.ExecutionStateContext.Fail("timeoutReached", "Execution timed out waiting for other inputs")
 	}
+
+	return ctx.ExecutionStateContext.Fail("timeoutReached", "Execution timed out waiting for other inputs")
 }
 
 func (m *Merge) Execute(ctx components.ExecutionContext) error {
