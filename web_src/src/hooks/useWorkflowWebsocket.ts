@@ -1,7 +1,9 @@
 import { useCallback } from 'react';
 import useWebSocket from 'react-use-websocket';
+import { useQueryClient } from '@tanstack/react-query';
 import { WorkflowsWorkflowNodeExecution, WorkflowsWorkflowEvent } from '@/api-client';
 import { useNodeExecutionStore } from '@/stores/nodeExecutionStore';
+import { workflowKeys } from './useWorkflowData';
 
 const SOCKET_SERVER_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/`;
 
@@ -10,6 +12,7 @@ export function useWorkflowWebsocket(
   organizationId: string,
 ): void {
   const nodeExecutionStore = useNodeExecutionStore();
+  const queryClient = useQueryClient();
 
   const onMessage = useCallback((event: MessageEvent<unknown>) => {
     try {
@@ -38,6 +41,13 @@ export function useWorkflowWebsocket(
                 : execution.nodeId;
 
               nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
+
+              // Invalidate execution chain query for this root event to refetch updated chain
+              if (execution.rootEvent?.id) {
+                queryClient.invalidateQueries({
+                  queryKey: workflowKeys.eventExecution(workflowId, execution.rootEvent.id),
+                });
+              }
             }
           }
           break;
@@ -47,7 +57,7 @@ export function useWorkflowWebsocket(
     } catch (error) {
       console.error('Error parsing message:', error);
     }
-  }, [nodeExecutionStore]);
+  }, [nodeExecutionStore, queryClient, workflowId]);
 
   useWebSocket(
     `${SOCKET_SERVER_URL}${workflowId}?organization_id=${organizationId}`,
