@@ -24,7 +24,6 @@ import { organizationKeys, useOrganizationRoles, useOrganizationUsers } from "@/
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import {
   eventExecutionsQueryOptions,
-  nodeEventsQueryOptions,
   useTriggers,
   useUpdateWorkflow,
   useWorkflow,
@@ -524,7 +523,6 @@ export function WorkflowPageV2() {
 
               return ChainExecutionState.FAILED;
             };
-            console.log(exec?.childExecutions)
 
             const mainItem = {
               name: nodeInfo?.name || exec.nodeId || 'Unknown',
@@ -743,7 +741,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
       markUnsavedChange("structural");
     },
-    [workflow, organizationId, workflowId, queryClient, markUnsavedChange],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
   );
 
   const handleEdgeDelete = useCallback(
@@ -1081,31 +1079,6 @@ export function WorkflowPageV2() {
     />
   );
 }
-
-function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]) {
-  const results = useQueries({
-    queries: triggerNodes.map((node) => nodeEventsQueryOptions(workflowId, node.id!, { limit: 10 })),
-  });
-
-  // Check if any queries are still loading
-  const isLoading = results.some((result) => result.isLoading);
-
-  // Build a map of nodeId -> last event
-  // Memoize to prevent unnecessary re-renders downstream
-  const eventsMap = useMemo(() => {
-    const map: Record<string, WorkflowsWorkflowEvent[]> = {};
-    triggerNodes.forEach((node, index) => {
-      const result = results[index];
-      if (result.data?.events && result.data.events.length > 0) {
-        map[node.id!] = result.data.events;
-      }
-    });
-    return map;
-  }, [results, triggerNodes]);
-
-  return { eventsMap, isLoading };
-}
-
 
 function useExecutionChainData(workflowId: string, nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>) {
   // Get all unique root event IDs from executions

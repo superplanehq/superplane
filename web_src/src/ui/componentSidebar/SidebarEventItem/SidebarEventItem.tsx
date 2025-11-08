@@ -14,7 +14,7 @@ interface TabData {
   current?: Record<string, any>;
   root?: Record<string, any>;
   payload?: any;
-  executionChain?: Array<{ name: string; state: ChainExecutionState; children?: Array<{ name: string; state: string }> }>;
+  executionChain?: Array<{ name: string; state: ChainExecutionState; children?: Array<{ name: string; state: ChainExecutionState }> }>;
 }
 
 interface SidebarEventItemProps {
