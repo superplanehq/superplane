@@ -83,6 +83,12 @@ blocks:
             - npm ci
             - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
             - npm run test:run
+        - name: "Format Check"
+          commands:
+            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules
+            - cd web_src
+            - npm ci
+            - npm run format:check
 
 after_pipeline:
   task:
