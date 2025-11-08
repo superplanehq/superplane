@@ -31,7 +31,41 @@ func (m *Merge) OutputChannels(configuration any) []components.OutputChannel {
 }
 
 func (m *Merge) Configuration() []configuration.Field {
-	return []configuration.Field{}
+	return []configuration.Field{
+		{
+			Name:     "executionTimeout",
+			Label:    "Execution Timeout",
+			Type:     configuration.FieldTypeObject,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:     "value",
+							Label:    "Timeout",
+							Type:     configuration.FieldTypeNumber,
+							Required: true,
+						},
+						{
+							Name:     "unit",
+							Label:    "Unit",
+							Type:     configuration.FieldTypeSelect,
+							Required: true,
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: []configuration.FieldOption{
+										{Label: "Seconds", Value: "seconds"},
+										{Label: "Minutes", Value: "minutes"},
+										{Label: "Hours", Value: "hours"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 func (m *Merge) Actions() []components.Action { return []components.Action{} }
