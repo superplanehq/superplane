@@ -1,5 +1,5 @@
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { QueryClient, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -23,6 +23,7 @@ import { organizationKeys, useOrganizationRoles, useOrganizationUsers } from "@/
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import {
+  eventExecutionsQueryOptions,
   useTriggers,
   useUpdateWorkflow,
   useWorkflow,
@@ -49,6 +50,7 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { flattenObject } from "@/lib/utils";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
+import { ChainExecutionState } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -166,6 +168,12 @@ export function WorkflowPageV2() {
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
   }, [storeVersion]);
 
+  // Execution chain data based on node executions from store
+  const {
+    executionChainMap,
+  } = useExecutionChainData(workflowId!, nodeExecutionsMap);
+
+
   const saveWorkflowSnapshot = useCallback(
     (currentWorkflow: WorkflowsWorkflow) => {
       if (!initialWorkflowSnapshot) {
@@ -254,6 +262,7 @@ export function WorkflowPageV2() {
     triggersLoading,
     blueprintsLoading,
     componentsLoading,
+    organizationId,
   ]);
 
   const getSidebarData = useCallback(
@@ -305,6 +314,46 @@ export function WorkflowPageV2() {
       }
     },
     [workflow?.spec?.nodes, workflowId, queryClient, getNodeData, loadNodeDataMethod],
+  );
+
+  const workflowEdges = useMemo(() => workflow?.spec?.edges || [], [workflow?.spec?.edges]);
+
+  /**
+   * Builds a topological path to find all nodes that should execute before the given target node.
+   * This follows the directed graph structure of the workflow to determine execution order.
+   */
+  const getNodesBeforeTarget = useCallback(
+    (targetNodeId: string): Set<string> => {
+      if (workflowEdges.length === 0) {
+        return new Set();
+      }
+
+      const nodesBefore = new Set<string>();
+
+      const incomingEdges = new Map<string, string[]>();
+      workflowEdges.forEach(edge => {
+        if (!incomingEdges.has(edge.targetId!)) {
+          incomingEdges.set(edge.targetId!, []);
+        }
+        incomingEdges.get(edge.targetId!)!.push(edge.sourceId!);
+      });
+
+      const visited = new Set<string>();
+      const dfs = (nodeId: string) => {
+        if (visited.has(nodeId)) return;
+        visited.add(nodeId);
+
+        const incomingNodes = incomingEdges.get(nodeId) || [];
+        incomingNodes.forEach(sourceNodeId => {
+          nodesBefore.add(sourceNodeId);
+          dfs(sourceNodeId);
+        });
+      };
+
+      dfs(targetNodeId);
+      return nodesBefore;
+    },
+    [workflowEdges]
   );
 
   const getTabData = useCallback(
@@ -408,9 +457,97 @@ export function WorkflowPageV2() {
         tabData.payload = payload;
       }
 
+      // Execution Chain tab: get execution chain for the root event
+      if (execution.rootEvent?.id) {
+        const executionChain = executionChainMap[execution.rootEvent.id];
+        if (executionChain && executionChain.length > 0) {
+          const currentExecutionTime = execution.createdAt ? new Date(execution.createdAt).getTime() : Date.now();
+
+          const nodesBefore = getNodesBeforeTarget(nodeId);
+          nodesBefore.add(nodeId);
+
+          const executionsUpToCurrent = executionChain.filter(exec => {
+            const execTime = exec.createdAt ? new Date(exec.createdAt).getTime() : 0;
+            const isNodeBefore = nodesBefore.has(exec.nodeId || '');
+            const isBeforeCurrentTime = execTime <= currentExecutionTime;
+            return isNodeBefore && isBeforeCurrentTime;
+          });
+
+          // Sort the filtered executions by creation time to get chronological order
+          executionsUpToCurrent.sort((a, b) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return timeA - timeB;
+          });
+
+          // Group executions by node to create hierarchy
+          const nodeExecutions: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
+          executionsUpToCurrent.forEach(exec => {
+            const execNodeId = exec.nodeId || 'unknown';
+            if (!nodeExecutions[execNodeId]) {
+              nodeExecutions[execNodeId] = [];
+            }
+            nodeExecutions[execNodeId].push(exec);
+          });
+
+
+          const sortedNodeEntries = Object.values(nodeExecutions)
+            .flatMap((execs) => execs)
+            .sort((execsA, execsB) => {
+              const timeA = execsA.updatedAt ? new Date(execsA.updatedAt).getTime() : 0;
+              const timeB = execsB.updatedAt ? new Date(execsB.updatedAt).getTime() : 0;
+              return timeA - timeB;
+            });
+
+
+          const nodesById = workflow?.spec?.nodes?.reduce((acc, node) => {
+            if (!node?.id) return acc;
+            acc[node.id] = node;
+            return acc;
+          }, {} as Record<string, ComponentsNode>);
+
+          const chainData = sortedNodeEntries.map((exec) => {
+            const nodeInfo = nodesById?.[exec.nodeId || ''];
+
+            const getSidebarEventItemState = (exec: WorkflowsWorkflowNodeExecution) => {
+              if (exec.state === 'STATE_FINISHED') {
+                if (exec.result === 'RESULT_PASSED') {
+                  return ChainExecutionState.COMPLETED;
+                }
+                return ChainExecutionState.FAILED;
+              };
+
+              if (exec.state === 'STATE_STARTED') {
+                return ChainExecutionState.RUNNING;
+              }
+
+              return ChainExecutionState.FAILED;
+            };
+
+            const mainItem = {
+              name: nodeInfo?.name || exec.nodeId || 'Unknown',
+              state: getSidebarEventItemState(exec),
+              children: exec?.childExecutions && exec.childExecutions.length > 1 ? exec.childExecutions.map(childExec => {
+                const childNodeInfo = nodesById?.[childExec.nodeId || ''];
+                return {
+                  name: childNodeInfo?.name || childExec.nodeId || 'Unknown',
+                  state: getSidebarEventItemState(childExec),
+                }
+              }) : undefined
+            };
+
+            return mainItem;
+          });
+
+          if (chainData.length > 0) {
+            tabData.executionChain = chainData;
+          }
+        }
+      }
+
       return Object.keys(tabData).length > 0 ? tabData : undefined;
     },
-    [workflow, nodeExecutionsMap, nodeEventsMap],
+    [workflow, nodeExecutionsMap, nodeEventsMap, executionChainMap, getNodesBeforeTarget],
   );
 
   const getNodeEditData = useCallback(
@@ -604,7 +741,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
       markUnsavedChange("structural");
     },
-    [workflow, organizationId, workflowId, queryClient, markUnsavedChange],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
   );
 
   const handleEdgeDelete = useCallback(
@@ -941,6 +1078,43 @@ export function WorkflowPageV2() {
       ]}
     />
   );
+}
+
+function useExecutionChainData(workflowId: string, nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>) {
+  // Get all unique root event IDs from executions
+  const rootEventIds = useMemo(() => {
+    const eventIds = new Set<string>();
+    Object.values(nodeExecutionsMap).forEach(executions => {
+      executions.forEach(execution => {
+        if (execution.rootEvent?.id) {
+          eventIds.add(execution.rootEvent.id);
+        }
+      });
+    });
+    return Array.from(eventIds);
+  }, [nodeExecutionsMap]);
+
+  // Fetch execution chains for each unique root event
+  const executionChainResults = useQueries({
+    queries: rootEventIds.map((eventId) => eventExecutionsQueryOptions(workflowId, eventId)),
+  });
+
+  // Check if any queries are still loading
+  const isLoading = executionChainResults.some((result) => result.isLoading);
+
+  // Build map of eventId -> execution chain
+  const executionChainMap = useMemo(() => {
+    const map: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
+    rootEventIds.forEach((eventId, index) => {
+      const result = executionChainResults[index];
+      if (result.data?.executions && result.data.executions.length > 0) {
+        map[eventId] = result.data.executions;
+      }
+    });
+    return map;
+  }, [executionChainResults, rootEventIds]);
+
+  return { executionChainMap, isLoading };
 }
 
 function prepareData(

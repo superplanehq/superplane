@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import React, { useState } from 'react'
-import { SidebarEventItem } from './SidebarEventItem'
+import { SidebarEventItem, ChainExecutionState } from './SidebarEventItem'
 import { SidebarEvent } from '../types'
 
 const meta: Meta<typeof SidebarEventItem> = {
@@ -329,6 +329,181 @@ export const LargePayload: Story = {
           ]
         }
       }, null, 2)
+    },
+  },
+}
+
+export const WithExecutionChain: Story = {
+  render: (args) => (
+    <ComponentWrapper>
+      <SidebarEventItem {...args} />
+    </ComponentWrapper>
+  ),
+  args: {
+    event: {
+      ...mockEvent,
+      title: 'Deployment Pipeline',
+      subtitle: 'Production deploy',
+      state: 'running' as const,
+    },
+    index: 0,
+    variant: 'latest',
+    isOpen: true,
+    tabData: {
+      current: {
+        'Status': 'Deploying',
+        'Progress': '60%',
+        'Started': '3 minutes ago',
+        'ETA': '2 minutes',
+      },
+      root: {
+        'Pipeline ID': 'deploy_prod_2024_001',
+        'Branch': 'main',
+        'Commit': 'a1b2c3d',
+        'Environment': 'production',
+      },
+      executionChain: [
+        { name: 'Build Docker Image', state: ChainExecutionState.COMPLETED },
+        { name: 'Run Unit Tests', state: ChainExecutionState.COMPLETED },
+        { name: 'Security Scan', state: ChainExecutionState.COMPLETED },
+        { name: 'Deploy to Staging', state: ChainExecutionState.COMPLETED },
+        { name: 'Integration Tests', state: ChainExecutionState.RUNNING },
+        { name: 'Deploy to Production', state: ChainExecutionState.RUNNING },
+        { name: 'Health Checks', state: ChainExecutionState.RUNNING },
+        { name: 'Update DNS', state: ChainExecutionState.RUNNING },
+      ],
+    },
+  },
+}
+
+export const WithExecutionChainFailed: Story = {
+  render: (args) => (
+    <ComponentWrapper>
+      <SidebarEventItem {...args} />
+    </ComponentWrapper>
+  ),
+  args: {
+    event: {
+      ...mockEvent,
+      title: 'Failed Deployment',
+      subtitle: 'Build failed',
+      state: 'discarded' as const,
+    },
+    index: 0,
+    variant: 'latest',
+    isOpen: true,
+    tabData: {
+      current: {
+        'Status': 'Failed',
+        'Error': 'Build compilation error',
+        'Started': '5 minutes ago',
+        'Failed at': '3 minutes ago',
+      },
+      root: {
+        'Pipeline ID': 'deploy_prod_2024_002',
+        'Branch': 'feature/new-api',
+        'Commit': 'x9y8z7w',
+        'Environment': 'production',
+      },
+      executionChain: [
+        { name: 'Build Docker Image', state: ChainExecutionState.COMPLETED },
+        { name: 'Run Unit Tests', state: ChainExecutionState.COMPLETED },
+        { name: 'Security Scan', state: ChainExecutionState.FAILED },
+        { name: 'Deploy to Staging', state: ChainExecutionState.RUNNING },
+        { name: 'Integration Tests', state: ChainExecutionState.RUNNING },
+        { name: 'Deploy to Production', state: ChainExecutionState.RUNNING },
+      ],
+    },
+  },
+}
+
+export const WithNestedExecutionChain: Story = {
+  render: (args) => (
+    <ComponentWrapper>
+      <SidebarEventItem {...args} />
+    </ComponentWrapper>
+  ),
+  args: {
+    event: {
+      ...mockEvent,
+      title: 'Complex Deployment',
+      subtitle: 'Multi-service deployment',
+      state: 'running' as const,
+    },
+    index: 0,
+    variant: 'latest',
+    isOpen: true,
+    tabData: {
+      current: {
+        'Status': 'Deploying Services',
+        'Progress': '4/6 services',
+        'Started': '8 minutes ago',
+        'ETA': '5 minutes',
+      },
+      root: {
+        'Pipeline ID': 'deploy_multi_2024_003',
+        'Branch': 'release/v2.1.0',
+        'Commit': 'def456gh',
+        'Environment': 'production',
+      },
+      executionChain: [
+        {
+          name: 'Preparation Phase',
+          state: ChainExecutionState.COMPLETED,
+          children: [
+            { name: 'Validate Configuration', state: ChainExecutionState.COMPLETED },
+            { name: 'Check Dependencies', state: ChainExecutionState.COMPLETED },
+            { name: 'Reserve Resources', state: ChainExecutionState.COMPLETED },
+          ]
+        },
+        {
+          name: 'Build Phase',
+          state: ChainExecutionState.COMPLETED,
+          children: [
+            { name: 'Build API Service', state: ChainExecutionState.COMPLETED },
+            { name: 'Build Frontend', state: ChainExecutionState.COMPLETED },
+            { name: 'Build Background Jobs', state: ChainExecutionState.COMPLETED },
+            { name: 'Build Database Migrations', state: ChainExecutionState.COMPLETED },
+          ]
+        },
+        {
+          name: 'Test Phase',
+          state: ChainExecutionState.COMPLETED,
+          children: [
+            { name: 'Unit Tests', state: ChainExecutionState.COMPLETED },
+            { name: 'Integration Tests', state: ChainExecutionState.COMPLETED },
+            { name: 'Security Scan', state: ChainExecutionState.COMPLETED },
+          ]
+        },
+        {
+          name: 'Deploy to Staging',
+          state: ChainExecutionState.RUNNING,
+          children: [
+            { name: 'Deploy Database', state: ChainExecutionState.COMPLETED },
+            { name: 'Deploy API Service', state: ChainExecutionState.COMPLETED },
+            { name: 'Deploy Frontend', state: ChainExecutionState.RUNNING },
+            { name: 'Deploy Background Jobs', state: ChainExecutionState.RUNNING },
+          ]
+        },
+        {
+          name: 'Staging Tests',
+          state: ChainExecutionState.RUNNING,
+          children: [
+            { name: 'Smoke Tests', state: ChainExecutionState.RUNNING },
+            { name: 'Performance Tests', state: ChainExecutionState.RUNNING },
+            { name: 'User Acceptance Tests', state: ChainExecutionState.RUNNING },
+          ]
+        },
+        {
+          name: 'Production Deployment',
+          state: ChainExecutionState.RUNNING,
+          children: [
+            { name: 'Blue-Green Switch', state: ChainExecutionState.RUNNING },
+            { name: 'Health Checks', state: ChainExecutionState.RUNNING },
+            { name: 'Monitor Metrics', state: ChainExecutionState.RUNNING },
+          ]
+        },
+      ],
     },
   },
 }

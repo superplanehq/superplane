@@ -331,6 +331,27 @@ export const nodeQueueItemsQueryOptions = (
   enabled: !!workflowId && !!nodeId,
 })
 
+export const eventExecutionsQueryOptions = (
+  workflowId: string,
+  eventId: string
+) => ({
+  queryKey: workflowKeys.eventExecution(workflowId, eventId),
+  queryFn: async () => {
+    const response = await workflowsListEventExecutions(
+      withOrganizationHeader({
+        path: {
+          workflowId,
+          eventId,
+        },
+      })
+    )
+    return response.data
+  },
+  staleTime: 30 * 1000, // 30 seconds
+  gcTime: 5 * 60 * 1000, // 5 minutes
+  enabled: !!workflowId && !!eventId,
+})
+
 export const useNodeEvents = (workflowId: string, nodeId: string) => {
   return useQuery(nodeEventsQueryOptions(workflowId, nodeId))
 }

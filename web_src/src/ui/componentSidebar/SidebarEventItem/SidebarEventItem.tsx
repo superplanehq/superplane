@@ -1,13 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon } from "@/lib/utils";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ChildEvents, ChildEventsInfo } from "../../childEvents";
 import { SidebarEvent } from "../types";
+
+export enum ChainExecutionState {
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  RUNNING = 'running',
+}
 
 interface TabData {
   current?: Record<string, any>;
   root?: Record<string, any>;
   payload?: any;
+  executionChain?: Array<{ name: string; state: ChainExecutionState; children?: Array<{ name: string; state: ChainExecutionState }> }>;
 }
 
 interface SidebarEventItemProps {
@@ -34,15 +41,16 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   tabData,
 }) => {
   // Determine default active tab based on available data
-  const getDefaultActiveTab = useCallback((): 'current' | 'root' | 'payload' => {
+  const getDefaultActiveTab = useCallback((): 'current' | 'root' | 'payload' | 'executionChain' => {
     if (!tabData) return 'current';
     if (tabData.current) return 'current';
     if (tabData.root) return 'root';
     if (tabData.payload) return 'payload';
+    if (tabData.executionChain) return 'executionChain';
     return 'current';
   }, [tabData]);
 
-  const [activeTab, setActiveTab] = useState<'current' | 'root' | 'payload'>(getDefaultActiveTab());
+  const [activeTab, setActiveTab] = useState<'current' | 'root' | 'payload' | 'executionChain'>(getDefaultActiveTab());
 
   // Update active tab when tabData changes to ensure we always have a valid active tab
   useEffect(() => {
@@ -54,6 +62,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       } else if (activeTab === 'root' && !tabData.root) {
         setActiveTab(defaultTab);
       } else if (activeTab === 'payload' && !tabData.payload) {
+        setActiveTab(defaultTab);
+      } else if (activeTab === 'executionChain' && !tabData.executionChain) {
         setActiveTab(defaultTab);
       }
     }
@@ -117,6 +127,13 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       break;
   }
 
+  const totalExecutionsCount = useMemo(() => {
+    if (!tabData?.executionChain) return 0;
+
+    const childCount = tabData.executionChain.reduce((acc, execution) => acc + (execution.children?.length || 0), 0);
+    return childCount + tabData.executionChain.length;
+  }, [tabData?.executionChain]);
+
   return (
     <div
       key={event.title + index}
@@ -173,6 +190,17 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       Root
                     </button>
                   )}
+                  {tabData.executionChain && (
+                    <button
+                      onClick={() => setActiveTab('executionChain')}
+                      className={`px-5 py-1 text-sm font-medium ${activeTab === 'executionChain'
+                        ? 'text-black border-b-1 border-black'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                        }`}
+                    >
+                      Execution Chain
+                    </button>
+                  )}
                 </div>
                 {tabData.payload && (
                   <button
@@ -220,6 +248,80 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     : JSON.stringify(tabData.payload, null, 2)
                   }
                 </pre>
+              </div>
+            )}
+
+            {tabData && activeTab === 'executionChain' && tabData.executionChain && (
+              <div className="w-full flex flex-col gap-2 px-2 py-2">
+                <div className="text-sm text-gray-500 ml-2">
+                  {totalExecutionsCount} execution{totalExecutionsCount === 1 ? '' : 's'}
+                </div>
+                {tabData.executionChain.map((execution, index) => (
+                  <div key={index} className="flex flex-col gap-1">
+                    {/* Main execution */}
+                    <div className="flex items-center gap-2 px-2 rounded-md w-full min-w-0">
+                      <div className="flex-shrink-0">
+                        {execution.state === ChainExecutionState.COMPLETED ? (
+                          React.createElement(resolveIcon("circle-check"), {
+                            size: 16,
+                            className: "text-green-600"
+                          })
+                        ) : execution.state === ChainExecutionState.FAILED ? (
+                          React.createElement(resolveIcon("x"), {
+                            size: 16,
+                            className: "text-red-600"
+                          })
+                        ) : execution.state === ChainExecutionState.RUNNING ? (
+                          React.createElement(resolveIcon("refresh-cw"), {
+                            size: 16,
+                            className: "text-blue-600 animate-spin"
+                          })
+                        ) : (
+                          React.createElement(resolveIcon("circle"), {
+                            size: 16,
+                            className: "text-gray-400"
+                          })
+                        )}
+                      </div>
+                      <span className="text-sm text-gray-800 truncate flex-1">{execution.name}</span>
+                    </div>
+                    {/* Children executions */}
+                    {execution.children && execution.children.map((child, childIndex) => (
+                      <div key={`${index}-${childIndex}`} className="flex items-center gap-2 px-2 rounded-md w-full min-w-0">
+                        <div className="flex-shrink-0">
+                          {React.createElement(resolveIcon("corner-down-right"), {
+                            size: 16,
+                            className: "text-gray-400"
+                          })}
+                        </div>
+                        <div className="flex-shrink-0">
+                          {child.state === ChainExecutionState.COMPLETED ? (
+                            React.createElement(resolveIcon("circle-check"), {
+                              size: 16,
+                              className: "text-green-600"
+                            })
+                          ) : child.state === ChainExecutionState.FAILED ? (
+                            React.createElement(resolveIcon("x"), {
+                              size: 16,
+                              className: "text-red-600"
+                            })
+                          ) : child.state === ChainExecutionState.RUNNING ? (
+                            React.createElement(resolveIcon("refresh-cw"), {
+                              size: 16,
+                              className: "text-blue-600 animate-spin"
+                            })
+                          ) : (
+                            React.createElement(resolveIcon("circle"), {
+                              size: 16,
+                              className: "text-gray-400"
+                            })
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-700 truncate flex-1">{child.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
               </div>
             )}
 

@@ -5,12 +5,14 @@ import { ChildEventsInfo } from "../childEvents";
 import { MetadataItem, MetadataList } from "../metadataList";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
+import { ChainExecutionState } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
 
 interface TabData {
   current?: Record<string, any>;
   root?: Record<string, any>;
   payload?: any;
+  executionChain?: Array<{ name: string; state: ChainExecutionState; children?: Array<{ name: string; state: ChainExecutionState }> }>;
 }
 
 interface ComponentSidebarProps {
