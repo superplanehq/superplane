@@ -44,23 +44,18 @@ func (m *Merge) HandleAction(ctx components.ActionContext) error {
 }
 
 func (m *Merge) Execute(ctx components.ExecutionContext) error {
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {ctx.Data},
-	})
+	// do nothing, all work is essentially done in the ProcessQueueItem
+	// Eventually, we will add timeout handling here
+	return nil
 }
 
 func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) error {
-	merge_group := ctx.RootEventID
+	mergeGroup := ctx.RootEventID
 
-	fmt.Println("processing merge for group:", merge_group)
-
-	execID, err := m.findOrCreateExecution(ctx, merge_group)
+	execID, err := m.findOrCreateExecution(ctx, mergeGroup)
 	if err != nil {
-		fmt.Println("error finding or creating execution:", err)
 		return err
 	}
-
-	fmt.Println("using execution ID:", execID)
 
 	if err := ctx.DequeueItem(); err != nil {
 		return err
@@ -80,7 +75,8 @@ func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) error {
 	fmt.Println("incoming:", incoming)
 
 	if len(md.EventIDs) >= incoming {
-		return m.FinishExecution(ctx, execID, merge_group, md)
+		fmt.Println("Finishing execution")
+		return m.FinishExecution(ctx, execID, mergeGroup, md)
 	}
 
 	return nil

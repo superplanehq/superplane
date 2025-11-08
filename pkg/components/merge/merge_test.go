@@ -24,9 +24,12 @@ func Test_Merge(t *testing.T) {
 	m := &Merge{}
 
 	steps.ProcessFirstEvent(m)
-	steps.ProcessSecondEvent(m)
-
 	steps.AssertOneExecutionCreated()
+	steps.AssertExecutionPending()
+
+	steps.ProcessSecondEvent(m)
+	steps.AssertOneExecutionCreated()
+	steps.AssertExecutionFinished()
 }
 
 type MergeTestSteps struct {
@@ -200,4 +203,16 @@ func (s *MergeTestSteps) AssertOneExecutionCreated() {
 	var executions []models.WorkflowNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).Find(&executions).Error)
 	assert.Equal(s.t, 1, len(executions))
+}
+
+func (s *MergeTestSteps) AssertExecutionFinished() {
+	var execution models.WorkflowNodeExecution
+	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
+	assert.Equal(s.t, execution.State, models.WorkflowNodeExecutionStateFinished)
+}
+
+func (s *MergeTestSteps) AssertExecutionPending() {
+	var execution models.WorkflowNodeExecution
+	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
+	assert.Equal(s.t, execution.State, models.WorkflowNodeExecutionStatePending)
 }
