@@ -576,7 +576,9 @@ CREATE TABLE public.workflow_node_execution_kvs (
     execution_id uuid NOT NULL,
     key text NOT NULL,
     value text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    workflow_id uuid NOT NULL,
+    node_id character varying(128) NOT NULL
 );
 
 
@@ -1285,6 +1287,13 @@ CREATE INDEX idx_workflow_node_execution_kvs_ekv ON public.workflow_node_executi
 
 
 --
+-- Name: idx_workflow_node_execution_kvs_workflow_node_key_value; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_execution_kvs_workflow_node_key_value ON public.workflow_node_execution_kvs USING btree (workflow_id, node_id, key, value);
+
+
+--
 -- Name: idx_workflow_node_executions_workflow_node_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1446,6 +1455,22 @@ ALTER TABLE ONLY public.execution_resources
 
 ALTER TABLE ONLY public.execution_resources
     ADD CONSTRAINT execution_resources_parent_resource_id_fkey FOREIGN KEY (parent_resource_id) REFERENCES public.resources(id);
+
+
+--
+-- Name: workflow_node_execution_kvs fk_wnek_workflow; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_kvs
+    ADD CONSTRAINT fk_wnek_workflow FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_execution_kvs fk_wnek_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_kvs
+    ADD CONSTRAINT fk_wnek_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
 
 
 --
@@ -1688,7 +1713,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251106120000	f
+20251107235000	f
 \.
 
 

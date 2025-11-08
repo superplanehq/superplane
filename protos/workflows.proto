@@ -237,6 +237,7 @@ message Workflow {
   message Status {
     repeated WorkflowNodeExecution last_executions = 1;
     repeated WorkflowNodeQueueItem next_queue_items = 2;
+    repeated WorkflowEvent last_events = 3;
   }
 
   Metadata metadata = 1;

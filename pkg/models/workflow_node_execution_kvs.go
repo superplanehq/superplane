@@ -21,16 +21,18 @@ import (
 
 type WorkflowNodeExecutionKV struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	WorkflowID  uuid.UUID `gorm:"type:uuid;not null"`
+	NodeID      string    `gorm:"type:varchar(128);not null"`
 	ExecutionID uuid.UUID `gorm:"type:uuid;not null"`
 	Key         string    `gorm:"type:text;not null"`
 	Value       string    `gorm:"type:text;not null"`
 	CreatedAt   *time.Time
 }
 
-func (WorkflowNodeExecutionKV) TableName() string { return "workflow_node_execution_kvs" }
-
-func CreateWorkflowNodeExecutionKVInTransaction(tx *gorm.DB, executionID uuid.UUID, key, value string) error {
+func CreateWorkflowNodeExecutionKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string, executionID uuid.UUID, key, value string) error {
 	rec := WorkflowNodeExecutionKV{
+		WorkflowID:  workflowID,
+		NodeID:      nodeID,
 		ExecutionID: executionID,
 		Key:         key,
 		Value:       value,
@@ -39,14 +41,25 @@ func CreateWorkflowNodeExecutionKVInTransaction(tx *gorm.DB, executionID uuid.UU
 	return tx.Create(&rec).Error
 }
 
-func FindFirstWorkflowNodeExecutionKVInTransaction(tx *gorm.DB, key, value string) (*WorkflowNodeExecutionKV, error) {
-	var rec WorkflowNodeExecutionKV
+func FirstNodeExecutionByKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID, key, value string) (*WorkflowNodeExecution, error) {
+	var execution WorkflowNodeExecution
 
-	err := tx.Where("key = ? AND value = ?", key, value).Order("created_at ASC").First(&rec).Error
+	err := tx.
+		Model(&WorkflowNodeExecution{}).
+		Where("id IN (?)", tx.
+			Select("execution_id").
+			Table("workflow_node_execution_kvs").
+			Where("key = ? AND value = ?", key, value).
+			Where("workflow_id = ?", workflowID).
+			Where("node_id = ?", nodeID)).
+		Order("created_at ASC").
+		Limit(1).
+		First(&execution).
+		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &rec, nil
+	return &execution, nil
 }

@@ -81,6 +81,7 @@ func (s *CustomComponentsSteps) GivenACanvasWithComponentExists() {
 
 	// save canvas
 	s.session.Click(q.TestID("save-canvas-button"))
+	s.session.Sleep(1000)
 }
 
 func (s *CustomComponentsSteps) GivenNodeHasOneExecution() {

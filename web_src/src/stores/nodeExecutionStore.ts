@@ -163,6 +163,17 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
       });
     });
 
+    // Populate with last events from workflow.status
+    workflow.status?.lastEvents?.forEach((event) => {
+      if (!event.nodeId) return;
+
+      const existing = initialData.get(event.nodeId) || { ...emptyNodeData };
+      initialData.set(event.nodeId, {
+        ...existing,
+        events: [event],
+      });
+    });
+
     set({ data: initialData, version: get().version + 1 });
   },
 
