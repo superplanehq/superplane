@@ -40,7 +40,6 @@ import {
   NodeEditData,
   SidebarData,
   SidebarEvent,
-  TabData,
 } from "@/ui/CanvasPage";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
@@ -50,7 +49,7 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { flattenObject } from "@/lib/utils";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
-import { ChainExecutionState } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
+import { ChainExecutionState, TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 
 type UnsavedChangeKind = "position" | "structural";
 

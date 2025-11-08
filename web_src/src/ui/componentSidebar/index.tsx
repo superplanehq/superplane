@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon } from "@/lib/utils";
 import { TextAlignStart, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -5,16 +6,8 @@ import { ChildEventsInfo } from "../childEvents";
 import { MetadataItem, MetadataList } from "../metadataList";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
-import { ChainExecutionState } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
-
-interface TabData {
-  current?: Record<string, any>;
-  root?: Record<string, any>;
-  payload?: any;
-  executionChain?: Array<{ name: string; state: ChainExecutionState; children?: Array<{ name: string; state: ChainExecutionState }> }>;
-}
-
+import { TabData } from "./SidebarEventItem/SidebarEventItem";
 interface ComponentSidebarProps {
   isOpen?: boolean;
   setIsOpen?: (isOpen: boolean) => void;

@@ -10,11 +10,17 @@ export enum ChainExecutionState {
   RUNNING = 'running',
 }
 
-interface TabData {
+export interface ExecutionChainItem {
+  name: string;
+  state: ChainExecutionState;
+  children?: Array<{ name: string; state: ChainExecutionState }>;
+}
+
+export interface TabData {
   current?: Record<string, any>;
   root?: Record<string, any>;
   payload?: any;
-  executionChain?: Array<{ name: string; state: ChainExecutionState; children?: Array<{ name: string; state: ChainExecutionState }> }>;
+  executionChain?: ExecutionChainItem[];
 }
 
 interface SidebarEventItemProps {
