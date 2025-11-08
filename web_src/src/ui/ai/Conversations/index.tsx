@@ -1,13 +1,4 @@
-import {
-  BotIcon,
-  CheckIcon,
-  CopyIcon,
-  FileIcon,
-  ListIcon,
-  PaperclipIcon,
-  PlusIcon,
-  XIcon,
-} from "lucide-react";
+import { BotIcon, CheckIcon, CopyIcon, FileIcon, ListIcon, PaperclipIcon, PlusIcon, XIcon } from "lucide-react";
 
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -92,10 +83,7 @@ export namespace Conversations {
     /**
      * Called when a conversation title is updated
      */
-    onUpdateConversationTitle?: (
-      conversationId: string,
-      newTitle: string
-    ) => void;
+    onUpdateConversationTitle?: (conversationId: string, newTitle: string) => void;
 
     /**
      * Context-aware actions available for current page
@@ -179,9 +167,7 @@ export function Conversations({
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Get the active conversation
-  const activeConversation = conversations.find(
-    (c) => c.id === activeConversationId
-  );
+  const activeConversation = conversations.find((c) => c.id === activeConversationId);
 
   // Handle mounting
   useEffect(() => {
@@ -271,9 +257,7 @@ export function Conversations({
     }
   };
 
-  const groupConversationsByTime = (
-    conversations: Conversations.Conversation[]
-  ) => {
+  const groupConversationsByTime = (conversations: Conversations.Conversation[]) => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekStart = new Date(today);
@@ -341,9 +325,7 @@ export function Conversations({
       {/* Resize Handle */}
       <div
         className={`absolute left-0 top-0 bottom-0 w-1 cursor-col-resize transition-all ${
-          isResizing
-            ? "bg-accent-base"
-            : "hover:bg-accent-base/50 bg-surface-outline/50"
+          isResizing ? "bg-accent-base" : "hover:bg-accent-base/50 bg-surface-outline/50"
         }`}
         onMouseDown={handleResizeStart}
         title="Drag to resize"
@@ -413,35 +395,29 @@ export function Conversations({
               </div>
             ) : (
               <div className="py-2">
-                {groupConversationsByTime(conversations).map(
-                  ([groupName, groupConversations]) => (
-                    <div key={groupName} className="mb-4">
-                      <div className="px-4 py-1 text-xs font-medium text-content-dimmed uppercase tracking-wide">
-                        {groupName}
-                      </div>
-                      <div className="space-y-0.5">
-                        {groupConversations.map((conversation) => (
-                          <button
-                            key={conversation.id}
-                            onClick={() => {
-                              onSelectConversation?.(conversation.id);
-                              setShowConversationsList(false);
-                            }}
-                            className={`w-full text-left px-4 py-2 hover:bg-surface-highlight transition-colors ${
-                              activeConversationId === conversation.id
-                                ? "bg-surface-highlight"
-                                : ""
-                            }`}
-                          >
-                            <div className="text-sm text-content-base truncate">
-                              {conversation.title}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
+                {groupConversationsByTime(conversations).map(([groupName, groupConversations]) => (
+                  <div key={groupName} className="mb-4">
+                    <div className="px-4 py-1 text-xs font-medium text-content-dimmed uppercase tracking-wide">
+                      {groupName}
                     </div>
-                  )
-                )}
+                    <div className="space-y-0.5">
+                      {groupConversations.map((conversation) => (
+                        <button
+                          key={conversation.id}
+                          onClick={() => {
+                            onSelectConversation?.(conversation.id);
+                            setShowConversationsList(false);
+                          }}
+                          className={`w-full text-left px-4 py-2 hover:bg-surface-highlight transition-colors ${
+                            activeConversationId === conversation.id ? "bg-surface-highlight" : ""
+                          }`}
+                        >
+                          <div className="text-sm text-content-base truncate">{conversation.title}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -451,14 +427,9 @@ export function Conversations({
       {/* Context Attachment */}
       {(activeConversation?.context || contextAttachment) && (
         <div className="px-4 py-3 border-b border-surface-outline bg-surface-base">
-          <div className="text-xs text-content-dimmed mb-2 uppercase tracking-wide font-medium">
-            Context
-          </div>
+          <div className="text-xs text-content-dimmed mb-2 uppercase tracking-wide font-medium">Context</div>
           <div className="flex items-center gap-2">
-            <PaperclipIcon
-              size={14}
-              className="text-content-base flex-shrink-0"
-            />
+            <PaperclipIcon size={14} className="text-content-base flex-shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="text-sm text-content-base truncate">
                 {(activeConversation?.context || contextAttachment)?.title}
@@ -471,9 +442,7 @@ export function Conversations({
       {/* Context Actions */}
       {contextActions.length > 0 && !activeConversation && (
         <div className="px-4 py-4 bg-surface-base">
-          <div className="text-xs text-content-dimmed mb-3 uppercase tracking-wide font-medium">
-            Available Actions
-          </div>
+          <div className="text-xs text-content-dimmed mb-3 uppercase tracking-wide font-medium">Available Actions</div>
           <div className="flex flex-col gap-2">
             {contextActions.map((action) => (
               <button
@@ -484,9 +453,7 @@ export function Conversations({
                 {action.icon}
                 <div className="">
                   <span>{action.label}</span>
-                  <div className="text-xs text-stone-500">
-                    {action.description}
-                  </div>
+                  <div className="text-xs text-stone-500">{action.description}</div>
                 </div>
               </button>
             ))}
@@ -504,9 +471,7 @@ export function Conversations({
                   <BotIcon size={32} className="text-white" />
                 </div>
                 <h3 className="font-medium mb-2">Welcome to Alfred</h3>
-                <p className="text-sm mb-4">
-                  Start a conversation to get AI assistance with your work.
-                </p>
+                <p className="text-sm mb-4">Start a conversation to get AI assistance with your work.</p>
                 <button
                   onClick={() => onCreateConversation?.(null)}
                   className="px-4 py-2 bg-accent-base text-white rounded hover:bg-accent-hover transition-colors"
@@ -521,19 +486,11 @@ export function Conversations({
             {activeConversation.messages
               .filter((message) => message.status !== "pending")
               .map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex gap-3 ${
-                    message.sender === "user" ? "flex-row-reverse" : ""
-                  }`}
-                >
+                <div key={message.id} className={`flex gap-3 ${message.sender === "user" ? "flex-row-reverse" : ""}`}>
                   {/* Avatar */}
                   <div className="flex-shrink-0">
                     {message.sender === "ai" ? (
-                      <BotIcon
-                        size={32}
-                        className="text-white bg-black rounded p-1.5 mt-3"
-                      />
+                      <BotIcon size={32} className="text-white bg-black rounded p-1.5 mt-3" />
                     ) : (
                       <BotIcon size={32} className="text-content-dimmed" />
                     )}
@@ -547,23 +504,17 @@ export function Conversations({
                           : "bg-sky-200 text-content-base"
                       }`}
                     >
-                      <div className="text-sm whitespace-pre-wrap">
-                        {message.content}
-                      </div>
+                      <div className="text-sm whitespace-pre-wrap">{message.content}</div>
                       <div
                         className={`text-xs mt-1 ${
-                          message.sender === "user"
-                            ? "text-white/70"
-                            : "text-content-dimmed"
+                          message.sender === "user" ? "text-white/70" : "text-content-dimmed"
                         }`}
                       >
                         {formatTime(message.timestamp)}
                       </div>
 
                       {/* Copy button for AI messages */}
-                      {message.sender === "ai" && (
-                        <CopyButton text={message.content} />
-                      )}
+                      {message.sender === "ai" && <CopyButton text={message.content} />}
                     </div>
 
                     {/* Message Actions */}
@@ -585,10 +536,7 @@ export function Conversations({
               ))}
 
             {/* Typing indicator for pending AI messages */}
-            {activeConversation.messages.some(
-              (message) =>
-                message.sender === "ai" && message.status === "pending"
-            ) && (
+            {activeConversation.messages.some((message) => message.sender === "ai" && message.status === "pending") && (
               <div className="flex gap-3">
                 {/* AI Avatar */}
                 <div className="flex-shrink-0">
@@ -601,9 +549,7 @@ export function Conversations({
                   <div className="rounded-lg px-3 py-2 bg-surface-highlight text-content-base">
                     <div className="flex items-center gap-2">
                       <BounceLoader size={16} color="#6B7280" />
-                      <span className="text-sm text-content-dimmed">
-                        Reviewing...
-                      </span>
+                      <span className="text-sm text-content-dimmed">Reviewing...</span>
                     </div>
                   </div>
                 </div>
@@ -644,18 +590,9 @@ export function Conversations({
   return createPortal(panelContent, document.body);
 }
 
-function BounceLoader({
-  size = 16,
-  color = "#000",
-}: {
-  size?: number;
-  color?: string;
-}) {
+function BounceLoader({ size = 16, color = "#000" }: { size?: number; color?: string }) {
   return (
-    <div
-      className="flex items-center justify-center"
-      style={{ width: size, height: size }}
-    >
+    <div className="flex items-center justify-center" style={{ width: size, height: size }}>
       <div
         className="w-2 h-2 bg-current rounded-full animate-bounce"
         style={{ backgroundColor: color, animationDelay: "0s" }}
@@ -676,7 +613,4 @@ export default Conversations;
 
 // Re-export the hook and types
 export { useConversations } from "./useConversations";
-export type {
-  UseConversationsOptions,
-  UseConversationsReturn,
-} from "./useConversations";
+export type { UseConversationsOptions, UseConversationsReturn } from "./useConversations";

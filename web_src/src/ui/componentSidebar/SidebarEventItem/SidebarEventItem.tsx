@@ -5,9 +5,9 @@ import { ChildEvents, ChildEventsInfo } from "../../childEvents";
 import { SidebarEvent } from "../types";
 
 export enum ChainExecutionState {
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-  RUNNING = 'running',
+  COMPLETED = "completed",
+  FAILED = "failed",
+  RUNNING = "running",
 }
 
 export interface ExecutionChainItem {
@@ -26,7 +26,7 @@ export interface TabData {
 interface SidebarEventItemProps {
   event: SidebarEvent;
   index: number;
-  variant?: 'latest' | 'queue';
+  variant?: "latest" | "queue";
   isOpen: boolean;
   onToggleOpen: (eventId: string) => void;
   onExpandChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
@@ -38,7 +38,7 @@ interface SidebarEventItemProps {
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   event,
   index,
-  variant = 'latest',
+  variant = "latest",
   isOpen,
   onToggleOpen,
   onExpandChildEvents,
@@ -47,29 +47,29 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   tabData,
 }) => {
   // Determine default active tab based on available data
-  const getDefaultActiveTab = useCallback((): 'current' | 'root' | 'payload' | 'executionChain' => {
-    if (!tabData) return 'current';
-    if (tabData.current) return 'current';
-    if (tabData.root) return 'root';
-    if (tabData.payload) return 'payload';
-    if (tabData.executionChain) return 'executionChain';
-    return 'current';
+  const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" | "executionChain" => {
+    if (!tabData) return "current";
+    if (tabData.current) return "current";
+    if (tabData.root) return "root";
+    if (tabData.payload) return "payload";
+    if (tabData.executionChain) return "executionChain";
+    return "current";
   }, [tabData]);
 
-  const [activeTab, setActiveTab] = useState<'current' | 'root' | 'payload' | 'executionChain'>(getDefaultActiveTab());
+  const [activeTab, setActiveTab] = useState<"current" | "root" | "payload" | "executionChain">(getDefaultActiveTab());
 
   // Update active tab when tabData changes to ensure we always have a valid active tab
   useEffect(() => {
     const defaultTab = getDefaultActiveTab();
     // Only update if current active tab is not available in the new tabData
     if (tabData) {
-      if (activeTab === 'current' && !tabData.current) {
+      if (activeTab === "current" && !tabData.current) {
         setActiveTab(defaultTab);
-      } else if (activeTab === 'root' && !tabData.root) {
+      } else if (activeTab === "root" && !tabData.root) {
         setActiveTab(defaultTab);
-      } else if (activeTab === 'payload' && !tabData.payload) {
+      } else if (activeTab === "payload" && !tabData.payload) {
         setActiveTab(defaultTab);
-      } else if (activeTab === 'executionChain' && !tabData.executionChain) {
+      } else if (activeTab === "executionChain" && !tabData.executionChain) {
         setActiveTab(defaultTab);
       }
     }
@@ -100,7 +100,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       iconSize = 8;
       break;
     case "waiting":
-      if (variant === 'queue') {
+      if (variant === "queue") {
         // Match node card styling (neutral grey + dashed icon)
         EventIcon = resolveIcon("circle-dashed");
         EventColor = "text-gray-500";
@@ -176,33 +176,36 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                 <div className="flex">
                   {tabData.current && (
                     <button
-                      onClick={() => setActiveTab('current')}
-                      className={`px-5 py-1 text-sm font-medium rounded-tl-md  ${activeTab === 'current'
-                        ? 'text-black border-b-1 border-black'
-                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                        }`}
+                      onClick={() => setActiveTab("current")}
+                      className={`px-5 py-1 text-sm font-medium rounded-tl-md  ${
+                        activeTab === "current"
+                          ? "text-black border-b-1 border-black"
+                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                      }`}
                     >
                       Current
                     </button>
                   )}
                   {tabData.root && (
                     <button
-                      onClick={() => setActiveTab('root')}
-                      className={`px-5 py-1 text-sm font-medium ${activeTab === 'root'
-                        ? 'text-black border-b-1 border-black'
-                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                        }`}
+                      onClick={() => setActiveTab("root")}
+                      className={`px-5 py-1 text-sm font-medium ${
+                        activeTab === "root"
+                          ? "text-black border-b-1 border-black"
+                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                      }`}
                     >
                       Root
                     </button>
                   )}
                   {tabData.executionChain && (
                     <button
-                      onClick={() => setActiveTab('executionChain')}
-                      className={`px-5 py-1 text-sm font-medium ${activeTab === 'executionChain'
-                        ? 'text-black border-b-1 border-black'
-                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                        }`}
+                      onClick={() => setActiveTab("executionChain")}
+                      className={`px-5 py-1 text-sm font-medium ${
+                        activeTab === "executionChain"
+                          ? "text-black border-b-1 border-black"
+                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                      }`}
                     >
                       Execution Chain
                     </button>
@@ -210,11 +213,12 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                 </div>
                 {tabData.payload && (
                   <button
-                    onClick={() => setActiveTab('payload')}
-                    className={`px-3 py-1 text-sm font-medium rounded-tr-md flex items-center gap-1 ${activeTab === 'payload'
-                      ? 'text-black border-b-1 border-black bg-gray-100'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-l-1 border-gray-200'
-                      }`}
+                    onClick={() => setActiveTab("payload")}
+                    className={`px-3 py-1 text-sm font-medium rounded-tr-md flex items-center gap-1 ${
+                      activeTab === "payload"
+                        ? "text-black border-b-1 border-black bg-gray-100"
+                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-l-1 border-gray-200"
+                    }`}
                   >
                     {React.createElement(resolveIcon("code"), { size: 14 })}
                     Payload
@@ -224,108 +228,119 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             )}
 
             {/* Tab Content */}
-            {tabData && activeTab === 'current' && tabData.current && (
+            {tabData && activeTab === "current" && tabData.current && (
               <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
                 {Object.entries(tabData.current).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>{key}:</span>
-                    <span className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate" title={String(value)}>{String(value)}</span>
+                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                      {key}:
+                    </span>
+                    <span
+                      className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                      title={String(value)}
+                    >
+                      {String(value)}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
 
-            {tabData && activeTab === 'root' && tabData.root && (
+            {tabData && activeTab === "root" && tabData.root && (
               <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
                 {Object.entries(tabData.root).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>{key}:</span>
-                    <span className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate" title={String(value)}>{String(value)}</span>
+                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                      {key}:
+                    </span>
+                    <span
+                      className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                      title={String(value)}
+                    >
+                      {String(value)}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
 
-            {tabData && activeTab === 'payload' && tabData.payload && (
+            {tabData && activeTab === "payload" && tabData.payload && (
               <div className="w-full px-2 py-2">
                 <pre className="text-xs bg-gray-50 p-2 rounded border overflow-x-auto">
-                  {typeof tabData.payload === 'string'
-                    ? tabData.payload
-                    : JSON.stringify(tabData.payload, null, 2)
-                  }
+                  {typeof tabData.payload === "string" ? tabData.payload : JSON.stringify(tabData.payload, null, 2)}
                 </pre>
               </div>
             )}
 
-            {tabData && activeTab === 'executionChain' && tabData.executionChain && (
+            {tabData && activeTab === "executionChain" && tabData.executionChain && (
               <div className="w-full flex flex-col gap-2 px-2 py-2">
                 <div className="text-sm text-gray-500 ml-2">
-                  {totalExecutionsCount} execution{totalExecutionsCount === 1 ? '' : 's'}
+                  {totalExecutionsCount} execution{totalExecutionsCount === 1 ? "" : "s"}
                 </div>
                 {tabData.executionChain.map((execution, index) => (
                   <div key={index} className="flex flex-col gap-1">
                     {/* Main execution */}
                     <div className="flex items-center gap-2 px-2 rounded-md w-full min-w-0">
                       <div className="flex-shrink-0">
-                        {execution.state === ChainExecutionState.COMPLETED ? (
-                          React.createElement(resolveIcon("circle-check"), {
-                            size: 16,
-                            className: "text-green-600"
-                          })
-                        ) : execution.state === ChainExecutionState.FAILED ? (
-                          React.createElement(resolveIcon("x"), {
-                            size: 16,
-                            className: "text-red-600"
-                          })
-                        ) : execution.state === ChainExecutionState.RUNNING ? (
-                          React.createElement(resolveIcon("refresh-cw"), {
-                            size: 16,
-                            className: "text-blue-600 animate-spin"
-                          })
-                        ) : (
-                          React.createElement(resolveIcon("circle"), {
-                            size: 16,
-                            className: "text-gray-400"
-                          })
-                        )}
+                        {execution.state === ChainExecutionState.COMPLETED
+                          ? React.createElement(resolveIcon("circle-check"), {
+                              size: 16,
+                              className: "text-green-600",
+                            })
+                          : execution.state === ChainExecutionState.FAILED
+                            ? React.createElement(resolveIcon("x"), {
+                                size: 16,
+                                className: "text-red-600",
+                              })
+                            : execution.state === ChainExecutionState.RUNNING
+                              ? React.createElement(resolveIcon("refresh-cw"), {
+                                  size: 16,
+                                  className: "text-blue-600 animate-spin",
+                                })
+                              : React.createElement(resolveIcon("circle"), {
+                                  size: 16,
+                                  className: "text-gray-400",
+                                })}
                       </div>
                       <span className="text-sm text-gray-800 truncate flex-1">{execution.name}</span>
                     </div>
                     {/* Children executions */}
-                    {execution.children && execution.children.map((child, childIndex) => (
-                      <div key={`${index}-${childIndex}`} className="flex items-center gap-2 px-2 rounded-md w-full min-w-0">
-                        <div className="flex-shrink-0">
-                          {React.createElement(resolveIcon("corner-down-right"), {
-                            size: 16,
-                            className: "text-gray-400"
-                          })}
+                    {execution.children &&
+                      execution.children.map((child, childIndex) => (
+                        <div
+                          key={`${index}-${childIndex}`}
+                          className="flex items-center gap-2 px-2 rounded-md w-full min-w-0"
+                        >
+                          <div className="flex-shrink-0">
+                            {React.createElement(resolveIcon("corner-down-right"), {
+                              size: 16,
+                              className: "text-gray-400",
+                            })}
+                          </div>
+                          <div className="flex-shrink-0">
+                            {child.state === ChainExecutionState.COMPLETED
+                              ? React.createElement(resolveIcon("circle-check"), {
+                                  size: 16,
+                                  className: "text-green-600",
+                                })
+                              : child.state === ChainExecutionState.FAILED
+                                ? React.createElement(resolveIcon("x"), {
+                                    size: 16,
+                                    className: "text-red-600",
+                                  })
+                                : child.state === ChainExecutionState.RUNNING
+                                  ? React.createElement(resolveIcon("refresh-cw"), {
+                                      size: 16,
+                                      className: "text-blue-600 animate-spin",
+                                    })
+                                  : React.createElement(resolveIcon("circle"), {
+                                      size: 16,
+                                      className: "text-gray-400",
+                                    })}
+                          </div>
+                          <span className="text-sm text-gray-700 truncate flex-1">{child.name}</span>
                         </div>
-                        <div className="flex-shrink-0">
-                          {child.state === ChainExecutionState.COMPLETED ? (
-                            React.createElement(resolveIcon("circle-check"), {
-                              size: 16,
-                              className: "text-green-600"
-                            })
-                          ) : child.state === ChainExecutionState.FAILED ? (
-                            React.createElement(resolveIcon("x"), {
-                              size: 16,
-                              className: "text-red-600"
-                            })
-                          ) : child.state === ChainExecutionState.RUNNING ? (
-                            React.createElement(resolveIcon("refresh-cw"), {
-                              size: 16,
-                              className: "text-blue-600 animate-spin"
-                            })
-                          ) : (
-                            React.createElement(resolveIcon("circle"), {
-                              size: 16,
-                              className: "text-gray-400"
-                            })
-                          )}
-                        </div>
-                        <span className="text-sm text-gray-700 truncate flex-1">{child.name}</span>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 ))}
               </div>
@@ -336,8 +351,15 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
               <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
                 {Object.entries(event.values || {}).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>{key}:</span>
-                    <span className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate" title={value}>{value}</span>
+                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                      {key}:
+                    </span>
+                    <span
+                      className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                      title={value}
+                    >
+                      {value}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -346,11 +368,12 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             {/* Child Events */}
             {event.childEventsInfo && event.childEventsInfo.count > 0 && (
               <div
-                className={`w-full bg-gray-100 rounded-b-sm px-4 py-3 ${((tabData && (tabData.current || tabData.root || tabData.payload)) ||
-                  (!tabData && event.values && Object.entries(event.values).length > 0))
-                  ? "border-t-1 border-gray-200"
-                  : " rounded-t-sm"
-                  }`}
+                className={`w-full bg-gray-100 rounded-b-sm px-4 py-3 ${
+                  (tabData && (tabData.current || tabData.root || tabData.payload)) ||
+                  (!tabData && event.values && Object.entries(event.values).length > 0)
+                    ? "border-t-1 border-gray-200"
+                    : " rounded-t-sm"
+                }`}
               >
                 <ChildEvents
                   childEventsInfo={event.childEventsInfo}

@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import { Mail, Plus, PlusCircle, Search, UserPlus } from "lucide-react"
+import type { Meta, StoryObj } from "@storybook/react";
+import { Mail, Plus, PlusCircle, Search, UserPlus } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -17,7 +17,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "./index"
+} from "./index";
 
 const meta = {
   title: "shadcn Primitives/DropdownMenu",
@@ -41,11 +41,11 @@ const meta = {
     dir: "ltr",
     modal: false,
   },
-} satisfies Meta<typeof DropdownMenu>
+} satisfies Meta<typeof DropdownMenu>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<typeof meta>
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   render: (args) => (
@@ -61,7 +61,7 @@ export const Default: Story = {
       </DropdownMenuContent>
     </DropdownMenu>
   ),
-}
+};
 
 export const WithShortcuts: Story = {
   render: (args) => (
@@ -83,7 +83,7 @@ export const WithShortcuts: Story = {
   argTypes: {
     modal: { control: { disable: true } },
   },
-}
+};
 
 export const WithSubmenus: Story = {
   render: (args) => (
@@ -124,7 +124,7 @@ export const WithSubmenus: Story = {
       </DropdownMenuContent>
     </DropdownMenu>
   ),
-}
+};
 
 export const WithRadioItems: Story = {
   render: (args) => (
@@ -134,17 +134,13 @@ export const WithRadioItems: Story = {
         <DropdownMenuLabel inset>Status</DropdownMenuLabel>
         <DropdownMenuRadioGroup value="warning">
           <DropdownMenuRadioItem value="info">Info</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="warning">
-            Warning
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="error">
-            Error
-          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="warning">Warning</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="error">Error</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   ),
-}
+};
 
 export const WithCheckboxes: Story = {
   render: (args) => (
@@ -155,10 +151,8 @@ export const WithCheckboxes: Story = {
           Autosave
           <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem>
-          Show Comments
-        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem>Show Comments</DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>
   ),
-}
+};

@@ -10,10 +10,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "If",
         description: "Branch execution based on a condition",
         type: "component",
-        outputChannels: [
-          { id: "then", label: "Then" } as any,
-          { id: "else", label: "Else" } as any,
-        ],
+        outputChannels: [{ id: "then", label: "Then" } as any, { id: "else", label: "Else" } as any],
         configuration: [
           {
             key: "expression",
@@ -64,10 +61,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Approval",
         description: "Pause until manual approval or rejection",
         type: "component",
-        outputChannels: [
-          { id: "approved", label: "Approved" } as any,
-          { id: "rejected", label: "Rejected" } as any,
-        ],
+        outputChannels: [{ id: "approved", label: "Approved" } as any, { id: "rejected", label: "Rejected" } as any],
         configuration: [
           {
             key: "approvers",
@@ -271,8 +265,20 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         configuration: [
           { key: "pageId", label: "Page ID", type: "string", required: true },
           { key: "name", label: "Name", type: "string", required: true },
-          { key: "status", label: "Status", type: "enum", values: ["investigating","identified","monitoring","resolved"], required: true },
-          { key: "impact", label: "Impact", type: "enum", values: ["none","minor","major","critical"], required: false },
+          {
+            key: "status",
+            label: "Status",
+            type: "enum",
+            values: ["investigating", "identified", "monitoring", "resolved"],
+            required: true,
+          },
+          {
+            key: "impact",
+            label: "Impact",
+            type: "enum",
+            values: ["none", "minor", "major", "critical"],
+            required: false,
+          },
           { key: "message", label: "Message", type: "text", required: true },
           { key: "componentIds", label: "Component IDs", type: "string[]", required: false },
           { key: "apiKey", label: "API Key (secret)", type: "string", required: true },
@@ -288,7 +294,13 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         outputChannels: [{ id: "updated", label: "Updated" } as any],
         configuration: [
           { key: "incidentId", label: "Incident ID", type: "string", required: true },
-          { key: "status", label: "Status", type: "enum", values: ["investigating","identified","monitoring","resolved"], required: false },
+          {
+            key: "status",
+            label: "Status",
+            type: "enum",
+            values: ["investigating", "identified", "monitoring", "resolved"],
+            required: false,
+          },
           { key: "message", label: "Message", type: "text", required: true },
           { key: "apiKey", label: "API Key (secret)", type: "string", required: true },
         ],
@@ -317,7 +329,13 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         outputChannels: [{ id: "updated", label: "Updated" } as any],
         configuration: [
           { key: "componentId", label: "Component ID", type: "string", required: true },
-          { key: "status", label: "Status", type: "enum", values: ["operational","degraded_performance","partial_outage","major_outage"], required: true },
+          {
+            key: "status",
+            label: "Status",
+            type: "enum",
+            values: ["operational", "degraded_performance", "partial_outage", "major_outage"],
+            required: true,
+          },
           { key: "apiKey", label: "API Key (secret)", type: "string", required: true },
         ],
         icon: "megaphone",
@@ -349,7 +367,13 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         outputChannels: [{ id: "set", label: "Set" } as any],
         configuration: [
           { key: "pageId", label: "Page ID", type: "string", required: true },
-          { key: "status", label: "Status", type: "enum", values: ["none","minor","major","critical"], required: true },
+          {
+            key: "status",
+            label: "Status",
+            type: "enum",
+            values: ["none", "minor", "major", "critical"],
+            required: true,
+          },
           { key: "apiKey", label: "API Key (secret)", type: "string", required: true },
         ],
         icon: "megaphone",
@@ -667,10 +691,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "GitHub Actions",
         description: "Dispatch or wait on GitHub Actions workflows",
         type: "component",
-        outputChannels: [
-          { id: "success", label: "Success" } as any,
-          { id: "failure", label: "Failure" } as any,
-        ],
+        outputChannels: [{ id: "success", label: "Success" } as any, { id: "failure", label: "Failure" } as any],
         configuration: [
           { key: "repo", label: "Repository", type: "string", required: true },
           {
@@ -787,10 +808,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "GitLab Pipeline",
         description: "Trigger on pipeline status changes",
         type: "trigger",
-        outputChannels: [
-          { id: "success", label: "Success" } as any,
-          { id: "failed", label: "Failed" } as any,
-        ],
+        outputChannels: [{ id: "success", label: "Success" } as any, { id: "failed", label: "Failed" } as any],
         configuration: [
           { key: "project", label: "Project", type: "string", required: true },
           { key: "ref", label: "Ref", type: "string", required: false },
@@ -814,10 +832,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Semaphore CI",
         description: "Trigger or monitor Semaphore pipelines",
         type: "component",
-        outputChannels: [
-          { id: "passed", label: "Passed" } as any,
-          { id: "failed", label: "Failed" } as any,
-        ],
+        outputChannels: [{ id: "passed", label: "Passed" } as any, { id: "failed", label: "Failed" } as any],
         configuration: [
           { key: "org", label: "Organization", type: "string", required: true },
           { key: "project", label: "Project", type: "string", required: true },
@@ -848,10 +863,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Semaphore Run Workflow",
         description: "Start a workflow with parameters",
         type: "component",
-        outputChannels: [
-          { id: "started", label: "Started" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
+        outputChannels: [{ id: "started", label: "Started" } as any, { id: "error", label: "Error" } as any],
         configuration: [
           { key: "org", label: "Organization", type: "string", required: true },
           { key: "project", label: "Project", type: "string", required: true },
@@ -883,10 +895,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Semaphore Cancel Pipeline",
         description: "Cancel a running pipeline",
         type: "component",
-        outputChannels: [
-          { id: "canceled", label: "Canceled" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
+        outputChannels: [{ id: "canceled", label: "Canceled" } as any, { id: "error", label: "Error" } as any],
         configuration: [
           { key: "org", label: "Organization", type: "string", required: true },
           { key: "project", label: "Project", type: "string", required: true },
@@ -912,10 +921,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Semaphore Retry Pipeline",
         description: "Retry a failed pipeline",
         type: "component",
-        outputChannels: [
-          { id: "retried", label: "Retried" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
+        outputChannels: [{ id: "retried", label: "Retried" } as any, { id: "error", label: "Error" } as any],
         configuration: [
           { key: "org", label: "Organization", type: "string", required: true },
           { key: "project", label: "Project", type: "string", required: true },
@@ -940,10 +946,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Semaphore Promote Pipeline",
         description: "Promote a pipeline to the next block",
         type: "component",
-        outputChannels: [
-          { id: "promoted", label: "Promoted" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
+        outputChannels: [{ id: "promoted", label: "Promoted" } as any, { id: "error", label: "Error" } as any],
         configuration: [
           { key: "org", label: "Organization", type: "string", required: true },
           { key: "project", label: "Project", type: "string", required: true },
@@ -1043,10 +1046,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Argo App Rollback",
         description: "Rollback an app to a previous revision",
         type: "component",
-        outputChannels: [
-          { id: "rolledBack", label: "Rolled Back" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
+        outputChannels: [{ id: "rolledBack", label: "Rolled Back" } as any, { id: "error", label: "Error" } as any],
         configuration: [
           { key: "app", label: "Application", type: "string", required: true },
           {
@@ -1107,10 +1107,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Argo App Delete",
         description: "Delete an application (optionally cascade resources)",
         type: "component",
-        outputChannels: [
-          { id: "deleted", label: "Deleted" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
+        outputChannels: [{ id: "deleted", label: "Deleted" } as any, { id: "error", label: "Error" } as any],
         configuration: [
           { key: "app", label: "Application", type: "string", required: true },
           {
@@ -1173,10 +1170,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Argo Workflow Submit",
         description: "Submit a workflow from template with parameters",
         type: "component",
-        outputChannels: [
-          { id: "submitted", label: "Submitted" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
+        outputChannels: [{ id: "submitted", label: "Submitted" } as any, { id: "error", label: "Error" } as any],
         configuration: [
           {
             key: "namespace",
@@ -1217,10 +1211,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Argo Workflow Terminate",
         description: "Terminate a running workflow",
         type: "component",
-        outputChannels: [
-          { id: "terminated", label: "Terminated" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
+        outputChannels: [{ id: "terminated", label: "Terminated" } as any, { id: "error", label: "Error" } as any],
         configuration: [
           {
             key: "namespace",
@@ -1363,10 +1354,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Maintenance Windows",
         description: "Trigger on maintenance window start/end",
         type: "trigger",
-        outputChannels: [
-          { id: "start", label: "Start" } as any,
-          { id: "end", label: "End" } as any,
-        ],
+        outputChannels: [{ id: "start", label: "Start" } as any, { id: "end", label: "End" } as any],
         configuration: [
           {
             key: "serviceIds",
@@ -1827,10 +1815,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "SLO Burn Trigger",
         description: "Trigger when SLO burn rate crosses a threshold",
         type: "trigger",
-        outputChannels: [
-          { id: "breached", label: "Breached" } as any,
-          { id: "recovered", label: "Recovered" } as any,
-        ],
+        outputChannels: [{ id: "breached", label: "Breached" } as any, { id: "recovered", label: "Recovered" } as any],
         configuration: [
           { key: "sloId", label: "SLO ID", type: "string", required: true },
           {
@@ -1897,10 +1882,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Project Test",
         description: "Test a project for vulnerabilities",
         type: "component",
-        outputChannels: [
-          { id: "clean", label: "Clean" } as any,
-          { id: "vulns", label: "Vulnerabilities" } as any,
-        ],
+        outputChannels: [{ id: "clean", label: "Clean" } as any, { id: "vulns", label: "Vulnerabilities" } as any],
         configuration: [
           { key: "org", label: "Org", type: "string", required: false },
           { key: "project", label: "Project", type: "string", required: true },
@@ -1958,10 +1940,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Ignore Issue",
         description: "Ignore a specific issue with reason and expiry",
         type: "component",
-        outputChannels: [
-          { id: "ignored", label: "Ignored" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
+        outputChannels: [{ id: "ignored", label: "Ignored" } as any, { id: "error", label: "Error" } as any],
         configuration: [
           {
             key: "apiToken",
@@ -2022,10 +2001,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "PR Check Status",
         description: "Trigger on Snyk PR check pass/fail",
         type: "trigger",
-        outputChannels: [
-          { id: "passed", label: "Passed" } as any,
-          { id: "failed", label: "Failed" } as any,
-        ],
+        outputChannels: [{ id: "passed", label: "Passed" } as any, { id: "failed", label: "Failed" } as any],
         configuration: [
           {
             key: "repos",
@@ -2127,10 +2103,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "K8s Apply Manifest",
         description: "Apply a Kubernetes manifest to a cluster",
         type: "component",
-        outputChannels: [
-          { id: "applied", label: "Applied" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
+        outputChannels: [{ id: "applied", label: "Applied" } as any, { id: "error", label: "Error" } as any],
         configuration: [
           { key: "cluster", label: "Cluster", type: "string", required: false },
           {
@@ -2154,10 +2127,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "K8s Rollout Restart",
         description: "Restart a deployment and wait for readiness",
         type: "component",
-        outputChannels: [
-          { id: "success", label: "Success" } as any,
-          { id: "failed", label: "Failed" } as any,
-        ],
+        outputChannels: [{ id: "success", label: "Success" } as any, { id: "failed", label: "Failed" } as any],
         configuration: [
           { key: "cluster", label: "Cluster", type: "string", required: false },
           {
@@ -2240,7 +2210,13 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         configuration: [
           { key: "cluster", label: "Cluster", type: "string", required: false },
           { key: "namespace", label: "Namespace", type: "string", required: true },
-          { key: "kind", label: "Kind", type: "enum", values: ["deployment","statefulset","daemonset"], required: true },
+          {
+            key: "kind",
+            label: "Kind",
+            type: "enum",
+            values: ["deployment", "statefulset", "daemonset"],
+            required: true,
+          },
           { key: "name", label: "Name", type: "string", required: true },
           { key: "timeout", label: "Timeout (s)", type: "number", required: false },
         ],
@@ -2256,7 +2232,13 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         configuration: [
           { key: "cluster", label: "Cluster", type: "string", required: false },
           { key: "namespace", label: "Namespace", type: "string", required: false },
-          { key: "kind", label: "Kind", type: "enum", values: ["pod","deployment","service","ingress","job","configmap","secret"], required: true },
+          {
+            key: "kind",
+            label: "Kind",
+            type: "enum",
+            values: ["pod", "deployment", "service", "ingress", "job", "configmap", "secret"],
+            required: true,
+          },
           { key: "name", label: "Name", type: "string", required: true },
           { key: "gracePeriod", label: "Grace Period (s)", type: "number", required: false },
         ],
@@ -2364,10 +2346,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "AWS Lambda Invoke",
         description: "Invoke a Lambda function with payload",
         type: "component",
-        outputChannels: [
-          { id: "success", label: "Success" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
+        outputChannels: [{ id: "success", label: "Success" } as any, { id: "error", label: "Error" } as any],
         configuration: [
           {
             key: "functionName",
@@ -2407,10 +2386,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "AWS ECS Deploy",
         description: "Update ECS service to new task definition",
         type: "component",
-        outputChannels: [
-          { id: "deployed", label: "Deployed" } as any,
-          { id: "failed", label: "Failed" } as any,
-        ],
+        outputChannels: [{ id: "deployed", label: "Deployed" } as any, { id: "failed", label: "Failed" } as any],
         configuration: [
           { key: "cluster", label: "Cluster", type: "string", required: true },
           { key: "service", label: "Service", type: "string", required: true },
@@ -2565,10 +2541,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "GCP Cloud Run Deploy",
         description: "Deploy a revision to Cloud Run",
         type: "component",
-        outputChannels: [
-          { id: "deployed", label: "Deployed" } as any,
-          { id: "failed", label: "Failed" } as any,
-        ],
+        outputChannels: [{ id: "deployed", label: "Deployed" } as any, { id: "failed", label: "Failed" } as any],
         configuration: [
           { key: "service", label: "Service", type: "string", required: true },
           { key: "image", label: "Image", type: "string", required: true },
@@ -2602,10 +2575,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "GCP GKE Rollout",
         description: "Roll out a deployment on GKE",
         type: "component",
-        outputChannels: [
-          { id: "success", label: "Success" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
+        outputChannels: [{ id: "success", label: "Success" } as any, { id: "error", label: "Error" } as any],
         configuration: [
           { key: "cluster", label: "Cluster", type: "string", required: true },
           {
@@ -2705,10 +2675,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Message Events",
         description: "Trigger on new messages or edits",
         type: "trigger",
-        outputChannels: [
-          { id: "message", label: "Message" } as any,
-          { id: "edited", label: "Edited" } as any,
-        ],
+        outputChannels: [{ id: "message", label: "Message" } as any, { id: "edited", label: "Edited" } as any],
         configuration: [
           { key: "channels", label: "Channels", type: "string[]", required: false },
           { key: "mentionsOnly", label: "Mentions Only", type: "boolean", required: false },
@@ -2884,10 +2851,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Cloudflare Workers Deploy",
         description: "Deploy a Worker script to a route",
         type: "component",
-        outputChannels: [
-          { id: "deployed", label: "Deployed" } as any,
-          { id: "failed", label: "Failed" } as any,
-        ],
+        outputChannels: [{ id: "deployed", label: "Deployed" } as any, { id: "failed", label: "Failed" } as any],
         configuration: [
           {
             key: "scriptName",
@@ -2917,10 +2881,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Deployment",
         description: "Standardized deploy flow across environments",
         type: "blueprint",
-        outputChannels: [
-          { id: "success", label: "Success" } as any,
-          { id: "failed", label: "Failed" } as any,
-        ],
+        outputChannels: [{ id: "success", label: "Success" } as any, { id: "failed", label: "Failed" } as any],
         configuration: [
           {
             key: "environment",
@@ -2947,10 +2908,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         label: "Incident Monitor",
         description: "Detect, triage, and route incidents",
         type: "blueprint",
-        outputChannels: [
-          { id: "resolved", label: "Resolved" } as any,
-          { id: "escalated", label: "Escalated" } as any,
-        ],
+        outputChannels: [{ id: "resolved", label: "Resolved" } as any, { id: "escalated", label: "Escalated" } as any],
         configuration: [
           {
             key: "sources",

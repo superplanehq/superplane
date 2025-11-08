@@ -1,13 +1,13 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { SwitchComponent } from './';
+import type { Meta, StoryObj } from "@storybook/react";
+import { SwitchComponent } from "./";
 
 const meta: Meta<typeof SwitchComponent> = {
-  title: 'ui/SwitchComponent',
+  title: "ui/SwitchComponent",
   component: SwitchComponent,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 };
 
 export default meta;
@@ -22,29 +22,29 @@ export const Default: Story = {
         pathName: "MAIN",
         field: "$.title",
         operator: "contains",
-        value: "\"superplane\"",
+        value: '"superplane"',
         receivedAt: new Date(),
         eventState: "success",
-        eventTitle: "fix: Branch name contains 'superplane'"
+        eventTitle: "fix: Branch name contains 'superplane'",
       },
       {
         pathName: "STAGE",
         field: "$.author",
         operator: "contains",
-        value: "\"pedro\"",
+        value: '"pedro"',
         receivedAt: new Date(),
         eventState: "success",
-        eventTitle: "feature: Branch name contains 'dev'"
+        eventTitle: "feature: Branch name contains 'dev'",
       },
       {
         pathName: "DEV",
         field: "$.branch",
         operator: "is",
-        value: "\"dev\"",
+        value: '"dev"',
         receivedAt: new Date(),
         eventState: "failed",
-        eventTitle: "Build failed"
-      }
-    ]
+        eventTitle: "Build failed",
+      },
+    ],
   },
 };

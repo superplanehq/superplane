@@ -1,6 +1,6 @@
-import React from 'react';
-import { useAccount } from '../contexts/AccountContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React from "react";
+import { useAccount } from "../contexts/AccountContext";
+import { useNavigate, useLocation } from "react-router-dom";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -13,8 +13,8 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
   // If account is not loaded and not loading, redirect to organization select
   if (!loading && !account) {
-    console.log('[AuthGuard] No account, redirecting to organization select from:', location.pathname);
-    navigate('/', { replace: true });
+    console.log("[AuthGuard] No account, redirecting to organization select from:", location.pathname);
+    navigate("/", { replace: true });
     return null;
   }
 

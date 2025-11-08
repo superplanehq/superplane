@@ -1,15 +1,11 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import { Pencil, Plus, Share2 } from "lucide-react"
+import type { Meta, StoryObj } from "@storybook/react";
+import { Pencil, Plus, Share2 } from "lucide-react";
 
-import { Button } from "../button"
+import { Button } from "../button";
 
-import {
-  ButtonGroup,
-  ButtonGroupSeparator,
-  ButtonGroupText,
-} from "./index"
+import { ButtonGroup, ButtonGroupSeparator, ButtonGroupText } from "./index";
 
-type ButtonGroupArgs = React.ComponentProps<typeof ButtonGroup>
+type ButtonGroupArgs = React.ComponentProps<typeof ButtonGroup>;
 
 const meta = {
   title: "shadcn Primitives/ButtonGroup",
@@ -30,11 +26,11 @@ const meta = {
   args: {
     orientation: "horizontal",
   },
-} satisfies Meta<ButtonGroupArgs>
+} satisfies Meta<ButtonGroupArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<ButtonGroupArgs>
+type Story = StoryObj<ButtonGroupArgs>;
 
 export const Default: Story = {
   render: (args) => (
@@ -44,7 +40,7 @@ export const Default: Story = {
       <Button variant="outline">Cut</Button>
     </ButtonGroup>
   ),
-}
+};
 
 export const Vertical: Story = {
   args: {
@@ -63,7 +59,7 @@ export const Vertical: Story = {
       </Button>
     </ButtonGroup>
   ),
-}
+};
 
 export const WithSeparator: Story = {
   render: (args) => (
@@ -75,7 +71,7 @@ export const WithSeparator: Story = {
       </Button>
     </ButtonGroup>
   ),
-}
+};
 
 export const WithLabel: Story = {
   render: (args) => (
@@ -86,4 +82,4 @@ export const WithLabel: Story = {
       <Button variant="outline">Archived</Button>
     </ButtonGroup>
   ),
-}
+};

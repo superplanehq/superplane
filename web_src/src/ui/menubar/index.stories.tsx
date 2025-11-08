@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
 import {
   Menubar,
@@ -16,7 +16,7 @@ import {
   MenubarSubContent,
   MenubarSubTrigger,
   MenubarTrigger,
-} from "./index"
+} from "./index";
 
 const meta = {
   title: "shadcn Primitives/Menubar",
@@ -39,11 +39,11 @@ const meta = {
   args: {
     dir: "ltr",
   },
-} satisfies Meta<typeof Menubar>
+} satisfies Meta<typeof Menubar>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<typeof meta>
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   render: (args) => (
@@ -63,7 +63,7 @@ export const Default: Story = {
       </MenubarMenu>
     </Menubar>
   ),
-}
+};
 
 export const WithSubmenu: Story = {
   render: (args) => (
@@ -84,7 +84,7 @@ export const WithSubmenu: Story = {
       </MenubarMenu>
     </Menubar>
   ),
-}
+};
 
 export const WithRadioItems: Story = {
   render: (args) => (
@@ -102,7 +102,7 @@ export const WithRadioItems: Story = {
       </MenubarMenu>
     </Menubar>
   ),
-}
+};
 
 export const WithCheckboxItems: Story = {
   render: (args) => (
@@ -120,4 +120,4 @@ export const WithCheckboxItems: Story = {
       </MenubarMenu>
     </Menubar>
   ),
-}
+};

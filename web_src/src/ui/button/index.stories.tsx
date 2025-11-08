@@ -1,11 +1,11 @@
-import { Fragment } from "react"
-import type { Meta, StoryObj } from "@storybook/react"
-import { ChevronRight, Loader2, Mail, Settings, Trash2 } from "lucide-react"
+import { Fragment } from "react";
+import type { Meta, StoryObj } from "@storybook/react";
+import { ChevronRight, Loader2, Mail, Settings, Trash2 } from "lucide-react";
 
-import { Button, type ButtonProps } from "./index"
+import { Button, type ButtonProps } from "./index";
 
-type IconVariant = "none" | "withIcon" | "iconOnly"
-type ButtonStoryArgs = ButtonProps & { iconVariant?: IconVariant }
+type IconVariant = "none" | "withIcon" | "iconOnly";
+type ButtonStoryArgs = ButtonProps & { iconVariant?: IconVariant };
 
 const meta = {
   title: "shadcn Primitives/Button",
@@ -39,11 +39,11 @@ const meta = {
       table: { category: "Layout" },
     },
   },
-} satisfies Meta<typeof Button>
+} satisfies Meta<typeof Button>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<ButtonStoryArgs>
+type Story = StoryObj<ButtonStoryArgs>;
 
 const renderButton = ({ iconVariant = "none", children, size, ...props }: ButtonStoryArgs) => {
   const content = (() => {
@@ -54,20 +54,20 @@ const renderButton = ({ iconVariant = "none", children, size, ...props }: Button
             <Mail className="mr-2 h-4 w-4" />
             {children}
           </>
-        )
+        );
       case "iconOnly":
-        return <Settings className="h-4 w-4" />
+        return <Settings className="h-4 w-4" />;
       default:
-        return children
+        return children;
     }
-  })()
+  })();
 
   return (
     <Button {...props} size={iconVariant === "iconOnly" ? "icon" : size}>
       {content}
     </Button>
-  )
-}
+  );
+};
 
 const baseArgs: ButtonStoryArgs = {
   variant: "default",
@@ -75,27 +75,27 @@ const baseArgs: ButtonStoryArgs = {
   disabled: false,
   children: "Button",
   iconVariant: "none",
-}
+};
 
-const iconVariantOrder: IconVariant[] = ["none", "withIcon", "iconOnly"]
+const iconVariantOrder: IconVariant[] = ["none", "withIcon", "iconOnly"];
 const iconVariantLabels: Record<IconVariant, string> = {
   none: "No icon",
   withIcon: "Leading icon",
   iconOnly: "Icon only",
-}
+};
 
-const sizeOrder: Array<NonNullable<ButtonProps["size"]>> = ["sm", "default", "lg"]
+const sizeOrder: Array<NonNullable<ButtonProps["size"]>> = ["sm", "default", "lg"];
 const sizeLabels: Record<NonNullable<ButtonProps["size"]>, string> = {
   sm: "Small",
   default: "Default",
   lg: "Large",
   icon: "Icon",
-}
+};
 
 export const Default: Story = {
   args: baseArgs,
   render: renderButton,
-}
+};
 
 export const WithIcon: Story = {
   args: {
@@ -107,7 +107,7 @@ export const WithIcon: Story = {
   argTypes: {
     iconVariant: { control: { disable: true } },
   },
-}
+};
 
 export const WithTrailingIcon: Story = {
   args: {
@@ -123,7 +123,7 @@ export const WithTrailingIcon: Story = {
     children: { control: { disable: true } },
     iconVariant: { control: { disable: true } },
   },
-}
+};
 
 export const IconButton: Story = {
   args: {
@@ -141,7 +141,7 @@ export const IconButton: Story = {
     iconVariant: { control: { disable: true } },
     size: { control: { disable: true } },
   },
-}
+};
 
 export const Loading: Story = {
   args: {
@@ -159,7 +159,7 @@ export const Loading: Story = {
     disabled: { control: { disable: true } },
     iconVariant: { control: { disable: true } },
   },
-}
+};
 
 export const Destructive: Story = {
   args: {
@@ -177,7 +177,7 @@ export const Destructive: Story = {
     variant: { control: { disable: true } },
     iconVariant: { control: { disable: true } },
   },
-}
+};
 
 export const Secondary: Story = {
   args: {
@@ -190,7 +190,7 @@ export const Secondary: Story = {
     variant: { control: { disable: true } },
     iconVariant: { control: { disable: true } },
   },
-}
+};
 
 export const Ghost: Story = {
   args: {
@@ -203,7 +203,7 @@ export const Ghost: Story = {
     variant: { control: { disable: true } },
     iconVariant: { control: { disable: true } },
   },
-}
+};
 
 export const Link: Story = {
   args: {
@@ -216,7 +216,7 @@ export const Link: Story = {
     variant: { control: { disable: true } },
     iconVariant: { control: { disable: true } },
   },
-}
+};
 
 export const ButtonGroup: Story = {
   render: () => (
@@ -239,7 +239,7 @@ export const ButtonGroup: Story = {
     disabled: { control: { disable: true } },
     iconVariant: { control: { disable: true } },
   },
-}
+};
 
 export const FullWidth: Story = {
   render: () => <Button className="w-full">Continue</Button>,
@@ -253,7 +253,7 @@ export const FullWidth: Story = {
     disabled: { control: { disable: true } },
     iconVariant: { control: { disable: true } },
   },
-}
+};
 
 export const Sizes: Story = {
   render: () => (
@@ -269,7 +269,7 @@ export const Sizes: Story = {
     disabled: { control: { disable: true } },
     iconVariant: { control: { disable: true } },
   },
-}
+};
 
 export const SizeIconMatrix: Story = {
   render: () => (
@@ -283,9 +283,7 @@ export const SizeIconMatrix: Story = {
 
       {iconVariantOrder.map((iconVariant) => (
         <Fragment key={iconVariant}>
-          <div className="text-sm font-medium text-muted-foreground">
-            {iconVariantLabels[iconVariant]}
-          </div>
+          <div className="text-sm font-medium text-muted-foreground">{iconVariantLabels[iconVariant]}</div>
           {sizeOrder.map((size) => {
             const content = (() => {
               switch (iconVariant) {
@@ -295,15 +293,16 @@ export const SizeIconMatrix: Story = {
                       <Mail className="mr-2 h-4 w-4" />
                       {sizeLabels[size]}
                     </>
-                  )
+                  );
                 case "iconOnly":
-                  return <Settings className="h-4 w-4" />
+                  return <Settings className="h-4 w-4" />;
                 default:
-                  return sizeLabels[size]
+                  return sizeLabels[size];
               }
-            })()
+            })();
 
-            const ariaLabel = iconVariant === "iconOnly" ? `${iconVariantLabels[iconVariant]} ${sizeLabels[size]}` : undefined
+            const ariaLabel =
+              iconVariant === "iconOnly" ? `${iconVariantLabels[iconVariant]} ${sizeLabels[size]}` : undefined;
 
             return (
               <Button
@@ -313,7 +312,7 @@ export const SizeIconMatrix: Story = {
               >
                 {content}
               </Button>
-            )
+            );
           })}
         </Fragment>
       ))}
@@ -333,4 +332,4 @@ export const SizeIconMatrix: Story = {
       },
     },
   },
-}
+};

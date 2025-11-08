@@ -1,21 +1,21 @@
-import React, { useState, useRef } from 'react'
-import type { Meta, StoryObj } from '@storybook/react'
-import { MemoryRouter } from 'react-router-dom'
-import { GitHubIntegrationForm } from './GitHubIntegrationForm'
-import { SemaphoreIntegrationForm } from './SemaphoreIntegrationForm'
-import { ApiTokenForm } from './ApiTokenForm'
-import { useIntegrationForm } from './useIntegrationForm'
-import { Button } from '../Button/button'
-import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
-import type { IntegrationData, FormErrors } from './types'
-import { createMockSecrets, createMockIntegrations, defaultProps } from '../../../test/__mocks__/secrets'
+import React, { useState, useRef } from "react";
+import type { Meta, StoryObj } from "@storybook/react";
+import { MemoryRouter } from "react-router-dom";
+import { GitHubIntegrationForm } from "./GitHubIntegrationForm";
+import { SemaphoreIntegrationForm } from "./SemaphoreIntegrationForm";
+import { ApiTokenForm } from "./ApiTokenForm";
+import { useIntegrationForm } from "./useIntegrationForm";
+import { Button } from "../Button/button";
+import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
+import type { IntegrationData, FormErrors } from "./types";
+import { createMockSecrets, createMockIntegrations, defaultProps } from "../../../test/__mocks__/secrets";
 
 const meta: Meta = {
-  title: 'Components/IntegrationForm/Complete Flow',
+  title: "Components/IntegrationForm/Complete Flow",
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   decorators: [
     (Story) => (
       <MemoryRouter>
@@ -25,18 +25,18 @@ const meta: Meta = {
       </MemoryRouter>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
-const mockSecrets = createMockSecrets()
-const mockIntegrations = createMockIntegrations()
+const mockSecrets = createMockSecrets();
+const mockIntegrations = createMockIntegrations();
 
 export const GitHubIntegrationFlow: Story = {
   render: () => {
-    const [integrationType] = useState('github')
-    const orgUrlRef = useRef<HTMLInputElement>(null)
+    const [integrationType] = useState("github");
+    const orgUrlRef = useRef<HTMLInputElement>(null);
 
     const {
       integrationData,
@@ -48,43 +48,41 @@ export const GitHubIntegrationFlow: Story = {
       errors,
       setErrors,
       validateForm,
-      resetForm
+      resetForm,
     } = useIntegrationForm({
       integrationType,
-      integrations: mockIntegrations
-    })
+      integrations: mockIntegrations,
+    });
 
-    const [isSubmitting, setIsSubmitting] = useState(false)
-    const [submitResult, setSubmitResult] = useState<string | null>(null)
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitResult, setSubmitResult] = useState<string | null>(null);
 
     const handleSubmit = async () => {
       if (!validateForm()) {
-        setSubmitResult('❌ Validation failed. Please fix the errors above.')
-        return
+        setSubmitResult("❌ Validation failed. Please fix the errors above.");
+        return;
       }
 
-      setIsSubmitting(true)
-      setSubmitResult('⏳ Creating integration...')
+      setIsSubmitting(true);
+      setSubmitResult("⏳ Creating integration...");
 
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      setIsSubmitting(false)
-      setSubmitResult('✅ Integration created successfully!')
+      setIsSubmitting(false);
+      setSubmitResult("✅ Integration created successfully!");
 
       // Reset form after 3 seconds
       setTimeout(() => {
-        resetForm()
-        setSubmitResult(null)
-      }, 3000)
-    }
+        resetForm();
+        setSubmitResult(null);
+      }, 3000);
+    };
 
     return (
       <div className="space-y-6">
         <div className="border-b border-zinc-200 dark:border-zinc-700 pb-4">
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-            New GitHub Integration
-          </h2>
+          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">New GitHub Integration</h2>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
             This story demonstrates the complete integration creation flow.
           </p>
@@ -121,8 +119,8 @@ export const GitHubIntegrationFlow: Story = {
         <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
           <Button
             onClick={() => {
-              resetForm()
-              setSubmitResult(null)
+              resetForm();
+              setSubmitResult(null);
             }}
             disabled={isSubmitting}
           >
@@ -130,11 +128,7 @@ export const GitHubIntegrationFlow: Story = {
             Reset Form
           </Button>
 
-          <Button
-            color="blue"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-          >
+          <Button color="blue" onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
@@ -149,34 +143,32 @@ export const GitHubIntegrationFlow: Story = {
           </Button>
         </div>
 
-        {submitResult && (
-          <div className="p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-sm">
-            {submitResult}
-          </div>
-        )}
+        {submitResult && <div className="p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-sm">{submitResult}</div>}
 
         <div className="mt-8 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-sm">
-          <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-            📋 Form State (for debugging)
-          </h3>
+          <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-2">📋 Form State (for debugging)</h3>
           <pre className="text-xs text-blue-800 dark:text-blue-200 overflow-auto">
-            {JSON.stringify({
-              integrationData,
-              apiTokenTab,
-              newSecretToken: newSecretToken ? '***hidden***' : '',
-              errors
-            }, null, 2)}
+            {JSON.stringify(
+              {
+                integrationData,
+                apiTokenTab,
+                newSecretToken: newSecretToken ? "***hidden***" : "",
+                errors,
+              },
+              null,
+              2,
+            )}
           </pre>
         </div>
       </div>
-    )
-  }
-}
+    );
+  },
+};
 
 export const SemaphoreIntegrationFlow: Story = {
   render: () => {
-    const [integrationType] = useState('semaphore')
-    const orgUrlRef = useRef<HTMLInputElement>(null)
+    const [integrationType] = useState("semaphore");
+    const orgUrlRef = useRef<HTMLInputElement>(null);
 
     const {
       integrationData,
@@ -188,43 +180,41 @@ export const SemaphoreIntegrationFlow: Story = {
       errors,
       setErrors,
       validateForm,
-      resetForm
+      resetForm,
     } = useIntegrationForm({
       integrationType,
-      integrations: mockIntegrations
-    })
+      integrations: mockIntegrations,
+    });
 
-    const [isSubmitting, setIsSubmitting] = useState(false)
-    const [submitResult, setSubmitResult] = useState<string | null>(null)
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitResult, setSubmitResult] = useState<string | null>(null);
 
     const handleSubmit = async () => {
       if (!validateForm()) {
-        setSubmitResult('❌ Validation failed. Please fix the errors above.')
-        return
+        setSubmitResult("❌ Validation failed. Please fix the errors above.");
+        return;
       }
 
-      setIsSubmitting(true)
-      setSubmitResult('⏳ Creating integration...')
+      setIsSubmitting(true);
+      setSubmitResult("⏳ Creating integration...");
 
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      setIsSubmitting(false)
-      setSubmitResult('✅ Integration created successfully!')
+      setIsSubmitting(false);
+      setSubmitResult("✅ Integration created successfully!");
 
       // Reset form after 3 seconds
       setTimeout(() => {
-        resetForm()
-        setSubmitResult(null)
-      }, 3000)
-    }
+        resetForm();
+        setSubmitResult(null);
+      }, 3000);
+    };
 
     return (
       <div className="space-y-6">
         <div className="border-b border-zinc-200 dark:border-zinc-700 pb-4">
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-            New Semaphore Integration
-          </h2>
+          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">New Semaphore Integration</h2>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
             This story demonstrates the complete integration creation flow.
           </p>
@@ -261,8 +251,8 @@ export const SemaphoreIntegrationFlow: Story = {
         <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
           <Button
             onClick={() => {
-              resetForm()
-              setSubmitResult(null)
+              resetForm();
+              setSubmitResult(null);
             }}
             disabled={isSubmitting}
           >
@@ -270,11 +260,7 @@ export const SemaphoreIntegrationFlow: Story = {
             Reset Form
           </Button>
 
-          <Button
-            color="blue"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-          >
+          <Button color="blue" onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
@@ -289,60 +275,54 @@ export const SemaphoreIntegrationFlow: Story = {
           </Button>
         </div>
 
-        {submitResult && (
-          <div className="p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-sm">
-            {submitResult}
-          </div>
-        )}
+        {submitResult && <div className="p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-sm">{submitResult}</div>}
       </div>
-    )
-  }
-}
+    );
+  },
+};
 
 export const EditIntegrationFlow: Story = {
   render: () => {
-    const [integrationType] = useState('github')
-    const orgUrlRef = useRef<HTMLInputElement>(null)
+    const [integrationType] = useState("github");
+    const orgUrlRef = useRef<HTMLInputElement>(null);
 
     // Simulate editing an existing integration
     const [integrationData, setIntegrationData] = useState<IntegrationData>({
-      orgUrl: 'https://github.com/mycompany',
-      name: 'mycompany-production',
+      orgUrl: "https://github.com/mycompany",
+      name: "mycompany-production",
       apiToken: {
-        secretName: 'secret-1',
-        secretKey: 'api-token'
-      }
-    })
+        secretName: "secret-1",
+        secretKey: "api-token",
+      },
+    });
 
-    const [errors, setErrors] = useState<FormErrors>({})
-    const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('existing')
-    const [newSecretToken, setNewSecretToken] = useState('')
-    const [isSubmitting, setIsSubmitting] = useState(false)
-    const [submitResult, setSubmitResult] = useState<string | null>(null)
+    const [errors, setErrors] = useState<FormErrors>({});
+    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("existing");
+    const [newSecretToken, setNewSecretToken] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitResult, setSubmitResult] = useState<string | null>(null);
 
     const handleSubmit = async () => {
       // Basic validation
       if (!integrationData.name.trim() || !integrationData.orgUrl.trim()) {
-        setSubmitResult('❌ Please fill in all required fields.')
-        return
+        setSubmitResult("❌ Please fill in all required fields.");
+        return;
       }
 
-      setIsSubmitting(true)
-      setSubmitResult('⏳ Updating integration...')
+      setIsSubmitting(true);
+      setSubmitResult("⏳ Updating integration...");
 
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      setIsSubmitting(false)
-      setSubmitResult('✅ Integration updated successfully!')
-    }
+      setIsSubmitting(false);
+      setSubmitResult("✅ Integration updated successfully!");
+    };
 
     return (
       <div className="space-y-6">
         <div className="border-b border-zinc-200 dark:border-zinc-700 pb-4">
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-            Edit GitHub Integration
-          </h2>
+          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Edit GitHub Integration</h2>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
             This story demonstrates editing an existing integration.
           </p>
@@ -377,18 +357,12 @@ export const EditIntegrationFlow: Story = {
         />
 
         <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-          <Button
-            disabled={isSubmitting}
-          >
+          <Button disabled={isSubmitting}>
             <MaterialSymbol name="close" size="sm" />
             Cancel
           </Button>
 
-          <Button
-            color="blue"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-          >
+          <Button color="blue" onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
@@ -403,12 +377,8 @@ export const EditIntegrationFlow: Story = {
           </Button>
         </div>
 
-        {submitResult && (
-          <div className="p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-sm">
-            {submitResult}
-          </div>
-        )}
+        {submitResult && <div className="p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-sm">{submitResult}</div>}
       </div>
-    )
-  }
-}
+    );
+  },
+};

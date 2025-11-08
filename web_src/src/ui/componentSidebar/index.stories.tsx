@@ -1,15 +1,15 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { ComponentSidebar } from './';
-import GithubIcon from "@/assets/icons/integrations/github.svg"
-import { useState } from 'react';
+import type { Meta, StoryObj } from "@storybook/react";
+import { ComponentSidebar } from "./";
+import GithubIcon from "@/assets/icons/integrations/github.svg";
+import { useState } from "react";
 
 const meta: Meta<typeof ComponentSidebar> = {
-  title: 'ui/ComponentSidebar',
+  title: "ui/ComponentSidebar",
   component: ComponentSidebar,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 };
 
 export default meta;
@@ -46,10 +46,10 @@ const mockLatestEvents = [
     isOpen: false,
     receivedAt: new Date(Date.now() - 1000 * 60 * 30),
     values: {
-      "Author": "Pedro Forestileao",
-      "Commit": "feat: update component sidebar",
-      "Branch": "feature/ui-update",
-      "Type": "merge",
+      Author: "Pedro Forestileao",
+      Commit: "feat: update component sidebar",
+      Branch: "feature/ui-update",
+      Type: "merge",
       "Event ID": "abc123-def456-ghi789",
     },
     childEventsInfo: {
@@ -108,17 +108,21 @@ export const Default: Story = {
     const handleEventClick = (clickedEvent: any) => {
       console.log("Event clicked", clickedEvent);
 
-      setLatestEvents(prev => prev.map(event =>
-        event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
-          ? { ...event, isOpen: !event.isOpen }
-          : event
-      ));
+      setLatestEvents((prev) =>
+        prev.map((event) =>
+          event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
+            ? { ...event, isOpen: !event.isOpen }
+            : event,
+        ),
+      );
 
-      setNextEvents(prev => prev.map(event =>
-        event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
-          ? { ...event, isOpen: !event.isOpen }
-          : event
-      ));
+      setNextEvents((prev) =>
+        prev.map((event) =>
+          event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
+            ? { ...event, isOpen: !event.isOpen }
+            : event,
+        ),
+      );
     };
 
     return (
@@ -162,18 +166,22 @@ export const WithInteractiveEvents: Story = {
       console.log("Event clicked", clickedEvent);
 
       // Toggle isOpen state for latest events
-      setLatestEvents(prev => prev.map(event =>
-        event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
-          ? { ...event, isOpen: !event.isOpen }
-          : event
-      ));
+      setLatestEvents((prev) =>
+        prev.map((event) =>
+          event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
+            ? { ...event, isOpen: !event.isOpen }
+            : event,
+        ),
+      );
 
       // Toggle isOpen state for next events
-      setNextEvents(prev => prev.map(event =>
-        event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
-          ? { ...event, isOpen: !event.isOpen }
-          : event
-      ));
+      setNextEvents((prev) =>
+        prev.map((event) =>
+          event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
+            ? { ...event, isOpen: !event.isOpen }
+            : event,
+        ),
+      );
     };
 
     return (
@@ -213,17 +221,21 @@ export const WithDifferentIcon: Story = {
     const handleEventClick = (clickedEvent: any) => {
       console.log("Event clicked", clickedEvent);
 
-      setLatestEvents(prev => prev.map(event =>
-        event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
-          ? { ...event, isOpen: !event.isOpen }
-          : event
-      ));
+      setLatestEvents((prev) =>
+        prev.map((event) =>
+          event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
+            ? { ...event, isOpen: !event.isOpen }
+            : event,
+        ),
+      );
 
-      setNextEvents(prev => prev.map(event =>
-        event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
-          ? { ...event, isOpen: !event.isOpen }
-          : event
-      ));
+      setNextEvents((prev) =>
+        prev.map((event) =>
+          event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
+            ? { ...event, isOpen: !event.isOpen }
+            : event,
+        ),
+      );
     };
 
     return (
@@ -272,17 +284,21 @@ export const ExtendedMetadata: Story = {
     const handleEventClick = (clickedEvent: any) => {
       console.log("Event clicked", clickedEvent);
 
-      setLatestEvents(prev => prev.map(event =>
-        event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
-          ? { ...event, isOpen: !event.isOpen }
-          : event
-      ));
+      setLatestEvents((prev) =>
+        prev.map((event) =>
+          event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
+            ? { ...event, isOpen: !event.isOpen }
+            : event,
+        ),
+      );
 
-      setNextEvents(prev => prev.map(event =>
-        event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
-          ? { ...event, isOpen: !event.isOpen }
-          : event
-      ));
+      setNextEvents((prev) =>
+        prev.map((event) =>
+          event.title === clickedEvent.title && event.subtitle === clickedEvent.subtitle
+            ? { ...event, isOpen: !event.isOpen }
+            : event,
+        ),
+      );
     };
 
     return (

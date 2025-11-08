@@ -1,4 +1,4 @@
-import { toast } from 'react-toastify';
+import { toast } from "react-toastify";
 
 /**
  * Show a standardized error toast notification
@@ -13,7 +13,7 @@ export const showErrorToast = (message: string): void => {
     pauseOnHover: true,
     draggable: true,
     closeButton: false,
-    className: 'custom-toast',
+    className: "custom-toast",
   });
 };
 
@@ -30,7 +30,7 @@ export const showSuccessToast = (message: string): void => {
     pauseOnHover: true,
     draggable: true,
     closeButton: false,
-    className: 'custom-toast',
+    className: "custom-toast",
   });
 };
 
@@ -47,7 +47,7 @@ export const showInfoToast = (message: string): void => {
     pauseOnHover: true,
     draggable: true,
     closeButton: false,
-    className: 'custom-toast',
+    className: "custom-toast",
   });
 };
 
@@ -64,6 +64,6 @@ export const showWarningToast = (message: string): void => {
     pauseOnHover: true,
     draggable: true,
     closeButton: false,
-    className: 'custom-toast'
+    className: "custom-toast",
   });
 };

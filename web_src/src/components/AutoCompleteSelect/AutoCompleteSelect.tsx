@@ -1,38 +1,38 @@
-import { useState, useRef, useEffect } from 'react'
-import { useFloating, autoUpdate, offset, flip, shift, size } from '@floating-ui/react'
-import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol'
-import { twMerge } from 'tailwind-merge'
+import { useState, useRef, useEffect } from "react";
+import { useFloating, autoUpdate, offset, flip, shift, size } from "@floating-ui/react";
+import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
+import { twMerge } from "tailwind-merge";
 
 export interface AutoCompleteOption {
-  value: string
-  label: string
-  group?: string
-  type?: string
+  value: string;
+  label: string;
+  group?: string;
+  type?: string;
 }
 
 export interface AutoCompleteSelectProps {
-  options: AutoCompleteOption[]
-  value?: string
-  onChange: (value: string) => void
-  placeholder?: string
-  className?: string
-  error?: boolean
-  disabled?: boolean
+  options: AutoCompleteOption[];
+  value?: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+  error?: boolean;
+  disabled?: boolean;
 }
 
 export function AutoCompleteSelect({
   options,
-  value = '',
+  value = "",
   onChange,
-  placeholder = 'Search...',
+  placeholder = "Search...",
   className,
   error = false,
-  disabled = false
+  disabled = false,
 }: AutoCompleteSelectProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<HTMLDivElement>(null)
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const { refs, floatingStyles } = useFloating({
     open: isOpen,
@@ -45,76 +45,78 @@ export function AutoCompleteSelect({
         apply({ rects, elements }) {
           Object.assign(elements.floating.style, {
             minWidth: `${rects.reference.width}px`,
-          })
+          });
         },
       }),
     ],
     whileElementsMounted: autoUpdate,
-  })
+  });
 
   // Find the selected option
-  const selectedOption = options.find(option => option.value === value)
+  const selectedOption = options.find((option) => option.value === value);
 
   // Filter options based on query
-  const filteredOptions = query === ''
-    ? options
-    : options.filter(option =>
-      option.label.toLowerCase().includes(query.toLowerCase()) ||
-      option.value.toLowerCase().includes(query.toLowerCase())
-    )
+  const filteredOptions =
+    query === ""
+      ? options
+      : options.filter(
+          (option) =>
+            option.label.toLowerCase().includes(query.toLowerCase()) ||
+            option.value.toLowerCase().includes(query.toLowerCase()),
+        );
 
   // Group filtered options
-  const groupedOptions: Record<string, AutoCompleteOption[]> = {}
-  filteredOptions.forEach(option => {
-    const group = option.group || 'Options'
+  const groupedOptions: Record<string, AutoCompleteOption[]> = {};
+  filteredOptions.forEach((option) => {
+    const group = option.group || "Options";
     if (!groupedOptions[group]) {
-      groupedOptions[group] = []
+      groupedOptions[group] = [];
     }
-    groupedOptions[group].push(option)
-  })
+    groupedOptions[group].push(option);
+  });
 
   const handleInputFocus = () => {
-    setIsOpen(true)
-    setQuery('')
-  }
+    setIsOpen(true);
+    setQuery("");
+  };
 
   const handleInputBlur = (e: React.FocusEvent) => {
     if (listRef.current?.contains(e.relatedTarget as Node)) {
-      return
+      return;
     }
     setTimeout(() => {
-      setQuery('')
-      setIsOpen(false)
-    }, 150)
-  }
+      setQuery("");
+      setIsOpen(false);
+    }, 150);
+  };
 
   const handleOptionSelect = (optionValue: string) => {
-    onChange(optionValue)
+    onChange(optionValue);
     setTimeout(() => {
-      inputRef.current?.blur()
-      setQuery('')
-      setIsOpen(false)
-    }, 150)
-  }
+      inputRef.current?.blur();
+      setQuery("");
+      setIsOpen(false);
+    }, 150);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setQuery(e.target.value)
-    if (!isOpen) setIsOpen(true)
-  }
+    setQuery(e.target.value);
+    if (!isOpen) setIsOpen(true);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      setIsOpen(false)
-      setQuery('')
-      inputRef.current?.blur()
+    if (e.key === "Escape") {
+      setIsOpen(false);
+      setQuery("");
+      inputRef.current?.blur();
     }
-  }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const referenceEl = refs.reference.current
-      const floatingEl = refs.floating.current
+      const referenceEl = refs.reference.current;
+      const floatingEl = refs.floating.current;
 
       if (
         referenceEl &&
@@ -124,27 +126,27 @@ export function AutoCompleteSelect({
         !referenceEl.contains(event.target as Node) &&
         !floatingEl.contains(event.target as Node)
       ) {
-        setIsOpen(false)
-        setQuery('')
+        setIsOpen(false);
+        setQuery("");
       }
-    }
+    };
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [refs.reference, refs.floating])
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [refs.reference, refs.floating]);
 
   return (
     <div className="relative">
       <div
         ref={refs.setReference}
         className={twMerge(
-          'relative flex items-center w-full px-3 py-2 text-sm bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100',
-          'border rounded-md focus-within:outline-none focus-within:ring-2 cursor-pointer',
+          "relative flex items-center w-full px-3 py-2 text-sm bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100",
+          "border rounded-md focus-within:outline-none focus-within:ring-2 cursor-pointer",
           error
-            ? 'border-red-300 dark:border-red-600 focus-within:ring-red-500'
-            : 'border-zinc-300 dark:border-zinc-600 focus-within:ring-blue-500',
-          disabled && 'opacity-50 cursor-not-allowed',
-          className
+            ? "border-red-300 dark:border-red-600 focus-within:ring-red-500"
+            : "border-zinc-300 dark:border-zinc-600 focus-within:ring-blue-500",
+          disabled && "opacity-50 cursor-not-allowed",
+          className,
         )}
         onClick={() => inputRef.current?.focus()}
       >
@@ -163,10 +165,13 @@ export function AutoCompleteSelect({
           onKeyDown={handleKeyDown}
           disabled={disabled}
         />
-        <div className="ml-2" onClick={(e) => {
-          e.stopPropagation()
-          setIsOpen(!isOpen)
-        }}>
+        <div
+          className="ml-2"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(!isOpen);
+          }}
+        >
           <MaterialSymbol
             name={isOpen ? "expand_less" : "expand_more"}
             size="sm"
@@ -182,10 +187,10 @@ export function AutoCompleteSelect({
           role="listbox"
           className="z-50 max-h-60 overflow-auto rounded-md bg-white dark:bg-zinc-800 shadow-lg border border-zinc-200 dark:border-zinc-700 focus:outline-none"
         >
-          <div ref={listRef} >
+          <div ref={listRef}>
             {filteredOptions.length === 0 ? (
               <div className="px-3 py-2 text-sm text-zinc-500 dark:text-zinc-400">
-                {query !== '' ? 'No options found' : 'No connections available'}
+                {query !== "" ? "No options found" : "No connections available"}
               </div>
             ) : (
               Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
@@ -196,7 +201,7 @@ export function AutoCompleteSelect({
                     </div>
                   )}
                   {groupOptions.map((option) => {
-                    const isSelected = option.value === value
+                    const isSelected = option.value === value;
                     return (
                       <div
                         key={option.value}
@@ -204,27 +209,21 @@ export function AutoCompleteSelect({
                         aria-selected={isSelected}
                         className="relative cursor-pointer select-none px-3 py-2 text-sm hover:bg-blue-500 hover:text-white text-zinc-900 dark:text-zinc-100"
                         onClick={(e) => {
-                          e.preventDefault() // Prevent blur from firing
-                          handleOptionSelect(option.value)
+                          e.preventDefault(); // Prevent blur from firing
+                          handleOptionSelect(option.value);
                         }}
                       >
-                        <div className="flex items-center justify-between" onClick={() => handleOptionSelect(option.value)}>
-                          <span className={twMerge(
-                            'block truncate',
-                            isSelected ? 'font-medium' : 'font-normal'
-                          )}>
+                        <div
+                          className="flex items-center justify-between"
+                          onClick={() => handleOptionSelect(option.value)}
+                        >
+                          <span className={twMerge("block truncate", isSelected ? "font-medium" : "font-normal")}>
                             {option.label}
                           </span>
-                          {isSelected && (
-                            <MaterialSymbol
-                              name="check"
-                              size="sm"
-                              className="text-blue-500"
-                            />
-                          )}
+                          {isSelected && <MaterialSymbol name="check" size="sm" className="text-blue-500" />}
                         </div>
                       </div>
-                    )
+                    );
                   })}
                 </div>
               ))
@@ -233,5 +232,5 @@ export function AutoCompleteSelect({
         </div>
       )}
     </div>
-  )
+  );
 }

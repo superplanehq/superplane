@@ -11,7 +11,6 @@ import { TriggerProps } from "@/ui/trigger";
  * 3. Export it from index.ts and add it to the registry
  */
 export interface TriggerRenderer {
-
   /**
    * Converts node and trigger metadata from the backend into props for the Trigger UI component.
    *

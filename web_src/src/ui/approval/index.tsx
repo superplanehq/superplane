@@ -16,7 +16,7 @@ export interface AwaitingEvent {
   subtitle?: string;
 }
 
-type LastRunState = "processed" | "discarded" | "running"
+type LastRunState = "processed" | "discarded" | "running";
 
 interface ApprovalLastRunData {
   title: string;
@@ -100,43 +100,43 @@ export const Approval: React.FC<ApprovalProps> = ({
 
   const lastRunTimeAgo = React.useMemo(() => {
     if (!lastRunData) return null;
-    const now = new Date()
-    const diff = now.getTime() - lastRunData.receivedAt.getTime()
-    return calcRelativeTimeFromDiff(diff)
-  }, [lastRunData])
+    const now = new Date();
+    const diff = now.getTime() - lastRunData.receivedAt.getTime();
+    return calcRelativeTimeFromDiff(diff);
+  }, [lastRunData]);
 
   const LastRunIcon = React.useMemo(() => {
     if (!lastRunData) return null;
     if (lastRunData.state === "processed") {
-      return resolveIcon("check")
+      return resolveIcon("check");
     } else if (lastRunData.state === "discarded") {
-      return resolveIcon("x")
+      return resolveIcon("x");
     } else {
-      return resolveIcon("loader-2")
+      return resolveIcon("loader-2");
     }
-  }, [lastRunData])
+  }, [lastRunData]);
 
   const LastRunColor = React.useMemo(() => {
     if (!lastRunData) return "text-gray-700";
     if (lastRunData.state === "processed") {
-      return "text-green-700"
+      return "text-green-700";
     } else if (lastRunData.state === "discarded") {
-      return "text-red-700"
+      return "text-red-700";
     } else {
-      return "text-blue-700"
+      return "text-blue-700";
     }
-  }, [lastRunData])
+  }, [lastRunData]);
 
   const LastRunBackground = React.useMemo(() => {
     if (!lastRunData) return "bg-gray-200";
     if (lastRunData.state === "processed") {
-      return "bg-green-200"
+      return "bg-green-200";
     } else if (lastRunData.state === "discarded") {
-      return "bg-red-200"
+      return "bg-red-200";
     } else {
-      return "bg-blue-200"
+      return "bg-blue-200";
     }
-  }, [lastRunData])
+  }, [lastRunData]);
 
   if (collapsed) {
     return (
@@ -163,9 +163,7 @@ export const Approval: React.FC<ApprovalProps> = ({
             {spec?.values?.length ? (
               <div className="flex items-center gap-1 text-xs text-gray-500">
                 <ListFilter size={12} />
-                <span>
-                  {spec.values.length} approvals required
-                </span>
+                <span>{spec.values.length} approvals required</span>
               </div>
             ) : null}
           </div>
@@ -216,9 +214,13 @@ export const Approval: React.FC<ApprovalProps> = ({
                 <span className="uppercase text-xs font-semibold tracking-wide">Last Run</span>
                 <span className="text-sm">{lastRunTimeAgo}</span>
               </div>
-              <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastRunBackground} ${LastRunColor} mb-4`}>
+              <div
+                className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastRunBackground} ${LastRunColor} mb-4`}
+              >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${lastRunData.state === "processed" ? "bg-green-600" : lastRunData.state === "discarded" ? "bg-red-600" : "bg-blue-600"}`}>
+                  <div
+                    className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${lastRunData.state === "processed" ? "bg-green-600" : lastRunData.state === "discarded" ? "bg-red-600" : "bg-blue-600"}`}
+                  >
                     {LastRunIcon && <LastRunIcon size={12} className="text-white" />}
                   </div>
                   <span className="truncate text-sm min-w-0">{lastRunData.title}</span>
@@ -239,7 +241,8 @@ export const Approval: React.FC<ApprovalProps> = ({
               <div className="flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100 text-gray-500 mb-4">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <div className="w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center text-gray-400 bg-gray-400">
-                    {resolveIcon("circle") && React.createElement(resolveIcon("circle")!, { size: 12, className: "text-white" })}
+                    {resolveIcon("circle") &&
+                      React.createElement(resolveIcon("circle")!, { size: 12, className: "text-white" })}
                   </div>
                   <span className="truncate text-sm">No events received yet</span>
                 </div>
@@ -250,19 +253,13 @@ export const Approval: React.FC<ApprovalProps> = ({
           {awaitingEvent ? (
             <>
               <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-                <span className="uppercase text-xs font-semibold tracking-wide">
-                  Awaiting Approval
-                </span>
+                <span className="uppercase text-xs font-semibold tracking-wide">Awaiting Approval</span>
                 <span className="text-sm">{timeAgo}</span>
               </div>
 
-              <div
-                className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-orange-200 mb-4`}
-              >
+              <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-orange-200 mb-4`}>
                 <div className="flex items-center gap-2 w-[80%] text-amber-800">
-                  <div
-                    className={`w-5 h-5 rounded-full flex items-center justify-center`}
-                  >
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center`}>
                     <CircleDashedIcon size={20} className="text-amber-800" />
                   </div>
                   <span className="truncate text-sm">{awaitingEvent.title}</span>

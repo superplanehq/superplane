@@ -85,8 +85,12 @@ export const ComponentSidebar = ({
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
     const seeded = new Set(openEventIds);
-    latestEvents.forEach(e => { if (e.isOpen) seeded.add(e.id); });
-    nextInQueueEvents.forEach(e => { if (e.isOpen) seeded.add(e.id); });
+    latestEvents.forEach((e) => {
+      if (e.isOpen) seeded.add(e.id);
+    });
+    nextInQueueEvents.forEach((e) => {
+      if (e.isOpen) seeded.add(e.id);
+    });
     if (seeded.size !== openEventIds.size) setOpenEventIds(seeded);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestEvents, nextInQueueEvents]);
@@ -133,9 +137,10 @@ export const ComponentSidebar = ({
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
   const handleToggleOpen = useCallback((eventId: string) => {
-    setOpenEventIds(prev => {
+    setOpenEventIds((prev) => {
       const next = new Set(prev);
-      if (next.has(eventId)) next.delete(eventId); else next.add(eventId);
+      if (next.has(eventId)) next.delete(eventId);
+      else next.add(eventId);
       return next;
     });
   }, []);
@@ -151,13 +156,15 @@ export const ComponentSidebar = ({
       {/* Resize handle */}
       <div
         onMouseDown={handleMouseDown}
-        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-blue-50 transition-colors flex items-center justify-center group ${isResizing ? "bg-blue-50" : ""
-          }`}
+        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-blue-50 transition-colors flex items-center justify-center group ${
+          isResizing ? "bg-blue-50" : ""
+        }`}
         style={{ marginLeft: "-8px" }}
       >
         <div
-          className={`w-1 h-12 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${isResizing ? "bg-blue-500" : ""
-            }`}
+          className={`w-1 h-12 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
+            isResizing ? "bg-blue-500" : ""
+          }`}
         />
       </div>
       <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-gray-200 bg-gray-50">

@@ -1,61 +1,74 @@
-import React from 'react'
-import type { Meta, StoryObj } from '@storybook/react'
-import { Input, InputGroup } from './input'
+import React from "react";
+import type { Meta, StoryObj } from "@storybook/react";
+import { Input, InputGroup } from "./input";
 
 const meta: Meta<typeof Input> = {
-  title: 'Components/Input',
+  title: "Components/Input",
   component: Input,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
     type: {
-      control: 'select',
-      options: ['text', 'email', 'password', 'number', 'search', 'tel', 'url', 'date', 'datetime-local', 'month', 'time', 'week'],
+      control: "select",
+      options: [
+        "text",
+        "email",
+        "password",
+        "number",
+        "search",
+        "tel",
+        "url",
+        "date",
+        "datetime-local",
+        "month",
+        "time",
+        "week",
+      ],
     },
     disabled: {
-      control: 'boolean',
+      control: "boolean",
     },
   },
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    placeholder: 'Enter text...',
+    placeholder: "Enter text...",
   },
-}
+};
 
 export const Email: Story = {
   args: {
-    type: 'email',
-    placeholder: 'Enter email...',
+    type: "email",
+    placeholder: "Enter email...",
   },
-}
+};
 
 export const Password: Story = {
   args: {
-    type: 'password',
-    placeholder: 'Enter password...',
+    type: "password",
+    placeholder: "Enter password...",
   },
-}
+};
 
 export const Number: Story = {
   args: {
-    type: 'number',
-    placeholder: 'Enter number...',
+    type: "number",
+    placeholder: "Enter number...",
   },
-}
+};
 
 export const Disabled: Story = {
   args: {
-    placeholder: 'Disabled input',
+    placeholder: "Disabled input",
     disabled: true,
   },
-}
+};
 
 export const WithIcon: Story = {
   render: (args) => (
@@ -67,9 +80,9 @@ export const WithIcon: Story = {
     </InputGroup>
   ),
   args: {
-    placeholder: 'Search users...',
+    placeholder: "Search users...",
   },
-}
+};
 
 export const WithRightIcon: Story = {
   render: (args) => (
@@ -81,6 +94,6 @@ export const WithRightIcon: Story = {
     </InputGroup>
   ),
   args: {
-    placeholder: 'Search...',
+    placeholder: "Search...",
   },
-}
+};

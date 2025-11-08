@@ -121,7 +121,6 @@ export function WorkflowPageV2() {
   // Revert functionality - track initial workflow snapshot
   const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<WorkflowsWorkflow | null>(null);
 
-
   // Use Zustand store for execution data - extract only the methods to avoid recreating callbacks
   // Subscribe to version to ensure React detects all updates
   const storeVersion = useNodeExecutionStore((state) => state.version);
@@ -168,10 +167,7 @@ export function WorkflowPageV2() {
   }, [storeVersion]);
 
   // Execution chain data based on node executions from store
-  const {
-    executionChainMap,
-  } = useExecutionChainData(workflowId!, nodeExecutionsMap);
-
+  const { executionChainMap } = useExecutionChainData(workflowId!, nodeExecutionsMap);
 
   const saveWorkflowSnapshot = useCallback(
     (currentWorkflow: WorkflowsWorkflow) => {
@@ -226,13 +222,7 @@ export function WorkflowPageV2() {
 
   const { nodes, edges } = useMemo(() => {
     // Don't prepare data until everything is loaded
-    if (
-      !workflow ||
-      workflowLoading ||
-      triggersLoading ||
-      blueprintsLoading ||
-      componentsLoading
-    ) {
+    if (!workflow || workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
       return { nodes: [], edges: [] };
     }
     return prepareData(
@@ -275,9 +265,7 @@ export function WorkflowPageV2() {
       // Build maps with current node data for sidebar
       const executionsMap = nodeData.executions.length > 0 ? { [nodeId]: nodeData.executions } : {};
       const queueItemsMap = nodeData.queueItems.length > 0 ? { [nodeId]: nodeData.queueItems } : {};
-      const eventsMapForSidebar = nodeData.events.length > 0
-        ? { [nodeId]: nodeData.events }
-        : nodeEventsMap; // Fall back to existing events map for trigger nodes
+      const eventsMapForSidebar = nodeData.events.length > 0 ? { [nodeId]: nodeData.events } : nodeEventsMap; // Fall back to existing events map for trigger nodes
 
       const sidebarData = prepareSidebarData(
         node,
@@ -330,7 +318,7 @@ export function WorkflowPageV2() {
       const nodesBefore = new Set<string>();
 
       const incomingEdges = new Map<string, string[]>();
-      workflowEdges.forEach(edge => {
+      workflowEdges.forEach((edge) => {
         if (!incomingEdges.has(edge.targetId!)) {
           incomingEdges.set(edge.targetId!, []);
         }
@@ -343,7 +331,7 @@ export function WorkflowPageV2() {
         visited.add(nodeId);
 
         const incomingNodes = incomingEdges.get(nodeId) || [];
-        incomingNodes.forEach(sourceNodeId => {
+        incomingNodes.forEach((sourceNodeId) => {
           nodesBefore.add(sourceNodeId);
           dfs(sourceNodeId);
         });
@@ -352,7 +340,7 @@ export function WorkflowPageV2() {
       dfs(targetNodeId);
       return nodesBefore;
     },
-    [workflowEdges]
+    [workflowEdges],
   );
 
   const getTabData = useCallback(
@@ -373,9 +361,9 @@ export function WorkflowPageV2() {
 
         tabData.current = {
           ...eventValues,
-          'Event ID': triggerEvent.id,
-          'Node ID': triggerEvent.nodeId,
-          'Created At': triggerEvent.createdAt ? new Date(triggerEvent.createdAt).toLocaleString() : undefined,
+          "Event ID": triggerEvent.id,
+          "Node ID": triggerEvent.nodeId,
+          "Created At": triggerEvent.createdAt ? new Date(triggerEvent.createdAt).toLocaleString() : undefined,
         };
 
         // Payload tab: raw event data
@@ -407,19 +395,19 @@ export function WorkflowPageV2() {
         if (Object.keys(flattened).length > 0) {
           tabData.current = {
             ...flattened,
-            'Execution ID': execution.id,
-            'Execution State': execution.state?.replace("STATE_", "").toLowerCase(),
-            'Execution Result': execution.result?.replace("RESULT_", "").toLowerCase(),
-            'Execution Started': execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
+            "Execution ID": execution.id,
+            "Execution State": execution.state?.replace("STATE_", "").toLowerCase(),
+            "Execution Result": execution.result?.replace("RESULT_", "").toLowerCase(),
+            "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
           };
         }
       } else {
         // Fallback to basic execution data if no outputs
         tabData.current = {
-          'Execution ID': execution.id,
-          'Execution State': execution.state,
-          'Execution Result': execution.result,
-          'Execution Started': execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
+          "Execution ID": execution.id,
+          "Execution State": execution.state,
+          "Execution Result": execution.result,
+          "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
         };
       }
 
@@ -431,9 +419,11 @@ export function WorkflowPageV2() {
 
         tabData.root = {
           ...rootEventValues,
-          'Event ID': execution.rootEvent.id,
-          'Node ID': execution.rootEvent.nodeId,
-          'Created At': execution.rootEvent.createdAt ? new Date(execution.rootEvent.createdAt).toLocaleString() : undefined,
+          "Event ID": execution.rootEvent.id,
+          "Node ID": execution.rootEvent.nodeId,
+          "Created At": execution.rootEvent.createdAt
+            ? new Date(execution.rootEvent.createdAt).toLocaleString()
+            : undefined,
         };
       }
 
@@ -465,9 +455,9 @@ export function WorkflowPageV2() {
           const nodesBefore = getNodesBeforeTarget(nodeId);
           nodesBefore.add(nodeId);
 
-          const executionsUpToCurrent = executionChain.filter(exec => {
+          const executionsUpToCurrent = executionChain.filter((exec) => {
             const execTime = exec.createdAt ? new Date(exec.createdAt).getTime() : 0;
-            const isNodeBefore = nodesBefore.has(exec.nodeId || '');
+            const isNodeBefore = nodesBefore.has(exec.nodeId || "");
             const isBeforeCurrentTime = execTime <= currentExecutionTime;
             return isNodeBefore && isBeforeCurrentTime;
           });
@@ -481,14 +471,13 @@ export function WorkflowPageV2() {
 
           // Group executions by node to create hierarchy
           const nodeExecutions: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
-          executionsUpToCurrent.forEach(exec => {
-            const execNodeId = exec.nodeId || 'unknown';
+          executionsUpToCurrent.forEach((exec) => {
+            const execNodeId = exec.nodeId || "unknown";
             if (!nodeExecutions[execNodeId]) {
               nodeExecutions[execNodeId] = [];
             }
             nodeExecutions[execNodeId].push(exec);
           });
-
 
           const sortedNodeEntries = Object.values(nodeExecutions)
             .flatMap((execs) => execs)
@@ -498,25 +487,27 @@ export function WorkflowPageV2() {
               return timeA - timeB;
             });
 
-
-          const nodesById = workflow?.spec?.nodes?.reduce((acc, node) => {
-            if (!node?.id) return acc;
-            acc[node.id] = node;
-            return acc;
-          }, {} as Record<string, ComponentsNode>);
+          const nodesById = workflow?.spec?.nodes?.reduce(
+            (acc, node) => {
+              if (!node?.id) return acc;
+              acc[node.id] = node;
+              return acc;
+            },
+            {} as Record<string, ComponentsNode>,
+          );
 
           const chainData = sortedNodeEntries.map((exec) => {
-            const nodeInfo = nodesById?.[exec.nodeId || ''];
+            const nodeInfo = nodesById?.[exec.nodeId || ""];
 
             const getSidebarEventItemState = (exec: WorkflowsWorkflowNodeExecution) => {
-              if (exec.state === 'STATE_FINISHED') {
-                if (exec.result === 'RESULT_PASSED') {
+              if (exec.state === "STATE_FINISHED") {
+                if (exec.result === "RESULT_PASSED") {
                   return ChainExecutionState.COMPLETED;
                 }
                 return ChainExecutionState.FAILED;
-              };
+              }
 
-              if (exec.state === 'STATE_STARTED') {
+              if (exec.state === "STATE_STARTED") {
                 return ChainExecutionState.RUNNING;
               }
 
@@ -524,16 +515,19 @@ export function WorkflowPageV2() {
             };
 
             const mainItem = {
-              name: nodeInfo?.name || exec.nodeId || 'Unknown',
+              name: nodeInfo?.name || exec.nodeId || "Unknown",
               state: getSidebarEventItemState(exec),
-              children: exec?.childExecutions && exec.childExecutions.length > 0 ? exec.childExecutions.map(childExec => {
-                const childNodeId = childExec?.nodeId?.split(":")?.at(-1);
+              children:
+                exec?.childExecutions && exec.childExecutions.length > 0
+                  ? exec.childExecutions.map((childExec) => {
+                      const childNodeId = childExec?.nodeId?.split(":")?.at(-1);
 
-                return {
-                  name: childNodeId || 'Unknown',
-                  state: getSidebarEventItemState(childExec),
-                }
-              }) : undefined
+                      return {
+                        name: childNodeId || "Unknown",
+                        state: getSidebarEventItemState(childExec),
+                      };
+                    })
+                  : undefined,
             };
 
             return mainItem;
@@ -595,10 +589,10 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow?.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
-            ...node,
-            configuration: updatedConfiguration,
-            name: updatedNodeName,
-          }
+              ...node,
+              configuration: updatedConfiguration,
+              name: updatedNodeName,
+            }
           : node,
       );
 
@@ -801,12 +795,12 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
-            ...node,
-            position: {
-              x: Math.round(position.x),
-              y: Math.round(position.y),
-            },
-          }
+              ...node,
+              position: {
+                x: Math.round(position.x),
+                y: Math.round(position.y),
+              },
+            }
           : node,
       );
 
@@ -841,9 +835,9 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
-            ...node,
-            isCollapsed: newIsCollapsed,
-          }
+              ...node,
+              isCollapsed: newIsCollapsed,
+            }
           : node,
       );
 
@@ -1007,12 +1001,7 @@ export function WorkflowPageV2() {
   );
 
   // Show loading indicator while data is being fetched
-  if (
-    workflowLoading ||
-    triggersLoading ||
-    blueprintsLoading ||
-    componentsLoading
-  ) {
+  if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-3">
@@ -1080,12 +1069,15 @@ export function WorkflowPageV2() {
   );
 }
 
-function useExecutionChainData(workflowId: string, nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>) {
+function useExecutionChainData(
+  workflowId: string,
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+) {
   // Get all unique root event IDs from executions
   const rootEventIds = useMemo(() => {
     const eventIds = new Set<string>();
-    Object.values(nodeExecutionsMap).forEach(executions => {
-      executions.forEach(execution => {
+    Object.values(nodeExecutionsMap).forEach((executions) => {
+      executions.forEach((execution) => {
         if (execution.rootEvent?.id) {
           eventIds.add(execution.rootEvent.id);
         }
@@ -1133,26 +1125,27 @@ function prepareData(
   edges: CanvasEdge[];
 } {
   const edges = workflow?.spec?.edges?.map(prepareEdge) || [];
-  const nodes = workflow?.spec?.nodes
-    ?.map((node) => {
-      return prepareNode(
-        workflow?.spec?.nodes!,
-        node,
-        triggers,
-        blueprints,
-        components,
-        nodeEventsMap,
-        nodeExecutionsMap,
-        nodeQueueItemsMap,
-        workflowId,
-        queryClient,
-        organizationId,
-      );
-    })
-    .map((node) => ({
-      ...node,
-      dragHandle: ".canvas-node-drag-handle",
-    })) || [];
+  const nodes =
+    workflow?.spec?.nodes
+      ?.map((node) => {
+        return prepareNode(
+          workflow?.spec?.nodes!,
+          node,
+          triggers,
+          blueprints,
+          components,
+          nodeEventsMap,
+          nodeExecutionsMap,
+          nodeQueueItemsMap,
+          workflowId,
+          queryClient,
+          organizationId,
+        );
+      })
+      .map((node) => ({
+        ...node,
+        dragHandle: ".canvas-node-drag-handle",
+      })) || [];
 
   return { nodes, edges };
 }
@@ -1231,15 +1224,18 @@ function prepareCompositeNode(
         parameters:
           Object.keys(node.configuration!).length > 0
             ? [
-              {
-                icon: "cog",
-                items: Object.keys(node.configuration!).reduce((acc, key) => {
-                  const displayKey = fieldLabelMap[key] || key;
-                  acc[displayKey] = `${node.configuration![key]}`;
-                  return acc;
-                }, {} as Record<string, string>),
-              },
-            ]
+                {
+                  icon: "cog",
+                  items: Object.keys(node.configuration!).reduce(
+                    (acc, key) => {
+                      const displayKey = fieldLabelMap[key] || key;
+                      acc[displayKey] = `${node.configuration![key]}`;
+                      return acc;
+                    },
+                    {} as Record<string, string>,
+                  ),
+                },
+              ]
             : [],
       },
     },
@@ -1516,16 +1512,16 @@ function prepareApprovalNode(
       requireArtifacts:
         isPending && isExecutionActive
           ? [
-            {
-              label: "comment",
-              optional: true,
-            },
-          ]
+              {
+                label: "comment",
+                optional: true,
+              },
+            ]
           : undefined,
       artifacts: hasApprovalArtifacts
         ? {
-          Comment: approvalComment,
-        }
+            Comment: approvalComment,
+          }
         : undefined,
       artifactCount: hasApprovalArtifacts ? 1 : undefined,
       onApprove: async (artifacts?: Record<string, string>) => {
@@ -1611,41 +1607,41 @@ function prepareApprovalNode(
         spec:
           items.length > 0
             ? {
-              title: "approvals required",
-              tooltipTitle: "approvals required",
-              values: items.map((item) => {
-                const type = (item.type || "").toString();
-                let value =
-                  type === "user"
-                    ? item.user || ""
-                    : type === "role"
-                      ? item.role || ""
-                      : type === "group"
-                        ? item.group || ""
-                        : "";
-                const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
+                title: "approvals required",
+                tooltipTitle: "approvals required",
+                values: items.map((item) => {
+                  const type = (item.type || "").toString();
+                  let value =
+                    type === "user"
+                      ? item.user || ""
+                      : type === "role"
+                        ? item.role || ""
+                        : type === "group"
+                          ? item.group || ""
+                          : "";
+                  const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
 
-                // Pretty-print values
-                if (type === "user" && value && usersById[value]) {
-                  value = usersById[value].email || usersById[value].name || value;
-                }
-                if (type === "role" && value) {
-                  value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
-                  // Fallback to simple suffix mapping when not found
-                  const suffix = (item.role || "").split("_").pop();
-                  if (!rolesByName[item.role || ""] && suffix) {
-                    const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
-                    value = map[suffix] || value;
+                  // Pretty-print values
+                  if (type === "user" && value && usersById[value]) {
+                    value = usersById[value].email || usersById[value].name || value;
                   }
-                }
-                return {
-                  badges: [
-                    { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-                    { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
-                  ],
-                };
-              }),
-            }
+                  if (type === "role" && value) {
+                    value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
+                    // Fallback to simple suffix mapping when not found
+                    const suffix = (item.role || "").split("_").pop();
+                    if (!rolesByName[item.role || ""] && suffix) {
+                      const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
+                      value = map[suffix] || value;
+                    }
+                  }
+                  return {
+                    badges: [
+                      { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+                      { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
+                    ],
+                  };
+                }),
+              }
             : undefined,
         awaitingEvent:
           execution?.state === "STATE_STARTED" && rootTriggerRenderer
@@ -1654,16 +1650,16 @@ function prepareApprovalNode(
         lastRunData:
           execution && rootTriggerRenderer
             ? {
-              title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
-              subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
-              receivedAt: new Date(execution.createdAt!),
-              state:
-                getRunItemState(execution) === "success"
-                  ? ("processed" as const)
-                  : getRunItemState(execution) === "running"
-                    ? ("running" as const)
-                    : ("discarded" as const),
-            }
+                title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
+                subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
+                receivedAt: new Date(execution.createdAt!),
+                state:
+                  getRunItemState(execution) === "success"
+                    ? ("processed" as const)
+                    : getRunItemState(execution) === "running"
+                      ? ("running" as const)
+                      : ("discarded" as const),
+              }
             : undefined,
       },
     },
@@ -1799,7 +1795,7 @@ function prepareMergeNode(
     lastEvent = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: getRunItemState(execution)
+      eventState: getRunItemState(execution),
     };
   }
 
@@ -1821,17 +1817,17 @@ function prepareMergeNode(
         nextInQueue:
           nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
             ? (() => {
-              const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-              const title =
-                item?.name ||
-                item?.input?.title ||
-                item?.input?.name ||
-                item?.input?.eventTitle ||
-                item?.id ||
-                "Queued";
-              const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-              return { title, subtitle };
-            })()
+                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
+                const title =
+                  item?.name ||
+                  item?.input?.title ||
+                  item?.input?.name ||
+                  item?.input?.eventTitle ||
+                  item?.id ||
+                  "Queued";
+                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
+                return { title, subtitle };
+              })()
             : undefined,
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
@@ -2046,17 +2042,17 @@ function prepareSemaphoreNode(
         nextInQueue:
           nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
             ? (() => {
-              const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-              const title =
-                item?.name ||
-                item?.input?.title ||
-                item?.input?.name ||
-                item?.input?.eventTitle ||
-                item?.id ||
-                "Queued";
-              const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-              return { title, subtitle };
-            })()
+                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
+                const title =
+                  item?.name ||
+                  item?.input?.title ||
+                  item?.input?.name ||
+                  item?.input?.eventTitle ||
+                  item?.id ||
+                  "Queued";
+                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
+                return { title, subtitle };
+              })()
             : undefined,
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
@@ -2125,17 +2121,17 @@ function prepareWaitNode(
         nextInQueue:
           nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
             ? (() => {
-              const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-              const title =
-                item?.name ||
-                item?.input?.title ||
-                item?.input?.name ||
-                item?.input?.eventTitle ||
-                item?.id ||
-                "Queued";
-              const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-              return { title, subtitle };
-            })()
+                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
+                const title =
+                  item?.name ||
+                  item?.input?.title ||
+                  item?.input?.name ||
+                  item?.input?.eventTitle ||
+                  item?.id ||
+                  "Queued";
+                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
+                return { title, subtitle };
+              })()
             : undefined,
         iconColor: getColorClass(metadata?.color || "yellow"),
         iconBackground: getBackgroundColorClass(metadata?.color || "yellow"),
@@ -2186,17 +2182,18 @@ function prepareTimeGateNode(
 
   const timeWindow = `${startTime} - ${endTime}`;
 
-
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
 
-  let lastExecution: {
-    title: string;
-    receivedAt: Date;
-    state: "success" | "failed" | "running";
-    values?: Record<string, string>;
-    nextRunTime?: Date;
-  } | undefined;
+  let lastExecution:
+    | {
+        title: string;
+        receivedAt: Date;
+        state: "success" | "failed" | "running";
+        values?: Record<string, string>;
+        nextRunTime?: Date;
+      }
+    | undefined;
 
   if (execution) {
     const executionState = getRunItemState(execution);
@@ -2208,11 +2205,12 @@ function prepareTimeGateNode(
     lastExecution = {
       title: title,
       receivedAt: new Date(execution.createdAt!),
-      state: executionState === "success"
-        ? ("success" as const)
-        : executionState === "failed"
-          ? ("failed" as const)
-          : ("running" as const),
+      state:
+        executionState === "success"
+          ? ("success" as const)
+          : executionState === "failed"
+            ? ("failed" as const)
+            : ("running" as const),
       values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
     };
 
@@ -2253,7 +2251,6 @@ function prepareTimeGateNode(
     },
   };
 }
-
 
 function prepareEdge(edge: ComponentsEdge): CanvasEdge {
   const id = `${edge.sourceId!}--${edge.targetId!}--${edge.channel!}`;
@@ -2304,9 +2301,9 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
       : {
-        title: execution.id || "Execution",
-        subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
-      };
+          title: execution.id || "Execution",
+          subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
+        };
 
     const values = execution.rootEvent ? rootTriggerRenderer.getRootEventValues(execution.rootEvent) : {};
 
