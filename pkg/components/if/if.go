@@ -90,23 +90,12 @@ func (f *If) Execute(ctx components.ExecutionContext) error {
 		return fmt.Errorf("expression evaluation failed: %w", err)
 	}
 
-	matches, ok := output.(bool)
+	_, ok := output.(bool)
 	if !ok {
 		return fmt.Errorf("expression must evaluate to boolean, got %T", output)
 	}
 
-	var outputs map[string][]any
-	if matches {
-		outputs = map[string][]any{
-			ChannelNameTrue: {ctx.Data},
-		}
-	} else {
-		outputs = map[string][]any{
-			ChannelNameFalse: {ctx.Data},
-		}
-	}
-
-	return ctx.ExecutionStateContext.Pass(outputs)
+	return ctx.ExecutionStateContext.Pass(map[string][]any{})
 }
 
 func (f *If) Actions() []components.Action {
