@@ -372,6 +372,45 @@ export function WorkflowPageV2() {
     [workflow?.spec?.nodes, workflowId, queryClient, getNodeData, loadNodeDataMethod],
   );
 
+  /**
+   * Builds a topological path to find all nodes that should execute before the given target node.
+   * This follows the directed graph structure of the workflow to determine execution order.
+   */
+  const getNodesBeforeTarget = useCallback(
+    (targetNodeId: string): Set<string> => {
+      if (!workflow?.spec?.nodes || !workflow?.spec?.edges) {
+        return new Set();
+      }
+
+      const edges = workflow.spec.edges;
+      const nodesBefore = new Set<string>();
+
+      const incomingEdges = new Map<string, string[]>();
+      edges.forEach(edge => {
+        if (!incomingEdges.has(edge.targetId!)) {
+          incomingEdges.set(edge.targetId!, []);
+        }
+        incomingEdges.get(edge.targetId!)!.push(edge.sourceId!);
+      });
+
+      const visited = new Set<string>();
+      const dfs = (nodeId: string) => {
+        if (visited.has(nodeId)) return;
+        visited.add(nodeId);
+
+        const incomingNodes = incomingEdges.get(nodeId) || [];
+        incomingNodes.forEach(sourceNodeId => {
+          nodesBefore.add(sourceNodeId);
+          dfs(sourceNodeId);
+        });
+      };
+
+      dfs(targetNodeId);
+      return nodesBefore;
+    },
+    [workflow?.spec?.nodes, workflow?.spec?.edges]
+  );
+
   const getTabData = useCallback(
     (nodeId: string, event: SidebarEvent): TabData | undefined => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
@@ -477,13 +516,16 @@ export function WorkflowPageV2() {
       if (execution.rootEvent?.id) {
         const executionChain = executionChainMap[execution.rootEvent.id];
         if (executionChain && executionChain.length > 0) {
-          // Get the current execution's timestamp for filtering
           const currentExecutionTime = execution.createdAt ? new Date(execution.createdAt).getTime() : Date.now();
 
-          // Filter to only include executions that happened before or at the same time as current execution
+          const nodesBefore = getNodesBeforeTarget(nodeId);
+          nodesBefore.add(nodeId);
+
           const executionsUpToCurrent = executionChain.filter(exec => {
             const execTime = exec.createdAt ? new Date(exec.createdAt).getTime() : 0;
-            return execTime <= currentExecutionTime;
+            const isNodeBefore = nodesBefore.has(exec.nodeId || '');
+            const isBeforeCurrentTime = execTime <= currentExecutionTime;
+            return isNodeBefore && isBeforeCurrentTime;
           });
 
           // Sort the filtered executions by creation time to get chronological order
@@ -504,11 +546,9 @@ export function WorkflowPageV2() {
           });
 
 
-          // Convert to execution chain format, maintaining chronological order
           const sortedNodeEntries = Object.values(nodeExecutions)
             .flatMap((execs) => execs)
             .sort((execsA, execsB) => {
-              // Sort by the earliest execution's createdAt in each node
               const timeA = execsA.updatedAt ? new Date(execsA.updatedAt).getTime() : 0;
               const timeB = execsB.updatedAt ? new Date(execsB.updatedAt).getTime() : 0;
               return timeA - timeB;
@@ -522,29 +562,27 @@ export function WorkflowPageV2() {
           }, {} as Record<string, ComponentsNode>);
 
           const chainData = sortedNodeEntries.map((exec) => {
-
-            // Get the main execution (earliest one)
             const nodeInfo = nodesById?.[exec.nodeId || ''];
 
             const getSidebarEventItemState = (exec: WorkflowsWorkflowNodeExecution) => {
               if (exec.state === 'STATE_FINISHED') {
                 if (exec.result === 'RESULT_PASSED') {
-                  return ChainExecutionState.COMPLETED; // Completed successfully
+                  return ChainExecutionState.COMPLETED;
                 }
-                return ChainExecutionState.FAILED; // Not completed (running, pending, or failed)
+                return ChainExecutionState.FAILED;
               };
 
               if (exec.state === 'STATE_STARTED') {
-                return ChainExecutionState.RUNNING; // Not completed (running, pending, or failed)
+                return ChainExecutionState.RUNNING;
               }
 
               return ChainExecutionState.FAILED;
             };
+            console.log(exec?.childExecutions)
 
             const mainItem = {
               name: nodeInfo?.name || exec.nodeId || 'Unknown',
               state: getSidebarEventItemState(exec),
-
               children: exec?.childExecutions && exec.childExecutions.length > 1 ? exec.childExecutions.map(childExec => {
                 const childNodeInfo = nodesById?.[childExec.nodeId || ''];
                 return {
@@ -565,7 +603,7 @@ export function WorkflowPageV2() {
 
       return Object.keys(tabData).length > 0 ? tabData : undefined;
     },
-    [workflow, nodeExecutionsMap, nodeEventsMap, executionChainMap],
+    [workflow, nodeExecutionsMap, nodeEventsMap, executionChainMap, getNodesBeforeTarget],
   );
 
   const getNodeEditData = useCallback(
