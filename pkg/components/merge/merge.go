@@ -134,13 +134,8 @@ func (m *Merge) addEventToMetadata(ctx components.ProcessQueueContext, execID uu
 	return md, nil
 }
 
-func (m *Merge) FinishExecution(ctx components.ProcessQueueContext, execID uuid.UUID, merge_group string, md *ExecutionMetadata) error {
-	output := map[string]any{
-		"merge_group": merge_group,
-		"event_ids":   md.EventIDs,
-	}
-
+func (m *Merge) FinishExecution(ctx components.ProcessQueueContext, execID uuid.UUID, mergeGroup string, md *ExecutionMetadata) error {
 	return ctx.FinishExecution(execID, map[string][]any{
-		components.DefaultOutputChannel.Name: {output},
+		components.DefaultOutputChannel.Name: {md},
 	})
 }
