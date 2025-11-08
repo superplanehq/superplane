@@ -24,11 +24,11 @@ func Test_Merge(t *testing.T) {
 	m := &Merge{}
 
 	steps.ProcessFirstEvent(m)
-	steps.AssertOneExecutionCreated()
+	steps.AssertNodeExecutionCount(1)
 	steps.AssertExecutionPending()
 
 	steps.ProcessSecondEvent(m)
-	steps.AssertOneExecutionCreated()
+	steps.AssertNodeExecutionCount(1)
 	steps.AssertExecutionFinished()
 }
 
@@ -117,6 +117,11 @@ func (s *MergeTestSteps) CreateWorkflow() {
 			TargetID: n4.NodeID,
 			Channel:  "default",
 		},
+		{
+			SourceID: n3.NodeID,
+			TargetID: n4.NodeID,
+			Channel:  "default",
+		},
 	}
 
 	require.NoError(s.t, s.Tx.Updates(&wf).Error)
@@ -199,10 +204,10 @@ func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 	require.NoError(s.t, err)
 }
 
-func (s *MergeTestSteps) AssertOneExecutionCreated() {
+func (s *MergeTestSteps) AssertNodeExecutionCount(expectedCount int) {
 	var executions []models.WorkflowNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).Find(&executions).Error)
-	assert.Equal(s.t, 1, len(executions))
+	assert.Equal(s.t, expectedCount, len(executions))
 }
 
 func (s *MergeTestSteps) AssertExecutionFinished() {
