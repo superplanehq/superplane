@@ -71,11 +71,7 @@ func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) error {
 		return err
 	}
 
-	fmt.Println("collected:", md.EventIDs)
-	fmt.Println("incoming:", incoming)
-
 	if len(md.EventIDs) >= incoming {
-		fmt.Println("Finishing execution")
 		return m.FinishExecution(ctx, execID, mergeGroup, md)
 	}
 
@@ -140,8 +136,8 @@ func (m *Merge) addEventToMetadata(ctx components.ProcessQueueContext, execID uu
 
 func (m *Merge) FinishExecution(ctx components.ProcessQueueContext, execID uuid.UUID, merge_group string, md *ExecutionMetadata) error {
 	output := map[string]any{
-		"merge_group":     merge_group,
-		"event_ids_count": md.EventIDs,
+		"merge_group": merge_group,
+		"event_ids":   md.EventIDs,
 	}
 
 	return ctx.FinishExecution(execID, map[string][]any{

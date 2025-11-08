@@ -7,8 +7,8 @@ package merge
 
 type ExecutionMetadata struct {
 	// GroupKey is a logical key used to correlate queue items into a single execution
-	GroupKey string `json:"merge_group,omitempty"`
+	GroupKey string `json:"groupKey,omitempty" mapstructure:"groupKey"`
 
 	// EventIDs collects upstream event ids that reached this merge
-	EventIDs []string `json:"events_ids,omitempty"`
+	EventIDs []string `json:"eventIDs,omitempty" mapstructure:"eventIDs"`
 }
