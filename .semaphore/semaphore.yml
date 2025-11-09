@@ -36,7 +36,7 @@ blocks:
       epilogue:
         always:
           commands:
-            - test-results publish junit-report.xml
+            - "[ -f junit-report.xml ] && test-results publish junit-report.xml"
 
   - name: "\U0001F9EA E2E"
     dependencies: []
