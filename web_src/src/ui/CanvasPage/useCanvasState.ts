@@ -128,6 +128,13 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      // Propagate node removals (e.g., via Backspace/Delete) to parent
+      const removedNodeIds = changes.filter((change) => change.type === "remove").map((change) => change.id);
+
+      if (removedNodeIds.length > 0 && props.onNodeDelete) {
+        removedNodeIds.forEach((id) => props.onNodeDelete?.(id));
+      }
+
       // Check for position changes and notify parent
       changes.forEach((change) => {
         if (change.type === "position" && change.position && change.dragging === false && props.onNodePositionChange) {
