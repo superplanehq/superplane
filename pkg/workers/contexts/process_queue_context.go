@@ -51,6 +51,17 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 			UpdatedAt:           &now,
 		}
 
+		// If this queue item originated from an internal (blueprint) execution chain,
+		// propagate the parent execution id from the previous execution so that
+		// child executions are linked to the top-level blueprint execution.
+		if event.ExecutionID != nil {
+			if prev, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, *event.ExecutionID); err == nil {
+				if prev.ParentExecutionID != nil {
+					execution.ParentExecutionID = prev.ParentExecutionID
+				}
+			}
+		}
+
 		if err := tx.Create(&execution).Error; err != nil {
 			return uuid.Nil, err
 		}
@@ -108,19 +119,52 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 	}
 
 	ctx.CountIncomingEdges = func() (int, error) {
+		// If this is an internal (blueprint) node, count incoming edges
+		// from the blueprint graph; otherwise count at the workflow level.
+		if node.ParentNodeID != nil && *node.ParentNodeID != "" {
+			// Parent should be a blueprint node. Load it and its blueprint spec.
+			parent, err := models.FindWorkflowNode(tx, node.WorkflowID, *node.ParentNodeID)
+			if err != nil {
+				return 0, err
+			}
+
+			// Defensive: if no blueprint ref, fallback to workflow edges.
+			blueprintID := parent.Ref.Data().Blueprint.ID
+			if blueprintID != "" {
+				bp, err := models.FindUnscopedBlueprintInTransaction(tx, blueprintID)
+				if err != nil {
+					return 0, err
+				}
+
+				// Child node id inside the blueprint (strip the parent prefix + ':')
+				prefix := parent.NodeID + ":"
+				childID := node.NodeID
+				if len(childID) > len(prefix) && childID[:len(prefix)] == prefix {
+					childID = childID[len(prefix):]
+				}
+
+				count := 0
+				for _, e := range bp.Edges {
+					if e.TargetID == childID {
+						count++
+					}
+				}
+				return count, nil
+			}
+			// Fallthrough to workflow-level counting if blueprint id missing
+		}
+
 		wf, err := models.FindUnscopedWorkflowInTransaction(tx, node.WorkflowID)
 		if err != nil {
 			return 0, err
 		}
 
 		count := 0
-
 		for _, edge := range wf.Edges {
 			if edge.TargetID == node.NodeID {
 				count++
 			}
 		}
-
 		return count, nil
 	}
 

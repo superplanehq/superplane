@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,6 +25,11 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 	}
 
 	nodes, edges, err := ParseWorkflow(registry, organizationID, pbWorkflow)
+	if err != nil {
+		return nil, err
+	}
+
+	expandedNodes, err := expandNodes(organizationID, nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -53,17 +59,26 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		}
 
 		//
-		// Create the workflow node records
+		// Create the workflow node records (including internal blueprint nodes)
 		//
-		for _, node := range nodes {
+		for _, node := range expandedNodes {
+			// Set ParentNodeID for internal nodes (IDs like parent:child)
+			var parentNodeID *string
+			if idx := strings.Index(node.ID, ":"); idx != -1 {
+				parent := node.ID[:idx]
+				parentNodeID = &parent
+			}
+
 			workflowNode := models.WorkflowNode{
 				WorkflowID:    workflow.ID,
 				NodeID:        node.ID,
+				ParentNodeID:  parentNodeID,
 				Name:          node.Name,
 				State:         models.WorkflowNodeStateReady,
 				Type:          node.Type,
 				Ref:           datatypes.NewJSONType(node.Ref),
 				Configuration: datatypes.NewJSONType(node.Configuration),
+				Metadata:      datatypes.NewJSONType(node.Metadata),
 				CreatedAt:     &now,
 				UpdatedAt:     &now,
 			}
