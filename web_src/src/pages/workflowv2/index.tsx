@@ -4,7 +4,7 @@ import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import {
   BlueprintsBlueprint,
@@ -61,6 +61,7 @@ export function WorkflowPageV2() {
   }>();
 
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
@@ -1023,6 +1024,26 @@ export function WorkflowPageV2() {
 
   return (
     <CanvasPage
+      // Persist right sidebar in query params
+      initialSidebar={{
+        isOpen: searchParams.get("sidebar") === "1",
+        nodeId: searchParams.get("node") || undefined,
+      }}
+      onSidebarChange={(open, nodeId) => {
+        const next = new URLSearchParams(searchParams);
+        if (open) {
+          next.set("sidebar", "1");
+          if (nodeId) {
+            next.set("node", nodeId);
+          } else {
+            next.delete("node");
+          }
+        } else {
+          next.delete("sidebar");
+          next.delete("node");
+        }
+        setSearchParams(next, { replace: true });
+      }}
       onNodeExpand={(nodeId) => {
         const latestExecution = nodeExecutionsMap[nodeId]?.[0];
         const executionId = latestExecution?.id;

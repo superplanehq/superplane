@@ -140,6 +140,10 @@ export interface CanvasPageProps {
   hasUserToggledSidebarRef?: React.MutableRefObject<boolean>;
   isSidebarOpenRef?: React.MutableRefObject<boolean | null>;
   viewportRef?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
+
+  // Optional: control and observe component sidebar state
+  onSidebarChange?: (isOpen: boolean, selectedNodeId: string | null) => void;
+  initialSidebar?: { isOpen?: boolean; nodeId?: string | null };
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
