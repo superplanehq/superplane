@@ -47,7 +47,7 @@ func (s *CustomComponentsSteps) GivenADeploymentComponentExists() {
 	source := q.TestID("building-block-noop")
 	target := q.TestID("rf__wrapper")
 
-	s.session.DragAndDrop(source, target, 400, 250)
+	s.session.DragAndDrop(source, target, 500, 250)
 	s.session.Sleep(300)
 	s.session.Click(q.TestID("add-node-button"))
 	s.session.Click(q.Text("Save"))
@@ -65,12 +65,12 @@ func (s *CustomComponentsSteps) GivenACanvasWithComponentExists() {
 
 	source1 := q.TestID("building-block-start")
 	target1 := q.TestID("rf__wrapper")
-	s.session.DragAndDrop(source1, target1, 200, 250)
+	s.session.DragAndDrop(source1, target1, 500, 250)
 	s.session.Click(q.TestID("add-node-button"))
 
 	source2 := q.TestID("building-block-e2e-deployment-component")
 	target2 := q.TestID("rf__wrapper")
-	s.session.DragAndDrop(source2, target2, 600, 250)
+	s.session.DragAndDrop(source2, target2, 900, 250)
 	s.session.Click(q.TestID("add-node-button"))
 
 	// connect: drag from Start node's output handle to the component's input handle
