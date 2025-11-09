@@ -197,7 +197,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
     });
   }, []);
 
-  const componentSidebar = useComponentSidebarState();
+  const componentSidebar = useComponentSidebarState(props.initialSidebar, props.onSidebarChange);
 
   // Memoize the default ai object to prevent unnecessary re-renders
   const defaultAi = useMemo<AiProps>(
@@ -232,19 +232,34 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   };
 }
 
-function useComponentSidebarState(): CanvasPageState["componentSidebar"] {
-  const [isOpen, setIsOpen] = useState<boolean>(false);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+function useComponentSidebarState(
+  initial: { isOpen?: boolean; nodeId?: string | null } | undefined,
+  onChange?: (isOpen: boolean, selectedNodeId: string | null) => void,
+): CanvasPageState["componentSidebar"] {
+  const [isOpen, setIsOpen] = useState<boolean>(initial?.isOpen ?? false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(initial?.nodeId ?? null);
 
   const close = useCallback(() => {
     setIsOpen(false);
     setSelectedNodeId(null);
-  }, []);
+    onChange?.(false, null);
+  }, [onChange]);
 
-  const open = useCallback((nodeId: string) => {
-    setSelectedNodeId(nodeId);
-    setIsOpen(true);
-  }, []);
+  const open = useCallback(
+    (nodeId: string) => {
+      setSelectedNodeId(nodeId);
+      setIsOpen(true);
+      onChange?.(true, nodeId);
+    },
+    [onChange],
+  );
+
+  // Keep external listener updated when selection changes while open
+  useEffect(() => {
+    if (isOpen) {
+      onChange?.(true, selectedNodeId);
+    }
+  }, [isOpen, selectedNodeId, onChange]);
 
   // Don't memoize the object itself - let it be a new reference each render
   // But the callbacks (open, close) are stable thanks to useCallback
