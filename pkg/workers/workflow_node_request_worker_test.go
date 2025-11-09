@@ -143,12 +143,19 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	assert.NoError(t, result2)
 
 	//
-	// Verify the request was marked as completed only once.
+	// Verify the request was marked as completed.
 	//
 	var updatedRequest models.WorkflowNodeRequest
 	err := database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
 	require.NoError(t, err)
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+
+	//
+	// Verify that exactly one workflow event was emitted (proving only one worker processed it).
+	//
+	eventCount, err := models.CountWorkflowEvents(workflow.ID, triggerNode)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), eventCount, "Expected exactly 1 workflow event, but found %d", eventCount)
 }
 
 func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
