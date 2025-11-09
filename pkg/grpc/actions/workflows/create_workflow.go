@@ -28,8 +28,7 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		return nil, err
 	}
 
-	// Expand blueprint nodes to include internal nodes (namespaced)
-	expandedNodes, err := expandBlueprintNodes(organizationID, nodes)
+	expandedNodes, err := expandNodes(organizationID, nodes)
 	if err != nil {
 		return nil, err
 	}

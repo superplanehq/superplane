@@ -36,8 +36,7 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		return nil, err
 	}
 
-	// Expand blueprint nodes to include internal nodes (namespaced)
-	expandedNodes, err := expandBlueprintNodes(organizationID, nodes)
+	expandedNodes, err := expandNodes(organizationID, nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -153,12 +152,6 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 }
 
 func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode) error {
-	// Skip setup for internal (blueprint-expanded) nodes
-	if meta := node.Metadata.Data(); meta != nil {
-		if internal, ok := meta["internal"].(bool); ok && internal {
-			return nil
-		}
-	}
 	switch node.Type {
 	case models.NodeTypeTrigger:
 		return setupTrigger(ctx, tx, encryptor, registry, node)
