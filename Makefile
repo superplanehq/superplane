@@ -26,6 +26,9 @@ GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_t
 lint:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app revive -formatter friendly -config lint.toml ./...
 
+format.go:
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -w .
+
 tidy:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod tidy
 
