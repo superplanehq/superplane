@@ -23,10 +23,16 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	nodes, edges, err := ParseWorkflow(registry, organizationID, pbWorkflow)
-	if err != nil {
-		return nil, err
-	}
+    nodes, edges, err := ParseWorkflow(registry, organizationID, pbWorkflow)
+    if err != nil {
+        return nil, err
+    }
+
+    // Expand blueprint nodes to include internal nodes (namespaced)
+    expandedNodes, err := expandBlueprintNodes(organizationID, nodes)
+    if err != nil {
+        return nil, err
+    }
 
 	createdBy := uuid.MustParse(userID)
 
@@ -53,20 +59,21 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		}
 
 		//
-		// Create the workflow node records
-		//
-		for _, node := range nodes {
-			workflowNode := models.WorkflowNode{
-				WorkflowID:    workflow.ID,
-				NodeID:        node.ID,
-				Name:          node.Name,
-				State:         models.WorkflowNodeStateReady,
-				Type:          node.Type,
-				Ref:           datatypes.NewJSONType(node.Ref),
-				Configuration: datatypes.NewJSONType(node.Configuration),
-				CreatedAt:     &now,
-				UpdatedAt:     &now,
-			}
+        // Create the workflow node records (including internal blueprint nodes)
+        //
+        for _, node := range expandedNodes {
+            workflowNode := models.WorkflowNode{
+                WorkflowID:    workflow.ID,
+                NodeID:        node.ID,
+                Name:          node.Name,
+                State:         models.WorkflowNodeStateReady,
+                Type:          node.Type,
+                Ref:           datatypes.NewJSONType(node.Ref),
+                Configuration: datatypes.NewJSONType(node.Configuration),
+                Metadata:      datatypes.NewJSONType(node.Metadata),
+                CreatedAt:     &now,
+                UpdatedAt:     &now,
+            }
 
 			if err := tx.Create(&workflowNode).Error; err != nil {
 				return err
