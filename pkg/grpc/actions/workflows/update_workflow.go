@@ -1,10 +1,10 @@
 package workflows
 
 import (
-    "context"
-    "slices"
-    "time"
-    "strings"
+	"context"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components"
@@ -108,27 +108,27 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 	//
 	// Node exists, just update it
 	//
-    existingNode := findNode(existingNodes, node.ID)
-    if existingNode != nil {
-        existingNode.Name = node.Name
-        existingNode.Type = node.Type
-        existingNode.Ref = datatypes.NewJSONType(node.Ref)
-        existingNode.Configuration = datatypes.NewJSONType(node.Configuration)
-        existingNode.Position = datatypes.NewJSONType(node.Position)
-        existingNode.IsCollapsed = node.IsCollapsed
-        existingNode.Metadata = datatypes.NewJSONType(node.Metadata)
-        // Set parent if internal namespaced id
-        if idx := strings.Index(node.ID, ":"); idx != -1 {
-            parent := node.ID[:idx]
-            existingNode.ParentNodeID = &parent
-        } else {
-            existingNode.ParentNodeID = nil
-        }
-        existingNode.UpdatedAt = &now
-        err := tx.Save(&existingNode).Error
-        if err != nil {
-            return nil, err
-        }
+	existingNode := findNode(existingNodes, node.ID)
+	if existingNode != nil {
+		existingNode.Name = node.Name
+		existingNode.Type = node.Type
+		existingNode.Ref = datatypes.NewJSONType(node.Ref)
+		existingNode.Configuration = datatypes.NewJSONType(node.Configuration)
+		existingNode.Position = datatypes.NewJSONType(node.Position)
+		existingNode.IsCollapsed = node.IsCollapsed
+		existingNode.Metadata = datatypes.NewJSONType(node.Metadata)
+		// Set parent if internal namespaced id
+		if idx := strings.Index(node.ID, ":"); idx != -1 {
+			parent := node.ID[:idx]
+			existingNode.ParentNodeID = &parent
+		} else {
+			existingNode.ParentNodeID = nil
+		}
+		existingNode.UpdatedAt = &now
+		err := tx.Save(&existingNode).Error
+		if err != nil {
+			return nil, err
+		}
 
 		return existingNode, nil
 	}
@@ -136,22 +136,22 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 	//
 	// Node doesn't exist, create it
 	//
-    // Derive ParentNodeID for internal nodes
-    var parentNodeID *string
-    if idx := strings.Index(node.ID, ":"); idx != -1 {
-        parent := node.ID[:idx]
-        parentNodeID = &parent
-    }
+	// Derive ParentNodeID for internal nodes
+	var parentNodeID *string
+	if idx := strings.Index(node.ID, ":"); idx != -1 {
+		parent := node.ID[:idx]
+		parentNodeID = &parent
+	}
 
-    workflowNode := models.WorkflowNode{
-        WorkflowID:    workflowID,
-        NodeID:        node.ID,
-        ParentNodeID:  parentNodeID,
-        Name:          node.Name,
-        State:         models.WorkflowNodeStateReady,
-        Type:          node.Type,
-        Ref:           datatypes.NewJSONType(node.Ref),
-        Configuration: datatypes.NewJSONType(node.Configuration),
+	workflowNode := models.WorkflowNode{
+		WorkflowID:    workflowID,
+		NodeID:        node.ID,
+		ParentNodeID:  parentNodeID,
+		Name:          node.Name,
+		State:         models.WorkflowNodeStateReady,
+		Type:          node.Type,
+		Ref:           datatypes.NewJSONType(node.Ref),
+		Configuration: datatypes.NewJSONType(node.Configuration),
 		Position:      datatypes.NewJSONType(node.Position),
 		IsCollapsed:   node.IsCollapsed,
 		Metadata:      datatypes.NewJSONType(node.Metadata),
