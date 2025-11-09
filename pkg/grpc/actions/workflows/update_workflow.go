@@ -31,16 +31,16 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		return nil, status.Errorf(codes.NotFound, "workflow not found: %v", err)
 	}
 
-    nodes, edges, err := ParseWorkflow(registry, organizationID, pbWorkflow)
-    if err != nil {
-        return nil, err
-    }
+	nodes, edges, err := ParseWorkflow(registry, organizationID, pbWorkflow)
+	if err != nil {
+		return nil, err
+	}
 
-    // Expand blueprint nodes to include internal nodes (namespaced)
-    expandedNodes, err := expandBlueprintNodes(organizationID, nodes)
-    if err != nil {
-        return nil, err
-    }
+	// Expand blueprint nodes to include internal nodes (namespaced)
+	expandedNodes, err := expandBlueprintNodes(organizationID, nodes)
+	if err != nil {
+		return nil, err
+	}
 
 	now := time.Now()
 
@@ -60,28 +60,28 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		//
 		// Update the workflow node records
 		//
-        existingNodes, err := models.FindWorkflowNodesInTransaction(tx, existingWorkflow.ID)
-        if err != nil {
-            return err
-        }
+		existingNodes, err := models.FindWorkflowNodesInTransaction(tx, existingWorkflow.ID)
+		if err != nil {
+			return err
+		}
 
 		//
 		// Go through each node in the new workflow, creating / updating it,
 		// and tracking which nodes we've seen, to delete nodes that are no longer in the workflow at the end.
 		//
-        for _, node := range expandedNodes {
-            workflowNode, err := upsertNode(tx, existingNodes, node, workflowID)
-            if err != nil {
-                return err
-            }
+		for _, node := range expandedNodes {
+			workflowNode, err := upsertNode(tx, existingNodes, node, workflowID)
+			if err != nil {
+				return err
+			}
 
-            err = setupNode(ctx, tx, encryptor, registry, *workflowNode)
-            if err != nil {
-                return err
-            }
-        }
+			err = setupNode(ctx, tx, encryptor, registry, *workflowNode)
+			if err != nil {
+				return err
+			}
+		}
 
-        return deleteNodes(tx, existingNodes, expandedNodes, workflowID)
+		return deleteNodes(tx, existingNodes, expandedNodes, workflowID)
 	})
 
 	if err != nil {
@@ -103,25 +103,25 @@ func findNode(nodes []models.WorkflowNode, nodeID string) *models.WorkflowNode {
 }
 
 func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.Node, workflowID uuid.UUID) (*models.WorkflowNode, error) {
-    now := time.Now()
+	now := time.Now()
 
 	//
 	// Node exists, just update it
 	//
 	existingNode := findNode(existingNodes, node.ID)
-    if existingNode != nil {
-        existingNode.Name = node.Name
-        existingNode.Type = node.Type
-        existingNode.Ref = datatypes.NewJSONType(node.Ref)
-        existingNode.Configuration = datatypes.NewJSONType(node.Configuration)
-        existingNode.Position = datatypes.NewJSONType(node.Position)
-        existingNode.IsCollapsed = node.IsCollapsed
-        existingNode.Metadata = datatypes.NewJSONType(node.Metadata)
-        existingNode.UpdatedAt = &now
-        err := tx.Save(&existingNode).Error
-        if err != nil {
-            return nil, err
-        }
+	if existingNode != nil {
+		existingNode.Name = node.Name
+		existingNode.Type = node.Type
+		existingNode.Ref = datatypes.NewJSONType(node.Ref)
+		existingNode.Configuration = datatypes.NewJSONType(node.Configuration)
+		existingNode.Position = datatypes.NewJSONType(node.Position)
+		existingNode.IsCollapsed = node.IsCollapsed
+		existingNode.Metadata = datatypes.NewJSONType(node.Metadata)
+		existingNode.UpdatedAt = &now
+		err := tx.Save(&existingNode).Error
+		if err != nil {
+			return nil, err
+		}
 
 		return existingNode, nil
 	}
@@ -129,20 +129,20 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 	//
 	// Node doesn't exist, create it
 	//
-    workflowNode := models.WorkflowNode{
-        WorkflowID:    workflowID,
-        NodeID:        node.ID,
-        Name:          node.Name,
-        State:         models.WorkflowNodeStateReady,
-        Type:          node.Type,
-        Ref:           datatypes.NewJSONType(node.Ref),
-        Configuration: datatypes.NewJSONType(node.Configuration),
-        Position:      datatypes.NewJSONType(node.Position),
-        IsCollapsed:   node.IsCollapsed,
-        Metadata:      datatypes.NewJSONType(node.Metadata),
-        CreatedAt:     &now,
-        UpdatedAt:     &now,
-    }
+	workflowNode := models.WorkflowNode{
+		WorkflowID:    workflowID,
+		NodeID:        node.ID,
+		Name:          node.Name,
+		State:         models.WorkflowNodeStateReady,
+		Type:          node.Type,
+		Ref:           datatypes.NewJSONType(node.Ref),
+		Configuration: datatypes.NewJSONType(node.Configuration),
+		Position:      datatypes.NewJSONType(node.Position),
+		IsCollapsed:   node.IsCollapsed,
+		Metadata:      datatypes.NewJSONType(node.Metadata),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
 
 	err := tx.Create(&workflowNode).Error
 	if err != nil {
@@ -153,17 +153,17 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 }
 
 func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode) error {
-    // Skip setup for internal (blueprint-expanded) nodes
-    if meta := node.Metadata.Data(); meta != nil {
-        if internal, ok := meta["internal"].(bool); ok && internal {
-            return nil
-        }
-    }
-    switch node.Type {
-    case models.NodeTypeTrigger:
-        return setupTrigger(ctx, tx, encryptor, registry, node)
-    case models.NodeTypeComponent:
-        return setupComponent(tx, registry, node)
+	// Skip setup for internal (blueprint-expanded) nodes
+	if meta := node.Metadata.Data(); meta != nil {
+		if internal, ok := meta["internal"].(bool); ok && internal {
+			return nil
+		}
+	}
+	switch node.Type {
+	case models.NodeTypeTrigger:
+		return setupTrigger(ctx, tx, encryptor, registry, node)
+	case models.NodeTypeComponent:
+		return setupComponent(tx, registry, node)
 	}
 
 	return nil

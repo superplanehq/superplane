@@ -1,17 +1,17 @@
 package workers
 
 import (
-    "context"
-    "fmt"
-    "log"
-    "time"
+	"context"
+	"fmt"
+	"log"
+	"time"
 
-    "golang.org/x/sync/semaphore"
-    "gorm.io/gorm"
+	"golang.org/x/sync/semaphore"
+	"gorm.io/gorm"
 
-    "github.com/superplanehq/superplane/pkg/database"
-    "github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-    "github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 type WorkflowEventRouter struct {
@@ -197,29 +197,29 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, workflow *
 	w.log("Child node %s is not a terminal node - creating next executions: %v", childNodeID, edges)
 
 	//
-    // Not a terminal node, create queue items for next internal nodes.
-    // The queue worker will create child executions, preserving parent linkage.
-    //
-    now := time.Now()
-    for _, edge := range edges {
-        // Ensure target internal node exists as a workflow node
-        targetNodeID := parentNode.NodeID + ":" + edge.TargetID
-        if _, err := models.FindWorkflowNode(tx, workflow.ID, targetNodeID); err != nil {
-            return err
-        }
+	// Not a terminal node, create queue items for next internal nodes.
+	// The queue worker will create child executions, preserving parent linkage.
+	//
+	now := time.Now()
+	for _, edge := range edges {
+		// Ensure target internal node exists as a workflow node
+		targetNodeID := parentNode.NodeID + ":" + edge.TargetID
+		if _, err := models.FindWorkflowNode(tx, workflow.ID, targetNodeID); err != nil {
+			return err
+		}
 
-        queueItem := models.WorkflowNodeQueueItem{
-            WorkflowID:  workflow.ID,
-            NodeID:      targetNodeID,
-            RootEventID: execution.RootEventID,
-            EventID:     event.ID,
-            CreatedAt:   &now,
-        }
+		queueItem := models.WorkflowNodeQueueItem{
+			WorkflowID:  workflow.ID,
+			NodeID:      targetNodeID,
+			RootEventID: execution.RootEventID,
+			EventID:     event.ID,
+			CreatedAt:   &now,
+		}
 
-        if err := tx.Create(&queueItem).Error; err != nil {
-            return err
-        }
-    }
+		if err := tx.Create(&queueItem).Error; err != nil {
+			return err
+		}
+	}
 
 	return event.RoutedInTransaction(tx)
 }

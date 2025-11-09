@@ -36,35 +36,35 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		Input:         event.Data.Data(),
 	}
 
-    ctx.CreateExecution = func() (uuid.UUID, error) {
-        now := time.Now()
+	ctx.CreateExecution = func() (uuid.UUID, error) {
+		now := time.Now()
 
-        execution := models.WorkflowNodeExecution{
-            WorkflowID:          queueItem.WorkflowID,
-            NodeID:              node.NodeID,
-            RootEventID:         queueItem.RootEventID,
-            EventID:             event.ID,
-            PreviousExecutionID: event.ExecutionID,
-            State:               models.WorkflowNodeExecutionStatePending,
-            Configuration:       datatypes.NewJSONType(config),
-            CreatedAt:           &now,
-            UpdatedAt:           &now,
-        }
+		execution := models.WorkflowNodeExecution{
+			WorkflowID:          queueItem.WorkflowID,
+			NodeID:              node.NodeID,
+			RootEventID:         queueItem.RootEventID,
+			EventID:             event.ID,
+			PreviousExecutionID: event.ExecutionID,
+			State:               models.WorkflowNodeExecutionStatePending,
+			Configuration:       datatypes.NewJSONType(config),
+			CreatedAt:           &now,
+			UpdatedAt:           &now,
+		}
 
-        // If this queue item originated from an internal (blueprint) execution chain,
-        // propagate the parent execution id from the previous execution so that
-        // child executions are linked to the top-level blueprint execution.
-        if event.ExecutionID != nil {
-            if prev, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, *event.ExecutionID); err == nil {
-                if prev.ParentExecutionID != nil {
-                    execution.ParentExecutionID = prev.ParentExecutionID
-                }
-            }
-        }
+		// If this queue item originated from an internal (blueprint) execution chain,
+		// propagate the parent execution id from the previous execution so that
+		// child executions are linked to the top-level blueprint execution.
+		if event.ExecutionID != nil {
+			if prev, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, *event.ExecutionID); err == nil {
+				if prev.ParentExecutionID != nil {
+					execution.ParentExecutionID = prev.ParentExecutionID
+				}
+			}
+		}
 
-        if err := tx.Create(&execution).Error; err != nil {
-            return uuid.Nil, err
-        }
+		if err := tx.Create(&execution).Error; err != nil {
+			return uuid.Nil, err
+		}
 
 		messages.NewWorkflowExecutionCreatedMessage(execution.WorkflowID.String(), &execution).PublishWithDelay(1 * time.Second)
 		return execution.ID, nil
