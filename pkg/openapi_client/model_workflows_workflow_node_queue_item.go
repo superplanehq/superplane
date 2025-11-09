@@ -21,11 +21,11 @@ var _ MappedNullable = &WorkflowsWorkflowNodeQueueItem{}
 
 // WorkflowsWorkflowNodeQueueItem struct for WorkflowsWorkflowNodeQueueItem
 type WorkflowsWorkflowNodeQueueItem struct {
-	Id *string `json:"id,omitempty"`
-	WorkflowId *string `json:"workflowId,omitempty"`
-	NodeId *string `json:"nodeId,omitempty"`
-	Input map[string]interface{} `json:"input,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	Id         *string                `json:"id,omitempty"`
+	WorkflowId *string                `json:"workflowId,omitempty"`
+	NodeId     *string                `json:"nodeId,omitempty"`
+	Input      map[string]interface{} `json:"input,omitempty"`
+	CreatedAt  *time.Time             `json:"createdAt,omitempty"`
 }
 
 // NewWorkflowsWorkflowNodeQueueItem instantiates a new WorkflowsWorkflowNodeQueueItem object
@@ -206,7 +206,7 @@ func (o *WorkflowsWorkflowNodeQueueItem) SetCreatedAt(v time.Time) {
 }
 
 func (o WorkflowsWorkflowNodeQueueItem) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -268,5 +268,3 @@ func (v *NullableWorkflowsWorkflowNodeQueueItem) UnmarshalJSON(src []byte) error
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

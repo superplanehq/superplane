@@ -21,9 +21,9 @@ type WorkflowNodeExecutionState string
 
 // List of WorkflowNodeExecutionState
 const (
-	WORKFLOWNODEEXECUTIONSTATE_STATE_UNKNOWN WorkflowNodeExecutionState = "STATE_UNKNOWN"
-	WORKFLOWNODEEXECUTIONSTATE_STATE_PENDING WorkflowNodeExecutionState = "STATE_PENDING"
-	WORKFLOWNODEEXECUTIONSTATE_STATE_STARTED WorkflowNodeExecutionState = "STATE_STARTED"
+	WORKFLOWNODEEXECUTIONSTATE_STATE_UNKNOWN  WorkflowNodeExecutionState = "STATE_UNKNOWN"
+	WORKFLOWNODEEXECUTIONSTATE_STATE_PENDING  WorkflowNodeExecutionState = "STATE_PENDING"
+	WORKFLOWNODEEXECUTIONSTATE_STATE_STARTED  WorkflowNodeExecutionState = "STATE_STARTED"
 	WORKFLOWNODEEXECUTIONSTATE_STATE_FINISHED WorkflowNodeExecutionState = "STATE_FINISHED"
 )
 
@@ -113,4 +113,3 @@ func (v *NullableWorkflowNodeExecutionState) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-

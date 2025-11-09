@@ -20,15 +20,14 @@ import (
 	"strings"
 )
 
-
 // CanvasAPIService CanvasAPI service
 type CanvasAPIService service
 
 type ApiSuperplaneAddUserRequest struct {
-	ctx context.Context
-	ApiService *CanvasAPIService
+	ctx            context.Context
+	ApiService     *CanvasAPIService
 	canvasIdOrName string
-	body *SuperplaneAddUserBody
+	body           *SuperplaneAddUserBody
 }
 
 func (r ApiSuperplaneAddUserRequest) Body(body SuperplaneAddUserBody) ApiSuperplaneAddUserRequest {
@@ -45,26 +44,27 @@ SuperplaneAddUser Add a user to a canvas
 
 Add a user to a canvas
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasIdOrName
- @return ApiSuperplaneAddUserRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param canvasIdOrName
+	@return ApiSuperplaneAddUserRequest
 */
 func (a *CanvasAPIService) SuperplaneAddUser(ctx context.Context, canvasIdOrName string) ApiSuperplaneAddUserRequest {
 	return ApiSuperplaneAddUserRequest{
-		ApiService: a,
-		ctx: ctx,
+		ApiService:     a,
+		ctx:            ctx,
 		canvasIdOrName: canvasIdOrName,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *CanvasAPIService) SuperplaneAddUserExecute(r ApiSuperplaneAddUserRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasAPIService.SuperplaneAddUser")
@@ -123,14 +123,14 @@ func (a *CanvasAPIService) SuperplaneAddUserExecute(r ApiSuperplaneAddUserReques
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -147,9 +147,9 @@ func (a *CanvasAPIService) SuperplaneAddUserExecute(r ApiSuperplaneAddUserReques
 }
 
 type ApiSuperplaneCreateCanvasRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *CanvasAPIService
-	body *SuperplaneCreateCanvasRequest
+	body       *SuperplaneCreateCanvasRequest
 }
 
 func (r ApiSuperplaneCreateCanvasRequest) Body(body SuperplaneCreateCanvasRequest) ApiSuperplaneCreateCanvasRequest {
@@ -166,24 +166,25 @@ SuperplaneCreateCanvas Create a new canvas
 
 Creates a new canvas with the given name and organization ID
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiSuperplaneCreateCanvasRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiSuperplaneCreateCanvasRequest
 */
 func (a *CanvasAPIService) SuperplaneCreateCanvas(ctx context.Context) ApiSuperplaneCreateCanvasRequest {
 	return ApiSuperplaneCreateCanvasRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return SuperplaneCreateCanvasResponse
+//
+//	@return SuperplaneCreateCanvasResponse
 func (a *CanvasAPIService) SuperplaneCreateCanvasExecute(r ApiSuperplaneCreateCanvasRequest) (*SuperplaneCreateCanvasResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *SuperplaneCreateCanvasResponse
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *SuperplaneCreateCanvasResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasAPIService.SuperplaneCreateCanvas")
@@ -241,14 +242,14 @@ func (a *CanvasAPIService) SuperplaneCreateCanvasExecute(r ApiSuperplaneCreateCa
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -265,9 +266,9 @@ func (a *CanvasAPIService) SuperplaneCreateCanvasExecute(r ApiSuperplaneCreateCa
 }
 
 type ApiSuperplaneDeleteCanvasRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *CanvasAPIService
-	idOrName string
+	idOrName   string
 }
 
 func (r ApiSuperplaneDeleteCanvasRequest) Execute() (map[string]interface{}, *http.Response, error) {
@@ -279,26 +280,27 @@ SuperplaneDeleteCanvas Delete a canvas
 
 Deletes the specified canvas (can be referenced by ID or name)
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param idOrName
- @return ApiSuperplaneDeleteCanvasRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param idOrName
+	@return ApiSuperplaneDeleteCanvasRequest
 */
 func (a *CanvasAPIService) SuperplaneDeleteCanvas(ctx context.Context, idOrName string) ApiSuperplaneDeleteCanvasRequest {
 	return ApiSuperplaneDeleteCanvasRequest{
 		ApiService: a,
-		ctx: ctx,
-		idOrName: idOrName,
+		ctx:        ctx,
+		idOrName:   idOrName,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *CanvasAPIService) SuperplaneDeleteCanvasExecute(r ApiSuperplaneDeleteCanvasRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasAPIService.SuperplaneDeleteCanvas")
@@ -352,14 +354,14 @@ func (a *CanvasAPIService) SuperplaneDeleteCanvasExecute(r ApiSuperplaneDeleteCa
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -376,10 +378,10 @@ func (a *CanvasAPIService) SuperplaneDeleteCanvasExecute(r ApiSuperplaneDeleteCa
 }
 
 type ApiSuperplaneDescribeCanvasRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *CanvasAPIService
-	id string
-	name *string
+	id         string
+	name       *string
 }
 
 func (r ApiSuperplaneDescribeCanvasRequest) Name(name string) ApiSuperplaneDescribeCanvasRequest {
@@ -396,26 +398,27 @@ SuperplaneDescribeCanvas Get canvas details
 
 Returns the details of a specific canvas
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id
- @return ApiSuperplaneDescribeCanvasRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiSuperplaneDescribeCanvasRequest
 */
 func (a *CanvasAPIService) SuperplaneDescribeCanvas(ctx context.Context, id string) ApiSuperplaneDescribeCanvasRequest {
 	return ApiSuperplaneDescribeCanvasRequest{
 		ApiService: a,
-		ctx: ctx,
-		id: id,
+		ctx:        ctx,
+		id:         id,
 	}
 }
 
 // Execute executes the request
-//  @return SuperplaneDescribeCanvasResponse
+//
+//	@return SuperplaneDescribeCanvasResponse
 func (a *CanvasAPIService) SuperplaneDescribeCanvasExecute(r ApiSuperplaneDescribeCanvasRequest) (*SuperplaneDescribeCanvasResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *SuperplaneDescribeCanvasResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *SuperplaneDescribeCanvasResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasAPIService.SuperplaneDescribeCanvas")
@@ -472,14 +475,14 @@ func (a *CanvasAPIService) SuperplaneDescribeCanvasExecute(r ApiSuperplaneDescri
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -496,7 +499,7 @@ func (a *CanvasAPIService) SuperplaneDescribeCanvasExecute(r ApiSuperplaneDescri
 }
 
 type ApiSuperplaneListCanvasesRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *CanvasAPIService
 }
 
@@ -509,24 +512,25 @@ SuperplaneListCanvases List canvases
 
 Returns a list of all canvases
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiSuperplaneListCanvasesRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiSuperplaneListCanvasesRequest
 */
 func (a *CanvasAPIService) SuperplaneListCanvases(ctx context.Context) ApiSuperplaneListCanvasesRequest {
 	return ApiSuperplaneListCanvasesRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return SuperplaneListCanvasesResponse
+//
+//	@return SuperplaneListCanvasesResponse
 func (a *CanvasAPIService) SuperplaneListCanvasesExecute(r ApiSuperplaneListCanvasesRequest) (*SuperplaneListCanvasesResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *SuperplaneListCanvasesResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *SuperplaneListCanvasesResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasAPIService.SuperplaneListCanvases")
@@ -579,14 +583,14 @@ func (a *CanvasAPIService) SuperplaneListCanvasesExecute(r ApiSuperplaneListCanv
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -603,10 +607,10 @@ func (a *CanvasAPIService) SuperplaneListCanvasesExecute(r ApiSuperplaneListCanv
 }
 
 type ApiSuperplaneRemoveUserRequest struct {
-	ctx context.Context
-	ApiService *CanvasAPIService
+	ctx            context.Context
+	ApiService     *CanvasAPIService
 	canvasIdOrName string
-	userId string
+	userId         string
 }
 
 func (r ApiSuperplaneRemoveUserRequest) Execute() (map[string]interface{}, *http.Response, error) {
@@ -618,28 +622,29 @@ SuperplaneRemoveUser Remove a user from a canvas
 
 Remove a user from a canvas
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasIdOrName
- @param userId
- @return ApiSuperplaneRemoveUserRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param canvasIdOrName
+	@param userId
+	@return ApiSuperplaneRemoveUserRequest
 */
 func (a *CanvasAPIService) SuperplaneRemoveUser(ctx context.Context, canvasIdOrName string, userId string) ApiSuperplaneRemoveUserRequest {
 	return ApiSuperplaneRemoveUserRequest{
-		ApiService: a,
-		ctx: ctx,
+		ApiService:     a,
+		ctx:            ctx,
 		canvasIdOrName: canvasIdOrName,
-		userId: userId,
+		userId:         userId,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *CanvasAPIService) SuperplaneRemoveUserExecute(r ApiSuperplaneRemoveUserRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CanvasAPIService.SuperplaneRemoveUser")
@@ -694,14 +699,14 @@ func (a *CanvasAPIService) SuperplaneRemoveUserExecute(r ApiSuperplaneRemoveUser
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

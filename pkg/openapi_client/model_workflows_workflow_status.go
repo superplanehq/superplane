@@ -22,7 +22,7 @@ var _ MappedNullable = &WorkflowsWorkflowStatus{}
 type WorkflowsWorkflowStatus struct {
 	LastExecutions []WorkflowsWorkflowNodeExecution `json:"lastExecutions,omitempty"`
 	NextQueueItems []WorkflowsWorkflowNodeQueueItem `json:"nextQueueItems,omitempty"`
-	LastEvents []WorkflowsWorkflowEvent `json:"lastEvents,omitempty"`
+	LastEvents     []WorkflowsWorkflowEvent         `json:"lastEvents,omitempty"`
 }
 
 // NewWorkflowsWorkflowStatus instantiates a new WorkflowsWorkflowStatus object
@@ -139,7 +139,7 @@ func (o *WorkflowsWorkflowStatus) SetLastEvents(v []WorkflowsWorkflowEvent) {
 }
 
 func (o WorkflowsWorkflowStatus) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,5 +195,3 @@ func (v *NullableWorkflowsWorkflowStatus) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

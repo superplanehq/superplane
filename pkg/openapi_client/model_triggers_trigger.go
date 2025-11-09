@@ -20,11 +20,11 @@ var _ MappedNullable = &TriggersTrigger{}
 
 // TriggersTrigger struct for TriggersTrigger
 type TriggersTrigger struct {
-	Name *string `json:"name,omitempty"`
-	Label *string `json:"label,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Icon *string `json:"icon,omitempty"`
-	Color *string `json:"color,omitempty"`
+	Name          *string              `json:"name,omitempty"`
+	Label         *string              `json:"label,omitempty"`
+	Description   *string              `json:"description,omitempty"`
+	Icon          *string              `json:"icon,omitempty"`
+	Color         *string              `json:"color,omitempty"`
 	Configuration []ConfigurationField `json:"configuration,omitempty"`
 }
 
@@ -238,7 +238,7 @@ func (o *TriggersTrigger) SetConfiguration(v []ConfigurationField) {
 }
 
 func (o TriggersTrigger) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -303,5 +303,3 @@ func (v *NullableTriggersTrigger) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-
