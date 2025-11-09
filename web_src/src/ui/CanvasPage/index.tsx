@@ -180,6 +180,9 @@ const nodeTypes = {
         onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
         onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
         onToggleView={callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
+        onToggleCollapse={
+          callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
+        }
         ai={{
           show: callbacks.aiState.sidebarOpen,
           suggestion: callbacks.aiState.suggestions[nodeProps.id] || null,

@@ -64,6 +64,7 @@ export const Approval: React.FC<ApprovalProps> = ({
   lastRunData,
   zeroStateText = "Awaiting events for approval",
   selected = false,
+  onToggleCollapse,
   onRun,
   runDisabled,
   runDisabledTooltip,
@@ -149,6 +150,7 @@ export const Approval: React.FC<ApprovalProps> = ({
           title={title}
           collapsedBackground={collapsedBackground}
           shape="rounded"
+          onDoubleClick={onToggleCollapse}
           onRun={onRun}
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}
@@ -183,6 +185,7 @@ export const Approval: React.FC<ApprovalProps> = ({
           headerColor={headerColor}
           title={title}
           description={description}
+          onDoubleClick={onToggleCollapse}
           onRun={onRun}
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}
