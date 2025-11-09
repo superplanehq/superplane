@@ -1021,7 +1021,11 @@ export function WorkflowPageV2() {
   return (
     <CanvasPage
       onNodeExpand={(nodeId) => {
-        navigate(`/${organizationId}/workflows/${workflowId}/nodes/${nodeId}`);
+        const latestExecution = nodeExecutionsMap[nodeId]?.[0];
+        const executionId = latestExecution?.id;
+        if (executionId) {
+          navigate(`/${organizationId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`);
+        }
       }}
       title={workflow.metadata?.name!}
       nodes={nodes}
