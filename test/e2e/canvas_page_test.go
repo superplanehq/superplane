@@ -78,7 +78,7 @@ func (s *CanvasPageSteps) AddNoopToCanvas(nodeName string) {
 	source := q.TestID("building-block-noop")
 	target := q.TestID("rf__wrapper")
 
-	s.session.DragAndDrop(source, target, 400, 250)
+	s.session.DragAndDrop(source, target, 500, 250)
 	s.session.Sleep(300)
 
 	// Use default name if empty string provided (node name is required)
@@ -123,7 +123,7 @@ func (s *CanvasPageSteps) AddApprovalToCanvas(nodeName string) {
 	source := q.TestID("building-block-approval")
 	target := q.TestID("rf__wrapper")
 
-	s.session.DragAndDrop(source, target, 400, 250)
+	s.session.DragAndDrop(source, target, 500, 250)
 	s.session.Sleep(300)
 
 	// Use default name if empty string provided (node name is required)
