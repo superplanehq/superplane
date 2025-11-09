@@ -45,6 +45,7 @@ export const Trigger: React.FC<TriggerProps> = ({
   collapsed = false,
   collapsedBackground,
   selected = false,
+  onToggleCollapse,
   onRun,
   runDisabled,
   runDisabledTooltip,
@@ -100,6 +101,7 @@ export const Trigger: React.FC<TriggerProps> = ({
           title={title}
           collapsedBackground={collapsedBackground}
           shape="circle"
+          onDoubleClick={onToggleCollapse}
           onRun={onRun}
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}
@@ -129,6 +131,7 @@ export const Trigger: React.FC<TriggerProps> = ({
           headerColor={headerColor}
           title={title}
           description={description}
+          onDoubleClick={onToggleCollapse}
           onRun={onRun}
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}

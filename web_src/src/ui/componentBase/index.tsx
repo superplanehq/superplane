@@ -60,6 +60,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   collapsedBackground,
   eventSections,
   selected = false,
+  onToggleCollapse,
   onRun,
   runDisabled,
   runDisabledTooltip,
@@ -84,6 +85,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           title={title}
           collapsedBackground={collapsedBackground}
           shape="circle"
+          onDoubleClick={onToggleCollapse}
           onRun={onRun}
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}
@@ -122,6 +124,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           headerColor={headerColor}
           title={title}
           description={description}
+          onDoubleClick={onToggleCollapse}
           onRun={onRun}
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}
