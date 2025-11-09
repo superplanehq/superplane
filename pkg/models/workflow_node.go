@@ -22,6 +22,7 @@ const (
 type WorkflowNode struct {
 	WorkflowID    uuid.UUID `gorm:"primaryKey"`
 	NodeID        string    `gorm:"primaryKey"`
+	ParentNodeID  *string
 	Name          string
 	State         string
 	Type          string
