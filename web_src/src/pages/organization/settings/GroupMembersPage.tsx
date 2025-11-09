@@ -25,6 +25,7 @@ import {
   useRemoveUserFromGroup,
 } from "../../../hooks/useOrganizationData";
 import { SuperplaneUsersUser } from "@/api-client";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 export function GroupMembersPage() {
   const { groupName: encodedGroupName } = useParams<{ groupName: string }>();
@@ -32,6 +33,7 @@ export function GroupMembersPage() {
   const navigate = useNavigate();
   const { organizationId } = useParams<{ organizationId: string }>();
   const orgId = organizationId;
+  usePageTitle([groupName || "Group", "Members"]);
   const addMembersSectionRef = useRef<AddMembersSectionRef>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditingGroupName, setIsEditingGroupName] = useState(false);

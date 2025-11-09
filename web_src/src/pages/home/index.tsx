@@ -1,9 +1,12 @@
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { Box, GitBranch, LayoutGrid, List, MoreVertical, Plus, Search, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/Button/button";
 import { CreateCanvasModal } from "../../components/CreateCanvasModal";
 import { CreateCustomComponentModal } from "../../components/CreateCustomComponentModal";
+import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../../components/Dialog/dialog";
+import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "../../components/Dropdown/dropdown";
 import { Heading } from "../../components/Heading/heading";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
@@ -12,8 +15,6 @@ import { useDeleteWorkflow, useWorkflows } from "../../hooks/useWorkflowData";
 import { cn, resolveIcon } from "../../lib/utils";
 import { getColorClass } from "../../utils/colors";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
-import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "../../components/Dropdown/dropdown";
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../../components/Dialog/dialog";
 
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
 import { useCreateCustomComponentModalState } from "./useCreateCustomComponentModalState";
@@ -42,6 +43,8 @@ interface WorkflowCardData {
 }
 
 const HomePage = () => {
+  usePageTitle(["Home"]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [activeTab, setActiveTab] = useState<TabType>("canvases");

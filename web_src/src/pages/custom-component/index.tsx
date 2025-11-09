@@ -1,20 +1,20 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { Node, Edge, addEdge, Connection, applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import { useBlueprint, useUpdateBlueprint } from "../../hooks/useBlueprintData";
-import { useComponents } from "../../hooks/useBlueprintData";
-import { Button } from "../../components/ui/button";
-import { AlertCircle } from "lucide-react";
-import { CustomComponentBuilderPage } from "../../ui/CustomComponentBuilderPage";
-import type { BreadcrumbItem, NewNodeData } from "../../ui/CustomComponentBuilderPage";
-import { BlockData } from "../../ui/CanvasPage/Block";
-import { Heading } from "../../components/Heading/heading";
-import { ComponentsComponent, ComponentsNode } from "../../api-client";
-import { showSuccessToast, showErrorToast } from "../../utils/toast";
-import { filterVisibleConfiguration } from "../../utils/components";
-import ELK from "elkjs/lib/elk.bundled.js";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import { Connection, Edge, Node, addEdge, applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import ELK from "elkjs/lib/elk.bundled.js";
+import { AlertCircle } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ComponentsComponent, ComponentsNode } from "../../api-client";
+import { Heading } from "../../components/Heading/heading";
+import { Button } from "../../components/ui/button";
+import { useBlueprint, useComponents, useUpdateBlueprint } from "../../hooks/useBlueprintData";
+import { BlockData } from "../../ui/CanvasPage/Block";
+import type { BreadcrumbItem, NewNodeData } from "../../ui/CustomComponentBuilderPage";
+import { CustomComponentBuilderPage } from "../../ui/CustomComponentBuilderPage";
+import { filterVisibleConfiguration } from "../../utils/components";
+import { showErrorToast, showSuccessToast } from "../../utils/toast";
 
 const elk = new ELK();
 
@@ -251,9 +251,11 @@ export const CustomComponent = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Fetch blueprint and components
-  const { data: blueprint, isLoading: blueprintLoading } = useBlueprint(organizationId!, blueprintId!);
+  const { data: blueprint, isLoading: blueprintLoading } = useBlueprint(organizationId || "", blueprintId || "");
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
   const updateBlueprintMutation = useUpdateBlueprint(organizationId!, blueprintId!);
+
+  usePageTitle([blueprint?.name || "Custom Component"]);
 
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
