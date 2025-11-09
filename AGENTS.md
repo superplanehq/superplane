@@ -18,6 +18,7 @@
 - Targeted E2E tests: `make e2e E2E_TEST_PACKAGES=./test/e2e/workflows`
 - After updating UI code, always run `make check.build.ui` to verify everything is correct
 - After editing JS code, always run `make format.js` to make sure that the files are consistently formatted
+- After editing Golang code, always run `make format.go` to make sure that files are consistently formatted
 - After updating GoLang code, always check it with `make lint && make check.build.app`
 - To generate DB migrations, use `make db.migration.create NAME=<name>`. Always use dashes instead of underscores in the name. We do not write migrations to rollback, so leave the `*.down.sql` files empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>`, where DB_NAME can be `superplane_dev` or `superplane_test`
 - When validating enum fields in protobuf requests, ensure that the enums are properly mapped to constants in the `pkg/models` package. Check the `Proto*` and `*ToProto` functions in pkg/grpc/actions/common.go.

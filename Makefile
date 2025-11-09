@@ -27,7 +27,7 @@ lint:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app revive -formatter friendly -config lint.toml ./...
 
 format.go:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -w .
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -s -w .
 
 tidy:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod tidy
