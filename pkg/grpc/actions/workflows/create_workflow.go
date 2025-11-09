@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -61,9 +62,17 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		// Create the workflow node records (including internal blueprint nodes)
 		//
 		for _, node := range expandedNodes {
+			// Set ParentNodeID for internal nodes (IDs like parent:child)
+			var parentNodeID *string
+			if idx := strings.Index(node.ID, ":"); idx != -1 {
+				parent := node.ID[:idx]
+				parentNodeID = &parent
+			}
+
 			workflowNode := models.WorkflowNode{
 				WorkflowID:    workflow.ID,
 				NodeID:        node.ID,
+				ParentNodeID:  parentNodeID,
 				Name:          node.Name,
 				State:         models.WorkflowNodeStateReady,
 				Type:          node.Type,
