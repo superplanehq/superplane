@@ -617,11 +617,11 @@ func TestParseDayInYear(t *testing.T) {
 	tg := &TimeGate{}
 
 	tests := []struct {
-		name         string
-		input        string
+		name          string
+		input         string
 		expectedMonth int
 		expectedDay   int
-		hasError     bool
+		hasError      bool
 	}{
 		{"valid Christmas", "12/25", 12, 25, false},
 		{"valid New Year", "01/01", 1, 1, false},

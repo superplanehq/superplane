@@ -15,67 +15,67 @@ func TestNextMinutesTrigger(t *testing.T) {
 		expectNext    time.Time
 	}{
 		{
-			name:     "10 minute interval with reference time",
-			interval: 10,
-			now:      mustParseTime("2025-01-01T12:35:00Z"),
+			name:          "10 minute interval with reference time",
+			interval:      10,
+			now:           mustParseTime("2025-01-01T12:35:00Z"),
 			referenceTime: stringPtr("2025-01-01T12:00:00Z"),
-			expectNext: mustParseTime("2025-01-01T12:40:00Z"), // 4 intervals of 10 min from 12:00
+			expectNext:    mustParseTime("2025-01-01T12:40:00Z"), // 4 intervals of 10 min from 12:00
 		},
 		{
-			name:     "5 minute interval exactly at interval boundary",
-			interval: 5,
-			now:      mustParseTime("2025-01-01T12:20:00Z"),
+			name:          "5 minute interval exactly at interval boundary",
+			interval:      5,
+			now:           mustParseTime("2025-01-01T12:20:00Z"),
 			referenceTime: stringPtr("2025-01-01T12:00:00Z"),
-			expectNext: mustParseTime("2025-01-01T12:25:00Z"), // next interval after 12:20
+			expectNext:    mustParseTime("2025-01-01T12:25:00Z"), // next interval after 12:20
 		},
 		{
-			name:     "15 minute interval with reference time in past",
-			interval: 15,
-			now:      mustParseTime("2025-01-01T12:45:00Z"),
+			name:          "15 minute interval with reference time in past",
+			interval:      15,
+			now:           mustParseTime("2025-01-01T12:45:00Z"),
 			referenceTime: stringPtr("2025-01-01T11:30:00Z"),
-			expectNext: mustParseTime("2025-01-01T13:00:00Z"), // 6 intervals of 15 min from 11:30 (11:30, 11:45, 12:00, 12:15, 12:30, 12:45, 13:00)
+			expectNext:    mustParseTime("2025-01-01T13:00:00Z"), // 6 intervals of 15 min from 11:30 (11:30, 11:45, 12:00, 12:15, 12:30, 12:45, 13:00)
 		},
 		{
-			name:     "30 minute interval crossing day boundary",
-			interval: 30,
-			now:      mustParseTime("2025-01-01T23:50:00Z"),
+			name:          "30 minute interval crossing day boundary",
+			interval:      30,
+			now:           mustParseTime("2025-01-01T23:50:00Z"),
 			referenceTime: stringPtr("2025-01-01T23:00:00Z"),
-			expectNext: mustParseTime("2025-01-02T00:00:00Z"), // 2 intervals from 23:00 (23:30, 00:00)
+			expectNext:    mustParseTime("2025-01-02T00:00:00Z"), // 2 intervals from 23:00 (23:30, 00:00)
 		},
 		{
-			name:     "1 minute interval high frequency",
-			interval: 1,
-			now:      mustParseTime("2025-01-01T12:05:30Z"),
+			name:          "1 minute interval high frequency",
+			interval:      1,
+			now:           mustParseTime("2025-01-01T12:05:30Z"),
 			referenceTime: stringPtr("2025-01-01T12:00:00Z"),
-			expectNext: mustParseTime("2025-01-01T12:06:00Z"), // next minute after 5:30
+			expectNext:    mustParseTime("2025-01-01T12:06:00Z"), // next minute after 5:30
 		},
 		{
-			name:     "no reference time provided - use current time",
-			interval: 10,
-			now:      mustParseTime("2025-01-01T12:05:00Z"),
+			name:          "no reference time provided - use current time",
+			interval:      10,
+			now:           mustParseTime("2025-01-01T12:05:00Z"),
 			referenceTime: nil,
-			expectNext: mustParseTime("2025-01-01T12:15:00Z"), // 10 minutes from now
+			expectNext:    mustParseTime("2025-01-01T12:15:00Z"), // 10 minutes from now
 		},
 		{
-			name:     "reference time in future - should handle gracefully",
-			interval: 5,
-			now:      mustParseTime("2025-01-01T12:00:00Z"),
+			name:          "reference time in future - should handle gracefully",
+			interval:      5,
+			now:           mustParseTime("2025-01-01T12:00:00Z"),
 			referenceTime: stringPtr("2025-01-01T12:10:00Z"),
-			expectNext: mustParseTime("2025-01-01T12:15:00Z"), // first interval after reference time (since minutesElapsed is 0, next is reference + interval)
+			expectNext:    mustParseTime("2025-01-01T12:15:00Z"), // first interval after reference time (since minutesElapsed is 0, next is reference + interval)
 		},
 		{
-			name:        "invalid interval - too small",
-			interval:    0,
-			now:         mustParseTime("2025-01-01T12:00:00Z"),
+			name:          "invalid interval - too small",
+			interval:      0,
+			now:           mustParseTime("2025-01-01T12:00:00Z"),
 			referenceTime: stringPtr("2025-01-01T12:00:00Z"),
-			expectError: true,
+			expectError:   true,
 		},
 		{
-			name:        "invalid interval - too large",
-			interval:    1441,
-			now:         mustParseTime("2025-01-01T12:00:00Z"),
+			name:          "invalid interval - too large",
+			interval:      1441,
+			now:           mustParseTime("2025-01-01T12:00:00Z"),
 			referenceTime: stringPtr("2025-01-01T12:00:00Z"),
-			expectError: true,
+			expectError:   true,
 		},
 	}
 
@@ -420,4 +420,3 @@ func mustParseTime(timeStr string) time.Time {
 func stringPtr(s string) *string {
 	return &s
 }
-

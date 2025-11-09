@@ -20,17 +20,16 @@ import (
 	"strings"
 )
 
-
 // WorkflowNodeExecutionAPIService WorkflowNodeExecutionAPI service
 type WorkflowNodeExecutionAPIService service
 
 type ApiWorkflowsInvokeNodeExecutionActionRequest struct {
-	ctx context.Context
-	ApiService *WorkflowNodeExecutionAPIService
-	workflowId string
+	ctx         context.Context
+	ApiService  *WorkflowNodeExecutionAPIService
+	workflowId  string
 	executionId string
-	actionName string
-	body *WorkflowsInvokeNodeExecutionActionBody
+	actionName  string
+	body        *WorkflowsInvokeNodeExecutionActionBody
 }
 
 func (r ApiWorkflowsInvokeNodeExecutionActionRequest) Body(body WorkflowsInvokeNodeExecutionActionBody) ApiWorkflowsInvokeNodeExecutionActionRequest {
@@ -47,30 +46,31 @@ WorkflowsInvokeNodeExecutionAction Invoke execution action
 
 Invokes a custom action on a workflow node execution
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param workflowId
- @param executionId
- @param actionName
- @return ApiWorkflowsInvokeNodeExecutionActionRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param workflowId
+	@param executionId
+	@param actionName
+	@return ApiWorkflowsInvokeNodeExecutionActionRequest
 */
 func (a *WorkflowNodeExecutionAPIService) WorkflowsInvokeNodeExecutionAction(ctx context.Context, workflowId string, executionId string, actionName string) ApiWorkflowsInvokeNodeExecutionActionRequest {
 	return ApiWorkflowsInvokeNodeExecutionActionRequest{
-		ApiService: a,
-		ctx: ctx,
-		workflowId: workflowId,
+		ApiService:  a,
+		ctx:         ctx,
+		workflowId:  workflowId,
 		executionId: executionId,
-		actionName: actionName,
+		actionName:  actionName,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *WorkflowNodeExecutionAPIService) WorkflowsInvokeNodeExecutionActionExecute(r ApiWorkflowsInvokeNodeExecutionActionRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowNodeExecutionAPIService.WorkflowsInvokeNodeExecutionAction")
@@ -131,14 +131,14 @@ func (a *WorkflowNodeExecutionAPIService) WorkflowsInvokeNodeExecutionActionExec
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -155,11 +155,11 @@ func (a *WorkflowNodeExecutionAPIService) WorkflowsInvokeNodeExecutionActionExec
 }
 
 type ApiWorkflowsListChildExecutionsRequest struct {
-	ctx context.Context
-	ApiService *WorkflowNodeExecutionAPIService
-	workflowId string
+	ctx         context.Context
+	ApiService  *WorkflowNodeExecutionAPIService
+	workflowId  string
 	executionId string
-	body *map[string]interface{}
+	body        *map[string]interface{}
 }
 
 func (r ApiWorkflowsListChildExecutionsRequest) Body(body map[string]interface{}) ApiWorkflowsListChildExecutionsRequest {
@@ -176,28 +176,29 @@ WorkflowsListChildExecutions List child executions for an execution
 
 List child executions for an execution
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param workflowId
- @param executionId
- @return ApiWorkflowsListChildExecutionsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param workflowId
+	@param executionId
+	@return ApiWorkflowsListChildExecutionsRequest
 */
 func (a *WorkflowNodeExecutionAPIService) WorkflowsListChildExecutions(ctx context.Context, workflowId string, executionId string) ApiWorkflowsListChildExecutionsRequest {
 	return ApiWorkflowsListChildExecutionsRequest{
-		ApiService: a,
-		ctx: ctx,
-		workflowId: workflowId,
+		ApiService:  a,
+		ctx:         ctx,
+		workflowId:  workflowId,
 		executionId: executionId,
 	}
 }
 
 // Execute executes the request
-//  @return WorkflowsListChildExecutionsResponse
+//
+//	@return WorkflowsListChildExecutionsResponse
 func (a *WorkflowNodeExecutionAPIService) WorkflowsListChildExecutionsExecute(r ApiWorkflowsListChildExecutionsRequest) (*WorkflowsListChildExecutionsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *WorkflowsListChildExecutionsResponse
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *WorkflowsListChildExecutionsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowNodeExecutionAPIService.WorkflowsListChildExecutions")
@@ -257,14 +258,14 @@ func (a *WorkflowNodeExecutionAPIService) WorkflowsListChildExecutionsExecute(r 
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

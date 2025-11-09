@@ -20,16 +20,16 @@ var _ MappedNullable = &ComponentsNode{}
 
 // ComponentsNode struct for ComponentsNode
 type ComponentsNode struct {
-	Id *string `json:"id,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Type *ComponentsNodeType `json:"type,omitempty"`
+	Id            *string                `json:"id,omitempty"`
+	Name          *string                `json:"name,omitempty"`
+	Type          *ComponentsNodeType    `json:"type,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
-	Position *ComponentsPosition `json:"position,omitempty"`
-	Component *NodeComponentRef `json:"component,omitempty"`
-	Blueprint *NodeBlueprintRef `json:"blueprint,omitempty"`
-	Trigger *NodeTriggerRef `json:"trigger,omitempty"`
-	IsCollapsed *bool `json:"isCollapsed,omitempty"`
+	Metadata      map[string]interface{} `json:"metadata,omitempty"`
+	Position      *ComponentsPosition    `json:"position,omitempty"`
+	Component     *NodeComponentRef      `json:"component,omitempty"`
+	Blueprint     *NodeBlueprintRef      `json:"blueprint,omitempty"`
+	Trigger       *NodeTriggerRef        `json:"trigger,omitempty"`
+	IsCollapsed   *bool                  `json:"isCollapsed,omitempty"`
 }
 
 // NewComponentsNode instantiates a new ComponentsNode object
@@ -374,7 +374,7 @@ func (o *ComponentsNode) SetIsCollapsed(v bool) {
 }
 
 func (o ComponentsNode) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -451,5 +451,3 @@ func (v *NullableComponentsNode) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

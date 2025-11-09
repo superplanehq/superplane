@@ -20,10 +20,10 @@ var _ MappedNullable = &UsersListUserRolesResponse{}
 
 // UsersListUserRolesResponse struct for UsersListUserRolesResponse
 type UsersListUserRolesResponse struct {
-	UserId *string `json:"userId,omitempty"`
+	UserId     *string                  `json:"userId,omitempty"`
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
-	DomainId *string `json:"domainId,omitempty"`
-	Roles []RolesRole `json:"roles,omitempty"`
+	DomainId   *string                  `json:"domainId,omitempty"`
+	Roles      []RolesRole              `json:"roles,omitempty"`
 }
 
 // NewUsersListUserRolesResponse instantiates a new UsersListUserRolesResponse object
@@ -176,7 +176,7 @@ func (o *UsersListUserRolesResponse) SetRoles(v []RolesRole) {
 }
 
 func (o UsersListUserRolesResponse) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -235,5 +235,3 @@ func (v *NullableUsersListUserRolesResponse) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

@@ -73,7 +73,7 @@ func (o *IntegrationsListIntegrationsResponse) SetIntegrations(v []IntegrationsI
 }
 
 func (o IntegrationsListIntegrationsResponse) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,5 +123,3 @@ func (v *NullableIntegrationsListIntegrationsResponse) UnmarshalJSON(src []byte)
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-
