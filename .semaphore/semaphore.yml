@@ -28,6 +28,9 @@ blocks:
         - name: "\U0001F9EA Lint"
           commands:
             - make lint
+        - name: "Go Format Check"
+          commands:
+            - make format.go.check
       epilogue:
         always:
           commands:
@@ -86,9 +89,8 @@ blocks:
         - name: "Format Check"
           commands:
             - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules
-            - cd web_src
-            - npm ci
-            - npm run format:check
+            - cd web_src && npm ci && cd ..
+            - make format.js.check
 
 after_pipeline:
   task:
