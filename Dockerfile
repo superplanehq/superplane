@@ -61,7 +61,7 @@ RUN go install gotest.tools/gotestsum@v1.12.3
 
 # Install Playwright
 RUN go install github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1
-RUN playwright install --with-deps
+RUN playwright install chromium-headless-shell --with-deps
 
 # Inject test files and dev entrypoint
 COPY test test
