@@ -20,9 +20,13 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) *pb.Workfl
 		return nil
 	}
 
-	nodes := make([]models.Node, len(workflowNodes))
-	for i, wn := range workflowNodes {
-		nodes[i] = models.Node{
+	// Only expose top-level nodes (no parents) to the UI
+	nodes := make([]models.Node, 0, len(workflowNodes))
+	for _, wn := range workflowNodes {
+		if wn.ParentNodeID != nil {
+			continue
+		}
+		nodes = append(nodes, models.Node{
 			ID:            wn.NodeID,
 			Name:          wn.Name,
 			Type:          wn.Type,
@@ -31,7 +35,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) *pb.Workfl
 			Metadata:      wn.Metadata.Data(),
 			Position:      wn.Position.Data(),
 			IsCollapsed:   wn.IsCollapsed,
-		}
+		})
 	}
 
 	var createdBy *pb.UserRef
