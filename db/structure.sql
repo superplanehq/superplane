@@ -654,7 +654,8 @@ CREATE TABLE public.workflow_nodes (
     webhook_id uuid,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     "position" jsonb DEFAULT '{}'::jsonb NOT NULL,
-    is_collapsed boolean DEFAULT false NOT NULL
+    is_collapsed boolean DEFAULT false NOT NULL,
+    parent_node_id character varying(128)
 );
 
 
@@ -1301,6 +1302,13 @@ CREATE INDEX idx_workflow_node_executions_workflow_node_id ON public.workflow_no
 
 
 --
+-- Name: idx_workflow_nodes_parent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_nodes_parent ON public.workflow_nodes USING btree (workflow_id, parent_node_id);
+
+
+--
 -- Name: idx_workflow_nodes_state; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1471,6 +1479,14 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 
 ALTER TABLE ONLY public.workflow_node_execution_kvs
     ADD CONSTRAINT fk_wnek_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_nodes fk_workflow_nodes_parent; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_nodes
+    ADD CONSTRAINT fk_workflow_nodes_parent FOREIGN KEY (workflow_id, parent_node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
 
 
 --
@@ -1713,7 +1729,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251107235000	f
+20251109212906	f
 \.
 
 
