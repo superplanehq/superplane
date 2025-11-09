@@ -28,10 +28,15 @@ blocks:
         - name: "\U0001F9EA Lint"
           commands:
             - make lint
+        - name: "Go Format Check"
+          commands:
+            - make test.setup
+            - make test.start
+            - make format.go.check
       epilogue:
         always:
           commands:
-            - test-results publish junit-report.xml
+            - "[ -f junit-report.xml ] && test-results publish junit-report.xml"
 
   - name: "\U0001F9EA E2E"
     dependencies: []
@@ -86,9 +91,8 @@ blocks:
         - name: "Format Check"
           commands:
             - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules
-            - cd web_src
-            - npm ci
-            - npm run format:check
+            - cd web_src && npm ci && cd ..
+            - make format.js.check
 
 after_pipeline:
   task:

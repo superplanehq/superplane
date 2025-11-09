@@ -26,9 +26,6 @@ GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_t
 lint:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app revive -formatter friendly -config lint.toml ./...
 
-format.go:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -s -w .
-
 tidy:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod tidy
 
@@ -38,6 +35,10 @@ test.setup:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go get ./...
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
+
+test.start:
+	docker compose $(DOCKER_COMPOSE_OPTS) up -d
+	sleep 5
 
 test.e2e.setup:
 	$(MAKE) test.setup
@@ -57,6 +58,22 @@ test.e2e:
 
 test.shell:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
+
+#
+# Code formatting
+#
+
+format.go:
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -s -w .
+
+format.go.check:
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -s -l . | tee /dev/stderr | if read; then exit 1; else exit 0; fi
+
+format.js:
+	cd web_src && npm run format
+
+format.js.check:
+	cd web_src && npm run format:check
 
 #
 # Targets for dev environment
@@ -90,9 +107,6 @@ ui.setup:
 
 ui.start:
 	npm run storybook
-
-format.js:
-	cd web_src && npm run format
 
 #
 # Database target helpers
