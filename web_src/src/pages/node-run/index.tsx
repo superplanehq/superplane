@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 
 import { BlueprintsBlueprint, ComponentsComponent, ComponentsEdge, ComponentsNode } from "@/api-client";
 import { useBlueprint, useBlueprints, useComponents } from "@/hooks/useBlueprintData";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useChildExecutions, useWorkflow } from "@/hooks/useWorkflowData";
 import { getTriggerRenderer } from "@/pages/workflowv2/renderers";
 import { CanvasEdge, CanvasNode, CanvasPage } from "@/ui/CanvasPage";
@@ -11,6 +12,8 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 export function NodeRunPage() {
   const { organizationId, workflowId, nodeId, executionId } = useParams();
   const { data: workflow } = useWorkflow(organizationId!, workflowId!);
+
+  usePageTitle([workflow?.metadata?.name]);
 
   // Node details within the workflow
   const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);

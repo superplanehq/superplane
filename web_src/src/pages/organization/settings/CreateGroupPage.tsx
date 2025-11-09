@@ -15,11 +15,13 @@ import { Text } from "../../../components/Text/text";
 import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
 import { useCreateGroup, useOrganizationRoles } from "../../../hooks/useOrganizationData";
 import { Heading } from "@/components/Heading/heading";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 export function CreateGroupPage() {
   const navigate = useNavigate();
   const { organizationId } = useParams<{ organizationId: string }>();
   const orgId = organizationId;
+  usePageTitle(["Create Group"]);
 
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");

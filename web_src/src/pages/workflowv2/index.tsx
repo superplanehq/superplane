@@ -1,10 +1,10 @@
+import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
-import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 
 import {
   BlueprintsBlueprint,
@@ -22,6 +22,7 @@ import {
 import { organizationKeys, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import {
   eventExecutionsQueryOptions,
   useTriggers,
@@ -30,6 +31,7 @@ import {
   workflowKeys,
 } from "@/hooks/useWorkflowData";
 import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
+import { flattenObject } from "@/lib/utils";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 import {
   CANVAS_SIDEBAR_STORAGE_KEY,
@@ -41,15 +43,14 @@ import {
   SidebarData,
   SidebarEvent,
 } from "@/ui/CanvasPage";
+import { ChainExecutionState, TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { formatTimeAgo } from "@/utils/date";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { flattenObject } from "@/lib/utils";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
-import { ChainExecutionState, TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -66,6 +67,8 @@ export function WorkflowPageV2() {
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
+
+  usePageTitle([workflow?.metadata?.name || "Canvas"]);
 
   // Warm up org users and roles cache so approval specs can pretty-print
   // user IDs as emails and role names as display names.

@@ -8,6 +8,7 @@ import { Label, Description } from "../../../components/Fieldset/fieldset";
 import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
 import { useRole, useCreateRole, useUpdateRole } from "../../../hooks/useOrganizationData";
 import { Heading } from "@/components/Heading/heading";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 interface Permission {
   id: string;
@@ -210,6 +211,7 @@ export function CreateRolePage() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const orgId = organizationId;
   const isEditMode = !!roleNameParam;
+  usePageTitle([isEditMode ? "Edit Role" : "Create Role"]);
 
   const [roleName, setRoleName] = useState("");
   const [roleDescription, setRoleDescription] = useState("");
