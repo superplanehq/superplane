@@ -30,6 +30,8 @@ blocks:
             - make lint
         - name: "Go Format Check"
           commands:
+            - make test.setup
+            - make test.start
             - make format.go.check
       epilogue:
         always:
