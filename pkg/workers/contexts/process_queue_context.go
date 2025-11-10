@@ -18,11 +18,21 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		return nil, err
 	}
 
-	config, err := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
+	configBuilder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
-		WithInput(event.Data.Data()).
-		Build(node.Configuration.Data())
+		WithInput(event.Data.Data())
+
+	if node.ParentNodeID != nil {
+		parent, err := models.FindWorkflowNode(tx, node.WorkflowID, *node.ParentNodeID)
+		if err != nil {
+			return nil, err
+		}
+
+		configBuilder = configBuilder.ForBlueprintNode(parent)
+	}
+
+	config, err := configBuilder.Build(node.Configuration.Data())
 	if err != nil {
 		return nil, err
 	}
