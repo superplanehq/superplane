@@ -30,29 +30,34 @@ func (m *MockExecutionStateContext) IsFinished() bool {
 
 func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 	tests := []struct {
-		name          string
-		configuration map[string]any
-		inputData     any
+		name            string
+		configuration   map[string]any
+		inputData       any
+		expectedOutputs map[string][]any
 	}{
 		{
-			name:          "filter with true condition emits empty event",
-			configuration: map[string]any{"expression": "true"},
-			inputData:     map[string]any{"test": "value"},
+			name:            "filter with true condition emits empty event",
+			configuration:   map[string]any{"expression": "true"},
+			inputData:       map[string]any{"test": "value"},
+			expectedOutputs: map[string][]any{"default": {make(map[string]any)}},
 		},
 		{
-			name:          "filter with false condition emits empty event",
-			configuration: map[string]any{"expression": "false"},
-			inputData:     map[string]any{"test": "value"},
+			name:            "filter with false condition emits empty event",
+			configuration:   map[string]any{"expression": "false"},
+			inputData:       map[string]any{"test": "value"},
+			expectedOutputs: map[string][]any{},
 		},
 		{
-			name:          "filter with complex true condition emits empty event",
-			configuration: map[string]any{"expression": "$.test == 'value'"},
-			inputData:     map[string]any{"test": "value"},
+			name:            "filter with complex true condition emits empty event",
+			configuration:   map[string]any{"expression": "$.test == 'value'"},
+			inputData:       map[string]any{"test": "value"},
+			expectedOutputs: map[string][]any{"default": {make(map[string]any)}},
 		},
 		{
-			name:          "filter with complex false condition emits empty event",
-			configuration: map[string]any{"expression": "$.test == 'different'"},
-			inputData:     map[string]any{"test": "value"},
+			name:            "filter with complex false condition emits empty event",
+			configuration:   map[string]any{"expression": "$.test == 'different'"},
+			inputData:       map[string]any{"test": "value"},
+			expectedOutputs: map[string][]any{},
 		},
 	}
 
@@ -63,11 +68,7 @@ func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 
 			mockExecStateCtx := &MockExecutionStateContext{}
 
-			if tt.configuration["expression"] == "true" || (tt.configuration["expression"] == "$.test == 'value'" && tt.inputData.(map[string]any)["test"] == "value") {
-				mockExecStateCtx.On("Pass", map[string][]any{"default": {make(map[string]any)}}).Return(nil)
-			} else {
-				mockExecStateCtx.On("Pass", map[string][]any{}).Return(nil)
-			}
+			mockExecStateCtx.On("Pass", tt.expectedOutputs).Return(nil)
 
 			ctx := components.ExecutionContext{
 				Data:                  tt.inputData,
