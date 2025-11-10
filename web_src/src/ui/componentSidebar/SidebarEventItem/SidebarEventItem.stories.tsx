@@ -203,11 +203,6 @@ export const WithTabDataAndChildEvents: Story = {
       ...mockEvent,
       title: "Workflow Execution",
       subtitle: "Multi-step process",
-      childEventsInfo: {
-        count: 5,
-        hasFailures: false,
-        lastUpdated: new Date().toISOString(),
-      },
     },
     index: 0,
     variant: "latest",
@@ -226,8 +221,6 @@ export const WithTabDataAndChildEvents: Story = {
         Version: "v1.2.3",
       },
     },
-    onExpandChildEvents: (info) => console.log("Expand child events:", info),
-    onReRunChildEvents: (info) => console.log("Re-run child events:", info),
   },
 };
 

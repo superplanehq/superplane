@@ -14,7 +14,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfigurationField } from "@/api-client";
 import { AiSidebar } from "../ai";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
-import type { ChildEventsInfo } from "../childEvents";
 import { ComponentSidebar } from "../componentSidebar";
 import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
@@ -36,7 +35,6 @@ export interface SidebarEvent {
   isOpen: boolean;
   receivedAt?: Date;
   values?: Record<string, string>;
-  childEventsInfo?: ChildEventsInfo;
 }
 
 export interface SidebarData {

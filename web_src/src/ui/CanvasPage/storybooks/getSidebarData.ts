@@ -29,7 +29,6 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           isOpen: false,
           receivedAt: trigger.lastEventData.receivedAt,
           values: trigger.lastEventData.values,
-          childEventsInfo: trigger.lastEventData.childEventsInfo,
         });
       }
 
@@ -129,7 +128,6 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           isOpen: false,
           receivedAt: composite.lastRunItem.receivedAt,
           values: composite.lastRunItem.values,
-          childEventsInfo: composite.lastRunItem.childEventsInfo,
         });
       }
 
@@ -152,15 +150,6 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           isOpen: false,
           receivedAt: new Date(Date.now() - 8 * 60 * 1000),
           values: { records: "1,250", format: "JSON" },
-          childEventsInfo: {
-            count: 1,
-            waitingInfos: [
-              {
-                icon: "Calendar",
-                info: "20 minutes to transform",
-              },
-            ],
-          },
         },
         {
           id: "1050e8400-e29b-41d4-a716-446655440002",

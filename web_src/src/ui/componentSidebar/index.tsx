@@ -2,7 +2,6 @@
 import { resolveIcon } from "@/lib/utils";
 import { TextAlignStart, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ChildEventsInfo } from "../childEvents";
 import { MetadataItem, MetadataList } from "../metadataList";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
@@ -23,8 +22,6 @@ interface ComponentSidebarProps {
   moreInQueueCount: number;
   hideQueueEvents?: boolean;
 
-  onExpandChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
-  onReRunChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
   onEventClick?: (event: SidebarEvent) => void;
   onClose?: () => void;
   onSeeFullHistory?: () => void;
@@ -54,8 +51,6 @@ export const ComponentSidebar = ({
   iconSlug,
   iconColor,
   iconBackground,
-  onExpandChildEvents,
-  onReRunChildEvents,
   onEventClick,
   onClose,
   latestEvents,
@@ -223,8 +218,6 @@ export const ComponentSidebar = ({
                     variant="latest"
                     isOpen={openEventIds.has(event.id) || event.isOpen}
                     onToggleOpen={handleToggleOpen}
-                    onExpandChildEvents={onExpandChildEvents}
-                    onReRunChildEvents={onReRunChildEvents}
                     onEventClick={onEventClick}
                     tabData={getTabData?.(event)}
                   />
@@ -260,8 +253,6 @@ export const ComponentSidebar = ({
                       variant="queue"
                       isOpen={openEventIds.has(event.id) || event.isOpen}
                       onToggleOpen={handleToggleOpen}
-                      onExpandChildEvents={onExpandChildEvents}
-                      onReRunChildEvents={onReRunChildEvents}
                       onEventClick={onEventClick}
                       tabData={getTabData?.(event)}
                     />
