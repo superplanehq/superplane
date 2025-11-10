@@ -202,12 +202,23 @@ func CreateUser(t *testing.T, r *ResourceRegistry, organizationID uuid.UUID) *mo
 }
 
 func EmitWorkflowEventForNode(t *testing.T, workflowID uuid.UUID, nodeID string, channel string, executionID *uuid.UUID) *models.WorkflowEvent {
+	return EmitWorkflowEventForNodeWithData(t, workflowID, nodeID, channel, executionID, map[string]any{"key": "value"})
+}
+
+func EmitWorkflowEventForNodeWithData(
+	t *testing.T,
+	workflowID uuid.UUID,
+	nodeID string,
+	channel string,
+	executionID *uuid.UUID,
+	data map[string]any,
+) *models.WorkflowEvent {
 	now := time.Now()
 	event := models.WorkflowEvent{
 		WorkflowID:  workflowID,
 		NodeID:      nodeID,
 		Channel:     channel,
-		Data:        datatypes.NewJSONType[any](map[string]any{"key": "value"}),
+		Data:        datatypes.NewJSONType[any](data),
 		State:       models.WorkflowEventStatePending,
 		ExecutionID: executionID,
 		CreatedAt:   &now,
@@ -277,6 +288,31 @@ func CreateWorkflowNodeExecution(
 		Configuration:     datatypes.NewJSONType(map[string]any{}),
 		CreatedAt:         &now,
 		UpdatedAt:         &now,
+	}
+
+	require.NoError(t, database.Conn().Create(&execution).Error)
+	return &execution
+}
+
+func CreateNextNodeExecution(
+	t *testing.T,
+	workflowID uuid.UUID,
+	nodeID string,
+	rootEventID uuid.UUID,
+	eventID uuid.UUID,
+	previous *uuid.UUID,
+) *models.WorkflowNodeExecution {
+	now := time.Now()
+	execution := models.WorkflowNodeExecution{
+		WorkflowID:          workflowID,
+		NodeID:              nodeID,
+		RootEventID:         rootEventID,
+		EventID:             eventID,
+		PreviousExecutionID: previous,
+		State:               models.WorkflowNodeExecutionStatePending,
+		Configuration:       datatypes.NewJSONType(map[string]any{}),
+		CreatedAt:           &now,
+		UpdatedAt:           &now,
 	}
 
 	require.NoError(t, database.Conn().Create(&execution).Error)
