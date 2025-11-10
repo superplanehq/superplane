@@ -46,31 +46,39 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		Input:         event.Data.Data(),
 	}
 
-	ctx.CreateExecution = func() (uuid.UUID, error) {
-		now := time.Now()
+    ctx.CreateExecution = func() (uuid.UUID, error) {
+        now := time.Now()
 
-		execution := models.WorkflowNodeExecution{
-			WorkflowID:          queueItem.WorkflowID,
-			NodeID:              node.NodeID,
-			RootEventID:         queueItem.RootEventID,
-			EventID:             event.ID,
-			PreviousExecutionID: event.ExecutionID,
-			State:               models.WorkflowNodeExecutionStatePending,
-			Configuration:       datatypes.NewJSONType(config),
-			CreatedAt:           &now,
-			UpdatedAt:           &now,
-		}
+        execution := models.WorkflowNodeExecution{
+            WorkflowID:          queueItem.WorkflowID,
+            NodeID:              node.NodeID,
+            RootEventID:         queueItem.RootEventID,
+            EventID:             event.ID,
+            State:               models.WorkflowNodeExecutionStatePending,
+            Configuration:       datatypes.NewJSONType(config),
+            CreatedAt:           &now,
+            UpdatedAt:           &now,
+        }
 
-		// If this queue item originated from an internal (blueprint) execution chain,
-		// propagate the parent execution id from the previous execution so that
-		// child executions are linked to the top-level blueprint execution.
-		if event.ExecutionID != nil {
-			if prev, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, *event.ExecutionID); err == nil {
-				if prev.ParentExecutionID != nil {
-					execution.ParentExecutionID = prev.ParentExecutionID
-				}
-			}
-		}
+        // Only set PreviousExecutionID if the referenced execution actually exists.
+        // This avoids FK violations when an event carries an invalid execution reference.
+        if event.ExecutionID != nil {
+            if prev, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, *event.ExecutionID); err == nil {
+                execution.PreviousExecutionID = &prev.ID
+                // If this queue item originated from an internal (blueprint) execution chain,
+                // propagate the parent execution id from the previous execution so that
+                // child executions are linked to the top-level blueprint execution.
+                if prev.ParentExecutionID != nil {
+                    execution.ParentExecutionID = prev.ParentExecutionID
+                }
+            } else if err == gorm.ErrRecordNotFound {
+                // Leave PreviousExecutionID nil to prevent FK constraint violation.
+                // Intentionally proceed so the workflow can recover; upstream should investigate
+                // who produced an event pointing to a non-existent execution.
+            } else {
+                return uuid.Nil, err
+            }
+        }
 
 		if err := tx.Create(&execution).Error; err != nil {
 			return uuid.Nil, err
