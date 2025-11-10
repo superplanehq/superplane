@@ -118,6 +118,7 @@ export interface CanvasPageProps {
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
+  onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
   onDirty?: () => void;
 
   onRun?: (nodeId: string, channel: string, data: any) => void | Promise<void>;
@@ -199,6 +200,8 @@ const nodeTypes = {
 };
 
 function CanvasPage(props: CanvasPageProps) {
+  const cancelQueueItemRef = useRef<CanvasPageProps["onCancelQueueItem"]>(props.onCancelQueueItem);
+  cancelQueueItemRef.current = props.onCancelQueueItem;
   const state = useCanvasState(props);
   const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(null);
   const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
@@ -413,6 +416,11 @@ function CanvasPage(props: CanvasPageProps) {
             getSidebarData={props.getSidebarData}
             loadSidebarData={props.loadSidebarData}
             getTabData={props.getTabData}
+            onCancelQueueItem={
+              props.onCancelQueueItem && state.componentSidebar.selectedNodeId
+                ? (id) => props.onCancelQueueItem!(state.componentSidebar.selectedNodeId!, id)
+                : undefined
+            }
             onRun={handleNodeRun}
             onDuplicate={props.onDuplicate}
             onDocs={props.onDocs}
@@ -479,6 +487,7 @@ function Sidebar({
   getSidebarData,
   loadSidebarData,
   getTabData,
+  onCancelQueueItem,
   onRun,
   onDuplicate,
   onDocs,
@@ -493,6 +502,7 @@ function Sidebar({
   getSidebarData?: (nodeId: string) => SidebarData | null;
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
+  onCancelQueueItem?: (id: string) => void;
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
@@ -569,6 +579,7 @@ function Sidebar({
           ? (event) => getTabData(state.componentSidebar.selectedNodeId!, event)
           : undefined
       }
+      onCancelQueueItem={onCancelQueueItem}
       onEventClick={(event) => {
         setLatestEvents((prev) => {
           return prev.map((e) => {

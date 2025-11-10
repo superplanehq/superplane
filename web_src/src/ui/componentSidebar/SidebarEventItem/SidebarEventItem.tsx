@@ -33,6 +33,7 @@ interface SidebarEventItemProps {
   onReRunChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
   onEventClick?: (event: SidebarEvent) => void;
   tabData?: TabData;
+  onCancelQueueItem?: (id: string) => void;
 }
 
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
@@ -45,6 +46,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   onReRunChildEvents,
   onEventClick,
   tabData,
+  onCancelQueueItem,
 }) => {
   // Determine default active tab based on available data
   const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" | "executionChain" => {
@@ -145,15 +147,15 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       key={event.title + index}
       className={`flex flex-col items-center justify-between gap-1 px-2 py-1.5 rounded-md ${EventBackground} ${EventColor}`}
     >
-      <div
-        className="flex items-center gap-3 rounded-md w-full min-w-0 cursor-pointer"
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleOpen(event.id);
-          onEventClick?.(event);
-        }}
-      >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className="flex items-center gap-3 rounded-md w-full min-w-0">
+        <div
+          className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleOpen(event.id);
+            onEventClick?.(event);
+          }}
+        >
           <div
             className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center border-[1.5px] ${EventColor} ${iconBorderColor} ${animation}`}
           >
@@ -163,6 +165,18 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         </div>
         {event.subtitle && (
           <span className="text-sm text-gray-500 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
+        )}
+        {variant === "queue" && onCancelQueueItem && (
+          <button
+            className="ml-2 text-gray-500 hover:text-red-600"
+            title="Cancel queued event"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancelQueueItem(event.id);
+            }}
+          >
+            {React.createElement(resolveIcon("x"), { size: 16 })}
+          </button>
         )}
       </div>
       {isOpen &&

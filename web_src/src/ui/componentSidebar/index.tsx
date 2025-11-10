@@ -44,6 +44,9 @@ interface ComponentSidebarProps {
 
   // Tab data function to get tab data for each event
   getTabData?: (event: SidebarEvent) => TabData | undefined;
+
+  // Queue actions
+  onCancelQueueItem?: (id: string) => void;
 }
 
 export const ComponentSidebar = ({
@@ -75,6 +78,7 @@ export const ComponentSidebar = ({
   onDelete,
   isCompactView = false,
   getTabData,
+  onCancelQueueItem,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
@@ -264,6 +268,7 @@ export const ComponentSidebar = ({
                       onReRunChildEvents={onReRunChildEvents}
                       onEventClick={onEventClick}
                       tabData={getTabData?.(event)}
+                      onCancelQueueItem={onCancelQueueItem}
                     />
                   );
                 })}

@@ -95,6 +95,17 @@ service Workflows {
     };
   }
 
+  rpc DeleteNodeQueueItem(DeleteNodeQueueItemRequest) returns (DeleteNodeQueueItemResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/workflows/{workflow_id}/nodes/{node_id}/queue/{item_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete item from a node's queue";
+      description: "Deletes a specific item in a node's queue";
+      tags: "WorkflowNode";
+    };
+  }
+
   rpc ListNodeExecutions(ListNodeExecutionsRequest) returns (ListNodeExecutionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/workflows/{workflow_id}/nodes/{node_id}/executions"
@@ -283,6 +294,14 @@ message ListNodeQueueItemsResponse {
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
 }
+
+message DeleteNodeQueueItemRequest {
+  string workflow_id = 1;
+  string node_id = 2;
+  string item_id = 3;
+}
+
+message DeleteNodeQueueItemResponse {}
 
 message ListNodeExecutionsRequest {
   string workflow_id = 1;

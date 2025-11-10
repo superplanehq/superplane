@@ -2637,6 +2637,50 @@
           "WorkflowNode"
         ]
       }
+    },
+    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue/{itemId}": {
+      "delete": {
+        "summary": "Delete item from a node's queue",
+        "description": "Deletes a specific item in a node's queue",
+        "operationId": "Workflows_DeleteNodeQueueItem",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsDeleteNodeQueueItemResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "WorkflowNode"
+        ]
+      }
     }
   },
   "definitions": {
@@ -4404,6 +4448,9 @@
           "$ref": "#/definitions/WorkflowsWorkflow"
         }
       }
+    },
+    "WorkflowsDeleteNodeQueueItemResponse": {
+      "type": "object"
     },
     "WorkflowsDeleteWorkflowResponse": {
       "type": "object"
