@@ -23,6 +23,11 @@ func (m *MockExecutionStateContext) Fail(reason, message string) error {
 	return args.Error(0)
 }
 
+func (m *MockExecutionStateContext) IsFinished() bool {
+	args := m.Called()
+	return args.Bool(0)
+}
+
 func TestNoop_Execute_EmitsEmptyEvents(t *testing.T) {
 	tests := []struct {
 		name      string

@@ -86,12 +86,17 @@ func (f *Filter) Execute(ctx components.ExecutionContext) error {
 		return fmt.Errorf("expression evaluation failed: %w", err)
 	}
 
-	_, ok := output.(bool)
+	matches, ok := output.(bool)
 	if !ok {
 		return fmt.Errorf("expression must evaluate to boolean, got %T", output)
 	}
 
-	return ctx.ExecutionStateContext.Pass(map[string][]any{})
+	outputs := map[string][]any{}
+	if matches {
+		outputs[components.DefaultOutputChannel.Name] = []any{}
+	}
+
+	return ctx.ExecutionStateContext.Pass(outputs)
 }
 
 func (f *Filter) Actions() []components.Action {

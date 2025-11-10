@@ -23,6 +23,11 @@ func (m *MockExecutionStateContext) Fail(reason, message string) error {
 	return args.Error(0)
 }
 
+func (m *MockExecutionStateContext) IsFinished() bool {
+	args := m.Called()
+	return args.Bool(0)
+}
+
 func TestIf_Execute_EmitsEmptyEvents(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -58,7 +63,11 @@ func TestIf_Execute_EmitsEmptyEvents(t *testing.T) {
 
 			mockExecStateCtx := &MockExecutionStateContext{}
 
-			mockExecStateCtx.On("Pass", map[string][]any{}).Return(nil)
+			if tt.configuration["expression"] == "true" || (tt.configuration["expression"] == "$.test == 'value'" && tt.inputData.(map[string]any)["test"] == "value") {
+				mockExecStateCtx.On("Pass", map[string][]any{"true": {}}).Return(nil)
+			} else {
+				mockExecStateCtx.On("Pass", map[string][]any{"false": {}}).Return(nil)
+			}
 
 			ctx := components.ExecutionContext{
 				Data:                  tt.inputData,
@@ -132,7 +141,11 @@ func TestIf_Execute_BothTrueAndFalsePathsEmitEmpty(t *testing.T) {
 
 			mockExecStateCtx := &MockExecutionStateContext{}
 
-			mockExecStateCtx.On("Pass", map[string][]any{}).Return(nil)
+			if tt.configuration["expression"] == "true" {
+				mockExecStateCtx.On("Pass", map[string][]any{"true": {}}).Return(nil)
+			} else {
+				mockExecStateCtx.On("Pass", map[string][]any{"false": {}}).Return(nil)
+			}
 
 			ctx := components.ExecutionContext{
 				Data:                  map[string]any{"test": "value"},
