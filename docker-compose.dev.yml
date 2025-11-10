@@ -51,6 +51,7 @@ services:
       SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Superplane}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@superplane.com}
+      BLOCK_SIGNUP: ${BLOCK_SIGNUP:-no}
 
     ports:
       - 5173:5173

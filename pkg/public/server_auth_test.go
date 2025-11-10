@@ -24,7 +24,7 @@ func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *model
 	os.Setenv("BASE_URL", "http://localhost:8000")
 
 	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(r.Encryptor, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", r.AuthService)
+	server, err := NewServer(r.Encryptor, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", r.AuthService, false)
 	require.NoError(t, err)
 
 	token, err := signer.Generate(r.Account.ID.String(), time.Hour)

@@ -84,11 +84,12 @@ func NewServer(
 	appEnv string,
 	templateDir string,
 	authorizationService authorization.Authorization,
+	blockSignup bool,
 	middlewares ...mux.MiddlewareFunc,
 ) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir)
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
