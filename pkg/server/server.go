@@ -122,8 +122,9 @@ func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwt
 
 	appEnv := os.Getenv("APP_ENV")
 	templateDir := os.Getenv("TEMPLATE_DIR")
+	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
 
-	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, appEnv, templateDir, authService)
+	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, appEnv, templateDir, authService, blockSignup)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}

@@ -3,6 +3,7 @@ package authentication
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
@@ -23,12 +24,15 @@ import (
 	"gorm.io/gorm"
 )
 
+const SignupDisabledError = "signup is currently disabled"
+
 type Handler struct {
 	jwtSigner   *jwt.Signer
 	authService authorization.Authorization
 	encryptor   crypto.Encryptor
 	isDev       bool
 	templateDir string
+	blockSignup bool
 }
 
 type ProviderConfig struct {
@@ -37,13 +41,14 @@ type ProviderConfig struct {
 	CallbackURL string
 }
 
-func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string, templateDir string) *Handler {
+func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string, templateDir string, blockSignup bool) *Handler {
 	return &Handler{
 		jwtSigner:   jwtSigner,
 		encryptor:   encryptor,
 		authService: authService,
 		isDev:       appEnv == "development",
 		templateDir: templateDir,
+		blockSignup: blockSignup,
 	}
 }
 
@@ -123,8 +128,14 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		AccessToken: "dev-token-" + provider,
 	}
 
-	account, err := findOrCreateAccount(mockUser.Name, mockUser.Email)
+	account, err := a.findOrCreateAccount(mockUser.Name, mockUser.Email)
+
 	if err != nil {
+		if err.Error() == SignupDisabledError {
+			http.Error(w, SignupDisabledError, http.StatusForbidden)
+			return
+		}
+
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -151,7 +162,7 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account, err := findOrCreateAccount(gothUser.Name, gothUser.Email)
+	account, err := a.findOrCreateAccount(gothUser.Name, gothUser.Email)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -294,10 +305,15 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func findOrCreateAccount(name, email string) (*models.Account, error) {
+func (a *Handler) findOrCreateAccount(name, email string) (*models.Account, error) {
 	account, err := models.FindAccountByEmail(email)
 	if err == nil {
 		return account, nil
+	}
+
+	if a.blockSignup {
+		log.Warnf("Signup blocked for email: %s", email)
+		return nil, fmt.Errorf(SignupDisabledError)
 	}
 
 	account, err = models.CreateAccount(name, email)
