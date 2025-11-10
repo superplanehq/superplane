@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon } from "@/lib/utils";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { ChildEvents, ChildEventsInfo } from "../../childEvents";
 import { SidebarEvent } from "../types";
 
 export enum ChainExecutionState {
@@ -29,8 +28,6 @@ interface SidebarEventItemProps {
   variant?: "latest" | "queue";
   isOpen: boolean;
   onToggleOpen: (eventId: string) => void;
-  onExpandChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
-  onReRunChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
   onEventClick?: (event: SidebarEvent) => void;
   tabData?: TabData;
 }
@@ -41,8 +38,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   variant = "latest",
   isOpen,
   onToggleOpen,
-  onExpandChildEvents,
-  onReRunChildEvents,
   onEventClick,
   tabData,
 }) => {
@@ -167,7 +162,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       </div>
       {isOpen &&
         ((event.values && Object.entries(event.values).length > 0) ||
-          (event.childEventsInfo && event.childEventsInfo.count > 0) ||
           tabData) && (
           <div className="rounded-sm bg-white border-1 border-gray-800 text-gray-500 w-full">
             {/* Tab Navigation */}
@@ -362,25 +356,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     </span>
                   </div>
                 ))}
-              </div>
-            )}
-
-            {/* Child Events */}
-            {event.childEventsInfo && event.childEventsInfo.count > 0 && (
-              <div
-                className={`w-full bg-gray-100 rounded-b-sm px-4 py-3 ${
-                  (tabData && (tabData.current || tabData.root || tabData.payload)) ||
-                  (!tabData && event.values && Object.entries(event.values).length > 0)
-                    ? "border-t-1 border-gray-200"
-                    : " rounded-t-sm"
-                }`}
-              >
-                <ChildEvents
-                  childEventsInfo={event.childEventsInfo}
-                  onExpandChildEvents={onExpandChildEvents}
-                  onReRunChildEvents={onReRunChildEvents}
-                  className="font-medium"
-                />
               </div>
             )}
           </div>

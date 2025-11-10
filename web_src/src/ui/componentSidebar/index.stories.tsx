@@ -28,18 +28,15 @@ const mockMetadata = [
 
 const mockLatestEvents = [
   {
+    id: "event-1",
     title: "New commit",
     subtitle: "4m",
     state: "processed" as const,
     isOpen: false,
     receivedAt: new Date(),
-    childEventsInfo: {
-      count: 1,
-      state: "processed" as const,
-      waitingInfos: [],
-    },
   },
   {
+    id: "event-2",
     title: "Pull request merged",
     subtitle: "3h",
     state: "discarded" as const,
@@ -52,51 +49,23 @@ const mockLatestEvents = [
       Type: "merge",
       "Event ID": "abc123-def456-ghi789",
     },
-    childEventsInfo: {
-      count: 3,
-      state: "processed" as const,
-      waitingInfos: [
-        {
-          icon: "check",
-          info: "Tests passed",
-        },
-        {
-          icon: "check",
-          info: "Deploy completed",
-        },
-      ],
-    },
   },
 ];
 
 const mockNextInQueueEvents = [
   {
+    id: "queue-1",
     title: "Deploy to staging",
     state: "waiting" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() + 1000 * 60 * 5),
-    childEventsInfo: {
-      count: 2,
-      state: "waiting" as const,
-      waitingInfos: [
-        {
-          icon: "clock",
-          info: "Waiting for approval",
-          futureTimeDate: new Date(Date.now() + 1000 * 60 * 15),
-        },
-      ],
-    },
   },
   {
+    id: "queue-2",
     title: "Security scan",
     state: "waiting" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() + 1000 * 60 * 10),
-    childEventsInfo: {
-      count: 1,
-      state: "waiting" as const,
-      waitingInfos: [],
-    },
   },
 ];
 
@@ -144,8 +113,6 @@ export const Default: Story = {
     title: "Listen to code changes",
     iconSrc: GithubIcon,
     iconBackground: "bg-black",
-    onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
-    onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
     onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
@@ -203,8 +170,6 @@ export const WithInteractiveEvents: Story = {
     title: "Interactive Event Sidebar",
     iconSrc: GithubIcon,
     iconBackground: "bg-black",
-    onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
-    onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
     onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
@@ -267,8 +232,6 @@ export const WithDifferentIcon: Story = {
     iconSlug: "database",
     iconColor: "text-blue-500",
     iconBackground: "bg-blue-200",
-    onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
-    onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
     onRun: () => console.log("Run action"),
     onDeactivate: () => console.log("Deactivate action"),
@@ -338,8 +301,6 @@ export const ExtendedMetadata: Story = {
     iconSlug: "github",
     iconColor: "text-purple-500",
     iconBackground: "bg-purple-200",
-    onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
-    onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
     onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
@@ -373,8 +334,6 @@ export const ZeroState: Story = {
     iconSlug: "circle-dashed",
     iconColor: "text-gray-500",
     iconBackground: "bg-gray-200",
-    onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
-    onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
   },
 };
@@ -400,8 +359,6 @@ export const WithActionsDropdown: Story = {
     title: "Component with All Actions",
     iconSrc: GithubIcon,
     iconBackground: "bg-green-600",
-    onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
-    onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
     onRun: () => {
       console.log("Run action triggered");

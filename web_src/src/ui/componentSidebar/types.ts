@@ -1,4 +1,3 @@
-import { ChildEventsInfo } from "../childEvents";
 import { ChildEventsState } from "../composite";
 
 export interface SidebarEvent {
@@ -9,5 +8,4 @@ export interface SidebarEvent {
   isOpen: boolean;
   receivedAt?: Date;
   values?: Record<string, string>;
-  childEventsInfo?: ChildEventsInfo;
 }
