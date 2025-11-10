@@ -71,7 +71,12 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 	}
 
 	ctx.DequeueItem = func() error {
-		return queueItem.Delete(tx)
+		if err := queueItem.Delete(tx); err != nil {
+			return err
+		}
+		// Notify deletion
+		messages.NewWorkflowQueueItemDeletedMessage(queueItem.WorkflowID.String(), queueItem).PublishWithDelay(1 * time.Second)
+		return nil
 	}
 
 	ctx.UpdateNodeState = func(state string) error {

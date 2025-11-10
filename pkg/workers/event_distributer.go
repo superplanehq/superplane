@@ -48,6 +48,8 @@ func (e *EventDistributer) Start() error {
 		{messages.WorkflowExchange, messages.WorkflowExecutionCreatedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecutionCreated)},
 		{messages.WorkflowExchange, messages.WorkflowExecutionStartedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecutionStarted)},
 		{messages.WorkflowExchange, messages.WorkflowExecutionFinishedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecutionFinished)},
+		{messages.WorkflowExchange, messages.WorkflowQueueItemCreatedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowQueueItemCreated)},
+		{messages.WorkflowExchange, messages.WorkflowQueueItemDeletedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowQueueItemDeleted)},
 	}
 
 	// Start a consumer for each route

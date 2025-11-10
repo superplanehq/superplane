@@ -446,3 +446,18 @@ message ExecutionFinished {
   string node_id = 3;
   google.protobuf.Timestamp timestamp = 4;
 }
+
+// Queue item lifecycle (for realtime updates)
+message QueueItemCreated {
+  string id = 1;
+  string workflow_id = 2;
+  string node_id = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+message QueueItemDeleted {
+  string id = 1;
+  string workflow_id = 2;
+  string node_id = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}

@@ -113,6 +113,9 @@ func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, workflow *models.Wor
 		if err := tx.Create(&queueItem).Error; err != nil {
 			return err
 		}
+
+		// Notify via message bus (delayed to avoid race with transaction visibility)
+		messages.NewWorkflowQueueItemCreatedMessage(workflow.ID.String(), &queueItem).PublishWithDelay(1 * time.Second)
 	}
 
 	return event.RoutedInTransaction(tx)
@@ -141,6 +144,9 @@ func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, workflow *model
 		if err := tx.Create(&queueItem).Error; err != nil {
 			return err
 		}
+
+		// Notify via message bus
+		messages.NewWorkflowQueueItemCreatedMessage(workflow.ID.String(), &queueItem).PublishWithDelay(1 * time.Second)
 	}
 
 	return event.RoutedInTransaction(tx)
@@ -219,6 +225,9 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, workflow *
 		if err := tx.Create(&queueItem).Error; err != nil {
 			return err
 		}
+
+		// Notify via message bus
+		messages.NewWorkflowQueueItemCreatedMessage(workflow.ID.String(), &queueItem).PublishWithDelay(1 * time.Second)
 	}
 
 	return event.RoutedInTransaction(tx)
