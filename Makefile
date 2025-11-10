@@ -144,6 +144,14 @@ db.delete:
 # Protobuf compilation
 #
 
+gen:
+	$(MAKE) pb.gen
+	$(MAKE) openapi.spec.gen
+	$(MAKE) openapi.client.gen
+	$(MAKE) openapi.web.client.gen
+	$(MAKE) format.go
+	$(MAKE) format.js
+
 MODULES := authorization,organizations,secrets,integrations,canvases,users,groups,roles,me,configuration,components,triggers,blueprints,workflows
 REST_API_MODULES := authorization,organizations,secrets,integrations,canvases,users,groups,roles,me,configuration,components,triggers,blueprints,workflows
 pb.gen:
