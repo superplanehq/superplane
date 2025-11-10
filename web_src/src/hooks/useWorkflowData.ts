@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import {
   workflowsListWorkflows,
   workflowsDescribeWorkflow,
@@ -40,6 +40,10 @@ export const workflowKeys = {
   nodeEvents: () => [...workflowKeys.all, "nodeEvents"] as const,
   nodeEvent: (workflowId: string, nodeId: string, limit?: number) =>
     [...workflowKeys.nodeEvents(), workflowId, nodeId, limit] as const,
+  nodeEventHistory: (workflowId: string, nodeId: string) =>
+    [...workflowKeys.nodeEvents(), "infinite", workflowId, nodeId] as const,
+  nodeExecutionHistory: (workflowId: string, nodeId: string) =>
+    [...workflowKeys.nodeExecutions(), "infinite", workflowId, nodeId] as const,
 };
 
 export const triggerKeys = {
@@ -377,5 +381,76 @@ export const useTrigger = (triggerName: string) => {
       return response.data?.trigger;
     },
     enabled: !!triggerName,
+  });
+};
+
+export const useInfiniteNodeEvents = (workflowId: string, nodeId: string, enabled: boolean = false) => {
+  return useInfiniteQuery({
+    queryKey: workflowKeys.nodeEventHistory(workflowId, nodeId),
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const response = await workflowsListNodeEvents(
+        withOrganizationHeader({
+          path: {
+            workflowId,
+            nodeId,
+          },
+          query: {
+            limit: 20,
+            ...(pageParam ? { before: pageParam } : {}),
+          },
+        }),
+      );
+      return response.data;
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.events?.length || 0), 0);
+      const totalCount = lastPage?.totalCount || 0;
+      if (currentLoadedCount >= totalCount) return undefined;
+
+      if (lastPage?.events && lastPage.events.length === 20) {
+        const lastEvent = lastPage.events[lastPage.events.length - 1];
+        return lastEvent.createdAt;
+      }
+      return undefined;
+    },
+    initialPageParam: undefined as string | undefined,
+    enabled: enabled && !!workflowId && !!nodeId,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useInfiniteNodeExecutions = (workflowId: string, nodeId: string, enabled: boolean = false) => {
+  return useInfiniteQuery({
+    queryKey: workflowKeys.nodeExecutionHistory(workflowId, nodeId),
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const response = await workflowsListNodeExecutions(
+        withOrganizationHeader({
+          path: {
+            workflowId,
+            nodeId,
+          },
+          query: {
+            limit: 20,
+            ...(pageParam ? { before: pageParam } : {}),
+          },
+        }),
+      );
+      return response.data;
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.executions?.length || 0), 0);
+      const totalCount = lastPage?.totalCount || 0;
+      
+      if (currentLoadedCount >= totalCount) return undefined;
+
+      if (lastPage?.executions && lastPage.executions.length === 20) {
+        const lastExecution = lastPage.executions[lastPage.executions.length - 1];
+        return lastExecution.createdAt;
+      }
+      return undefined;
+    },
+    initialPageParam: undefined as string | undefined,
+    enabled: enabled && !!workflowId && !!nodeId,
+    refetchOnWindowFocus: false,
   });
 };
