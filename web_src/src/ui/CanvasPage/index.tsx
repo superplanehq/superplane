@@ -47,6 +47,7 @@ export interface SidebarData {
   iconColor?: string;
   iconBackground?: string;
   moreInQueueCount: number;
+  moreInHistoryCount: number;
   hideQueueEvents?: boolean;
   isLoading?: boolean;
 }
@@ -143,6 +144,12 @@ export interface CanvasPageProps {
   // Optional: control and observe component sidebar state
   onSidebarChange?: (isOpen: boolean, selectedNodeId: string | null) => void;
   initialSidebar?: { isOpen?: boolean; nodeId?: string | null };
+
+  // Full history functionality
+  getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
+  onLoadMoreHistory?: (nodeId: string) => void;
+  getHasMoreHistory?: (nodeId: string) => boolean;
+  getLoadingMoreHistory?: (nodeId: string) => boolean;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -427,6 +434,10 @@ function CanvasPage(props: CanvasPageProps) {
             onDelete={handleNodeDelete}
             runDisabled={props.runDisabled}
             runDisabledTooltip={props.runDisabledTooltip}
+            getAllHistoryEvents={props.getAllHistoryEvents}
+            onLoadMoreHistory={props.onLoadMoreHistory}
+            getHasMoreHistory={props.getHasMoreHistory}
+            getLoadingMoreHistory={props.getLoadingMoreHistory}
           />
         </div>
       </div>
@@ -495,6 +506,10 @@ function Sidebar({
   onDelete,
   runDisabled,
   runDisabledTooltip,
+  getAllHistoryEvents,
+  onLoadMoreHistory,
+  getHasMoreHistory,
+  getLoadingMoreHistory,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -510,6 +525,10 @@ function Sidebar({
   onDelete?: (nodeId: string) => void;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
+  getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
+  onLoadMoreHistory?: (nodeId: string) => void;
+  getHasMoreHistory?: (nodeId: string) => boolean;
+  getLoadingMoreHistory?: (nodeId: string) => boolean;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -571,6 +590,7 @@ function Sidebar({
       iconColor={sidebarData.iconColor}
       iconBackground={sidebarData.iconBackground}
       moreInQueueCount={sidebarData.moreInQueueCount}
+      moreInHistoryCount={sidebarData.moreInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
       getTabData={
         getTabData && state.componentSidebar.selectedNodeId
@@ -605,6 +625,26 @@ function Sidebar({
       onDeactivate={onDeactivate ? () => onDeactivate(state.componentSidebar.selectedNodeId!) : undefined}
       onToggleView={onToggleView ? () => onToggleView(state.componentSidebar.selectedNodeId!) : undefined}
       onDelete={onDelete ? () => onDelete(state.componentSidebar.selectedNodeId!) : undefined}
+      allEvents={
+        getAllHistoryEvents && state.componentSidebar.selectedNodeId
+          ? getAllHistoryEvents(state.componentSidebar.selectedNodeId)
+          : []
+      }
+      onLoadMoreHistory={
+        onLoadMoreHistory && state.componentSidebar.selectedNodeId
+          ? () => onLoadMoreHistory(state.componentSidebar.selectedNodeId!)
+          : undefined
+      }
+      hasMoreHistory={
+        getHasMoreHistory && state.componentSidebar.selectedNodeId
+          ? getHasMoreHistory(state.componentSidebar.selectedNodeId)
+          : false
+      }
+      loadingMoreHistory={
+        getLoadingMoreHistory && state.componentSidebar.selectedNodeId
+          ? getLoadingMoreHistory(state.componentSidebar.selectedNodeId)
+          : false
+      }
     />
   );
 }
