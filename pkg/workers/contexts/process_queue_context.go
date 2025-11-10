@@ -18,11 +18,24 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		return nil, err
 	}
 
-	config, err := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
+	// Build the node configuration, ensuring that blueprint child nodes
+	// can reference the parent blueprint's configuration via {{ config.* }}.
+	builder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
-		WithInput(event.Data.Data()).
-		Build(node.Configuration.Data())
+		WithInput(event.Data.Data())
+
+	// If this node belongs to a blueprint, pass the parent blueprint node
+	// so the expression resolver exposes `config` with the blueprint config.
+	if node.ParentNodeID != nil && *node.ParentNodeID != "" {
+		if parent, err := models.FindWorkflowNode(tx, node.WorkflowID, *node.ParentNodeID); err == nil {
+			builder = builder.ForBlueprintNode(parent)
+		} else {
+			return nil, err
+		}
+	}
+
+	config, err := builder.Build(node.Configuration.Data())
 	if err != nil {
 		return nil, err
 	}
