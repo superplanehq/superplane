@@ -125,7 +125,6 @@ func ListPendingNodeExecutions() ([]WorkflowNodeExecution, error) {
 	var executions []WorkflowNodeExecution
 	query := database.Conn().
 		Where("state = ?", WorkflowNodeExecutionStatePending).
-		Where("parent_execution_id IS NULL").
 		Order("created_at DESC")
 
 	err := query.Find(&executions).Error
@@ -203,25 +202,6 @@ func FindNodeExecutionInTransaction(tx *gorm.DB, workflowID, id uuid.UUID) (*Wor
 	}
 
 	return &execution, nil
-}
-
-func ListPendingChildExecutions() ([]WorkflowNodeExecution, error) {
-	return ListPendingChildExecutionsInTransaction(database.Conn())
-}
-
-func ListPendingChildExecutionsInTransaction(tx *gorm.DB) ([]WorkflowNodeExecution, error) {
-	var executions []WorkflowNodeExecution
-	err := tx.
-		Where("state = ?", WorkflowNodeExecutionStatePending).
-		Where("parent_execution_id IS NOT NULL").
-		Find(&executions).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return executions, nil
 }
 
 func FindChildExecutionsForMultiple(parentExecutionIDs []string) ([]WorkflowNodeExecution, error) {

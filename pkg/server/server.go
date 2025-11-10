@@ -71,13 +71,6 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_BLUEPRINT_NODE_EXECUTOR") == "yes" {
-		log.Println("Starting Pending Node Execution Worker")
-
-		w := workers.NewBlueprintNodeExecutor(registry)
-		go w.Start(context.Background())
-	}
-
 	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
 		log.Println("Starting Node Request Worker")
 

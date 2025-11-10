@@ -486,8 +486,8 @@ export function WorkflowPageV2() {
           const sortedNodeEntries = Object.values(nodeExecutions)
             .flatMap((execs) => execs)
             .sort((execsA, execsB) => {
-              const timeA = execsA.updatedAt ? new Date(execsA.updatedAt).getTime() : 0;
-              const timeB = execsB.updatedAt ? new Date(execsB.updatedAt).getTime() : 0;
+              const timeA = execsA.createdAt ? new Date(execsA.createdAt).getTime() : 0;
+              const timeB = execsB.createdAt ? new Date(execsB.createdAt).getTime() : 0;
               return timeA - timeB;
             });
 
@@ -523,14 +523,21 @@ export function WorkflowPageV2() {
               state: getSidebarEventItemState(exec),
               children:
                 exec?.childExecutions && exec.childExecutions.length > 0
-                  ? exec.childExecutions.map((childExec) => {
-                      const childNodeId = childExec?.nodeId?.split(":")?.at(-1);
+                  ? exec.childExecutions
+                      .slice()
+                      .sort((a, b) => {
+                        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                        return timeA - timeB;
+                      })
+                      .map((childExec) => {
+                        const childNodeId = childExec?.nodeId?.split(":")?.at(-1);
 
-                      return {
-                        name: childNodeId || "Unknown",
-                        state: getSidebarEventItemState(childExec),
-                      };
-                    })
+                        return {
+                          name: childNodeId || "Unknown",
+                          state: getSidebarEventItemState(childExec),
+                        };
+                      })
                   : undefined,
             };
 
