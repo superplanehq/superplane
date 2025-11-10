@@ -28,7 +28,7 @@ func NewWorkflowNodeQueueWorker(registry *registry.Registry) *WorkflowNodeQueueW
 	return &WorkflowNodeQueueWorker{
 		registry:  registry,
 		semaphore: semaphore.NewWeighted(25),
-		logger:    log.WithFields(log.Fields{"worker": "WorkflowEventRouter"}),
+		logger:    log.WithFields(log.Fields{"worker": "WorkflowNodeQueueWorker"}),
 	}
 }
 
