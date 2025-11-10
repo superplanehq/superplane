@@ -51,6 +51,7 @@ import { formatTimeAgo } from "@/utils/date";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
+import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -306,6 +307,13 @@ export function WorkflowPageV2() {
     },
     [workflow?.spec?.nodes, workflowId, queryClient, getNodeData, loadNodeDataMethod],
   );
+
+  const onCancelQueueItem = useOnCancelQueueItemHandler({
+    workflowId: workflowId!,
+    organizationId,
+    workflow,
+    loadSidebarData,
+  });
 
   const workflowEdges = useMemo(() => workflow?.spec?.edges || [], [workflow?.spec?.edges]);
 
@@ -1091,6 +1099,7 @@ export function WorkflowPageV2() {
       canUndo={initialWorkflowSnapshot !== null}
       runDisabled={hasRunBlockingChanges}
       runDisabledTooltip={hasRunBlockingChanges ? "Save canvas changes before running" : undefined}
+      onCancelQueueItem={onCancelQueueItem}
       breadcrumbs={[
         {
           label: "Canvases",
