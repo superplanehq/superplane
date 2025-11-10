@@ -4,7 +4,7 @@ import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } fro
 import { Button } from "../Button/button";
 import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
 import { Link } from "../Link/link";
-import { useIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { useIntegrations, useCreateIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
 import { useSecrets, useCreateSecret } from "@/hooks/useSecrets";
 import {
   GitHubIntegrationForm,
@@ -13,6 +13,7 @@ import {
   NEW_SECRET_NAME,
   useIntegrationForm,
 } from "../IntegrationForm";
+import type { IntegrationsIntegration } from "@/api-client/types.gen";
 
 interface IntegrationModalProps {
   open: boolean;
@@ -21,6 +22,8 @@ interface IntegrationModalProps {
   canvasId: string;
   organizationId: string;
   onSuccess?: (integrationId: string) => void;
+  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION";
+  editingIntegration?: IntegrationsIntegration;
 }
 
 export function IntegrationModal({
@@ -30,14 +33,21 @@ export function IntegrationModal({
   canvasId,
   organizationId: organizationId,
   onSuccess,
+  domainType = "DOMAIN_TYPE_CANVAS",
+  editingIntegration,
 }: IntegrationModalProps) {
   const [isCreating, setIsCreating] = useState(false);
   const orgUrlRef = useRef<HTMLInputElement>(null);
 
-  const { data: integrations = [] } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS");
-  const { data: secrets = [] } = useSecrets(canvasId, "DOMAIN_TYPE_CANVAS");
-  const createIntegrationMutation = useCreateIntegration(canvasId, "DOMAIN_TYPE_CANVAS");
-  const createSecretMutation = useCreateSecret(canvasId, "DOMAIN_TYPE_CANVAS");
+  const { data: integrations = [] } = useIntegrations(organizationId, domainType);
+  const { data: secrets = [] } = useSecrets(organizationId, domainType);
+  const createIntegrationMutation = useCreateIntegration(organizationId, domainType);
+  const updateIntegrationMutation = useUpdateIntegration(
+    organizationId,
+    domainType,
+    editingIntegration?.metadata?.id || "",
+  );
+  const createSecretMutation = useCreateSecret(organizationId, domainType);
 
   const {
     integrationData,
@@ -51,7 +61,7 @@ export function IntegrationModal({
     validateForm,
     resetForm,
     config,
-  } = useIntegrationForm({ integrationType, integrations });
+  } = useIntegrationForm({ integrationType, integrations, editingIntegration });
 
   useEffect(() => {
     if (open && orgUrlRef.current) {
@@ -61,12 +71,28 @@ export function IntegrationModal({
     }
   }, [open]);
 
+  // Clear form when modal is closed
+  useEffect(() => {
+    if (!open) {
+      resetForm();
+      setErrors({});
+    }
+  }, [open, resetForm, setErrors]);
+
+  // Reset form when modal is opened for creating new integration
+  useEffect(() => {
+    if (open && !editingIntegration) {
+      resetForm();
+    }
+  }, [open, editingIntegration, resetForm]);
+
   const handleSaveIntegration = async () => {
     if (!validateForm()) {
       return;
     }
 
     setIsCreating(true);
+    const isEditing = !!editingIntegration;
 
     try {
       let secretName = integrationData.apiToken.secretName;
@@ -74,8 +100,20 @@ export function IntegrationModal({
 
       if (apiTokenTab === "new") {
         try {
+          let newSecretName = `${integrationData.name.trim()}-api-key`;
+          const conflictingSecretsCount = secrets.reduce((acc, secret) => {
+            if (secret.metadata?.name === newSecretName) {
+              return acc + 1;
+            }
+            return acc;
+          }, 0);
+
+          if (conflictingSecretsCount > 0) {
+            newSecretName = `${newSecretName}-${conflictingSecretsCount + 1}`;
+          }
+
           const secretData = {
-            name: `${integrationData.name.trim()}-api-key`,
+            name: newSecretName,
             environmentVariables: [
               {
                 name: NEW_SECRET_NAME,
@@ -108,13 +146,21 @@ export function IntegrationModal({
         tokenSecretKey: secretKey,
       };
 
-      const result = await createIntegrationMutation.mutateAsync(integrationPayload);
+      let result;
+      if (isEditing) {
+        result = await updateIntegrationMutation.mutateAsync({
+          id: editingIntegration?.metadata?.id || "",
+          ...integrationPayload,
+        });
+      } else {
+        result = await createIntegrationMutation.mutateAsync(integrationPayload);
+      }
 
       onSuccess?.(result.data?.integration?.metadata?.id || "");
       onClose();
       resetForm();
     } catch (error) {
-      console.error("Failed to create integration:", error);
+      console.error(`Failed to ${isEditing ? "update" : "create"} integration:`, error);
     } finally {
       setIsCreating(false);
     }
@@ -124,10 +170,22 @@ export function IntegrationModal({
 
   return createPortal(
     <Dialog open={open} onClose={() => {}} className="relative z-50" size="md">
-      <DialogTitle>Create {config.displayName} Integration</DialogTitle>
+      <DialogTitle>
+        {editingIntegration ? "Edit" : "Create"} {config.displayName} Integration
+      </DialogTitle>
       <DialogDescription className="text-sm">
-        New integration will be saved to integrations page. Manage integrations{" "}
-        <Link href={`/${organizationId}/canvas/${canvasId}#integrations`} className="text-blue-600 dark:text-blue-400">
+        {editingIntegration
+          ? "Update your integration settings below."
+          : "New integration will be saved to integrations page."}{" "}
+        Manage integrations{" "}
+        <Link
+          href={
+            domainType === "DOMAIN_TYPE_ORGANIZATION"
+              ? `/${organizationId}/settings/integrations`
+              : `/${organizationId}/canvas/${canvasId}#integrations`
+          }
+          className="text-blue-600 dark:text-blue-400"
+        >
           {" "}
           here
         </Link>
@@ -187,8 +245,10 @@ export function IntegrationModal({
           {isCreating ? (
             <>
               <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
-              Creating...
+              {editingIntegration ? "Updating..." : "Creating..."}
             </>
+          ) : editingIntegration ? (
+            "Update"
           ) : (
             "Create"
           )}

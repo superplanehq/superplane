@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { FormErrors, IntegrationData } from "./types";
 import { getIntegrationConfig } from "./integrationConfigs";
 
@@ -11,16 +11,30 @@ interface UseIntegrationFormProps {
 export const NEW_SECRET_NAME = "my-api-token";
 
 export function useIntegrationForm({ integrationType, integrations, editingIntegration }: UseIntegrationFormProps) {
-  const [integrationData, setIntegrationData] = useState<IntegrationData>({
-    orgUrl: "",
-    name: "",
-    apiToken: {
-      secretName: "",
-      secretKey: "",
-    },
+  const [integrationData, setIntegrationData] = useState<IntegrationData>(() => {
+    if (editingIntegration) {
+      return {
+        name: editingIntegration.metadata?.name || "",
+        orgUrl: editingIntegration.spec?.url || "",
+        apiToken: {
+          secretName: editingIntegration.spec?.auth?.token?.valueFrom?.secret?.name || "",
+          secretKey: editingIntegration.spec?.auth?.token?.valueFrom?.secret?.key || "",
+        },
+      };
+    }
+    return {
+      orgUrl: "",
+      name: "",
+      apiToken: {
+        secretName: "",
+        secretKey: "",
+      },
+    };
   });
 
-  const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("new");
+  const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">(() => {
+    return editingIntegration ? "existing" : "new";
+  });
   const [newSecretToken, setNewSecretToken] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -64,7 +78,7 @@ export function useIntegrationForm({ integrationType, integrations, editingInteg
     return Object.keys(newErrors).length === 0;
   };
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setIntegrationData({
       orgUrl: "",
       name: "",
@@ -73,7 +87,7 @@ export function useIntegrationForm({ integrationType, integrations, editingInteg
     setNewSecretToken("");
     setApiTokenTab("new");
     setErrors({});
-  };
+  }, []);
 
   return {
     integrationData,
