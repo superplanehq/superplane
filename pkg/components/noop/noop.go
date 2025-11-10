@@ -46,7 +46,7 @@ func (c *NoOp) Configuration() []configuration.Field {
 
 func (c *NoOp) Execute(ctx components.ExecutionContext) error {
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {ctx.Data},
+		components.DefaultOutputChannel.Name: {make(map[string]any)},
 	})
 }
 

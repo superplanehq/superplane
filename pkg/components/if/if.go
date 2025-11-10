@@ -98,11 +98,11 @@ func (f *If) Execute(ctx components.ExecutionContext) error {
 	var outputs map[string][]any
 	if matches {
 		outputs = map[string][]any{
-			ChannelNameTrue: {ctx.Data},
+			ChannelNameTrue: {make(map[string]any)},
 		}
 	} else {
 		outputs = map[string][]any{
-			ChannelNameFalse: {ctx.Data},
+			ChannelNameFalse: {make(map[string]any)},
 		}
 	}
 

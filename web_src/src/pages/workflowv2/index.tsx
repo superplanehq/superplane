@@ -1719,11 +1719,9 @@ function prepareIfNode(
       eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
     };
 
-    // Determine which branch was taken based on execution metadata or result
-    const wasTrueBranch = execution.result === "RESULT_PASSED";
-    if (wasTrueBranch) {
+    if (execution.outputs?.["true"]) {
       trueEvent = eventData;
-    } else {
+    } else if (execution.outputs?.["false"]) {
       falseEvent = eventData;
     }
   }

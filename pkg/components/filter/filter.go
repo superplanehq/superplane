@@ -93,7 +93,7 @@ func (f *Filter) Execute(ctx components.ExecutionContext) error {
 
 	outputs := map[string][]any{}
 	if matches {
-		outputs[components.DefaultOutputChannel.Name] = []any{ctx.Data}
+		outputs[components.DefaultOutputChannel.Name] = []any{make(map[string]any)}
 	}
 
 	return ctx.ExecutionStateContext.Pass(outputs)
