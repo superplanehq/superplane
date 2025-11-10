@@ -62,6 +62,10 @@ func (s *WorkflowService) ListNodeQueueItems(ctx context.Context, req *pb.ListNo
 	return workflows.ListNodeQueueItems(ctx, s.registry, req.WorkflowId, req.NodeId, req.Limit, req.Before)
 }
 
+func (s *WorkflowService) DeleteNodeQueueItem(ctx context.Context, req *pb.DeleteNodeQueueItemRequest) (*pb.DeleteNodeQueueItemResponse, error) {
+	return workflows.DeleteNodeQueueItem(ctx, s.registry, req.WorkflowId, req.NodeId, req.ItemId)
+}
+
 func (s *WorkflowService) ListNodeExecutions(ctx context.Context, req *pb.ListNodeExecutionsRequest) (*pb.ListNodeExecutionsResponse, error) {
 	return workflows.ListNodeExecutions(ctx, s.registry, req.WorkflowId, req.NodeId, req.States, req.Results, req.Limit, req.Before)
 }
