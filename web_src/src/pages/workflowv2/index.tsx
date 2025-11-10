@@ -51,6 +51,7 @@ import { formatTimeAgo } from "@/utils/date";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
+import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -130,7 +131,6 @@ export function WorkflowPageV2() {
   const storeVersion = useNodeExecutionStore((state) => state.version);
   const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
   const loadNodeDataMethod = useNodeExecutionStore((state) => state.loadNodeData);
-  const refetchNodeDataMethod = useNodeExecutionStore((state) => state.refetchNodeData);
   const initializeFromWorkflow = useNodeExecutionStore((state) => state.initializeFromWorkflow);
 
   // Initialize store from workflow.status on workflow load (only once per workflow)
@@ -307,6 +307,13 @@ export function WorkflowPageV2() {
     },
     [workflow?.spec?.nodes, workflowId, queryClient, getNodeData, loadNodeDataMethod],
   );
+
+  const onCancelQueueItem = useOnCancelQueueItemHandler({
+    workflowId: workflowId!,
+    organizationId,
+    workflow,
+    loadSidebarData,
+  });
 
   const workflowEdges = useMemo(() => workflow?.spec?.edges || [], [workflow?.spec?.edges]);
 
@@ -1092,35 +1099,7 @@ export function WorkflowPageV2() {
       canUndo={initialWorkflowSnapshot !== null}
       runDisabled={hasRunBlockingChanges}
       runDisabledTooltip={hasRunBlockingChanges ? "Save canvas changes before running" : undefined}
-      onCancelQueueItem={async (nodeId: string, queueItemId: string) => {
-        // Ask user to confirm cancellation
-        if (!window.confirm("Cancel this queued event?")) return;
-        try {
-          // Use direct fetch to avoid tight coupling; SDK will be regenerated to include this
-          await fetch(
-            `/api/v1/workflows/${workflowId}/nodes/${encodeURIComponent(nodeId)}/queue/${encodeURIComponent(queueItemId)}`,
-            {
-              method: "DELETE",
-              headers: {
-                ...(organizationId ? { "X-Organization-ID": organizationId } : {}),
-              },
-            },
-          );
-
-          // Refresh queue items and sidebar data for this node
-          const nodeIdStrict = nodeId as string;
-          await queryClient.invalidateQueries({ queryKey: workflowKeys.nodeQueueItem(workflowId!, nodeIdStrict) });
-          // Force refetch of node data to update the sidebar immediately
-          const node = workflow?.spec?.nodes?.find((n) => n.id === nodeIdStrict);
-          if (node) {
-            await refetchNodeDataMethod(workflowId!, nodeIdStrict, node.type!, queryClient);
-          } else {
-            loadSidebarData(nodeIdStrict);
-          }
-        } catch (err) {
-          console.error("Failed to cancel queue item", err);
-        }
-      }}
+      onCancelQueueItem={onCancelQueueItem}
       breadcrumbs={[
         {
           label: "Canvases",
