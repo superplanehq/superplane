@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -20,12 +21,14 @@ import (
 type WorkflowNodeQueueWorker struct {
 	registry  *registry.Registry
 	semaphore *semaphore.Weighted
+	logger    *log.Entry
 }
 
 func NewWorkflowNodeQueueWorker(registry *registry.Registry) *WorkflowNodeQueueWorker {
 	return &WorkflowNodeQueueWorker{
 		registry:  registry,
 		semaphore: semaphore.NewWeighted(25),
+		logger:    log.WithFields(log.Fields{"worker": "WorkflowEventRouter"}),
 	}
 }
 
@@ -40,20 +43,21 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 		case <-ticker.C:
 			nodes, err := models.ListWorkflowNodesReady()
 			if err != nil {
-				w.log("Error finding workflow nodes ready to be processed: %v", err)
+				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
 
 			for _, node := range nodes {
+				logger := logging.ForNode(w.logger, node)
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
-					w.log("Error acquiring semaphore: %v", err)
+					logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
 
 				go func(node models.WorkflowNode) {
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessNode(node); err != nil {
-						w.log("Error processing workflow node - workflow=%s, node=%s: %v", node.WorkflowID, node.NodeID, err)
+					if err := w.LockAndProcessNode(logger, node); err != nil {
+						logger.Errorf("Error processing: %v", err)
 					}
 				}(node)
 			}
@@ -61,19 +65,19 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *WorkflowNodeQueueWorker) LockAndProcessNode(node models.WorkflowNode) error {
+func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.WorkflowNode) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		n, err := models.LockWorkflowNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
-			w.log("Node node=%s workflow=%s already being processed - skipping", node.NodeID, node.WorkflowID)
+			logger.Info("Node already being processed - skipping")
 			return nil
 		}
 
-		return w.processNode(tx, n)
+		return w.processNode(tx, logger, n)
 	})
 }
 
-func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.WorkflowNode) error {
+func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.WorkflowNode) error {
 	queueItem, err := node.FirstQueueItem(tx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -82,6 +86,9 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.Workflow
 
 		return err
 	}
+
+	logger = logging.ForQueueItem(logger, *queueItem)
+	logger.Info("Processing queue item")
 
 	ctx, err := contexts.BuildProcessQueueContext(tx, node, queueItem)
 	if err != nil {
@@ -119,8 +126,4 @@ func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *components.ProcessQu
 	}
 
 	return comp.ProcessQueueItem(*ctx)
-}
-
-func (w *WorkflowNodeQueueWorker) log(format string, v ...any) {
-	log.Printf("[WorkflowNodeQueueWorker] "+format, v...)
 }
