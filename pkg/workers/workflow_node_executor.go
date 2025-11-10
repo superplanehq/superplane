@@ -113,6 +113,12 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 		return fmt.Errorf("error finding input: %v", err)
 	}
 
+	//
+	// Build the configuration for the first node.
+	// If we have an error here, we should fail the execution,
+	// since this means the first node has improper configuration,
+	// and the user should be aware of this.
+	//
 	config, err := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 		WithRootEvent(&execution.RootEventID).
 		WithPreviousExecution(&execution.ID).
@@ -121,7 +127,16 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 		Build(firstNode.Configuration)
 
 	if err != nil {
-		return err
+		err = execution.FailInTransaction(
+			tx,
+			models.WorkflowNodeExecutionResultReasonError,
+			fmt.Sprintf("error building configuration for execution of node %s: %v", firstNode.ID, err),
+		)
+
+		messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution).
+			PublishWithDelay(1 * time.Second)
+
+		return nil
 	}
 
 	createdChildExecution, err := models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)

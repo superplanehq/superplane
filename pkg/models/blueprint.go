@@ -55,7 +55,6 @@ func (b *Blueprint) FindEdges(sourceID string, channel string) []Edge {
 	return edges
 }
 
-// TODO: this is where input channels come in
 func (b *Blueprint) FindRootNode() *Node {
 	hasIncoming := make(map[string]bool)
 	for _, edge := range b.Edges {
