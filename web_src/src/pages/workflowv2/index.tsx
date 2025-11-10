@@ -524,13 +524,13 @@ export function WorkflowPageV2() {
               children:
                 exec?.childExecutions && exec.childExecutions.length > 0
                   ? exec.childExecutions.map((childExec) => {
-                      const childNodeId = childExec?.nodeId?.split(":")?.at(-1);
+                    const childNodeId = childExec?.nodeId?.split(":")?.at(-1);
 
-                      return {
-                        name: childNodeId || "Unknown",
-                        state: getSidebarEventItemState(childExec),
-                      };
-                    })
+                    return {
+                      name: childNodeId || "Unknown",
+                      state: getSidebarEventItemState(childExec),
+                    };
+                  })
                   : undefined,
             };
 
@@ -593,10 +593,10 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow?.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              configuration: updatedConfiguration,
-              name: updatedNodeName,
-            }
+            ...node,
+            configuration: updatedConfiguration,
+            name: updatedNodeName,
+          }
           : node,
       );
 
@@ -799,12 +799,12 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              position: {
-                x: Math.round(position.x),
-                y: Math.round(position.y),
-              },
-            }
+            ...node,
+            position: {
+              x: Math.round(position.x),
+              y: Math.round(position.y),
+            },
+          }
           : node,
       );
 
@@ -839,9 +839,9 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              isCollapsed: newIsCollapsed,
-            }
+            ...node,
+            isCollapsed: newIsCollapsed,
+          }
           : node,
       );
 
@@ -1252,18 +1252,18 @@ function prepareCompositeNode(
         parameters:
           Object.keys(node.configuration!).length > 0
             ? [
-                {
-                  icon: "cog",
-                  items: Object.keys(node.configuration!).reduce(
-                    (acc, key) => {
-                      const displayKey = fieldLabelMap[key] || key;
-                      acc[displayKey] = `${node.configuration![key]}`;
-                      return acc;
-                    },
-                    {} as Record<string, string>,
-                  ),
-                },
-              ]
+              {
+                icon: "cog",
+                items: Object.keys(node.configuration!).reduce(
+                  (acc, key) => {
+                    const displayKey = fieldLabelMap[key] || key;
+                    acc[displayKey] = `${node.configuration![key]}`;
+                    return acc;
+                  },
+                  {} as Record<string, string>,
+                ),
+              },
+            ]
             : [],
       },
     },
@@ -1540,16 +1540,16 @@ function prepareApprovalNode(
       requireArtifacts:
         isPending && isExecutionActive
           ? [
-              {
-                label: "comment",
-                optional: true,
-              },
-            ]
+            {
+              label: "comment",
+              optional: true,
+            },
+          ]
           : undefined,
       artifacts: hasApprovalArtifacts
         ? {
-            Comment: approvalComment,
-          }
+          Comment: approvalComment,
+        }
         : undefined,
       artifactCount: hasApprovalArtifacts ? 1 : undefined,
       onApprove: async (artifacts?: Record<string, string>) => {
@@ -1635,41 +1635,41 @@ function prepareApprovalNode(
         spec:
           items.length > 0
             ? {
-                title: "approvals required",
-                tooltipTitle: "approvals required",
-                values: items.map((item) => {
-                  const type = (item.type || "").toString();
-                  let value =
-                    type === "user"
-                      ? item.user || ""
-                      : type === "role"
-                        ? item.role || ""
-                        : type === "group"
-                          ? item.group || ""
-                          : "";
-                  const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
+              title: "approvals required",
+              tooltipTitle: "approvals required",
+              values: items.map((item) => {
+                const type = (item.type || "").toString();
+                let value =
+                  type === "user"
+                    ? item.user || ""
+                    : type === "role"
+                      ? item.role || ""
+                      : type === "group"
+                        ? item.group || ""
+                        : "";
+                const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
 
-                  // Pretty-print values
-                  if (type === "user" && value && usersById[value]) {
-                    value = usersById[value].email || usersById[value].name || value;
+                // Pretty-print values
+                if (type === "user" && value && usersById[value]) {
+                  value = usersById[value].email || usersById[value].name || value;
+                }
+                if (type === "role" && value) {
+                  value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
+                  // Fallback to simple suffix mapping when not found
+                  const suffix = (item.role || "").split("_").pop();
+                  if (!rolesByName[item.role || ""] && suffix) {
+                    const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
+                    value = map[suffix] || value;
                   }
-                  if (type === "role" && value) {
-                    value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
-                    // Fallback to simple suffix mapping when not found
-                    const suffix = (item.role || "").split("_").pop();
-                    if (!rolesByName[item.role || ""] && suffix) {
-                      const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
-                      value = map[suffix] || value;
-                    }
-                  }
-                  return {
-                    badges: [
-                      { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-                      { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
-                    ],
-                  };
-                }),
-              }
+                }
+                return {
+                  badges: [
+                    { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+                    { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
+                  ],
+                };
+              }),
+            }
             : undefined,
         awaitingEvent:
           execution?.state === "STATE_STARTED" && rootTriggerRenderer
@@ -1678,16 +1678,16 @@ function prepareApprovalNode(
         lastRunData:
           execution && rootTriggerRenderer
             ? {
-                title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
-                subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
-                receivedAt: new Date(execution.createdAt!),
-                state:
-                  getRunItemState(execution) === "success"
-                    ? ("processed" as const)
-                    : getRunItemState(execution) === "running"
-                      ? ("running" as const)
-                      : ("discarded" as const),
-              }
+              title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
+              subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
+              receivedAt: new Date(execution.createdAt!),
+              state:
+                getRunItemState(execution) === "success"
+                  ? ("processed" as const)
+                  : getRunItemState(execution) === "running"
+                    ? ("running" as const)
+                    : ("discarded" as const),
+            }
             : undefined,
       },
     },
@@ -1719,11 +1719,9 @@ function prepareIfNode(
       eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
     };
 
-    // Determine which branch was taken based on execution metadata or result
-    const wasTrueBranch = execution.result === "RESULT_PASSED";
-    if (wasTrueBranch) {
+    if (execution.outputs?.["true"]) {
       trueEvent = eventData;
-    } else {
+    } else if (execution.outputs?.["false"]) {
       falseEvent = eventData;
     }
   }
@@ -1845,17 +1843,17 @@ function prepareMergeNode(
         nextInQueue:
           nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
             ? (() => {
-                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-                const title =
-                  item?.name ||
-                  item?.input?.title ||
-                  item?.input?.name ||
-                  item?.input?.eventTitle ||
-                  item?.id ||
-                  "Queued";
-                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-                return { title, subtitle };
-              })()
+              const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
+              const title =
+                item?.name ||
+                item?.input?.title ||
+                item?.input?.name ||
+                item?.input?.eventTitle ||
+                item?.id ||
+                "Queued";
+              const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
+              return { title, subtitle };
+            })()
             : undefined,
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
@@ -2070,17 +2068,17 @@ function prepareSemaphoreNode(
         nextInQueue:
           nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
             ? (() => {
-                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-                const title =
-                  item?.name ||
-                  item?.input?.title ||
-                  item?.input?.name ||
-                  item?.input?.eventTitle ||
-                  item?.id ||
-                  "Queued";
-                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-                return { title, subtitle };
-              })()
+              const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
+              const title =
+                item?.name ||
+                item?.input?.title ||
+                item?.input?.name ||
+                item?.input?.eventTitle ||
+                item?.id ||
+                "Queued";
+              const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
+              return { title, subtitle };
+            })()
             : undefined,
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
@@ -2149,17 +2147,17 @@ function prepareWaitNode(
         nextInQueue:
           nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
             ? (() => {
-                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-                const title =
-                  item?.name ||
-                  item?.input?.title ||
-                  item?.input?.name ||
-                  item?.input?.eventTitle ||
-                  item?.id ||
-                  "Queued";
-                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-                return { title, subtitle };
-              })()
+              const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
+              const title =
+                item?.name ||
+                item?.input?.title ||
+                item?.input?.name ||
+                item?.input?.eventTitle ||
+                item?.id ||
+                "Queued";
+              const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
+              return { title, subtitle };
+            })()
             : undefined,
         iconColor: getColorClass(metadata?.color || "yellow"),
         iconBackground: getBackgroundColorClass(metadata?.color || "yellow"),
@@ -2215,12 +2213,12 @@ function prepareTimeGateNode(
 
   let lastExecution:
     | {
-        title: string;
-        receivedAt: Date;
-        state: "success" | "failed" | "running";
-        values?: Record<string, string>;
-        nextRunTime?: Date;
-      }
+      title: string;
+      receivedAt: Date;
+      state: "success" | "failed" | "running";
+      values?: Record<string, string>;
+      nextRunTime?: Date;
+    }
     | undefined;
 
   if (execution) {
@@ -2329,9 +2327,9 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
       : {
-          title: execution.id || "Execution",
-          subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
-        };
+        title: execution.id || "Execution",
+        subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
+      };
 
     const values = execution.rootEvent ? rootTriggerRenderer.getRootEventValues(execution.rootEvent) : {};
 
