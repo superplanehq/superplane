@@ -734,6 +734,10 @@ export type WorkflowsCreateWorkflowResponse = {
   workflow?: WorkflowsWorkflow;
 };
 
+export type WorkflowsDeleteNodeQueueItemResponse = {
+  [key: string]: unknown;
+};
+
 export type WorkflowsDeleteWorkflowResponse = {
   [key: string]: unknown;
 };
@@ -2782,6 +2786,37 @@ export type WorkflowsListNodeQueueItemsResponses = {
 
 export type WorkflowsListNodeQueueItemsResponse2 =
   WorkflowsListNodeQueueItemsResponses[keyof WorkflowsListNodeQueueItemsResponses];
+
+export type WorkflowsDeleteNodeQueueItemData = {
+  body?: never;
+  path: {
+    workflowId: string;
+    nodeId: string;
+    itemId: string;
+  };
+  query?: never;
+  url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue/{itemId}";
+};
+
+export type WorkflowsDeleteNodeQueueItemErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type WorkflowsDeleteNodeQueueItemError =
+  WorkflowsDeleteNodeQueueItemErrors[keyof WorkflowsDeleteNodeQueueItemErrors];
+
+export type WorkflowsDeleteNodeQueueItemResponses = {
+  /**
+   * A successful response.
+   */
+  200: WorkflowsDeleteNodeQueueItemResponse;
+};
+
+export type WorkflowsDeleteNodeQueueItemResponse2 =
+  WorkflowsDeleteNodeQueueItemResponses[keyof WorkflowsDeleteNodeQueueItemResponses];
 
 export type ClientOptions = {
   baseUrl: `http://${string}` | `https://${string}` | (string & {});

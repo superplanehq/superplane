@@ -200,6 +200,9 @@ import type {
   WorkflowsListNodeQueueItemsData,
   WorkflowsListNodeQueueItemsResponse2,
   WorkflowsListNodeQueueItemsError,
+  WorkflowsDeleteNodeQueueItemData,
+  WorkflowsDeleteNodeQueueItemResponse2,
+  WorkflowsDeleteNodeQueueItemError,
 } from "./types.gen";
 import { client as _heyApiClient } from "./client.gen";
 
@@ -1342,6 +1345,23 @@ export const workflowsListNodeQueueItems = <ThrowOnError extends boolean = true>
     ThrowOnError
   >({
     url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue",
+    ...options,
+  });
+};
+
+/**
+ * Delete item from a node's queue
+ * Deletes a specific item in a node's queue
+ */
+export const workflowsDeleteNodeQueueItem = <ThrowOnError extends boolean = true>(
+  options: Options<WorkflowsDeleteNodeQueueItemData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).delete<
+    WorkflowsDeleteNodeQueueItemResponse2,
+    WorkflowsDeleteNodeQueueItemError,
+    ThrowOnError
+  >({
+    url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue/{itemId}",
     ...options,
   });
 };
