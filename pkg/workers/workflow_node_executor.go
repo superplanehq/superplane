@@ -8,7 +8,9 @@ import (
 
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -58,7 +60,7 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 				go func(execution models.WorkflowNodeExecution) {
 					defer w.semaphore.Release(1)
 
-					err := w.LockAndProcessNodeExecution(execution)
+					err := w.LockAndProcessNodeExecution(execution.ID)
 					if err == nil {
 						return
 					}
@@ -74,15 +76,42 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 	}
 }
 
-func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(execution models.WorkflowNodeExecution) error {
+func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		e, err := models.LockWorkflowNodeExecution(tx, execution.ID)
+		var execution models.WorkflowNodeExecution
+
+		//
+		// Try to lock the execution record for update.
+		// If we can't, it means another worker is already processing it.
+		//
+		// We also ensure that the execution is still in pending state,
+		// to avoid processing already started or finished executions.
+		//
+		// Why we need to check the state again:
+		//
+		// Even though we fetch pending executions in the main loop,
+		// there is a race condition where multiple workers might pick the same execution
+		// before any of them has a chance to lock it.
+		//
+		// By checking the state again here, we ensure that only one worker
+		// can start processing a given execution.
+		//
+		// Note: We use SKIP LOCKED to avoid waiting on locked records.
+		//
+
+		err := tx.
+			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+			Where("id = ?", id).
+			Where("state = ?", models.WorkflowNodeExecutionStatePending).
+			First(&execution).
+			Error
+
 		if err != nil {
 			w.logger.Errorf("Execution %s already being processed - skipping", execution.ID)
 			return ErrRecordLocked
 		}
 
-		return w.processNodeExecution(tx, e)
+		return w.processNodeExecution(tx, &execution)
 	})
 }
 
