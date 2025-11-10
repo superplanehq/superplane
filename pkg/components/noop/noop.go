@@ -45,7 +45,9 @@ func (c *NoOp) Configuration() []configuration.Field {
 }
 
 func (c *NoOp) Execute(ctx components.ExecutionContext) error {
-	return ctx.ExecutionStateContext.Pass(map[string][]any{})
+	return ctx.ExecutionStateContext.Pass(map[string][]any{
+		components.DefaultOutputChannel.Name: {make(map[string]any)},
+	})
 }
 
 func (c *NoOp) ProcessQueueItem(ctx components.ProcessQueueContext) error {

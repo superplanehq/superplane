@@ -61,7 +61,7 @@ func TestNoop_Execute_EmitsEmptyEvents(t *testing.T) {
 
 			mockExecStateCtx := &MockExecutionStateContext{}
 
-			mockExecStateCtx.On("Pass", map[string][]any{}).Return(nil)
+			mockExecStateCtx.On("Pass", map[string][]any{"default": {make(map[string]any)}}).Return(nil)
 
 			ctx := components.ExecutionContext{
 				Data:                  tt.inputData,
@@ -91,7 +91,7 @@ func TestNoop_Execute_AlwaysEmitsEmpty(t *testing.T) {
 			components.DefaultOutputChannel.Name: {originalData},
 		})
 
-		mockExecStateCtx.On("Pass", map[string][]any{}).Return(nil)
+		mockExecStateCtx.On("Pass", map[string][]any{"default": {make(map[string]any)}}).Return(nil)
 
 		ctx := components.ExecutionContext{
 			Data:                  originalData,

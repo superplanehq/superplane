@@ -64,7 +64,7 @@ func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 			mockExecStateCtx := &MockExecutionStateContext{}
 
 			if tt.configuration["expression"] == "true" || (tt.configuration["expression"] == "$.test == 'value'" && tt.inputData.(map[string]any)["test"] == "value") {
-				mockExecStateCtx.On("Pass", map[string][]any{"default": {}}).Return(nil)
+				mockExecStateCtx.On("Pass", map[string][]any{"default": {make(map[string]any)}}).Return(nil)
 			} else {
 				mockExecStateCtx.On("Pass", map[string][]any{}).Return(nil)
 			}
