@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -59,7 +60,7 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 				go func(execution models.WorkflowNodeExecution) {
 					defer w.semaphore.Release(1)
 
-					err := w.LockAndProcessNodeExecution(execution)
+					err := w.LockAndProcessNodeExecution(execution.ID)
 					if err == nil {
 						return
 					}
@@ -75,7 +76,7 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 	}
 }
 
-func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(execution models.WorkflowNodeExecution) error {
+func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		var execution models.WorkflowNodeExecution
 
@@ -100,7 +101,7 @@ func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(execution models.Work
 
 		err := tx.
 			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-			Where("id = ?", execution.ID).
+			Where("id = ?", id).
 			Where("state = ?", models.WorkflowNodeExecutionStatePending).
 			First(&execution).
 			Error
