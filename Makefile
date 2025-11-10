@@ -85,7 +85,19 @@ dev.setup:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 
 dev.start:
-	docker compose $(DOCKER_COMPOSE_OPTS) up
+	docker compose $(DOCKER_COMPOSE_OPTS) up -d
+	echo "Waiting for services to start..."
+	sleep 20 # usually takes some time for the DB and the app to be ready
+	echo "Dev environment started. Access the app at http://localhost:8000"
+
+dev.logs:
+	docker compose $(DOCKER_COMPOSE_OPTS) logs -f
+
+dev.logs.app:
+	docker compose $(DOCKER_COMPOSE_OPTS) logs -f app
+
+dev.down:
+	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
 
 dev.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app /bin/bash
