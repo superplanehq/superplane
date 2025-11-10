@@ -258,6 +258,11 @@ func (e *WorkflowNodeExecution) Start() error {
 }
 
 func (e *WorkflowNodeExecution) StartInTransaction(tx *gorm.DB) error {
+	// Just a sanity check that we are not trying to start and already started execution.
+	if e.State != WorkflowNodeExecutionStatePending {
+		return fmt.Errorf("cannot start execution %s in state %s", e.ID, e.State)
+	}
+
 	//
 	// Update the execution state to started.
 	//
