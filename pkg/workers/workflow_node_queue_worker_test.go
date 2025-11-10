@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -17,6 +18,7 @@ func Test__WorkflowNodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	logger := log.NewEntry(log.New())
 
 	//
 	// Create a simple workflow with a trigger and a component node.
@@ -67,7 +69,7 @@ func Test__WorkflowNodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	// - Node state is updated to processing
 	// - Queue item is deleted
 	//
-	err = worker.LockAndProcessNode(*node)
+	err = worker.LockAndProcessNode(logger, *node)
 	require.NoError(t, err)
 
 	// Verify execution was created with pending state
@@ -91,6 +93,7 @@ func Test__WorkflowNodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 
 func Test__WorkflowNodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	r := support.Setup(t)
+	logger := log.NewEntry(log.New())
 
 	//
 	// Create a simple blueprint with two sequential nodes
@@ -172,7 +175,7 @@ func Test__WorkflowNodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	// - Queue item is deleted
 	//
 	worker := NewWorkflowNodeQueueWorker(r.Registry)
-	err = worker.LockAndProcessNode(*node)
+	err = worker.LockAndProcessNode(logger, *node)
 	require.NoError(t, err)
 
 	// Verify execution was created with pending state
@@ -198,6 +201,7 @@ func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	logger := log.NewEntry(log.New())
 
 	//
 	// Create a simple workflow with a trigger and a component node.
@@ -265,7 +269,7 @@ func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, componentNode)
 	require.NoError(t, err)
 
-	err = worker.LockAndProcessNode(*node)
+	err = worker.LockAndProcessNode(logger, *node)
 	require.NoError(t, err)
 
 	// Verify the execution was created with the oldest event
@@ -290,6 +294,7 @@ func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	logger := log.NewEntry(log.New())
 
 	//
 	// Create a simple workflow with a trigger and a component node.
@@ -318,7 +323,7 @@ func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
 	//
 	// Process the node with an empty queue - this should succeed but do nothing.
 	//
-	err = worker.LockAndProcessNode(*node)
+	err = worker.LockAndProcessNode(logger, *node)
 	require.NoError(t, err)
 
 	// Verify no executions were created
@@ -374,12 +379,14 @@ func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	//
 	go func() {
 		worker1 := NewWorkflowNodeQueueWorker(r.Registry)
-		results <- worker1.LockAndProcessNode(*node)
+		logger := log.NewEntry(log.New())
+		results <- worker1.LockAndProcessNode(logger, *node)
 	}()
 
 	go func() {
 		worker2 := NewWorkflowNodeQueueWorker(r.Registry)
-		results <- worker2.LockAndProcessNode(*node)
+		logger := log.NewEntry(log.New())
+		results <- worker2.LockAndProcessNode(logger, *node)
 	}()
 
 	// Collect results - both should succeed (return nil)

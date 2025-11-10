@@ -3,6 +3,7 @@ package workers
 import (
 	"testing"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -12,6 +13,7 @@ import (
 
 func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	router := NewWorkflowEventRouter()
+	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
 	//
@@ -36,7 +38,7 @@ func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	// Create the root event for the trigger node, and process it.
 	//
 	event := support.EmitWorkflowEventForNode(t, workflow.ID, node1, "default", nil)
-	err := router.LockAndProcessEvent(*event)
+	err := router.LockAndProcessEvent(logger, *event)
 	require.NoError(t, err)
 
 	//
@@ -56,6 +58,7 @@ func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 
 func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	router := NewWorkflowEventRouter()
+	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
 	trigger1 := "trigger-1"
@@ -92,7 +95,7 @@ func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	outputEvent := events[0]
-	err = router.LockAndProcessEvent(outputEvent)
+	err = router.LockAndProcessEvent(logger, outputEvent)
 	require.NoError(t, err)
 
 	updatedEvent, err := models.FindWorkflowEvent(outputEvent.ID)
@@ -108,6 +111,7 @@ func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 
 func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing.T) {
 	router := NewWorkflowEventRouter()
+	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
 	//
@@ -189,7 +193,7 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	childOutputEvent := events[0]
-	err = router.LockAndProcessEvent(childOutputEvent)
+	err = router.LockAndProcessEvent(logger, childOutputEvent)
 	require.NoError(t, err)
 
 	parent, err := models.FindNodeExecution(workflow.ID, parentExecution.ID)
@@ -204,6 +208,7 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 
 func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	router := NewWorkflowEventRouter()
+	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
 	//
@@ -283,7 +288,7 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 5)
 	childOutputEvent := events[0]
-	err = router.LockAndProcessEvent(childOutputEvent)
+	err = router.LockAndProcessEvent(logger, childOutputEvent)
 	require.NoError(t, err)
 
 	parent, err := models.FindNodeExecution(workflow.ID, parentExecution.ID)
