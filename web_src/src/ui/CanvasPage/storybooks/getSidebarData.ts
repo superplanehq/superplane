@@ -96,6 +96,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
         latestEvents,
         nextInQueueEvents,
         moreInQueueCount: 0,
+        moreInHistoryCount: 0,
         hideQueueEvents: true,
       };
     }
@@ -202,6 +203,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
         latestEvents,
         nextInQueueEvents,
         moreInQueueCount: nextInQueueEvents.length > 2 ? nextInQueueEvents.length - 2 : 0,
+        moreInHistoryCount: 0,
       };
     }
 
@@ -284,6 +286,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
         latestEvents,
         nextInQueueEvents,
         moreInQueueCount: 0,
+        moreInHistoryCount: 0,
       };
     }
 
@@ -375,6 +378,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
         latestEvents,
         nextInQueueEvents,
         moreInQueueCount: 0,
+        moreInHistoryCount: 0,
       };
     }
 

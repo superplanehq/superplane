@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon } from "@/lib/utils";
-import { TextAlignStart, X } from "lucide-react";
+import { ArrowLeft, Search, TextAlignStart, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { MetadataItem, MetadataList } from "../metadataList";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
@@ -20,6 +20,7 @@ interface ComponentSidebarProps {
   iconColor?: string;
   iconBackground?: string;
   moreInQueueCount: number;
+  moreInHistoryCount: number;
   hideQueueEvents?: boolean;
 
   onEventClick?: (event: SidebarEvent) => void;
@@ -44,6 +45,12 @@ interface ComponentSidebarProps {
 
   // Queue actions
   onCancelQueueItem?: (id: string) => void;
+
+  // Full history props
+  allEvents?: SidebarEvent[];
+  onLoadMoreHistory?: () => void;
+  hasMoreHistory?: boolean;
+  loadingMoreHistory?: boolean;
 }
 
 export const ComponentSidebar = ({
@@ -59,6 +66,7 @@ export const ComponentSidebar = ({
   latestEvents,
   nextInQueueEvents,
   moreInQueueCount = 0,
+  moreInHistoryCount = 0,
   hideQueueEvents = false,
   onSeeFullHistory,
   onRun,
@@ -74,12 +82,20 @@ export const ComponentSidebar = ({
   isCompactView = false,
   getTabData,
   onCancelQueueItem,
+  allEvents = [],
+  onLoadMoreHistory,
+  hasMoreHistory = false,
+  loadingMoreHistory = false,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   // Keep expanded state stable across parent re-renders
   const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
+
+  const [showFullHistory, setShowFullHistory] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -144,6 +160,42 @@ export const ComponentSidebar = ({
     });
   }, []);
 
+  const handleSeeFullHistory = useCallback(() => {
+    setShowFullHistory(true);
+    onSeeFullHistory?.();
+  }, [onSeeFullHistory]);
+
+  const handleBackToOverview = useCallback(() => {
+    setShowFullHistory(false);
+    setSearchQuery("");
+    setStatusFilter("all");
+  }, []);
+
+  const filteredHistoryEvents = React.useMemo(() => {
+    let events = [...allEvents];
+
+    if (statusFilter !== "all") {
+      events = events.filter((event) => event.state === statusFilter);
+    }
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      events = events.filter(
+        (event) =>
+          event.title.toLowerCase().includes(query) ||
+          event.subtitle?.toLowerCase().includes(query) ||
+          Object.values(event.values || {}).some((value) => String(value).toLowerCase().includes(query)),
+      );
+    }
+
+    return events;
+  }, [allEvents, statusFilter, searchQuery]);
+
+  const statusOptions = React.useMemo(() => {
+    const statuses = new Set(allEvents.map((event) => event.state));
+    return Array.from(statuses).filter(Boolean);
+  }, [allEvents]);
+
   if (!isOpen) return null;
 
   return (
@@ -175,19 +227,21 @@ export const ComponentSidebar = ({
           </div>
           <div className="flex justify-between gap-3 w-full">
             <h2 className="text-xl font-semibold">{title}</h2>
-            <SidebarActionsDropdown
-              onRun={onRun}
-              runDisabled={runDisabled}
-              runDisabledTooltip={runDisabledTooltip}
-              onDuplicate={onDuplicate}
-              onDocs={onDocs}
-              onEdit={onEdit}
-              onConfigure={onConfigure}
-              onDeactivate={onDeactivate}
-              onToggleView={onToggleView}
-              onDelete={onDelete}
-              isCompactView={isCompactView}
-            />
+            {!showFullHistory && (
+              <SidebarActionsDropdown
+                onRun={onRun}
+                runDisabled={runDisabled}
+                runDisabledTooltip={runDisabledTooltip}
+                onDuplicate={onDuplicate}
+                onDocs={onDocs}
+                onEdit={onEdit}
+                onConfigure={onConfigure}
+                onDeactivate={onDeactivate}
+                onToggleView={onToggleView}
+                onDelete={onDelete}
+                isCompactView={isCompactView}
+              />
+            )}
           </div>
           <div
             onClick={() => onClose?.()}
@@ -198,84 +252,173 @@ export const ComponentSidebar = ({
           </div>
         </div>
       </div>
-      {metadata.length > 0 && (
-        <div className="px-3 py-1 border-b-1 border-gray-200">
-          <MetadataList
-            items={metadata}
-            className="border-b-0 text-gray-500 font-medium gap-2 flex flex-col py-2 font-mono"
-          />
-        </div>
-      )}
-      <div className="px-3 py-1 border-b-1 border-gray-200 pb-3 text-left">
-        <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Latest events</h2>
-        <div className="flex flex-col gap-2">
-          {latestEvents.length === 0 ? (
-            <div className="text-center py-4 text-gray-500 text-sm">No events found</div>
-          ) : (
-            <>
-              {latestEvents.slice(0, 5).map((event, index) => {
-                return (
-                  <SidebarEventItem
-                    key={event.id}
-                    event={event}
-                    index={index}
-                    variant="latest"
-                    isOpen={openEventIds.has(event.id) || event.isOpen}
-                    onToggleOpen={handleToggleOpen}
-                    onEventClick={onEventClick}
-                    tabData={getTabData?.(event)}
-                  />
-                );
-              })}
-              {moreInQueueCount > 0 && (
-                <button
-                  onClick={() => onSeeFullHistory?.()}
-                  className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
-                >
-                  <TextAlignStart size={16} />
-                  See full history
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-      {!hideQueueEvents && (
-        <div className="px-3 py-1 pb-3 text-left">
-          <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Next in queue</h2>
-          <div className="flex flex-col gap-2">
-            {nextInQueueEvents.length === 0 ? (
-              <div className="text-center py-4 text-gray-500 text-sm">Queue is empty</div>
-            ) : (
-              <>
-                {nextInQueueEvents.slice(0, 5).map((event, index) => {
-                  return (
+      {showFullHistory ? (
+        // Full History View
+        <>
+          {/* Back to Overview Section */}
+          <div className="px-3 py-2 border-b-1 border-gray-200">
+            <button
+              onClick={handleBackToOverview}
+              className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-800 cursor-pointer"
+            >
+              <ArrowLeft size={16} />
+              Back to Overview
+            </button>
+          </div>
+
+          {/* Full History Header with Search and Filter */}
+          <div className="px-3 py-3 border-b-1 border-gray-200">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold uppercase text-gray-500">Full History</h2>
+            </div>
+            <div className="flex gap-2">
+              {/* Search Input */}
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search events..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              {/* Status Filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Status</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Full History Events List */}
+          <div className="px-3 py-1 pb-3">
+            <div className="flex flex-col gap-2">
+              {filteredHistoryEvents.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 text-sm">
+                  {searchQuery || statusFilter !== "all" ? "No matching events found" : "No events found"}
+                </div>
+              ) : (
+                <>
+                  {filteredHistoryEvents.map((event, index) => (
                     <SidebarEventItem
                       key={event.id}
                       event={event}
                       index={index}
-                      variant="queue"
+                      variant="latest"
                       isOpen={openEventIds.has(event.id) || event.isOpen}
                       onToggleOpen={handleToggleOpen}
                       onEventClick={onEventClick}
                       tabData={getTabData?.(event)}
-                      onCancelQueueItem={onCancelQueueItem}
                     />
-                  );
-                })}
-                {moreInQueueCount > 0 && (
-                  <button
-                    onClick={() => onSeeFullHistory?.()}
-                    className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
-                  >
-                    <TextAlignStart size={16} />
-                    {moreInQueueCount} more in the queue
-                  </button>
-                )}
-              </>
-            )}
+                  ))}
+                  {hasMoreHistory && !searchQuery && statusFilter === "all" && (
+                    <div className="flex justify-center pt-4">
+                      <button
+                        onClick={onLoadMoreHistory}
+                        disabled={loadingMoreHistory}
+                        className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      >
+                        {loadingMoreHistory ? "Loading..." : "+ Show more"}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        </>
+      ) : (
+        // Overview (Original Content)
+        <>
+          {metadata.length > 0 && (
+            <div className="px-3 py-1 border-b-1 border-gray-200">
+              <MetadataList
+                items={metadata}
+                className="border-b-0 text-gray-500 font-medium gap-2 flex flex-col py-2 font-mono"
+              />
+            </div>
+          )}
+          <div className="px-3 py-1 border-b-1 border-gray-200 pb-3 text-left">
+            <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Latest events</h2>
+            <div className="flex flex-col gap-2">
+              {latestEvents.length === 0 ? (
+                <div className="text-center py-4 text-gray-500 text-sm">No events found</div>
+              ) : (
+                <>
+                  {latestEvents.slice(0, 5).map((event, index) => {
+                    return (
+                      <SidebarEventItem
+                        key={event.id}
+                        event={event}
+                        index={index}
+                        variant="latest"
+                        isOpen={openEventIds.has(event.id) || event.isOpen}
+                        onToggleOpen={handleToggleOpen}
+                        onEventClick={onEventClick}
+                        tabData={getTabData?.(event)}
+                      />
+                    );
+                  })}
+                  {moreInHistoryCount > 0 && (
+                    <button
+                      onClick={handleSeeFullHistory}
+                      className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
+                    >
+                      <TextAlignStart size={16} />
+                      See full history
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+          {!hideQueueEvents && (
+            <div className="px-3 py-1 pb-3 text-left">
+              <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Next in queue</h2>
+              <div className="flex flex-col gap-2">
+                {nextInQueueEvents.length === 0 ? (
+                  <div className="text-center py-4 text-gray-500 text-sm">Queue is empty</div>
+                ) : (
+                  <>
+                    {nextInQueueEvents.slice(0, 5).map((event, index) => {
+                      return (
+                        <SidebarEventItem
+                          key={event.id}
+                          event={event}
+                          index={index}
+                          variant="queue"
+                          isOpen={openEventIds.has(event.id) || event.isOpen}
+                          onToggleOpen={handleToggleOpen}
+                          onEventClick={onEventClick}
+                          tabData={getTabData?.(event)}
+                          onCancelQueueItem={onCancelQueueItem}
+                        />
+                      );
+                    })}
+                    {moreInQueueCount > 0 && (
+                      <button
+                        onClick={handleSeeFullHistory}
+                        className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
+                      >
+                        <TextAlignStart size={16} />
+                        {moreInQueueCount} more in the queue
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
