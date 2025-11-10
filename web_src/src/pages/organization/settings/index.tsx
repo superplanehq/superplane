@@ -19,6 +19,7 @@ import { useOrganization } from "../../../hooks/useOrganizationData";
 import { useAccount } from "../../../contexts/AccountContext";
 import { useParams } from "react-router-dom";
 import { Members } from "./Members";
+import { Integrations } from "./Integrations";
 
 export function OrganizationSettings() {
   const navigate = useNavigate();
@@ -72,6 +73,7 @@ export function OrganizationSettings() {
     { id: "members", label: "Members", icon: "group" },
     { id: "groups", label: "Groups", icon: "group" },
     { id: "roles", label: "Roles", icon: "admin_panel_settings" },
+    { id: "integrations", label: "Integrations", icon: "integration_instructions" },
   ];
 
   return (
@@ -160,6 +162,7 @@ export function OrganizationSettings() {
               <Route path="members" element={<Members organizationId={organizationId || ""} />} />
               <Route path="groups" element={<Groups organizationId={organizationId || ""} />} />
               <Route path="roles" element={<Roles organizationId={organizationId || ""} />} />
+              <Route path="integrations" element={<Integrations organizationId={organizationId || ""} />} />
               <Route path="groups/:groupName/members" element={<GroupMembersPage />} />
               <Route path="create-group" element={<CreateGroupPage />} />
               <Route path="create-role" element={<CreateRolePage />} />
