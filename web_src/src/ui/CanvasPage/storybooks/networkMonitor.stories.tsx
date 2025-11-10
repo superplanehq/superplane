@@ -47,7 +47,7 @@ const sampleNodes: Node[] = [
         parameters: [
           {
             icon: "database",
-            items: { "servers": "db-primary, db-replica-1, db-replica-2" },
+            items: { servers: "db-primary, db-replica-1, db-replica-2" },
           },
         ],
         lastRunItem: {
@@ -91,7 +91,7 @@ const sampleNodes: Node[] = [
           { icon: "hard-drive", label: "Disk: 85% used" },
           { icon: "box", label: "Pods: 11/24 healthy" },
         ],
-        parameters: [{ icon: "server", items: { "clusters": "prod-cluster-1, prod-cluster-2" } }],
+        parameters: [{ icon: "server", items: { clusters: "prod-cluster-1, prod-cluster-2" } }],
         lastRunItem: {
           title: "Resource check",
           subtitle: "11/24 pods",
@@ -133,7 +133,7 @@ const sampleNodes: Node[] = [
           { icon: "alert-circle", label: "Error Rate: 0.3%" },
           { icon: "server", label: "Load Balancer: Healthy" },
         ],
-        parameters: [{ icon: "map", items: { "regions": "us-west-1, eu-global-1, asia-east-1" } }],
+        parameters: [{ icon: "map", items: { regions: "us-west-1, eu-global-1, asia-east-1" } }],
         lastRunItem: {
           title: "Traffic monitoring check",
           subtitle: "1,247 req/s",

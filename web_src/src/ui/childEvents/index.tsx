@@ -85,14 +85,14 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
               item.state === "processed"
                 ? resolveIcon("check")
                 : item.state === "discarded"
-                ? resolveIcon("x")
-                : resolveIcon("clock");
+                  ? resolveIcon("x")
+                  : resolveIcon("clock");
             const colorClass =
               item.state === "processed"
                 ? "text-green-700"
                 : item.state === "discarded"
-                ? "text-red-700"
-                : "text-blue-800";
+                  ? "text-red-700"
+                  : "text-blue-800";
 
             return (
               <div key={`${item.label}-${idx}`} className="flex justify-between items-center gap-3 py-1 w-full">

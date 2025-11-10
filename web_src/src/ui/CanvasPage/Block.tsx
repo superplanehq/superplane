@@ -102,8 +102,8 @@ export function Block(props: BlockProps) {
   const ai = props.ai || {
     show: false,
     suggestion: null,
-    onApply: () => { },
-    onDismiss: () => { },
+    onApply: () => {},
+    onDismiss: () => {},
   };
 
   return (
@@ -326,6 +326,7 @@ function BlockContent({
   onConfigure,
   onDuplicate,
   onDeactivate,
+  onToggleCollapse,
   onToggleView,
   onDelete,
   isCompactView,
@@ -344,6 +345,7 @@ function BlockContent({
     onConfigure,
     onDuplicate,
     onDeactivate,
+    onToggleCollapse,
     onToggleView,
     onDelete,
     isCompactView,

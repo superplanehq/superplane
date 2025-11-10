@@ -24,9 +24,16 @@ func Test_Merge(t *testing.T) {
 	m := &Merge{}
 
 	steps.ProcessFirstEvent(m)
-	steps.ProcessSecondEvent(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionPending()
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
 
-	steps.AssertTwoExecutionsCreated()
+	steps.ProcessSecondEvent(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionFinished()
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
+
+	steps.AssertQueueIsEmpty()
 }
 
 type MergeTestSteps struct {
@@ -114,6 +121,11 @@ func (s *MergeTestSteps) CreateWorkflow() {
 			TargetID: n4.NodeID,
 			Channel:  "default",
 		},
+		{
+			SourceID: n3.NodeID,
+			TargetID: n4.NodeID,
+			Channel:  "default",
+		},
 	}
 
 	require.NoError(s.t, s.Tx.Updates(&wf).Error)
@@ -196,8 +208,32 @@ func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 	require.NoError(s.t, err)
 }
 
-func (s *MergeTestSteps) AssertTwoExecutionsCreated() {
+func (s *MergeTestSteps) AssertNodeExecutionCount(expectedCount int) {
 	var executions []models.WorkflowNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).Find(&executions).Error)
-	assert.Equal(s.t, 2, len(executions))
+	assert.Equal(s.t, expectedCount, len(executions))
+}
+
+func (s *MergeTestSteps) AssertExecutionFinished() {
+	var execution models.WorkflowNodeExecution
+	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
+	assert.Equal(s.t, execution.State, models.WorkflowNodeExecutionStateFinished)
+}
+
+func (s *MergeTestSteps) AssertExecutionPending() {
+	var execution models.WorkflowNodeExecution
+	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
+	assert.Equal(s.t, execution.State, models.WorkflowNodeExecutionStatePending)
+}
+
+func (s *MergeTestSteps) AssertQueueIsEmpty() {
+	var count int64
+	require.NoError(s.t, s.Tx.Model(&models.WorkflowNodeQueueItem{}).Where("node_id = ?", s.MergeNode.NodeID).Count(&count).Error)
+	assert.Equal(s.t, int64(0), count)
+}
+
+func (s *MergeTestSteps) AssertNodeIsAllowedToProcessNextQueueItem() {
+	var node models.WorkflowNode
+	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&node).Error)
+	assert.Equal(s.t, models.WorkflowNodeStateReady, node.State)
 }

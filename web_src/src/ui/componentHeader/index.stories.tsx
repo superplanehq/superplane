@@ -1,14 +1,16 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { ComponentHeader, type ComponentHeaderProps } from './';
+import type { Meta, StoryObj } from "@storybook/react";
+import { ComponentHeader, type ComponentHeaderProps } from "./";
 
-const createHeaderProps = (baseProps: Omit<ComponentHeaderProps, keyof import('../types/componentActions').ComponentActionsProps>): ComponentHeaderProps => ({
+const createHeaderProps = (
+  baseProps: Omit<ComponentHeaderProps, keyof import("../types/componentActions").ComponentActionsProps>,
+): ComponentHeaderProps => ({
   ...baseProps,
-  onRun: () => console.log('Run clicked!'),
-  onDuplicate: () => console.log('Duplicate clicked!'),
-  onEdit: () => console.log('Edit clicked!'),
-  onDeactivate: () => console.log('Deactivate clicked!'),
-  onToggleView: () => console.log('Toggle view clicked!'),
-  onDelete: () => console.log('Delete clicked!'),
+  onRun: () => console.log("Run clicked!"),
+  onDuplicate: () => console.log("Duplicate clicked!"),
+  onEdit: () => console.log("Edit clicked!"),
+  onDeactivate: () => console.log("Deactivate clicked!"),
+  onToggleView: () => console.log("Toggle view clicked!"),
+  onDelete: () => console.log("Delete clicked!"),
 });
 
 const triggerHeader: ComponentHeaderProps = createHeaderProps({
@@ -44,12 +46,12 @@ const headerWithImage: ComponentHeaderProps = createHeaderProps({
 });
 
 const meta: Meta<typeof ComponentHeader> = {
-  title: 'ui/ComponentHeader',
+  title: "ui/ComponentHeader",
   component: ComponentHeader,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 };
 
 export default meta;

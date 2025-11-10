@@ -1,10 +1,12 @@
-import { defineConfig } from '@hey-api/openapi-ts';
+import { defineConfig } from "@hey-api/openapi-ts";
 
 export default defineConfig({
-  input: '../api/swagger/superplane.swagger.json',
-  output: 'src/api-client',
-  plugins: [{
-    name: '@hey-api/client-fetch',
-    throwOnError: true,
-  }],
+  input: "../api/swagger/superplane.swagger.json",
+  output: "src/api-client",
+  plugins: [
+    {
+      name: "@hey-api/client-fetch",
+      throwOnError: true,
+    },
+  ],
 });

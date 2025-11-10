@@ -1,13 +1,13 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { Wait } from './';
+import type { Meta, StoryObj } from "@storybook/react";
+import { Wait } from "./";
 
 const meta: Meta<typeof Wait> = {
-  title: 'ui/Wait',
+  title: "ui/Wait",
   component: Wait,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 };
 
 export default meta;

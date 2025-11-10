@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Text } from '../../components/Text/text';
-import { useAccount } from '../../contexts/AccountContext';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Text } from "../../components/Text/text";
+import { useAccount } from "../../contexts/AccountContext";
 
 interface Organization {
   id: string;
@@ -24,18 +24,18 @@ const OrganizationSelect: React.FC = () => {
     if (!account) return;
 
     try {
-      const orgsResponse = await fetch('/organizations', {
-        credentials: 'include',
+      const orgsResponse = await fetch("/organizations", {
+        credentials: "include",
       });
 
       if (orgsResponse.ok) {
         const organizations = await orgsResponse.json();
         setOrganizations(organizations);
       } else {
-        setError('Failed to load organizations');
+        setError("Failed to load organizations");
       }
     } catch {
-      setError('Failed to load organizations');
+      setError("Failed to load organizations");
     } finally {
       setLoading(false);
     }
@@ -63,7 +63,7 @@ const OrganizationSelect: React.FC = () => {
         <div className="max-w-7xl w-full">
           <div className="mb-4">
             <Text className="text-2xl font-bold text-gray-700 dark:text-gray-300 text-left">
-              Hey there{account?.name ? `, ${account.name}` : ''}! How's it going?
+              Hey there{account?.name ? `, ${account.name}` : ""}! How's it going?
             </Text>
             {organizations.length > 0 && (
               <Text className="text-2xl font-bold text-gray-700 dark:text-gray-300 text-left">
@@ -74,20 +74,14 @@ const OrganizationSelect: React.FC = () => {
 
           {error && (
             <div className="mb-6 p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-              <Text className="text-red-700 dark:text-red-400 text-sm">
-                {error}
-              </Text>
+              <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
             </div>
           )}
 
           {organizations.length === 0 && (
             <div className="text-left py-2 mb-4">
-              <Text className="text-gray-600 dark:text-gray-400">
-                You're not a member of any organizations yet.
-              </Text>
-              <Text className="text-gray-600 dark:text-gray-400">
-                Create a new organization to get started!
-              </Text>
+              <Text className="text-gray-600 dark:text-gray-400">You're not a member of any organizations yet.</Text>
+              <Text className="text-gray-600 dark:text-gray-400">Create a new organization to get started!</Text>
             </div>
           )}
 
@@ -100,25 +94,19 @@ const OrganizationSelect: React.FC = () => {
               >
                 <div className="flex items-center mb-2">
                   <span className="text-md mr-2">🏢</span>
-                  <h4 className="text-md font-semibold text-gray-900 dark:text-white truncate">
-                    {org.name}
-                  </h4>
+                  <h4 className="text-md font-semibold text-gray-900 dark:text-white truncate">{org.name}</h4>
                 </div>
-                <Text className="text-sm text-left text-gray-600 dark:text-gray-400 truncate">
-                  {org.description}
-                </Text>
+                <Text className="text-sm text-left text-gray-600 dark:text-gray-400 truncate">{org.description}</Text>
               </div>
             ))}
 
             <div
               className="bg-blue-50 dark:bg-blue-900/20 border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg p-6 flex flex-col items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors cursor-pointer"
-              onClick={() => navigate('/create')}
+              onClick={() => navigate("/create")}
             >
               <div className="flex items-center mb-1">
                 <div className="text-2xl mb-3 mr-2 text-blue-600 dark:text-blue-400">+</div>
-                <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2 text-center">
-                  Create New
-                </h4>
+                <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2 text-center">Create New</h4>
               </div>
               <Text className="text-sm text-blue-500 dark:text-blue-300 text-center">
                 Start fresh with a new organization

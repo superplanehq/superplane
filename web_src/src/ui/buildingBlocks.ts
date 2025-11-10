@@ -100,4 +100,3 @@ export function buildBuildingBlockCategories(
 export function flattenBuildingBlocks(categories: BuildingBlockCategory[]): BuildingBlock[] {
   return categories.flatMap((c) => c.blocks);
 }
-

@@ -20,7 +20,7 @@ export function convertLocalTimeToUTC(timeString: string, userTimezone?: string)
 
   // Create a date object with today's date and the given time in the user's timezone
   const today = new Date();
-  const [hours, minutes] = timeString.split(':').map(Number);
+  const [hours, minutes] = timeString.split(":").map(Number);
 
   // Create a date in the user's timezone
   const localDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes);
@@ -32,8 +32,8 @@ export function convertLocalTimeToUTC(timeString: string, userTimezone?: string)
   // Adjust the date to UTC
   const utcDate = new Date(localDate.getTime() - offset);
 
-  const utcHours = utcDate.getUTCHours().toString().padStart(2, '0');
-  const utcMinutes = utcDate.getUTCMinutes().toString().padStart(2, '0');
+  const utcHours = utcDate.getUTCHours().toString().padStart(2, "0");
+  const utcMinutes = utcDate.getUTCMinutes().toString().padStart(2, "0");
 
   return `${utcHours}:${utcMinutes}`;
 }
@@ -49,17 +49,17 @@ export function convertUTCToLocalTime(utcTimeString: string, userTimezone?: stri
 
   // Create a date object with today's date and the given UTC time
   const today = new Date();
-  const [hours, minutes] = utcTimeString.split(':').map(Number);
+  const [hours, minutes] = utcTimeString.split(":").map(Number);
 
   // Create a UTC date
   const utcDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes));
 
   // Convert to user's timezone
-  const localTime = utcDate.toLocaleString('en-US', {
+  const localTime = utcDate.toLocaleString("en-US", {
     timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
   });
 
   return localTime;
@@ -75,26 +75,26 @@ export function convertUTCToLocalTime(utcTimeString: string, userTimezone?: stri
 export function formatTimestampInUserTimezone(
   timestamp: string | Date,
   userTimezone?: string,
-  includeTimezone = true
+  includeTimezone = true,
 ): string {
   const timezone = userTimezone || getUserTimezone();
-  const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+  const date = typeof timestamp === "string" ? new Date(timestamp) : timestamp;
 
   const options: Intl.DateTimeFormatOptions = {
     timeZone: timezone,
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false // Use 24-hour format instead of AM/PM
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false, // Use 24-hour format instead of AM/PM
   };
 
   if (includeTimezone) {
-    options.timeZoneName = 'short';
+    options.timeZoneName = "short";
   }
 
-  return date.toLocaleDateString('en-US', options);
+  return date.toLocaleDateString("en-US", options);
 }
 
 /**
@@ -107,10 +107,14 @@ export function getUserTimezoneDisplay(userTimezone?: string): string {
 
   // Get timezone abbreviation
   const now = new Date();
-  const timeZoneName = now.toLocaleDateString('en-US', {
-    timeZone: timezone,
-    timeZoneName: 'long'
-  }).split(', ').pop() || timezone;
+  const timeZoneName =
+    now
+      .toLocaleDateString("en-US", {
+        timeZone: timezone,
+        timeZoneName: "long",
+      })
+      .split(", ")
+      .pop() || timezone;
 
   return timeZoneName;
 }
@@ -122,7 +126,7 @@ export function getUserTimezoneDisplay(userTimezone?: string): string {
  * @returns Formatted relative time string or 'N/A' if dateString is undefined
  */
 export function formatRelativeTime(dateString: string | undefined, abbreviated?: boolean): string {
-  if (!dateString) return 'N/A'
+  if (!dateString) return "N/A";
 
   const date = new Date(dateString);
   const now = new Date();
@@ -144,16 +148,16 @@ export function formatRelativeTime(dateString: string | undefined, abbreviated?:
       return `${Math.abs(diffDays)}d ago`;
     }
   } else {
-    const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+    const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 
     if (Math.abs(diffSeconds) < 60) {
-      return rtf.format(-diffSeconds, 'second');
+      return rtf.format(-diffSeconds, "second");
     } else if (Math.abs(diffMinutes) < 60) {
-      return rtf.format(-diffMinutes, 'minute');
+      return rtf.format(-diffMinutes, "minute");
     } else if (Math.abs(diffHours) < 24) {
-      return rtf.format(-diffHours, 'hour');
+      return rtf.format(-diffHours, "hour");
     } else {
-      return rtf.format(-diffDays, 'day');
+      return rtf.format(-diffDays, "day");
     }
   }
 }

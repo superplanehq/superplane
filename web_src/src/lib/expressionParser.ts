@@ -25,12 +25,7 @@ const operators = new Set([
   ":",
 ]);
 
-const logicalOperators = new Set([
-  "and",
-  "or",
-  "||",
-  "&&"
-]);
+const logicalOperators = new Set(["and", "or", "||", "&&"]);
 
 const isStaticValue = (value: string) => {
   if (value === "true" || value === "false") return true;
@@ -48,7 +43,7 @@ export const parseExpression = (expression: string): ComponentBaseSpecValue[] =>
   const result: ComponentBaseSpecValue[] = [];
   const splittedExpression = splitBySpaces(expression);
   let current: ComponentBaseSpecValue = {
-    badges: []
+    badges: [],
   };
 
   for (const term of splittedExpression) {
@@ -59,7 +54,7 @@ export const parseExpression = (expression: string): ComponentBaseSpecValue[] =>
       current.badges.push({ label: term, bgColor: "bg-gray-500", textColor: "text-white" });
       result.push(current);
       current = {
-        badges: []
+        badges: [],
       };
     } else if (isStaticValue(normalizedTerm)) {
       current.badges.push({ label: term, bgColor: "bg-green-100", textColor: "text-green-700" });

@@ -29,7 +29,7 @@ export const Noop: React.FC<NoopProps> = ({
   if (lastEvent) {
     eventSections.push({
       title: "Last Event",
-      ...lastEvent
+      ...lastEvent,
     });
   }
 

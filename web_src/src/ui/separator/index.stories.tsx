@@ -1,8 +1,8 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { Separator } from "./index"
+import { Separator } from "./index";
 
-type SeparatorArgs = React.ComponentProps<typeof Separator>
+type SeparatorArgs = React.ComponentProps<typeof Separator>;
 
 const meta = {
   title: "shadcn Primitives/Separator",
@@ -27,25 +27,21 @@ const meta = {
     orientation: "horizontal",
     decorative: true,
   },
-} satisfies Meta<SeparatorArgs>
+} satisfies Meta<SeparatorArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<SeparatorArgs>
+type Story = StoryObj<SeparatorArgs>;
 
 export const Horizontal: Story = {
   render: (args) => (
     <div className="w-64 space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Use separators to divide related sections of content.
-      </p>
+      <p className="text-sm text-muted-foreground">Use separators to divide related sections of content.</p>
       <Separator {...args} />
-      <p className="text-sm text-muted-foreground">
-        This illustrates the default horizontal orientation.
-      </p>
+      <p className="text-sm text-muted-foreground">This illustrates the default horizontal orientation.</p>
     </div>
   ),
-}
+};
 
 export const Vertical: Story = {
   args: {
@@ -60,4 +56,4 @@ export const Vertical: Story = {
       <span className="text-sm">Third</span>
     </div>
   ),
-}
+};

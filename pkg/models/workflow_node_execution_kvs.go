@@ -54,6 +54,7 @@ func FirstNodeExecutionByKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, node
 			Where("node_id = ?", nodeID)).
 		Order("created_at ASC").
 		Limit(1).
+		Where("state != ?", WorkflowNodeExecutionStateFinished).
 		First(&execution).
 		Error
 

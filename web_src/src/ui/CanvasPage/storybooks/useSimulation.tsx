@@ -23,10 +23,7 @@ interface SimulationProps {
 export type RunSimulationFn = (startNodeId: string) => Promise<void>;
 
 export function useSimulationRunner(props: SimulationProps): SimulationEngine {
-  return useMemo(
-    () => new SimulationEngine(props.nodes, props.edges, props.setNodes),
-    []
-  );
+  return useMemo(() => new SimulationEngine(props.nodes, props.edges, props.setNodes), []);
 }
 
 export function useSimulationCron(intervalMs: number, callback: () => void) {
@@ -63,7 +60,7 @@ export class SimulationEngine {
   constructor(
     private nodes: CanvasNode[],
     private edges: CanvasEdge[],
-    private setNodes: SetNodesFn
+    private setNodes: SetNodesFn,
   ) {
     this.queues = new Map();
     this.prepareQueues();
@@ -84,11 +81,7 @@ export class SimulationEngine {
     }
   }
 
-  async onApprove(
-    nodeId: string,
-    _aproveId: string,
-    _artifacts?: Record<string, string>
-  ) {
+  async onApprove(nodeId: string, _aproveId: string, _artifacts?: Record<string, string>) {
     const queue = this.queues.get(nodeId);
     if (!queue) return;
     if (!queue.active) return;
@@ -121,11 +114,7 @@ export class SimulationEngine {
       queue.active = event;
       this.sendOnQueueChange(nodeId);
 
-      await run(
-        event.input,
-        updateNode,
-        (output: any) => (event.output = output)
-      );
+      await run(event.input, updateNode, (output: any) => (event.output = output));
 
       if (node.data.approval) {
         while (!event.approved) {
@@ -164,14 +153,10 @@ export class SimulationEngine {
 
             if (isArrayIndex) {
               const index = parseInt(key, 10);
-              current[index] = Array.isArray(current[index])
-                ? [...current[index]]
-                : { ...current[index] };
+              current[index] = Array.isArray(current[index]) ? [...current[index]] : { ...current[index] };
               current = current[index];
             } else {
-              current[key] = Array.isArray(current[key])
-                ? [...current[key]]
-                : { ...current[key] };
+              current[key] = Array.isArray(current[key]) ? [...current[key]] : { ...current[key] };
               current = current[key];
             }
           }
@@ -179,7 +164,7 @@ export class SimulationEngine {
           const finalKey = pathParts[pathParts.length - 1];
           current[finalKey] = value;
           return updatedNode;
-        })
+        }),
       );
     };
   }

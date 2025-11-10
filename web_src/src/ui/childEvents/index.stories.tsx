@@ -1,13 +1,13 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { ChildEvents } from './';
+import type { Meta, StoryObj } from "@storybook/react";
+import { ChildEvents } from "./";
 
 const meta: Meta<typeof ChildEvents> = {
-  title: 'ui/ChildEvents',
+  title: "ui/ChildEvents",
   component: ChildEvents,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 };
 
 export default meta;

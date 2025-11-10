@@ -50,9 +50,7 @@ export const EditStringField: Story = {
 
     return (
       <div>
-        <Button onClick={() => setIsOpen(true)}>
-          Open Edit String Field Modal
-        </Button>
+        <Button onClick={() => setIsOpen(true)}>Open Edit String Field Modal</Button>
         <ConfigurationFieldModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
@@ -89,9 +87,7 @@ export const EditSelectField: Story = {
 
     return (
       <div>
-        <Button onClick={() => setIsOpen(true)}>
-          Open Edit Select Field Modal
-        </Button>
+        <Button onClick={() => setIsOpen(true)}>Open Edit Select Field Modal</Button>
         <ConfigurationFieldModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
@@ -129,9 +125,7 @@ export const EditMultiSelectField: Story = {
 
     return (
       <div>
-        <Button onClick={() => setIsOpen(true)}>
-          Open Edit Multi-Select Field Modal
-        </Button>
+        <Button onClick={() => setIsOpen(true)}>Open Edit Multi-Select Field Modal</Button>
         <ConfigurationFieldModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
@@ -159,9 +153,7 @@ export const EditBooleanField: Story = {
 
     return (
       <div>
-        <Button onClick={() => setIsOpen(true)}>
-          Open Edit Boolean Field Modal
-        </Button>
+        <Button onClick={() => setIsOpen(true)}>Open Edit Boolean Field Modal</Button>
         <ConfigurationFieldModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
@@ -189,9 +181,7 @@ export const EditNumberField: Story = {
 
     return (
       <div>
-        <Button onClick={() => setIsOpen(true)}>
-          Open Edit Number Field Modal
-        </Button>
+        <Button onClick={() => setIsOpen(true)}>Open Edit Number Field Modal</Button>
         <ConfigurationFieldModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}

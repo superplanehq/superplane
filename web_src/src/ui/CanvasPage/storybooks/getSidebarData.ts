@@ -33,7 +33,9 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
         });
       }
 
-      const genFunction: () => DockerImage = isGitSha(trigger.lastEventData.subtitle) ? genCommit as () => DockerImage : genDockerImage;
+      const genFunction: () => DockerImage = isGitSha(trigger.lastEventData.subtitle)
+        ? (genCommit as () => DockerImage)
+        : genDockerImage;
 
       // Add 3 random latest events
       latestEvents.push(
@@ -62,7 +64,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           state: "discarded",
           isOpen: false,
           receivedAt: new Date(Date.now() - 30 * 60 * 1000),
-        }
+        },
       );
 
       // Add 2 queue events
@@ -105,7 +107,9 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       const latestEvents: SidebarEvent[] = [];
       const nextInQueueEvents: SidebarEvent[] = [];
 
-      const genFunction: () => DockerImage = isGitSha(composite?.lastRunItem?.subtitle) ? genCommit as () => DockerImage : genDockerImage;
+      const genFunction: () => DockerImage = isGitSha(composite?.lastRunItem?.subtitle)
+        ? (genCommit as () => DockerImage)
+        : genDockerImage;
 
       const conversionStateMap: Record<string, string> = {
         success: "processed",
@@ -118,7 +122,10 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           id: composite.lastRunItem.id,
           title: composite.lastRunItem.title,
           subtitle: composite.lastRunItem.subtitle,
-          state: (conversionStateMap[composite.lastRunItem.state] || "processed") as "waiting" | "processed" | "discarded",
+          state: (conversionStateMap[composite.lastRunItem.state] || "processed") as
+            | "waiting"
+            | "processed"
+            | "discarded",
           isOpen: false,
           receivedAt: composite.lastRunItem.receivedAt,
           values: composite.lastRunItem.values,
@@ -146,14 +153,14 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           receivedAt: new Date(Date.now() - 8 * 60 * 1000),
           values: { records: "1,250", format: "JSON" },
           childEventsInfo: {
-           count: 1,
-           waitingInfos: [
-            {
-              icon: "Calendar",
-              info: "20 minutes to transform"
-            },
-           ] 
-          }
+            count: 1,
+            waitingInfos: [
+              {
+                icon: "Calendar",
+                info: "20 minutes to transform",
+              },
+            ],
+          },
         },
         {
           id: "1050e8400-e29b-41d4-a716-446655440002",
@@ -162,7 +169,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           state: "discarded",
           isOpen: false,
           receivedAt: new Date(Date.now() - 20 * 60 * 1000),
-        }
+        },
       );
 
       if (composite.nextInQueue) {
@@ -193,7 +200,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           state: "waiting",
           isOpen: false,
           receivedAt: new Date(Date.now() + 25 * 60 * 1000),
-        }
+        },
       );
 
       return {
@@ -214,7 +221,9 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       const approval = data.approval;
       const latestEvents: SidebarEvent[] = [];
 
-      const genFunction: () => DockerImage = isGitSha(approval?.awaitingEvent?.subtitle) ? genCommit as () => DockerImage : genDockerImage;
+      const genFunction: () => DockerImage = isGitSha(approval?.awaitingEvent?.subtitle)
+        ? (genCommit as () => DockerImage)
+        : genDockerImage;
 
       if (approval?.awaitingEvent) {
         latestEvents.push({
@@ -254,7 +263,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           state: "discarded",
           isOpen: false,
           receivedAt: new Date(Date.now() - 35 * 60 * 1000),
-        }
+        },
       );
 
       // Add 2 queue events
@@ -291,7 +300,9 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
 
     // Handle switch nodes
     if (data.type === "switch" && data.switch) {
-      const genFunction: () => DockerImage = isGitSha(data.switch.subtitle) ? genCommit as () => DockerImage : genDockerImage;
+      const genFunction: () => DockerImage = isGitSha(data.switch.subtitle)
+        ? (genCommit as () => DockerImage)
+        : genDockerImage;
       const switchData = data.switch;
       const latestEvents: SidebarEvent[] = [];
 
@@ -343,7 +354,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           state: "discarded",
           isOpen: false,
           receivedAt: new Date(Date.now() - 25 * 60 * 1000),
-        }
+        },
       );
 
       // Add 2 queue events

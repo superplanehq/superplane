@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { Skeleton } from "./index"
+import { Skeleton } from "./index";
 
 const meta = {
   title: "shadcn Primitives/Skeleton",
@@ -14,11 +14,11 @@ const meta = {
       control: { type: "text" },
     },
   },
-} satisfies Meta<typeof Skeleton>
+} satisfies Meta<typeof Skeleton>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<typeof Skeleton>
+type Story = StoryObj<typeof Skeleton>;
 
 export const Default: Story = {
   render: (args) => (
@@ -30,4 +30,4 @@ export const Default: Story = {
       </div>
     </div>
   ),
-}
+};

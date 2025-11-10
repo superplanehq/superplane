@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { Button } from "../button"
+import { Button } from "../button";
 
 import {
   AlertDialog,
@@ -12,9 +12,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "./index"
+} from "./index";
 
-type AlertDialogArgs = React.ComponentProps<typeof AlertDialog>
+type AlertDialogArgs = React.ComponentProps<typeof AlertDialog>;
 
 const meta = {
   title: "shadcn Primitives/AlertDialog",
@@ -32,11 +32,11 @@ const meta = {
   args: {
     defaultOpen: false,
   },
-} satisfies Meta<AlertDialogArgs>
+} satisfies Meta<AlertDialogArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<AlertDialogArgs>
+type Story = StoryObj<AlertDialogArgs>;
 
 const renderAlertDialog = (args: AlertDialogArgs) => (
   <AlertDialog {...args}>
@@ -47,8 +47,7 @@ const renderAlertDialog = (args: AlertDialogArgs) => (
       <AlertDialogHeader>
         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
         <AlertDialogDescription>
-          This action cannot be undone. This will permanently delete your
-          account and remove your data from our servers.
+          This action cannot be undone. This will permanently delete your account and remove your data from our servers.
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
@@ -57,8 +56,8 @@ const renderAlertDialog = (args: AlertDialogArgs) => (
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
-)
+);
 
 export const Default: Story = {
   render: renderAlertDialog,
-}
+};

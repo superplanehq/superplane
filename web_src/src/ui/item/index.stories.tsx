@@ -1,18 +1,11 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import { BadgeCheck, ChevronRight, ShieldAlert } from "lucide-react"
+import type { Meta, StoryObj } from "@storybook/react";
+import { BadgeCheck, ChevronRight, ShieldAlert } from "lucide-react";
 
-import { Button } from "../button"
+import { Button } from "../button";
 
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemMedia,
-  ItemTitle,
-} from "./index"
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "./index";
 
-type ItemArgs = React.ComponentProps<typeof Item>
+type ItemArgs = React.ComponentProps<typeof Item>;
 
 const meta = {
   title: "shadcn Primitives/Item",
@@ -49,9 +42,7 @@ const meta = {
         </ItemMedia>
         <ItemContent>
           <ItemTitle>Security Alert</ItemTitle>
-          <ItemDescription>
-            New login detected from unknown device.
-          </ItemDescription>
+          <ItemDescription>New login detected from unknown device.</ItemDescription>
         </ItemContent>
         <ItemActions>
           <Button size="sm" variant="outline">
@@ -61,19 +52,19 @@ const meta = {
       </Item>
     </div>
   ),
-} satisfies Meta<ItemArgs>
+} satisfies Meta<ItemArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<ItemArgs>
+type Story = StoryObj<ItemArgs>;
 
-export const Default: Story = {}
+export const Default: Story = {};
 
 export const Muted: Story = {
   args: {
     variant: "muted",
   },
-}
+};
 
 export const Compact: Story = {
   render: () => (
@@ -93,4 +84,4 @@ export const Compact: Story = {
       </Item>
     </div>
   ),
-}
+};

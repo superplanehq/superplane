@@ -54,7 +54,7 @@ export function CustomComponentConfigurationSidebar({
   onAddOutputChannel,
   onEditOutputChannel,
 }: CustomComponentConfigurationSidebarProps) {
-  const [activeTab, setActiveTab] = useState<'configuration' | 'outputChannels'>('configuration');
+  const [activeTab, setActiveTab] = useState<"configuration" | "outputChannels">("configuration");
 
   if (!isOpen) {
     return (
@@ -85,15 +85,8 @@ export function CustomComponentConfigurationSidebar({
     <div className="w-96 bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 flex flex-col z-50">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-0">
-        <h2 className="text-md font-semibold text-gray-900 dark:text-zinc-100">
-          Component Settings
-        </h2>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => onToggle(false)}
-          aria-label="Close settings"
-        >
+        <h2 className="text-md font-semibold text-gray-900 dark:text-zinc-100">Component Settings</h2>
+        <Button variant="outline" size="icon" onClick={() => onToggle(false)} aria-label="Close settings">
           <PanelLeftClose size={24} className="rotate-180" />
         </Button>
       </div>
@@ -183,30 +176,32 @@ export function CustomComponentConfigurationSidebar({
                           {field.label || field.name}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                          Type: {field.type} {field.required && '(required)'}
+                          Type: {field.type} {field.required && "(required)"}
                         </p>
                         {field.description && (
-                          <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
-                            {field.description}
-                          </p>
+                          <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">{field.description}</p>
                         )}
-                        {field.type === 'select' && field.typeOptions?.select?.options && field.typeOptions.select.options.length > 0 && (
-                          <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
-                            Options: {field.typeOptions.select.options.map((opt: any) => opt.label).join(', ')}
-                          </p>
-                        )}
-                        {field.type === 'multi_select' && field.typeOptions?.multiSelect?.options && field.typeOptions.multiSelect.options.length > 0 && (
-                          <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
-                            Options: {field.typeOptions.multiSelect.options.map((opt: any) => opt.label).join(', ')}
-                          </p>
-                        )}
+                        {field.type === "select" &&
+                          field.typeOptions?.select?.options &&
+                          field.typeOptions.select.options.length > 0 && (
+                            <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
+                              Options: {field.typeOptions.select.options.map((opt: any) => opt.label).join(", ")}
+                            </p>
+                          )}
+                        {field.type === "multi_select" &&
+                          field.typeOptions?.multiSelect?.options &&
+                          field.typeOptions.multiSelect.options.length > 0 && (
+                            <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
+                              Options: {field.typeOptions.multiSelect.options.map((opt: any) => opt.label).join(", ")}
+                            </p>
+                          )}
                       </div>
                       <Button
                         variant="ghost"
                         size="icon-sm"
                         onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteConfigField(index)
+                          e.stopPropagation();
+                          handleDeleteConfigField(index);
                         }}
                       >
                         <Trash2 className="text-red-500" />
@@ -218,11 +213,7 @@ export function CustomComponentConfigurationSidebar({
             )}
 
             {/* Add New Configuration Field Button */}
-            <Button
-              variant="outline"
-              onClick={onAddConfigField}
-              className="w-full"
-            >
+            <Button variant="outline" onClick={onAddConfigField} className="w-full">
               <Plus />
               Add Configuration Field
             </Button>
@@ -249,23 +240,19 @@ export function CustomComponentConfigurationSidebar({
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <ArrowUpRight className="text-green-600 dark:text-green-400" />
-                          <p className="font-medium text-sm text-gray-900 dark:text-zinc-100">
-                            {outputChannel.name}
-                          </p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-zinc-100">{outputChannel.name}</p>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-2">
-                          Node: {outputChannel.nodeId}
-                        </p>
+                        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-2">Node: {outputChannel.nodeId}</p>
                         <p className="text-xs text-gray-500 dark:text-zinc-400">
-                          Channel: {outputChannel.nodeOutputChannel || 'default'}
+                          Channel: {outputChannel.nodeOutputChannel || "default"}
                         </p>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon-sm"
                         onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteOutputChannel(index)
+                          e.stopPropagation();
+                          handleDeleteOutputChannel(index);
                         }}
                       >
                         <Trash2 className="text-red-500" />
@@ -277,11 +264,7 @@ export function CustomComponentConfigurationSidebar({
             )}
 
             {/* Add New Output Channel Button */}
-            <Button
-              variant="outline"
-              onClick={onAddOutputChannel}
-              className="w-full"
-            >
+            <Button variant="outline" onClick={onAddOutputChannel} className="w-full">
               <Plus />
               Add Output Channel
             </Button>

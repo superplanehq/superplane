@@ -279,21 +279,6 @@ func (e *WorkflowNodeExecution) Start() error {
 
 func (e *WorkflowNodeExecution) StartInTransaction(tx *gorm.DB) error {
 	//
-	// Update the workflow node state to processing.
-	//
-	node, err := FindWorkflowNode(tx, e.WorkflowID, e.NodeID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-
-	if node != nil {
-		err = node.UpdateState(tx, WorkflowNodeStateProcessing)
-		if err != nil {
-			return err
-		}
-	}
-
-	//
 	// Update the execution state to started.
 	//
 	return tx.Model(e).

@@ -1,13 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import * as React from 'react';
-import {
-  Calculator,
-  Calendar,
-  CreditCard,
-  Settings,
-  Smile,
-  User,
-} from 'lucide-react';
+import type { Meta, StoryObj } from "@storybook/react";
+import * as React from "react";
+import { Calculator, Calendar, CreditCard, Settings, Smile, User } from "lucide-react";
 
 import {
   Command,
@@ -19,14 +12,14 @@ import {
   CommandList,
   CommandSeparator,
   CommandShortcut,
-} from './index';
+} from "./index";
 
 const meta: Meta<typeof Command> = {
-  title: 'shadcn Primitives/Command',
+  title: "shadcn Primitives/Command",
   component: Command,
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
 };
 
@@ -37,21 +30,19 @@ const CommandDialogDemo = () => {
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'j' && (e.metaKey || e.ctrlKey)) {
+      if (e.key === "j" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setOpen((open) => !open);
       }
     };
-    document.addEventListener('keydown', down);
-    return () => document.removeEventListener('keydown', down);
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
   }, []);
 
   return (
     <>
       <p className="text-sm text-muted-foreground">
-        Press{
-        " "
-        }
+        Press{" "}
         <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
           <span className="text-xs">⌘</span>J
         </kbd>
@@ -100,5 +91,5 @@ const CommandDialogDemo = () => {
 
 export const Dialog: StoryObj<typeof Command> = {
   render: () => <CommandDialogDemo />,
-  name: 'Command Dialog',
+  name: "Command Dialog",
 };

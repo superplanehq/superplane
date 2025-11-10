@@ -20,10 +20,10 @@ var _ MappedNullable = &RolesRoleSpec{}
 
 // RolesRoleSpec struct for RolesRoleSpec
 type RolesRoleSpec struct {
-	DisplayName *string `json:"displayName,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Permissions []AuthorizationPermission `json:"permissions,omitempty"`
-	InheritedRole *RolesRole `json:"inheritedRole,omitempty"`
+	DisplayName   *string                   `json:"displayName,omitempty"`
+	Description   *string                   `json:"description,omitempty"`
+	Permissions   []AuthorizationPermission `json:"permissions,omitempty"`
+	InheritedRole *RolesRole                `json:"inheritedRole,omitempty"`
 }
 
 // NewRolesRoleSpec instantiates a new RolesRoleSpec object
@@ -172,7 +172,7 @@ func (o *RolesRoleSpec) SetInheritedRole(v RolesRole) {
 }
 
 func (o RolesRoleSpec) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -231,5 +231,3 @@ func (v *NullableRolesRoleSpec) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

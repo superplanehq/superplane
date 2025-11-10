@@ -21,19 +21,19 @@ var _ MappedNullable = &BlueprintsBlueprint{}
 
 // BlueprintsBlueprint struct for BlueprintsBlueprint
 type BlueprintsBlueprint struct {
-	Id *string `json:"id,omitempty"`
-	OrganizationId *string `json:"organizationId,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
-	Nodes []ComponentsNode `json:"nodes,omitempty"`
-	Edges []ComponentsEdge `json:"edges,omitempty"`
-	Configuration []ConfigurationField `json:"configuration,omitempty"`
+	Id             *string                             `json:"id,omitempty"`
+	OrganizationId *string                             `json:"organizationId,omitempty"`
+	Name           *string                             `json:"name,omitempty"`
+	Description    *string                             `json:"description,omitempty"`
+	CreatedAt      *time.Time                          `json:"createdAt,omitempty"`
+	UpdatedAt      *time.Time                          `json:"updatedAt,omitempty"`
+	Nodes          []ComponentsNode                    `json:"nodes,omitempty"`
+	Edges          []ComponentsEdge                    `json:"edges,omitempty"`
+	Configuration  []ConfigurationField                `json:"configuration,omitempty"`
 	OutputChannels []SuperplaneBlueprintsOutputChannel `json:"outputChannels,omitempty"`
-	Icon *string `json:"icon,omitempty"`
-	Color *string `json:"color,omitempty"`
-	CreatedBy *SuperplaneBlueprintsUserRef `json:"createdBy,omitempty"`
+	Icon           *string                             `json:"icon,omitempty"`
+	Color          *string                             `json:"color,omitempty"`
+	CreatedBy      *SuperplaneBlueprintsUserRef        `json:"createdBy,omitempty"`
 }
 
 // NewBlueprintsBlueprint instantiates a new BlueprintsBlueprint object
@@ -470,7 +470,7 @@ func (o *BlueprintsBlueprint) SetCreatedBy(v SuperplaneBlueprintsUserRef) {
 }
 
 func (o BlueprintsBlueprint) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -556,5 +556,3 @@ func (v *NullableBlueprintsBlueprint) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

@@ -1,7 +1,7 @@
-import * as React from "react"
-import type { Meta, StoryObj } from "@storybook/react"
+import * as React from "react";
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 import {
   NavigationMenu,
@@ -10,17 +10,17 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
   navigationMenuTriggerStyle,
-} from "./index"
+} from "./index";
 
 type NavigationLink = {
-  label: string
-  href: string
-  active?: boolean
-}
+  label: string;
+  href: string;
+  active?: boolean;
+};
 
 type NavigationMenuStoryArgs = React.ComponentProps<typeof NavigationMenu> & {
-  items: NavigationLink[]
-}
+  items: NavigationLink[];
+};
 
 const meta = {
   title: "shadcn Primitives/NavigationMenu",
@@ -39,28 +39,20 @@ const meta = {
       table: { category: "Layout" },
     },
   },
-} satisfies Meta<typeof NavigationMenu>
+} satisfies Meta<typeof NavigationMenu>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<NavigationMenuStoryArgs>
+type Story = StoryObj<NavigationMenuStoryArgs>;
 
 const NavigationMenuDemo = ({ items, className, viewport, ...props }: NavigationMenuStoryArgs) => (
   <div className="w-full border-b border-border bg-background">
     <div className="mx-auto flex w-full max-w-4xl justify-center px-4 py-8">
-      <NavigationMenu
-        className={cn("max-w-full justify-center gap-1", className)}
-        viewport={viewport}
-        {...props}
-      >
+      <NavigationMenu className={cn("max-w-full justify-center gap-1", className)} viewport={viewport} {...props}>
         <NavigationMenuList>
           {items.map((item) => (
             <NavigationMenuItem key={item.href}>
-              <NavigationMenuLink
-                href={item.href}
-                active={item.active}
-                className={navigationMenuTriggerStyle()}
-              >
+              <NavigationMenuLink href={item.href} active={item.active} className={navigationMenuTriggerStyle()}>
                 {item.label}
               </NavigationMenuLink>
             </NavigationMenuItem>
@@ -70,7 +62,7 @@ const NavigationMenuDemo = ({ items, className, viewport, ...props }: Navigation
       </NavigationMenu>
     </div>
   </div>
-)
+);
 
 const baseArgs: NavigationMenuStoryArgs = {
   viewport: false,
@@ -82,9 +74,9 @@ const baseArgs: NavigationMenuStoryArgs = {
     { label: "About", href: "#about" },
     { label: "Contact", href: "#contact" },
   ],
-}
+};
 
 export const Default: Story = {
   args: baseArgs,
   render: (args) => <NavigationMenuDemo {...args} />,
-}
+};

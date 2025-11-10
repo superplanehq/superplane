@@ -46,9 +46,7 @@ const sampleNodes: Node[] = [
           { icon: "zap", label: "Query Time: 12ms avg" },
           { icon: "activity", label: "Pool: 45/100 connections" },
         ],
-        parameters: [
-          { icon: "database", items: ["db-primary", "db-replica-1", "db-replica-2"] }
-        ],
+        parameters: [{ icon: "database", items: ["db-primary", "db-replica-1", "db-replica-2"] }],
         lastRunItem: {
           title: "Database health check",
           subtitle: "45ms lag",
@@ -60,14 +58,14 @@ const sampleNodes: Node[] = [
           },
           state: "success",
           values: {
-            "Connection": "Healthy",
+            Connection: "Healthy",
             "Replication Lag": "45ms",
             "Avg Query Time": "12ms",
             "Pool Usage": "45/100",
           },
         },
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
   {
@@ -90,9 +88,7 @@ const sampleNodes: Node[] = [
           { icon: "hard-drive", label: "Disk: 85% used" },
           { icon: "box", label: "Pods: 11/24 healthy" },
         ],
-        parameters: [
-          { icon: "server", items: ["prod-cluster-1", "prod-cluster-2"] }
-        ],
+        parameters: [{ icon: "server", items: ["prod-cluster-1", "prod-cluster-2"] }],
         lastRunItem: {
           title: "Resource check",
           subtitle: "11/24 pods",
@@ -105,13 +101,13 @@ const sampleNodes: Node[] = [
           state: "failure",
           values: {
             "CPU Usage": "45%",
-            "Memory": "12.3 GB available",
-            "Disk": "85% used",
-            "Pods": "24/24",
+            Memory: "12.3 GB available",
+            Disk: "85% used",
+            Pods: "24/24",
           },
         },
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
   {
@@ -134,9 +130,7 @@ const sampleNodes: Node[] = [
           { icon: "alert-circle", label: "Error Rate: 0.3%" },
           { icon: "server", label: "Load Balancer: Healthy" },
         ],
-        parameters: [
-          { icon: "map", items: ["us-west-1", "eu-global-1", "asia-east-1"] }
-        ],
+        parameters: [{ icon: "map", items: ["us-west-1", "eu-global-1", "asia-east-1"] }],
         lastRunItem: {
           title: "Traffic monitoring check",
           subtitle: "1,247 req/s",
@@ -149,13 +143,13 @@ const sampleNodes: Node[] = [
           state: "success",
           values: {
             "Requests/sec": "1,247",
-            "Connections": "3,842",
+            Connections: "3,842",
             "Error Rate": "0.3%",
-            "Status": "Healthy",
+            Status: "Healthy",
           },
         },
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
   {
@@ -236,11 +230,11 @@ const sampleNodes: Node[] = [
           },
           state: "failed",
           values: {
-            "Author": "Bart Willems",
-            "Commit": "FEAT-1234",
-            "Sha": "ef758d40",
-            "Image": "v3.18.217",
-            "Size": "971.5 MB"
+            Author: "Bart Willems",
+            Commit: "FEAT-1234",
+            Sha: "ef758d40",
+            Image: "v3.18.217",
+            Size: "971.5 MB",
           },
         },
         nextInQueue: {
@@ -248,8 +242,8 @@ const sampleNodes: Node[] = [
           subtitle: "ef758d40",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30), // 30 minutes ago
         },
-        collapsed: true
-      }
+        collapsed: true,
+      },
     },
   },
   {
@@ -274,7 +268,7 @@ const sampleNodes: Node[] = [
             requireArtifacts: [
               {
                 label: "CVE Report",
-              }
+              },
             ],
             onApprove: (artifacts) => console.log("Security approved with artifacts:", artifacts),
             onReject: (comment) => console.log("Security rejected with comment:", comment),
@@ -309,8 +303,8 @@ const sampleNodes: Node[] = [
           subtitle: "ef758d40",
         },
         receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 24),
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
   {
@@ -333,9 +327,7 @@ const sampleNodes: Node[] = [
           { icon: "package", label: "Image: v3.18.217" },
           { icon: "package", label: "Size: 971.5 MB" },
         ],
-        parameters: [
-          { icon: "map", items: ["us-west-1", "us-east-1"] }
-        ],
+        parameters: [{ icon: "map", items: ["us-west-1", "us-east-1"] }],
         lastRunItem: {
           title: "FEAT-984: Autocomplete",
           subtitle: "ef758d40",
@@ -347,11 +339,11 @@ const sampleNodes: Node[] = [
           },
           state: "success",
           values: {
-            "Author": "Bart Willems",
-            "Commit": "FEAT-1234",
-            "Sha": "ef758d40",
-            "Image": "v3.18.217",
-            "Size": "971.5 MB"
+            Author: "Bart Willems",
+            Commit: "FEAT-1234",
+            Sha: "ef758d40",
+            Image: "v3.18.217",
+            Size: "971.5 MB",
           },
         },
         nextInQueue: {
@@ -359,8 +351,8 @@ const sampleNodes: Node[] = [
           subtitle: "ef758d40",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60), // 1 hour ago
         },
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
   {
@@ -384,9 +376,7 @@ const sampleNodes: Node[] = [
           { icon: "package", label: "Image: v3.18.217" },
           { icon: "package", label: "Size: 971.5 MB" },
         ],
-        parameters: [
-          { icon: "map", items: ["eu-global-1", "eu-global-2"] }
-        ],
+        parameters: [{ icon: "map", items: ["eu-global-1", "eu-global-2"] }],
         lastRunItem: {
           title: "fix: open rejected events",
           subtitle: "ef758d40",
@@ -409,11 +399,11 @@ const sampleNodes: Node[] = [
           },
           state: "running",
           values: {
-            "Author": "Bart Willems",
-            "Commit": "FEAT-1234",
-            "Sha": "ef758d40",
-            "Image": "v3.18.217",
-            "Size": "971.5 MB"
+            Author: "Bart Willems",
+            Commit: "FEAT-1234",
+            Sha: "ef758d40",
+            Image: "v3.18.217",
+            Size: "971.5 MB",
           },
         },
         nextInQueue: {
@@ -421,8 +411,8 @@ const sampleNodes: Node[] = [
           subtitle: "ef758d40",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 4), // 4 hours ago
         },
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
   {
@@ -445,9 +435,7 @@ const sampleNodes: Node[] = [
           { icon: "package", label: "Image: v3.18.217" },
           { icon: "package", label: "Size: 971.5 MB" },
         ],
-        parameters: [
-          { icon: "map", items: ["asia-east-1"] }
-        ],
+        parameters: [{ icon: "map", items: ["asia-east-1"] }],
         lastRunItem: {
           title: "fix: open rejected events",
           subtitle: "ef758d40",
@@ -459,16 +447,16 @@ const sampleNodes: Node[] = [
           },
           state: "fail",
           values: {
-            "Author": "Bart Willems",
-            "Commit": "FEAT-1234",
-            "Sha": "ef758d40",
-            "Image": "v3.18.217",
-            "Size": "971.5 MB"
+            Author: "Bart Willems",
+            Commit: "FEAT-1234",
+            Sha: "ef758d40",
+            Image: "v3.18.217",
+            Size: "971.5 MB",
           },
         },
         startLastValuesOpen: false,
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
 ];
@@ -492,18 +480,18 @@ export const DeployAndMonitor: Story = {
     const simulationEdges = useMemo(() => args.edges ?? [], [args.edges]);
 
     const toggleNodeCollapse = useCallback((nodeId: string) => {
-      console.log('toggleNodeCollapse called for nodeId:', nodeId);
-      setSimulationNodes(prevNodes => {
-        console.log('Current nodes:', prevNodes.length);
-        const newNodes = prevNodes.map(node => {
+      console.log("toggleNodeCollapse called for nodeId:", nodeId);
+      setSimulationNodes((prevNodes) => {
+        console.log("Current nodes:", prevNodes.length);
+        const newNodes = prevNodes.map((node) => {
           if (node.id !== nodeId) return node;
 
-          console.log('Found node to toggle:', nodeId, node.data);
+          console.log("Found node to toggle:", nodeId, node.data);
           const nodeData = { ...node.data } as unknown as BlockData;
 
           // Toggle collapse state based on node type
           if (nodeData.type === "composite" && nodeData.composite) {
-            console.log('Toggling composite from', nodeData.composite.collapsed, 'to', !nodeData.composite.collapsed);
+            console.log("Toggling composite from", nodeData.composite.collapsed, "to", !nodeData.composite.collapsed);
             nodeData.composite = {
               ...nodeData.composite,
               collapsed: !nodeData.composite.collapsed,
@@ -511,7 +499,7 @@ export const DeployAndMonitor: Story = {
           }
 
           if (nodeData.type === "approval" && nodeData.approval) {
-            console.log('Toggling approval from', nodeData.approval.collapsed, 'to', !nodeData.approval.collapsed);
+            console.log("Toggling approval from", nodeData.approval.collapsed, "to", !nodeData.approval.collapsed);
             nodeData.approval = {
               ...nodeData.approval,
               collapsed: !nodeData.approval.collapsed,
@@ -519,7 +507,7 @@ export const DeployAndMonitor: Story = {
           }
 
           if (nodeData.type === "trigger" && nodeData.trigger) {
-            console.log('Toggling trigger from', nodeData.trigger.collapsed, 'to', !nodeData.trigger.collapsed);
+            console.log("Toggling trigger from", nodeData.trigger.collapsed, "to", !nodeData.trigger.collapsed);
             nodeData.trigger = {
               ...nodeData.trigger,
               collapsed: !nodeData.trigger.collapsed,
@@ -527,10 +515,10 @@ export const DeployAndMonitor: Story = {
           }
 
           const updatedNode: CanvasNode = { ...node, data: nodeData as unknown as Record<string, unknown> };
-          console.log('Updated node:', updatedNode);
+          console.log("Updated node:", updatedNode);
           return updatedNode;
         });
-        console.log('Returning new nodes:', newNodes.length);
+        console.log("Returning new nodes:", newNodes.length);
         return newNodes;
       });
     }, []);
@@ -553,30 +541,26 @@ export const DeployAndMonitor: Story = {
 
       // Walk the graph in topological-ish layers with delays.
       const visited = new Set<string>();
-      let frontier: Array<{ id: string; value: unknown }> = [
-        { id: start.id, value: event },
-      ];
+      let frontier: Array<{ id: string; value: unknown }> = [{ id: start.id, value: event }];
 
       while (frontier.length) {
         // mark nodes in this layer as working + set lastEvent
         const layerIds = frontier.map((f) => f.id);
-        const valuesById = new Map(
-          frontier.map((f) => [f.id, f.value] as const)
-        );
+        const valuesById = new Map(frontier.map((f) => [f.id, f.value] as const));
 
         setSimulationNodes((prev) =>
           prev.map((n) =>
             layerIds.includes(n.id)
               ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  state: "working",
-                  lastEvent: valuesById.get(n.id),
-                },
-              }
-              : n
-          )
+                  ...n,
+                  data: {
+                    ...n.data,
+                    state: "working",
+                    lastEvent: valuesById.get(n.id),
+                  },
+                }
+              : n,
+          ),
         );
 
         // wait 5 seconds to simulate processing
@@ -584,11 +568,7 @@ export const DeployAndMonitor: Story = {
 
         // turn off working state for this layer
         setSimulationNodes((prev) =>
-          prev.map((n) =>
-            layerIds.includes(n.id)
-              ? { ...n, data: { ...n.data, state: "pending" } }
-              : n
-          )
+          prev.map((n) => (layerIds.includes(n.id) ? { ...n, data: { ...n.data, state: "pending" } } : n)),
         );
 
         // build next layer
@@ -598,7 +578,7 @@ export const DeployAndMonitor: Story = {
           const nexts = outgoing.get(id) ?? [];
           nexts.forEach((nid) => {
             if (!visited.has(nid)) {
-              const transformed = { ...(value as Record<string, unknown> ?? {}), via: id };
+              const transformed = { ...((value as Record<string, unknown>) ?? {}), via: id };
               next.push({ id: nid, value: transformed });
             }
           });
@@ -608,10 +588,7 @@ export const DeployAndMonitor: Story = {
       }
     }, [simulationNodes, simulationEdges]);
 
-    const getSidebarData = useMemo(
-      () => createGetSidebarData(simulationNodes ?? []),
-      [simulationNodes]
-    );
+    const getSidebarData = useMemo(() => createGetSidebarData(simulationNodes ?? []), [simulationNodes]);
 
     return (
       <div className="h-[100vh] w-full ">
@@ -643,7 +620,7 @@ export const DeployAndMonitor: Story = {
           onToggleView={(nodeId) => {
             console.log("Toggle view action for node:", nodeId);
             console.log("Current nodes before toggle:", simulationNodes.length);
-            console.log("Node data before toggle:", simulationNodes.find(n => n.id === nodeId)?.data);
+            console.log("Node data before toggle:", simulationNodes.find((n) => n.id === nodeId)?.data);
             toggleNodeCollapse(nodeId);
           }}
           onDeactivate={(nodeId) => {

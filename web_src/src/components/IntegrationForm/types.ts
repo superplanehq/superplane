@@ -20,8 +20,8 @@ export interface BaseIntegrationFormProps {
   setIntegrationData: React.Dispatch<React.SetStateAction<IntegrationData>>;
   errors: FormErrors;
   setErrors: React.Dispatch<React.SetStateAction<FormErrors>>;
-  apiTokenTab: 'existing' | 'new';
-  setApiTokenTab: React.Dispatch<React.SetStateAction<'existing' | 'new'>>;
+  apiTokenTab: "existing" | "new";
+  setApiTokenTab: React.Dispatch<React.SetStateAction<"existing" | "new">>;
   newSecretToken: string;
   setNewSecretToken: React.Dispatch<React.SetStateAction<string>>;
   secrets: any[];

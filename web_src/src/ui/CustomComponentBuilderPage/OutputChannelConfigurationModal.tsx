@@ -1,23 +1,11 @@
 import { useState, useEffect } from "react";
 import { Node } from "@xyflow/react";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SuperplaneBlueprintsOutputChannel } from "@/api-client";
 
 interface OutputChannelConfigurationModalProps {
@@ -35,9 +23,7 @@ export function OutputChannelConfigurationModal({
   nodes,
   onSave,
 }: OutputChannelConfigurationModalProps) {
-  const [outputChannelForm, setOutputChannelForm] = useState<
-    Partial<SuperplaneBlueprintsOutputChannel>
-  >({
+  const [outputChannelForm, setOutputChannelForm] = useState<Partial<SuperplaneBlueprintsOutputChannel>>({
     name: "",
     nodeId: "",
     nodeOutputChannel: "default",
@@ -75,19 +61,14 @@ export function OutputChannelConfigurationModal({
   };
 
   const selectedNode = nodes.find((n) => n.id === outputChannelForm.nodeId);
-  const nodeChannels =
-    (selectedNode?.data as any)?.outputChannels || ["default"];
+  const nodeChannels = (selectedNode?.data as any)?.outputChannels || ["default"];
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-w-2xl" showCloseButton={false}>
         <VisuallyHidden>
-          <DialogTitle>
-            {outputChannel ? "Edit Output Channel" : "Add Output Channel"}
-          </DialogTitle>
-          <DialogDescription>
-            Configure the blueprint output channel
-          </DialogDescription>
+          <DialogTitle>{outputChannel ? "Edit Output Channel" : "Add Output Channel"}</DialogTitle>
+          <DialogDescription>Configure the blueprint output channel</DialogDescription>
         </VisuallyHidden>
         <div className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-6">
@@ -97,9 +78,7 @@ export function OutputChannelConfigurationModal({
           <div className="space-y-4">
             {/* Output Channel Name */}
             <div>
-              <Label className="block text-sm font-medium mb-2">
-                Output Channel Name *
-              </Label>
+              <Label className="block text-sm font-medium mb-2">Output Channel Name *</Label>
               <Input
                 type="text"
                 value={outputChannelForm.name || ""}
@@ -112,9 +91,7 @@ export function OutputChannelConfigurationModal({
                 placeholder="e.g., success, error, default"
                 autoFocus
               />
-              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                The name of this output channel
-              </p>
+              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">The name of this output channel</p>
             </div>
 
             {/* Node Selection */}
@@ -152,9 +129,7 @@ export function OutputChannelConfigurationModal({
             {/* Node Output Channel Selection */}
             {outputChannelForm.nodeId && (
               <div>
-                <Label className="block text-sm font-medium mb-2">
-                  Node Output Channel *
-                </Label>
+                <Label className="block text-sm font-medium mb-2">Node Output Channel *</Label>
                 <Select
                   value={outputChannelForm.nodeOutputChannel || "default"}
                   onValueChange={(val) =>
@@ -189,9 +164,7 @@ export function OutputChannelConfigurationModal({
             <Button
               variant="default"
               onClick={handleSave}
-              disabled={
-                !outputChannelForm.name?.trim() || !outputChannelForm.nodeId
-              }
+              disabled={!outputChannelForm.name?.trim() || !outputChannelForm.nodeId}
             >
               {outputChannel ? "Save Changes" : "Add Output Channel"}
             </Button>

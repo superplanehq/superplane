@@ -36,6 +36,10 @@ test.setup:
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
+test.start:
+	docker compose $(DOCKER_COMPOSE_OPTS) up -d
+	sleep 5
+
 test.e2e.setup:
 	$(MAKE) test.setup
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm ci"
@@ -54,6 +58,22 @@ test.e2e:
 
 test.shell:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
+
+#
+# Code formatting
+#
+
+format.go:
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -s -w .
+
+format.go.check:
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -s -l . | tee /dev/stderr | if read; then exit 1; else exit 0; fi
+
+format.js:
+	cd web_src && npm run format
+
+format.js.check:
+	cd web_src && npm run format:check
 
 #
 # Targets for dev environment
