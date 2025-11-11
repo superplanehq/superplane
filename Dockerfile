@@ -19,6 +19,7 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 ENV GOPATH="/go"
 ENV GOBIN="/go/bin"
 ENV PATH="${GOBIN}:${PATH}"
+ENV GOPROXY="https://proxy.golang.org,direct"
 
 RUN bash scripts/install-go.sh ${GO_VERSION}
 RUN bash scripts/install-nodejs.sh
@@ -51,17 +52,18 @@ FROM base AS dev
 
 WORKDIR /app
 
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
-RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest
-RUN go install github.com/air-verse/air@latest
-RUN go install github.com/mgechev/revive@v1.8.0
-RUN go install gotest.tools/gotestsum@v1.12.3
+# Install dev tools with retries to mitigate intermittent network flakes
+RUN bash /tmp/scripts/retry.sh 6 2s go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+RUN bash /tmp/scripts/retry.sh 6 2s go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
+RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest
+RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/air-verse/air@latest
+RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/mgechev/revive@v1.8.0
+RUN bash /tmp/scripts/retry.sh 6 2s go install gotest.tools/gotestsum@v1.12.3
 
-# Install Playwright
-RUN go install github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1
-RUN playwright install chromium-headless-shell --with-deps
+# Install Playwright (with retries as it's network heavy)
+RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1
+RUN bash /tmp/scripts/retry.sh 6 2s playwright install chromium-headless-shell --with-deps
 
 # Inject test files and dev entrypoint
 COPY test test
