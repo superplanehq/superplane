@@ -116,12 +116,21 @@ func (w *Wait) Actions() []components.Action {
 		{
 			Name: "timeReached",
 		},
+		{
+			Name:           "passThrough",
+			Description:    "Push Through",
+			UserAccessible: true,
+		},
 	}
 }
 
 func (w *Wait) HandleAction(ctx components.ActionContext) error {
 	switch ctx.Name {
 	case "timeReached":
+		return ctx.ExecutionStateContext.Pass(map[string][]any{
+			components.DefaultOutputChannel.Name: {map[string]any{}},
+		})
+	case "passThrough":
 		return ctx.ExecutionStateContext.Pass(map[string][]any{
 			components.DefaultOutputChannel.Name: {map[string]any{}},
 		})
