@@ -24,10 +24,10 @@ GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_t
 #
 
 lint:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app revive -formatter friendly -config lint.toml ./...
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app revive -formatter friendly -config lint.toml ./...
 
 tidy:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod tidy
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app go mod tidy
 
 test.setup:
 	@mkdir -p tmp/screenshots
@@ -40,12 +40,12 @@ test.start:
 	docker compose $(DOCKER_COMPOSE_OPTS) up -d
 	sleep 5
 
-test.e2e.setup:
-	$(MAKE) test.setup
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm ci"
-
 test.down:
 	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
+
+test.e2e.setup:
+	$(MAKE) test.setup
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "cd web_src && npm ci"
 
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
@@ -106,13 +106,13 @@ check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
 
 check.build.ui:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run build"
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "cd web_src && npm run build"
 
 check.build.app:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app go build cmd/server/main.go
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app go build cmd/server/main.go
 
 storybook:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash -c "cd web_src && npm install && npm run storybook"
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app /bin/bash -c "cd web_src && npm install && npm run storybook"
 
 ui.setup:
 	npm install
