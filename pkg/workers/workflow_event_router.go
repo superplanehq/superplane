@@ -43,6 +43,8 @@ func (w *WorkflowEventRouter) Start(ctx context.Context) {
 
 			for _, event := range events {
 				logger := logging.ForEvent(w.logger, event)
+				messages.NewWorkflowEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
@@ -54,7 +56,6 @@ func (w *WorkflowEventRouter) Start(ctx context.Context) {
 					if err := w.LockAndProcessEvent(logger, event); err != nil {
 						w.logger.Errorf("Error processing event %s: %v", event.ID, err)
 					}
-					messages.NewWorkflowEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
 				}(event)
 			}
 		}

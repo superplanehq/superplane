@@ -52,19 +52,19 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 			}
 
 			for _, execution := range executions {
+				messages.NewWorkflowExecutionCreatedMessage(execution.WorkflowID.String(), &execution).Publish()
+
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
 
-				messages.NewWorkflowExecutionCreatedMessage(execution.WorkflowID.String(), &execution).Publish()
-
 				go func(execution models.WorkflowNodeExecution) {
 					defer w.semaphore.Release(1)
+					defer messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
 
 					err := w.LockAndProcessNodeExecution(execution.ID)
 					if err == nil {
-						messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
 						return
 					}
 
