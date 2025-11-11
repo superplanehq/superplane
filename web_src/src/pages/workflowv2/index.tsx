@@ -518,7 +518,7 @@ export function WorkflowPageV2() {
 
       if (node.type === "TYPE_TRIGGER") {
         const events = nodeEventsMap[nodeId] || [];
-        const triggerEvent = events.find((evt) => evt.id === event.id);
+        const triggerEvent = events.find((evt) => evt.id === (event.triggerEventId || event.id));
 
         if (!triggerEvent) return undefined;
 
@@ -550,7 +550,9 @@ export function WorkflowPageV2() {
 
       // Handle other components (non-triggers) - get execution for this event
       const executions = nodeExecutionsMap[nodeId] || [];
-      const execution = executions.find((exec: WorkflowsWorkflowNodeExecution) => exec.id === event.id);
+      const execution = executions.find(
+        (exec: WorkflowsWorkflowNodeExecution) => exec.id === (event.executionId || event.id),
+      );
 
       if (!execution) return undefined;
 

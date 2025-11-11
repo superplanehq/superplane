@@ -169,6 +169,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         {/* Actions dropdown */}
         <SidebarEventActionsMenu
           eventId={event.id}
+          executionId={(event.executionId || (tabData?.current?.["Execution ID"] as string)) as string | undefined}
           onCancelQueueItem={onCancelQueueItem}
           onPassThrough={onPassThrough}
           supportsPassThrough={supportsPassThrough}

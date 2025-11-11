@@ -28,6 +28,8 @@ export function mapTriggerEventsToSidebarEvents(
       isOpen: false,
       receivedAt: event.createdAt ? new Date(event.createdAt) : undefined,
       values,
+      triggerEventId: event.id!,
+      kind: "trigger",
     };
   });
 }
@@ -68,6 +70,8 @@ export function mapExecutionsToSidebarEvents(
       isOpen: false,
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
       values,
+      executionId: execution.id!,
+      kind: "execution",
     };
   });
 }
@@ -103,6 +107,7 @@ export function mapQueueItemsToSidebarEvents(
       state: "waiting" as const,
       isOpen: false,
       receivedAt: item.createdAt ? new Date(item.createdAt) : undefined,
+      kind: "queue",
     };
   });
 }

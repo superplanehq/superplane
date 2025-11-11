@@ -447,18 +447,18 @@ export const ComponentSidebar = ({
                 <>
                   {latestEvents.slice(0, 5).map((event, index) => {
                     return (
-                        <SidebarEventItem
-                          key={event.id}
-                          event={event}
-                          index={index}
-                          variant="latest"
-                          isOpen={openEventIds.has(event.id) || event.isOpen}
-                          onToggleOpen={handleToggleOpen}
-                          onEventClick={onEventClick}
-                          tabData={getTabData?.(event)}
-                          onPassThrough={onPassThrough}
-                          supportsPassThrough={supportsPassThrough}
-                        />
+                      <SidebarEventItem
+                        key={event.id}
+                        event={event}
+                        index={index}
+                        variant="latest"
+                        isOpen={openEventIds.has(event.id) || event.isOpen}
+                        onToggleOpen={handleToggleOpen}
+                        onEventClick={onEventClick}
+                        tabData={getTabData?.(event)}
+                        onPassThrough={onPassThrough}
+                        supportsPassThrough={supportsPassThrough}
+                      />
                     );
                   })}
                   {handleSeeFullHistory && (

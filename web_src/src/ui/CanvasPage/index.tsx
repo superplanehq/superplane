@@ -35,6 +35,10 @@ export interface SidebarEvent {
   isOpen: boolean;
   receivedAt?: Date;
   values?: Record<string, string>;
+  // Optional specific identifiers to avoid overloading `id`
+  executionId?: string;
+  triggerEventId?: string;
+  kind?: "execution" | "trigger" | "queue";
 }
 
 export interface SidebarData {
@@ -540,7 +544,7 @@ function Sidebar({
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   onCancelQueueItem?: (id: string) => void;
-  onPassThrough?: (nodeId: string) => void;
+  onPassThrough?: (nodeId: string, executionId: string) => void;
   supportsPassThrough?: (nodeId: string) => boolean;
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
@@ -629,7 +633,11 @@ function Sidebar({
           : undefined
       }
       onCancelQueueItem={onCancelQueueItem}
-      onPassThrough={onPassThrough && state.componentSidebar.selectedNodeId ? () => onPassThrough(state.componentSidebar.selectedNodeId!) : undefined}
+      onPassThrough={
+        onPassThrough && state.componentSidebar.selectedNodeId
+          ? (executionId) => onPassThrough(state.componentSidebar.selectedNodeId!, executionId)
+          : undefined
+      }
       supportsPassThrough={supportsPassThrough ? supportsPassThrough(state.componentSidebar.selectedNodeId!) : false}
       onEventClick={(event) => {
         setLatestEvents((prev) => {

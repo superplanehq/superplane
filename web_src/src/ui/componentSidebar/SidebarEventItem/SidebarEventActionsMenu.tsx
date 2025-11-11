@@ -6,6 +6,7 @@ import type { ChildEventsState } from "../../composite";
 
 interface SidebarEventActionsMenuProps {
   eventId: string;
+  executionId?: string;
   onCancelQueueItem?: (id: string) => void;
   onPassThrough?: (executionId: string) => void;
   supportsPassThrough?: boolean;
@@ -14,6 +15,7 @@ interface SidebarEventActionsMenuProps {
 
 export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = ({
   eventId,
+  executionId,
   onCancelQueueItem,
   onPassThrough,
   supportsPassThrough,
@@ -23,7 +25,7 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   const isDiscarded = eventState === "discarded";
   const isWaiting = eventState === "waiting";
 
-  const showPassThrough = supportsPassThrough && !(isProcessed || isDiscarded || isWaiting);
+  const showPassThrough = supportsPassThrough && !!executionId && !(isProcessed || isDiscarded || isWaiting);
   const showCancel = !(isProcessed || isDiscarded);
   const showReEmit = isProcessed || isDiscarded;
 
@@ -41,11 +43,16 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
     (e: React.MouseEvent) => {
       e.stopPropagation();
 
+      if (!executionId) {
+        console.warn("No executionId provided for pass-through action");
+        return;
+      }
+
       if (onPassThrough) {
-        onPassThrough(eventId);
+        onPassThrough(executionId);
       }
     },
-    [onPassThrough, eventId],
+    [onPassThrough, executionId, eventId],
   );
 
   const handleCancelQueueItem = React.useCallback(
