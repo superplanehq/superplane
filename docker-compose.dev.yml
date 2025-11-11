@@ -28,6 +28,8 @@ services:
       # and keeps the cache across container restarts (since /app is bind-mounted)
       GOCACHE: "/app/tmp/go-build"
       XDG_CACHE_HOME: "/app/tmp"
+      # Lock Playwright browsers location so install and runtime match
+      PLAYWRIGHT_BROWSERS_PATH: "/app/tmp/ms-playwright"
       START_PUBLIC_API: "yes"
       START_INTERNAL_API: "yes"
       START_GRPC_GATEWAY: "yes"

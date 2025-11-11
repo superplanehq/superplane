@@ -54,7 +54,9 @@ test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
 test.e2e:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app go test ./test/e2e/... -p 1 -v
+	# Ensure Playwright browsers are installed into the same cache path used at runtime
+	# The Playwright CLI is pinned in Dockerfile (go install .../cmd/playwright@v0.5200.1)
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app bash -lc 'playwright install chromium-headless-shell --with-deps && go test ./test/e2e/... -p 1 -v'
 
 test.shell:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
