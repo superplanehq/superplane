@@ -3,16 +3,21 @@ import { resolveIcon } from "@/lib/utils";
 import { EllipsisVertical } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import type { ChildEventsState } from "../../composite";
+import { showInfoToast } from "@/utils/toast";
 
 interface SidebarEventActionsMenuProps {
   eventId: string;
   onCancelQueueItem?: (id: string) => void;
+  onPassThrough?: (executionId: string) => void;
+  supportsPassThrough?: boolean;
   eventState: ChildEventsState;
 }
 
 export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = ({
   eventId,
   onCancelQueueItem,
+  onPassThrough,
+  supportsPassThrough,
   eventState,
 }) => {
   return (
@@ -30,8 +35,8 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
         {/* Cancel when not finished (queued or running) */}
         {!(eventState === "processed" || eventState === "discarded") && (
           <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
+            onSelect={() => {
+              showInfoToast("Cancelling event...");
               onCancelQueueItem?.(eventId);
             }}
             className="gap-2"
@@ -41,15 +46,16 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
           </DropdownMenuItem>
         )}
 
-        {/* Push Through only when running (not finished and not queued) */}
-        {!(eventState === "processed" || eventState === "discarded" || eventState === "waiting") && (
+        {/* Push Through only when running and if component supports it */}
+        {supportsPassThrough && !(eventState === "processed" || eventState === "discarded" || eventState === "waiting") && (
           <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
+            onSelect={() => {
+              showInfoToast("Pushing through...");
+              onPassThrough?.(eventId);
             }}
             className="gap-2"
           >
-            {React.createElement(resolveIcon("chevrons-right"), { size: 16 })}
+            {React.createElement(resolveIcon("fast-forward"), { size: 16 })}
             Push Through
           </DropdownMenuItem>
         )}
@@ -57,8 +63,8 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
         {/* Re-emit for finished or running; not for queued */}
         {eventState !== "waiting" && (
           <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
+            onSelect={() => {
+              /* noop for now */
             }}
             className="gap-2"
           >

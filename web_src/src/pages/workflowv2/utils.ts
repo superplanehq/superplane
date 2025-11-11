@@ -44,7 +44,9 @@ export function mapExecutionsToSidebarEvents(
         ? ("processed" as const)
         : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
           ? ("discarded" as const)
-          : ("waiting" as const);
+          : execution.state === "STATE_STARTED"
+            ? ("running" as const)
+            : ("waiting" as const);
 
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");

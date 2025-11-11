@@ -46,6 +46,8 @@ interface ComponentSidebarProps {
 
   // Queue actions
   onCancelQueueItem?: (id: string) => void;
+  onPassThrough?: (executionId: string) => void;
+  supportsPassThrough?: boolean;
 
   // Full history props
   getAllHistoryEvents?: () => SidebarEvent[];
@@ -90,6 +92,8 @@ export const ComponentSidebar = ({
   isCompactView = false,
   getTabData,
   onCancelQueueItem,
+  onPassThrough,
+  supportsPassThrough,
   onLoadMoreHistory,
   getAllHistoryEvents,
   getHasMoreHistory,
@@ -402,6 +406,8 @@ export const ComponentSidebar = ({
                       onToggleOpen={handleToggleOpen}
                       onEventClick={onEventClick}
                       tabData={getTabData?.(event)}
+                      onPassThrough={onPassThrough}
+                      supportsPassThrough={supportsPassThrough}
                     />
                   ))}
                   {hasMoreItems && !searchQuery && statusFilter === "all" && (
@@ -441,16 +447,18 @@ export const ComponentSidebar = ({
                 <>
                   {latestEvents.slice(0, 5).map((event, index) => {
                     return (
-                      <SidebarEventItem
-                        key={event.id}
-                        event={event}
-                        index={index}
-                        variant="latest"
-                        isOpen={openEventIds.has(event.id) || event.isOpen}
-                        onToggleOpen={handleToggleOpen}
-                        onEventClick={onEventClick}
-                        tabData={getTabData?.(event)}
-                      />
+                        <SidebarEventItem
+                          key={event.id}
+                          event={event}
+                          index={index}
+                          variant="latest"
+                          isOpen={openEventIds.has(event.id) || event.isOpen}
+                          onToggleOpen={handleToggleOpen}
+                          onEventClick={onEventClick}
+                          tabData={getTabData?.(event)}
+                          onPassThrough={onPassThrough}
+                          supportsPassThrough={supportsPassThrough}
+                        />
                     );
                   })}
                   {handleSeeFullHistory && (
@@ -486,6 +494,8 @@ export const ComponentSidebar = ({
                           onEventClick={onEventClick}
                           tabData={getTabData?.(event)}
                           onCancelQueueItem={onCancelQueueItem}
+                          onPassThrough={onPassThrough}
+                          supportsPassThrough={supportsPassThrough}
                         />
                       );
                     })}

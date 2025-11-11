@@ -32,6 +32,8 @@ interface SidebarEventItemProps {
   onEventClick?: (event: SidebarEvent) => void;
   tabData?: TabData;
   onCancelQueueItem?: (id: string) => void;
+  onPassThrough?: (executionId: string) => void;
+  supportsPassThrough?: boolean;
 }
 
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
@@ -43,6 +45,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   onEventClick,
   tabData,
   onCancelQueueItem,
+  onPassThrough,
+  supportsPassThrough,
 }) => {
   // Determine default active tab based on available data
   const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" | "executionChain" => {
@@ -163,7 +167,13 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           <span className="text-sm text-gray-500 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
         )}
         {/* Actions dropdown */}
-        <SidebarEventActionsMenu eventId={event.id} onCancelQueueItem={onCancelQueueItem} eventState={event.state} />
+        <SidebarEventActionsMenu
+          eventId={event.id}
+          onCancelQueueItem={onCancelQueueItem}
+          onPassThrough={onPassThrough}
+          supportsPassThrough={supportsPassThrough}
+          eventState={event.state}
+        />
       </div>
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
         <div className="rounded-sm bg-white border-1 border-gray-800 text-gray-500 w-full">

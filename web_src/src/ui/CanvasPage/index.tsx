@@ -118,6 +118,8 @@ export interface CanvasPageProps {
   onEdgeDelete?: (edgeIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
+  onPassThrough?: (nodeId: string, executionId: string) => void;
+  supportsPassThrough?: (nodeId: string) => boolean;
   onDirty?: () => void;
 
   onRun?: (nodeId: string, channel: string, data: any) => void | Promise<void>;
@@ -432,6 +434,12 @@ function CanvasPage(props: CanvasPageProps) {
                 ? (id) => props.onCancelQueueItem!(state.componentSidebar.selectedNodeId!, id)
                 : undefined
             }
+            onPassThrough={
+              props.onPassThrough && state.componentSidebar.selectedNodeId
+                ? (executionId) => props.onPassThrough!(state.componentSidebar.selectedNodeId!, executionId)
+                : undefined
+            }
+            supportsPassThrough={props.supportsPassThrough}
             onRun={handleNodeRun}
             onDuplicate={props.onDuplicate}
             onDocs={props.onDocs}
@@ -507,6 +515,8 @@ function Sidebar({
   loadSidebarData,
   getTabData,
   onCancelQueueItem,
+  onPassThrough,
+  supportsPassThrough,
   onRun,
   onDuplicate,
   onDocs,
@@ -530,6 +540,8 @@ function Sidebar({
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   onCancelQueueItem?: (id: string) => void;
+  onPassThrough?: (nodeId: string) => void;
+  supportsPassThrough?: (nodeId: string) => boolean;
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
@@ -617,6 +629,8 @@ function Sidebar({
           : undefined
       }
       onCancelQueueItem={onCancelQueueItem}
+      onPassThrough={onPassThrough && state.componentSidebar.selectedNodeId ? () => onPassThrough(state.componentSidebar.selectedNodeId!) : undefined}
+      supportsPassThrough={supportsPassThrough ? supportsPassThrough(state.componentSidebar.selectedNodeId!) : false}
       onEventClick={(event) => {
         setLatestEvents((prev) => {
           return prev.map((e) => {

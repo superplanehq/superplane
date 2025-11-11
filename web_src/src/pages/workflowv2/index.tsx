@@ -58,6 +58,7 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
+import { usePassThroughHandler } from "./usePassThroughHandler";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { mapExecutionsToSidebarEvents, mapQueueItemsToSidebarEvents, mapTriggerEventsToSidebarEvents } from "./utils";
@@ -290,7 +291,6 @@ export function WorkflowPageV2() {
     (nodeId: string): SidebarData | null => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
-      setCurrentHistoryNode({ nodeId, nodeType: node?.type || "TYPE_ACTION" });
 
       // Get current data from store (don't trigger load here - that's done in useEffect)
       const nodeData = getNodeData(nodeId);
@@ -1175,6 +1175,13 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, updateWorkflowMutation],
   );
 
+  // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
+  const { onPassThrough, supportsPassThrough } = usePassThroughHandler({
+    workflowId: workflowId!,
+    organizationId,
+    workflow,
+  });
+
   // Show loading indicator while data is being fetched
   if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
     return (
@@ -1198,7 +1205,7 @@ export function WorkflowPageV2() {
       // Persist right sidebar in query params
       initialSidebar={{
         isOpen: searchParams.get("sidebar") === "1",
-        nodeId: searchParams.get("node") || undefined,
+        nodeId: searchParams.get("node") || null,
       }}
       onSidebarChange={(open, nodeId) => {
         const next = new URLSearchParams(searchParams);
@@ -1256,6 +1263,8 @@ export function WorkflowPageV2() {
       runDisabled={hasRunBlockingChanges}
       runDisabledTooltip={hasRunBlockingChanges ? "Save canvas changes before running" : undefined}
       onCancelQueueItem={onCancelQueueItem}
+      onPassThrough={onPassThrough}
+      supportsPassThrough={supportsPassThrough}
       getAllHistoryEvents={getAllHistoryEvents}
       onLoadMoreHistory={handleLoadMoreHistory}
       getHasMoreHistory={getHasMoreHistory}
