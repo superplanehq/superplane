@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env sh
+set -eu
 
 # VSCode test runner for Go
 # Usage:
@@ -12,119 +12,133 @@ FILE_RELATIVE=${2:-}
 LINE_NUMBER=${3:-}
 
 # Resolve repo root based on this script's location
-ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT_DIR"
-
-echo "[vscode] mode=$MODE file=$FILE_RELATIVE line=$LINE_NUMBER"
 
 # Docker Compose config (assumes compose is already up)
 DOCKER_COMPOSE_OPTS=${DOCKER_COMPOSE_OPTS:-"-f docker-compose.dev.yml"}
 
 docker_exec() {
   # Pass DB_NAME=superplane_test to match Makefile test environment
+  echo "+ docker compose ${DOCKER_COMPOSE_OPTS} exec -e DB_NAME=superplane_test app bash -lc \"$*\""
+  echo ""
+  echo "--------------------------------------------------------------------------------"
+  echo ""
+  # Run command while capturing exit status even with set -e
+  set +e
   docker compose ${DOCKER_COMPOSE_OPTS} exec -e DB_NAME=superplane_test app bash -lc "$*"
+  status=$?
+  set -e
+  if [ "$status" -eq 0 ]; then
+    # Green PASSED
+    printf "\n\033[32mPASSED\033[0m\n"
+  else
+    # Red FAILED
+    printf "\n\033[31mFAILED\033[0m\n"
+  fi
+  return "$status"
 }
 
 # Utility: determine package import path for a given file or directory
 pkg_for_path() {
-  local path="$1"
+  path="$1"
   if [ -d "$path" ]; then
     pkg_dir="$path"
   else
     pkg_dir="$(dirname "$path")"
   fi
-  # Convert to import path relative to module
-  local module_path
   module_path=$(awk '/^module /{print $2; exit}' go.mod)
-  # Trim leading ./ if present
   pkg_rel="${pkg_dir#./}"
   echo "$module_path/${pkg_rel}"
 }
 
 # Utility: extract all Test* names from a _test.go file
 extract_tests_in_file() {
-  local file="$1"
-  # Match both free funcs and methods: func (r *R) TestXxx(t *testing.T)
-  awk '/^func\s*(\([^)]*\)\s*)?Test[[:alnum:]_]*\s*\(/ { \
+  file="$1"
+  # Output Test* names one per line
+  awk '/^func[[:space:]]*(\([^)]*\)[[:space:]]*)?Test[[:alnum:]_]*[[:space:]]*\(/ { \
         name=$0; \
-        sub(/^func\s*/, "", name); \
-        sub(/^\([^)]*\)\s*/, "", name); \
+        sub(/^func[[:space:]]*/, "", name); \
+        sub(/^\([^)]*\)[[:space:]]*/, "", name); \
         sub(/\(.*/, "", name); \
-        gsub(/\s+/, "", name); \
+        gsub(/[[:space:]]+/, "", name); \
         print name; \
       }' "$file"
 }
 
 # Utility: find Test* name at or above specific line in a _test.go file
 test_name_for_line() {
-  local file="$1"; local line="$2"
+  file="$1"; line="$2"
   awk -v target="$line" '
-    /^func\s*(\([^)]*\)\s*)?Test[[:alnum:]_]*\s*\(/ {
+    /^func[[:space:]]*(\([^)]*\)[[:space:]]*)?Test[[:alnum:]_]*[[:space:]]*\(/ {
       name=$0
-      sub(/^func\s*/, "", name)
-      sub(/^\([^)]*\)\s*/, "", name)
+      sub(/^func[[:space:]]*/, "", name)
+      sub(/^\([^)]*\)[[:space:]]*/, "", name)
       sub(/\(.*/, "", name)
-      gsub(/\s+/, "", name)
-      start=NR
+      gsub(/[[:space:]]+/, "", name)
+      current=name
     }
-    NR==target { current=name }
-    END { if (length(current)>0) print current }
+    NR==target { seen=1 }
+    NR>target && seen && !printed { if (length(current)>0) { print current; printed=1 } }
+    END { if (seen && !printed && length(current)>0) print current }
   ' "$file"
 }
 
 run_all() {
-  echo "Running in docker: go test ./..."
-  docker_exec "cd /app && GOFLAGS= go test -count=1 ./..."
+  echo "Running in docker: go test -p 1 -v ./..."
+  docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v ./..."
 }
 
 run_file() {
-  local file="$1"
-  if [[ "$file" != *_test.go ]]; then
+  file="$1"
+  case "$file" in
+    *_test.go) : ;;
+    *)
     # Not a test file: run the package containing the file
-    local pkg
     pkg=$(pkg_for_path "$file")
-    echo "Running package tests in docker: go test $pkg"
-    docker_exec "cd /app && GOFLAGS= go test -count=1 '$pkg'"
+    echo "Running package tests in docker: go test -p 1 -v $pkg"
+    docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg'"
     return
-  fi
+    ;;
+  esac
 
   # Test file: try to run only tests in this file
-  local tests regex pkg
-  mapfile -t tests < <(extract_tests_in_file "$file") || true
   pkg=$(pkg_for_path "$file")
-
-  if [ ${#tests[@]} -eq 0 ]; then
+  tests_list=$(extract_tests_in_file "$file" || true)
+  if [ -z "${tests_list:-}" ]; then
     echo "No tests found in $file; running package in docker: $pkg"
-    docker_exec "cd /app && GOFLAGS= go test -count=1 '$pkg'"
+    docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg'"
     return
   fi
 
-  regex="^($(IFS='|'; echo "${tests[*]}")$)"
+  # Join test names with | to build regex
+  regex="^($(printf '%s' "$tests_list" | paste -sd '|' -))$"
   echo "Running tests in file: $file"
-  echo "docker exec: go test $pkg -run '$regex'"
-  docker_exec "cd /app && GOFLAGS= go test -count=1 '$pkg' -run '$regex'"
+  echo "docker exec: go test -p 1 -v $pkg -run $regex"
+  docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg' -run '$regex'"
 }
 
 run_line() {
-  local file="$1"; local line="$2"
-  local pkg test
+  file="$1"; line="$2"
   pkg=$(pkg_for_path "$file")
 
-  if [[ "$file" != *_test.go ]]; then
+  case "$file" in
+    *_test.go) : ;;
+    *)
     echo "File is not a test file; running package in docker: $pkg"
-    docker_exec "cd /app && GOFLAGS= go test -count=1 '$pkg'"
+    docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg'"
     return
-  fi
+    ;;
+  esac
 
-  test=$(test_name_for_line "$file" "$line" || true)
-  if [ -z "$test" ]; then
+  test_name=$(test_name_for_line "$file" "$line" || true)
+  if [ -z "${test_name:-}" ]; then
     echo "No enclosing test found at $file:$line; running tests in file"
     run_file "$file"
     return
   fi
 
-  echo "Running single test in docker: $test in $pkg"
-  docker_exec "cd /app && GOFLAGS= go test -count=1 '$pkg' -run '^$test$'"
+  docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg' -run '^$test_name$'"
 }
 
 case "$MODE" in
