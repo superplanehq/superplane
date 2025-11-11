@@ -426,21 +426,7 @@ message EventCreated {
   google.protobuf.Timestamp timestamp = 4;
 }
 
-message ExecutionCreated {
-  string id = 1;
-  string workflow_id = 2;
-  string node_id = 3;
-  google.protobuf.Timestamp timestamp = 4;
-}
-
-message ExecutionStarted {
-  string id = 1;
-  string workflow_id = 2;
-  string node_id = 3;
-  google.protobuf.Timestamp timestamp = 4;
-}
-
-message ExecutionFinished {
+message ExecutionUpdated {
   string id = 1;
   string workflow_id = 2;
   string node_id = 3;
