@@ -373,10 +373,6 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handlePushThrough = (executionId: string) => {
     if (state.componentSidebar.selectedNodeId && props.onPushThrough) {
-      console.log("Selected Node ID:", state.componentSidebar.selectedNodeId);
-      console.log("Execution ID:", executionId);
-      console.log(props.onPushThrough);
-
       props.onPushThrough(state.componentSidebar.selectedNodeId, executionId);
     }
   };

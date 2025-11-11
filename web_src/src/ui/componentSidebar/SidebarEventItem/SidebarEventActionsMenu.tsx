@@ -26,8 +26,9 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   const isWaiting = eventState === "waiting";
 
   const showPushThrough = supportsPushThrough && !!executionId && !(isProcessed || isDiscarded || isWaiting);
-  const showCancel = !(isProcessed || isDiscarded);
+  const showCancel = isWaiting;
   const showReEmit = isProcessed || isDiscarded;
+  console.log(eventState);
 
   const handleReEmit = React.useCallback(
     (e: React.MouseEvent) => {

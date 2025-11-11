@@ -28,7 +28,7 @@ export function usePushThroughHandler({ workflowId, organizationId, workflow }: 
             path: {
               workflowId,
               executionId,
-              actionName: "passThrough",
+              actionName: "pushThrough",
             },
             body: { parameters: {} },
           }),
