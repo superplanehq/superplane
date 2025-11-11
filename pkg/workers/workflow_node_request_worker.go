@@ -12,6 +12,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
@@ -55,6 +56,10 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 
 					if err := w.LockAndProcessRequest(request); err != nil {
 						w.log("Error processing request %s: %v", request.ID, err)
+					}
+
+					if request.ExecutionID != nil {
+						messages.NewWorkflowExecutionFinishedMessage(request.WorkflowID.String(), request.ExecutionID.String(), request.NodeID).Publish()
 					}
 				}(request)
 			}

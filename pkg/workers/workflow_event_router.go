@@ -54,6 +54,7 @@ func (w *WorkflowEventRouter) Start(ctx context.Context) {
 					if err := w.LockAndProcessEvent(logger, event); err != nil {
 						w.logger.Errorf("Error processing event %s: %v", event.ID, err)
 					}
+					messages.NewWorkflowEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
 				}(event)
 			}
 		}
@@ -312,13 +313,10 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 		}
 	}
 
-	events, err := parentExecution.PassInTransaction(tx, outputs)
+	_, err = parentExecution.PassInTransaction(tx, outputs)
 	if err != nil {
 		return err
 	}
-
-	messages.NewWorkflowExecutionFinishedMessage(parentExecution.WorkflowID.String(), parentExecution).PublishWithDelay(1 * time.Second)
-	messages.PublishManyWorkflowEventsWithDelay(parentExecution.WorkflowID.String(), events, 1*time.Second)
 
 	logger.Infof("Parent execution completed")
 	return event.RoutedInTransaction(tx)
