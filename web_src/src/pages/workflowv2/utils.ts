@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
+  ComponentsNode,
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowNodeExecution,
-  ComponentsNode,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { SidebarEvent } from "@/ui/CanvasPage";
-import { getTriggerRenderer } from "./renderers";
 import { formatTimeAgo } from "@/utils/date";
+import { getTriggerRenderer } from "./renderers";
 
 export function mapTriggerEventsToSidebarEvents(
   events: WorkflowsWorkflowEvent[],
@@ -28,6 +28,8 @@ export function mapTriggerEventsToSidebarEvents(
       isOpen: false,
       receivedAt: event.createdAt ? new Date(event.createdAt) : undefined,
       values,
+      triggerEventId: event.id!,
+      kind: "trigger",
     };
   });
 }
@@ -44,7 +46,9 @@ export function mapExecutionsToSidebarEvents(
         ? ("processed" as const)
         : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
           ? ("discarded" as const)
-          : ("waiting" as const);
+          : execution.state === "STATE_STARTED"
+            ? ("running" as const)
+            : ("waiting" as const);
 
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
@@ -66,6 +70,8 @@ export function mapExecutionsToSidebarEvents(
       isOpen: false,
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
       values,
+      executionId: execution.id!,
+      kind: "execution",
     };
   });
 }
@@ -101,6 +107,7 @@ export function mapQueueItemsToSidebarEvents(
       state: "waiting" as const,
       isOpen: false,
       receivedAt: item.createdAt ? new Date(item.createdAt) : undefined,
+      kind: "queue",
     };
   });
 }

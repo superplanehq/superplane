@@ -35,6 +35,10 @@ export interface SidebarEvent {
   isOpen: boolean;
   receivedAt?: Date;
   values?: Record<string, string>;
+  // Optional specific identifiers to avoid overloading `id`
+  executionId?: string;
+  triggerEventId?: string;
+  kind?: "execution" | "trigger" | "queue";
 }
 
 export interface SidebarData {
@@ -118,6 +122,8 @@ export interface CanvasPageProps {
   onEdgeDelete?: (edgeIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
+  onPushThrough?: (nodeId: string, executionId: string) => void;
+  supportsPushThrough?: (nodeId: string) => boolean;
   onDirty?: () => void;
 
   onRun?: (nodeId: string, channel: string, data: any) => void | Promise<void>;
@@ -365,6 +371,22 @@ function CanvasPage(props: CanvasPageProps) {
     [state.toggleNodeCollapse, props.onToggleView],
   );
 
+  const handlePushThrough = (executionId: string) => {
+    if (state.componentSidebar.selectedNodeId && props.onPushThrough) {
+      console.log("Selected Node ID:", state.componentSidebar.selectedNodeId);
+      console.log("Execution ID:", executionId);
+      console.log(props.onPushThrough);
+
+      props.onPushThrough(state.componentSidebar.selectedNodeId, executionId);
+    }
+  };
+
+  const handleCancelQueueItem = (queueId: string) => {
+    if (state.componentSidebar.selectedNodeId && props.onCancelQueueItem) {
+      props.onCancelQueueItem!(state.componentSidebar.selectedNodeId!, queueId);
+    }
+  };
+
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
@@ -427,11 +449,9 @@ function CanvasPage(props: CanvasPageProps) {
             getSidebarData={props.getSidebarData}
             loadSidebarData={props.loadSidebarData}
             getTabData={props.getTabData}
-            onCancelQueueItem={
-              props.onCancelQueueItem && state.componentSidebar.selectedNodeId
-                ? (id) => props.onCancelQueueItem!(state.componentSidebar.selectedNodeId!, id)
-                : undefined
-            }
+            onCancelQueueItem={handleCancelQueueItem}
+            onPushThrough={handlePushThrough}
+            supportsPushThrough={props.supportsPushThrough}
             onRun={handleNodeRun}
             onDuplicate={props.onDuplicate}
             onDocs={props.onDocs}
@@ -507,6 +527,8 @@ function Sidebar({
   loadSidebarData,
   getTabData,
   onCancelQueueItem,
+  onPushThrough,
+  supportsPushThrough,
   onRun,
   onDuplicate,
   onDocs,
@@ -530,6 +552,8 @@ function Sidebar({
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   onCancelQueueItem?: (id: string) => void;
+  onPushThrough?: (executionId: string) => void;
+  supportsPushThrough?: (nodeId: string) => boolean;
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
@@ -617,6 +641,8 @@ function Sidebar({
           : undefined
       }
       onCancelQueueItem={onCancelQueueItem}
+      onPushThrough={onPushThrough}
+      supportsPushThrough={supportsPushThrough?.(state.componentSidebar.selectedNodeId!)}
       onEventClick={(event) => {
         setLatestEvents((prev) => {
           return prev.map((e) => {

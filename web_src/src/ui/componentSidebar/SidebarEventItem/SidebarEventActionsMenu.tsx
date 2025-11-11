@@ -1,20 +1,71 @@
-import React from "react";
 import { resolveIcon } from "@/lib/utils";
-import { EllipsisVertical } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { EllipsisVertical } from "lucide-react";
+import React from "react";
 import type { ChildEventsState } from "../../composite";
 
 interface SidebarEventActionsMenuProps {
   eventId: string;
+  executionId?: string;
   onCancelQueueItem?: (id: string) => void;
+  onPushThrough?: (executionId: string) => void;
+  supportsPushThrough?: boolean;
   eventState: ChildEventsState;
 }
 
 export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = ({
   eventId,
+  executionId,
   onCancelQueueItem,
+  onPushThrough,
+  supportsPushThrough,
   eventState,
 }) => {
+  const isProcessed = eventState === "processed";
+  const isDiscarded = eventState === "discarded";
+  const isWaiting = eventState === "waiting";
+
+  const showPushThrough = supportsPushThrough && !!executionId && !(isProcessed || isDiscarded || isWaiting);
+  const showCancel = !(isProcessed || isDiscarded);
+  const showReEmit = isProcessed || isDiscarded;
+
+  const handleReEmit = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+
+      // Implement re-emit logic here
+      // TODO: Add re-emit handler prop if needed
+    },
+    [eventId],
+  );
+
+  const handlePushThrough = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+
+      if (!executionId) {
+        console.warn("No executionId provided for push-through action");
+        return;
+      }
+
+      if (onPushThrough) {
+        onPushThrough(executionId);
+      }
+    },
+    [onPushThrough, executionId, eventId],
+  );
+
+  const handleCancelQueueItem = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+
+      if (onCancelQueueItem) {
+        onCancelQueueItem(eventId);
+      }
+    },
+    [onCancelQueueItem, eventId],
+  );
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -26,42 +77,24 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
           <EllipsisVertical size={16} />
         </button>
       </DropdownMenuTrigger>
+
       <DropdownMenuContent align="end" sideOffset={6} className="min-w-[11rem]">
-        {/* Cancel when not finished (queued or running) */}
-        {!(eventState === "processed" || eventState === "discarded") && (
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-              onCancelQueueItem?.(eventId);
-            }}
-            className="gap-2"
-          >
+        {showCancel && (
+          <DropdownMenuItem onClick={handleCancelQueueItem} className="gap-2">
             {React.createElement(resolveIcon("x-circle"), { size: 16 })}
             Cancel
           </DropdownMenuItem>
         )}
 
-        {/* Push Through only when running (not finished and not queued) */}
-        {!(eventState === "processed" || eventState === "discarded" || eventState === "waiting") && (
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            className="gap-2"
-          >
-            {React.createElement(resolveIcon("chevrons-right"), { size: 16 })}
+        {showPushThrough && (
+          <DropdownMenuItem onClick={handlePushThrough} className="gap-2">
+            {React.createElement(resolveIcon("fast-forward"), { size: 16 })}
             Push Through
           </DropdownMenuItem>
         )}
 
-        {/* Re-emit for finished or running; not for queued */}
-        {eventState !== "waiting" && (
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            className="gap-2"
-          >
+        {showReEmit && (
+          <DropdownMenuItem onClick={handleReEmit} className="gap-2">
             {React.createElement(resolveIcon("rotate-ccw"), { size: 16 })}
             Re-emit
           </DropdownMenuItem>

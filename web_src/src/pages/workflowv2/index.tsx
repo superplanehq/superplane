@@ -25,7 +25,9 @@ import {
 import { organizationKeys, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
+import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useQueueHistory } from "@/hooks/useQueueHistory";
 import {
   eventExecutionsQueryOptions,
   nodeEventsQueryOptions,
@@ -49,6 +51,7 @@ import {
   SidebarData,
   SidebarEvent,
 } from "@/ui/CanvasPage";
+import { EventState } from "@/ui/componentBase";
 import { ChainExecutionState, TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
@@ -58,10 +61,8 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
-import { useNodeHistory } from "@/hooks/useNodeHistory";
-import { useQueueHistory } from "@/hooks/useQueueHistory";
+import { usePushThroughHandler } from "./usePushThroughHandler";
 import { mapExecutionsToSidebarEvents, mapQueueItemsToSidebarEvents, mapTriggerEventsToSidebarEvents } from "./utils";
-import { EventState } from "@/ui/componentBase";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -1175,6 +1176,13 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, updateWorkflowMutation],
   );
 
+  // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
+  const { onPushThrough, supportsPushThrough } = usePushThroughHandler({
+    workflowId: workflowId!,
+    organizationId,
+    workflow,
+  });
+
   // Show loading indicator while data is being fetched
   if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
     return (
@@ -1198,7 +1206,7 @@ export function WorkflowPageV2() {
       // Persist right sidebar in query params
       initialSidebar={{
         isOpen: searchParams.get("sidebar") === "1",
-        nodeId: searchParams.get("node") || undefined,
+        nodeId: searchParams.get("node") || null,
       }}
       onSidebarChange={(open, nodeId) => {
         const next = new URLSearchParams(searchParams);
@@ -1256,6 +1264,8 @@ export function WorkflowPageV2() {
       runDisabled={hasRunBlockingChanges}
       runDisabledTooltip={hasRunBlockingChanges ? "Save canvas changes before running" : undefined}
       onCancelQueueItem={onCancelQueueItem}
+      onPushThrough={onPushThrough}
+      supportsPushThrough={supportsPushThrough}
       getAllHistoryEvents={getAllHistoryEvents}
       onLoadMoreHistory={handleLoadMoreHistory}
       getHasMoreHistory={getHasMoreHistory}

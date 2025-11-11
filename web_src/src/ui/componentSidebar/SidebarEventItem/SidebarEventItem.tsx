@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon } from "@/lib/utils";
-import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { SidebarEvent } from "../types";
+import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 
 export enum ChainExecutionState {
   COMPLETED = "completed",
@@ -32,6 +32,8 @@ interface SidebarEventItemProps {
   onEventClick?: (event: SidebarEvent) => void;
   tabData?: TabData;
   onCancelQueueItem?: (id: string) => void;
+  onPushThrough?: (executionId: string) => void;
+  supportsPushThrough?: boolean;
 }
 
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
@@ -43,6 +45,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   onEventClick,
   tabData,
   onCancelQueueItem,
+  onPushThrough,
+  supportsPushThrough,
 }) => {
   // Determine default active tab based on available data
   const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" | "executionChain" => {
@@ -162,9 +166,17 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         {event.subtitle && (
           <span className="text-sm text-gray-500 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
         )}
-        {/* Actions dropdown */}
-        <SidebarEventActionsMenu eventId={event.id} onCancelQueueItem={onCancelQueueItem} eventState={event.state} />
+
+        <SidebarEventActionsMenu
+          eventId={event.id}
+          executionId={event.executionId}
+          onCancelQueueItem={onCancelQueueItem}
+          onPushThrough={onPushThrough}
+          supportsPushThrough={supportsPushThrough}
+          eventState={event.state}
+        />
       </div>
+
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
         <div className="rounded-sm bg-white border-1 border-gray-800 text-gray-500 w-full">
           {/* Tab Navigation */}
