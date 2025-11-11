@@ -58,7 +58,9 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 						w.log("Error processing request %s: %v", request.ID, err)
 					}
 
-					messages.NewWorkflowExecutionFinishedMessage(request.WorkflowID.String(), request.ExecutionID.String(), request.NodeID).Publish()
+					if request.ExecutionID != nil {
+						messages.NewWorkflowExecutionFinishedMessage(request.WorkflowID.String(), request.ExecutionID.String(), request.NodeID).Publish()
+					}
 				}(request)
 			}
 		}
