@@ -22,26 +22,26 @@ blocks:
           - make test.setup
           - make test.start
       jobs:
-        - name: "Test"
-          commands:
-            - make test
-
         - name: "Lint"
           commands:
             - make lint
 
-        - name: "Validate DB structure"
+        - name: "Unit Tests"
           commands:
-            - make check.db.structure
-
-        - name: "Go Format Check"
-          commands:
-            - make format.go.check
+            - make test
 
         - name: "E2E Tests"
           commands:
             - make test.e2e.setup
             - make test.e2e
+
+        - name: "Check: DB structure"
+          commands:
+            - make check.db.structure
+
+        - name: "Check: Go Format"
+          commands:
+            - make format.go.check
 
       epilogue:
         always:
