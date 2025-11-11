@@ -17,10 +17,12 @@ export interface ComponentBaseSpecValue {
   badges: SpecBadge[];
 }
 
+export type EventState = "success" | "failed" | "neutral" | "next-in-queue" | "running";
+
 export interface EventSection {
   title: string;
   receivedAt?: Date;
-  eventState?: "success" | "failed" | "neutral" | "next-in-queue" | "running";
+  eventState?: EventState;
   eventTitle?: string;
   eventSubtitle?: string;
   handleComponent?: React.ReactNode;
