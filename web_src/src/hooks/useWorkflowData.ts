@@ -407,7 +407,7 @@ export const useInfiniteNodeEvents = (workflowId: string, nodeId: string, enable
     getNextPageParam: (lastPage, allPages) => {
       const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.events?.length || 0), 0);
       const totalCount = lastPage?.totalCount || 0;
-      
+
       if (currentLoadedCount >= totalCount) return undefined;
 
       if (lastPage?.events && lastPage.events.length > 0) {
@@ -443,7 +443,7 @@ export const useInfiniteNodeExecutions = (workflowId: string, nodeId: string, en
     getNextPageParam: (lastPage, allPages) => {
       const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.executions?.length || 0), 0);
       const totalCount = lastPage?.totalCount || 0;
-      
+
       if (currentLoadedCount >= totalCount) return undefined;
 
       if (lastPage?.executions && lastPage.executions.length > 0) {
@@ -479,7 +479,7 @@ export const useInfiniteNodeQueueItems = (workflowId: string, nodeId: string, en
     getNextPageParam: (lastPage, allPages) => {
       const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.items?.length || 0), 0);
       const totalCount = lastPage?.totalCount || 0;
-      
+
       if (currentLoadedCount >= totalCount) return undefined;
 
       if (lastPage?.items && lastPage.items.length > 0) {

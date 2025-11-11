@@ -26,10 +26,14 @@ export const useNodeHistory = ({ workflowId, nodeId, nodeType, allNodes, enabled
     if (!node) return [];
 
     if (isTriggerNode) {
-      const allEvents = eventsQuery.data?.pages.flatMap((page) => (page as WorkflowsListNodeEventsResponse)?.events || []) || [];
+      const allEvents =
+        eventsQuery.data?.pages.flatMap((page) => (page as WorkflowsListNodeEventsResponse)?.events || []) || [];
       return mapTriggerEventsToSidebarEvents(allEvents, node);
     } else {
-      const allExecutions = executionsQuery.data?.pages.flatMap((page) => (page as WorkflowsListNodeExecutionsResponse)?.executions || []) || [];
+      const allExecutions =
+        executionsQuery.data?.pages.flatMap(
+          (page) => (page as WorkflowsListNodeExecutionsResponse)?.executions || [],
+        ) || [];
       return mapExecutionsToSidebarEvents(allExecutions, allNodes);
     }
   }, [enabled, allNodes, nodeId, isTriggerNode, eventsQuery.data, executionsQuery.data]);
@@ -42,8 +46,14 @@ export const useNodeHistory = ({ workflowId, nodeId, nodeType, allNodes, enabled
     }
   }, [isTriggerNode, eventsQuery, executionsQuery]);
 
-  const hasMoreHistory = useMemo(() => isTriggerNode ? eventsQuery.hasNextPage : executionsQuery.hasNextPage, [isTriggerNode, eventsQuery.hasNextPage, executionsQuery.hasNextPage]);
-  const isLoadingMore = useMemo(() => isTriggerNode ? eventsQuery.isFetchingNextPage : executionsQuery.isFetchingNextPage, [isTriggerNode, eventsQuery.isFetchingNextPage, executionsQuery.isFetchingNextPage]);
+  const hasMoreHistory = useMemo(
+    () => (isTriggerNode ? eventsQuery.hasNextPage : executionsQuery.hasNextPage),
+    [isTriggerNode, eventsQuery.hasNextPage, executionsQuery.hasNextPage],
+  );
+  const isLoadingMore = useMemo(
+    () => (isTriggerNode ? eventsQuery.isFetchingNextPage : executionsQuery.isFetchingNextPage),
+    [isTriggerNode, eventsQuery.isFetchingNextPage, executionsQuery.isFetchingNextPage],
+  );
 
   return {
     getAllHistoryEvents,

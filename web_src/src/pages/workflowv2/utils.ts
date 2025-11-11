@@ -1,10 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { WorkflowsWorkflowEvent, WorkflowsWorkflowNodeExecution, ComponentsNode, WorkflowsWorkflowNodeQueueItem } from "@/api-client";
+import {
+  WorkflowsWorkflowEvent,
+  WorkflowsWorkflowNodeExecution,
+  ComponentsNode,
+  WorkflowsWorkflowNodeQueueItem,
+} from "@/api-client";
 import { SidebarEvent } from "@/ui/CanvasPage";
 import { getTriggerRenderer } from "./renderers";
 import { formatTimeAgo } from "@/utils/date";
 
-export function mapTriggerEventsToSidebarEvents(events: WorkflowsWorkflowEvent[], node: ComponentsNode, limit?: number): SidebarEvent[] {
+export function mapTriggerEventsToSidebarEvents(
+  events: WorkflowsWorkflowEvent[],
+  node: ComponentsNode,
+  limit?: number,
+): SidebarEvent[] {
   const eventsToMap = limit ? events.slice(0, limit) : events;
   return eventsToMap.map((event) => {
     const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
@@ -23,7 +32,11 @@ export function mapTriggerEventsToSidebarEvents(events: WorkflowsWorkflowEvent[]
   });
 }
 
-export function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution[], nodes: ComponentsNode[], limit?: number): SidebarEvent[] {
+export function mapExecutionsToSidebarEvents(
+  executions: WorkflowsWorkflowNodeExecution[],
+  nodes: ComponentsNode[],
+  limit?: number,
+): SidebarEvent[] {
   const executionsToMap = limit ? executions.slice(0, limit) : executions;
   return executionsToMap.map((execution) => {
     const state =
@@ -57,7 +70,11 @@ export function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeEx
   });
 }
 
-export function mapQueueItemsToSidebarEvents(queueItems: WorkflowsWorkflowNodeQueueItem[], nodes: ComponentsNode[], limit?: number): SidebarEvent[] {
+export function mapQueueItemsToSidebarEvents(
+  queueItems: WorkflowsWorkflowNodeQueueItem[],
+  nodes: ComponentsNode[],
+  limit?: number,
+): SidebarEvent[] {
   const queueItemsToMap = limit ? queueItems.slice(0, limit) : queueItems;
   return queueItemsToMap.map((item) => {
     const anyItem = item as any;

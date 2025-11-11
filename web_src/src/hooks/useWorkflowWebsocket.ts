@@ -7,7 +7,11 @@ import { workflowKeys } from "./useWorkflowData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
 
-export function useWorkflowWebsocket(workflowId: string, organizationId: string, onNodeEvent?: (nodeId: string, event: string) => void): void {
+export function useWorkflowWebsocket(
+  workflowId: string,
+  organizationId: string,
+  onNodeEvent?: (nodeId: string, event: string) => void,
+): void {
   const nodeExecutionStore = useNodeExecutionStore();
   const queryClient = useQueryClient();
 
