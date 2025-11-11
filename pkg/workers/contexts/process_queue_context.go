@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -76,7 +75,6 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 			return uuid.Nil, err
 		}
 
-		messages.NewWorkflowExecutionCreatedMessage(execution.WorkflowID.String(), &execution).PublishWithDelay(1 * time.Second)
 		return execution.ID, nil
 	}
 
@@ -185,7 +183,6 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		}
 
 		exec.PassInTransaction(tx, outputs)
-		messages.NewWorkflowExecutionFinishedMessage(exec.WorkflowID.String(), exec).PublishWithDelay(1 * time.Second)
 
 		return nil
 	}

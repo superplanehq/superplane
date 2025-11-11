@@ -57,11 +57,14 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 					continue
 				}
 
+				messages.NewWorkflowExecutionCreatedMessage(execution.WorkflowID.String(), &execution).Publish()
+
 				go func(execution models.WorkflowNodeExecution) {
 					defer w.semaphore.Release(1)
 
 					err := w.LockAndProcessNodeExecution(execution.ID)
 					if err == nil {
+						messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
 						return
 					}
 
@@ -165,24 +168,15 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 			fmt.Sprintf("error building configuration for execution of node %s: %v", firstNode.ID, err),
 		)
 
-		messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution).
-			PublishWithDelay(1 * time.Second)
-
 		return nil
 	}
 
-	createdChildExecution, err := models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)
+	_, err = models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)
 	if err != nil {
 		return fmt.Errorf("failed to create child execution: %w", err)
 	}
 
-	messages.NewWorkflowExecutionCreatedMessage(createdChildExecution.WorkflowID.String(), createdChildExecution).PublishWithDelay(1 * time.Second)
-
 	err = execution.StartInTransaction(tx)
-
-	if err == nil {
-		messages.NewWorkflowExecutionStartedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
-	}
 
 	return err
 }
@@ -199,8 +193,6 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		logger.Errorf("failed to start execution: %v", err)
 		return fmt.Errorf("failed to start execution: %w", err)
 	}
-
-	messages.NewWorkflowExecutionStartedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
 
 	ref := node.Ref.Data()
 	component, err := w.registry.GetComponent(ref.Component.Name)
@@ -236,11 +228,8 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 	if err := component.Execute(ctx); err != nil {
 		logger.Errorf("failed to execute component: %v", err)
 		err = execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, err.Error())
-		messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
 		return err
 	}
-
-	messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
 
 	logger.Info("Component executed successfully")
 
