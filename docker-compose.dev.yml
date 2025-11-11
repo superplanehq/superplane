@@ -23,6 +23,11 @@ services:
       RBAC_MODEL_PATH: "/app/rbac/rbac_model.conf"
       RBAC_ORG_POLICY_PATH: "/app/rbac/rbac_org_policy.csv"
       RBAC_CANVAS_POLICY_PATH: "/app/rbac/rbac_canvas_policy.csv"
+      # Ensure Go build cache initializes in a writable, persisted location
+      # This fixes: "failed to initialize build cache at /.cache/go-build: permission denied"
+      # and keeps the cache across container restarts (since /app is bind-mounted)
+      GOCACHE: "/app/tmp/go-build"
+      XDG_CACHE_HOME: "/app/tmp"
       START_PUBLIC_API: "yes"
       START_INTERNAL_API: "yes"
       START_GRPC_GATEWAY: "yes"
