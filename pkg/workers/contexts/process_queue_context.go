@@ -86,14 +86,18 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		return node.UpdateState(tx, state)
 	}
 
-	ctx.DefaultProcessing = func() error {
-		if _, err := ctx.CreateExecution(); err != nil {
-			return err
+	ctx.DefaultProcessing = func() (*models.WorkflowNodeExecution, error) {
+		execID, err := ctx.CreateExecution()
+		if err != nil {
+			return nil, err
 		}
 		if err := ctx.DequeueItem(); err != nil {
-			return err
+			return nil, err
 		}
-		return ctx.UpdateNodeState(models.WorkflowNodeStateProcessing)
+		if err := ctx.UpdateNodeState(models.WorkflowNodeStateProcessing); err != nil {
+			return nil, err
+		}
+		return models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
 	}
 
 	ctx.GetExecutionMetadata = func(execID uuid.UUID) (map[string]any, error) {
@@ -176,15 +180,15 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		return count, nil
 	}
 
-	ctx.FinishExecution = func(execID uuid.UUID, outputs map[string][]any) error {
+	ctx.FinishExecution = func(execID uuid.UUID, outputs map[string][]any) (*models.WorkflowNodeExecution, error) {
 		exec, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		exec.PassInTransaction(tx, outputs)
 
-		return nil
+		return exec, nil
 	}
 
 	ctx.FindExecutionIDByKV = func(key string, value string) (uuid.UUID, bool, error) {

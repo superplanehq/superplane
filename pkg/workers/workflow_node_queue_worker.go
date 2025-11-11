@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -66,25 +67,37 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 }
 
 func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.WorkflowNode) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	var exec *models.WorkflowNodeExecution
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		n, err := models.LockWorkflowNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
 			logger.Info("Node already being processed - skipping")
 			return nil
 		}
 
-		return w.processNode(tx, logger, n)
+		exec, err = w.processNode(tx, logger, n)
+		return err
 	})
+
+	if err == nil && exec != nil {
+		messages.NewWorkflowExecutionFinishedMessage(
+			exec.WorkflowID.String(),
+			exec.ID.String(),
+			exec.NodeID,
+		).Publish()
+	}
+
+	return err
 }
 
-func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.WorkflowNode) error {
+func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.WorkflowNode) (*models.WorkflowNodeExecution, error) {
 	queueItem, err := node.FirstQueueItem(tx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
+			return nil, nil
 		}
 
-		return err
+		return nil, err
 	}
 
 	logger = logging.ForQueueItem(logger, *queueItem)
@@ -92,7 +105,7 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 
 	ctx, err := contexts.BuildProcessQueueContext(tx, node, queueItem)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	switch node.Type {
@@ -109,20 +122,20 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 		 */
 		return ctx.DefaultProcessing()
 	default:
-		return fmt.Errorf("unsupported node type: %s", node.Type)
+		return nil, fmt.Errorf("unsupported node type: %s", node.Type)
 	}
 }
 
-func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *components.ProcessQueueContext, node *models.WorkflowNode) error {
+func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *components.ProcessQueueContext, node *models.WorkflowNode) (*models.WorkflowNodeExecution, error) {
 	ref := node.Ref.Data()
 
 	if ref.Component == nil || ref.Component.Name == "" {
-		return fmt.Errorf("node %s has no component reference", node.NodeID)
+		return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
 	}
 
 	comp, err := w.registry.GetComponent(ref.Component.Name)
 	if err != nil {
-		return fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
 	}
 
 	return comp.ProcessQueueItem(*ctx)
