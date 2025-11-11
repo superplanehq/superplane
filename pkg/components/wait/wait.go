@@ -118,7 +118,7 @@ func (w *Wait) Actions() []components.Action {
 			Name: "timeReached",
 		},
 		{
-			Name:           "passThrough",
+			Name:           "pushThrough",
 			Description:    "Push Through",
 			UserAccessible: true,
 		},
@@ -128,17 +128,35 @@ func (w *Wait) Actions() []components.Action {
 func (w *Wait) HandleAction(ctx components.ActionContext) error {
 	switch ctx.Name {
 	case "timeReached":
-		return ctx.ExecutionStateContext.Pass(map[string][]any{
-			components.DefaultOutputChannel.Name: {map[string]any{}},
-		})
-	case "passThrough":
-		return ctx.ExecutionStateContext.Pass(map[string][]any{
-			components.DefaultOutputChannel.Name: {map[string]any{}},
-		})
+		return w.HandleTimeReached(ctx)
+	case "pushThrough":
+		return w.HandlePushThrough(ctx)
 
 	default:
 		return fmt.Errorf("unknown action: %s", ctx.Name)
 	}
+}
+
+func (w *Wait) HandleTimeReached(ctx components.ActionContext) error {
+	if ctx.ExecutionStateContext.IsFinished() {
+		// already handled, for example via "pushThrough" action
+		return nil
+	}
+
+	return ctx.ExecutionStateContext.Pass(map[string][]any{
+		components.DefaultOutputChannel.Name: {map[string]any{}},
+	})
+}
+
+func (w *Wait) HandlePushThrough(ctx components.ActionContext) error {
+	if ctx.ExecutionStateContext.IsFinished() {
+		// already handled, for example via "timeReached" action
+		return nil
+	}
+
+	return ctx.ExecutionStateContext.Pass(map[string][]any{
+		components.DefaultOutputChannel.Name: {map[string]any{}},
+	})
 }
 
 func (w *Wait) Setup(ctx components.SetupContext) error {

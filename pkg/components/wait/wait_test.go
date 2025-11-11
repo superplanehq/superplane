@@ -26,12 +26,12 @@ func (m *mockExecutionStateContext) Fail(reason, message string) error {
 	return nil
 }
 
-func TestWait_HandleAction_PassThrough(t *testing.T) {
+func TestWait_HandleAction_PushThrough(t *testing.T) {
 	w := &Wait{}
 
 	mockState := &mockExecutionStateContext{}
 	ctx := components.ActionContext{
-		Name:                  "passThrough",
+		Name:                  "pushThrough",
 		ExecutionStateContext: mockState,
 		MetadataContext:       nil,
 		Configuration:         nil,

@@ -82,20 +82,23 @@ func TestTimeGate_Configuration(t *testing.T) {
 func TestTimeGate_Actions(t *testing.T) {
 	tg := &TimeGate{}
 	actions := tg.Actions()
+
 	if len(actions) < 2 {
 		t.Fatalf("expected at least 2 actions, got %d: %+v", len(actions), actions)
 	}
-	var hasTimeReached, hasPassThrough bool
+
+	var hasTimeReached, hasPushThrough bool
 	for _, a := range actions {
 		if a.Name == "timeReached" {
 			hasTimeReached = true
 		}
-		if a.Name == "passThrough" {
-			hasPassThrough = true
+		if a.Name == "pushThrough" {
+			hasPushThrough = true
 		}
 	}
+
 	assert.True(t, hasTimeReached)
-	assert.True(t, hasPassThrough)
+	assert.True(t, hasPushThrough)
 }
 
 // High-signal tests for action handling behavior
@@ -117,12 +120,12 @@ func (m *actionMockExecutionStateContext) Fail(reason, message string) error {
 	return nil
 }
 
-func TestTimeGate_HandleAction_PassThrough_Finishes(t *testing.T) {
+func TestTimeGate_HandleAction_PushThrough_Finishes(t *testing.T) {
 	tg := &TimeGate{}
 
 	mockState := &actionMockExecutionStateContext{}
 	ctx := components.ActionContext{
-		Name:                  "passThrough",
+		Name:                  "pushThrough",
 		ExecutionStateContext: mockState,
 		Parameters:            map[string]any{},
 	}
