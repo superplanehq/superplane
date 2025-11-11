@@ -21,9 +21,9 @@ type WorkflowNodeExecutionResult string
 
 // List of WorkflowNodeExecutionResult
 const (
-	WORKFLOWNODEEXECUTIONRESULT_RESULT_UNKNOWN   WorkflowNodeExecutionResult = "RESULT_UNKNOWN"
-	WORKFLOWNODEEXECUTIONRESULT_RESULT_PASSED    WorkflowNodeExecutionResult = "RESULT_PASSED"
-	WORKFLOWNODEEXECUTIONRESULT_RESULT_FAILED    WorkflowNodeExecutionResult = "RESULT_FAILED"
+	WORKFLOWNODEEXECUTIONRESULT_RESULT_UNKNOWN WorkflowNodeExecutionResult = "RESULT_UNKNOWN"
+	WORKFLOWNODEEXECUTIONRESULT_RESULT_PASSED WorkflowNodeExecutionResult = "RESULT_PASSED"
+	WORKFLOWNODEEXECUTIONRESULT_RESULT_FAILED WorkflowNodeExecutionResult = "RESULT_FAILED"
 	WORKFLOWNODEEXECUTIONRESULT_RESULT_CANCELLED WorkflowNodeExecutionResult = "RESULT_CANCELLED"
 )
 
@@ -113,3 +113,4 @@ func (v *NullableWorkflowNodeExecutionResult) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+

@@ -21,7 +21,7 @@ var _ MappedNullable = &SecretsSecretSpec{}
 // SecretsSecretSpec struct for SecretsSecretSpec
 type SecretsSecretSpec struct {
 	Provider *SecretProvider `json:"provider,omitempty"`
-	Local    *SecretLocal    `json:"local,omitempty"`
+	Local *SecretLocal `json:"local,omitempty"`
 }
 
 // NewSecretsSecretSpec instantiates a new SecretsSecretSpec object
@@ -110,7 +110,7 @@ func (o *SecretsSecretSpec) SetLocal(v SecretLocal) {
 }
 
 func (o SecretsSecretSpec) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -163,3 +163,5 @@ func (v *NullableSecretsSecretSpec) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

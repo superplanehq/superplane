@@ -152,8 +152,8 @@ gen:
 	$(MAKE) format.go
 	$(MAKE) format.js
 
-MODULES := authorization,organizations,secrets,integrations,canvases,users,groups,roles,me,configuration,components,triggers,blueprints,workflows
-REST_API_MODULES := authorization,organizations,secrets,integrations,canvases,users,groups,roles,me,configuration,components,triggers,blueprints,workflows
+MODULES := authorization,organizations,secrets,integrations,applications,canvases,users,groups,roles,me,configuration,components,triggers,blueprints,workflows
+REST_API_MODULES := authorization,organizations,secrets,integrations,applications,canvases,users,groups,roles,me,configuration,components,triggers,blueprints,workflows
 pb.gen:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)

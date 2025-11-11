@@ -20,16 +20,16 @@ var _ MappedNullable = &ConfigurationTypeOptions{}
 
 // ConfigurationTypeOptions struct for ConfigurationTypeOptions
 type ConfigurationTypeOptions struct {
-	Number      *ConfigurationNumberTypeOptions      `json:"number,omitempty"`
-	Select      *ConfigurationSelectTypeOptions      `json:"select,omitempty"`
+	Number *ConfigurationNumberTypeOptions `json:"number,omitempty"`
+	Select *ConfigurationSelectTypeOptions `json:"select,omitempty"`
 	MultiSelect *ConfigurationMultiSelectTypeOptions `json:"multiSelect,omitempty"`
 	Integration *ConfigurationIntegrationTypeOptions `json:"integration,omitempty"`
-	List        *ConfigurationListTypeOptions        `json:"list,omitempty"`
-	Object      *ConfigurationObjectTypeOptions      `json:"object,omitempty"`
-	Resource    *ConfigurationResourceTypeOptions    `json:"resource,omitempty"`
-	Time        *ConfigurationTimeTypeOptions        `json:"time,omitempty"`
-	Date        *ConfigurationDateTypeOptions        `json:"date,omitempty"`
-	Datetime    *ConfigurationDateTimeTypeOptions    `json:"datetime,omitempty"`
+	List *ConfigurationListTypeOptions `json:"list,omitempty"`
+	Object *ConfigurationObjectTypeOptions `json:"object,omitempty"`
+	Resource *ConfigurationResourceTypeOptions `json:"resource,omitempty"`
+	Time *ConfigurationTimeTypeOptions `json:"time,omitempty"`
+	Date *ConfigurationDateTypeOptions `json:"date,omitempty"`
+	Datetime *ConfigurationDateTimeTypeOptions `json:"datetime,omitempty"`
 }
 
 // NewConfigurationTypeOptions instantiates a new ConfigurationTypeOptions object
@@ -370,7 +370,7 @@ func (o *ConfigurationTypeOptions) SetDatetime(v ConfigurationDateTimeTypeOption
 }
 
 func (o ConfigurationTypeOptions) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -447,3 +447,5 @@ func (v *NullableConfigurationTypeOptions) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

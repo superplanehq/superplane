@@ -20,6 +20,9 @@
       "name": "Integrations"
     },
     {
+      "name": "Applications"
+    },
+    {
       "name": "Superplane"
     },
     {
@@ -58,6 +61,30 @@
     "application/json"
   ],
   "paths": {
+    "/api/v1/applications": {
+      "get": {
+        "summary": "List available applications",
+        "description": "List available applications",
+        "operationId": "Applications_ListApplications",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneApplicationsListApplicationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Application"
+        ]
+      }
+    },
     "/api/v1/blueprints": {
       "get": {
         "summary": "List blueprints",
@@ -1206,6 +1233,76 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/OrganizationsUpdateOrganizationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/api/v1/organizations/{id}/applications": {
+      "get": {
+        "summary": "List applications in an organization",
+        "description": "Returns a list of applications in an organization",
+        "operationId": "Organizations_ListApplications",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneOrganizationsListApplicationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "post": {
+        "summary": "Install application on organization",
+        "description": "Install an application on an organization",
+        "operationId": "Organizations_InstallApplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsInstallApplicationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsInstallApplicationBody"
             }
           }
         ],
@@ -2684,6 +2781,35 @@
     }
   },
   "definitions": {
+    "ApplicationsApplicationDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationField"
+          }
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsComponent"
+          }
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/TriggersTrigger"
+          }
+        }
+      }
+    },
     "AuthToken": {
       "type": "object",
       "properties": {
@@ -3608,6 +3734,49 @@
         }
       }
     },
+    "OrganizationsAppInstallation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "appName": {
+          "type": "string"
+        },
+        "installationName": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "object"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "browserAction": {
+          "$ref": "#/definitions/OrganizationsBrowserAction"
+        }
+      }
+    },
+    "OrganizationsBrowserAction": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "formFields": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "OrganizationsCreateInvitationBody": {
       "type": "object",
       "properties": {
@@ -3632,6 +3801,28 @@
       "properties": {
         "organization": {
           "$ref": "#/definitions/OrganizationsOrganization"
+        }
+      }
+    },
+    "OrganizationsInstallApplicationBody": {
+      "type": "object",
+      "properties": {
+        "appName": {
+          "type": "string"
+        },
+        "installationName": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "OrganizationsInstallApplicationResponse": {
+      "type": "object",
+      "properties": {
+        "installation": {
+          "$ref": "#/definitions/OrganizationsAppInstallation"
         }
       }
     },
@@ -4024,6 +4215,18 @@
     "SuperplaneAddUserResponse": {
       "type": "object"
     },
+    "SuperplaneApplicationsListApplicationsResponse": {
+      "type": "object",
+      "properties": {
+        "applications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ApplicationsApplicationDefinition"
+          }
+        }
+      }
+    },
     "SuperplaneBlueprintsOutputChannel": {
       "type": "object",
       "properties": {
@@ -4172,6 +4375,18 @@
         },
         "hasToken": {
           "type": "boolean"
+        }
+      }
+    },
+    "SuperplaneOrganizationsListApplicationsResponse": {
+      "type": "object",
+      "properties": {
+        "applications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/OrganizationsAppInstallation"
+          }
         }
       }
     },

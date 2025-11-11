@@ -25,7 +25,7 @@ func Test__HealthCheckEndpoint(t *testing.T) {
 
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", authService, false)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", "", "/app/templates", authService, false)
 	require.NoError(t, err)
 
 	response := execRequest(server, requestParams{
@@ -45,7 +45,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 
 	signer := jwt.NewSigner("test")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", authService, false)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", "", "/app/templates", authService, false)
 	require.NoError(t, err)
 
 	server.RegisterOpenAPIHandler()
@@ -115,7 +115,7 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 
 	signer := jwt.NewSigner("test")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", authService, false)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", "", "/app/templates", authService, false)
 	require.NoError(t, err)
 
 	err = server.RegisterGRPCGateway("localhost:50051")

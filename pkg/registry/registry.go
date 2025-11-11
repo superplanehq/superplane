@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/applications"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -21,9 +22,10 @@ import (
 )
 
 var (
-	registeredComponents = make(map[string]components.Component)
-	registeredTriggers   = make(map[string]triggers.Trigger)
-	mu                   sync.RWMutex
+	registeredComponents   = make(map[string]components.Component)
+	registeredTriggers     = make(map[string]triggers.Trigger)
+	registeredApplications = make(map[string]applications.Application)
+	mu                     sync.RWMutex
 )
 
 func RegisterComponent(name string, c components.Component) {
@@ -38,6 +40,12 @@ func RegisterTrigger(name string, t triggers.Trigger) {
 	registeredTriggers[name] = t
 }
 
+func RegisterIntegration(name string, i applications.Application) {
+	mu.Lock()
+	defer mu.Unlock()
+	registeredApplications[name] = i
+}
+
 type Integration struct {
 	EventHandler       integrations.EventHandler
 	OIDCVerifier       integrations.OIDCVerifier
@@ -48,6 +56,7 @@ type Registry struct {
 	httpClient   *http.Client
 	Encryptor    crypto.Encryptor
 	Integrations map[string]Integration
+	Applications map[string]applications.Application
 	Components   map[string]components.Component
 	Triggers     map[string]triggers.Trigger
 }
@@ -59,6 +68,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 		httpClient:   &http.Client{Timeout: 10 * time.Second},
 		Components:   map[string]components.Component{},
 		Triggers:     map[string]triggers.Trigger{},
+		Applications: map[string]applications.Application{},
 	}
 
 	r.Init()
@@ -83,7 +93,7 @@ func (r *Registry) Init() {
 	}
 
 	//
-	// Copy registered components and triggers
+	// Copy registered integrations, components and triggers
 	//
 	mu.RLock()
 	defer mu.RUnlock()
@@ -94,6 +104,10 @@ func (r *Registry) Init() {
 
 	for name, trigger := range registeredTriggers {
 		r.Triggers[name] = trigger
+	}
+
+	for name, application := range registeredApplications {
+		r.Applications[name] = application
 	}
 }
 
@@ -248,4 +262,26 @@ func (r *Registry) GetComponent(name string) (components.Component, error) {
 	}
 
 	return component, nil
+}
+
+func (r *Registry) GetApplication(name string) (applications.Application, error) {
+	application, ok := r.Applications[name]
+	if !ok {
+		return nil, fmt.Errorf("application %s not registered", name)
+	}
+
+	return application, nil
+}
+
+func (r *Registry) ListApplications() []applications.Application {
+	applications := make([]applications.Application, 0, len(r.Applications))
+	for _, application := range r.Applications {
+		applications = append(applications, application)
+	}
+
+	sort.Slice(applications, func(i, j int) bool {
+		return applications[i].Name() < applications[j].Name()
+	})
+
+	return applications
 }

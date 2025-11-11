@@ -6,15 +6,24 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 type OrganizationService struct {
 	authorizationService authorization.Authorization
+	registry             *registry.Registry
+	baseURL              string
 }
 
-func NewOrganizationService(authorizationService authorization.Authorization) *OrganizationService {
+func NewOrganizationService(
+	authorizationService authorization.Authorization,
+	registry *registry.Registry,
+	baseURL string,
+) *OrganizationService {
 	return &OrganizationService{
 		authorizationService: authorizationService,
+		registry:             registry,
+		baseURL:              baseURL,
 	}
 }
 
@@ -56,4 +65,22 @@ func (s *OrganizationService) RemoveInvitation(ctx context.Context, req *pb.Remo
 func (s *OrganizationService) UpdateInvitation(ctx context.Context, req *pb.UpdateInvitationRequest) (*pb.UpdateInvitationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.UpdateInvitation(ctx, s.authorizationService, orgID, req.InvitationId, req.CanvasIds)
+}
+
+func (s *OrganizationService) ListApplications(ctx context.Context, req *pb.ListApplicationsRequest) (*pb.ListApplicationsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListApplications(ctx, orgID)
+}
+
+func (s *OrganizationService) InstallApplication(ctx context.Context, req *pb.InstallApplicationRequest) (*pb.InstallApplicationResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.InstallApplication(
+		ctx,
+		s.registry,
+		s.baseURL,
+		orgID,
+		req.AppName,
+		req.InstallationName,
+		req.Configuration,
+	)
 }

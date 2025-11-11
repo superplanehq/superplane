@@ -4,6 +4,7 @@ package Superplane.Organizations;
 
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/organizations";
@@ -115,6 +116,64 @@ service Organizations {
       tags: "Organization";
     };
   }
+
+  rpc ListApplications(ListApplicationsRequest) returns (ListApplicationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/applications"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List applications in an organization";
+      description: "Returns a list of applications in an organization";
+      tags: "Organization";
+    };
+  }
+
+  rpc InstallApplication(InstallApplicationRequest) returns (InstallApplicationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/applications"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Install application on organization";
+      description: "Install an application on an organization";
+      tags: "Organization";
+    };
+  }
+}
+
+message ListApplicationsRequest {
+  string id = 1;
+}
+
+message ListApplicationsResponse {
+  repeated AppInstallation applications = 1;
+}
+
+message InstallApplicationRequest {
+  string id = 1;
+  string app_name = 2;
+  string installation_name = 3;
+  google.protobuf.Struct configuration = 4;
+}
+
+message InstallApplicationResponse {
+  AppInstallation installation = 1;
+}
+
+message AppInstallation {
+  string id = 1;
+  string app_name = 2;
+  string installation_name = 3;
+  string state = 4;
+  google.protobuf.Struct configuration = 5;
+  google.protobuf.Struct metadata = 6;
+  BrowserAction browser_action = 7;
+}
+
+message BrowserAction {
+  string url = 1;
+  string method = 2;
+  map<string, string> form_fields = 3;
 }
 
 message Organization {

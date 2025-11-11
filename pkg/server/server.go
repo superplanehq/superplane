@@ -17,7 +17,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/workers"
 
-	// Import components and triggers to register them via init()
+	// Import integrations, components and triggers to register them via init()
+	_ "github.com/superplanehq/superplane/pkg/applications/github"
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
@@ -100,12 +101,12 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	}
 }
 
-func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
+func startInternalAPI(baseURL string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(encryptor, authService, registry, 50051)
+	grpc.RunServer(baseURL, encryptor, authService, registry, 50051)
 }
 
-func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
+func startPublicAPI(baseURL string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	basePath := os.Getenv("PUBLIC_API_BASE_PATH")
@@ -117,7 +118,7 @@ func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwt
 	templateDir := os.Getenv("TEMPLATE_DIR")
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
 
-	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, appEnv, templateDir, authService, blockSignup)
+	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, baseURL, appEnv, templateDir, authService, blockSignup)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}
@@ -223,11 +224,11 @@ func Start() {
 	registry := registry.NewRegistry(encryptorInstance)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
+		go startPublicAPI(baseURL, encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(encryptorInstance, authService, registry)
+		go startInternalAPI(baseURL, encryptorInstance, authService, registry)
 	}
 
 	startWorkers(jwtSigner, encryptorInstance, registry, baseURL)

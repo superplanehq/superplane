@@ -21,9 +21,9 @@ type IntegrationAuthType string
 
 // List of IntegrationAuthType
 const (
-	INTEGRATIONAUTHTYPE_AUTH_TYPE_NONE  IntegrationAuthType = "AUTH_TYPE_NONE"
+	INTEGRATIONAUTHTYPE_AUTH_TYPE_NONE IntegrationAuthType = "AUTH_TYPE_NONE"
 	INTEGRATIONAUTHTYPE_AUTH_TYPE_TOKEN IntegrationAuthType = "AUTH_TYPE_TOKEN"
-	INTEGRATIONAUTHTYPE_AUTH_TYPE_OIDC  IntegrationAuthType = "AUTH_TYPE_OIDC"
+	INTEGRATIONAUTHTYPE_AUTH_TYPE_OIDC IntegrationAuthType = "AUTH_TYPE_OIDC"
 )
 
 // All allowed values of IntegrationAuthType enum
@@ -111,3 +111,4 @@ func (v *NullableIntegrationAuthType) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+

@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/applications"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -26,6 +27,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbApplications "github.com/superplanehq/superplane/pkg/protos/applications"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbSup "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
@@ -65,6 +67,7 @@ type Server struct {
 	upgrader              *websocket.Upgrader
 	Router                *mux.Router
 	BasePath              string
+	BaseURL               string
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
 	isDev                 bool
@@ -81,6 +84,7 @@ func NewServer(
 	jwtSigner *jwt.Signer,
 	oidcVerifier *crypto.OIDCVerifier,
 	basePath string,
+	baseURL string,
 	appEnv string,
 	templateDir string,
 	authorizationService authorization.Authorization,
@@ -94,6 +98,7 @@ func NewServer(
 	authHandler.InitializeProviders(providers)
 
 	server := &Server{
+		BaseURL:               baseURL,
 		BasePath:              basePath,
 		wsHub:                 ws.NewHub(),
 		authHandler:           authHandler,
@@ -187,6 +192,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbApplications.RegisterApplicationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	err = pbSecret.RegisterSecretsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
@@ -232,6 +242,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/applications").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/components").Handler(protectedGRPCHandler)
@@ -368,6 +379,13 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
+	//
+	// HTTP endpoints for app installations
+	// Match all paths under /apps/{installationID}/ including subpaths
+	//
+	r.PathPrefix(s.BasePath+"/apps/{installationID}").HandlerFunc(s.HandleAppInstallationRequest).
+		Methods("GET", "POST")
+
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
@@ -381,6 +399,44 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	}
 
 	s.Router = r
+}
+
+func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	installationIDFromRequest := vars["installationID"]
+	installationID, err := uuid.Parse(installationIDFromRequest)
+	if err != nil {
+		http.Error(w, "installation not found", http.StatusNotFound)
+		return
+	}
+
+	appInstallation, err := models.FindAppInstallation(installationID)
+	if err != nil {
+		http.Error(w, "installation not found", http.StatusNotFound)
+		return
+	}
+
+	app, err := s.registry.GetApplication(appInstallation.AppName)
+	if err != nil {
+		http.Error(w, "app not found", http.StatusNotFound)
+		return
+	}
+
+	app.HandleRequest(applications.HttpRequestContext{
+		Request:        r,
+		Response:       &w,
+		AppContext:     contexts.NewAppContext(appInstallation),
+		OrganizationID: appInstallation.OrganizationID.String(),
+		InstallationID: installationID.String(),
+		BaseURL:        s.BaseURL,
+	})
+
+	err = database.Conn().Save(&appInstallation).Error
+	if err != nil {
+		http.Error(w, "installation not found", http.StatusNotFound)
+		return
+	}
 }
 
 type OrganizationCreationRequest struct {

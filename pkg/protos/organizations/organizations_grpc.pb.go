@@ -27,6 +27,8 @@ const (
 	Organizations_ListInvitations_FullMethodName      = "/Superplane.Organizations.Organizations/ListInvitations"
 	Organizations_RemoveInvitation_FullMethodName     = "/Superplane.Organizations.Organizations/RemoveInvitation"
 	Organizations_UpdateInvitation_FullMethodName     = "/Superplane.Organizations.Organizations/UpdateInvitation"
+	Organizations_ListApplications_FullMethodName     = "/Superplane.Organizations.Organizations/ListApplications"
+	Organizations_InstallApplication_FullMethodName   = "/Superplane.Organizations.Organizations/InstallApplication"
 )
 
 // OrganizationsClient is the client API for Organizations service.
@@ -41,6 +43,8 @@ type OrganizationsClient interface {
 	ListInvitations(ctx context.Context, in *ListInvitationsRequest, opts ...grpc.CallOption) (*ListInvitationsResponse, error)
 	RemoveInvitation(ctx context.Context, in *RemoveInvitationRequest, opts ...grpc.CallOption) (*RemoveInvitationResponse, error)
 	UpdateInvitation(ctx context.Context, in *UpdateInvitationRequest, opts ...grpc.CallOption) (*UpdateInvitationResponse, error)
+	ListApplications(ctx context.Context, in *ListApplicationsRequest, opts ...grpc.CallOption) (*ListApplicationsResponse, error)
+	InstallApplication(ctx context.Context, in *InstallApplicationRequest, opts ...grpc.CallOption) (*InstallApplicationResponse, error)
 }
 
 type organizationsClient struct {
@@ -131,6 +135,26 @@ func (c *organizationsClient) UpdateInvitation(ctx context.Context, in *UpdateIn
 	return out, nil
 }
 
+func (c *organizationsClient) ListApplications(ctx context.Context, in *ListApplicationsRequest, opts ...grpc.CallOption) (*ListApplicationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListApplicationsResponse)
+	err := c.cc.Invoke(ctx, Organizations_ListApplications_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) InstallApplication(ctx context.Context, in *InstallApplicationRequest, opts ...grpc.CallOption) (*InstallApplicationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InstallApplicationResponse)
+	err := c.cc.Invoke(ctx, Organizations_InstallApplication_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrganizationsServer is the server API for Organizations service.
 // All implementations should embed UnimplementedOrganizationsServer
 // for forward compatibility.
@@ -143,6 +167,8 @@ type OrganizationsServer interface {
 	ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error)
 	RemoveInvitation(context.Context, *RemoveInvitationRequest) (*RemoveInvitationResponse, error)
 	UpdateInvitation(context.Context, *UpdateInvitationRequest) (*UpdateInvitationResponse, error)
+	ListApplications(context.Context, *ListApplicationsRequest) (*ListApplicationsResponse, error)
+	InstallApplication(context.Context, *InstallApplicationRequest) (*InstallApplicationResponse, error)
 }
 
 // UnimplementedOrganizationsServer should be embedded to have
@@ -175,6 +201,12 @@ func (UnimplementedOrganizationsServer) RemoveInvitation(context.Context, *Remov
 }
 func (UnimplementedOrganizationsServer) UpdateInvitation(context.Context, *UpdateInvitationRequest) (*UpdateInvitationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateInvitation not implemented")
+}
+func (UnimplementedOrganizationsServer) ListApplications(context.Context, *ListApplicationsRequest) (*ListApplicationsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListApplications not implemented")
+}
+func (UnimplementedOrganizationsServer) InstallApplication(context.Context, *InstallApplicationRequest) (*InstallApplicationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InstallApplication not implemented")
 }
 func (UnimplementedOrganizationsServer) testEmbeddedByValue() {}
 
@@ -340,6 +372,42 @@ func _Organizations_UpdateInvitation_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_ListApplications_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListApplicationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).ListApplications(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_ListApplications_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).ListApplications(ctx, req.(*ListApplicationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_InstallApplication_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InstallApplicationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).InstallApplication(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_InstallApplication_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).InstallApplication(ctx, req.(*InstallApplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Organizations_ServiceDesc is the grpc.ServiceDesc for Organizations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -378,6 +446,14 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateInvitation",
 			Handler:    _Organizations_UpdateInvitation_Handler,
+		},
+		{
+			MethodName: "ListApplications",
+			Handler:    _Organizations_ListApplications_Handler,
+		},
+		{
+			MethodName: "InstallApplication",
+			Handler:    _Organizations_InstallApplication_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -3,6 +3,7 @@
 .travis.yml
 README.md
 api/openapi.yaml
+api_application.go
 api_blueprint.go
 api_canvas.go
 api_component.go
@@ -20,6 +21,8 @@ api_workflow_node.go
 api_workflow_node_execution.go
 client.go
 configuration.go
+docs/ApplicationAPI.md
+docs/ApplicationsApplicationDefinition.md
 docs/AuthToken.md
 docs/AuthorizationDomainType.md
 docs/AuthorizationPermission.md
@@ -94,9 +97,13 @@ docs/NodeBlueprintRef.md
 docs/NodeComponentRef.md
 docs/NodeTriggerRef.md
 docs/OrganizationAPI.md
+docs/OrganizationsAppInstallation.md
+docs/OrganizationsBrowserAction.md
 docs/OrganizationsCreateInvitationBody.md
 docs/OrganizationsCreateInvitationResponse.md
 docs/OrganizationsDescribeOrganizationResponse.md
+docs/OrganizationsInstallApplicationBody.md
+docs/OrganizationsInstallApplicationResponse.md
 docs/OrganizationsInvitation.md
 docs/OrganizationsListInvitationsResponse.md
 docs/OrganizationsOrganization.md
@@ -131,6 +138,7 @@ docs/SecretsSecretSpec.md
 docs/SecretsUpdateSecretBody.md
 docs/SecretsUpdateSecretResponse.md
 docs/SuperplaneAddUserBody.md
+docs/SuperplaneApplicationsListApplicationsResponse.md
 docs/SuperplaneBlueprintsOutputChannel.md
 docs/SuperplaneBlueprintsUserRef.md
 docs/SuperplaneCanvas.md
@@ -143,6 +151,7 @@ docs/SuperplaneIntegrationsValueFrom.md
 docs/SuperplaneIntegrationsValueFromSecret.md
 docs/SuperplaneListCanvasesResponse.md
 docs/SuperplaneMeUser.md
+docs/SuperplaneOrganizationsListApplicationsResponse.md
 docs/SuperplaneUsersUser.md
 docs/SuperplaneWorkflowsUserRef.md
 docs/TriggerAPI.md
@@ -188,6 +197,7 @@ docs/WorkflowsWorkflowNodeQueueItem.md
 docs/WorkflowsWorkflowSpec.md
 docs/WorkflowsWorkflowStatus.md
 git_push.sh
+model_applications_application_definition.go
 model_auth_token.go
 model_authorization_domain_type.go
 model_authorization_permission.go
@@ -255,9 +265,13 @@ model_me_regenerate_token_response.go
 model_node_blueprint_ref.go
 model_node_component_ref.go
 model_node_trigger_ref.go
+model_organizations_app_installation.go
+model_organizations_browser_action.go
 model_organizations_create_invitation_body.go
 model_organizations_create_invitation_response.go
 model_organizations_describe_organization_response.go
+model_organizations_install_application_body.go
+model_organizations_install_application_response.go
 model_organizations_invitation.go
 model_organizations_list_invitations_response.go
 model_organizations_organization.go
@@ -290,6 +304,7 @@ model_secrets_secret_spec.go
 model_secrets_update_secret_body.go
 model_secrets_update_secret_response.go
 model_superplane_add_user_body.go
+model_superplane_applications_list_applications_response.go
 model_superplane_blueprints_output_channel.go
 model_superplane_blueprints_user_ref.go
 model_superplane_canvas.go
@@ -302,6 +317,7 @@ model_superplane_integrations_value_from.go
 model_superplane_integrations_value_from_secret.go
 model_superplane_list_canvases_response.go
 model_superplane_me_user.go
+model_superplane_organizations_list_applications_response.go
 model_superplane_users_user.go
 model_superplane_workflows_user_ref.go
 model_triggers_describe_trigger_response.go
@@ -341,6 +357,7 @@ model_workflows_workflow_node_queue_item.go
 model_workflows_workflow_spec.go
 model_workflows_workflow_status.go
 response.go
+test/api_application_test.go
 test/api_blueprint_test.go
 test/api_canvas_test.go
 test/api_component_test.go
