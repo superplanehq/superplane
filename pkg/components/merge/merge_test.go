@@ -194,8 +194,9 @@ func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 	ctx1, err := contexts.BuildProcessQueueContext(s.Tx, s.MergeNode, s.QueureItem1)
 	assert.NoError(s.t, err)
 
-	err = m.ProcessQueueItem(*ctx1)
+	execution, err := m.ProcessQueueItem(*ctx1)
 	require.NoError(s.t, err)
+	require.Nil(s.t, execution)
 }
 
 func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
@@ -204,8 +205,9 @@ func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 	ctx2, err := contexts.BuildProcessQueueContext(s.Tx, s.MergeNode, s.QueureItem2)
 	assert.NoError(s.t, err)
 
-	err = m.ProcessQueueItem(*ctx2)
+	execution, err := m.ProcessQueueItem(*ctx2)
 	require.NoError(s.t, err)
+	require.NotNil(s.t, execution)
 }
 
 func (s *MergeTestSteps) AssertNodeExecutionCount(expectedCount int) {

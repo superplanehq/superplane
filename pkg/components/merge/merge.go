@@ -87,30 +87,30 @@ func (m *Merge) Setup(ctx components.SetupContext) error {
 	return nil
 }
 
-func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	mergeGroup := ctx.RootEventID
 
 	execID, err := m.findOrCreateExecution(ctx, mergeGroup)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := ctx.DequeueItem(); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := ctx.UpdateNodeState(models.WorkflowNodeStateReady); err != nil {
-		return err
+		return nil, err
 	}
 
 	incoming, err := ctx.CountIncomingEdges()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	md, err := m.addEventToMetadata(ctx, execID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(md.EventIDs) >= incoming {
@@ -119,7 +119,7 @@ func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) error {
 		})
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (m *Merge) findOrCreateExecution(ctx components.ProcessQueueContext, mergeGroup string) (uuid.UUID, error) {

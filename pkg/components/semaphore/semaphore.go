@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -156,7 +157,7 @@ func (s *Semaphore) Configuration() []configuration.Field {
 	}
 }
 
-func (s *Semaphore) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+func (s *Semaphore) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 

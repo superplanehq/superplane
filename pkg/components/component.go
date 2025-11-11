@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
@@ -63,7 +64,7 @@ type Component interface {
 	 * is ready to be processed. Implementations should create the appropriate
 	 * execution or handle the item synchronously using the provided context.
 	 */
-	ProcessQueueItem(ctx ProcessQueueContext) error
+	ProcessQueueItem(ctx ProcessQueueContext) (*models.WorkflowNodeExecution, error)
 
 	/*
 	 * Passes full execution control to the component.
@@ -212,7 +213,7 @@ type ProcessQueueContext struct {
 	// DefaultProcessing performs the default processing for the queue item.
 	// Convenience method to avoid boilerplate in components that just want default behavior,
 	// where an execution is created and the item is dequeued.
-	DefaultProcessing func() error
+	DefaultProcessing func() (*models.WorkflowNodeExecution, error)
 
 	// GetExecutionMetadata retrieves the execution metadata for a given execution ID.
 	GetExecutionMetadata func(uuid.UUID) (map[string]any, error)
@@ -222,7 +223,7 @@ type ProcessQueueContext struct {
 	CountIncomingEdges func() (int, error)
 
 	// FinishExecution marks the execution as finished with the provided outputs.
-	FinishExecution func(execID uuid.UUID, outputs map[string][]any) error
+	FinishExecution func(execID uuid.UUID, outputs map[string][]any) (*models.WorkflowNodeExecution, error)
 
 	FindExecutionIDByKV func(key string, value string) (uuid.UUID, bool, error)
 	SetExecutionKV      func(execID uuid.UUID, key string, value string) error
