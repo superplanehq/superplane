@@ -183,7 +183,7 @@ func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, logger *log.Ent
 		createdQueueItems = append(createdQueueItems, queueItem)
 	}
 
-	return createdQueueItems, nil
+	return createdQueueItems, event.RoutedInTransaction(tx)
 }
 
 func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry, workflow *models.Workflow, execution *models.WorkflowNodeExecution, event *models.WorkflowEvent) ([]models.WorkflowNodeQueueItem, error) {
@@ -271,7 +271,7 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, logger *lo
 		createdQueueItems = append(createdQueueItems, queueItem)
 	}
 
-	return createdQueueItems, nil
+	return createdQueueItems, event.RoutedInTransaction(tx)
 }
 
 func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
