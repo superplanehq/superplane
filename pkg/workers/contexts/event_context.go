@@ -29,9 +29,5 @@ func (s *EventContext) Emit(data any) error {
 		CreatedAt:  &now,
 	}
 
-	if err := s.tx.Create(&event).Error; err != nil {
-		return err
-	}
-
-	return nil
+	return s.tx.Create(&event).Error
 }
