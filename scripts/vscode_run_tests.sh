@@ -20,13 +20,14 @@ DOCKER_COMPOSE_OPTS=${DOCKER_COMPOSE_OPTS:-"-f docker-compose.dev.yml"}
 
 docker_exec() {
   # Pass DB_NAME=superplane_test to match Makefile test environment
-  echo "+ docker compose ${DOCKER_COMPOSE_OPTS} exec -e DB_NAME=superplane_test app bash -lc \"$*\""
+  # Also force Go build cache to a writable, persisted path in the repo
+  echo "+ docker compose ${DOCKER_COMPOSE_OPTS} exec -e DB_NAME=superplane_test -e GOCACHE=/app/tmp/go-build -e XDG_CACHE_HOME=/app/tmp app bash -lc \"$*\""
   echo ""
   echo "--------------------------------------------------------------------------------"
   echo ""
   # Run command while capturing exit status even with set -e
   set +e
-  docker compose ${DOCKER_COMPOSE_OPTS} exec -e DB_NAME=superplane_test app bash -lc "$*"
+  docker compose ${DOCKER_COMPOSE_OPTS} exec -e DB_NAME=superplane_test -e GOCACHE=/app/tmp/go-build -e XDG_CACHE_HOME=/app/tmp app bash -lc "$*"
   status=$?
   set -e
   if [ "$status" -eq 0 ]; then
