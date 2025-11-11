@@ -13,34 +13,15 @@ type Params = {
   workflow?: WorkflowsWorkflow | null;
 };
 
-export function usePassThroughHandler({ workflowId, organizationId, workflow }: Params) {
+export function usePushThroughHandler({ workflowId, organizationId, workflow }: Params) {
   const queryClient = useQueryClient();
   const refetchNodeData = useNodeExecutionStore((state) => state.refetchNodeData);
   const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
 
-  const isUuid = (value?: string) =>
-    typeof value === "string" &&
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(value);
-
-  const onPassThrough = useCallback(
-    async (nodeId: string, incomingExecutionId: string) => {
+  const onPushThrough = useCallback(
+    async (nodeId: string, executionId: string) => {
       try {
-        // Resolve a valid executionId (UUID) robustly
-        let executionId = incomingExecutionId;
-        if (!isUuid(executionId)) {
-          // Try to find a running execution for this node from the store
-          const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
-          const running = (nodeData.executions || []).find((e) => e.state === "STATE_STARTED");
-          if (isUuid(running?.id)) {
-            executionId = running!.id!;
-          }
-        }
-
-        if (!isUuid(executionId)) {
-          console.error("onPassThrough: invalid executionId", { nodeId, incomingExecutionId, resolved: executionId });
-          showErrorToast("Failed to push through: missing execution ID");
-          return;
-        }
+        console.log("Attempting to push through node:", nodeId, "with executionId:", executionId);
 
         await workflowsInvokeNodeExecutionAction(
           withOrganizationHeader({
@@ -69,7 +50,7 @@ export function usePassThroughHandler({ workflowId, organizationId, workflow }: 
     [workflowId, organizationId, queryClient, workflow?.spec?.nodes, refetchNodeData, getNodeData],
   );
 
-  const supportsPassThrough = useCallback(
+  const supportsPushThrough = useCallback(
     (nodeId: string) => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       const name = node?.component?.name;
@@ -78,5 +59,5 @@ export function usePassThroughHandler({ workflowId, organizationId, workflow }: 
     [workflow],
   );
 
-  return { onPassThrough, supportsPassThrough } as const;
+  return { onPushThrough, supportsPushThrough } as const;
 }

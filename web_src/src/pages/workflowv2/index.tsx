@@ -25,7 +25,9 @@ import {
 import { organizationKeys, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
+import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useQueueHistory } from "@/hooks/useQueueHistory";
 import {
   eventExecutionsQueryOptions,
   nodeEventsQueryOptions,
@@ -49,6 +51,7 @@ import {
   SidebarData,
   SidebarEvent,
 } from "@/ui/CanvasPage";
+import { EventState } from "@/ui/componentBase";
 import { ChainExecutionState, TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
@@ -58,11 +61,8 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
-import { usePassThroughHandler } from "./usePassThroughHandler";
-import { useNodeHistory } from "@/hooks/useNodeHistory";
-import { useQueueHistory } from "@/hooks/useQueueHistory";
+import { usePushThroughHandler } from "./usePushThroughHandler";
 import { mapExecutionsToSidebarEvents, mapQueueItemsToSidebarEvents, mapTriggerEventsToSidebarEvents } from "./utils";
-import { EventState } from "@/ui/componentBase";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -291,6 +291,7 @@ export function WorkflowPageV2() {
     (nodeId: string): SidebarData | null => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
+      setCurrentHistoryNode({ nodeId, nodeType: node?.type || "TYPE_ACTION" });
 
       // Get current data from store (don't trigger load here - that's done in useEffect)
       const nodeData = getNodeData(nodeId);
@@ -518,7 +519,7 @@ export function WorkflowPageV2() {
 
       if (node.type === "TYPE_TRIGGER") {
         const events = nodeEventsMap[nodeId] || [];
-        const triggerEvent = events.find((evt) => evt.id === (event.triggerEventId || event.id));
+        const triggerEvent = events.find((evt) => evt.id === event.id);
 
         if (!triggerEvent) return undefined;
 
@@ -550,9 +551,7 @@ export function WorkflowPageV2() {
 
       // Handle other components (non-triggers) - get execution for this event
       const executions = nodeExecutionsMap[nodeId] || [];
-      const execution = executions.find(
-        (exec: WorkflowsWorkflowNodeExecution) => exec.id === (event.executionId || event.id),
-      );
+      const execution = executions.find((exec: WorkflowsWorkflowNodeExecution) => exec.id === event.id);
 
       if (!execution) return undefined;
 
@@ -1178,7 +1177,7 @@ export function WorkflowPageV2() {
   );
 
   // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
-  const { onPassThrough, supportsPassThrough } = usePassThroughHandler({
+  const { onPushThrough, supportsPushThrough } = usePushThroughHandler({
     workflowId: workflowId!,
     organizationId,
     workflow,
@@ -1265,8 +1264,8 @@ export function WorkflowPageV2() {
       runDisabled={hasRunBlockingChanges}
       runDisabledTooltip={hasRunBlockingChanges ? "Save canvas changes before running" : undefined}
       onCancelQueueItem={onCancelQueueItem}
-      onPassThrough={onPassThrough}
-      supportsPassThrough={supportsPassThrough}
+      onPushThrough={onPushThrough}
+      supportsPushThrough={supportsPushThrough}
       getAllHistoryEvents={getAllHistoryEvents}
       onLoadMoreHistory={handleLoadMoreHistory}
       getHasMoreHistory={getHasMoreHistory}

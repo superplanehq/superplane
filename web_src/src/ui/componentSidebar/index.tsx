@@ -5,8 +5,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { MetadataItem, MetadataList } from "../metadataList";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
-import { SidebarEvent } from "./types";
 import { ChainExecutionState, TabData } from "./SidebarEventItem/SidebarEventItem";
+import { SidebarEvent } from "./types";
 interface ComponentSidebarProps {
   isOpen?: boolean;
   setIsOpen?: (isOpen: boolean) => void;
@@ -46,8 +46,8 @@ interface ComponentSidebarProps {
 
   // Queue actions
   onCancelQueueItem?: (id: string) => void;
-  onPassThrough?: (executionId: string) => void;
-  supportsPassThrough?: boolean;
+  onPushThrough?: (executionId: string) => void;
+  supportsPushThrough?: boolean;
 
   // Full history props
   getAllHistoryEvents?: () => SidebarEvent[];
@@ -92,8 +92,8 @@ export const ComponentSidebar = ({
   isCompactView = false,
   getTabData,
   onCancelQueueItem,
-  onPassThrough,
-  supportsPassThrough,
+  onPushThrough,
+  supportsPushThrough,
   onLoadMoreHistory,
   getAllHistoryEvents,
   getHasMoreHistory,
@@ -406,8 +406,8 @@ export const ComponentSidebar = ({
                       onToggleOpen={handleToggleOpen}
                       onEventClick={onEventClick}
                       tabData={getTabData?.(event)}
-                      onPassThrough={onPassThrough}
-                      supportsPassThrough={supportsPassThrough}
+                      onPushThrough={onPushThrough}
+                      supportsPushThrough={supportsPushThrough}
                     />
                   ))}
                   {hasMoreItems && !searchQuery && statusFilter === "all" && (
@@ -456,8 +456,8 @@ export const ComponentSidebar = ({
                         onToggleOpen={handleToggleOpen}
                         onEventClick={onEventClick}
                         tabData={getTabData?.(event)}
-                        onPassThrough={onPassThrough}
-                        supportsPassThrough={supportsPassThrough}
+                        onPushThrough={onPushThrough}
+                        supportsPushThrough={supportsPushThrough}
                       />
                     );
                   })}
@@ -494,8 +494,8 @@ export const ComponentSidebar = ({
                           onEventClick={onEventClick}
                           tabData={getTabData?.(event)}
                           onCancelQueueItem={onCancelQueueItem}
-                          onPassThrough={onPassThrough}
-                          supportsPassThrough={supportsPassThrough}
+                          onPushThrough={onPushThrough}
+                          supportsPushThrough={supportsPushThrough}
                         />
                       );
                     })}

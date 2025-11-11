@@ -102,6 +102,9 @@ dev.down:
 dev.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app /bin/bash
 
+dev.db.console:
+	$(MAKE) db.console DB_NAME=superplane_dev
+
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
 

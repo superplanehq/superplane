@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
+  ComponentsNode,
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowNodeExecution,
-  ComponentsNode,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { SidebarEvent } from "@/ui/CanvasPage";
-import { getTriggerRenderer } from "./renderers";
 import { formatTimeAgo } from "@/utils/date";
+import { getTriggerRenderer } from "./renderers";
 
 export function mapTriggerEventsToSidebarEvents(
   events: WorkflowsWorkflowEvent[],

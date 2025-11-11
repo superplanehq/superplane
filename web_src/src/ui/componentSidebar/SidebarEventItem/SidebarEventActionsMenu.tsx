@@ -8,8 +8,8 @@ interface SidebarEventActionsMenuProps {
   eventId: string;
   executionId?: string;
   onCancelQueueItem?: (id: string) => void;
-  onPassThrough?: (executionId: string) => void;
-  supportsPassThrough?: boolean;
+  onPushThrough?: (executionId: string) => void;
+  supportsPushThrough?: boolean;
   eventState: ChildEventsState;
 }
 
@@ -17,15 +17,15 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   eventId,
   executionId,
   onCancelQueueItem,
-  onPassThrough,
-  supportsPassThrough,
+  onPushThrough,
+  supportsPushThrough,
   eventState,
 }) => {
   const isProcessed = eventState === "processed";
   const isDiscarded = eventState === "discarded";
   const isWaiting = eventState === "waiting";
 
-  const showPassThrough = supportsPassThrough && !!executionId && !(isProcessed || isDiscarded || isWaiting);
+  const showPushThrough = supportsPushThrough && !!executionId && !(isProcessed || isDiscarded || isWaiting);
   const showCancel = !(isProcessed || isDiscarded);
   const showReEmit = isProcessed || isDiscarded;
 
@@ -36,23 +36,23 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
       // Implement re-emit logic here
       // TODO: Add re-emit handler prop if needed
     },
-    [onPassThrough, eventId],
+    [eventId],
   );
 
-  const handlePassThrough = React.useCallback(
+  const handlePushThrough = React.useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
 
       if (!executionId) {
-        console.warn("No executionId provided for pass-through action");
+        console.warn("No executionId provided for push-through action");
         return;
       }
 
-      if (onPassThrough) {
-        onPassThrough(executionId);
+      if (onPushThrough) {
+        onPushThrough(executionId);
       }
     },
-    [onPassThrough, executionId, eventId],
+    [onPushThrough, executionId, eventId],
   );
 
   const handleCancelQueueItem = React.useCallback(
@@ -86,8 +86,8 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
           </DropdownMenuItem>
         )}
 
-        {showPassThrough && (
-          <DropdownMenuItem onClick={handlePassThrough} className="gap-2">
+        {showPushThrough && (
+          <DropdownMenuItem onClick={handlePushThrough} className="gap-2">
             {React.createElement(resolveIcon("fast-forward"), { size: 16 })}
             Push Through
           </DropdownMenuItem>
