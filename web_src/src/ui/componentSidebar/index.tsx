@@ -47,10 +47,10 @@ interface ComponentSidebarProps {
   onCancelQueueItem?: (id: string) => void;
 
   // Full history props
-  allEvents?: SidebarEvent[];
+  getAllHistoryEvents?: () => SidebarEvent[];
   onLoadMoreHistory?: () => void;
-  hasMoreHistory?: boolean;
-  loadingMoreHistory?: boolean;
+  getHasMoreHistory?: () => boolean;
+  getLoadingMoreHistory?: () => boolean;
 }
 
 export const ComponentSidebar = ({
@@ -82,10 +82,10 @@ export const ComponentSidebar = ({
   isCompactView = false,
   getTabData,
   onCancelQueueItem,
-  allEvents = [],
   onLoadMoreHistory,
-  hasMoreHistory = false,
-  loadingMoreHistory = false,
+  getAllHistoryEvents,
+  getHasMoreHistory,
+  getLoadingMoreHistory,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
@@ -171,8 +171,29 @@ export const ComponentSidebar = ({
     setStatusFilter("all");
   }, []);
 
+  const allEvents = React.useMemo(() => {
+    if (!getAllHistoryEvents || !showFullHistory) return [];
+    return getAllHistoryEvents();
+  }, [getAllHistoryEvents, showFullHistory]);
+
+  const hasMoreHistory = React.useMemo(() => {
+    if (!getHasMoreHistory || !showFullHistory) return false;
+    return getHasMoreHistory();
+  }, [getHasMoreHistory, showFullHistory]);
+
+  const loadingMoreHistory = React.useMemo(() => {
+    if (!getLoadingMoreHistory || !showFullHistory) return false;
+    return getLoadingMoreHistory();
+  }, [getLoadingMoreHistory, showFullHistory]);
+
+  const handleLoadMoreHistory = React.useCallback(() => {
+    if (!onLoadMoreHistory || !showFullHistory) return;
+    onLoadMoreHistory();
+  }, [onLoadMoreHistory, showFullHistory]);
+
   const filteredHistoryEvents = React.useMemo(() => {
-    let events = [...allEvents];
+    if (!allEvents) return [];
+    let events = allEvents;
 
     if (statusFilter !== "all") {
       events = events.filter((event) => event.state === statusFilter);
@@ -323,7 +344,7 @@ export const ComponentSidebar = ({
                   {hasMoreHistory && !searchQuery && statusFilter === "all" && (
                     <div className="flex justify-center pt-4">
                       <button
-                        onClick={onLoadMoreHistory}
+                        onClick={handleLoadMoreHistory}
                         disabled={loadingMoreHistory}
                         className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:text-gray-400 disabled:cursor-not-allowed"
                       >
@@ -368,7 +389,7 @@ export const ComponentSidebar = ({
                       />
                     );
                   })}
-                  {moreInHistoryCount > 0 && (
+                  {handleSeeFullHistory && (
                     <button
                       onClick={handleSeeFullHistory}
                       className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"

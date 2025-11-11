@@ -395,7 +395,7 @@ export const useInfiniteNodeEvents = (workflowId: string, nodeId: string, enable
             nodeId,
           },
           query: {
-            limit: 20,
+            limit: 10,
             ...(pageParam ? { before: pageParam } : {}),
           },
         }),
@@ -405,9 +405,10 @@ export const useInfiniteNodeEvents = (workflowId: string, nodeId: string, enable
     getNextPageParam: (lastPage, allPages) => {
       const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.events?.length || 0), 0);
       const totalCount = lastPage?.totalCount || 0;
+      
       if (currentLoadedCount >= totalCount) return undefined;
 
-      if (lastPage?.events && lastPage.events.length === 20) {
+      if (lastPage?.events && lastPage.events.length > 0) {
         const lastEvent = lastPage.events[lastPage.events.length - 1];
         return lastEvent.createdAt;
       }
@@ -430,7 +431,7 @@ export const useInfiniteNodeExecutions = (workflowId: string, nodeId: string, en
             nodeId,
           },
           query: {
-            limit: 20,
+            limit: 10,
             ...(pageParam ? { before: pageParam } : {}),
           },
         }),
@@ -443,7 +444,7 @@ export const useInfiniteNodeExecutions = (workflowId: string, nodeId: string, en
       
       if (currentLoadedCount >= totalCount) return undefined;
 
-      if (lastPage?.executions && lastPage.executions.length === 20) {
+      if (lastPage?.executions && lastPage.executions.length > 0) {
         const lastExecution = lastPage.executions[lastPage.executions.length - 1];
         return lastExecution.createdAt;
       }

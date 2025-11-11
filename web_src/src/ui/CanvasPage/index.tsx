@@ -579,6 +579,7 @@ function Sidebar({
 
   return (
     <ComponentSidebar
+      key={state.componentSidebar.selectedNodeId}
       isOpen={state.componentSidebar.isOpen}
       onClose={state.componentSidebar.close}
       latestEvents={latestEvents}
@@ -625,26 +626,10 @@ function Sidebar({
       onDeactivate={onDeactivate ? () => onDeactivate(state.componentSidebar.selectedNodeId!) : undefined}
       onToggleView={onToggleView ? () => onToggleView(state.componentSidebar.selectedNodeId!) : undefined}
       onDelete={onDelete ? () => onDelete(state.componentSidebar.selectedNodeId!) : undefined}
-      allEvents={
-        getAllHistoryEvents && state.componentSidebar.selectedNodeId
-          ? getAllHistoryEvents(state.componentSidebar.selectedNodeId)
-          : []
-      }
-      onLoadMoreHistory={
-        onLoadMoreHistory && state.componentSidebar.selectedNodeId
-          ? () => onLoadMoreHistory(state.componentSidebar.selectedNodeId!)
-          : undefined
-      }
-      hasMoreHistory={
-        getHasMoreHistory && state.componentSidebar.selectedNodeId
-          ? getHasMoreHistory(state.componentSidebar.selectedNodeId)
-          : false
-      }
-      loadingMoreHistory={
-        getLoadingMoreHistory && state.componentSidebar.selectedNodeId
-          ? getLoadingMoreHistory(state.componentSidebar.selectedNodeId)
-          : false
-      }
+      getAllHistoryEvents={() => getAllHistoryEvents?.(state.componentSidebar.selectedNodeId!) || []}
+      onLoadMoreHistory={() => onLoadMoreHistory?.(state.componentSidebar.selectedNodeId!)}
+      getHasMoreHistory={() => getHasMoreHistory?.(state.componentSidebar.selectedNodeId!) || false}
+      getLoadingMoreHistory={() => getLoadingMoreHistory?.(state.componentSidebar.selectedNodeId!) || false}
     />
   );
 }

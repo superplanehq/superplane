@@ -12,6 +12,8 @@ import {
   ComponentsEdge,
   ComponentsNode,
   TriggersTrigger,
+  WorkflowsListNodeEventsResponse,
+  WorkflowsListNodeExecutionsResponse,
   WorkflowsWorkflow,
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowNodeExecution,
@@ -25,6 +27,8 @@ import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import {
   eventExecutionsQueryOptions,
+  nodeEventsQueryOptions,
+  nodeExecutionsQueryOptions,
   useTriggers,
   useUpdateWorkflow,
   useWorkflow,
@@ -52,6 +56,7 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
+import { useNodeHistory } from "@/hooks/useNodeHistory";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -205,7 +210,24 @@ export function WorkflowPageV2() {
     }
   }, [initialWorkflowSnapshot, organizationId, workflowId, queryClient]);
 
-  useWorkflowWebsocket(workflowId!, organizationId!);
+  const handleNodeWebsocketEvent = useCallback(
+    (nodeId: string, event: string) => {
+      if (event.startsWith("event_created")) {
+        queryClient.invalidateQueries({
+          queryKey: workflowKeys.nodeEventHistory(workflowId!, nodeId),
+        });
+      }
+
+      if (event.startsWith("execution")) {
+        queryClient.invalidateQueries({
+          queryKey: workflowKeys.nodeExecutionHistory(workflowId!, nodeId),
+        });
+      }
+    },
+    [queryClient, workflowId],
+  );
+
+  useWorkflowWebsocket(workflowId!, organizationId!, handleNodeWebsocketEvent);
 
   // Warn user before leaving page with unsaved changes
   useEffect(() => {
@@ -263,6 +285,7 @@ export function WorkflowPageV2() {
     (nodeId: string): SidebarData | null => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
+      setCurrentHistoryNode({ nodeId, nodeType: node?.type || "TYPE_ACTION" });
 
       // Get current data from store (don't trigger load here - that's done in useEffect)
       const nodeData = getNodeData(nodeId);
@@ -271,6 +294,22 @@ export function WorkflowPageV2() {
       const executionsMap = nodeData.executions.length > 0 ? { [nodeId]: nodeData.executions } : {};
       const queueItemsMap = nodeData.queueItems.length > 0 ? { [nodeId]: nodeData.queueItems } : {};
       const eventsMapForSidebar = nodeData.events.length > 0 ? { [nodeId]: nodeData.events } : nodeEventsMap; // Fall back to existing events map for trigger nodes
+
+      // Try to get total count from API cache if available
+      let totalHistoryCount: number | undefined;
+      if (workflowId) {
+        if (node.type === "TYPE_TRIGGER") {
+          const eventsCacheData = queryClient.getQueryData(
+            nodeEventsQueryOptions(workflowId, nodeId, { limit: 10 }).queryKey,
+          ) as WorkflowsListNodeEventsResponse;
+          totalHistoryCount = eventsCacheData?.totalCount;
+        } else {
+          const executionsCacheData = queryClient.getQueryData(
+            nodeExecutionsQueryOptions(workflowId, nodeId, { limit: 10 }).queryKey,
+          ) as WorkflowsListNodeExecutionsResponse;
+          totalHistoryCount = executionsCacheData?.totalCount;
+        }
+      }
 
       const sidebarData = prepareSidebarData(
         node,
@@ -281,6 +320,7 @@ export function WorkflowPageV2() {
         executionsMap,
         queueItemsMap,
         eventsMapForSidebar,
+        totalHistoryCount,
       );
 
       // Add loading state to sidebar data
@@ -289,7 +329,7 @@ export function WorkflowPageV2() {
         isLoading: nodeData.isLoading,
       };
     },
-    [workflow, blueprints, components, triggers, nodeEventsMap, getNodeData],
+    [workflow, workflowId, blueprints, components, triggers, nodeEventsMap, getNodeData, queryClient],
   );
 
   // Trigger data loading when sidebar opens for a node
@@ -305,7 +345,8 @@ export function WorkflowPageV2() {
         loadNodeDataMethod(workflowId!, nodeId, node.type!, queryClient);
       }
     },
-    [workflow?.spec?.nodes, workflowId, queryClient, getNodeData, loadNodeDataMethod],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [workflow?.spec?.nodes?.map((n) => n.id), workflowId, queryClient, getNodeData, loadNodeDataMethod],
   );
 
   const onCancelQueueItem = useOnCancelQueueItemHandler({
@@ -314,6 +355,58 @@ export function WorkflowPageV2() {
     workflow,
     loadSidebarData,
   });
+
+  const [currentHistoryNode, setCurrentHistoryNode] = useState<{ nodeId: string; nodeType: string } | null>(null);
+
+  const nodeHistoryQuery = useNodeHistory({
+    workflowId: workflowId || "",
+    nodeId: currentHistoryNode?.nodeId || "",
+    nodeType: currentHistoryNode?.nodeType || "TYPE_ACTION",
+    allNodes: workflow?.spec?.nodes || [],
+    enabled: !!currentHistoryNode && !!workflowId,
+  });
+
+  const getAllHistoryEvents = useCallback(
+    (nodeId: string): SidebarEvent[] => {
+      if (currentHistoryNode?.nodeId === nodeId) {
+        return nodeHistoryQuery.getAllHistoryEvents();
+      }
+
+      return [];
+    },
+    [currentHistoryNode, nodeHistoryQuery],
+  );
+  // Load more history for a specific node
+  const handleLoadMoreHistory = useCallback(
+    (nodeId: string) => {
+      if (!currentHistoryNode || currentHistoryNode.nodeId !== nodeId) {
+        setCurrentHistoryNode({ nodeId, nodeType: currentHistoryNode?.nodeType || "TYPE_ACTION" });
+      } else {
+        nodeHistoryQuery.handleLoadMore();
+      }
+    },
+    [currentHistoryNode, nodeHistoryQuery],
+  );
+
+  const getHasMoreHistory = useCallback(
+    (nodeId: string): boolean => {
+      if (currentHistoryNode?.nodeId === nodeId) {
+        return nodeHistoryQuery.hasMoreHistory;
+      }
+      return false;
+    },
+    [currentHistoryNode, nodeHistoryQuery.hasMoreHistory],
+  );
+
+  const getLoadingMoreHistory = useCallback(
+    (nodeId: string): boolean => {
+      if (currentHistoryNode?.nodeId === nodeId) {
+        return nodeHistoryQuery.isLoadingMore;
+      }
+      return false;
+    },
+    [currentHistoryNode, nodeHistoryQuery.isLoadingMore],
+  );
 
   const workflowEdges = useMemo(() => workflow?.spec?.edges || [], [workflow?.spec?.edges]);
 
@@ -1100,6 +1193,10 @@ export function WorkflowPageV2() {
       runDisabled={hasRunBlockingChanges}
       runDisabledTooltip={hasRunBlockingChanges ? "Save canvas changes before running" : undefined}
       onCancelQueueItem={onCancelQueueItem}
+      getAllHistoryEvents={getAllHistoryEvents}
+      onLoadMoreHistory={handleLoadMoreHistory}
+      getHasMoreHistory={getHasMoreHistory}
+      getLoadingMoreHistory={getLoadingMoreHistory}
       breadcrumbs={[
         {
           label: "Canvases",
@@ -2266,8 +2363,9 @@ function prepareEdge(edge: ComponentsEdge): CanvasEdge {
   };
 }
 
-function mapTriggerEventsToSidebarEvents(events: WorkflowsWorkflowEvent[], node: ComponentsNode) {
-  return events.slice(0, 5).map((event) => {
+function mapTriggerEventsToSidebarEvents(events: WorkflowsWorkflowEvent[], node: ComponentsNode, limit?: number) {
+  const eventsToMap = limit ? events.slice(0, limit) : events;
+  return eventsToMap.map((event) => {
     const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
     const { title, subtitle } = triggerRenderer.getTitleAndSubtitle(event);
     const values = triggerRenderer.getRootEventValues(event);
@@ -2284,8 +2382,13 @@ function mapTriggerEventsToSidebarEvents(events: WorkflowsWorkflowEvent[], node:
   });
 }
 
-function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution[], nodes: ComponentsNode[]) {
-  return executions.slice(0, 5).map((execution) => {
+function mapExecutionsToSidebarEvents(
+  executions: WorkflowsWorkflowNodeExecution[],
+  nodes: ComponentsNode[],
+  limit?: number,
+) {
+  const executionsToMap = limit ? executions.slice(0, limit) : executions;
+  return executionsToMap.map((execution) => {
     const state =
       execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
         ? ("processed" as const)
@@ -2327,6 +2430,7 @@ function prepareSidebarData(
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
+  totalHistoryCount?: number,
 ): SidebarData {
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
@@ -2368,8 +2472,8 @@ function prepareSidebarData(
 
   const latestEvents =
     node.type === "TYPE_TRIGGER"
-      ? mapTriggerEventsToSidebarEvents(events, node)
-      : mapExecutionsToSidebarEvents(executions, nodes);
+      ? mapTriggerEventsToSidebarEvents(events, node, 5)
+      : mapExecutionsToSidebarEvents(executions, nodes, 5);
 
   // Convert queue items to sidebar events (next in queue)
   const nextInQueueEvents = queueItems.slice(0, 5).map((item) => {
@@ -2437,6 +2541,7 @@ function prepareSidebarData(
     iconColor: getColorClass(color),
     iconBackground: getBackgroundColorClass(color),
     moreInQueueCount: Math.max(0, queueItems.length - 5),
+    moreInHistoryCount: totalHistoryCount ? Math.max(0, totalHistoryCount - latestEvents.length) : 0,
     hideQueueEvents,
   };
 }
