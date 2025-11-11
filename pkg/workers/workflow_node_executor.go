@@ -57,14 +57,14 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 					continue
 				}
 
-				messages.NewWorkflowExecutionCreatedMessage(execution.WorkflowID.String(), &execution).Publish()
+				messages.NewWorkflowExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
 
 				go func(execution models.WorkflowNodeExecution) {
 					defer w.semaphore.Release(1)
 
 					err := w.LockAndProcessNodeExecution(execution.ID)
 					if err == nil {
-						messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
+						messages.NewWorkflowExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
 						return
 					}
 

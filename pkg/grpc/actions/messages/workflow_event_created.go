@@ -9,12 +9,12 @@ import (
 const WorkflowEventCreatedRoutingKey = "workflow-event-created"
 
 type WorkflowEventCreatedMessage struct {
-	message *pb.EventCreated
+	message *pb.WorkflowNodeEventMessage
 }
 
 func NewWorkflowEventCreatedMessage(workflowId string, event *models.WorkflowEvent) WorkflowEventCreatedMessage {
 	return WorkflowEventCreatedMessage{
-		message: &pb.EventCreated{
+		message: &pb.WorkflowNodeEventMessage{
 			Id:         event.ID.String(),
 			WorkflowId: workflowId,
 			NodeId:     event.NodeID,

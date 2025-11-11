@@ -59,7 +59,7 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 					}
 
 					if request.ExecutionID != nil {
-						messages.NewWorkflowExecutionFinishedMessage(request.WorkflowID.String(), request.ExecutionID.String(), request.NodeID).Publish()
+						messages.NewWorkflowExecutionMessage(request.WorkflowID.String(), request.ExecutionID.String(), request.NodeID).Publish()
 					}
 				}(request)
 			}
