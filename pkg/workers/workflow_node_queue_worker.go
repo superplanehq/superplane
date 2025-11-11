@@ -80,7 +80,7 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node mod
 	})
 
 	if err == nil && exec != nil {
-		messages.NewWorkflowExecutionFinishedMessage(
+		messages.NewWorkflowExecutionMessage(
 			exec.WorkflowID.String(),
 			exec.ID.String(),
 			exec.NodeID,

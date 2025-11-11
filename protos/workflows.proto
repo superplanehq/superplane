@@ -419,14 +419,14 @@ message ListEventExecutionsResponse {
 // Standalone messages
 //
 
-message EventCreated {
+message WorkflowNodeEventMessage {
   string id = 1;
   string workflow_id = 2;
   string node_id = 3;
   google.protobuf.Timestamp timestamp = 4;
 }
 
-message ExecutionUpdated {
+message WorkflowNodeExecutionMessage {
   string id = 1;
   string workflow_id = 2;
   string node_id = 3;

@@ -19,18 +19,37 @@ type ExecutionStateWebsocketEvent struct {
 	Payload json.RawMessage `json:"payload"`
 }
 
-func HandleWorkflowExecutionCreated(messageBody []byte, wsHub *ws.Hub) error {
-	log.Debugf("Received execution_created event")
+const (
+	ExecutionCreatedEvent  = "execution_created"
+	ExecutionFinishedEvent = "execution_finished"
+	ExecutionStartedEvent  = "execution_started"
+)
 
-	pbMsg := &pb.ExecutionCreated{}
+func HandleWorkflowExecution(messageBody []byte, wsHub *ws.Hub) error {
+	log.Debugf("Received execution event")
+
+	pbMsg := &pb.WorkflowNodeExecutionMessage{}
 	if err := proto.Unmarshal(messageBody, pbMsg); err != nil {
-		return fmt.Errorf("failed to unmarshal execution_created message: %w", err)
+		return fmt.Errorf("failed to unmarshal execution event: %w", err)
 	}
 
-	return handleExecutionState(pbMsg.WorkflowId, pbMsg.Id, wsHub, "execution_created")
+	return handleExecutionState(pbMsg.WorkflowId, pbMsg.Id, wsHub)
 }
 
-func handleExecutionState(workflowID string, executionID string, wsHub *ws.Hub, eventName string) error {
+func workflowExecutionStateToWsEvent(workflowState string) string {
+	switch workflowState {
+	case models.WorkflowNodeExecutionStatePending:
+		return ExecutionCreatedEvent
+	case models.WorkflowNodeExecutionStateFinished:
+		return ExecutionFinishedEvent
+	case models.WorkflowNodeExecutionStateStarted:
+		return ExecutionStartedEvent
+	default:
+		return ""
+	}
+}
+
+func handleExecutionState(workflowID string, executionID string, wsHub *ws.Hub) error {
 	workflowUUID, err := uuid.Parse(workflowID)
 	if err != nil {
 		return fmt.Errorf("failed to parse workflow id: %w", err)
@@ -44,6 +63,11 @@ func handleExecutionState(workflowID string, executionID string, wsHub *ws.Hub, 
 	execution, err := models.FindNodeExecution(workflowUUID, executionUUID)
 	if err != nil {
 		return fmt.Errorf("failed to find execution: %w", err)
+	}
+
+	eventName := workflowExecutionStateToWsEvent(execution.State)
+	if eventName == "" {
+		return fmt.Errorf("unknown execution state: %s", execution.State)
 	}
 
 	serializedExecutions, err := workflows.SerializeNodeExecutions([]models.WorkflowNodeExecution{*execution}, []models.WorkflowNodeExecution{})
