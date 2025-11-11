@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"time"
 
@@ -75,7 +76,16 @@ func (e *EventDistributer) createHandler(processFn func([]byte, *ws.Hub) error) 
 
 // consumeMessages sets up a consumer for a specific routing key
 func (e *EventDistributer) consumeMessages(amqpURL, exchange, routingKey string, handler func(delivery tackle.Delivery) error) {
-	queueName := fmt.Sprintf("superplane.%s.%s.consumer", exchange, routingKey)
+	//
+	// Since we are using distributed architecture and the websocket connections are spreaded between many replicas,
+	// We need to create different queue names for each replica, so all will instances receive the messages
+	//
+	randomSuffix, err := createRandomString(10)
+	if err != nil {
+		log.Errorf("Error creating random suffix for queueName: %v", err)
+		return
+	}
+	queueName := fmt.Sprintf("superplane.%s.%s.consumer.%s", exchange, routingKey, randomSuffix)
 
 	for {
 		log.Infof("Connecting to RabbitMQ queue %s for %s events", queueName, routingKey)
@@ -115,4 +125,26 @@ func (e *EventDistributer) Shutdown(ctx context.Context) error {
 	log.Info("Shutting down EventDistributer worker")
 	close(e.shutdown)
 	return nil
+}
+
+func createRandomString(length int) (string, error) {
+	charset := "abcdefghijklmnopqrstuvwxyz0123456789"
+
+	if length <= 0 {
+		return "", fmt.Errorf("length must be positive")
+	}
+
+	randomBytes := make([]byte, length)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", err
+	}
+
+	result := make([]byte, length)
+	charsetLen := len(charset)
+	for i, b := range randomBytes {
+		result[i] = charset[int(b)%charsetLen]
+	}
+
+	return string(result), nil
 }
