@@ -1,4 +1,5 @@
-import { WorkflowsWorkflowEvent, WorkflowsWorkflowNodeExecution, ComponentsNode } from "@/api-client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { WorkflowsWorkflowEvent, WorkflowsWorkflowNodeExecution, ComponentsNode, WorkflowsWorkflowNodeQueueItem } from "@/api-client";
 import { SidebarEvent } from "@/ui/CanvasPage";
 import { getTriggerRenderer } from "./renderers";
 import { formatTimeAgo } from "@/utils/date";
@@ -52,6 +53,37 @@ export function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeEx
       isOpen: false,
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
       values,
+    };
+  });
+}
+
+export function mapQueueItemsToSidebarEvents(queueItems: WorkflowsWorkflowNodeQueueItem[], nodes: ComponentsNode[], limit?: number): SidebarEvent[] {
+  const queueItemsToMap = limit ? queueItems.slice(0, limit) : queueItems;
+  return queueItemsToMap.map((item) => {
+    const anyItem = item as any;
+    let title =
+      anyItem?.name ||
+      anyItem?.input?.title ||
+      anyItem?.input?.name ||
+      anyItem?.input?.eventTitle ||
+      item.id ||
+      "Queued";
+    const onlyTrigger = nodes.filter((n) => n.type === "TYPE_TRIGGER");
+    if (title === item.id || title === "Queued") {
+      if (onlyTrigger.length === 1 && onlyTrigger[0]?.trigger?.name === "schedule") {
+        title = "Event emitted by schedule";
+      }
+    }
+    const timestamp = item.createdAt ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "") : "";
+    const subtitle: string = (typeof anyItem?.input?.subtitle === "string" && anyItem.input.subtitle) || timestamp;
+
+    return {
+      id: item.id!,
+      title,
+      subtitle,
+      state: "waiting" as const,
+      isOpen: false,
+      receivedAt: item.createdAt ? new Date(item.createdAt) : undefined,
     };
   });
 }

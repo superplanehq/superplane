@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon } from "@/lib/utils";
-import { ArrowLeft, Search, TextAlignStart, X } from "lucide-react";
+import { ArrowLeft, Plus, Search, TextAlignStart, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { MetadataItem, MetadataList } from "../metadataList";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
 import { SidebarEvent } from "./types";
-import { TabData } from "./SidebarEventItem/SidebarEventItem";
+import { ChainExecutionState, TabData } from "./SidebarEventItem/SidebarEventItem";
 interface ComponentSidebarProps {
   isOpen?: boolean;
   setIsOpen?: (isOpen: boolean) => void;
@@ -19,13 +19,14 @@ interface ComponentSidebarProps {
   iconSlug?: string;
   iconColor?: string;
   iconBackground?: string;
-  moreInQueueCount: number;
-  moreInHistoryCount: number;
+  totalInQueueCount: number;
+  totalInHistoryCount: number;
   hideQueueEvents?: boolean;
 
   onEventClick?: (event: SidebarEvent) => void;
   onClose?: () => void;
   onSeeFullHistory?: () => void;
+  onSeeQueue?: () => void;
 
   // Action handlers
   onRun?: () => void;
@@ -51,6 +52,12 @@ interface ComponentSidebarProps {
   onLoadMoreHistory?: () => void;
   getHasMoreHistory?: () => boolean;
   getLoadingMoreHistory?: () => boolean;
+
+  // Queue pr ops
+  getAllQueueEvents?: () => SidebarEvent[];
+  onLoadMoreQueue?: () => void;
+  getHasMoreQueue?: () => boolean;
+  getLoadingMoreQueue?: () => boolean;
 }
 
 export const ComponentSidebar = ({
@@ -65,9 +72,10 @@ export const ComponentSidebar = ({
   onClose,
   latestEvents,
   nextInQueueEvents,
-  moreInQueueCount = 0,
-  moreInHistoryCount = 0,
+  totalInQueueCount = 0,
+  totalInHistoryCount = 0,
   hideQueueEvents = false,
+  onSeeQueue,
   onSeeFullHistory,
   onRun,
   runDisabled,
@@ -86,6 +94,10 @@ export const ComponentSidebar = ({
   getAllHistoryEvents,
   getHasMoreHistory,
   getLoadingMoreHistory,
+  onLoadMoreQueue,
+  getAllQueueEvents,
+  getHasMoreQueue,
+  getLoadingMoreQueue,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
@@ -93,9 +105,9 @@ export const ComponentSidebar = ({
   // Keep expanded state stable across parent re-renders
   const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
 
-  const [showFullHistory, setShowFullHistory] = useState(false);
+  const [page, setPage] = useState<"overview" | "history" | "queue">("overview");
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<ChainExecutionState | "all">("all");
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -160,36 +172,86 @@ export const ComponentSidebar = ({
     });
   }, []);
 
+  const handleSeeQueue = useCallback(() => {
+    setPage("queue");
+    onSeeQueue?.();
+  }, [onSeeQueue]);
+
   const handleSeeFullHistory = useCallback(() => {
-    setShowFullHistory(true);
+    setPage("history");
     onSeeFullHistory?.();
   }, [onSeeFullHistory]);
 
   const handleBackToOverview = useCallback(() => {
-    setShowFullHistory(false);
+    setPage("overview");
     setSearchQuery("");
     setStatusFilter("all");
   }, []);
 
   const allEvents = React.useMemo(() => {
-    if (!getAllHistoryEvents || !showFullHistory) return [];
-    return getAllHistoryEvents();
-  }, [getAllHistoryEvents, showFullHistory]);
+    if (page === "overview") return [];
 
-  const hasMoreHistory = React.useMemo(() => {
-    if (!getHasMoreHistory || !showFullHistory) return false;
-    return getHasMoreHistory();
-  }, [getHasMoreHistory, showFullHistory]);
+    switch (page) {
+      case "history":
+        return getAllHistoryEvents?.() || [];
+      case "queue":
+        return getAllQueueEvents?.() || [];
+      default:
+        return [];
+    }
+  }, [getAllHistoryEvents, getAllQueueEvents, page]);
 
-  const loadingMoreHistory = React.useMemo(() => {
-    if (!getLoadingMoreHistory || !showFullHistory) return false;
-    return getLoadingMoreHistory();
-  }, [getLoadingMoreHistory, showFullHistory]);
+  const hasMoreItems = React.useMemo(() => {
+    if (page === "overview") return false;
 
-  const handleLoadMoreHistory = React.useCallback(() => {
-    if (!onLoadMoreHistory || !showFullHistory) return;
-    onLoadMoreHistory();
-  }, [onLoadMoreHistory, showFullHistory]);
+    switch (page) {
+      case "history":
+        return getHasMoreHistory?.() || false;
+      case "queue":
+        return getHasMoreQueue?.() || false;
+      default:
+        return false;
+    }
+  }, [getHasMoreHistory, getHasMoreQueue, page]);
+
+  const loadingMoreItems = React.useMemo(() => {
+    if (page === "overview") return false;
+
+    switch (page) {
+      case "history":
+        return getLoadingMoreHistory?.() || false;
+      case "queue":
+        return getLoadingMoreQueue?.() || false;
+      default:
+        return false;
+    }
+  }, [getLoadingMoreHistory, getLoadingMoreQueue, page]);
+
+  const handleLoadMoreItems = React.useCallback(() => {
+    if (page === "overview") return;
+
+    switch (page) {
+      case "history":
+        return onLoadMoreHistory?.();
+      case "queue":
+        return onLoadMoreQueue?.();
+      default:
+        return;
+    }
+  }, [onLoadMoreHistory, onLoadMoreQueue, page]);
+
+  const showMoreCount = React.useMemo(() => {
+    if (page === "overview") return 0;
+
+    switch (page) {
+      case "history":
+        return totalInHistoryCount - allEvents.length;
+      case "queue":
+        return totalInQueueCount - allEvents.length;
+      default:
+        return 0;
+    }
+  }, [allEvents, totalInHistoryCount, totalInQueueCount, page]);
 
   const filteredHistoryEvents = React.useMemo(() => {
     if (!allEvents) return [];
@@ -248,21 +310,19 @@ export const ComponentSidebar = ({
           </div>
           <div className="flex justify-between gap-3 w-full">
             <h2 className="text-xl font-semibold">{title}</h2>
-            {!showFullHistory && (
-              <SidebarActionsDropdown
-                onRun={onRun}
-                runDisabled={runDisabled}
-                runDisabledTooltip={runDisabledTooltip}
-                onDuplicate={onDuplicate}
-                onDocs={onDocs}
-                onEdit={onEdit}
-                onConfigure={onConfigure}
-                onDeactivate={onDeactivate}
-                onToggleView={onToggleView}
-                onDelete={onDelete}
-                isCompactView={isCompactView}
-              />
-            )}
+            <SidebarActionsDropdown
+              onRun={onRun}
+              runDisabled={runDisabled}
+              runDisabledTooltip={runDisabledTooltip}
+              onDuplicate={onDuplicate}
+              onDocs={onDocs}
+              onEdit={onEdit}
+              onConfigure={onConfigure}
+              onDeactivate={onDeactivate}
+              onToggleView={onToggleView}
+              onDelete={onDelete}
+              isCompactView={isCompactView}
+            />
           </div>
           <div
             onClick={() => onClose?.()}
@@ -273,14 +333,13 @@ export const ComponentSidebar = ({
           </div>
         </div>
       </div>
-      {showFullHistory ? (
-        // Full History View
+      {page !== "overview" ? (
         <>
           {/* Back to Overview Section */}
           <div className="px-3 py-2 border-b-1 border-gray-200">
             <button
               onClick={handleBackToOverview}
-              className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-800 cursor-pointer"
+              className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800 cursor-pointer"
             >
               <ArrowLeft size={16} />
               Back to Overview
@@ -288,31 +347,35 @@ export const ComponentSidebar = ({
           </div>
 
           {/* Full History Header with Search and Filter */}
-          <div className="px-3 py-3 border-b-1 border-gray-200">
+          <div className="px-3 py-3">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold uppercase text-gray-500">Full History</h2>
+              <h2 className="text-sm font-semibold uppercase text-gray-500">
+                {page === "history" ? "Full History" : "Queue"}
+              </h2>
             </div>
             <div className="flex gap-2">
               {/* Search Input */}
               <div className="relative flex-1">
-                <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search events..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-3 py-1.5 border border-gray-200 rounded-md text-sm focus:outline-none "
                 />
               </div>
               {/* Status Filter */}
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => setStatusFilter(e.target.value as ChainExecutionState)}
+                className="px-3 py-1.5 border border-gray-200 rounded-md text-sm focus:outline-none placeholder:text-gray-400 text-gray-400"
               >
-                <option value="all">All Status</option>
+                <option value="all" className="text-gray-400">
+                  All Statuses
+                </option>
                 {statusOptions.map((status) => (
-                  <option key={status} value={status}>
+                  <option key={status} value={status} className="text-gray-400">
                     {status.charAt(0).toUpperCase() + status.slice(1)}
                   </option>
                 ))}
@@ -334,21 +397,22 @@ export const ComponentSidebar = ({
                       key={event.id}
                       event={event}
                       index={index}
-                      variant="latest"
+                      variant={page === "history" ? "latest" : "queue"}
                       isOpen={openEventIds.has(event.id) || event.isOpen}
                       onToggleOpen={handleToggleOpen}
                       onEventClick={onEventClick}
                       tabData={getTabData?.(event)}
                     />
                   ))}
-                  {hasMoreHistory && !searchQuery && statusFilter === "all" && (
-                    <div className="flex justify-center pt-4">
+                  {hasMoreItems && !searchQuery && statusFilter === "all" && (
+                    <div className="flex justify-center pt-1">
                       <button
-                        onClick={handleLoadMoreHistory}
-                        disabled={loadingMoreHistory}
-                        className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+                        onClick={handleLoadMoreItems}
+                        disabled={loadingMoreItems}
+                        className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed rounded-md px-2 py-1.5 border border-gray-200 shadow-xs"
                       >
-                        {loadingMoreHistory ? "Loading..." : "+ Show more"}
+                        {loadingMoreItems ? null : <Plus size={16} />}
+                        {loadingMoreItems ? "Loading..." : `Show ${showMoreCount} more`}
                       </button>
                     </div>
                   )}
@@ -425,13 +489,13 @@ export const ComponentSidebar = ({
                         />
                       );
                     })}
-                    {moreInQueueCount > 0 && (
+                    {totalInQueueCount > 5 && (
                       <button
-                        onClick={handleSeeFullHistory}
+                        onClick={handleSeeQueue}
                         className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
                       >
                         <TextAlignStart size={16} />
-                        {moreInQueueCount} more in the queue
+                        {totalInQueueCount - 5} more in the queue
                       </button>
                     )}
                   </>

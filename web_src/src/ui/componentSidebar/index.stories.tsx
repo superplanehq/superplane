@@ -216,8 +216,8 @@ export const Default: Story = {
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
           onEventClick={handleEventClick}
-          moreInQueueCount={2}
-          moreInHistoryCount={5}
+          totalInQueueCount={2}
+          totalInHistoryCount={5}
           onSeeFullHistory={() => console.log("See full history")}
         />
       </div>
@@ -274,8 +274,8 @@ export const WithInteractiveEvents: Story = {
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
           onEventClick={handleEventClick}
-          moreInQueueCount={2}
-          moreInHistoryCount={3}
+          totalInQueueCount={2}
+          totalInHistoryCount={3}
           onSeeFullHistory={() => console.log("See full history")}
         />
       </div>
@@ -327,8 +327,8 @@ export const WithDifferentIcon: Story = {
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
           onEventClick={handleEventClick}
-          moreInQueueCount={2}
-          moreInHistoryCount={4}
+          totalInQueueCount={2}
+          totalInHistoryCount={4}
           onSeeFullHistory={() => console.log("See full history")}
         />
       </div>
@@ -389,8 +389,8 @@ export const ExtendedMetadata: Story = {
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
           onEventClick={handleEventClick}
-          moreInQueueCount={2}
-          moreInHistoryCount={8}
+          totalInQueueCount={2}
+          totalInHistoryCount={8}
           onSeeFullHistory={() => console.log("See full history")}
         />
       </div>
@@ -440,8 +440,8 @@ export const ZeroState: Story = {
           latestEvents={[]}
           nextInQueueEvents={[]}
           onEventClick={() => console.log("Event clicked")}
-          moreInQueueCount={0}
-          moreInHistoryCount={0}
+          totalInQueueCount={0}
+          totalInHistoryCount={0}
           onSeeFullHistory={() => console.log("See full history")}
         />
       </div>
@@ -467,8 +467,8 @@ export const WithActionsDropdown: Story = {
           latestEvents={mockLatestEvents}
           nextInQueueEvents={mockNextInQueueEvents}
           onEventClick={() => console.log("Event clicked")}
-          moreInQueueCount={3}
-          moreInHistoryCount={7}
+          totalInQueueCount={3}
+          totalInHistoryCount={7}
           onSeeFullHistory={() => console.log("See full history")}
         />
       </div>
@@ -517,23 +517,17 @@ export const WithFullHistory: Story = {
 
       // Toggle isOpen state for latest events
       setLatestEvents((prev) =>
-        prev.map((event) =>
-          event.id === clickedEvent.id ? { ...event, isOpen: !event.isOpen } : event,
-        ),
+        prev.map((event) => (event.id === clickedEvent.id ? { ...event, isOpen: !event.isOpen } : event)),
       );
 
       // Toggle isOpen state for next events
       setNextEvents((prev) =>
-        prev.map((event) =>
-          event.id === clickedEvent.id ? { ...event, isOpen: !event.isOpen } : event,
-        ),
+        prev.map((event) => (event.id === clickedEvent.id ? { ...event, isOpen: !event.isOpen } : event)),
       );
 
       // Toggle isOpen state for all events
       setAllEvents((prev) =>
-        prev.map((event) =>
-          event.id === clickedEvent.id ? { ...event, isOpen: !event.isOpen } : event,
-        ),
+        prev.map((event) => (event.id === clickedEvent.id ? { ...event, isOpen: !event.isOpen } : event)),
       );
     };
 
@@ -574,8 +568,8 @@ export const WithFullHistory: Story = {
           nextInQueueEvents={nextEvents}
           allEvents={allEvents}
           onEventClick={handleEventClick}
-          moreInQueueCount={5}
-          moreInHistoryCount={10}
+          totalInQueueCount={5}
+          totalInHistoryCount={10}
           onSeeFullHistory={() => console.log("See full history triggered")}
           onLoadMoreHistory={handleLoadMore}
           hasMoreHistory={hasMore}
@@ -609,15 +603,11 @@ export const HistoryCountDemo: Story = {
       console.log("Event clicked", clickedEvent);
 
       setLatestEvents((prev) =>
-        prev.map((event) =>
-          event.id === clickedEvent.id ? { ...event, isOpen: !event.isOpen } : event,
-        ),
+        prev.map((event) => (event.id === clickedEvent.id ? { ...event, isOpen: !event.isOpen } : event)),
       );
 
       setNextEvents((prev) =>
-        prev.map((event) =>
-          event.id === clickedEvent.id ? { ...event, isOpen: !event.isOpen } : event,
-        ),
+        prev.map((event) => (event.id === clickedEvent.id ? { ...event, isOpen: !event.isOpen } : event)),
       );
     };
 
@@ -629,8 +619,8 @@ export const HistoryCountDemo: Story = {
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
           onEventClick={handleEventClick}
-          moreInQueueCount={3} // Shows "3 more in the queue"
-          moreInHistoryCount={15} // Shows "See full history" with 15 more events
+          totalInQueueCount={3} // Shows "3 more in the queue"
+          totalInHistoryCount={15} // Shows "See full history" with 15 more events
           onSeeFullHistory={() => console.log("See full history clicked - showing 15 more history events")}
         />
       </div>

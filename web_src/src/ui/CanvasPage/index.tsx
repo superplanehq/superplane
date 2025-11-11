@@ -46,8 +46,8 @@ export interface SidebarData {
   iconSlug?: string;
   iconColor?: string;
   iconBackground?: string;
-  moreInQueueCount: number;
-  moreInHistoryCount: number;
+  totalInQueueCount: number;
+  totalInHistoryCount: number;
   hideQueueEvents?: boolean;
   isLoading?: boolean;
 }
@@ -150,6 +150,12 @@ export interface CanvasPageProps {
   onLoadMoreHistory?: (nodeId: string) => void;
   getHasMoreHistory?: (nodeId: string) => boolean;
   getLoadingMoreHistory?: (nodeId: string) => boolean;
+
+  // Queue functionality
+  onLoadMoreQueue?: (nodeId: string) => void;
+  getAllQueueEvents?: (nodeId: string) => SidebarEvent[];
+  getHasMoreQueue?: (nodeId: string) => boolean;
+  getLoadingMoreQueue?: (nodeId: string) => boolean;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -438,6 +444,10 @@ function CanvasPage(props: CanvasPageProps) {
             onLoadMoreHistory={props.onLoadMoreHistory}
             getHasMoreHistory={props.getHasMoreHistory}
             getLoadingMoreHistory={props.getLoadingMoreHistory}
+            onLoadMoreQueue={props.onLoadMoreQueue}
+            getAllQueueEvents={props.getAllQueueEvents}
+            getHasMoreQueue={props.getHasMoreQueue}
+            getLoadingMoreQueue={props.getLoadingMoreQueue}
           />
         </div>
       </div>
@@ -510,6 +520,10 @@ function Sidebar({
   onLoadMoreHistory,
   getHasMoreHistory,
   getLoadingMoreHistory,
+  onLoadMoreQueue,
+  getAllQueueEvents,
+  getHasMoreQueue,
+  getLoadingMoreQueue,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -529,6 +543,10 @@ function Sidebar({
   onLoadMoreHistory?: (nodeId: string) => void;
   getHasMoreHistory?: (nodeId: string) => boolean;
   getLoadingMoreHistory?: (nodeId: string) => boolean;
+  onLoadMoreQueue?: (nodeId: string) => void;
+  getAllQueueEvents?: (nodeId: string) => SidebarEvent[];
+  getHasMoreQueue?: (nodeId: string) => boolean;
+  getLoadingMoreQueue?: (nodeId: string) => boolean;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -590,8 +608,8 @@ function Sidebar({
       iconSlug={sidebarData.iconSlug}
       iconColor={sidebarData.iconColor}
       iconBackground={sidebarData.iconBackground}
-      moreInQueueCount={sidebarData.moreInQueueCount}
-      moreInHistoryCount={sidebarData.moreInHistoryCount}
+      totalInQueueCount={sidebarData.totalInQueueCount}
+      totalInHistoryCount={sidebarData.totalInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
       getTabData={
         getTabData && state.componentSidebar.selectedNodeId
@@ -630,6 +648,10 @@ function Sidebar({
       onLoadMoreHistory={() => onLoadMoreHistory?.(state.componentSidebar.selectedNodeId!)}
       getHasMoreHistory={() => getHasMoreHistory?.(state.componentSidebar.selectedNodeId!) || false}
       getLoadingMoreHistory={() => getLoadingMoreHistory?.(state.componentSidebar.selectedNodeId!) || false}
+      onLoadMoreQueue={() => onLoadMoreQueue?.(state.componentSidebar.selectedNodeId!)}
+      getAllQueueEvents={() => getAllQueueEvents?.(state.componentSidebar.selectedNodeId!) || []}
+      getHasMoreQueue={() => getHasMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
+      getLoadingMoreQueue={() => getLoadingMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
     />
   );
 }

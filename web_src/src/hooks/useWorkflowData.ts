@@ -44,6 +44,8 @@ export const workflowKeys = {
     [...workflowKeys.nodeEvents(), "infinite", workflowId, nodeId] as const,
   nodeExecutionHistory: (workflowId: string, nodeId: string) =>
     [...workflowKeys.nodeExecutions(), "infinite", workflowId, nodeId] as const,
+  nodeQueueItemHistory: (workflowId: string, nodeId: string) =>
+    [...workflowKeys.nodeQueueItems(), "infinite", workflowId, nodeId] as const,
 };
 
 export const triggerKeys = {
@@ -447,6 +449,42 @@ export const useInfiniteNodeExecutions = (workflowId: string, nodeId: string, en
       if (lastPage?.executions && lastPage.executions.length > 0) {
         const lastExecution = lastPage.executions[lastPage.executions.length - 1];
         return lastExecution.createdAt;
+      }
+      return undefined;
+    },
+    initialPageParam: undefined as string | undefined,
+    enabled: enabled && !!workflowId && !!nodeId,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useInfiniteNodeQueueItems = (workflowId: string, nodeId: string, enabled: boolean = false) => {
+  return useInfiniteQuery({
+    queryKey: workflowKeys.nodeQueueItemHistory(workflowId, nodeId),
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const response = await workflowsListNodeQueueItems(
+        withOrganizationHeader({
+          path: {
+            workflowId,
+            nodeId,
+          },
+          query: {
+            limit: 10,
+            ...(pageParam ? { before: pageParam } : {}),
+          },
+        }),
+      );
+      return response.data;
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.items?.length || 0), 0);
+      const totalCount = lastPage?.totalCount || 0;
+      
+      if (currentLoadedCount >= totalCount) return undefined;
+
+      if (lastPage?.items && lastPage.items.length > 0) {
+        const lastQueueItem = lastPage.items[lastPage.items.length - 1];
+        return lastQueueItem.createdAt;
       }
       return undefined;
     },
