@@ -412,7 +412,7 @@ export const ComponentSidebar = ({
                         className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed rounded-md px-2 py-1.5 border border-gray-200 shadow-xs"
                       >
                         {loadingMoreItems ? null : <Plus size={16} />}
-                        {loadingMoreItems ? "Loading..." : `Show ${showMoreCount} more`}
+                        {loadingMoreItems ? "Loading..." : `Show ${showMoreCount > 10 ? "10" : showMoreCount} more`}
                       </button>
                     </div>
                   )}
