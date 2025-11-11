@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon } from "@/lib/utils";
+import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { SidebarEvent } from "../types";
 
@@ -161,18 +162,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         {event.subtitle && (
           <span className="text-sm text-gray-500 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
         )}
-        {variant === "queue" && onCancelQueueItem && (
-          <button
-            className="ml-2 text-gray-500 hover:text-red-600"
-            title="Cancel queued event"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCancelQueueItem(event.id);
-            }}
-          >
-            {React.createElement(resolveIcon("x"), { size: 16 })}
-          </button>
-        )}
+        {/* Actions dropdown */}
+        <SidebarEventActionsMenu eventId={event.id} onCancelQueueItem={onCancelQueueItem} eventState={event.state} />
       </div>
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
         <div className="rounded-sm bg-white border-1 border-gray-800 text-gray-500 w-full">
