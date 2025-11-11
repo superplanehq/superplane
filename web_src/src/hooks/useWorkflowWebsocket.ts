@@ -7,7 +7,11 @@ import { workflowKeys } from "./useWorkflowData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
 
-export function useWorkflowWebsocket(workflowId: string, organizationId: string): void {
+export function useWorkflowWebsocket(
+  workflowId: string,
+  organizationId: string,
+  onNodeEvent?: (nodeId: string, event: string) => void,
+): void {
   const nodeExecutionStore = useNodeExecutionStore();
   const queryClient = useQueryClient();
 
@@ -23,6 +27,7 @@ export function useWorkflowWebsocket(workflowId: string, organizationId: string)
             if (payload && payload.nodeId) {
               const workflowEvent = payload as WorkflowsWorkflowEvent;
               nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
+              onNodeEvent?.(workflowEvent.nodeId!, data.event);
             }
             break;
           case "execution_created":
@@ -47,6 +52,7 @@ export function useWorkflowWebsocket(workflowId: string, organizationId: string)
                     queryKey: workflowKeys.eventExecution(workflowId, execution.rootEvent.id),
                   });
                 }
+                onNodeEvent?.(execution.nodeId!, data.event);
               }
             }
             break;
@@ -57,7 +63,7 @@ export function useWorkflowWebsocket(workflowId: string, organizationId: string)
         console.error("Error parsing message:", error);
       }
     },
-    [nodeExecutionStore, queryClient, workflowId],
+    [nodeExecutionStore, queryClient, workflowId, onNodeEvent],
   );
 
   useWebSocket(`${SOCKET_SERVER_URL}${workflowId}?organization_id=${organizationId}`, {

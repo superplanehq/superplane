@@ -46,7 +46,8 @@ export interface SidebarData {
   iconSlug?: string;
   iconColor?: string;
   iconBackground?: string;
-  moreInQueueCount: number;
+  totalInQueueCount: number;
+  totalInHistoryCount: number;
   hideQueueEvents?: boolean;
   isLoading?: boolean;
 }
@@ -143,6 +144,18 @@ export interface CanvasPageProps {
   // Optional: control and observe component sidebar state
   onSidebarChange?: (isOpen: boolean, selectedNodeId: string | null) => void;
   initialSidebar?: { isOpen?: boolean; nodeId?: string | null };
+
+  // Full history functionality
+  getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
+  onLoadMoreHistory?: (nodeId: string) => void;
+  getHasMoreHistory?: (nodeId: string) => boolean;
+  getLoadingMoreHistory?: (nodeId: string) => boolean;
+
+  // Queue functionality
+  onLoadMoreQueue?: (nodeId: string) => void;
+  getAllQueueEvents?: (nodeId: string) => SidebarEvent[];
+  getHasMoreQueue?: (nodeId: string) => boolean;
+  getLoadingMoreQueue?: (nodeId: string) => boolean;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -427,6 +440,14 @@ function CanvasPage(props: CanvasPageProps) {
             onDelete={handleNodeDelete}
             runDisabled={props.runDisabled}
             runDisabledTooltip={props.runDisabledTooltip}
+            getAllHistoryEvents={props.getAllHistoryEvents}
+            onLoadMoreHistory={props.onLoadMoreHistory}
+            getHasMoreHistory={props.getHasMoreHistory}
+            getLoadingMoreHistory={props.getLoadingMoreHistory}
+            onLoadMoreQueue={props.onLoadMoreQueue}
+            getAllQueueEvents={props.getAllQueueEvents}
+            getHasMoreQueue={props.getHasMoreQueue}
+            getLoadingMoreQueue={props.getLoadingMoreQueue}
           />
         </div>
       </div>
@@ -495,6 +516,14 @@ function Sidebar({
   onDelete,
   runDisabled,
   runDisabledTooltip,
+  getAllHistoryEvents,
+  onLoadMoreHistory,
+  getHasMoreHistory,
+  getLoadingMoreHistory,
+  onLoadMoreQueue,
+  getAllQueueEvents,
+  getHasMoreQueue,
+  getLoadingMoreQueue,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -510,6 +539,14 @@ function Sidebar({
   onDelete?: (nodeId: string) => void;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
+  getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
+  onLoadMoreHistory?: (nodeId: string) => void;
+  getHasMoreHistory?: (nodeId: string) => boolean;
+  getLoadingMoreHistory?: (nodeId: string) => boolean;
+  onLoadMoreQueue?: (nodeId: string) => void;
+  getAllQueueEvents?: (nodeId: string) => SidebarEvent[];
+  getHasMoreQueue?: (nodeId: string) => boolean;
+  getLoadingMoreQueue?: (nodeId: string) => boolean;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -560,6 +597,7 @@ function Sidebar({
 
   return (
     <ComponentSidebar
+      key={state.componentSidebar.selectedNodeId}
       isOpen={state.componentSidebar.isOpen}
       onClose={state.componentSidebar.close}
       latestEvents={latestEvents}
@@ -570,7 +608,8 @@ function Sidebar({
       iconSlug={sidebarData.iconSlug}
       iconColor={sidebarData.iconColor}
       iconBackground={sidebarData.iconBackground}
-      moreInQueueCount={sidebarData.moreInQueueCount}
+      totalInQueueCount={sidebarData.totalInQueueCount}
+      totalInHistoryCount={sidebarData.totalInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
       getTabData={
         getTabData && state.componentSidebar.selectedNodeId
@@ -605,6 +644,14 @@ function Sidebar({
       onDeactivate={onDeactivate ? () => onDeactivate(state.componentSidebar.selectedNodeId!) : undefined}
       onToggleView={onToggleView ? () => onToggleView(state.componentSidebar.selectedNodeId!) : undefined}
       onDelete={onDelete ? () => onDelete(state.componentSidebar.selectedNodeId!) : undefined}
+      getAllHistoryEvents={() => getAllHistoryEvents?.(state.componentSidebar.selectedNodeId!) || []}
+      onLoadMoreHistory={() => onLoadMoreHistory?.(state.componentSidebar.selectedNodeId!)}
+      getHasMoreHistory={() => getHasMoreHistory?.(state.componentSidebar.selectedNodeId!) || false}
+      getLoadingMoreHistory={() => getLoadingMoreHistory?.(state.componentSidebar.selectedNodeId!) || false}
+      onLoadMoreQueue={() => onLoadMoreQueue?.(state.componentSidebar.selectedNodeId!)}
+      getAllQueueEvents={() => getAllQueueEvents?.(state.componentSidebar.selectedNodeId!) || []}
+      getHasMoreQueue={() => getHasMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
+      getLoadingMoreQueue={() => getLoadingMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
     />
   );
 }
