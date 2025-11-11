@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -96,6 +97,12 @@ func InvokeNodeExecutionAction(
 	if err != nil {
 		return nil, fmt.Errorf("failed to save execution: %w", err)
 	}
+
+	messages.NewWorkflowExecutionMessage(
+		execution.WorkflowID.String(),
+		execution.ID.String(),
+		execution.NodeID,
+	).Publish()
 
 	return &pb.InvokeNodeExecutionActionResponse{}, nil
 }
