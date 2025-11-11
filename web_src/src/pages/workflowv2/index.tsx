@@ -61,6 +61,7 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { mapExecutionsToSidebarEvents, mapQueueItemsToSidebarEvents, mapTriggerEventsToSidebarEvents } from "./utils";
+import { EventState } from "@/ui/componentBase";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -1507,6 +1508,18 @@ function getRunItemState(execution: WorkflowsWorkflowNodeExecution): LastRunStat
   return "failed";
 }
 
+function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
+  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
+    return "running";
+  }
+
+  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
+    return "success";
+  }
+
+  return "failed";
+}
+
 function prepareNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
@@ -1840,14 +1853,13 @@ function prepareIfNode(
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
+  const lastTrueExecution = executions.length > 0 ? executions.find((e) => e.outputs?.["true"]) : null;
+  const lastFalseExecution = executions.length > 0 ? executions.find((e) => e.outputs?.["false"]) : null;
 
   // Parse conditions from node configuration
   const expression = node.configuration?.expression;
 
-  // Get last execution for event data
-  let trueEvent, falseEvent;
-  if (execution) {
+  const processExecutionEventData = (execution: WorkflowsWorkflowNodeExecution) => {
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
 
@@ -1856,14 +1868,20 @@ function prepareIfNode(
     const eventData = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
+      eventState: executionToEventSectionState(execution),
     };
 
-    if (execution.outputs?.["true"]) {
-      trueEvent = eventData;
-    } else if (execution.outputs?.["false"]) {
-      falseEvent = eventData;
-    }
+    return eventData;
+  };
+
+  // Get last execution for event data
+  let trueEvent, falseEvent;
+  if (lastTrueExecution) {
+    trueEvent = processExecutionEventData(lastTrueExecution!);
+  }
+
+  if (lastFalseExecution) {
+    falseEvent = processExecutionEventData(lastFalseExecution!);
   }
 
   return {
@@ -1914,7 +1932,7 @@ function prepareNoopNode(
     lastEvent = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
+      eventState: executionToEventSectionState(execution),
     };
   }
 
@@ -1961,7 +1979,7 @@ function prepareMergeNode(
     lastEvent = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: getRunItemState(execution),
+      eventState: executionToEventSectionState(execution),
     };
   }
 
@@ -2025,7 +2043,7 @@ function prepareFilterNode(
     lastEvent = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
+      eventState: executionToEventSectionState(execution),
     };
   }
 
