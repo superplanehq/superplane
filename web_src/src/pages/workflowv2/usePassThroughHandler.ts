@@ -1,12 +1,11 @@
-import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
-import { WorkflowsWorkflow, WorkflowsWorkflowNodeExecution } from "@/api-client";
-import { workflowsInvokeNodeExecutionAction } from "@/api-client";
+import { workflowsInvokeNodeExecutionAction, WorkflowsWorkflow } from "@/api-client";
 import { workflowKeys } from "@/hooks/useWorkflowData";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 
 type Params = {
   workflowId: string;
@@ -19,37 +18,26 @@ export function usePassThroughHandler({ workflowId, organizationId, workflow }: 
   const refetchNodeData = useNodeExecutionStore((state) => state.refetchNodeData);
 
   const onPassThrough = useCallback(
-    async (nodeId: string, executionId?: string) => {
-      // Pull latest executions lazily from the store to avoid hook ordering deps
-      let executions: WorkflowsWorkflowNodeExecution[] = [];
-      try {
-        const storeData: any = useNodeExecutionStore.getState().data;
-        const nodeData = typeof storeData?.get === "function" ? storeData.get(nodeId) : storeData?.[nodeId];
-        executions = nodeData?.executions || [];
-      } catch {
-        executions = [];
-      }
-      const execution = executionId
-        ? executions.find((e) => e.id === executionId)
-        : executions.find((e) => e.state === "STATE_STARTED") || executions[0];
-      if (!execution?.id) return;
+    async (nodeId: string, executionId: string) => {
       try {
         await workflowsInvokeNodeExecutionAction(
           withOrganizationHeader({
             path: {
               workflowId,
-              executionId: execution.id,
+              executionId: executionId,
               actionName: "passThrough",
             },
             body: { parameters: {} },
           }),
         );
-        // Invalidate and force-refresh node data so sidebar updates immediately
+
         await queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecution(workflowId, nodeId) });
         const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+
         if (node) {
           await refetchNodeData(workflowId, nodeId, node.type!, queryClient);
         }
+
         showSuccessToast("Pushed through");
       } catch (error) {
         console.error("Failed to push through:", error);

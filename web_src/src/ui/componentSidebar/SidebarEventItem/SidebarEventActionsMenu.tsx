@@ -1,9 +1,8 @@
-import React from "react";
 import { resolveIcon } from "@/lib/utils";
-import { EllipsisVertical } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { EllipsisVertical } from "lucide-react";
+import React from "react";
 import type { ChildEventsState } from "../../composite";
-import { showInfoToast } from "@/utils/toast";
 
 interface SidebarEventActionsMenuProps {
   eventId: string;
@@ -20,6 +19,46 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   supportsPassThrough,
   eventState,
 }) => {
+  const isProcessed = eventState === "processed";
+  const isDiscarded = eventState === "discarded";
+  const isWaiting = eventState === "waiting";
+
+  const showPassThrough = supportsPassThrough && !(isProcessed || isDiscarded || isWaiting);
+  const showCancel = !(isProcessed || isDiscarded);
+  const showReEmit = isProcessed || isDiscarded;
+
+  const handleReEmit = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+
+      // Implement re-emit logic here
+      // TODO: Add re-emit handler prop if needed
+    },
+    [onPassThrough, eventId],
+  );
+
+  const handlePassThrough = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+
+      if (onPassThrough) {
+        onPassThrough(eventId);
+      }
+    },
+    [onPassThrough, eventId],
+  );
+
+  const handleCancelQueueItem = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+
+      if (onCancelQueueItem) {
+        onCancelQueueItem(eventId);
+      }
+    },
+    [onCancelQueueItem, eventId],
+  );
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -31,43 +70,24 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
           <EllipsisVertical size={16} />
         </button>
       </DropdownMenuTrigger>
+
       <DropdownMenuContent align="end" sideOffset={6} className="min-w-[11rem]">
-        {/* Cancel when not finished (queued or running) */}
-        {!(eventState === "processed" || eventState === "discarded") && (
-          <DropdownMenuItem
-            onSelect={() => {
-              showInfoToast("Cancelling event...");
-              onCancelQueueItem?.(eventId);
-            }}
-            className="gap-2"
-          >
+        {showCancel && (
+          <DropdownMenuItem onClick={handleCancelQueueItem} className="gap-2">
             {React.createElement(resolveIcon("x-circle"), { size: 16 })}
             Cancel
           </DropdownMenuItem>
         )}
 
-        {/* Push Through only when running and if component supports it */}
-        {supportsPassThrough && !(eventState === "processed" || eventState === "discarded" || eventState === "waiting") && (
-          <DropdownMenuItem
-            onSelect={() => {
-              showInfoToast("Pushing through...");
-              onPassThrough?.(eventId);
-            }}
-            className="gap-2"
-          >
+        {showPassThrough && (
+          <DropdownMenuItem onClick={handlePassThrough} className="gap-2">
             {React.createElement(resolveIcon("fast-forward"), { size: 16 })}
             Push Through
           </DropdownMenuItem>
         )}
 
-        {/* Re-emit for finished or running; not for queued */}
-        {eventState !== "waiting" && (
-          <DropdownMenuItem
-            onSelect={() => {
-              /* noop for now */
-            }}
-            className="gap-2"
-          >
+        {showReEmit && (
+          <DropdownMenuItem onClick={handleReEmit} className="gap-2">
             {React.createElement(resolveIcon("rotate-ccw"), { size: 16 })}
             Re-emit
           </DropdownMenuItem>
