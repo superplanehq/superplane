@@ -32,7 +32,7 @@ func HandleWorkflowQueueItemCreated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to unmarshal queue_item_created message: %w", err)
 	}
 
-	return handleQueueItemState(pbMsg.WorkflowId, pbMsg.Id, wsHub, QueueItemCreatedEvent)
+	return handleQueueItemState(pbMsg.WorkflowId, pbMsg.Id, pbMsg.NodeId, wsHub, QueueItemCreatedEvent)
 }
 
 func HandleWorkflowQueueItemConsumed(messageBody []byte, wsHub *ws.Hub) error {
@@ -43,10 +43,10 @@ func HandleWorkflowQueueItemConsumed(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to unmarshal queue_item_consumed message: %w", err)
 	}
 
-	return handleQueueItemState(pbMsg.WorkflowId, pbMsg.Id, wsHub, QueueItemConsumedEvent)
+	return handleQueueItemState(pbMsg.WorkflowId, pbMsg.Id, pbMsg.NodeId, wsHub, QueueItemConsumedEvent)
 }
 
-func handleQueueItemState(workflowID string, queueItemID string, wsHub *ws.Hub, eventName string) error {
+func handleQueueItemState(workflowID string, queueItemID string, nodeID string, wsHub *ws.Hub, eventName string) error {
 	workflowUUID, err := uuid.Parse(workflowID)
 	if err != nil {
 		return fmt.Errorf("failed to parse workflow id: %w", err)
@@ -57,21 +57,36 @@ func handleQueueItemState(workflowID string, queueItemID string, wsHub *ws.Hub, 
 		return fmt.Errorf("failed to parse queue item id: %w", err)
 	}
 
-	queueItem, err := models.FindNodeQueueItem(workflowUUID, queueItemUUID)
-	if err != nil {
-		return fmt.Errorf("failed to find queue item: %w", err)
+	var serializedQueueItem *pb.WorkflowNodeQueueItem
+
+	//
+	// If queie item is consumed, it means it was already deleted from the database
+	//
+	if eventName == QueueItemConsumedEvent {
+		serializedQueueItem = &pb.WorkflowNodeQueueItem{
+			WorkflowId: workflowUUID.String(),
+			NodeId:     nodeID,
+			Id:         queueItemUUID.String(),
+		}
+	} else {
+		queueItem, err := models.FindNodeQueueItem(workflowUUID, queueItemUUID)
+		if err != nil {
+			return fmt.Errorf("failed to find queue item: %w", err)
+		}
+
+		serializedQueueItems, err := workflows.SerializeNodeQueueItems([]models.WorkflowNodeQueueItem{*queueItem})
+		if err != nil {
+			return fmt.Errorf("failed to serialize queue item: %w", err)
+		}
+
+		if len(serializedQueueItems) == 0 {
+			return fmt.Errorf("no serialized queue items")
+		}
+
+		serializedQueueItem = serializedQueueItems[0]
 	}
 
-	serializedQueueItems, err := workflows.SerializeNodeQueueItems([]models.WorkflowNodeQueueItem{*queueItem})
-	if err != nil {
-		return fmt.Errorf("failed to serialize queue item: %w", err)
-	}
-
-	if len(serializedQueueItems) == 0 {
-		return fmt.Errorf("no serialized queue items")
-	}
-
-	serializedQueueItemJSON, err := protojson.Marshal(serializedQueueItems[0])
+	serializedQueueItemJSON, err := protojson.Marshal(serializedQueueItem)
 	if err != nil {
 		return fmt.Errorf("failed to marshal queue item: %w", err)
 	}

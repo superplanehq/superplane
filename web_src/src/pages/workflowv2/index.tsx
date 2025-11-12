@@ -229,6 +229,12 @@ export function WorkflowPageV2() {
           queryKey: workflowKeys.nodeExecutionHistory(workflowId!, nodeId),
         });
       }
+
+      if (event.startsWith("queue_item")) {
+        queryClient.invalidateQueries({
+          queryKey: workflowKeys.nodeQueueItemHistory(workflowId!, nodeId),
+        });
+      }
     },
     [queryClient, workflowId],
   );
@@ -300,30 +306,8 @@ export function WorkflowPageV2() {
       const executionsMap = nodeData.executions.length > 0 ? { [nodeId]: nodeData.executions } : {};
       const queueItemsMap = nodeData.queueItems.length > 0 ? { [nodeId]: nodeData.queueItems } : {};
       const eventsMapForSidebar = nodeData.events.length > 0 ? { [nodeId]: nodeData.events } : nodeEventsMap; // Fall back to existing events map for trigger nodes
-
-      // Try to get total count from API cache if available
-      let totalHistoryCount: number | undefined;
-      if (workflowId) {
-        if (node.type === "TYPE_TRIGGER") {
-          const eventsCacheData = queryClient.getQueryData(
-            nodeEventsQueryOptions(workflowId, nodeId, { limit: 10 }).queryKey,
-          ) as WorkflowsListNodeEventsResponse;
-          totalHistoryCount = eventsCacheData?.totalCount;
-        } else {
-          const executionsCacheData = queryClient.getQueryData(
-            nodeExecutionsQueryOptions(workflowId, nodeId, { limit: 10 }).queryKey,
-          ) as WorkflowsListNodeExecutionsResponse;
-          totalHistoryCount = executionsCacheData?.totalCount;
-        }
-      }
-
-      let totalQueueCount: number | undefined;
-      if (workflowId) {
-        const queueItemsCacheData = queryClient.getQueryData(
-          nodeQueueItemsQueryOptions(workflowId, nodeId).queryKey,
-        ) as WorkflowsListNodeQueueItemsResponse;
-        totalQueueCount = queueItemsCacheData?.totalCount;
-      }
+      const totalHistoryCount = nodeData.totalInHistoryCount;
+      const totalQueueCount = nodeData.totalInQueueCount;
 
       const sidebarData = prepareSidebarData(
         node,
