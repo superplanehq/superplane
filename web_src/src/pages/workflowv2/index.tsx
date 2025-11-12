@@ -12,9 +12,6 @@ import {
   ComponentsEdge,
   ComponentsNode,
   TriggersTrigger,
-  WorkflowsListNodeEventsResponse,
-  WorkflowsListNodeExecutionsResponse,
-  WorkflowsListNodeQueueItemsResponse,
   WorkflowsWorkflow,
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowNodeExecution,
@@ -30,9 +27,6 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import {
   eventExecutionsQueryOptions,
-  nodeEventsQueryOptions,
-  nodeExecutionsQueryOptions,
-  nodeQueueItemsQueryOptions,
   useTriggers,
   useUpdateWorkflow,
   useWorkflow,
@@ -337,15 +331,9 @@ export function WorkflowPageV2() {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return;
 
-      const nodeData = getNodeData(nodeId);
-
-      // Trigger load if not already loaded or loading
-      if (!nodeData.isLoaded && !nodeData.isLoading) {
-        loadNodeDataMethod(workflowId!, nodeId, node.type!, queryClient);
-      }
+      loadNodeDataMethod(workflowId!, nodeId, node.type!, queryClient);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [workflow?.spec?.nodes?.map((n) => n.id), workflowId, queryClient, getNodeData, loadNodeDataMethod],
+    [workflow, workflowId, queryClient, loadNodeDataMethod],
   );
 
   const onCancelQueueItem = useOnCancelQueueItemHandler({

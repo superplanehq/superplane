@@ -181,14 +181,6 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
   },
 
   loadNodeData: async (workflowId, nodeId, nodeType, queryClient) => {
-    const current = get().data.get(nodeId);
-
-    // Skip if already loaded or loading
-    if (current?.isLoaded || current?.isLoading) {
-      return;
-    }
-
-    // Mark as loading
     set((state) => {
       const newData = new Map(state.data);
       newData.set(nodeId, {
@@ -223,7 +215,8 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
           executions: executionsResult.executions || [],
           queueItems: queueItemsResult.items || [],
           events: eventsResult.events || [],
-          totalInHistoryCount: nodeType === "TYPE_TRIGGER" ? eventsResult?.totalCount || 0 : executionsResult?.totalCount || 0,
+          totalInHistoryCount:
+            nodeType === "TYPE_TRIGGER" ? eventsResult?.totalCount || 0 : executionsResult?.totalCount || 0,
           totalInQueueCount: queueItemsResult?.totalCount || 0,
           isLoading: false,
           isLoaded: true,
@@ -283,9 +276,10 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         const newData = new Map(state.data);
         newData.set(nodeId, {
           executions: executionsResult.executions || [],
-          queueItems: queueItemsResult.items || [], 
+          queueItems: queueItemsResult.items || [],
           events: eventsResult.events || [],
-          totalInHistoryCount: nodeType !== "TYPE_TRIGGER" ? executionsResult?.totalCount || 0 : eventsResult?.totalCount || 0,
+          totalInHistoryCount:
+            nodeType !== "TYPE_TRIGGER" ? executionsResult?.totalCount || 0 : eventsResult?.totalCount || 0,
           totalInQueueCount: queueItemsResult?.totalCount || 0,
           isLoading: false,
           isLoaded: true,
