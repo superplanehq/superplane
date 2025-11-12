@@ -9,19 +9,10 @@ interface SimpleTooltipProps {
   hideOnClick?: boolean;
 }
 
-export const SimpleTooltip: React.FC<SimpleTooltipProps> = ({
-  children,
-  content,
-  delay = 200,
-  hideOnClick = true,
-}) => {
+export const SimpleTooltip: React.FC<SimpleTooltipProps> = ({ children, content, delay = 200, hideOnClick = true }) => {
   return (
     <Tippy
-      render={() => (
-        <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg">
-          {content}
-        </div>
-      )}
+      render={() => <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg">{content}</div>}
       placement="top"
       delay={delay}
       hideOnClick={hideOnClick}
