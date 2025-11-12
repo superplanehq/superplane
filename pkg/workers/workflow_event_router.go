@@ -89,7 +89,7 @@ func (w *WorkflowEventRouter) LockAndProcessEvent(logger *log.Entry, event model
 				event.WorkflowID.String(),
 				queueItem.ID.String(),
 				queueItem.NodeID,
-			).Publish()
+			).Publish(false)
 		}
 	}
 

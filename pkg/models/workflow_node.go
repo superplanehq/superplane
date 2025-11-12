@@ -234,3 +234,17 @@ func FindNextQueueItemPerNode(workflowID uuid.UUID) ([]WorkflowNodeQueueItem, er
 
 	return queueItems, nil
 }
+
+func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*WorkflowNodeQueueItem, error) {
+	var queueItem WorkflowNodeQueueItem
+	err := database.Conn().
+		Where("workflow_id = ? AND id = ?", workflowID, queueItemID).
+		First(&queueItem).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &queueItem, nil
+}

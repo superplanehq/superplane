@@ -94,7 +94,7 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node mod
 				queueItem.WorkflowID.String(),
 				queueItem.ID.String(),
 				queueItem.NodeID,
-			).Publish()
+			).Publish(true)
 		}
 	}
 
