@@ -3049,6 +3049,10 @@
             "type": "object",
             "$ref": "#/definitions/ConfigurationValidationRule"
           }
+        },
+        "placeholder": {
+          "type": "string",
+          "title": "Optional placeholder text for UI inputs"
         }
       }
     },

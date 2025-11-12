@@ -21,6 +21,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
     label: "",
     type: "string",
     description: "",
+    placeholder: "",
     required: false,
     typeOptions: {},
   });
@@ -35,6 +36,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
         label: "",
         type: "string",
         description: "",
+        placeholder: "",
         required: false,
         typeOptions: {},
       });
@@ -47,6 +49,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
       label: "",
       type: "string",
       description: "",
+      placeholder: "",
       required: false,
       typeOptions: {},
     });
@@ -262,6 +265,22 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                   })
                 }
                 placeholder="Describe the purpose of this field"
+              />
+            </div>
+
+            {/* Field Placeholder */}
+            <div>
+              <Label className="block text-sm font-medium mb-2">Placeholder</Label>
+              <Input
+                type="text"
+                value={configFieldForm.placeholder || ""}
+                onChange={(e) =>
+                  setConfigFieldForm({
+                    ...configFieldForm,
+                    placeholder: e.target.value,
+                  })
+                }
+                placeholder="Optional placeholder text"
               />
             </div>
 
