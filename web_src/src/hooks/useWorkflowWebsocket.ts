@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import useWebSocket from "react-use-websocket";
 import { useQueryClient } from "@tanstack/react-query";
-import { WorkflowsWorkflowNodeExecution, WorkflowsWorkflowEvent } from "@/api-client";
+import { WorkflowsWorkflowNodeExecution, WorkflowsWorkflowEvent, WorkflowsWorkflowNodeQueueItem } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { workflowKeys } from "./useWorkflowData";
 
@@ -54,6 +54,20 @@ export function useWorkflowWebsocket(
                 }
                 onNodeEvent?.(execution.nodeId!, data.event);
               }
+            }
+            break;
+          case "queue_item_created":
+            if (payload && payload.nodeId) {
+              const queueItem = payload as WorkflowsWorkflowNodeQueueItem;
+              nodeExecutionStore.addNodeQueueItem(queueItem.nodeId!, queueItem);
+              onNodeEvent?.(queueItem.nodeId!, data.event);
+            }
+            break;
+          case "queue_item_consumed":
+            if (payload && payload.nodeId && payload.id) {
+              const queueItem = payload as WorkflowsWorkflowNodeQueueItem;
+              nodeExecutionStore.removeNodeQueueItem(queueItem.nodeId!, queueItem.id!);
+              onNodeEvent?.(queueItem.nodeId!, data.event);
             }
             break;
           default:

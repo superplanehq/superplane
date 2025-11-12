@@ -68,6 +68,7 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 
 func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.WorkflowNode) error {
 	var exec *models.WorkflowNodeExecution
+	var queueItem *models.WorkflowNodeQueueItem
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		n, err := models.LockWorkflowNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
@@ -75,29 +76,39 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node mod
 			return nil
 		}
 
-		exec, err = w.processNode(tx, logger, n)
+		exec, queueItem, err = w.processNode(tx, logger, n)
 		return err
 	})
 
-	if err == nil && exec != nil {
-		messages.NewWorkflowExecutionMessage(
-			exec.WorkflowID.String(),
-			exec.ID.String(),
-			exec.NodeID,
-		).Publish()
+	if err == nil {
+		if exec != nil {
+			messages.NewWorkflowExecutionMessage(
+				exec.WorkflowID.String(),
+				exec.ID.String(),
+				exec.NodeID,
+			).Publish()
+		}
+
+		if queueItem != nil {
+			messages.NewWorkflowQueueItemMessage(
+				queueItem.WorkflowID.String(),
+				queueItem.ID.String(),
+				queueItem.NodeID,
+			).Publish(true)
+		}
 	}
 
 	return err
 }
 
-func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.WorkflowNode) (*models.WorkflowNodeExecution, error) {
+func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.WorkflowNode) (*models.WorkflowNodeExecution, *models.WorkflowNodeQueueItem, error) {
 	queueItem, err := node.FirstQueueItem(tx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
+			return nil, nil, nil
 		}
 
-		return nil, err
+		return nil, nil, err
 	}
 
 	logger = logging.ForQueueItem(logger, *queueItem)
@@ -105,25 +116,28 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 
 	ctx, err := contexts.BuildProcessQueueContext(tx, node, queueItem)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
+	var exec *models.WorkflowNodeExecution
 	switch node.Type {
 	case models.NodeTypeComponent:
 		/*
 		* For component nodes, delegate to the component's ProcessQueueItem implementation to handle
 		* the processing.
 		 */
-		return w.processComponentNode(ctx, node)
+		exec, err = w.processComponentNode(ctx, node)
 	case models.NodeTypeBlueprint:
 		/*
 		* For blueprint nodes, use the default processing logic.
 		* Blueprint nodes do not have custom processing logic.
 		 */
-		return ctx.DefaultProcessing()
+		exec, err = ctx.DefaultProcessing()
 	default:
-		return nil, fmt.Errorf("unsupported node type: %s", node.Type)
+		return nil, nil, fmt.Errorf("unsupported node type: %s", node.Type)
 	}
+
+	return exec, queueItem, err
 }
 
 func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *components.ProcessQueueContext, node *models.WorkflowNode) (*models.WorkflowNodeExecution, error) {
