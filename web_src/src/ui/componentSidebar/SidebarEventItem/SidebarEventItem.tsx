@@ -1,8 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon } from "@/lib/utils";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
+import JsonView from "@uiw/react-json-view";
+import { SimpleTooltip } from "../SimpleTooltip";
 
 export enum ChainExecutionState {
   COMPLETED = "completed",
@@ -12,7 +15,10 @@ export enum ChainExecutionState {
 
 export interface ExecutionChainItem {
   name: string;
+  nodeId: string;
+  executionId: string;
   state: ChainExecutionState;
+  payload?: any;
   children?: Array<{ name: string; state: ChainExecutionState }>;
 }
 
@@ -59,6 +65,82 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   }, [tabData]);
 
   const [activeTab, setActiveTab] = useState<"current" | "root" | "payload" | "executionChain">(getDefaultActiveTab());
+  const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
+  const [modalPayload, setModalPayload] = useState<any>(null);
+  const [copiedExecutions, setCopiedExecutions] = useState<Set<string>>(new Set());
+  const [payloadCopied, setPayloadCopied] = useState(false);
+
+  const navigate = useNavigate();
+
+  const copyToClipboard = useCallback((text: string) => {
+    navigator.clipboard.writeText(text);
+  }, []);
+
+  const copyPayloadToClipboard = useCallback(
+    (payload: any) => {
+      const payloadString = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+      copyToClipboard(payloadString);
+      setPayloadCopied(true);
+      setTimeout(() => setPayloadCopied(false), 2000);
+    },
+    [copyToClipboard],
+  );
+
+  const copyExecutionLink = useCallback(
+    (execution: ExecutionChainItem) => {
+      const pathParts = window.location.pathname.split("/");
+      const orgId = pathParts[1];
+      const workflowId = pathParts[3];
+
+      if ((execution.children?.length || 0) > 0) {
+        const nodeId = execution.nodeId;
+        const executionId = execution.executionId;
+
+        const link = `${window.location.origin}/${orgId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`;
+        copyToClipboard(link);
+      } else {
+        const link = `${window.location.origin}/${orgId}/workflows/${workflowId}?sidebar=1&node=${execution.nodeId}`;
+        copyToClipboard(link);
+      }
+
+      const executionKey = `${execution.nodeId}-${execution.executionId}`;
+      setCopiedExecutions((prev) => new Set(prev).add(executionKey));
+      setTimeout(() => {
+        setCopiedExecutions((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(executionKey);
+          return newSet;
+        });
+      }, 2000);
+    },
+    [copyToClipboard],
+  );
+
+  const handleExpandCustomComponentExecution = useCallback(
+    (execution: ExecutionChainItem) => {
+      const pathParts = window.location.pathname.split("/");
+      const orgId = pathParts[1];
+      const workflowId = pathParts[3];
+
+      const nodeId = execution.nodeId;
+      const executionId = execution.executionId;
+
+      const path = `/${orgId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`;
+      navigate(path, { replace: false });
+    },
+    [navigate],
+  );
+
+  const showExecutionPayload = useCallback(
+    (execution: ExecutionChainItem) => {
+      const payload = execution.payload || tabData?.payload;
+      if (payload) {
+        setModalPayload(payload);
+        setIsPayloadModalOpen(true);
+      }
+    },
+    [tabData?.payload],
+  );
 
   // Update active tab when tabData changes to ensure we always have a valid active tab
   useEffect(() => {
@@ -275,21 +357,57 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
           {tabData && activeTab === "payload" && tabData.payload && (
             <div className="w-full px-2 py-2">
-              <pre className="text-xs bg-gray-50 p-2 rounded border overflow-x-auto">
-                {typeof tabData.payload === "string" ? tabData.payload : JSON.stringify(tabData.payload, null, 2)}
-              </pre>
+              <div className="flex items-center justify-between mb-2 relative">
+                <div className="flex items-center gap-1 absolute right-2 top-4">
+                  <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
+                    <button
+                      onClick={() => copyPayloadToClipboard(tabData.payload)}
+                      className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                    >
+                      {React.createElement(resolveIcon("copy"), { size: 14 })}
+                    </button>
+                  </SimpleTooltip>
+                  <SimpleTooltip content="Payload">
+                    <button
+                      onClick={() => {
+                        setModalPayload(tabData.payload);
+                        setIsPayloadModalOpen(true);
+                      }}
+                      className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                    >
+                      {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
+                    </button>
+                  </SimpleTooltip>
+                </div>
+              </div>
+              <div className="h-50 overflow-auto border rounded bg-white">
+                <JsonView
+                  value={typeof tabData.payload === "string" ? JSON.parse(tabData.payload) : tabData.payload}
+                  style={{
+                    fontSize: "12px",
+                    fontFamily:
+                      'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
+                    backgroundColor: "#ffffff",
+                    color: "#24292e",
+                    padding: "8px",
+                  }}
+                  displayObjectSize={false}
+                  displayDataTypes={false}
+                  enableClipboard={false}
+                />
+              </div>
             </div>
           )}
 
           {tabData && activeTab === "executionChain" && tabData.executionChain && (
-            <div className="w-full flex flex-col gap-2 px-2 py-2">
+            <div className="w-full flex flex-col px-2 py-2">
               <div className="text-sm text-gray-500 ml-2">
                 {totalExecutionsCount} execution{totalExecutionsCount === 1 ? "" : "s"}
               </div>
               {tabData.executionChain.map((execution, index) => (
-                <div key={index} className="flex flex-col gap-1">
+                <div key={index} className="flex flex-col">
                   {/* Main execution */}
-                  <div className="flex items-center gap-2 px-2 rounded-md w-full min-w-0">
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0 group hover:bg-gray-100">
                     <div className="flex-shrink-0">
                       {execution.state === ChainExecutionState.COMPLETED
                         ? React.createElement(resolveIcon("circle-check"), {
@@ -312,13 +430,59 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                               })}
                     </div>
                     <span className="text-sm text-gray-800 truncate flex-1">{execution.name}</span>
+                    {/* Hover Icons */}
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* See Group (Expand/Collapse) */}
+                      {execution.children && execution.children.length > 0 && (
+                        <SimpleTooltip content="See Group">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExpandCustomComponentExecution(execution);
+                            }}
+                            className="p-1 rounded text-gray-500"
+                          >
+                            {React.createElement(resolveIcon("expand"), { size: 14 })}
+                          </button>
+                        </SimpleTooltip>
+                      )}
+                      {/* Copy Link */}
+                      <SimpleTooltip
+                        content={
+                          copiedExecutions.has(`${execution.nodeId}-${execution.executionId}`) ? "Copied!" : "Copy Link"
+                        }
+                        hideOnClick={false}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyExecutionLink(execution);
+                          }}
+                          className="p-1 rounded text-gray-500"
+                        >
+                          {React.createElement(resolveIcon("link"), { size: 14 })}
+                        </button>
+                      </SimpleTooltip>
+                      {/* Payload */}
+                      <SimpleTooltip content="Payload">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            showExecutionPayload(execution);
+                          }}
+                          className="p-1 rounded text-gray-500"
+                        >
+                          {React.createElement(resolveIcon("code"), { size: 14 })}
+                        </button>
+                      </SimpleTooltip>
+                    </div>
                   </div>
                   {/* Children executions */}
                   {execution.children &&
                     execution.children.map((child, childIndex) => (
                       <div
                         key={`${index}-${childIndex}`}
-                        className="flex items-center gap-2 px-2 rounded-md w-full min-w-0"
+                        className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0"
                       >
                         <div className="flex-shrink-0">
                           {React.createElement(resolveIcon("corner-down-right"), {
@@ -373,6 +537,54 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Payload Modal */}
+      {isPayloadModalOpen && modalPayload && (
+        <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Payload</h3>
+              <div className="flex items-center gap-2">
+                <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
+                  <button
+                    onClick={() => copyPayloadToClipboard(modalPayload)}
+                    className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
+                  >
+                    {React.createElement(resolveIcon("copy"), { size: 14 })}
+                    Copy
+                  </button>
+                </SimpleTooltip>
+                <button
+                  onClick={() => {
+                    setIsPayloadModalOpen(false);
+                    setModalPayload(null);
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                >
+                  {React.createElement(resolveIcon("x"), { size: 16 })}
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto bg-white rounded-b-lg">
+              <div className="p-4">
+                <JsonView
+                  value={typeof modalPayload === "string" ? JSON.parse(modalPayload) : modalPayload}
+                  style={{
+                    fontSize: "14px",
+                    fontFamily:
+                      'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
+                    backgroundColor: "#ffffff",
+                    color: "#24292e",
+                  }}
+                  displayObjectSize={false}
+                  displayDataTypes={false}
+                  enableClipboard={false}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
