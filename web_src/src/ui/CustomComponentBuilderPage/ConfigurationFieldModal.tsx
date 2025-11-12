@@ -143,7 +143,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
           <DialogTitle>{field ? "Edit Configuration Field" : "Add Configuration Field"}</DialogTitle>
           <DialogDescription>Configure the blueprint configuration field</DialogDescription>
         </VisuallyHidden>
-        <div className="p-6">
+        <div className="p-1 max-h-[calc(100vh-5rem)] overflow-y-auto">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-6">
             {field ? "Edit Configuration Field" : "Add Configuration Field"}
           </h3>
