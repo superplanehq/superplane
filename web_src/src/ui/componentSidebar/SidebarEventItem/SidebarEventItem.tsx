@@ -3,6 +3,7 @@ import { resolveIcon } from "@/lib/utils";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
+import JsonView from "@uiw/react-json-view";
 
 export enum ChainExecutionState {
   COMPLETED = "completed",
@@ -59,6 +60,11 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   }, [tabData]);
 
   const [activeTab, setActiveTab] = useState<"current" | "root" | "payload" | "executionChain">(getDefaultActiveTab());
+  const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
+
+  const copyToClipboard = useCallback((text: string) => {
+    navigator.clipboard.writeText(text);
+  }, []);
 
   // Update active tab when tabData changes to ensure we always have a valid active tab
   useEffect(() => {
@@ -275,9 +281,46 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
           {tabData && activeTab === "payload" && tabData.payload && (
             <div className="w-full px-2 py-2">
-              <pre className="text-xs bg-gray-50 p-2 rounded border overflow-x-auto">
-                {typeof tabData.payload === "string" ? tabData.payload : JSON.stringify(tabData.payload, null, 2)}
-              </pre>
+              <div className="flex items-center justify-between mb-2 relative">
+                <div className="flex items-center gap-1 absolute right-2 top-4">
+                  <button
+                    onClick={() => {
+                      const payloadString =
+                        typeof tabData.payload === "string"
+                          ? tabData.payload
+                          : JSON.stringify(tabData.payload, null, 2);
+                      copyToClipboard(payloadString);
+                    }}
+                    className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                    title="Copy payload"
+                  >
+                    {React.createElement(resolveIcon("copy"), { size: 14 })}
+                  </button>
+                  <button
+                    onClick={() => setIsPayloadModalOpen(true)}
+                    className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                    title="Expand payload"
+                  >
+                    {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
+                  </button>
+                </div>
+              </div>
+              <div className="h-50 overflow-auto border rounded bg-white">
+                <JsonView
+                  value={typeof tabData.payload === "string" ? JSON.parse(tabData.payload) : tabData.payload}
+                  style={{
+                    fontSize: "12px",
+                    fontFamily:
+                      'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
+                    backgroundColor: "#ffffff",
+                    color: "#24292e",
+                    padding: "8px",
+                  }}
+                  displayObjectSize={false}
+                  displayDataTypes={false}
+                  enableClipboard={false}
+                />
+              </div>
             </div>
           )}
 
@@ -373,6 +416,50 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Payload Modal */}
+      {isPayloadModalOpen && tabData?.payload && (
+        <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Payload</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const payloadString =
+                      typeof tabData.payload === "string" ? tabData.payload : JSON.stringify(tabData.payload, null, 2);
+                    copyToClipboard(payloadString);
+                  }}
+                  className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
+                >
+                  {React.createElement(resolveIcon("copy"), { size: 14 })}
+                  Copy
+                </button>
+                <button
+                  onClick={() => setIsPayloadModalOpen(false)}
+                  className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                >
+                  {React.createElement(resolveIcon("x"), { size: 16 })}
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto bg-white rounded-b-lg">
+              <div className="p-4">
+                <JsonView
+                  value={typeof tabData.payload === "string" ? JSON.parse(tabData.payload) : tabData.payload}
+                  style={{
+                    fontSize: "14px",
+                    fontFamily:
+                      'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
+                    backgroundColor: "#ffffff",
+                    color: "#24292e",
+                  }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
