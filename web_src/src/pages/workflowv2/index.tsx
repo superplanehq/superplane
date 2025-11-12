@@ -652,7 +652,7 @@ export function WorkflowPageV2() {
                 return ChainExecutionState.FAILED;
               }
 
-              if (exec.state === "STATE_STARTED") {
+              if (exec.state === "STATE_STARTED" || exec.state === "STATE_PENDING") {
                 return ChainExecutionState.RUNNING;
               }
 
@@ -696,7 +696,6 @@ export function WorkflowPageV2() {
                         const childrenNodeId = childExec?.nodeId?.split(":")?.at(-1);
                         const childNode = childrenNodesById?.[childrenNodeId || ""];
                         const childNodeName = childNode?.name || childrenNodeId;
-
                         return {
                           name: childNodeName || "Unknown",
                           state: getSidebarEventItemState(childExec),

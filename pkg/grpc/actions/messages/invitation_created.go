@@ -22,5 +22,5 @@ func NewInvitationCreatedMessage(invitation *models.OrganizationInvitation) Invi
 }
 
 func (m InvitationCreatedMessage) Publish() error {
-	return Publish(DeliveryHubCanvasExchange, InvitationCreatedRoutingKey, toBytes(m.message))
+	return Publish(WorkflowExchange, InvitationCreatedRoutingKey, toBytes(m.message))
 }

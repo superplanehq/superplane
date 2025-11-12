@@ -8,8 +8,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -19,6 +22,14 @@ func Test__WorkflowNodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	defer r.Close()
 	worker := NewWorkflowNodeQueueWorker(r.Registry)
 	logger := log.NewEntry(log.New())
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemConsumedRoutingKey)
+	executionConsumer.Start()
+	queueConsumedConsumer.Start()
+	defer executionConsumer.Stop()
+	defer queueConsumedConsumer.Stop()
 
 	//
 	// Create a simple workflow with a trigger and a component node.
@@ -89,11 +100,22 @@ func Test__WorkflowNodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	queueItems, err = models.ListNodeQueueItems(workflow.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 0)
+
+	assert.True(t, executionConsumer.HasReceivedMessage())
+	assert.True(t, queueConsumedConsumer.HasReceivedMessage())
 }
 
 func Test__WorkflowNodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	r := support.Setup(t)
 	logger := log.NewEntry(log.New())
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemConsumedRoutingKey)
+	executionConsumer.Start()
+	queueConsumedConsumer.Start()
+	defer executionConsumer.Stop()
+	defer queueConsumedConsumer.Stop()
 
 	//
 	// Create a simple blueprint with two sequential nodes
@@ -195,6 +217,9 @@ func Test__WorkflowNodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	queueItems, err = models.ListNodeQueueItems(workflow.ID, blueprintNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 0)
+
+	assert.True(t, executionConsumer.HasReceivedMessage())
+	assert.True(t, queueConsumedConsumer.HasReceivedMessage())
 }
 
 func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
@@ -202,6 +227,14 @@ func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	defer r.Close()
 	worker := NewWorkflowNodeQueueWorker(r.Registry)
 	logger := log.NewEntry(log.New())
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemConsumedRoutingKey)
+	executionConsumer.Start()
+	queueConsumedConsumer.Start()
+	defer executionConsumer.Stop()
+	defer queueConsumedConsumer.Stop()
 
 	//
 	// Create a simple workflow with a trigger and a component node.
@@ -288,6 +321,9 @@ func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	assert.Contains(t, eventIDs, midEvent.ID)
 	assert.Contains(t, eventIDs, newEvent.ID)
 	assert.NotContains(t, eventIDs, oldEvent.ID)
+
+	assert.True(t, executionConsumer.HasReceivedMessage())
+	assert.True(t, queueConsumedConsumer.HasReceivedMessage())
 }
 
 func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
@@ -295,6 +331,14 @@ func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
 	defer r.Close()
 	worker := NewWorkflowNodeQueueWorker(r.Registry)
 	logger := log.NewEntry(log.New())
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemConsumedRoutingKey)
+	executionConsumer.Start()
+	queueConsumedConsumer.Start()
+	defer executionConsumer.Stop()
+	defer queueConsumedConsumer.Stop()
 
 	//
 	// Create a simple workflow with a trigger and a component node.
@@ -335,11 +379,22 @@ func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
 	node, err = models.FindWorkflowNode(database.Conn(), workflow.ID, componentNode)
 	require.NoError(t, err)
 	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
+	assert.False(t, queueConsumedConsumer.HasReceivedMessage())
 }
 
 func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemConsumedRoutingKey)
+	executionConsumer.Start()
+	queueConsumedConsumer.Start()
+	defer executionConsumer.Stop()
+	defer queueConsumedConsumer.Stop()
 
 	//
 	// Create a simple workflow with a trigger and a component node.
@@ -410,4 +465,7 @@ func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	queueItems, err := models.ListNodeQueueItems(workflow.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 0, "Queue item should be deleted")
+
+	assert.True(t, executionConsumer.HasReceivedMessage())
+	assert.True(t, queueConsumedConsumer.HasReceivedMessage())
 }

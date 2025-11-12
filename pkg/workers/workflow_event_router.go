@@ -62,6 +62,7 @@ func (w *WorkflowEventRouter) Start(ctx context.Context) {
 
 func (w *WorkflowEventRouter) LockAndProcessEvent(logger *log.Entry, event models.WorkflowEvent) error {
 	var createdQueueItems []models.WorkflowNodeQueueItem
+	var execution *models.WorkflowNodeExecution
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		e, err := models.LockWorkflowEvent(tx, event.ID)
 		if err != nil {
@@ -69,7 +70,7 @@ func (w *WorkflowEventRouter) LockAndProcessEvent(logger *log.Entry, event model
 			return nil
 		}
 
-		createdQueueItems, err = w.processEvent(tx, logger, e)
+		createdQueueItems, execution, err = w.processEvent(tx, logger, e)
 		if err != nil {
 			return err
 		}
@@ -93,29 +94,39 @@ func (w *WorkflowEventRouter) LockAndProcessEvent(logger *log.Entry, event model
 		}
 	}
 
+	if execution != nil {
+		messages.NewWorkflowExecutionMessage(
+			event.WorkflowID.String(),
+			execution.ID.String(),
+			execution.NodeID,
+		).Publish()
+	}
+
 	return nil
 }
 
-func (w *WorkflowEventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.WorkflowEvent) ([]models.WorkflowNodeQueueItem, error) {
+func (w *WorkflowEventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.WorkflowEvent) ([]models.WorkflowNodeQueueItem, *models.WorkflowNodeExecution, error) {
 	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, event.WorkflowID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if event.ExecutionID == nil {
-		return w.processRootEvent(tx, workflow, event)
+		queueItems, err := w.processRootEvent(tx, workflow, event)
+		return queueItems, nil, err
 	}
 
 	execution, err := models.FindNodeExecutionInTransaction(tx, event.WorkflowID, *event.ExecutionID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if execution.ParentExecutionID != nil {
 		return w.processChildExecutionEvent(tx, logger, workflow, execution, event)
 	}
 
-	return w.processExecutionEvent(tx, logger, workflow, execution, event)
+	queueItems, err := w.processExecutionEvent(tx, logger, workflow, execution, event)
+	return queueItems, execution, err
 }
 
 func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, workflow *models.Workflow, event *models.WorkflowEvent) ([]models.WorkflowNodeQueueItem, error) {
@@ -186,17 +197,17 @@ func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, logger *log.Ent
 	return createdQueueItems, event.RoutedInTransaction(tx)
 }
 
-func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry, workflow *models.Workflow, execution *models.WorkflowNodeExecution, event *models.WorkflowEvent) ([]models.WorkflowNodeQueueItem, error) {
+func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry, workflow *models.Workflow, execution *models.WorkflowNodeExecution, event *models.WorkflowEvent) ([]models.WorkflowNodeQueueItem, *models.WorkflowNodeExecution, error) {
 	parentExecution, err := models.FindNodeExecutionInTransaction(tx, workflow.ID, *execution.ParentExecutionID)
 	if err != nil {
 		logger.Errorf("Error finding parent execution: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	parentNode, err := models.FindWorkflowNode(tx, workflow.ID, parentExecution.NodeID)
 	if err != nil {
 		logger.Errorf("Error finding parent node: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	logger = logging.ForExecution(logger, execution, parentExecution)
@@ -206,7 +217,7 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, logger *lo
 	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, blueprintID)
 	if err != nil {
 		logger.Errorf("Error finding blueprint: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	childNodeID := execution.NodeID[len(parentNode.NodeID)+1:]
@@ -225,11 +236,11 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, logger *lo
 		parentExecution, err := models.LockWorkflowNodeExecution(tx, *execution.ParentExecutionID)
 		if err != nil {
 			logger.Info("Child node is a terminal node, but parent is locked - skipping")
-			return createdQueueItems, nil
+			return createdQueueItems, nil, nil
 		}
 
 		logger.Info("Child node is a terminal node - checking parent execution")
-		return createdQueueItems, w.completeParentExecutionIfNeeded(
+		return createdQueueItems, parentExecution, w.completeParentExecutionIfNeeded(
 			tx,
 			logger,
 			parentNode,
@@ -252,7 +263,7 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, logger *lo
 		targetNodeID := parentNode.NodeID + ":" + edge.TargetID
 		if _, err := models.FindWorkflowNode(tx, workflow.ID, targetNodeID); err != nil {
 			logger.Errorf("Error finding target node: %v", err)
-			return nil, err
+			return nil, nil, err
 		}
 
 		queueItem := models.WorkflowNodeQueueItem{
@@ -265,13 +276,13 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, logger *lo
 
 		if err := tx.Create(&queueItem).Error; err != nil {
 			logger.Errorf("Error creating queue item: %v", err)
-			return nil, err
+			return nil, nil, err
 		}
 
 		createdQueueItems = append(createdQueueItems, queueItem)
 	}
 
-	return createdQueueItems, event.RoutedInTransaction(tx)
+	return createdQueueItems, nil, event.RoutedInTransaction(tx)
 }
 
 func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(

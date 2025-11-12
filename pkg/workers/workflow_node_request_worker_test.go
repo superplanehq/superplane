@@ -6,8 +6,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -16,6 +19,11 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	worker := NewNodeRequestWorker(r.Registry)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
 
 	//
 	// Create a simple workflow with a schedule trigger node.
@@ -70,11 +78,18 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
 	require.NoError(t, err)
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
 func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
 
 	//
 	// Create a simple workflow with a schedule trigger node.
@@ -156,12 +171,19 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	eventCount, err := models.CountWorkflowEvents(workflow.ID, triggerNode)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), eventCount, "Expected exactly 1 workflow event, but found %d", eventCount)
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
 func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	worker := NewNodeRequestWorker(r.Registry)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
 
 	//
 	// Create a simple workflow with a trigger node.
@@ -204,12 +226,19 @@ func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 	err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported node execution request type")
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
 func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	worker := NewNodeRequestWorker(r.Registry)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
 
 	//
 	// Create a simple workflow with a trigger node.
@@ -252,12 +281,19 @@ func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 	err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec is not specified")
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
 func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	worker := NewNodeRequestWorker(r.Registry)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
 
 	//
 	// Create a simple workflow with a trigger node that references a non-existent trigger.
@@ -301,12 +337,19 @@ func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 	err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "trigger not found")
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
 func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	worker := NewNodeRequestWorker(r.Registry)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
 
 	//
 	// Create a simple workflow with a schedule trigger node.
@@ -354,4 +397,6 @@ func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "action 'non-existent-action' not found")
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
 }

@@ -7,7 +7,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-const DeliveryHubCanvasExchange = "superplane.canvas-exchange"
 const WorkflowExchange = "superplane.workflow-exchange"
 
 func Publish(exchange string, routingKey string, message []byte) error {
