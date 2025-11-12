@@ -46,7 +46,11 @@ import {
   SidebarEvent,
 } from "@/ui/CanvasPage";
 import { EventState } from "@/ui/componentBase";
-import { ChainExecutionState, TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
+import {
+  ChainExecutionState,
+  ExecutionChainItem,
+  TabData,
+} from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
@@ -669,8 +673,15 @@ export function WorkflowPageV2() {
                     )
                 : {};
 
-            const mainItem = {
+            const mainItem: ExecutionChainItem = {
               name: nodeInfo?.name || exec.nodeId || "Unknown",
+              nodeId: exec.nodeId || "",
+              executionId: exec.id || "",
+              payload: {
+                input: exec.input || {},
+                outputs: exec.outputs || {},
+                metadata: exec.metadata || {},
+              },
               state: getSidebarEventItemState(exec),
               children:
                 exec?.childExecutions && exec.childExecutions.length > 0
@@ -1164,6 +1175,25 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, updateWorkflowMutation],
   );
 
+  const handleSidebarChange = useCallback(
+    (open: boolean, nodeId: string | null) => {
+      const next = new URLSearchParams(searchParams);
+      if (open) {
+        next.set("sidebar", "1");
+        if (nodeId) {
+          next.set("node", nodeId);
+        } else {
+          next.delete("node");
+        }
+      } else {
+        next.delete("sidebar");
+        next.delete("node");
+      }
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
   // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
   const { onPushThrough, supportsPushThrough } = usePushThroughHandler({
     workflowId: workflowId!,
@@ -1196,21 +1226,7 @@ export function WorkflowPageV2() {
         isOpen: searchParams.get("sidebar") === "1",
         nodeId: searchParams.get("node") || null,
       }}
-      onSidebarChange={(open, nodeId) => {
-        const next = new URLSearchParams(searchParams);
-        if (open) {
-          next.set("sidebar", "1");
-          if (nodeId) {
-            next.set("node", nodeId);
-          } else {
-            next.delete("node");
-          }
-        } else {
-          next.delete("sidebar");
-          next.delete("node");
-        }
-        setSearchParams(next, { replace: true });
-      }}
+      onSidebarChange={handleSidebarChange}
       onNodeExpand={(nodeId) => {
         const latestExecution = nodeExecutionsMap[nodeId]?.[0];
         const executionId = latestExecution?.id;
