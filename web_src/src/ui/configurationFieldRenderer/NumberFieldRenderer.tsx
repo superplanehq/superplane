@@ -23,7 +23,7 @@ export const NumberFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
         const val = e.target.value === "" ? undefined : Number(e.target.value);
         onChange(val);
       }}
-      placeholder={`Enter ${field.name}`}
+      placeholder={field.placeholder || `Enter ${field.name}`}
       min={numberOptions?.min}
       max={numberOptions?.max}
       className={hasError ? "border-red-500 border-2" : ""}
