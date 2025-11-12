@@ -36,6 +36,37 @@ func Test_Merge(t *testing.T) {
 	steps.AssertQueueIsEmpty()
 }
 
+func Test_Merge_StopIfExpression(t *testing.T) {
+	steps := NewMergeTestSteps(t)
+
+	steps.CreateWorkflow()
+	steps.SetMergeConfiguration(map[string]any{
+		"stopIfExpression": "$.result == \"fail\"",
+	})
+
+	steps.CreateEventsWithData(
+		map[string]any{"result": "fail"},
+		map[string]any{"result": "ok"},
+	)
+	steps.CreateQueueItems()
+
+	m := &Merge{}
+
+	// First event should immediately finish the merge due to stop expression
+	steps.ProcessFirstEventExpectFinish(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionFinished()
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
+
+	// Second event should be dequeued and not re-finish the execution
+	steps.ProcessSecondEventExpectNoFinish(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionFinished()
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
+
+	steps.AssertQueueIsEmpty()
+}
+
 type MergeTestSteps struct {
 	t  *testing.T
 	Tx *gorm.DB
@@ -137,6 +168,11 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	s.MergeNode = n4
 }
 
+func (s *MergeTestSteps) SetMergeConfiguration(cfg map[string]any) {
+	s.MergeNode.Configuration = datatypes.NewJSONType(cfg)
+	require.NoError(s.t, s.Tx.Save(s.MergeNode).Error)
+}
+
 func (s *MergeTestSteps) CreateEvents() {
 	rootEvent := &models.WorkflowEvent{
 		WorkflowID: s.Wf.ID,
@@ -159,6 +195,36 @@ func (s *MergeTestSteps) CreateEvents() {
 		NodeID:     s.ProcessNode2.NodeID,
 		Channel:    "default",
 		Data:       datatypes.JSONType[any]{},
+	}
+	require.NoError(s.t, s.Tx.Create(event2).Error)
+
+	s.RootEvent = rootEvent
+	s.Process1Event = event1
+	s.Process2Event = event2
+}
+
+func (s *MergeTestSteps) CreateEventsWithData(data1 any, data2 any) {
+	rootEvent := &models.WorkflowEvent{
+		WorkflowID: s.Wf.ID,
+		NodeID:     "start-node",
+		Channel:    "default",
+		Data:       datatypes.JSONType[any]{},
+	}
+	require.NoError(s.t, s.Tx.Create(rootEvent).Error)
+
+	event1 := &models.WorkflowEvent{
+		WorkflowID: s.Wf.ID,
+		NodeID:     s.ProcessNode1.NodeID,
+		Channel:    "default",
+		Data:       datatypes.NewJSONType(data1),
+	}
+	require.NoError(s.t, s.Tx.Create(event1).Error)
+
+	event2 := &models.WorkflowEvent{
+		WorkflowID: s.Wf.ID,
+		NodeID:     s.ProcessNode2.NodeID,
+		Channel:    "default",
+		Data:       datatypes.NewJSONType(data2),
 	}
 	require.NoError(s.t, s.Tx.Create(event2).Error)
 
@@ -199,6 +265,19 @@ func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 	require.Nil(s.t, execution)
 }
 
+// ProcessFirstEventExpectFinish is used when the first event should
+// finish the merge immediately (e.g. due to stopIfExpression)
+func (s *MergeTestSteps) ProcessFirstEventExpectFinish(m *Merge) {
+	fmt.Println("Processing first event (expect finish)")
+
+	ctx1, err := contexts.BuildProcessQueueContext(s.Tx, s.MergeNode, s.QueureItem1)
+	assert.NoError(s.t, err)
+
+	execution, err := m.ProcessQueueItem(*ctx1)
+	require.NoError(s.t, err)
+	require.NotNil(s.t, execution)
+}
+
 func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 	fmt.Println("Processing second event")
 
@@ -208,6 +287,17 @@ func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 	execution, err := m.ProcessQueueItem(*ctx2)
 	require.NoError(s.t, err)
 	require.NotNil(s.t, execution)
+}
+
+func (s *MergeTestSteps) ProcessSecondEventExpectNoFinish(m *Merge) {
+	fmt.Println("Processing second event")
+
+	ctx2, err := contexts.BuildProcessQueueContext(s.Tx, s.MergeNode, s.QueureItem2)
+	assert.NoError(s.t, err)
+
+	execution, err := m.ProcessQueueItem(*ctx2)
+	require.NoError(s.t, err)
+	require.Nil(s.t, execution)
 }
 
 func (s *MergeTestSteps) AssertNodeExecutionCount(expectedCount int) {
