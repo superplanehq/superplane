@@ -11,4 +11,7 @@ type ExecutionMetadata struct {
 
 	// EventIDs collects upstream event ids that reached this merge
 	EventIDs []string `json:"eventIDs,omitempty" mapstructure:"eventIDs"`
+
+	// StopEarly indicates the merge was short-circuited based on a stop condition
+	StopEarly bool `json:"stopEarly,omitempty" mapstructure:"stopEarly"`
 }

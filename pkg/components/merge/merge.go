@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
@@ -37,6 +38,12 @@ type Spec struct {
 		Value int    `json:"value"`
 		Unit  string `json:"unit"`
 	} `json:"executionTimeout"`
+
+	// Optional expression to short-circuit waiting for all inputs.
+	// The expression is evaluated against the incoming event input using
+	// the Expr language with the input bound to the variable '$'.
+	// If it evaluates to true, the merge finishes immediately.
+	StopIfExpression string `json:"stopIfExpression" mapstructure:"stopIfExpression"`
 }
 
 func (m *Merge) Configuration() []configuration.Field {
@@ -73,6 +80,13 @@ func (m *Merge) Configuration() []configuration.Field {
 					},
 				},
 			},
+		},
+		{
+			Name:        "stopIfExpression",
+			Label:       "Stop if",
+			Type:        configuration.FieldTypeString,
+			Description: "When true, stop waiting and finish immediately.",
+			Required:    false,
 		},
 	}
 }
@@ -113,8 +127,40 @@ func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.Wo
 		return nil, err
 	}
 
+	// Decode config to check for optional stop expression
+	spec := &Spec{}
+	_ = mapstructure.Decode(ctx.Configuration, &spec)
+
+	// If already short-circuited, do not finish again
+	if md.StopEarly {
+		return nil, nil
+	}
+
+	// Evaluate stop expression if provided
+	if spec.StopIfExpression != "" {
+		env := map[string]any{
+			"$": ctx.Input,
+		}
+		vm, err := expr.Compile(spec.StopIfExpression, expr.Env(env), expr.AsBool())
+		if err != nil {
+			return nil, fmt.Errorf("stopIfExpression compilation failed: %w", err)
+		}
+		out, err := expr.Run(vm, env)
+		if err != nil {
+			return nil, fmt.Errorf("stopIfExpression evaluation failed: %w", err)
+		}
+		if b, ok := out.(bool); ok && b {
+			// Mark metadata and fail immediately
+			md.StopEarly = true
+			if err := ctx.SetExecutionMetadata(execID, md); err != nil {
+				return nil, err
+			}
+			return ctx.FailExecution(execID, "stopped", "Stopped by stopIfExpression")
+		}
+	}
+
 	if len(md.EventIDs) >= incoming {
-		return ctx.FinishExecution(execID, map[string][]any{
+		return ctx.PassExecution(execID, map[string][]any{
 			components.DefaultOutputChannel.Name: {md},
 		})
 	}
