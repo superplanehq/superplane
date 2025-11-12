@@ -655,6 +655,20 @@ export function WorkflowPageV2() {
               return ChainExecutionState.FAILED;
             };
 
+            const childrenNodesById =
+              nodeInfo?.type === "TYPE_BLUEPRINT"
+                ? blueprints
+                    .find((bp) => bp.id === nodeInfo?.blueprint?.id)
+                    ?.nodes?.reduce(
+                      (acc, node) => {
+                        if (!node?.id) return acc;
+                        acc[node.id] = node;
+                        return acc;
+                      },
+                      {} as Record<string, ComponentsNode>,
+                    )
+                : {};
+
             const mainItem = {
               name: nodeInfo?.name || exec.nodeId || "Unknown",
               state: getSidebarEventItemState(exec),
@@ -668,10 +682,12 @@ export function WorkflowPageV2() {
                         return timeA - timeB;
                       })
                       .map((childExec) => {
-                        const childNodeId = childExec?.nodeId?.split(":")?.at(-1);
+                        const childrenNodeId = childExec?.nodeId?.split(":")?.at(-1);
+                        const childNode = childrenNodesById?.[childrenNodeId || ""];
+                        const childNodeName = childNode?.name || childrenNodeId;
 
                         return {
-                          name: childNodeId || "Unknown",
+                          name: childNodeName || "Unknown",
                           state: getSidebarEventItemState(childExec),
                         };
                       })
@@ -689,7 +705,7 @@ export function WorkflowPageV2() {
 
       return Object.keys(tabData).length > 0 ? tabData : undefined;
     },
-    [workflow, nodeExecutionsMap, nodeEventsMap, executionChainMap, getNodesBeforeTarget],
+    [workflow, blueprints, nodeExecutionsMap, nodeEventsMap, executionChainMap, getNodesBeforeTarget],
   );
 
   const getNodeEditData = useCallback(
