@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 import JsonView from "@uiw/react-json-view";
+import { SimpleTooltip } from "../SimpleTooltip";
 
 export enum ChainExecutionState {
   COMPLETED = "completed",
@@ -66,12 +67,24 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const [activeTab, setActiveTab] = useState<"current" | "root" | "payload" | "executionChain">(getDefaultActiveTab());
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
+  const [copiedExecutions, setCopiedExecutions] = useState<Set<string>>(new Set());
+  const [payloadCopied, setPayloadCopied] = useState(false);
 
   const navigate = useNavigate();
 
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
   }, []);
+
+  const copyPayloadToClipboard = useCallback(
+    (payload: any) => {
+      const payloadString = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+      copyToClipboard(payloadString);
+      setPayloadCopied(true);
+      setTimeout(() => setPayloadCopied(false), 2000);
+    },
+    [copyToClipboard],
+  );
 
   const copyExecutionLink = useCallback(
     (execution: ExecutionChainItem) => {
@@ -85,12 +98,20 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
         const link = `${window.location.origin}/${orgId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`;
         copyToClipboard(link);
-
-        return;
+      } else {
+        const link = `${window.location.origin}/${orgId}/workflows/${workflowId}?sidebar=1&node=${execution.nodeId}`;
+        copyToClipboard(link);
       }
 
-      const link = `${window.location.origin}/${orgId}/workflows/${workflowId}?sidebar=1&node=${execution.nodeId}`;
-      copyToClipboard(link);
+      const executionKey = `${execution.nodeId}-${execution.executionId}`;
+      setCopiedExecutions((prev) => new Set(prev).add(executionKey));
+      setTimeout(() => {
+        setCopiedExecutions((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(executionKey);
+          return newSet;
+        });
+      }, 2000);
     },
     [copyToClipboard],
   );
@@ -338,29 +359,25 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             <div className="w-full px-2 py-2">
               <div className="flex items-center justify-between mb-2 relative">
                 <div className="flex items-center gap-1 absolute right-2 top-4">
-                  <button
-                    onClick={() => {
-                      const payloadString =
-                        typeof tabData.payload === "string"
-                          ? tabData.payload
-                          : JSON.stringify(tabData.payload, null, 2);
-                      copyToClipboard(payloadString);
-                    }}
-                    className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
-                    title="Copy payload"
-                  >
-                    {React.createElement(resolveIcon("copy"), { size: 14 })}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setModalPayload(tabData.payload);
-                      setIsPayloadModalOpen(true);
-                    }}
-                    className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
-                    title="Expand payload"
-                  >
-                    {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
-                  </button>
+                  <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
+                    <button
+                      onClick={() => copyPayloadToClipboard(tabData.payload)}
+                      className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                    >
+                      {React.createElement(resolveIcon("copy"), { size: 14 })}
+                    </button>
+                  </SimpleTooltip>
+                  <SimpleTooltip content="Payload">
+                    <button
+                      onClick={() => {
+                        setModalPayload(tabData.payload);
+                        setIsPayloadModalOpen(true);
+                      }}
+                      className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                    >
+                      {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
+                    </button>
+                  </SimpleTooltip>
                 </div>
               </div>
               <div className="h-50 overflow-auto border rounded bg-white">
@@ -417,39 +434,47 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {/* See Group (Expand/Collapse) */}
                       {execution.children && execution.children.length > 0 && (
+                        <SimpleTooltip content="See Group">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExpandCustomComponentExecution(execution);
+                            }}
+                            className="p-1 rounded text-gray-500"
+                          >
+                            {React.createElement(resolveIcon("expand"), { size: 14 })}
+                          </button>
+                        </SimpleTooltip>
+                      )}
+                      {/* Copy Link */}
+                      <SimpleTooltip
+                        content={
+                          copiedExecutions.has(`${execution.nodeId}-${execution.executionId}`) ? "Copied!" : "Copy Link"
+                        }
+                        hideOnClick={false}
+                      >
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleExpandCustomComponentExecution(execution);
+                            copyExecutionLink(execution);
                           }}
                           className="p-1 rounded text-gray-500"
-                          title="Expand Group"
                         >
-                          {React.createElement(resolveIcon("expand"), { size: 14 })}
+                          {React.createElement(resolveIcon("link"), { size: 14 })}
                         </button>
-                      )}
-                      {/* Copy Link */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyExecutionLink(execution);
-                        }}
-                        className="p-1 rounded text-gray-500"
-                        title="Copy Link"
-                      >
-                        {React.createElement(resolveIcon("link"), { size: 14 })}
-                      </button>
+                      </SimpleTooltip>
                       {/* Payload */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          showExecutionPayload(execution);
-                        }}
-                        className="p-1 rounded text-gray-500"
-                        title="Payload"
-                      >
-                        {React.createElement(resolveIcon("code"), { size: 14 })}
-                      </button>
+                      <SimpleTooltip content="Payload">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            showExecutionPayload(execution);
+                          }}
+                          className="p-1 rounded text-gray-500"
+                        >
+                          {React.createElement(resolveIcon("code"), { size: 14 })}
+                        </button>
+                      </SimpleTooltip>
                     </div>
                   </div>
                   {/* Children executions */}
@@ -522,17 +547,15 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-900">Payload</h3>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const payloadString =
-                      typeof modalPayload === "string" ? modalPayload : JSON.stringify(modalPayload, null, 2);
-                    copyToClipboard(payloadString);
-                  }}
-                  className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
-                >
-                  {React.createElement(resolveIcon("copy"), { size: 14 })}
-                  Copy
-                </button>
+                <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
+                  <button
+                    onClick={() => copyPayloadToClipboard(modalPayload)}
+                    className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
+                  >
+                    {React.createElement(resolveIcon("copy"), { size: 14 })}
+                    Copy
+                  </button>
+                </SimpleTooltip>
                 <button
                   onClick={() => {
                     setIsPayloadModalOpen(false);
@@ -555,6 +578,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     backgroundColor: "#ffffff",
                     color: "#24292e",
                   }}
+                  displayObjectSize={false}
+                  displayDataTypes={false}
+                  enableClipboard={false}
                 />
               </div>
             </div>
