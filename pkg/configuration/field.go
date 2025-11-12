@@ -31,6 +31,11 @@ type Field struct {
 	Label string `json:"label"`
 
 	/*
+	 * Optional placeholder shown in the UI input for this field
+	 */
+	Placeholder string `json:"placeholder,omitempty"`
+
+	/*
 	 * Type of the field. Supported types are:
 	 * - string
 	 * - number

@@ -8,7 +8,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
       type="text"
       value={(value as string) ?? (field.defaultValue as string) ?? ""}
       onChange={(e) => onChange(e.target.value || undefined)}
-      placeholder={`Enter ${field.name}`}
+      placeholder={field.placeholder || `Enter ${field.name}`}
       className={hasError ? "border-red-500 border-2" : ""}
     />
   );

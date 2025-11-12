@@ -327,6 +327,12 @@ func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
 		}
 	}
 
+	// Map placeholder if provided
+	if field.Placeholder != "" {
+		ph := field.Placeholder
+		pbField.Placeholder = &ph
+	}
+
 	if len(field.VisibilityConditions) > 0 {
 		pbField.VisibilityConditions = make([]*configpb.VisibilityCondition, len(field.VisibilityConditions))
 		for i, cond := range field.VisibilityConditions {
@@ -537,6 +543,10 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 
 	if pbField.DefaultValue != nil {
 		field.Default = *pbField.DefaultValue
+	}
+
+	if pbField.Placeholder != nil {
+		field.Placeholder = *pbField.Placeholder
 	}
 
 	if len(pbField.VisibilityConditions) > 0 {

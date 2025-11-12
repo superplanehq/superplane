@@ -133,6 +133,7 @@ export type ConfigurationField = {
   typeOptions?: ConfigurationTypeOptions;
   requiredConditions?: Array<ConfigurationRequiredCondition>;
   validationRules?: Array<ConfigurationValidationRule>;
+  placeholder?: string;
 };
 
 export type ConfigurationIntegrationTypeOptions = {

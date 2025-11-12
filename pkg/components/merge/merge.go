@@ -86,6 +86,7 @@ func (m *Merge) Configuration() []configuration.Field {
 			Label:       "Stop if",
 			Type:        configuration.FieldTypeString,
 			Description: "When true, stop waiting and finish immediately.",
+			Placeholder: "e.g. $.result == 'fail'",
 			Required:    false,
 		},
 	}
