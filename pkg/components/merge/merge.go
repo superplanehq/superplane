@@ -150,19 +150,17 @@ func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.Wo
 			return nil, fmt.Errorf("stopIfExpression evaluation failed: %w", err)
 		}
 		if b, ok := out.(bool); ok && b {
-			// Mark metadata and finish immediately
+			// Mark metadata and fail immediately
 			md.StopEarly = true
 			if err := ctx.SetExecutionMetadata(execID, md); err != nil {
 				return nil, err
 			}
-			return ctx.FinishExecution(execID, map[string][]any{
-				components.DefaultOutputChannel.Name: {md},
-			})
+			return ctx.FailExecution(execID, "stopped", "Stopped by stopIfExpression")
 		}
 	}
 
 	if len(md.EventIDs) >= incoming {
-		return ctx.FinishExecution(execID, map[string][]any{
+		return ctx.PassExecution(execID, map[string][]any{
 			components.DefaultOutputChannel.Name: {md},
 		})
 	}

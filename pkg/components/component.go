@@ -222,8 +222,11 @@ type ProcessQueueContext struct {
 	// CountIncomingEdges returns the number of incoming edges for this node
 	CountIncomingEdges func() (int, error)
 
-	// FinishExecution marks the execution as finished with the provided outputs.
-	FinishExecution func(execID uuid.UUID, outputs map[string][]any) (*models.WorkflowNodeExecution, error)
+	// PassExecution marks the execution as passed with the provided outputs.
+	PassExecution func(execID uuid.UUID, outputs map[string][]any) (*models.WorkflowNodeExecution, error)
+
+	// FailExecution marks the execution as failed with the provided reason and message.
+	FailExecution func(execID uuid.UUID, reason, message string) (*models.WorkflowNodeExecution, error)
 
 	FindExecutionIDByKV func(key string, value string) (uuid.UUID, bool, error)
 	SetExecutionKV      func(execID uuid.UUID, key string, value string) error

@@ -55,7 +55,7 @@ func Test_Merge_StopIfExpression(t *testing.T) {
 	// First event should immediately finish the merge due to stop expression
 	steps.ProcessFirstEventExpectFinish(m)
 	steps.AssertNodeExecutionCount(1)
-	steps.AssertExecutionFinished()
+	steps.AssertExecutionFailed()
 	steps.AssertNodeIsAllowedToProcessNextQueueItem()
 
 	// Second event should be dequeued and not re-finish the execution
@@ -310,6 +310,13 @@ func (s *MergeTestSteps) AssertExecutionFinished() {
 	var execution models.WorkflowNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
 	assert.Equal(s.t, execution.State, models.WorkflowNodeExecutionStateFinished)
+}
+
+func (s *MergeTestSteps) AssertExecutionFailed() {
+	var execution models.WorkflowNodeExecution
+	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
+	assert.Equal(s.t, execution.State, models.WorkflowNodeExecutionStateFinished)
+	assert.Equal(s.t, execution.Result, models.WorkflowNodeExecutionResultFailed)
 }
 
 func (s *MergeTestSteps) AssertExecutionPending() {

@@ -180,13 +180,26 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		return count, nil
 	}
 
-	ctx.FinishExecution = func(execID uuid.UUID, outputs map[string][]any) (*models.WorkflowNodeExecution, error) {
+	ctx.PassExecution = func(execID uuid.UUID, outputs map[string][]any) (*models.WorkflowNodeExecution, error) {
 		exec, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
 		if err != nil {
 			return nil, err
 		}
 
 		exec.PassInTransaction(tx, outputs)
+
+		return exec, nil
+	}
+
+	ctx.FailExecution = func(execID uuid.UUID, reason, message string) (*models.WorkflowNodeExecution, error) {
+		exec, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := exec.FailInTransaction(tx, reason, message); err != nil {
+			return nil, err
+		}
 
 		return exec, nil
 	}
