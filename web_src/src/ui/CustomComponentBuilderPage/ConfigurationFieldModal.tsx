@@ -22,6 +22,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
     type: "string",
     description: "",
     required: false,
+    defaultValue: "",
     typeOptions: {},
   });
 
@@ -36,6 +37,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
         type: "string",
         description: "",
         required: false,
+        defaultValue: "",
         typeOptions: {},
       });
     }
@@ -48,6 +50,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
       type: "string",
       description: "",
       required: false,
+      defaultValue: "",
       typeOptions: {},
     });
     onClose();
@@ -56,6 +59,18 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
   const handleSave = () => {
     if (!configFieldForm.name?.trim()) {
       return;
+    }
+
+    if (!configFieldForm.required && !configFieldForm.defaultValue?.trim()) {
+      return;
+    }
+
+    // Validate number constraints
+    if (configFieldForm.type === "number") {
+      const numberOptions = configFieldForm.typeOptions?.number;
+      if (!numberOptions || (numberOptions.min === undefined && numberOptions.max === undefined)) {
+        return;
+      }
     }
 
     // Validate options for select/multi_select types
@@ -91,6 +106,12 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
   const currentOptions = isSelect
     ? configFieldForm.typeOptions?.select?.options || []
     : configFieldForm.typeOptions?.multiSelect?.options || [];
+
+  const isNumberFieldValid = () => {
+    if (configFieldForm.type !== "number") return true;
+    const numberOptions = configFieldForm.typeOptions?.number;
+    return numberOptions && (numberOptions.min !== undefined || numberOptions.max !== undefined);
+  };
 
   const updateOptions = (newOptions: ConfigurationSelectOption[]) => {
     if (isSelect) {
@@ -162,7 +183,34 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
               <Label className="block text-sm font-medium mb-2">Type *</Label>
               <Select
                 value={configFieldForm.type || "string"}
-                onValueChange={(val) => setConfigFieldForm({ ...configFieldForm, type: val })}
+                onValueChange={(val) => {
+                  const newTypeOptions = { ...configFieldForm.typeOptions };
+
+                  // Set required type options based on field type
+                  if (val === "number") {
+                    // Backend requires at least min or max to be set for number fields
+                    // Initialize with empty values so user must configure them
+                    newTypeOptions.number = {
+                      min: undefined,
+                      max: undefined,
+                    };
+                  } else if (val === "select") {
+                    if (!newTypeOptions.select) {
+                      newTypeOptions.select = { options: [] };
+                    }
+                  } else if (val === "multi_select") {
+                    if (!newTypeOptions.multiSelect) {
+                      newTypeOptions.multiSelect = { options: [] };
+                    }
+                  }
+
+                  setConfigFieldForm({
+                    ...configFieldForm,
+                    type: val,
+                    defaultValue: "",
+                    typeOptions: newTypeOptions,
+                  });
+                }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -178,6 +226,64 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Number Options Section (for number type) */}
+            {configFieldForm.type === "number" && (
+              <div className="space-y-3">
+                <Label className="block text-sm font-medium">Number Constraints</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="block text-xs font-medium mb-1 text-gray-600 dark:text-zinc-400">
+                      Minimum Value
+                    </Label>
+                    <Input
+                      type="number"
+                      value={configFieldForm.typeOptions?.number?.min || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setConfigFieldForm({
+                          ...configFieldForm,
+                          typeOptions: {
+                            ...configFieldForm.typeOptions,
+                            number: {
+                              ...configFieldForm.typeOptions?.number,
+                              min: value ? parseFloat(value) : undefined,
+                            },
+                          },
+                        });
+                      }}
+                      placeholder="No limit"
+                    />
+                  </div>
+                  <div>
+                    <Label className="block text-xs font-medium mb-1 text-gray-600 dark:text-zinc-400">
+                      Maximum Value
+                    </Label>
+                    <Input
+                      type="number"
+                      value={configFieldForm.typeOptions?.number?.max || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setConfigFieldForm({
+                          ...configFieldForm,
+                          typeOptions: {
+                            ...configFieldForm.typeOptions,
+                            number: {
+                              ...configFieldForm.typeOptions?.number,
+                              max: value ? parseFloat(value) : undefined,
+                            },
+                          },
+                        });
+                      }}
+                      placeholder="No limit"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-zinc-400">
+                  At least one constraint is required for number fields
+                </p>
+              </div>
+            )}
 
             {/* Options Section (for select and multi_select types) */}
             {(configFieldForm.type === "select" || configFieldForm.type === "multi_select") && (
@@ -265,6 +371,81 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
               />
             </div>
 
+            {/* Default Value - only show when field is not required */}
+            {!configFieldForm.required && (
+              <div>
+                <Label className="block text-sm font-medium mb-2">Default Value *</Label>
+                {configFieldForm.type === "boolean" ? (
+                  <Select
+                    value={configFieldForm.defaultValue || ""}
+                    onValueChange={(val) => setConfigFieldForm({ ...configFieldForm, defaultValue: val })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select default value" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">True</SelectItem>
+                      <SelectItem value="false">False</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : configFieldForm.type === "select" ? (
+                  <Select
+                    value={configFieldForm.defaultValue || ""}
+                    onValueChange={(val) => setConfigFieldForm({ ...configFieldForm, defaultValue: val })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select default value" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(configFieldForm.typeOptions?.select?.options || []).map((option) => (
+                        <SelectItem key={option.value} value={option.value || ""}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : configFieldForm.type === "number" ? (
+                  <Input
+                    type="number"
+                    value={configFieldForm.defaultValue || ""}
+                    onChange={(e) =>
+                      setConfigFieldForm({
+                        ...configFieldForm,
+                        defaultValue: e.target.value,
+                      })
+                    }
+                    placeholder="Enter default number value"
+                  />
+                ) : configFieldForm.type === "date" ? (
+                  <Input
+                    type="date"
+                    value={configFieldForm.defaultValue || ""}
+                    onChange={(e) =>
+                      setConfigFieldForm({
+                        ...configFieldForm,
+                        defaultValue: e.target.value,
+                      })
+                    }
+                  />
+                ) : (
+                  <Input
+                    type={configFieldForm.type === "url" ? "url" : "text"}
+                    value={configFieldForm.defaultValue || ""}
+                    onChange={(e) =>
+                      setConfigFieldForm({
+                        ...configFieldForm,
+                        defaultValue: e.target.value,
+                      })
+                    }
+                    placeholder={`Enter default ${configFieldForm.type} value`}
+                  />
+                )}
+                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                  Default value is required when field is not required
+                </p>
+              </div>
+            )}
+
             {/* Required Checkbox */}
             <div className="flex items-center gap-2">
               <input
@@ -274,6 +455,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                   setConfigFieldForm({
                     ...configFieldForm,
                     required: e.target.checked,
+                    defaultValue: e.target.checked ? "" : configFieldForm.defaultValue,
                   })
                 }
                 className="h-4 w-4 rounded border-gray-300 dark:border-zinc-700"
@@ -292,7 +474,12 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
             <Button
               variant="default"
               onClick={handleSave}
-              disabled={!configFieldForm.name?.trim() || !configFieldForm.label?.trim()}
+              disabled={
+                !configFieldForm.name?.trim() ||
+                !configFieldForm.label?.trim() ||
+                (!configFieldForm.required && !configFieldForm.defaultValue?.trim()) ||
+                !isNumberFieldValid()
+              }
             >
               {field ? "Save Changes" : "Add Field"}
             </Button>
