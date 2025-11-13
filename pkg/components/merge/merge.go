@@ -118,7 +118,7 @@ func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.Wo
 		return nil, err
 	}
 
-	incoming, err := ctx.CountIncomingEdges()
+	incoming, err := ctx.CountDistinctIncomingSources()
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.Wo
 		}
 	}
 
-	if len(md.EventIDs) >= incoming {
+	if len(md.Sources) >= incoming {
 		return ctx.PassExecution(execID, map[string][]any{
 			components.DefaultOutputChannel.Name: {md},
 		})
@@ -192,6 +192,7 @@ func (m *Merge) findOrCreateExecution(ctx components.ProcessQueueContext, mergeG
 	md := &ExecutionMetadata{
 		GroupKey: mergeGroup,
 		EventIDs: []string{},
+		Sources:  []string{},
 	}
 
 	err = ctx.SetExecutionMetadata(execID, md)
@@ -216,6 +217,19 @@ func (m *Merge) addEventToMetadata(ctx components.ProcessQueueContext, execID uu
 	}
 
 	md.EventIDs = append(md.EventIDs, ctx.EventID)
+	// Track distinct source nodes that reached this merge
+	if ctx.SourceNodeID != "" {
+		exists := false
+		for _, s := range md.Sources {
+			if s == ctx.SourceNodeID {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			md.Sources = append(md.Sources, ctx.SourceNodeID)
+		}
+	}
 
 	err = ctx.SetExecutionMetadata(execID, md)
 	if err != nil {
