@@ -117,17 +117,18 @@ func (s *Semaphore) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "ref",
-			Label:    "Workflow ref",
-			Type:     configuration.FieldTypeString,
-			Required: true,
-		},
-		{
 			Name:        "pipelineFile",
-			Label:       "Pipeline File",
+			Label:       "Pipeline file",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "e.g. .semaphore/semaphore.yml",
+		},
+		{
+			Name:        "ref",
+			Label:       "Pipeline file location",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "e.g. ref/heads/main",
 		},
 		{
 			Name:  "parameters",
