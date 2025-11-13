@@ -33,6 +33,7 @@ const (
 	Workflows_ListChildExecutions_FullMethodName       = "/Superplane.Workflows.Workflows/ListChildExecutions"
 	Workflows_ListWorkflowEvents_FullMethodName        = "/Superplane.Workflows.Workflows/ListWorkflowEvents"
 	Workflows_ListEventExecutions_FullMethodName       = "/Superplane.Workflows.Workflows/ListEventExecutions"
+	Workflows_ReEmitNodeExecutionEvent_FullMethodName  = "/Superplane.Workflows.Workflows/ReEmitNodeExecutionEvent"
 )
 
 // WorkflowsClient is the client API for Workflows service.
@@ -53,6 +54,7 @@ type WorkflowsClient interface {
 	ListChildExecutions(ctx context.Context, in *ListChildExecutionsRequest, opts ...grpc.CallOption) (*ListChildExecutionsResponse, error)
 	ListWorkflowEvents(ctx context.Context, in *ListWorkflowEventsRequest, opts ...grpc.CallOption) (*ListWorkflowEventsResponse, error)
 	ListEventExecutions(ctx context.Context, in *ListEventExecutionsRequest, opts ...grpc.CallOption) (*ListEventExecutionsResponse, error)
+	ReEmitNodeExecutionEvent(ctx context.Context, in *ReEmitNodeExecutionEventRequest, opts ...grpc.CallOption) (*ReEmitNodeExecutionEventResponse, error)
 }
 
 type workflowsClient struct {
@@ -203,6 +205,16 @@ func (c *workflowsClient) ListEventExecutions(ctx context.Context, in *ListEvent
 	return out, nil
 }
 
+func (c *workflowsClient) ReEmitNodeExecutionEvent(ctx context.Context, in *ReEmitNodeExecutionEventRequest, opts ...grpc.CallOption) (*ReEmitNodeExecutionEventResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReEmitNodeExecutionEventResponse)
+	err := c.cc.Invoke(ctx, Workflows_ReEmitNodeExecutionEvent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WorkflowsServer is the server API for Workflows service.
 // All implementations should embed UnimplementedWorkflowsServer
 // for forward compatibility.
@@ -221,6 +233,7 @@ type WorkflowsServer interface {
 	ListChildExecutions(context.Context, *ListChildExecutionsRequest) (*ListChildExecutionsResponse, error)
 	ListWorkflowEvents(context.Context, *ListWorkflowEventsRequest) (*ListWorkflowEventsResponse, error)
 	ListEventExecutions(context.Context, *ListEventExecutionsRequest) (*ListEventExecutionsResponse, error)
+	ReEmitNodeExecutionEvent(context.Context, *ReEmitNodeExecutionEventRequest) (*ReEmitNodeExecutionEventResponse, error)
 }
 
 // UnimplementedWorkflowsServer should be embedded to have
@@ -271,6 +284,9 @@ func (UnimplementedWorkflowsServer) ListWorkflowEvents(context.Context, *ListWor
 }
 func (UnimplementedWorkflowsServer) ListEventExecutions(context.Context, *ListEventExecutionsRequest) (*ListEventExecutionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListEventExecutions not implemented")
+}
+func (UnimplementedWorkflowsServer) ReEmitNodeExecutionEvent(context.Context, *ReEmitNodeExecutionEventRequest) (*ReEmitNodeExecutionEventResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReEmitNodeExecutionEvent not implemented")
 }
 func (UnimplementedWorkflowsServer) testEmbeddedByValue() {}
 
@@ -544,6 +560,24 @@ func _Workflows_ListEventExecutions_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Workflows_ReEmitNodeExecutionEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReEmitNodeExecutionEventRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowsServer).ReEmitNodeExecutionEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Workflows_ReEmitNodeExecutionEvent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowsServer).ReEmitNodeExecutionEvent(ctx, req.(*ReEmitNodeExecutionEventRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Workflows_ServiceDesc is the grpc.ServiceDesc for Workflows service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -606,6 +640,10 @@ var Workflows_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListEventExecutions",
 			Handler:    _Workflows_ListEventExecutions_Handler,
+		},
+		{
+			MethodName: "ReEmitNodeExecutionEvent",
+			Handler:    _Workflows_ReEmitNodeExecutionEvent_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
