@@ -305,7 +305,7 @@ export const ComponentSidebar = ({
           }`}
         />
       </div>
-      <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-gray-200 bg-gray-50">
+      <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-border bg-gray-50">
         <div className="flex flex-col items-start gap-3 w-full mt-1">
           <div
             className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
@@ -430,14 +430,14 @@ export const ComponentSidebar = ({
         // Overview (Original Content)
         <>
           {metadata.length > 0 && (
-            <div className="px-3 py-1 border-b-1 border-gray-200">
+            <div className="px-3 py-1 border-b-1 border-border">
               <MetadataList
                 items={metadata}
                 className="border-b-0 text-gray-500 font-medium gap-2 flex flex-col py-2 font-mono"
               />
             </div>
           )}
-          <div className="px-3 py-1 border-b-1 border-gray-200 pb-3 text-left">
+          <div className="px-3 py-1 border-b-1 border-border pb-3 text-left">
             <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Latest events</h2>
             <div className="flex flex-col gap-2">
               {latestEvents.length === 0 ? (
