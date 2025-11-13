@@ -306,7 +306,7 @@ export const ComponentSidebar = ({
         />
       </div>
       <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-gray-200 bg-gray-50">
-        <div className="flex flex-col items-start gap-3 w-full mt-2">
+        <div className="flex flex-col items-start gap-3 w-full mt-1">
           <div
             className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
           >
@@ -330,10 +330,9 @@ export const ComponentSidebar = ({
           </div>
           <div
             onClick={() => onClose?.()}
-            className="flex items-center justify-center gap-1 absolute top-6 right-2 text-xs font-medium cursor-pointer"
+            className="absolute top-4 right-2 w-7 h-7 flex items-center justify-center rounded-sm cursor-pointer hover:bg-black/5 transition-colors"
           >
-            <span>Close</span>
-            <X size={14} />
+            <X size={16} />
           </div>
         </div>
       </div>
