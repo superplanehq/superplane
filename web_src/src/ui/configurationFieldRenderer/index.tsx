@@ -20,6 +20,7 @@ import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
 import { UserFieldRenderer } from "./UserFieldRenderer";
 import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
+import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { isFieldVisible, isFieldRequired, validateFieldValue } from "../../utils/components";
 import { ValidationError } from "./types";
 
@@ -166,6 +167,9 @@ export const ConfigurationFieldRenderer = ({
             domainType={domainType}
           />
         );
+
+      case "git-ref":
+        return <GitRefFieldRenderer {...commonProps} />;
 
       case "user":
         if (!domainId) {

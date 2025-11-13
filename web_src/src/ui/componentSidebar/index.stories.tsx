@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { ComponentSidebar } from "./";
 import GithubIcon from "@/assets/icons/integrations/github.svg";
 import { useState } from "react";
+import { MemoryRouter } from "react-router-dom";
 
 const meta: Meta<typeof ComponentSidebar> = {
   title: "ui/ComponentSidebar",
@@ -10,6 +11,13 @@ const meta: Meta<typeof ComponentSidebar> = {
     layout: "centered",
   },
   tags: ["autodocs"],
+  decorators: [
+    (Story) => (
+      <MemoryRouter>
+        <Story />
+      </MemoryRouter>
+    ),
+  ],
 };
 
 export default meta;
@@ -566,14 +574,14 @@ export const WithFullHistory: Story = {
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
-          allEvents={allEvents}
+          getAllHistoryEvents={() => allEvents}
           onEventClick={handleEventClick}
           totalInQueueCount={5}
           totalInHistoryCount={10}
           onSeeFullHistory={() => console.log("See full history triggered")}
           onLoadMoreHistory={handleLoadMore}
-          hasMoreHistory={hasMore}
-          loadingMoreHistory={loadingMore}
+          getHasMoreHistory={() => hasMore}
+          getLoadingMoreHistory={() => loadingMore}
         />
       </div>
     );
