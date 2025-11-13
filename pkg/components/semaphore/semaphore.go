@@ -123,10 +123,11 @@ func (s *Semaphore) Configuration() []configuration.Field {
 			Required: true,
 		},
 		{
-			Name:     "pipelineFile",
-			Label:    "Pipeline File",
-			Type:     configuration.FieldTypeString,
-			Required: true,
+			Name:        "pipelineFile",
+			Label:       "Pipeline File",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "e.g. .semaphore/semaphore.yml",
 		},
 		{
 			Name:  "parameters",
