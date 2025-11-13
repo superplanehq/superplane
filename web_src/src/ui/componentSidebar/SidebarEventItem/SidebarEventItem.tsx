@@ -40,6 +40,7 @@ interface SidebarEventItemProps {
   onCancelQueueItem?: (id: string) => void;
   onPushThrough?: (executionId: string) => void;
   supportsPushThrough?: boolean;
+  onReEmit?: (nodeId: string, eventOrExecutionId: string, kind: "trigger" | "execution") => void;
 }
 
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
@@ -53,6 +54,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   onCancelQueueItem,
   onPushThrough,
   supportsPushThrough,
+  onReEmit,
 }) => {
   // Determine default active tab based on available data
   const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" | "executionChain" => {
@@ -256,6 +258,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           onPushThrough={onPushThrough}
           supportsPushThrough={supportsPushThrough}
           eventState={event.state}
+          onReEmit={() => {
+            if (event.kind === "queue") return;
+            onReEmit?.(event.nodeId || "", event.id, event.kind || "execution");
+          }}
         />
       </div>
 

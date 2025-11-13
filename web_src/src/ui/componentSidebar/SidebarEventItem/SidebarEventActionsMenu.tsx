@@ -11,6 +11,7 @@ interface SidebarEventActionsMenuProps {
   onPushThrough?: (executionId: string) => void;
   supportsPushThrough?: boolean;
   eventState: ChildEventsState;
+  onReEmit?: () => void;
 }
 
 export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = ({
@@ -20,6 +21,7 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   onPushThrough,
   supportsPushThrough,
   eventState,
+  onReEmit,
 }) => {
   const isProcessed = eventState === "processed";
   const isDiscarded = eventState === "discarded";
@@ -32,11 +34,9 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   const handleReEmit = React.useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-
-      // Implement re-emit logic here
-      // TODO: Add re-emit handler prop if needed
+      onReEmit?.();
     },
-    [eventId],
+    [onReEmit],
   );
 
   const handlePushThrough = React.useCallback(

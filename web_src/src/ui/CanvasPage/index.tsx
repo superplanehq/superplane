@@ -135,6 +135,7 @@ export interface CanvasPageProps {
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
+  onReEmit?: (nodeId: string, eventOrExecutionId: string, kind: "trigger" | "execution") => void;
 
   ai?: AiProps;
 
@@ -465,6 +466,7 @@ function CanvasPage(props: CanvasPageProps) {
             getAllQueueEvents={props.getAllQueueEvents}
             getHasMoreQueue={props.getHasMoreQueue}
             getLoadingMoreQueue={props.getLoadingMoreQueue}
+            onReEmit={props.onReEmit}
           />
         </div>
       </div>
@@ -533,6 +535,7 @@ function Sidebar({
   onDeactivate,
   onToggleView,
   onDelete,
+  onReEmit,
   runDisabled,
   runDisabledTooltip,
   getAllHistoryEvents,
@@ -558,6 +561,7 @@ function Sidebar({
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
+  onReEmit?: (nodeId: string, eventOrExecutionId: string, kind: "trigger" | "execution") => void;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
@@ -677,6 +681,7 @@ function Sidebar({
       getAllQueueEvents={() => getAllQueueEvents?.(state.componentSidebar.selectedNodeId!) || []}
       getHasMoreQueue={() => getHasMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
       getLoadingMoreQueue={() => getLoadingMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
+      onReEmit={onReEmit}
     />
   );
 }

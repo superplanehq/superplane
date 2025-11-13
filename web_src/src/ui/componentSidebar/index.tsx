@@ -39,6 +39,7 @@ interface ComponentSidebarProps {
   onDeactivate?: () => void;
   onToggleView?: () => void;
   onDelete?: () => void;
+  onReEmit?: (nodeId: string, eventOrExecutionId: string, kind: "trigger" | "execution") => void;
   isCompactView?: boolean;
 
   // Tab data function to get tab data for each event
@@ -89,6 +90,7 @@ export const ComponentSidebar = ({
   onDeactivate,
   onToggleView,
   onDelete,
+  onReEmit,
   isCompactView = false,
   getTabData,
   onCancelQueueItem,
@@ -408,6 +410,7 @@ export const ComponentSidebar = ({
                       tabData={getTabData?.(event)}
                       onPushThrough={onPushThrough}
                       supportsPushThrough={supportsPushThrough}
+                      onReEmit={onReEmit}
                     />
                   ))}
                   {hasMoreItems && !searchQuery && statusFilter === "all" && (
@@ -458,6 +461,7 @@ export const ComponentSidebar = ({
                         tabData={getTabData?.(event)}
                         onPushThrough={onPushThrough}
                         supportsPushThrough={supportsPushThrough}
+                        onReEmit={onReEmit}
                       />
                     );
                   })}
