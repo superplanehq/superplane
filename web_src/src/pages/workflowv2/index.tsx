@@ -2557,5 +2557,6 @@ function prepareSidebarData(
     totalInHistoryCount: totalHistoryCount ? totalHistoryCount : 0,
     totalInQueueCount: totalQueueCount ? totalQueueCount : 0,
     hideQueueEvents,
+    isComposite: node.type === "TYPE_BLUEPRINT",
   };
 }
