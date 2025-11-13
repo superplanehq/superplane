@@ -672,15 +672,28 @@ export function WorkflowPageV2() {
                     )
                 : {};
 
+            let payload: Record<string, unknown> = {};
+
+            if (exec.outputs) {
+              const outputData: unknown[] = Object.values(exec.outputs)?.find((output) => {
+                return Array.isArray(output) && output?.length > 0;
+              }) as unknown[];
+
+              if (outputData?.length > 0) {
+                const output = outputData?.[0] as Record<string, unknown>;
+                if (output["data"]) {
+                  payload = (output["data"] as Record<string, unknown>) || {};
+                } else {
+                  payload = output || {};
+                }
+              }
+            }
+
             const mainItem: ExecutionChainItem = {
               name: nodeInfo?.name || exec.nodeId || "Unknown",
               nodeId: exec.nodeId || "",
               executionId: exec.id || "",
-              payload: {
-                input: exec.input || {},
-                outputs: exec.outputs || {},
-                metadata: exec.metadata || {},
-              },
+              payload,
               state: getSidebarEventItemState(exec),
               children:
                 exec?.childExecutions && exec.childExecutions.length > 0
