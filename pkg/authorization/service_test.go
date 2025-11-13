@@ -1093,7 +1093,6 @@ func Test__AuthService_CheckAndSyncMissingPermissions(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
-	authService.EnableCache(false)
 
 	org, err := models.CreateOrganization("test-org", "Test Organization")
 	require.NoError(t, err)
@@ -1140,7 +1139,6 @@ func Test__AuthService_SyncOrganizationRoles(t *testing.T) {
 
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
-	authService.EnableCache(false)
 
 	userID := uuid.New()
 	org, err := models.CreateOrganization("test-org", "Test Organization")
@@ -1202,7 +1200,6 @@ func Test__AuthService_SyncCanvasRoles(t *testing.T) {
 
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
-	authService.EnableCache(false)
 
 	userID := uuid.New()
 	org, err := models.CreateOrganization("test-org", "Test Organization")
