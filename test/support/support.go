@@ -165,7 +165,6 @@ func RandomName(prefix string) string {
 func AuthService(t *testing.T) *authorization.AuthService {
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
-	authService.EnableCache(false)
 	return authService
 }
 
