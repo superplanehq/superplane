@@ -512,15 +512,13 @@ export function WorkflowPageV2() {
         };
 
         // Payload tab: raw event data
-        const payload: Record<string, unknown> = {};
+        let payload: Record<string, unknown> = {};
 
         if (triggerEvent.data) {
-          payload.data = triggerEvent.data;
+          payload = triggerEvent.data;
         }
 
-        if (Object.keys(payload).length > 0) {
-          tabData.payload = payload;
-        }
+        tabData.payload = payload;
 
         return Object.keys(tabData).length > 0 ? tabData : undefined;
       }
@@ -573,23 +571,24 @@ export function WorkflowPageV2() {
       }
 
       // Payload tab: execution inputs and outputs (raw data)
-      const payload: Record<string, unknown> = {};
-
-      if (execution.input) {
-        payload.input = execution.input;
-      }
+      let payload: Record<string, unknown> = {};
 
       if (execution.outputs) {
-        payload.outputs = execution.outputs;
+        const outputData: unknown[] = Object.values(execution.outputs)?.find((output) => {
+          return Array.isArray(output) && output?.length > 0;
+        }) as unknown[];
+
+        if (outputData?.length > 0) {
+          const output = outputData?.[0] as Record<string, unknown>;
+          if (output["data"]) {
+            payload = (output["data"] as Record<string, unknown>) || {};
+          } else {
+            payload = output || {};
+          }
+        }
       }
 
-      if (execution.metadata) {
-        payload.metadata = execution.metadata;
-      }
-
-      if (Object.keys(payload).length > 0) {
-        tabData.payload = payload;
-      }
+      tabData.payload = payload;
 
       // Execution Chain tab: get execution chain for the root event
       if (execution.rootEvent?.id) {
