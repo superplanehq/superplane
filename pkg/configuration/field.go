@@ -8,15 +8,18 @@ const (
 	FieldTypeMultiSelect         = "multi-select"
 	FieldTypeIntegration         = "integration"
 	FieldTypeIntegrationResource = "integration-resource"
-	FieldTypeList                = "list"
-	FieldTypeObject              = "object"
-	FieldTypeTime                = "time"
-	FieldTypeDate                = "date"
-	FieldTypeDateTime            = "datetime"
-	FieldTypeDayInYear           = "day-in-year"
-	FieldTypeUser                = "user"
-	FieldTypeRole                = "role"
-	FieldTypeGroup               = "group"
+	// FieldTypeGitRef is a semantic string for Git references (e.g., refs/heads/main, refs/tags/v1.0.0)
+	// It behaves like a string in validation, but allows the UI to render a specialized control.
+	FieldTypeGitRef    = "git-ref"
+	FieldTypeList      = "list"
+	FieldTypeObject    = "object"
+	FieldTypeTime      = "time"
+	FieldTypeDate      = "date"
+	FieldTypeDateTime  = "datetime"
+	FieldTypeDayInYear = "day-in-year"
+	FieldTypeUser      = "user"
+	FieldTypeRole      = "role"
+	FieldTypeGroup     = "group"
 )
 
 type Field struct {
