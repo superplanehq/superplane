@@ -30,7 +30,7 @@ func ReEmitNodeExecutionEvent(
 		return nil, status.Error(codes.NotFound, "node not found")
 	}
 
-	nodeExecution, err := models.FindNodeExecution(workflowID, executionID)
+	nodeExecution, err := models.FindNodeExecutionWithNodeID(workflowID, executionID, nodeID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "node execution not found")
 	}

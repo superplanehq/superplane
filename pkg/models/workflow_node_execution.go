@@ -204,6 +204,26 @@ func FindNodeExecutionInTransaction(tx *gorm.DB, workflowID, id uuid.UUID) (*Wor
 	return &execution, nil
 }
 
+func FindNodeExecutionWithNodeID(workflowID, id uuid.UUID, nodeID string) (*WorkflowNodeExecution, error) {
+	return FindNodeExecutionWithNodeIDInTransaction(database.Conn(), workflowID, id, nodeID)
+}
+
+func FindNodeExecutionWithNodeIDInTransaction(tx *gorm.DB, workflowID, id uuid.UUID, nodeID string) (*WorkflowNodeExecution, error) {
+	var execution WorkflowNodeExecution
+	err := tx.
+		Where("id = ?", id).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		First(&execution).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
+}
+
 func FindChildExecutionsForMultiple(parentExecutionIDs []string) ([]WorkflowNodeExecution, error) {
 	var executions []WorkflowNodeExecution
 	err := database.Conn().
