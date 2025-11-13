@@ -967,6 +967,22 @@ function CanvasContent({
     runDisabledTooltip,
   };
 
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+
+  const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: any) => {
+    setHoveredEdgeId(edge.id);
+  }, []);
+
+  const handleEdgeMouseLeave = useCallback(() => {
+    setHoveredEdgeId(null);
+  }, []);
+
+  // Find the hovered edge to get its source and target
+  const hoveredEdge = useMemo(() => {
+    if (!hoveredEdgeId) return null;
+    return state.edges?.find((e) => e.id === hoveredEdgeId);
+  }, [hoveredEdgeId, state.edges]);
+
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
   const nodesWithCallbacks = useMemo(() => {
     return state.nodes.map((node) => ({
@@ -974,9 +990,10 @@ function CanvasContent({
       data: {
         ...node.data,
         _callbacksRef: callbacksRef,
+        _hoveredEdge: hoveredEdge,
       },
     }));
-  }, [state.nodes]);
+  }, [state.nodes, hoveredEdge]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -984,7 +1001,10 @@ function CanvasContent({
     }),
     [],
   );
-  const styledEdges = useMemo(() => state.edges?.map((e) => ({ ...e, ...EDGE_STYLE })), [state.edges]);
+  const styledEdges = useMemo(
+    () => state.edges?.map((e) => ({ ...e, ...EDGE_STYLE, data: { ...e.data, isHovered: e.id === hoveredEdgeId } })),
+    [state.edges, hoveredEdgeId],
+  );
 
   return (
     <>
@@ -1023,6 +1043,8 @@ function CanvasContent({
             onMove={handleMove}
             onInit={handleInit}
             onPaneClick={handlePaneClick}
+            onEdgeMouseEnter={handleEdgeMouseEnter}
+            onEdgeMouseLeave={handleEdgeMouseLeave}
             defaultViewport={viewport}
             fitView={false}
             style={{ opacity: isInitialized ? 1 : 0 }}
