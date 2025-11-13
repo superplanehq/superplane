@@ -123,7 +123,7 @@ export function Block(props: BlockProps) {
 // Handles are small connection points on the sides of blocks
 //
 
-const HANDLE_STYLE = {
+const HANDLE_STYLE: React.CSSProperties = {
   width: 12,
   height: 12,
   borderRadius: 100,

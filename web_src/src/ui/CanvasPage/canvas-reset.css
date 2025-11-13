@@ -15,3 +15,25 @@
 .sp-canvas .react-flow__node .canvas-node-drag-handle:active {
   cursor: grabbing;
 }
+
+.sp-canvas .react-flow__handle {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Create a larger hover area around the handle */
+.sp-canvas .react-flow__handle::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  pointer-events: auto;
+}
+
+.sp-canvas .react-flow__handle:hover {
+  width: 30px !important;
+  height: 30px !important;
+  border-width: 9px !important;
+}
