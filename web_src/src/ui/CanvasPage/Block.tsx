@@ -342,13 +342,13 @@ function BlockContent({
     runDisabled,
     runDisabledTooltip,
     onEdit,
-    onConfigure,
     onDuplicate,
     onDeactivate,
     onToggleCollapse,
     onToggleView,
     onDelete,
     isCompactView,
+    onConfigure: data.type === "composite" ? onConfigure : undefined,
   };
 
   switch (data.type) {
