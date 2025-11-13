@@ -224,7 +224,7 @@ export const Composite: React.FC<CompositeProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-1 border-border rounded-md w-[26rem] bg-white">
+      <div className="flex flex-col border-1 border-border rounded-md w-[26rem] bg-white overflow-hidden">
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}

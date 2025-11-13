@@ -122,7 +122,7 @@ export const Trigger: React.FC<TriggerProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-1 border-border rounded-md w-[23rem] bg-white">
+      <div className="flex flex-col border-1 border-border rounded-md w-[23rem] bg-white overflow-hidden">
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}

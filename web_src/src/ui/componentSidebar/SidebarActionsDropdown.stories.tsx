@@ -121,7 +121,7 @@ export const InteractiveToggle: Story = {
 export const InContext: Story = {
   render: (args) => {
     return (
-      <div className="w-80 bg-white border rounded-lg shadow-sm">
+      <div className="w-80 bg-white border rounded-lg shadow-sm overflow-hidden">
         <div className="flex items-center justify-between gap-3 p-4 border-b bg-gray-50">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">

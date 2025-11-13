@@ -176,7 +176,7 @@ export const Approval: React.FC<ApprovalProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-1 border-border rounded-md w-[30rem] bg-white">
+      <div className="flex flex-col border-1 border-border rounded-md w-[26rem] bg-white overflow-hidden">
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
