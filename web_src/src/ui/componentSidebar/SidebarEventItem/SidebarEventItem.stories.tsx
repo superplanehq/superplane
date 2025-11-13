@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import React, { useState } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { SidebarEventItem, ChainExecutionState } from "./SidebarEventItem";
 import { SidebarEvent } from "../types";
 
@@ -10,6 +11,13 @@ const meta: Meta<typeof SidebarEventItem> = {
     layout: "centered",
   },
   tags: ["autodocs"],
+  decorators: [
+    (Story) => (
+      <MemoryRouter>
+        <Story />
+      </MemoryRouter>
+    ),
+  ],
   argTypes: {
     variant: {
       control: "select",
