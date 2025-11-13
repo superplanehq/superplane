@@ -124,11 +124,10 @@ func (s *Semaphore) Configuration() []configuration.Field {
 			Placeholder: "e.g. .semaphore/semaphore.yml",
 		},
 		{
-			Name:        "ref",
-			Label:       "Pipeline file location",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Placeholder: "e.g. ref/heads/main",
+			Name:     "ref",
+			Label:    "Pipeline file location",
+			Type:     configuration.FieldTypeGitRef,
+			Required: true,
 		},
 		{
 			Name:  "parameters",
