@@ -42,6 +42,7 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		Configuration: config,
 		RootEventID:   queueItem.RootEventID.String(),
 		EventID:       event.ID.String(),
+		SourceNodeID:  event.NodeID,
 		Input:         event.Data.Data(),
 	}
 
@@ -178,6 +179,52 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 			}
 		}
 		return count, nil
+	}
+
+	ctx.CountDistinctIncomingSources = func() (int, error) {
+		// Similar blueprint-aware logic as CountIncomingEdges, but count
+		// distinct source nodes rather than edge count.
+		if node.ParentNodeID != nil && *node.ParentNodeID != "" {
+			parent, err := models.FindWorkflowNode(tx, node.WorkflowID, *node.ParentNodeID)
+			if err != nil {
+				return 0, err
+			}
+
+			blueprintID := parent.Ref.Data().Blueprint.ID
+			if blueprintID != "" {
+				bp, err := models.FindUnscopedBlueprintInTransaction(tx, blueprintID)
+				if err != nil {
+					return 0, err
+				}
+
+				prefix := parent.NodeID + ":"
+				childID := node.NodeID
+				if len(childID) > len(prefix) && childID[:len(prefix)] == prefix {
+					childID = childID[len(prefix):]
+				}
+
+				uniq := map[string]struct{}{}
+				for _, e := range bp.Edges {
+					if e.TargetID == childID {
+						uniq[e.SourceID] = struct{}{}
+					}
+				}
+				return len(uniq), nil
+			}
+		}
+
+		wf, err := models.FindUnscopedWorkflowInTransaction(tx, node.WorkflowID)
+		if err != nil {
+			return 0, err
+		}
+
+		uniq := map[string]struct{}{}
+		for _, edge := range wf.Edges {
+			if edge.TargetID == node.NodeID {
+				uniq[edge.SourceID] = struct{}{}
+			}
+		}
+		return len(uniq), nil
 	}
 
 	ctx.PassExecution = func(execID uuid.UUID, outputs map[string][]any) (*models.WorkflowNodeExecution, error) {

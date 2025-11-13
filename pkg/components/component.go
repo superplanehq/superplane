@@ -199,7 +199,9 @@ type ProcessQueueContext struct {
 	// Input event data and references
 	RootEventID string
 	EventID     string
-	Input       any
+	// SourceNodeID is the upstream node id that produced the event
+	SourceNodeID string
+	Input        any
 
 	// CreateExecution creates a pending execution for this queue item.
 	CreateExecution func() (uuid.UUID, error)
@@ -221,6 +223,11 @@ type ProcessQueueContext struct {
 
 	// CountIncomingEdges returns the number of incoming edges for this node
 	CountIncomingEdges func() (int, error)
+
+	// CountDistinctIncomingSources returns the number of distinct upstream
+	// source nodes connected to this node (ignoring multiple channels from the
+	// same source)
+	CountDistinctIncomingSources func() (int, error)
 
 	// PassExecution marks the execution as passed with the provided outputs.
 	PassExecution func(execID uuid.UUID, outputs map[string][]any) (*models.WorkflowNodeExecution, error)
