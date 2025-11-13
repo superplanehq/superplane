@@ -31,7 +31,7 @@ var _ Authorization = (*AuthService)(nil)
 //
 
 type AuthService struct {
-	enforcer              *casbin.CachedEnforcer
+	enforcer              *casbin.Enforcer
 	orgPolicyTemplates    [][5]string
 	canvasPolicyTemplates [][5]string
 }
@@ -46,7 +46,7 @@ func NewAuthService() (*AuthService, error) {
 		return nil, fmt.Errorf("failed to create casbin adapter: %w", err)
 	}
 
-	enforcer, err := casbin.NewCachedEnforcer(modelPath, adapter)
+	enforcer, err := casbin.NewEnforcer(modelPath, adapter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin enforcer: %w", err)
 	}
@@ -981,10 +981,6 @@ func (a *AuthService) SyncCanvasRoles(canvasID string) error {
 	}
 
 	return nil
-}
-
-func (a *AuthService) EnableCache(enable bool) {
-	a.enforcer.EnableCache(enable)
 }
 
 // Helper function to apply default policies from templates

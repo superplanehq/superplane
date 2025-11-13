@@ -21,7 +21,6 @@ import (
 func Test__HealthCheckEndpoint(t *testing.T) {
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
-	authService.EnableCache(false)
 
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
 	signer := jwt.NewSigner("test")
@@ -41,7 +40,6 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
-	authService.EnableCache(false)
 
 	signer := jwt.NewSigner("test")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
@@ -111,7 +109,6 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 func Test__GRPCGatewayRegistration(t *testing.T) {
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
-	authService.EnableCache(false)
 
 	signer := jwt.NewSigner("test")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
