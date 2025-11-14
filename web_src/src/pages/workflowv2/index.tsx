@@ -1084,6 +1084,17 @@ export function WorkflowPageV2() {
     [workflowId],
   );
 
+  const handleReEmit = useCallback(
+    async (nodeId: string, eventOrExecutionId: string) => {
+      const nodeEvents = nodeEventsMap[nodeId];
+      if (!nodeEvents) return;
+      const eventToReemit = nodeEvents.find((event) => event.id === eventOrExecutionId);
+      if (!eventToReemit) return;
+      handleRun(nodeId, eventToReemit.channel || "", eventToReemit.data);
+    },
+    [handleRun, nodeEventsMap],
+  );
+
   const handleNodeDuplicate = useCallback(
     (nodeId: string) => {
       if (!workflow || !organizationId || !workflowId) return;
@@ -1289,6 +1300,7 @@ export function WorkflowPageV2() {
       getAllQueueEvents={getAllQueueEvents}
       getHasMoreQueue={getHasMoreQueue}
       getLoadingMoreQueue={getLoadingMoreQueue}
+      onReEmit={handleReEmit}
       breadcrumbs={[
         {
           label: "Canvases",

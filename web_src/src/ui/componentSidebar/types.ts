@@ -13,6 +13,7 @@ export interface SidebarEvent {
   // Optional specific identifiers to avoid overloading `id`
   // Present for execution items
   executionId?: string;
+  nodeId?: string;
   // Present for trigger events
   triggerEventId?: string;
   // Optional explicit kind for clarity

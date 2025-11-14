@@ -23,13 +23,14 @@ export function mapTriggerEventsToSidebarEvents(
     return {
       id: event.id!,
       title,
-      subtitle,
+      subtitle: subtitle || formatTimeAgo(new Date(event.createdAt!)),
       state: "processed" as const,
       isOpen: false,
       receivedAt: event.createdAt ? new Date(event.createdAt) : undefined,
       values,
       triggerEventId: event.id!,
       kind: "trigger",
+      nodeId: node.id,
     };
   });
 }
@@ -65,13 +66,14 @@ export function mapExecutionsToSidebarEvents(
     return {
       id: execution.id!,
       title,
-      subtitle,
+      subtitle: subtitle || formatTimeAgo(new Date(execution.createdAt!)),
       state,
       isOpen: false,
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
       values,
       executionId: execution.id!,
       kind: "execution",
+      nodeId: execution?.nodeId,
     };
   });
 }
