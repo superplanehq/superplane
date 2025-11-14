@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/public"
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/services"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers"
 
 	// Import components and triggers to register them via init()
@@ -208,6 +209,17 @@ func configureLogging() {
 
 func Start() {
 	configureLogging()
+
+	if os.Getenv("ENABLE_OTEL_METRICS") == "yes" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := telemetry.InitMetrics(ctx); err != nil {
+			log.Warnf("Failed to initialize OpenTelemetry metrics: %v", err)
+		} else {
+			log.Info("OpenTelemetry metrics initialized")
+		}
+	}
 
 	encryptionKey := os.Getenv("ENCRYPTION_KEY")
 	if encryptionKey == "" {
