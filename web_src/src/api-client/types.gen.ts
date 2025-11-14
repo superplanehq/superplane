@@ -812,14 +812,6 @@ export type WorkflowsListWorkflowsResponse = {
   workflows?: Array<WorkflowsWorkflow>;
 };
 
-export type WorkflowsReEmitNodeExecutionEventBody = {
-  nodeId?: string;
-};
-
-export type WorkflowsReEmitNodeExecutionEventResponse = {
-  eventId?: string;
-};
-
 export type WorkflowsUpdateWorkflowBody = {
   workflow?: WorkflowsWorkflow;
 };
@@ -2668,36 +2660,6 @@ export type WorkflowsListChildExecutionsResponses = {
 
 export type WorkflowsListChildExecutionsResponse2 =
   WorkflowsListChildExecutionsResponses[keyof WorkflowsListChildExecutionsResponses];
-
-export type WorkflowsReEmitNodeExecutionEventData = {
-  body: WorkflowsReEmitNodeExecutionEventBody;
-  path: {
-    workflowId: string;
-    executionId: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{workflowId}/executions/{executionId}/reemit";
-};
-
-export type WorkflowsReEmitNodeExecutionEventErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsReEmitNodeExecutionEventError =
-  WorkflowsReEmitNodeExecutionEventErrors[keyof WorkflowsReEmitNodeExecutionEventErrors];
-
-export type WorkflowsReEmitNodeExecutionEventResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsReEmitNodeExecutionEventResponse;
-};
-
-export type WorkflowsReEmitNodeExecutionEventResponse2 =
-  WorkflowsReEmitNodeExecutionEventResponses[keyof WorkflowsReEmitNodeExecutionEventResponses];
 
 export type WorkflowsListNodeEventsData = {
   body?: never;

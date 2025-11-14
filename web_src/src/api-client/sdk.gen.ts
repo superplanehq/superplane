@@ -188,9 +188,6 @@ import type {
   WorkflowsListChildExecutionsData,
   WorkflowsListChildExecutionsResponse2,
   WorkflowsListChildExecutionsError,
-  WorkflowsReEmitNodeExecutionEventData,
-  WorkflowsReEmitNodeExecutionEventResponse2,
-  WorkflowsReEmitNodeExecutionEventError,
   WorkflowsListNodeEventsData,
   WorkflowsListNodeEventsResponse2,
   WorkflowsListNodeEventsError,
@@ -1272,27 +1269,6 @@ export const workflowsListChildExecutions = <ThrowOnError extends boolean = true
     ThrowOnError
   >({
     url: "/api/v1/workflows/{workflowId}/executions/{executionId}/children",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-};
-
-/**
- * Re-emit node execution event
- * Re-emit node execution event
- */
-export const workflowsReEmitNodeExecutionEvent = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsReEmitNodeExecutionEventData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).post<
-    WorkflowsReEmitNodeExecutionEventResponse2,
-    WorkflowsReEmitNodeExecutionEventError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/executions/{executionId}/reemit",
     ...options,
     headers: {
       "Content-Type": "application/json",

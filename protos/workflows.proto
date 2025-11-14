@@ -185,18 +185,6 @@ service Workflows {
       tags: "WorkflowEvent";
     };
   }
-
-  rpc ReEmitNodeExecutionEvent(ReEmitNodeExecutionEventRequest) returns (ReEmitNodeExecutionEventResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/workflows/{workflow_id}/executions/{execution_id}/reemit"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Re-emit node execution event";
-      description: "Re-emit node execution event";
-      tags: "WorkflowNodeExecution";
-    };
-  }
 }
 
 message ListWorkflowsRequest {}
@@ -290,16 +278,6 @@ message EmitNodeEventRequest {
 }
 
 message EmitNodeEventResponse {
-  string event_id = 1;
-}
-
-message ReEmitNodeExecutionEventRequest {
-  string workflow_id = 1;
-  string node_id = 2;
-  string execution_id = 3;
-}
-
-message ReEmitNodeExecutionEventResponse {
   string event_id = 1;
 }
 

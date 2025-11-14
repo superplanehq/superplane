@@ -108,35 +108,6 @@ func (s *WorkflowService) EmitNodeEvent(ctx context.Context, req *pb.EmitNodeEve
 		req.Data.AsMap(),
 	)
 }
-func (s *WorkflowService) ReEmitNodeExecutionEvent(ctx context.Context, req *pb.ReEmitNodeExecutionEventRequest) (*pb.ReEmitNodeExecutionEventResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-
-	workflowID, err := uuid.Parse(req.WorkflowId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
-	}
-
-	if req.NodeId == "" {
-		return nil, status.Error(codes.InvalidArgument, "node_id is required")
-	}
-
-	if req.ExecutionId == "" {
-		return nil, status.Error(codes.InvalidArgument, "execution_id is required")
-	}
-
-	executionID, err := uuid.Parse(req.ExecutionId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid execution_id")
-	}
-
-	return workflows.ReEmitNodeExecutionEvent(
-		ctx,
-		uuid.MustParse(organizationID),
-		workflowID,
-		req.NodeId,
-		executionID,
-	)
-}
 
 func (s *WorkflowService) InvokeNodeExecutionAction(ctx context.Context, req *pb.InvokeNodeExecutionActionRequest) (*pb.InvokeNodeExecutionActionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)

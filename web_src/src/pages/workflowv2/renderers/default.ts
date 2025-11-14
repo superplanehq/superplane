@@ -9,7 +9,7 @@ import { TriggerProps } from "@/ui/trigger";
  */
 export const defaultTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    return { title: event.id!, subtitle: '' };
+    return { title: event.id!, subtitle: "" };
   },
 
   getRootEventValues: (_: WorkflowsWorkflowEvent): Record<string, string> => {
