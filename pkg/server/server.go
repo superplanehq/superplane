@@ -33,7 +33,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 )
 
-func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) {
+func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, authService authorization.Authorization) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -97,6 +97,12 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 
 		w := workers.NewWebhookCleanupWorker(registry)
 		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_RBAC_POLICY_RELOAD_CONSUMER") == "yes" {
+		log.Println("Starting RBAC Policy Reload Consumer")
+		rbacPolicyReloadConsumer := workers.NewRBACPolicyReloadConsumer(rabbitMQURL, authService)
+		go rbacPolicyReloadConsumer.Start()
 	}
 }
 
@@ -230,7 +236,7 @@ func Start() {
 		go startInternalAPI(encryptorInstance, authService, registry)
 	}
 
-	startWorkers(jwtSigner, encryptorInstance, registry, baseURL)
+	startWorkers(jwtSigner, encryptorInstance, registry, baseURL, authService)
 
 	log.Println("Superplane is UP.")
 
