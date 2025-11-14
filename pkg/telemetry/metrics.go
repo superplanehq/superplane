@@ -1,0 +1,56 @@
+package telemetry
+
+import (
+	"context"
+	"sync/atomic"
+	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/metric"
+
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+)
+
+var (
+	meter                     = otel.Meter("superplane")
+	queueWorkerTickHistogram  metric.Float64Histogram
+	queueWorkerHistogramReady atomic.Bool
+)
+
+func InitMetrics(ctx context.Context) error {
+	exporter, err := otlpmetricgrpc.New(ctx)
+	if err != nil {
+		return err
+	}
+
+	provider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(
+			sdkmetric.NewPeriodicReader(exporter),
+		),
+	)
+
+	otel.SetMeterProvider(provider)
+	meter = provider.Meter("superplane")
+
+	queueWorkerTickHistogram, err = meter.Float64Histogram(
+		"queue_worker.tick.duration.seconds",
+		metric.WithDescription("Duration of each WorkflowNodeQueueWorker tick"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	queueWorkerHistogramReady.Store(true)
+
+	return nil
+}
+
+func RecordQueueWorkerTickDuration(ctx context.Context, d time.Duration) {
+	if !queueWorkerHistogramReady.Load() {
+		return
+	}
+
+	queueWorkerTickHistogram.Record(ctx, d.Seconds())
+}

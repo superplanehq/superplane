@@ -8,6 +8,8 @@ services:
     tty: true
 
     command: bash /app/docker-entrypoint.dev.sh
+    env_file:
+      - .env.docker
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"
