@@ -678,13 +678,8 @@ func (s *Server) setupDevProxy(webBasePath string) {
 
 	origDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
-		originalPath := req.URL.Path
-
 		origDirector(req)
-
 		req.Host = target.Host
-
-		log.Infof("Proxying: %s → %s", originalPath, req.URL.Path)
 	}
 
 	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

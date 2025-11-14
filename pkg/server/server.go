@@ -190,11 +190,24 @@ func lookupInternalAPIPort() int {
 	return port
 }
 
+func configureLogging() {
+	appEnv := os.Getenv("APP_ENV")
+
+	if appEnv == "development" || appEnv == "test" {
+		log.SetFormatter(&log.TextFormatter{
+			FullTimestamp:   false,
+			TimestampFormat: time.Stamp,
+		})
+	} else {
+		log.SetFormatter(&log.TextFormatter{
+			FullTimestamp:   true,
+			TimestampFormat: time.StampMilli,
+		})
+	}
+}
+
 func Start() {
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp:   true,
-		TimestampFormat: time.StampMilli,
-	})
+	configureLogging()
 
 	encryptionKey := os.Getenv("ENCRYPTION_KEY")
 	if encryptionKey == "" {

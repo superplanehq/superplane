@@ -173,26 +173,18 @@ func (s *TestContext) NewSession(t *testing.T) *TestSession {
 		baseURL:   s.baseURL,
 	}
 
-	// Expose SPA navigation logger and page-level hooks
-	if err := p.ExposeFunction("_spNav", func(args ...interface{}) interface{} {
-		if len(args) > 0 {
-			if url, ok := args[0].(string); ok {
-				t.Logf("[Browser Logs] Navigated to %s", url)
-			}
-		}
-		return nil
-	}); err != nil {
-		t.Fatalf("expose function: %v", err)
-	}
-
-	p.OnFrameNavigated(func(f pw.Frame) {
-		if f.ParentFrame() == nil {
-			t.Logf("[Browser Logs] Navigated to %s", f.URL())
-		}
-	})
-
 	p.OnConsole(func(m pw.ConsoleMessage) {
-		t.Logf("[console.%s] %s", m.Type(), m.Text())
+		text := m.Text()
+
+		// Ignore noisy dev-time logs from Vite and React DevTools suggestions
+		if strings.Contains(text, "[vite] connecting") ||
+			strings.Contains(text, "[vite] connected") ||
+			strings.Contains(text, "React DevTools") ||
+			strings.Contains(text, "Download the React DevTools") {
+			return
+		}
+
+		t.Logf("[console.%s] %s", m.Type(), text)
 	})
 
 	p.OnPageError(func(err error) {
