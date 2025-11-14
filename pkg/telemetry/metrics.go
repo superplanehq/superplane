@@ -13,9 +13,12 @@ import (
 )
 
 var (
-	meter                     = otel.Meter("superplane")
-	queueWorkerTickHistogram  metric.Float64Histogram
-	queueWorkerHistogramReady atomic.Bool
+	meter                          = otel.Meter("superplane")
+	queueWorkerTickHistogram       metric.Float64Histogram
+	queueWorkerHistogramReady      atomic.Bool
+	dbLocksCountHistogram          metric.Int64Histogram
+	dbLocksCountHistogramReady     atomic.Bool
+	dbLocksReporterInitializedFlag atomic.Bool
 )
 
 func InitMetrics(ctx context.Context) error {
@@ -43,6 +46,19 @@ func InitMetrics(ctx context.Context) error {
 	}
 
 	queueWorkerHistogramReady.Store(true)
+
+	dbLocksCountHistogram, err = meter.Int64Histogram(
+		"db.locks.count",
+		metric.WithDescription("Number of database locks"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbLocksCountHistogramReady.Store(true)
+
+	StartDatabaseLocksReporter(ctx)
 
 	return nil
 }
