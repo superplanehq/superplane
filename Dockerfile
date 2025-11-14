@@ -61,10 +61,6 @@ RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/air-verse/air@latest
 RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/mgechev/revive@v1.8.0
 RUN bash /tmp/scripts/retry.sh 6 2s go install gotest.tools/gotestsum@v1.12.3
 
-# Install Playwright (with retries as it's network heavy)
-RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1
-RUN bash /tmp/scripts/retry.sh 6 2s playwright install chromium-headless-shell --with-deps
-
 # Inject test files and dev entrypoint
 COPY test test
 COPY docker-entrypoint.dev.sh /app/docker-entrypoint.dev.sh
