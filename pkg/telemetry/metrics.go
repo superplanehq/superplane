@@ -7,19 +7,17 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
-	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/metric"
+
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 )
 
 var (
-	meter                      = otel.Meter("github.com/superplanehq/superplane")
-	queueWorkerTickHistogram   metric.Float64Histogram
-	queueWorkerHistogramReady  atomic.Bool
+	meter                     = otel.Meter("superplane")
+	queueWorkerTickHistogram  metric.Float64Histogram
+	queueWorkerHistogramReady atomic.Bool
 )
 
-// InitMetrics configures the global meter provider and initializes metrics.
-// It uses the standard OTLP metric gRPC exporter and relies on OpenTelemetry
-// environment variables (e.g. OTEL_EXPORTER_OTLP_ENDPOINT) for configuration.
 func InitMetrics(ctx context.Context) error {
 	exporter, err := otlpmetricgrpc.New(ctx)
 	if err != nil {
@@ -33,7 +31,7 @@ func InitMetrics(ctx context.Context) error {
 	)
 
 	otel.SetMeterProvider(provider)
-	meter = provider.Meter("github.com/superplanehq/superplane")
+	meter = provider.Meter("superplane")
 
 	queueWorkerTickHistogram, err = meter.Float64Histogram(
 		"queue_worker.tick.duration.seconds",
@@ -49,8 +47,6 @@ func InitMetrics(ctx context.Context) error {
 	return nil
 }
 
-// RecordQueueWorkerTickDuration records the duration of a single tick of the
-// WorkflowNodeQueueWorker. If metrics are not initialized, this is a no-op.
 func RecordQueueWorkerTickDuration(ctx context.Context, d time.Duration) {
 	if !queueWorkerHistogramReady.Load() {
 		return
@@ -58,4 +54,3 @@ func RecordQueueWorkerTickDuration(ctx context.Context, d time.Duration) {
 
 	queueWorkerTickHistogram.Record(ctx, d.Seconds())
 }
-

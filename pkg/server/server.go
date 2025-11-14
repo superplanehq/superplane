@@ -207,19 +207,24 @@ func configureLogging() {
 	}
 }
 
+func setupOtelMetrics() {
+	if os.Getenv("ENABLE_OTEL_METRICS") != "yes" {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := telemetry.InitMetrics(ctx); err != nil {
+		log.Warnf("Failed to initialize OpenTelemetry metrics: %v", err)
+	} else {
+		log.Info("OpenTelemetry metrics initialized")
+	}
+}
+
 func Start() {
 	configureLogging()
-
-	if os.Getenv("ENABLE_OTEL_METRICS") == "yes" {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err := telemetry.InitMetrics(ctx); err != nil {
-			log.Warnf("Failed to initialize OpenTelemetry metrics: %v", err)
-		} else {
-			log.Info("OpenTelemetry metrics initialized")
-		}
-	}
+	setupOtelMetrics()
 
 	encryptionKey := os.Getenv("ENCRYPTION_KEY")
 	if encryptionKey == "" {
