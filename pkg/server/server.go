@@ -208,7 +208,7 @@ func configureLogging() {
 }
 
 func setupOtelMetrics() {
-	if os.Getenv("ENABLE_OTEL_METRICS") != "yes" {
+	if os.Getenv("OTEL_ENABLED") != "yes" {
 		return
 	}
 
