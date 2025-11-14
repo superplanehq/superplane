@@ -32,7 +32,7 @@ blocks:
 
         - name: "E2E Tests"
           commands:
-            - make test.e2e.setup
+            - make setup.playwright
             - make test.e2e
 
         - name: "Check: DB structure"

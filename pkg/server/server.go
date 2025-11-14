@@ -102,7 +102,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 
 func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(encryptor, authService, registry, 50051)
+	grpc.RunServer(encryptor, authService, registry, lookupInternalAPIPort())
 }
 
 func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
@@ -170,6 +170,20 @@ func lookupPublicAPIPort() int {
 			port = v
 		} else {
 			log.Warnf("Invalid PUBLIC_API_PORT %q, falling back to 8000", p)
+		}
+	}
+
+	return port
+}
+
+func lookupInternalAPIPort() int {
+	port := 50051
+
+	if p := os.Getenv("INTERNAL_API_PORT"); p != "" {
+		if v, errConv := strconv.Atoi(p); errConv == nil && v > 0 {
+			port = v
+		} else {
+			log.Warnf("Invalid INTERNAL_API_PORT %q, falling back to 50051", p)
 		}
 	}
 
