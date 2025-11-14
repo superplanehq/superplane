@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -21,16 +23,50 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 			next.ServeHTTP(lrw, r)
 
 			duration := time.Since(start)
-			logger.WithFields(log.Fields{
-				"method":     r.Method,
-				"path":       r.URL.Path,
-				"remote":     r.RemoteAddr,
-				"user_agent": r.UserAgent(),
-				"duration":   duration,
-				"status":     lrw.statusCode,
-			}).Info("handled request")
+
+			if !shouldLogRequest(r.URL.Path) {
+				return
+			}
+
+			if ShowFullLogs() {
+				logger.WithFields(log.Fields{
+					"method":     r.Method,
+					"path":       r.URL.Path,
+					"remote":     r.RemoteAddr,
+					"user_agent": r.UserAgent(),
+					"duration":   duration,
+					"status":     lrw.statusCode,
+				}).Info("handled request")
+			} else {
+				logger.WithFields(log.Fields{
+					"method":   r.Method,
+					"path":     r.URL.Path,
+					"duration": duration,
+					"status":   lrw.statusCode,
+				}).Info("handled request")
+			}
 		})
 	}
+}
+
+func shouldLogRequest(path string) bool {
+	appEnv := os.Getenv("APP_ENV")
+
+	if appEnv != "development" && appEnv != "test" {
+		return true
+	}
+
+	if strings.HasPrefix(path, "/src/") ||
+		strings.HasPrefix(path, "/node_modules/") {
+		return false
+	}
+
+	return true
+}
+
+func ShowFullLogs() bool {
+	appEnv := os.Getenv("APP_ENV")
+	return appEnv != "development" && appEnv != "test"
 }
 
 type loggingResponseWriter struct {
