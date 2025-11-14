@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
 	uuid "github.com/google/uuid"
@@ -39,6 +40,19 @@ func TestCanvasPage(t *testing.T) {
 		steps.ClickAddItemButton()
 		steps.ClickAddItemButton()
 		steps.ClickAddItemButton()
+	})
+
+	t.Run("deleting a node from a canvas", func(t *testing.T) {
+		steps.Start()
+		steps.GivenACanvasExistsWithANoopNode()
+
+		// Delete the node via the node menu and save
+		steps.DeleteNodeFromCanvas("DeleteMe")
+		steps.AssertUnsavedChangesNoteIsVisible()
+		steps.SaveCanvas()
+
+		// Verify the node has been removed from the database
+		steps.AssertNodeDeletedInDB("DeleteMe")
 	})
 }
 
@@ -116,6 +130,7 @@ func (s *CanvasPageSteps) AssertExplainationIsShownWhenHoverOverRun() {
 func (s *CanvasPageSteps) SaveCanvas() {
 	s.session.Click(q.TestID("save-canvas-button"))
 	s.session.Sleep(500)
+	s.session.TakeScreenshot()
 	s.session.AssertText("Canvas changes saved")
 }
 
@@ -144,4 +159,42 @@ func (s *CanvasPageSteps) ClickAddItemButton() {
 func (s *CanvasPageSteps) AssertNodeIsAdded(nodeName string) {
 	// Verify the node displays the custom name, not the generic component label
 	s.session.AssertText(nodeName)
+}
+
+// GivenACanvasExistsWithANoopNode creates a canvas and adds a noop node named "DeleteMe".
+func (s *CanvasPageSteps) GivenACanvasExistsWithANoopNode() {
+	s.GivenACanvasExists()
+	s.VisitCanvasPage()
+	s.AddNoopToCanvas("DeleteMe")
+	s.SaveCanvas()
+	s.AssertNodeIsAdded("DeleteMe")
+}
+
+func (s *CanvasPageSteps) DeleteNodeFromCanvas(nodeName string) {
+	// Open the node header dropdown and click Delete
+	// Match the UI's toTestId() logic: lowercase, spaces -> dashes
+	safe := strings.ToLower(nodeName)
+	safe = strings.ReplaceAll(safe, " ", "-")
+	dropdown := q.TestID("node-" + safe + "-header-dropdown")
+	deleteButton := q.Locator("button:has-text('Delete')")
+
+	s.session.Click(dropdown)
+	s.session.Click(deleteButton)
+	s.session.Sleep(300)
+}
+
+func (s *CanvasPageSteps) AssertNodeDeletedInDB(nodeName string) {
+	// Confirm the node with the given name no longer exists for this workflow
+	orgUUID := uuid.MustParse(s.session.orgID)
+	wf, err := models.FindWorkflow(orgUUID, uuid.MustParse(s.workflowID))
+	require.NoError(s.t, err)
+
+	nodes, err := models.FindWorkflowNodes(wf.ID)
+	require.NoError(s.t, err)
+
+	for _, n := range nodes {
+		if n.Name == nodeName {
+			s.t.Fatalf("expected node %q to be deleted, but it still exists in DB", nodeName)
+		}
+	}
 }

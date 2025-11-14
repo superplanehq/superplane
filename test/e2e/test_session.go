@@ -49,7 +49,8 @@ func (s *TestSession) Visit(path string) {
 }
 
 func (s *TestSession) AssertText(text string) {
-	if err := s.page.Locator("text=" + text).WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.timeoutMs)}); err != nil {
+	locator := s.page.Locator("text=" + text).First()
+	if err := locator.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.timeoutMs)}); err != nil {
 		s.t.Fatalf("text %q not found: %v", text, err)
 	}
 }
