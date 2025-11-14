@@ -135,7 +135,7 @@ export interface CanvasPageProps {
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
-  onReEmit?: (nodeId: string, eventOrExecutionId: string, kind: "trigger" | "execution") => void;
+  onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
 
   ai?: AiProps;
 
@@ -561,7 +561,7 @@ function Sidebar({
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
-  onReEmit?: (nodeId: string, eventOrExecutionId: string, kind: "trigger" | "execution") => void;
+  onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];

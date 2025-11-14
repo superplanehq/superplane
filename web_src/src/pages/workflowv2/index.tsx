@@ -18,7 +18,6 @@ import {
   WorkflowsWorkflowNodeQueueItem,
   workflowsEmitNodeEvent,
   workflowsInvokeNodeExecutionAction,
-  workflowsReEmitNodeExecutionEvent,
 } from "@/api-client";
 import { organizationKeys, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
@@ -1086,39 +1085,14 @@ export function WorkflowPageV2() {
   );
 
   const handleReEmit = useCallback(
-    async (nodeId: string, eventOrExecutionId: string, kind: "trigger" | "execution") => {
-      if (!workflowId) return;
-
-      if (kind === "trigger") {
-        const nodeEvents = nodeEventsMap[nodeId];
-        if (!nodeEvents) return;
-        const eventToReemit = nodeEvents.find((event) => event.id === eventOrExecutionId);
-        if (!eventToReemit) return;
-        handleRun(nodeId, eventToReemit.channel || "", eventToReemit.data);
-
-        return;
-      }
-
-      try {
-        await workflowsReEmitNodeExecutionEvent(
-          withOrganizationHeader({
-            path: {
-              workflowId: workflowId,
-              executionId: eventOrExecutionId,
-            },
-            body: {
-              nodeId: nodeId,
-            },
-          }),
-        );
-        showSuccessToast("Event re-emitted successfully");
-      } catch (error) {
-        console.error("Failed to emit event:", error);
-        showErrorToast("Failed to emit event");
-        throw error; // Re-throw to let EmitEventModal handle it
-      }
+    async (nodeId: string, eventOrExecutionId: string) => {
+      const nodeEvents = nodeEventsMap[nodeId];
+      if (!nodeEvents) return;
+      const eventToReemit = nodeEvents.find((event) => event.id === eventOrExecutionId);
+      if (!eventToReemit) return;
+      handleRun(nodeId, eventToReemit.channel || "", eventToReemit.data);
     },
-    [workflowId, handleRun, nodeEventsMap],
+    [handleRun, nodeEventsMap],
   );
 
   const handleNodeDuplicate = useCallback(

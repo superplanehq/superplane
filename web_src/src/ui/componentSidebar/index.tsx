@@ -39,7 +39,7 @@ interface ComponentSidebarProps {
   onDeactivate?: () => void;
   onToggleView?: () => void;
   onDelete?: () => void;
-  onReEmit?: (nodeId: string, eventOrExecutionId: string, kind: "trigger" | "execution") => void;
+  onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   isCompactView?: boolean;
 
   // Tab data function to get tab data for each event
