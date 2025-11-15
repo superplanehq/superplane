@@ -85,21 +85,21 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
 
       <DropdownMenuContent align="end" sideOffset={6} className="min-w-[11rem]">
         {showCancel && (
-          <DropdownMenuItem onClick={handleCancelQueueItem} className="gap-2">
+          <DropdownMenuItem onClick={handleCancelQueueItem} className="gap-2" data-testid="cancel-queue-item">
             {React.createElement(resolveIcon("x-circle"), { size: 16 })}
             Cancel
           </DropdownMenuItem>
         )}
 
         {showPushThrough && (
-          <DropdownMenuItem onClick={handlePushThrough} className="gap-2">
+          <DropdownMenuItem onClick={handlePushThrough} className="gap-2" data-testid="push-through-item">
             {React.createElement(resolveIcon("fast-forward"), { size: 16 })}
             Push Through
           </DropdownMenuItem>
         )}
 
         {showReEmit && (
-          <DropdownMenuItem onClick={handleReEmit} className="gap-2">
+          <DropdownMenuItem onClick={handleReEmit} className="gap-2" data-testid="reemit-item">
             {React.createElement(resolveIcon("rotate-ccw"), { size: 16 })}
             Re-emit
           </DropdownMenuItem>

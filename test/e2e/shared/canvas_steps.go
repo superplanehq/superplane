@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/google/uuid"
@@ -81,20 +82,20 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 	s.session.Click(q.TestID("add-node-button"))
 }
 
-func (s *CanvasSteps) AddWait(name string, pos models.Position) {
+func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, unit string) {
 	source := q.TestID("building-block-wait")
 	target := q.TestID("rf__wrapper")
 
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
-
 	s.session.FillIn(q.TestID("node-name-input"), name)
+
 	valueInput := q.Locator(`label:has-text("How long should I wait?") + div input[type="number"]`)
-	s.session.FillIn(valueInput, "5")
+	s.session.FillIn(valueInput, strconv.Itoa(duration))
 
 	unitTrigger := q.Locator(`label:has-text("Unit") + div button`)
 	s.session.Click(unitTrigger)
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Seconds")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + unit + `")`))
 
 	s.session.Click(q.TestID("add-node-button"))
 	s.session.Sleep(300)
