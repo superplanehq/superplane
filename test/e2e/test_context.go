@@ -11,6 +11,7 @@ import (
 
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/superplanehq/superplane/pkg/server"
+	"github.com/superplanehq/superplane/test/e2e/session"
 )
 
 type TestContext struct {
@@ -159,19 +160,13 @@ func (s *TestContext) setUpNavigationLogger() {
 	}
 }
 
-func (s *TestContext) NewSession(t *testing.T) *TestSession {
+func (s *TestContext) NewSession(t *testing.T) *session.TestSession {
 	p, err := s.context.NewPage()
 	if err != nil {
 		t.Fatalf("page: %v", err)
 	}
 
-	sess := &TestSession{
-		t:         t,
-		context:   s.context,
-		page:      p,
-		timeoutMs: s.timeoutMs,
-		baseURL:   s.baseURL,
-	}
+	sess := session.NewTestSession(t, s.context, p, s.timeoutMs, s.baseURL)
 
 	p.OnConsole(func(m pw.ConsoleMessage) {
 		text := m.Text()
@@ -201,6 +196,7 @@ func (s *TestContext) NewSession(t *testing.T) *TestSession {
 		}
 		t.Logf("[Browser Logs] %s (request failed)", r.URL())
 	})
+
 	p.OnResponse(func(resp pw.Response) {
 		if status := resp.Status(); status >= 400 {
 			t.Logf("[Browser Logs] %d %s", status, resp.URL())

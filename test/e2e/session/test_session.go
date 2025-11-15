@@ -1,4 +1,4 @@
-package e2e
+package session
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -22,9 +23,19 @@ type TestSession struct {
 	page      pw.Page
 	timeoutMs float64
 
-	baseURL string
-	orgID   string
-	account *models.Account
+	BaseURL string
+	OrgID   uuid.UUID
+	Account *models.Account
+}
+
+func NewTestSession(t *testing.T, context pw.BrowserContext, page pw.Page, timeoutMs float64, baseURL string) *TestSession {
+	return &TestSession{
+		t:         t,
+		context:   context,
+		page:      page,
+		timeoutMs: timeoutMs,
+		BaseURL:   baseURL,
+	}
 }
 
 func (s *TestSession) Start() {
@@ -42,7 +53,7 @@ func (s *TestSession) Close() {
 func (s *TestSession) Page() pw.Page { return s.page }
 
 func (s *TestSession) Visit(path string) {
-	_, err := s.page.Goto(s.baseURL+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(s.timeoutMs)})
+	_, err := s.page.Goto(s.BaseURL+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(s.timeoutMs)})
 	if err != nil {
 		s.t.Fatalf("goto: %v", err)
 	}
@@ -92,7 +103,7 @@ func (s *TestSession) resetDatabase() {
 func (s *TestSession) Login() {
 	secret := os.Getenv("JWT_SECRET")
 	signer := spjwt.NewSigner(secret)
-	token, err := signer.Generate(s.account.ID.String(), 24*time.Hour)
+	token, err := signer.Generate(s.Account.ID.String(), 24*time.Hour)
 	if err != nil {
 		s.t.Fatalf("jwt: %v", err)
 	}
@@ -100,7 +111,7 @@ func (s *TestSession) Login() {
 	if err := s.context.AddCookies([]pw.OptionalCookie{{
 		Name:     "account_token",
 		Value:    token,
-		URL:      pw.String(s.baseURL + "/"),
+		URL:      pw.String(s.BaseURL + "/"),
 		HttpOnly: pw.Bool(true),
 	}}); err != nil {
 		s.t.Fatalf("add cookie: %v", err)
@@ -144,8 +155,8 @@ func (s *TestSession) setupUserAndOrganization() {
 		_ = svc.CreateOrganizationOwner(user.ID.String(), organization.ID.String())
 	}
 
-	s.orgID = organization.ID.String()
-	s.account = account
+	s.OrgID = organization.ID
+	s.Account = account
 }
 
 func (s *TestSession) Click(q queries.Query) {
@@ -167,7 +178,7 @@ func (s *TestSession) FillIn(q queries.Query, value string) {
 }
 
 func (s *TestSession) VisitHomePage() {
-	s.Visit("/" + s.orgID + "/")
+	s.Visit("/" + s.OrgID.String() + "/")
 }
 
 func (s *TestSession) DragAndDrop(source queries.Query, target queries.Query, offsetX, offsetY int) {
