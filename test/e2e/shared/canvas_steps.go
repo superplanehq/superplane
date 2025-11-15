@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -107,4 +108,30 @@ func (s *CanvasSteps) Connect(sourceName, targetName string) {
 
 	s.session.DragAndDrop(sourceHandle, targetHandle, 6, 6)
 	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) GetNodeFromDB(name string) *models.WorkflowNode {
+	canvas, err := models.FindWorkflow(s.session.OrgID, s.WorkflowID)
+	require.NoError(s.t, err)
+
+	nodes, err := models.FindWorkflowNodes(canvas.ID)
+	require.NoError(s.t, err)
+
+	nodeID := ""
+	for _, n := range nodes {
+		if n.Name == name {
+			nodeID = n.NodeID
+			break
+		}
+	}
+
+	if nodeID == "" {
+		s.t.Fatalf("node %s not found in database", name)
+		return nil
+	}
+
+	node, err := models.FindWorkflowNode(database.Conn(), s.WorkflowID, nodeID)
+	require.NoError(s.t, err)
+
+	return node
 }

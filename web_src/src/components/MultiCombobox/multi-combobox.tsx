@@ -2,7 +2,7 @@
 
 import * as Headless from "@headlessui/react";
 import clsx from "clsx";
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
 
 export function MultiCombobox<T extends { id: string }>({
@@ -224,6 +224,7 @@ export function MultiCombobox<T extends { id: string }>({
                     {!isValid && <MaterialSymbol name="warning" size="sm" className="text-red-500 dark:text-red-400" />}
                     <button
                       type="button"
+                      data-testid={`remove-${option.id}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleRemove(option);
