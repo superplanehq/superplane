@@ -644,24 +644,6 @@ function Sidebar({
       onCancelQueueItem={onCancelQueueItem}
       onPushThrough={onPushThrough}
       supportsPushThrough={supportsPushThrough?.(state.componentSidebar.selectedNodeId!)}
-      onEventClick={(event) => {
-        setLatestEvents((prev) => {
-          return prev.map((e) => {
-            if (e.id === event.id) {
-              return { ...e, isOpen: !e.isOpen };
-            }
-            return e;
-          });
-        });
-        setNextInQueueEvents((prev) => {
-          return prev.map((e) => {
-            if (e.title === event.title) {
-              return { ...e, isOpen: !e.isOpen };
-            }
-            return e;
-          });
-        });
-      }}
       onRun={onRun ? () => onRun(state.componentSidebar.selectedNodeId!) : undefined}
       runDisabled={runDisabled}
       runDisabledTooltip={runDisabledTooltip}
