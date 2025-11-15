@@ -85,6 +85,26 @@ test_name_for_line() {
   ' "$file"
 }
 
+# Utility: find nearest subtest name (t.Run("<name>", ...)) at or above a specific line
+subtest_name_for_line() {
+  file="$1"; line="$2"
+  awk -v target="$line" '
+    NR>target { exit }
+    {
+      # Match t.Run("name", ...) or something.Run("name", ...)
+      if ($0 ~ /Run\("[^"]*"[[:space:]]*,/) {
+        line=$0
+        sub(/.*Run\("/, "", line)
+        sub(/".*/, "", line)
+        current=line
+      }
+    }
+    END {
+      if (length(current)>0) print current
+    }
+  ' "$file"
+}
+
 run_all() {
   echo "Running in docker: go test -p 1 -v ./..."
   docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v ./..."
@@ -133,13 +153,19 @@ run_line() {
   esac
 
   test_name=$(test_name_for_line "$file" "$line" || true)
+  subtest_name=$(subtest_name_for_line "$file" "$line" || true)
   if [ -z "${test_name:-}" ]; then
     echo "No enclosing test found at $file:$line; running tests in file"
     run_file "$file"
     return
   fi
 
-  docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg' -run '^$test_name$'"
+  if [ -n "${subtest_name:-}" ]; then
+    echo "Running subtest: $test_name/$subtest_name"
+    docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg' -run '^$test_name$/^$subtest_name$'"
+  else
+    docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg' -run '^$test_name$'"
+  fi
 }
 
 case "$MODE" in
