@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
+	"github.com/superplanehq/superplane/test/e2e/session"
 )
 
 func TestApprovals(t *testing.T) {
@@ -24,9 +25,9 @@ func TestApprovals(t *testing.T) {
 
 type ApprovalSteps struct {
 	t          *testing.T
-	session    *TestSession
+	session    *session.TestSession
 	canvasName string
-	workflowID string
+	workflowID uuid.UUID
 }
 
 func (s *ApprovalSteps) Start() {
@@ -44,14 +45,13 @@ func (s *ApprovalSteps) GivenACanvasExists() {
 	s.session.Click(q.Text("Create canvas"))
 	s.session.Sleep(300)
 
-	orgUUID := uuid.MustParse(s.session.orgID)
-	wf, err := models.FindWorkflowByName(s.canvasName, orgUUID)
+	wf, err := models.FindWorkflowByName(s.canvasName, s.session.OrgID)
 	require.NoError(s.t, err)
-	s.workflowID = wf.ID.String()
+	s.workflowID = wf.ID
 }
 
 func (s *ApprovalSteps) VisitCanvasPage() {
-	s.session.Visit("/" + s.session.orgID + "/workflows/" + s.workflowID)
+	s.session.Visit("/" + s.session.OrgID.String() + "/workflows/" + s.workflowID.String())
 }
 
 func (s *ApprovalSteps) AddApprovalToCanvas(nodeName string) {
@@ -77,8 +77,7 @@ func (s *ApprovalSteps) SaveCanvas() {
 }
 
 func (s *ApprovalSteps) VerifyApprovalSavedToDB(nodeName string) {
-	orgUUID := uuid.MustParse(s.session.orgID)
-	wf, err := models.FindWorkflow(orgUUID, uuid.MustParse(s.workflowID))
+	wf, err := models.FindWorkflow(s.session.OrgID, s.workflowID)
 	require.NoError(s.t, err)
 
 	nodes, err := models.FindWorkflowNodes(wf.ID)

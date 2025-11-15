@@ -3,10 +3,10 @@ package e2e
 import (
 	"testing"
 
-	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
+	"github.com/superplanehq/superplane/test/e2e/session"
 )
 
 func TestCustomComponents(t *testing.T) {
@@ -24,7 +24,7 @@ func TestCustomComponents(t *testing.T) {
 
 type CustomComponentsSteps struct {
 	t           *testing.T
-	session     *TestSession
+	session     *session.TestSession
 	canvasName  string
 	workflowID  string
 	componentID string
@@ -95,7 +95,7 @@ func (s *CustomComponentsSteps) GivenNodeHasOneExecution() {
 	s.session.Sleep(1000)
 
 	// hack to refresh the page
-	s.session.Visit("/" + s.session.orgID + "/")
+	s.session.Visit("/" + s.session.OrgID.String() + "/")
 	s.session.Click(q.Text(s.canvasName))
 	s.session.Sleep(500)
 }
@@ -105,8 +105,7 @@ func (s *CustomComponentsSteps) ClickExpand() {
 }
 
 func (s *CustomComponentsSteps) AssertNavigatedToNodeRunPage() {
-	orgUUID := uuid.MustParse(s.session.orgID)
-	wf, err := models.FindWorkflowByName(s.canvasName, orgUUID)
+	wf, err := models.FindWorkflowByName(s.canvasName, s.session.OrgID)
 	require.NoError(s.t, err)
 	s.workflowID = wf.ID.String()
 

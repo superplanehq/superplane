@@ -11,6 +11,7 @@ import (
 
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/superplanehq/superplane/pkg/server"
+	"github.com/superplanehq/superplane/test/e2e/session"
 )
 
 type TestContext struct {
@@ -76,7 +77,12 @@ func (s *TestContext) launchBrowser() {
 		panic("browser launch: " + err.Error())
 	}
 
-	c, err := b.NewContext()
+	c, err := b.NewContext(pw.BrowserNewContextOptions{
+		Viewport: &pw.Size{
+			Width:  2560,
+			Height: 1440,
+		},
+	})
 	if err != nil {
 		panic("browser context: " + err.Error())
 	}
@@ -129,49 +135,56 @@ func (s *TestContext) startVite() {
 	}
 }
 
-func (s *TestContext) setUpNavigationLogger() {
-	if err := s.context.AddInitScript(pw.Script{Content: pw.String(`
-        (() => {
-          try {
-            let last = location.href;
-            const notify = () => {
-              const href = location.href;
-              if (href !== last) {
-                last = href;
-                if (window._spNav) {
-                  window._spNav(href);
-                }
-              }
-            };
-            const push = history.pushState;
-            const replace = history.replaceState;
-            history.pushState = function(...args){ const r = push.apply(this, args); notify(); return r; };
-            history.replaceState = function(...args){ const r = replace.apply(this, args); notify(); return r; };
-            window.addEventListener('popstate', notify);
-            window.addEventListener('hashchange', notify);
-            // Initial report
-            if (window._spNav) { window._spNav(location.href); }
-          } catch (_) { /* ignore */ }
-        })();
-    `)}); err != nil {
+const initScript = `
+	(() => {
+		try {
+			let last = location.href;
+			const notify = () => {
+				const href = location.href;
+				if (href !== last) {
+					last = href;
+				if (window._spNav) {
+					window._spNav(href);
+				}
+			}
+		};
+			const push = history.pushState;
+			const replace = history.replaceState;
+			history.pushState = function(...args){ const r = push.apply(this, args); notify(); return r; };
+			history.replaceState = function(...args){ const r = replace.apply(this, args); notify(); return r; };
+			window.addEventListener('popstate', notify);
+			window.addEventListener('hashchange', notify);
 
+			// Auto-accept all confirm dialogs in tests
+			try {
+				const originalConfirm = window.confirm;
+				window.confirm = function(message) {
+					return true;
+				};
+				window._spOriginalConfirm = originalConfirm;
+			} catch (_) {
+				// ignore
+			}
+
+			// Initial report
+			if (window._spNav) { window._spNav(location.href); }
+		} catch (_) { /* ignore */ }
+	})();
+`
+
+func (s *TestContext) setUpNavigationLogger() {
+	if err := s.context.AddInitScript(pw.Script{Content: pw.String(initScript)}); err != nil {
 		panic("init script: " + err.Error())
 	}
 }
 
-func (s *TestContext) NewSession(t *testing.T) *TestSession {
+func (s *TestContext) NewSession(t *testing.T) *session.TestSession {
 	p, err := s.context.NewPage()
 	if err != nil {
 		t.Fatalf("page: %v", err)
 	}
 
-	sess := &TestSession{
-		t:         t,
-		context:   s.context,
-		page:      p,
-		timeoutMs: s.timeoutMs,
-		baseURL:   s.baseURL,
-	}
+	sess := session.NewTestSession(t, s.context, p, s.timeoutMs, s.baseURL)
 
 	p.OnConsole(func(m pw.ConsoleMessage) {
 		text := m.Text()
@@ -201,6 +214,7 @@ func (s *TestContext) NewSession(t *testing.T) *TestSession {
 		}
 		t.Logf("[Browser Logs] %s (request failed)", r.URL())
 	})
+
 	p.OnResponse(func(resp pw.Response) {
 		if status := resp.Status(); status >= 400 {
 			t.Logf("[Browser Logs] %d %s", status, resp.URL())
