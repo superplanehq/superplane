@@ -105,7 +105,7 @@ export function mapQueueItemsToSidebarEvents(
       isOpen: false,
       receivedAt: item.createdAt ? new Date(item.createdAt) : undefined,
       kind: "queue",
-      values
+      values,
     };
   });
 }
