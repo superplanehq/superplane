@@ -168,6 +168,7 @@ type WorkflowNodeQueueItem struct {
 	// for that event with a simple query.
 	//
 	RootEventID uuid.UUID
+	RootEvent   *WorkflowEvent `gorm:"foreignKey:RootEventID"`
 
 	//
 	// The reference to a WorkflowEvent record,
@@ -183,6 +184,7 @@ func (i *WorkflowNodeQueueItem) Delete(tx *gorm.DB) error {
 func ListNodeQueueItems(workflowID uuid.UUID, nodeID string, limit int, beforeTime *time.Time) ([]WorkflowNodeQueueItem, error) {
 	var queueItems []WorkflowNodeQueueItem
 	query := database.Conn().
+		Preload("RootEvent").
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
 		Order("created_at DESC").

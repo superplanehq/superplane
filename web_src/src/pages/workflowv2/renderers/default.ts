@@ -2,6 +2,7 @@ import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-c
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "./types";
 import { TriggerProps } from "@/ui/trigger";
+import { flattenObject } from "@/lib/utils";
 
 /**
  * Default renderer for trigger types that don't have a specific renderer.
@@ -12,8 +13,8 @@ export const defaultTriggerRenderer: TriggerRenderer = {
     return { title: event.id!, subtitle: "" };
   },
 
-  getRootEventValues: (_: WorkflowsWorkflowEvent): Record<string, string> => {
-    return {};
+  getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
+    return flattenObject(event.data || {});
   },
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: any) => {
