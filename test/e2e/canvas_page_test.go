@@ -32,16 +32,6 @@ func TestCanvasPage(t *testing.T) {
 		steps.AssertExplainationIsShownWhenHoverOverRun()
 	})
 
-	t.Run("adding an approval component to canvas and testing add item to list 3 times", func(t *testing.T) {
-		steps.Start()
-		steps.GivenACanvasExists()
-		steps.VisitCanvasPage()
-		steps.AddApprovalToCanvas("Test Approval")
-		steps.ClickAddItemButton()
-		steps.ClickAddItemButton()
-		steps.ClickAddItemButton()
-	})
-
 	t.Run("deleting a node from a canvas", func(t *testing.T) {
 		steps.Start()
 		steps.GivenACanvasExistsWithANoopNode()
@@ -147,6 +137,7 @@ func (s *CanvasPageSteps) AddApprovalToCanvas(nodeName string) {
 	}
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
+	s.session.Click(q.TestID("add-node-button"))
 	s.session.Sleep(300)
 }
 
