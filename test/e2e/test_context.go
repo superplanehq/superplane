@@ -77,7 +77,12 @@ func (s *TestContext) launchBrowser() {
 		panic("browser launch: " + err.Error())
 	}
 
-	c, err := b.NewContext()
+	c, err := b.NewContext(pw.BrowserNewContextOptions{
+		Viewport: &pw.Size{
+			Width:  2560,
+			Height: 1440,
+		},
+	})
 	if err != nil {
 		panic("browser context: " + err.Error())
 	}

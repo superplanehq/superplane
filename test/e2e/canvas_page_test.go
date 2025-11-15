@@ -225,5 +225,6 @@ func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int)
 func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
 	s.session.Click(q.Locator("h2:has-text('Next in queue') ~ div button[aria-label='Open actions']"))
 	s.session.Click(q.TestID("cancel-queue-item"))
+	s.session.TakeScreenshot()
 	s.session.Sleep(1000) // wait for the cancellation to be processed
 }
