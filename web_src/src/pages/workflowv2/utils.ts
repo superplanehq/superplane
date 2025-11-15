@@ -85,31 +85,27 @@ export function mapQueueItemsToSidebarEvents(
 ): SidebarEvent[] {
   const queueItemsToMap = limit ? queueItems.slice(0, limit) : queueItems;
   return queueItemsToMap.map((item) => {
-    const anyItem = item as any;
-    let title =
-      anyItem?.name ||
-      anyItem?.input?.title ||
-      anyItem?.input?.name ||
-      anyItem?.input?.eventTitle ||
-      item.id ||
-      "Queued";
-    const onlyTrigger = nodes.filter((n) => n.type === "TYPE_TRIGGER");
-    if (title === item.id || title === "Queued") {
-      if (onlyTrigger.length === 1 && onlyTrigger[0]?.trigger?.name === "schedule") {
-        title = "Event emitted by schedule";
-      }
-    }
-    const timestamp = item.createdAt ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "") : "";
-    const subtitle: string = (typeof anyItem?.input?.subtitle === "string" && anyItem.input.subtitle) || timestamp;
+    const rootTriggerNode = nodes.find((n) => n.id === item.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+    const { title, subtitle } = item.rootEvent
+      ? rootTriggerRenderer.getTitleAndSubtitle(item.rootEvent)
+      : {
+          title: item.id || "Execution",
+          subtitle: item.createdAt ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "") : "",
+        };
+
+    const values = item.rootEvent ? rootTriggerRenderer.getRootEventValues(item.rootEvent) : {};
 
     return {
       id: item.id!,
       title,
-      subtitle,
+      subtitle: subtitle || formatTimeAgo(new Date(item.createdAt!)),
       state: "waiting" as const,
       isOpen: false,
       receivedAt: item.createdAt ? new Date(item.createdAt) : undefined,
       kind: "queue",
+      values
     };
   });
 }

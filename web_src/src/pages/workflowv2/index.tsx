@@ -523,6 +523,41 @@ export function WorkflowPageV2() {
         return Object.keys(tabData).length > 0 ? tabData : undefined;
       }
 
+      if (event.kind === "queue") {
+        // Handle queue items - get the queue item data
+        const queueItems = nodeQueueItemsMap[nodeId] || [];
+        const queueItem = queueItems.find((item: WorkflowsWorkflowNodeQueueItem) => item.id === event.id);
+
+        if (!queueItem) return undefined;
+
+        const tabData: TabData = {};
+
+        if (queueItem.rootEvent) {
+          const rootTriggerNode = workflow?.spec?.nodes?.find((n) => n.id === queueItem.rootEvent?.nodeId);
+          const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+          const rootEventValues = rootTriggerRenderer.getRootEventValues(queueItem.rootEvent);
+
+          tabData.root = {
+            ...rootEventValues,
+            "Event ID": queueItem.rootEvent.id,
+            "Node ID": queueItem.rootEvent.nodeId,
+            "Created At": queueItem.rootEvent.createdAt
+              ? new Date(queueItem.rootEvent.createdAt).toLocaleString()
+              : undefined,
+          };
+        }
+
+        tabData.current = {
+          "Queue Item ID": queueItem.id,
+          "Node ID": queueItem.nodeId,
+          "Created At": queueItem.createdAt ? new Date(queueItem.createdAt).toLocaleString() : undefined,
+        };
+
+        tabData.payload = queueItem.input || {};
+
+        return Object.keys(tabData).length > 0 ? tabData : undefined;
+      }
+
       // Handle other components (non-triggers) - get execution for this event
       const executions = nodeExecutionsMap[nodeId] || [];
       const execution = executions.find((exec: WorkflowsWorkflowNodeExecution) => exec.id === event.id);
