@@ -882,6 +882,7 @@ export type WorkflowsWorkflowNodeQueueItem = {
   input?: {
     [key: string]: unknown;
   };
+  rootEvent?: WorkflowsWorkflowEvent;
   createdAt?: string;
 };
 

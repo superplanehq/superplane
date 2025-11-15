@@ -4787,6 +4787,9 @@
         "input": {
           "type": "object"
         },
+        "rootEvent": {
+          "$ref": "#/definitions/WorkflowsWorkflowEvent"
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"

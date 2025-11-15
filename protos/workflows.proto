@@ -372,7 +372,8 @@ message WorkflowNodeQueueItem {
   string workflow_id = 2;
   string node_id = 3;
   google.protobuf.Struct input = 4;
-  google.protobuf.Timestamp created_at = 5;
+  WorkflowEvent root_event = 5;
+  google.protobuf.Timestamp created_at = 6;
 }
 
 message InvokeNodeExecutionActionRequest {
