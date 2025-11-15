@@ -3,9 +3,13 @@ package e2e
 import (
 	"strings"
 	"testing"
+	"time"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"gorm.io/datatypes"
+
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 )
@@ -36,13 +40,21 @@ func TestCanvasPage(t *testing.T) {
 		steps.Start()
 		steps.GivenACanvasExistsWithANoopNode()
 
-		// Delete the node via the node menu and save
 		steps.DeleteNodeFromCanvas("DeleteMe")
 		steps.AssertUnsavedChangesNoteIsVisible()
 		steps.SaveCanvas()
 
-		// Verify the node has been removed from the database
 		steps.AssertNodeDeletedInDB("DeleteMe")
+	})
+
+	t.Run("canceling queued items from the sidebar for a wait node", func(t *testing.T) {
+		steps.Start()
+		steps.GivenACanvasWithManualTriggerAndWaitNodeAndQueuedItems()
+		steps.VisitCanvasPage()
+		steps.OpenSidebarForNode("Wait")
+		steps.AssertSidebarShowsQueueCount(3)
+		steps.CancelFirstQueueItemFromSidebar()
+		steps.AssertSidebarShowsQueueCount(2)
 	})
 }
 
@@ -162,8 +174,6 @@ func (s *CanvasPageSteps) GivenACanvasExistsWithANoopNode() {
 }
 
 func (s *CanvasPageSteps) DeleteNodeFromCanvas(nodeName string) {
-	// Open the node header dropdown and click Delete
-	// Match the UI's toTestId() logic: lowercase, spaces -> dashes
 	safe := strings.ToLower(nodeName)
 	safe = strings.ReplaceAll(safe, " ", "-")
 	dropdown := q.TestID("node-" + safe + "-header-dropdown")
@@ -175,7 +185,6 @@ func (s *CanvasPageSteps) DeleteNodeFromCanvas(nodeName string) {
 }
 
 func (s *CanvasPageSteps) AssertNodeDeletedInDB(nodeName string) {
-	// Confirm the node with the given name no longer exists for this workflow
 	orgUUID := uuid.MustParse(s.session.orgID)
 	wf, err := models.FindWorkflow(orgUUID, uuid.MustParse(s.workflowID))
 	require.NoError(s.t, err)
@@ -188,4 +197,112 @@ func (s *CanvasPageSteps) AssertNodeDeletedInDB(nodeName string) {
 			s.t.Fatalf("expected node %q to be deleted, but it still exists in DB", nodeName)
 		}
 	}
+}
+
+// GivenACanvasWithManualTriggerAndWaitNodeAndQueuedItems seeds a workflow with a manual trigger and wait node
+// and creates multiple queue items for the wait node so that the sidebar shows them.
+func (s *CanvasPageSteps) GivenACanvasWithManualTriggerAndWaitNodeAndQueuedItems() {
+	orgUUID := uuid.MustParse(s.session.orgID)
+
+	orgWorkflowName := "E2E Manual + Wait Canvas"
+	now := time.Now()
+
+	workflow := &models.Workflow{
+		ID:             uuid.New(),
+		OrganizationID: orgUUID,
+		Name:           orgWorkflowName,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	err := database.Conn().Create(workflow).Error
+	require.NoError(s.t, err)
+
+	triggerNodeID := "start-node"
+	waitNodeID := "wait-node"
+
+	triggerNode := &models.WorkflowNode{
+		WorkflowID: workflow.ID,
+		NodeID:     triggerNodeID,
+		Type:       models.NodeTypeTrigger,
+		Name:       "Manual Start",
+		State:      models.WorkflowNodeStateReady,
+		Position:   datatypes.NewJSONType(models.Position{X: 100, Y: 100}),
+	}
+
+	waitNode := &models.WorkflowNode{
+		WorkflowID: workflow.ID,
+		NodeID:     waitNodeID,
+		Type:       models.NodeTypeComponent,
+		Name:       "Wait",
+		State:      models.WorkflowNodeStateReady,
+		Position:   datatypes.NewJSONType(models.Position{X: 400, Y: 100}),
+	}
+
+	err = database.Conn().Create([]*models.WorkflowNode{triggerNode, waitNode}).Error
+	require.NoError(s.t, err)
+
+	edge := models.Edge{
+		SourceID: triggerNodeID,
+		TargetID: waitNodeID,
+		Channel:  "default",
+	}
+
+	err = database.Conn().
+		Model(&models.Workflow{}).
+		Where("id = ?", workflow.ID).
+		Update("edges", datatypes.NewJSONSlice([]models.Edge{edge})).
+		Error
+	require.NoError(s.t, err)
+
+	rootEvent := &models.WorkflowEvent{
+		ID:         uuid.New(),
+		WorkflowID: workflow.ID,
+		NodeID:     triggerNodeID,
+		State:      models.WorkflowEventStatePending,
+		CreatedAt:  &now,
+	}
+
+	err = database.Conn().Create(rootEvent).Error
+	require.NoError(s.t, err)
+
+	for i := 0; i < 3; i++ {
+		itemNow := now.Add(time.Duration(i) * time.Second)
+		queueItem := &models.WorkflowNodeQueueItem{
+			WorkflowID:  workflow.ID,
+			NodeID:      waitNodeID,
+			RootEventID: rootEvent.ID,
+			EventID:     rootEvent.ID,
+			CreatedAt:   &itemNow,
+		}
+
+		err = database.Conn().Create(queueItem).Error
+		require.NoError(s.t, err)
+	}
+
+	s.canvasName = orgWorkflowName
+	s.workflowID = workflow.ID.String()
+}
+
+func (s *CanvasPageSteps) OpenSidebarForNode(nodeID string) {
+	safe := strings.ToLower(nodeID)
+	safe = strings.ReplaceAll(safe, " ", "-")
+	s.session.Click(q.TestID("node-" + safe + "-header-dropdown"))
+	s.session.Click(q.Locator("button:has-text('View details')"))
+	s.session.Sleep(500)
+}
+
+func (s *CanvasPageSteps) AssertSidebarShowsQueueCount(expected int) {
+	if expected == 0 {
+		s.session.AssertText("Queue is empty")
+		return
+	}
+
+	s.session.AssertText("Next in queue")
+}
+
+func (s *CanvasPageSteps) CancelFirstQueueItemFromSidebar() {
+	s.session.Click(q.Locator("h2:has-text('Next in queue') ~ div button[aria-label='Open actions']"))
+	s.session.Click(q.Locator("button:has-text('Cancel')"))
+	s.session.Sleep(500)
 }
