@@ -135,32 +135,45 @@ func (s *TestContext) startVite() {
 	}
 }
 
-func (s *TestContext) setUpNavigationLogger() {
-	if err := s.context.AddInitScript(pw.Script{Content: pw.String(`
-        (() => {
-          try {
-            let last = location.href;
-            const notify = () => {
-              const href = location.href;
-              if (href !== last) {
-                last = href;
-                if (window._spNav) {
-                  window._spNav(href);
-                }
-              }
-            };
-            const push = history.pushState;
-            const replace = history.replaceState;
-            history.pushState = function(...args){ const r = push.apply(this, args); notify(); return r; };
-            history.replaceState = function(...args){ const r = replace.apply(this, args); notify(); return r; };
-            window.addEventListener('popstate', notify);
-            window.addEventListener('hashchange', notify);
-            // Initial report
-            if (window._spNav) { window._spNav(location.href); }
-          } catch (_) { /* ignore */ }
-        })();
-    `)}); err != nil {
+const initScript = `
+	(() => {
+		try {
+			let last = location.href;
+			const notify = () => {
+				const href = location.href;
+				if (href !== last) {
+					last = href;
+				if (window._spNav) {
+					window._spNav(href);
+				}
+			}
+		};
+			const push = history.pushState;
+			const replace = history.replaceState;
+			history.pushState = function(...args){ const r = push.apply(this, args); notify(); return r; };
+			history.replaceState = function(...args){ const r = replace.apply(this, args); notify(); return r; };
+			window.addEventListener('popstate', notify);
+			window.addEventListener('hashchange', notify);
 
+			// Auto-accept all confirm dialogs in tests
+			try {
+				const originalConfirm = window.confirm;
+				window.confirm = function(message) {
+					return true;
+				};
+				window._spOriginalConfirm = originalConfirm;
+			} catch (_) {
+				// ignore
+			}
+
+			// Initial report
+			if (window._spNav) { window._spNav(location.href); }
+		} catch (_) { /* ignore */ }
+	})();
+`
+
+func (s *TestContext) setUpNavigationLogger() {
+	if err := s.context.AddInitScript(pw.Script{Content: pw.String(initScript)}); err != nil {
 		panic("init script: " + err.Error())
 	}
 }

@@ -16,32 +16,32 @@ import (
 func TestCanvasPage(t *testing.T) {
 	steps := &CanvasPageSteps{t: t}
 
-	// t.Run("adding a node to canvas displays custom node name", func(t *testing.T) {
-	// 	steps.start()
-	// 	steps.givenACanvasExists()
-	// 	steps.visitCanvasPage()
-	// 	steps.addNoop("Hello")
-	// 	steps.saveCanvas()
-	// 	steps.assertNodeIsAdded("Hello")
-	// })
+	t.Run("adding a node to canvas displays custom node name", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasExists()
+		steps.visitCanvasPage()
+		steps.addNoop("Hello")
+		steps.saveCanvas()
+		steps.assertNodeIsAdded("Hello")
+	})
 
-	// t.Run("run is disabled when you have unsaved changes", func(t *testing.T) {
-	// 	steps.start()
-	// 	steps.givenACanvasExists()
-	// 	steps.addNoop("Hello")
-	// 	steps.assertUnsavedChangesNoteIsVisible()
-	// 	steps.assertCantRunNode("Hello")
-	// 	steps.assertExplainationIsShownWhenHoverOverRun()
-	// })
+	t.Run("run is disabled when you have unsaved changes", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addNoop("Hello")
+		steps.assertUnsavedChangesNoteIsVisible()
+		steps.assertCantRunNode("Hello")
+		steps.assertExplainationIsShownWhenHoverOverRun()
+	})
 
-	// t.Run("deleting a node from a canvas", func(t *testing.T) {
-	// 	steps.start()
-	// 	steps.givenACanvasExistsWithANoopNode()
-	// 	steps.deleteNodeFromCanvas("DeleteMe")
-	// 	steps.assertUnsavedChangesNoteIsVisible()
-	// 	steps.saveCanvas()
-	// 	steps.assertNodeDeletedInDB("DeleteMe")
-	// })
+	t.Run("deleting a node from a canvas", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasExistsWithANoopNode()
+		steps.deleteNodeFromCanvas("DeleteMe")
+		steps.assertUnsavedChangesNoteIsVisible()
+		steps.saveCanvas()
+		steps.assertNodeDeletedInDB("DeleteMe")
+	})
 
 	t.Run("canceling queued items from the sidebar", func(t *testing.T) {
 		steps.start()
@@ -224,7 +224,9 @@ func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int)
 
 func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
 	s.session.Click(q.Locator("h2:has-text('Next in queue') ~ div button[aria-label='Open actions']"))
+	s.session.TakeScreenshot()
+	s.session.Sleep(300)
 	s.session.Click(q.TestID("cancel-queue-item"))
 	s.session.TakeScreenshot()
-	s.session.Sleep(1000) // wait for the cancellation to be processed
+	s.session.Sleep(500) // wait for the cancellation to be processed
 }

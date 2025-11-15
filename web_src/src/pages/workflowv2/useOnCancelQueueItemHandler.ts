@@ -1,10 +1,9 @@
-import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
-import { WorkflowsWorkflow } from "@/api-client";
-import { workflowsDeleteNodeQueueItem } from "@/api-client";
-import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
+import { workflowsDeleteNodeQueueItem, WorkflowsWorkflow } from "@/api-client";
 import { workflowKeys } from "@/hooks/useWorkflowData";
+import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 
 type Params = {
@@ -24,6 +23,7 @@ export function useOnCancelQueueItemHandler({ workflowId, organizationId, workfl
   return useCallback(
     async (nodeId: string, queueItemId: string) => {
       if (!window.confirm("Cancel this queued event?")) return;
+
       try {
         await workflowsDeleteNodeQueueItem(
           withOrganizationHeader({
