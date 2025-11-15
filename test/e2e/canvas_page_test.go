@@ -3,13 +3,10 @@ package e2e
 import (
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"gorm.io/datatypes"
 
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 )
@@ -143,12 +140,35 @@ func (s *CanvasPageSteps) AddApprovalToCanvas(nodeName string) {
 	s.session.DragAndDrop(source, target, 500, 250)
 	s.session.Sleep(300)
 
-	// Use default name if empty string provided (node name is required)
 	if nodeName == "" {
 		nodeName = "approval"
 	}
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
+	s.session.Click(q.TestID("add-node-button"))
+	s.session.Sleep(300)
+}
+
+func (s *CanvasPageSteps) AddWaitToCanvas(nodeName string) {
+	source := q.TestID("building-block-wait")
+	target := q.TestID("rf__wrapper")
+
+	s.session.DragAndDrop(source, target, 500, 150)
+	s.session.Sleep(300)
+
+	if nodeName == "" {
+		nodeName = "Wait"
+	}
+
+	s.session.FillIn(q.TestID("node-name-input"), nodeName)
+	// Configure required wait interval fields: value and unit.
+	valueInput := q.Locator(`label:has-text("How long should I wait?") + div input[type="number"]`)
+	s.session.FillIn(valueInput, "5")
+
+	unitTrigger := q.Locator(`label:has-text("Unit") + div button`)
+	s.session.Click(unitTrigger)
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Seconds")`))
+
 	s.session.Click(q.TestID("add-node-button"))
 	s.session.Sleep(300)
 }
@@ -199,89 +219,47 @@ func (s *CanvasPageSteps) AssertNodeDeletedInDB(nodeName string) {
 	}
 }
 
-// GivenACanvasWithManualTriggerAndWaitNodeAndQueuedItems seeds a workflow with a manual trigger and wait node
-// and creates multiple queue items for the wait node so that the sidebar shows them.
 func (s *CanvasPageSteps) GivenACanvasWithManualTriggerAndWaitNodeAndQueuedItems() {
+	// Create a new canvas via the UI
+	s.canvasName = "E2E Manual + Wait Canvas"
+
+	s.session.VisitHomePage()
+	s.session.Click(q.Text("New Canvas"))
+	s.session.FillIn(q.TestID("canvas-name-input"), s.canvasName)
+	s.session.Click(q.Text("Create canvas"))
+	s.session.Sleep(500)
+
 	orgUUID := uuid.MustParse(s.session.orgID)
-
-	orgWorkflowName := "E2E Manual + Wait Canvas"
-	now := time.Now()
-
-	workflow := &models.Workflow{
-		ID:             uuid.New(),
-		OrganizationID: orgUUID,
-		Name:           orgWorkflowName,
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-	}
-
-	err := database.Conn().Create(workflow).Error
+	wf, err := models.FindWorkflowByName(s.canvasName, orgUUID)
 	require.NoError(s.t, err)
+	s.workflowID = wf.ID.String()
 
-	triggerNodeID := "start-node"
-	waitNodeID := "wait-node"
+	// Go to the canvas page
+	s.VisitCanvasPage()
 
-	triggerNode := &models.WorkflowNode{
-		WorkflowID: workflow.ID,
-		NodeID:     triggerNodeID,
-		Type:       models.NodeTypeTrigger,
-		Name:       "Manual Start",
-		State:      models.WorkflowNodeStateReady,
-		Position:   datatypes.NewJSONType(models.Position{X: 100, Y: 100}),
-	}
+	// Add a manual trigger ("start") node via drag and drop only.
+	// For triggers, dropping the block directly creates the node with default name ("Manual Start").
+	startSource := q.TestID("building-block-start")
+	target := q.TestID("rf__wrapper")
+	s.session.DragAndDrop(startSource, target, 200, 150)
+	s.session.Sleep(500)
 
-	waitNode := &models.WorkflowNode{
-		WorkflowID: workflow.ID,
-		NodeID:     waitNodeID,
-		Type:       models.NodeTypeComponent,
-		Name:       "Wait",
-		State:      models.WorkflowNodeStateReady,
-		Position:   datatypes.NewJSONType(models.Position{X: 400, Y: 100}),
-	}
+	// Add a wait component node using the standard node configuration modal flow
+	s.AddWaitToCanvas("Wait")
 
-	err = database.Conn().Create([]*models.WorkflowNode{triggerNode, waitNode}).Error
-	require.NoError(s.t, err)
+	// Save the canvas so nodes and edges are persisted and wiring is handled by the app
+	s.SaveCanvas()
 
-	edge := models.Edge{
-		SourceID: triggerNodeID,
-		TargetID: waitNodeID,
-		Channel:  "default",
-	}
-
-	err = database.Conn().
-		Model(&models.Workflow{}).
-		Where("id = ?", workflow.ID).
-		Update("edges", datatypes.NewJSONSlice([]models.Edge{edge})).
-		Error
-	require.NoError(s.t, err)
-
-	rootEvent := &models.WorkflowEvent{
-		ID:         uuid.New(),
-		WorkflowID: workflow.ID,
-		NodeID:     triggerNodeID,
-		State:      models.WorkflowEventStatePending,
-		CreatedAt:  &now,
-	}
-
-	err = database.Conn().Create(rootEvent).Error
-	require.NoError(s.t, err)
+	// Trigger the manual start node multiple times to enqueue events for the Wait node.
+	// Open dropdown on Manual Start node and click Run three times.
+	dropdown := q.TestID("node-manual-start-header-dropdown")
+	runButton := q.Locator("button:has-text('Run')")
 
 	for i := 0; i < 3; i++ {
-		itemNow := now.Add(time.Duration(i) * time.Second)
-		queueItem := &models.WorkflowNodeQueueItem{
-			WorkflowID:  workflow.ID,
-			NodeID:      waitNodeID,
-			RootEventID: rootEvent.ID,
-			EventID:     rootEvent.ID,
-			CreatedAt:   &itemNow,
-		}
-
-		err = database.Conn().Create(queueItem).Error
-		require.NoError(s.t, err)
+		s.session.Click(dropdown)
+		s.session.Click(runButton)
+		s.session.Sleep(500)
 	}
-
-	s.canvasName = orgWorkflowName
-	s.workflowID = workflow.ID.String()
 }
 
 func (s *CanvasPageSteps) OpenSidebarForNode(nodeID string) {
