@@ -2,9 +2,12 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
+	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
 )
@@ -34,6 +37,15 @@ func TestWaitComponent(t *testing.T) {
 		steps.addWaitWithDuration(2, "Hours")
 		steps.saveCanvas()
 		steps.assertWaitSavedToDB(2, "hours")
+	})
+
+	t.Run("push through the wait item", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasWithManualTriggerWaitAndOutput()
+		steps.runManualTrigger()
+		steps.openSidebarForNode("Wait")
+		steps.pushThroughFirstItemFromSidebar()
+		steps.assertWaitExecutionFinishedAndOutputNodeProcessed()
 	})
 }
 
@@ -72,4 +84,44 @@ func (s *WaitSteps) assertWaitSavedToDB(value int, unit string) {
 
 	assert.Equal(s.t, float64(value), duration["value"])
 	assert.Equal(s.t, unit, duration["unit"])
+}
+
+func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
+	s.canvas = shared.NewCanvasSteps("Wait Push Through", s.t, s.session)
+
+	s.canvas.Create()
+	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
+	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 60, "Seconds")
+	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
+
+	s.canvas.Connect("Start", "Wait")
+	s.canvas.Connect("Wait", "Output")
+
+	s.canvas.Save()
+}
+
+func (s *WaitSteps) runManualTrigger() {
+	s.canvas.RunManualTrigger("Start")
+	s.canvas.WaitForExecution("Wait", models.WorkflowNodeExecutionStateStarted, 10*time.Second)
+}
+
+func (s *WaitSteps) openSidebarForNode(node string) {
+	s.session.Click(q.TestID("node", node, "header"))
+}
+
+func (s *WaitSteps) pushThroughFirstItemFromSidebar() {
+	s.session.Click(q.Locator("h2:has-text('Latest events') ~ div button[aria-label='Open actions']"))
+	s.session.Click(q.TestID("push-through-item"))
+	s.canvas.WaitForExecution("Output", models.WorkflowNodeExecutionStateFinished, 15*time.Second)
+}
+
+func (s *WaitSteps) assertWaitExecutionFinishedAndOutputNodeProcessed() {
+	waitExecs := s.canvas.GetExecutionsForNode("Wait")
+	outputExecs := s.canvas.GetExecutionsForNode("Output")
+
+	require.Len(s.t, waitExecs, 1, "expected one execution for wait node")
+	require.Len(s.t, outputExecs, 1, "expected one execution for output node")
+
+	require.Equal(s.t, models.WorkflowNodeExecutionStateFinished, waitExecs[0].State)
+	require.Equal(s.t, models.WorkflowNodeExecutionStateFinished, outputExecs[0].State)
 }
