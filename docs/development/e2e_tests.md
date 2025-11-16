@@ -128,8 +128,9 @@ Common test IDs:
 - Open a shell in the test container: `make test.shell`
 - Screenshots are saved to `tmp/screenshots/` on your host
 
-Note: The legacy `E2E_TEST_PACKAGES` variable is not used by the
-`test.e2e` target; use the `-run` flag to filter tests.
+Note: The `test.e2e` target uses `gotestsum` with `E2E_TEST_PACKAGES`
+to run tests and emit a JUnit report. Use the `-run` flag to filter
+tests within those packages.
 
 ## Project Layout
 

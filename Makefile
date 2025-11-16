@@ -50,7 +50,7 @@ test.e2e.setup:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "cd web_src && npm ci"
 
 test.e2e:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c 'go test ./test/e2e/... -p 1 -v'
+	$(GOTESTSUM) --packages="$(E2E_TEST_PACKAGES)" -- -p 1
 
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
