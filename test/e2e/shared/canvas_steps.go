@@ -58,16 +58,12 @@ func (s *CanvasSteps) Save() {
 	s.session.AssertText("Canvas changes saved")
 }
 
-func (s *CanvasSteps) AddApproval(nodeName string) {
+func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	source := q.TestID("building-block-approval")
 	target := q.TestID("rf__wrapper")
 
-	s.session.DragAndDrop(source, target, 500, 250)
+	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
-
-	if nodeName == "" {
-		nodeName = "approval"
-	}
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 	s.session.Click(q.TestID("add-node-button"))
@@ -108,6 +104,11 @@ func (s *CanvasSteps) Connect(sourceName, targetName string) {
 
 	s.session.DragAndDrop(sourceHandle, targetHandle, 6, 6)
 	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) StartEditingNode(name string) {
+	s.session.Click(q.TestID("node", name, "header-dropdown"))
+	s.session.Click(q.TestID("node-action-edit"))
 }
 
 func (s *CanvasSteps) GetNodeFromDB(name string) *models.WorkflowNode {

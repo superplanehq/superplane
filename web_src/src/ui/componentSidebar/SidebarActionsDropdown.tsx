@@ -11,6 +11,7 @@ export interface SidebarAction {
   hoverBackground?: string;
   hoverColor?: string;
   hasBorder?: boolean;
+  testId?: string;
 }
 
 interface SidebarActionsDropdownProps {
@@ -51,36 +52,42 @@ export const SidebarActionsDropdown = ({
       label: "Run",
       icon: "play",
       onAction: onRun,
+      testId: "node-action-run",
     },
     {
       id: "duplicate",
       label: "Duplicate",
       icon: "copy",
       onAction: onDuplicate,
+      testId: "node-action-duplicate",
     },
     {
       id: "docs",
       label: "Docs",
       icon: "book-text",
       onAction: onDocs,
+      testId: "node-action-docs",
     },
     {
       id: "edit",
       label: "Edit",
       icon: "pencil",
       onAction: onEdit,
+      testId: "node-action-edit",
     },
     {
       id: "configure",
       label: "Configure",
       icon: "settings-2",
       onAction: onConfigure,
+      testId: "node-action-configure",
     },
     {
       id: "deactivate",
       label: "Deactivate",
       icon: "octagon-pause",
       onAction: onDeactivate,
+      testId: "node-action-deactivate",
     },
     {
       id: "toggle-view",
@@ -88,6 +95,7 @@ export const SidebarActionsDropdown = ({
       icon: isCompactView ? "list-chevrons-up-down" : "list-chevrons-down-up",
       onAction: onToggleView,
       hasBorder: true,
+      testId: "node-action-toggle-view",
     },
     {
       id: "delete",
@@ -96,6 +104,7 @@ export const SidebarActionsDropdown = ({
       onAction: onDelete,
       hoverBackground: "hover:bg-red-100",
       hoverColor: "hover:text-red-700",
+      testId: "node-action-delete",
     },
   ];
 
@@ -167,6 +176,7 @@ export const SidebarActionsDropdown = ({
                           ? "text-gray-300 cursor-not-allowed bg-white hover:bg-white hover:opacity-100"
                           : "text-gray-700 hover:bg-gray-100"
                       }`}
+                      data-testid={action.testId}
                     >
                       <Icon size={16} />
                       <span>{action.label}</span>
