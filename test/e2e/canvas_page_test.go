@@ -82,10 +82,6 @@ func (s *CanvasPageSteps) givenACanvasExists() {
 	s.canvas.Create()
 }
 
-func (s *CanvasPageSteps) visitCanvasPage() {
-	s.canvas.Visit()
-}
-
 func (s *CanvasPageSteps) addNoop(name string) {
 	s.canvas.AddNoop(name, models.Position{X: 500, Y: 200})
 }
