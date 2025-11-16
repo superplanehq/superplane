@@ -15,12 +15,34 @@ func TestMembersInvitations(t *testing.T) {
 
 	t.Run("inviting a new organization member", func(t *testing.T) {
 		email := "e2e-member-invite@example.com"
-
 		steps.start()
 		steps.visitMembersPage()
 		steps.fillInviteEmailTextarea(email)
 		steps.submitInvitations()
 		steps.assertInvitationPersistedInDB(email)
+	})
+
+	t.Run("viewing existing organization members", func(t *testing.T) {
+		steps.start()
+		steps.visitMembersPage()
+		steps.assertMembersHeaderVisible()
+		steps.assertTabCounts("All (1)", "Active (1)", "Invited (0)")
+		steps.assertMemberVisible("e2e@superplane.local")
+	})
+
+	t.Run("viewing invited members in the organization", func(t *testing.T) {
+		email := "e2e-members-view@example.com"
+
+		steps.start()
+		steps.visitMembersPage()
+		steps.fillInviteEmailTextarea(email)
+		steps.submitInvitations()
+		steps.session.Sleep(2000)
+
+		steps.assertTabCounts("All (2)", "Active (1)", "Invited (1)")
+
+		steps.switchToTab("Invited (1)")
+		steps.assertMemberVisible(email)
 	})
 }
 
@@ -57,4 +79,23 @@ func (s *membersSteps) assertInvitationPersistedInDB(email string) {
 	require.NoError(s.t, err)
 	require.Equal(s.t, email, invitation.Email)
 	require.Equal(s.t, s.session.OrgID.String(), invitation.OrganizationID.String())
+}
+
+func (s *membersSteps) assertMembersHeaderVisible() {
+	s.session.AssertText("Members")
+}
+
+func (s *membersSteps) assertTabCounts(allLabel, activeLabel, invitedLabel string) {
+	s.session.AssertText(allLabel)
+	s.session.AssertText(activeLabel)
+	s.session.AssertText(invitedLabel)
+}
+
+func (s *membersSteps) assertMemberVisible(email string) {
+	s.session.AssertText(email)
+}
+
+func (s *membersSteps) switchToTab(label string) {
+	s.session.Click(q.Text(label))
+	s.session.Sleep(500)
 }
