@@ -25,11 +25,11 @@ Good example (narrative + steps):
 t.Run("adding a noop node", func(t *testing.T) {
   steps := &NoopSteps{t: t}
 
-  steps.Start()
-  steps.GivenACanvasExists()
-  steps.WhenIVisitTheCanvas()
-  steps.WhenIAddANoopNodeNamed("Hello")
-  steps.ThenISeeNodeTitled("Hello")
+  steps.start()
+  steps.givenACanvasExists()
+  steps.whenIVisitTheCanvas()
+  steps.whenIAddANoopNodeNamed("Hello")
+  steps.thenISeeNodeTitled("Hello")
 )
 ```
 
@@ -75,10 +75,10 @@ import (
 func TestExampleCanvasFlow(t *testing.T) {
     steps := &ExampleSteps{t: t}
     t.Run("create and save a canvas", func(t *testing.T) {
-        steps.Start()
-        steps.GivenIAmOnTheHomePage()
-        steps.WhenICreateACanvasNamed("My Canvas")
-        steps.ThenTheCanvasIsPersisted("My Canvas")
+        steps.start()
+        steps.givenIAmOnTheHomePage()
+        steps.whenICreateACanvasNamed("My Canvas")
+        steps.thenTheCanvasIsPersisted("My Canvas")
     })
 }
 
@@ -87,23 +87,23 @@ type ExampleSteps struct {
     session *TestSession
 }
 
-func (s *ExampleSteps) Start() {
+func (s *ExampleSteps) start() {
     s.session = ctx.NewSession(s.t)
     s.session.Start()
     s.session.Login()
 }
 
-func (s *ExampleSteps) GivenIAmOnTheHomePage() {
+func (s *ExampleSteps) givenIAmOnTheHomePage() {
     s.session.Visit("/" + s.session.orgID + "/")
 }
 
-func (s *ExampleSteps) WhenICreateACanvasNamed(name string) {
+func (s *ExampleSteps) whenICreateACanvasNamed(name string) {
     s.session.Click(q.Text("New Canvas"))
     s.session.FillIn(q.TestID("canvas-name-input"), name)
     s.session.Click(q.Text("Create canvas"))
 }
 
-func (s *ExampleSteps) ThenTheCanvasIsPersisted(name string) {
+func (s *ExampleSteps) thenTheCanvasIsPersisted(name string) {
     // lookup via models and assert
 }
 ```
