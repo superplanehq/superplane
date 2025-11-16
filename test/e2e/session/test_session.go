@@ -252,3 +252,38 @@ func (s *TestSession) AssertURLContains(part string) {
 		s.t.Fatalf("expected URL to contain %q, got %q", part, current)
 	}
 }
+
+func (s *TestSession) ScrollToTheBottomOfPage() {
+	s.t.Log("Scrolling to the bottom of the page")
+
+	script := `
+		() => {
+			try {
+				// Scroll main window
+				const doc = document.scrollingElement || document.documentElement || document.body;
+				if (doc) {
+					doc.scrollTo(0, doc.scrollHeight);
+				}
+
+				// Also scroll any large scrollable containers
+				const candidates = Array.from(document.querySelectorAll('*'))
+					.filter(el => {
+						const style = window.getComputedStyle(el);
+						return (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
+					});
+
+				for (const el of candidates) {
+					el.scrollTop = el.scrollHeight;
+				}
+			} catch (e) {
+				console.error('scroll error', e);
+			}
+		}
+	`
+
+	if _, err := s.page.Evaluate(script, nil); err != nil {
+		s.t.Fatalf("scrolling to the bottom of the page: %v", err)
+	}
+
+	time.Sleep(300 * time.Millisecond)
+}
