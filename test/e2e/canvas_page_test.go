@@ -53,6 +53,15 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertNodeDeletedInDB("DeleteMe")
 	})
 
+	t.Run("viewing queued items in the sidebar", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems()
+		steps.openSidebarForNode("Wait")
+		steps.assertRunningItemsCount("Wait", 1)
+		steps.assertQueuedItemsCount("Wait", 3)
+		steps.assertQueuedItemsVisibleInSidebar()
+	})
+
 	t.Run("canceling queued items from the sidebar", func(t *testing.T) {
 		steps.start()
 		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems()
@@ -261,6 +270,10 @@ func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int)
 	require.NoError(s.t, err)
 
 	require.Equal(s.t, expected, len(executions))
+}
+
+func (s *CanvasPageSteps) assertQueuedItemsVisibleInSidebar() {
+	s.session.AssertText("Next in queue")
 }
 
 func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
