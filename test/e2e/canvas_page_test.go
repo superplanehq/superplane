@@ -19,10 +19,20 @@ func TestCanvasPage(t *testing.T) {
 	t.Run("adding a node to canvas displays custom node name", func(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
-		steps.visitCanvasPage()
 		steps.addNoop("Hello")
 		steps.saveCanvas()
 		steps.assertNodeIsAdded("Hello")
+	})
+
+	t.Run("duplicating a node on canvas", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addNoop("Hello")
+		steps.saveCanvas()
+		steps.duplicateNodeOnCanvas("Hello")
+		steps.assertUnsavedChangesNoteIsVisible()
+		steps.saveCanvas()
+		steps.assertNodeDuplicatedInDB("Hello", "Hello copy")
 	})
 
 	t.Run("run is disabled when you have unsaved changes", func(t *testing.T) {
@@ -117,6 +127,11 @@ func (s *CanvasPageSteps) givenACanvasExistsWithANoopNode() {
 	s.canvas.Save()
 }
 
+func (s *CanvasPageSteps) duplicateNodeOnCanvas(nodeName string) {
+	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.Click(q.TestID("node-action-duplicate"))
+}
+
 func (s *CanvasPageSteps) deleteNodeFromCanvas(nodeName string) {
 	safe := strings.ToLower(nodeName)
 	safe = strings.ReplaceAll(safe, " ", "-")
@@ -140,6 +155,36 @@ func (s *CanvasPageSteps) assertNodeDeletedInDB(nodeName string) {
 			s.t.Fatalf("expected node %q to be deleted, but it still exists in DB", nodeName)
 		}
 	}
+}
+
+func (s *CanvasPageSteps) assertNodeDuplicatedInDB(originalName, duplicateName string) {
+	wf, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
+	require.NoError(s.t, err)
+
+	nodes, err := models.FindWorkflowNodes(wf.ID)
+	require.NoError(s.t, err)
+
+	var originalNode *models.WorkflowNode
+	var duplicateNode *models.WorkflowNode
+
+	for i := range nodes {
+		n := nodes[i]
+		if n.Name == originalName {
+			originalNode = &n
+		}
+		if n.Name == duplicateName {
+			duplicateNode = &n
+		}
+	}
+
+	require.NotNil(s.t, originalNode, "original node %q not found in DB", originalName)
+	require.NotNil(s.t, duplicateNode, "duplicate node %q not found in DB", duplicateName)
+
+	originalPos := originalNode.Position.Data()
+	duplicatePos := duplicateNode.Position.Data()
+
+	require.Equal(s.t, originalPos.X+50, duplicatePos.X, "duplicate node X position should be offset by 50")
+	require.Equal(s.t, originalPos.Y+50, duplicatePos.Y, "duplicate node Y position should be offset by 50")
 }
 
 func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems() {
