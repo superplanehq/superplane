@@ -99,6 +99,37 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Sleep(300)
 }
 
+func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
+	source := q.TestID("building-block-time_gate")
+	target := q.TestID("rf__wrapper")
+
+	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.session.Sleep(300)
+
+	s.session.FillIn(q.TestID("node-name-input"), name)
+}
+
+func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
+	source := q.TestID("building-block-time_gate")
+	target := q.TestID("rf__wrapper")
+
+	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.session.Sleep(300)
+
+	s.session.FillIn(q.TestID("node-name-input"), name)
+
+	s.session.Click(q.Locator(`label:has-text("Mode") + div button`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Exclude Range")`))
+
+	s.session.FillIn(q.Locator(`label:has-text("Start Time") + div input[type="time"]`), "00:00")
+	s.session.FillIn(q.Locator(`label:has-text("End Time") + div input[type="time"]`), "23:59")
+
+	s.session.Click(q.Locator(`label:has-text("Timezone") + div button`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
+
+	s.session.Click(q.TestID("add-node-button"))
+}
+
 func (s *CanvasSteps) Connect(sourceName, targetName string) {
 	sourceHandle := q.Locator(`.react-flow__node:has-text("` + sourceName + `") .react-flow__handle-right`)
 	targetHandle := q.Locator(`.react-flow__node:has-text("` + targetName + `") .react-flow__handle-left`)

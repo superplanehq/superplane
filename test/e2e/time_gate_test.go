@@ -2,8 +2,11 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
@@ -40,14 +43,21 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.saveCanvas()
 		steps.assertTimeGateSavedToDB("include_range", "09:00", "17:00", "-5", workweekDays)
 	})
+
+	t.Run("push through the time gate item", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasWithManualTriggerTimeGateAndOutput()
+		steps.runManualTrigger()
+		steps.openSidebarForNode("TimeGate")
+		steps.pushThroughFirstItemFromSidebar()
+		steps.assertTimeGateExecutionFinishedAndOutputNodeProcessed()
+	})
 }
 
 type TimeGateSteps struct {
 	t       *testing.T
 	session *session.TestSession
 	canvas  *shared.CanvasSteps
-
-	currentNodeName string
 }
 
 func (s *TimeGateSteps) start() {
@@ -62,15 +72,7 @@ func (s *TimeGateSteps) givenACanvasExists(canvasName string) {
 }
 
 func (s *TimeGateSteps) addTimeGate() {
-	s.currentNodeName = "Time Gate"
-
-	source := q.TestID("building-block-time_gate")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, 500, 250)
-	s.session.Sleep(300)
-
-	s.session.FillIn(q.TestID("node-name-input"), s.currentNodeName)
+	s.canvas.StartAddingTimeGate("TimeGate", models.Position{X: 500, Y: 250})
 }
 
 func (s *TimeGateSteps) setModeToIncludeRange() {
@@ -130,7 +132,7 @@ func (s *TimeGateSteps) saveTimeGate() {
 }
 
 func (s *TimeGateSteps) assertTimeGateSavedToDB(modeLabel, startTime, endTime, timezoneLabel string, days []string) {
-	node := s.canvas.GetNodeFromDB("Time Gate")
+	node := s.canvas.GetNodeFromDB("TimeGate")
 
 	assert.Equal(s.t, modeLabel, node.Configuration.Data()["mode"])
 	assert.Equal(s.t, startTime, node.Configuration.Data()["startTime"])
@@ -145,4 +147,44 @@ func (s *TimeGateSteps) assertTimeGateSavedToDB(modeLabel, startTime, endTime, t
 
 func (s *TimeGateSteps) saveCanvas() {
 	s.canvas.Save()
+}
+
+func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput() {
+	s.canvas = shared.NewCanvasSteps("Time Gate Push Through", s.t, s.session)
+
+	s.canvas.Create()
+	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
+	s.canvas.AddTimeGate("TimeGate", models.Position{X: 1000, Y: 250})
+	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
+
+	s.canvas.Connect("Start", "TimeGate")
+	s.canvas.Connect("TimeGate", "Output")
+
+	s.saveCanvas()
+}
+
+func (s *TimeGateSteps) runManualTrigger() {
+	s.canvas.RunManualTrigger("Start")
+	s.canvas.WaitForExecution("TimeGate", models.WorkflowNodeExecutionStateStarted, 10*time.Second)
+}
+
+func (s *TimeGateSteps) openSidebarForNode(node string) {
+	s.session.Click(q.TestID("node", node, "header"))
+}
+
+func (s *TimeGateSteps) pushThroughFirstItemFromSidebar() {
+	s.session.Click(q.Locator("h2:has-text('Latest events') ~ div button[aria-label='Open actions']"))
+	s.session.Click(q.TestID("push-through-item"))
+	s.canvas.WaitForExecution("Output", models.WorkflowNodeExecutionStateFinished, 15*time.Second)
+}
+
+func (s *TimeGateSteps) assertTimeGateExecutionFinishedAndOutputNodeProcessed() {
+	timeGateExecs := s.canvas.GetExecutionsForNode("TimeGate")
+	outputExecs := s.canvas.GetExecutionsForNode("Output")
+
+	require.Len(s.t, timeGateExecs, 1, "expected one execution for time gate node")
+	require.Len(s.t, outputExecs, 1, "expected one execution for output node")
+
+	require.Equal(s.t, models.WorkflowNodeExecutionStateFinished, timeGateExecs[0].State)
+	require.Equal(s.t, models.WorkflowNodeExecutionStateFinished, outputExecs[0].State)
 }
