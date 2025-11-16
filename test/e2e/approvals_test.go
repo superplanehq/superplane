@@ -1,8 +1,8 @@
 package e2e
 
 import (
-	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -31,14 +31,13 @@ func TestApprovals(t *testing.T) {
 		steps.verifyApprovalConfigurationPersisted()
 	})
 
-	// t.Run("running and approving on a canvas", func(t *testing.T) {
-	// 	steps.start()
-	// 	steps.givenCanvasWithManualTriggerApprovalAndNoop()
-	// 	steps.runManualTrigger()
-	// 	steps.openApprovalRunFromSidebar()
-	// 	steps.approveFirstPendingRequirement()
-	// 	steps.assertApprovalExecutionFinishedAndOutputNodeProcessed()
-	// })
+	t.Run("running and approving on a canvas", func(t *testing.T) {
+		steps.start()
+		steps.givenCanvasWithManualTriggerApprovalAndNoop()
+		steps.runManualTrigger()
+		steps.approveFirstPendingRequirement()
+		steps.assertApprovalExecutionFinishedAndOutputNodeProcessed()
+	})
 }
 
 type ApprovalSteps struct {
@@ -90,8 +89,6 @@ func (s *ApprovalSteps) verifyApprovalConfigurationPersisted() {
 	node := s.canvas.GetNodeFromDB("ReleaseApproval")
 	require.NotNil(s.t, node, "approval node not found in DB")
 
-	fmt.Println(node.Configuration.Data())
-
 	data := node.Configuration.Data()
 	items := data["items"].([]any)
 	require.Len(s.t, items, 1)
@@ -102,84 +99,51 @@ func (s *ApprovalSteps) verifyApprovalConfigurationPersisted() {
 	require.NotEmpty(s.t, itemCfg["user"])
 }
 
-// func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
-// 	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
-// 	s.canvas.Create()
-// 	s.canvas.Visit()
+func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
+	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
+	s.canvas.Create()
+	s.canvas.Visit()
 
-// 	s.canvas.AddManualTrigger("Start", models.Position{X: 400, Y: 200})
-// 	s.canvas.AddApproval("Approval", models.Position{X: 800, Y: 200})
-// 	s.canvas.AddNoop("Output", models.Position{X: 1200, Y: 200})
+	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
+	s.canvas.AddApproval("Approval", models.Position{X: 1000, Y: 200})
+	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
 
-// 	// Configure approval for current user
-// 	s.session.Click(q.TestID("node", "approval", "header"))
-// 	s.session.Click(q.TestID("edit-node-button"))
+	s.canvas.Connect("Start", "Approval")
+	s.canvas.Connect("Approval", "Output")
 
-// 	itemTypeSelect := q.Locator(`button:has-text("Select Type")`)
-// 	s.session.Click(itemTypeSelect)
-// 	s.session.Click(q.Locator(`div[role="option"]:has-text("User")`))
+	// set up manual approval configuration
+	s.canvas.StartEditingNode("Approval")
 
-// 	userFieldTrigger := q.Locator(`button:has-text("Select user")`)
-// 	s.session.Click(userFieldTrigger)
-// 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
+	s.session.Click(q.Locator(`button:has-text("Add Item")`))
+	s.session.Click(q.Locator(`button:has-text("Select Type")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("User")`))
 
-// 	s.session.Click(q.TestID("add-node-button"))
-// 	s.session.Sleep(300)
+	s.session.Click(q.Locator(`button:has-text("Select user")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
 
-// 	// Connect Start -> Approval -> Output
-// 	s.canvas.Connect("start", "approval")
-// 	s.canvas.Connect("approval", "output")
+	s.session.Click(q.TestID("add-node-button"))
+	s.session.Sleep(300)
 
-// 	s.saveCanvas()
-// }
+	s.saveCanvas()
+}
 
-// func (s *ApprovalSteps) runManualTrigger() {
-// 	dropdown := q.TestID("node-start-header-dropdown")
-// 	runOption := q.Locator("button:has-text('Run')")
+func (s *ApprovalSteps) runManualTrigger() {
+	s.canvas.RunManualTrigger("Start")
+	s.canvas.WaitForExecution("Approval", models.WorkflowNodeExecutionStatePending, 5*time.Second)
+}
 
-// 	s.session.Click(dropdown)
-// 	s.session.Click(runOption)
-// 	s.session.Click(q.TestID("emit-event-submit-button"))
-// 	s.session.Sleep(1000)
-// }
+func (s *ApprovalSteps) approveFirstPendingRequirement() {
+	s.session.Click(q.Locator(`button:has-text("Approve")`))
+	s.session.FillIn(q.Locator(`input:has-placeholder("Enter comment")`), "Do it")
+	s.session.Click(q.Locator(`button:has-text("Confirm Approval")`))
+}
 
-// func (s *ApprovalSteps) openApprovalRunFromSidebar() {
-// 	s.session.Sleep(500)
+func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {
+	s.canvas.WaitForExecution("Output", models.WorkflowNodeExecutionStateFinished, 10*time.Second)
 
-// 	// Click Approval node header to open sidebar, then expand run details
-// 	s.session.Click(q.TestID("node", "approval", "header"))
-// 	s.session.Sleep(300)
-// 	s.session.Click(q.TestID("expand-run-button"))
-// 	s.session.Sleep(500)
-// }
+	approvaExecs := s.canvas.GetExecutionsForNode("Approval")
+	outputExecs := s.canvas.GetExecutionsForNode("Output")
 
-// func (s *ApprovalSteps) approveFirstPendingRequirement() {
-// 	// Click the first "Approve" button in the approval list
-// 	s.session.Click(q.Locator(`button:has-text("Approve")`))
-// 	s.session.Sleep(200)
-// 	// Confirm approval (in the inner dialog)
-// 	s.session.Click(q.Locator(`button:has-text("Confirm Approval")`))
-// 	s.session.Sleep(1000)
-// }
-
-// func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {
-// wf, err := models.FindWorkflow(s.session.OrgID, s.workflowID)
-// require.NoError(s.t, err)
-
-// nodes, err := models.FindWorkflowNodes(wf.ID)
-// require.NoError(s.t, err)
-
-// var outputNode *models.WorkflowNode
-// for _, n := range nodes {
-// 	if n.Name == "Output" {
-// 		outputNode = &n
-// 		break
-// 	}
-// }
-// require.NotNil(s.t, outputNode, "output node not found")
-
-// var executions []models.WorkflowNodeExecution
-// err = models.ListWorkflowNodeExecutionsByNodeID(wf.ID, outputNode.NodeID, &executions)
-// require.NoError(s.t, err)
-// require.NotEmpty(s.t, executions, "expected at least one execution for output node")
-// }
+	require.Len(s.t, approvaExecs, 1, "expected one execution for approval node")
+	require.Len(s.t, outputExecs, 1, "expected one execution for output node")
+}
