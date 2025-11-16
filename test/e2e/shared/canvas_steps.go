@@ -3,6 +3,7 @@ package shared
 import (
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -111,6 +112,15 @@ func (s *CanvasSteps) StartEditingNode(name string) {
 	s.session.Click(q.TestID("node-action-edit"))
 }
 
+func (s *CanvasSteps) RunManualTrigger(name string) {
+	dropdown := q.TestID("node", name, "header-dropdown")
+	runOption := q.TestID("node-action-run")
+
+	s.session.Click(dropdown)
+	s.session.Click(runOption)
+	s.session.Click(q.TestID("emit-event-submit-button"))
+}
+
 func (s *CanvasSteps) GetNodeFromDB(name string) *models.WorkflowNode {
 	canvas, err := models.FindWorkflow(s.session.OrgID, s.WorkflowID)
 	require.NoError(s.t, err)
@@ -135,4 +145,55 @@ func (s *CanvasSteps) GetNodeFromDB(name string) *models.WorkflowNode {
 	require.NoError(s.t, err)
 
 	return node
+}
+
+func (s *CanvasSteps) GetExecutionsForNode(name string) []models.WorkflowNodeExecution {
+	node := s.GetNodeFromDB(name)
+
+	var executions []models.WorkflowNodeExecution
+
+	query := database.Conn().
+		Where("workflow_id = ?", s.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		Order("created_at DESC")
+
+	err := query.Find(&executions).Error
+	require.NoError(s.t, err)
+
+	return executions
+}
+
+func (s *CanvasSteps) GetExecutionsForNodeInState(name string, state string) []models.WorkflowNodeExecution {
+	node := s.GetNodeFromDB(name)
+
+	var executions []models.WorkflowNodeExecution
+
+	query := database.Conn().
+		Where("workflow_id = ?", s.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		Where("state = ?", state).
+		Order("created_at DESC")
+
+	err := query.Find(&executions).Error
+	require.NoError(s.t, err)
+
+	return executions
+}
+
+func (s *CanvasSteps) WaitForExecution(name string, state string, timeout time.Duration) {
+	found := false
+	start := time.Now()
+
+	for time.Since(start) < timeout {
+		executions := s.GetExecutionsForNodeInState(name, state)
+		if len(executions) > 0 {
+			found = true
+			break
+		}
+
+		s.t.Log("waiting for execution of node", name)
+		s.session.Sleep(1000)
+	}
+
+	require.True(s.t, found, "timed out waiting for execution of node %s", name)
 }
