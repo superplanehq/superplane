@@ -11,11 +11,10 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 #
 # Long sausage command to run tests with gotestsum
 #
-# - starts a docker container
-# - sets DB_NAME=superplane_test
+# - starts a docker container for unit tests
 # - mounts tmp/screenshots
-# - export junit report
-# - sets paralellism to 1
+# - exports junit report
+# - sets parallelism to 1
 #
 GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml 
 
@@ -50,7 +49,7 @@ test.e2e.setup:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "cd web_src && npm ci"
 
 test.e2e:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c 'go test ./test/e2e/... -p 1 -v'
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app gotestsum --format short --junitfile junit-report.xml --packages="$(E2E_TEST_PACKAGES)" -- -p 1
 
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
