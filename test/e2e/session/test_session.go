@@ -3,6 +3,7 @@ package session
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -29,13 +30,22 @@ type TestSession struct {
 }
 
 func NewTestSession(t *testing.T, context pw.BrowserContext, page pw.Page, timeoutMs float64, baseURL string) *TestSession {
-	return &TestSession{
+	sess := &TestSession{
 		t:         t,
 		context:   context,
 		page:      page,
 		timeoutMs: timeoutMs,
 		BaseURL:   baseURL,
 	}
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			sess.TakeScreenshot()
+		}
+		sess.Close()
+	})
+
+	return sess
 }
 
 func (s *TestSession) Start() {
@@ -68,10 +78,21 @@ func (s *TestSession) AssertText(text string) {
 
 func (s *TestSession) TakeScreenshot() {
 	path := fmt.Sprintf("/app/tmp/screenshots/%s-%d.png", s.t.Name(), time.Now().UnixMilli())
+	dir := filepath.Dir(path)
+
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		s.t.Logf("screenshot mkdir %s: %v", dir, err)
+		return
+	}
+
 	s.t.Logf("Taking screenshot: %s", path)
 
-	if _, err := s.page.Screenshot(pw.PageScreenshotOptions{Path: pw.String(path), FullPage: pw.Bool(true), Type: pw.ScreenshotTypePng}); err != nil {
-		s.t.Fatalf("screenshot: %v", err)
+	if _, err := s.page.Screenshot(pw.PageScreenshotOptions{
+		Path:     pw.String(path),
+		FullPage: pw.Bool(true),
+		Type:     pw.ScreenshotTypePng,
+	}); err != nil {
+		s.t.Logf("screenshot error: %v", err)
 	}
 }
 
