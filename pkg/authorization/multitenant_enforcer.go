@@ -11,30 +11,54 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-//
-// Efficient multi-tenant enforcer using Casbin with Gorm adapter.
-//
+func Verify(userID, orgID, resource, action string) (bool, error) {
+	enforcer, err := newMultiTenantEnforcer()
+	if err != nil {
+		return false, fmt.Errorf("failed to create multi-tenant enforcer: %w", err)
+	}
+
+	if err := enforcer.LoadOrganizationPolicy(orgID); err != nil {
+		return false, fmt.Errorf("failed to load organization policy: %w", err)
+	}
+
+	allowed, err := enforcer.EnforceOrganization(userID, orgID, resource, action)
+	if err != nil {
+		return false, fmt.Errorf("failed to enforce organization policy: %w", err)
+	}
+
+	return allowed, nil
+}
+
+func Update(orgID string, fn func(*casbin.Transaction) error) error {
+	if fn == nil {
+		return fmt.Errorf("update function cannot be nil")
+	}
+
+	enforcer, err := newMultiTenantEnforcer()
+	if err != nil {
+		return fmt.Errorf("failed to create multi-tenant enforcer: %w", err)
+	}
+
+	if err := enforcer.LoadOrganizationPolicy(orgID); err != nil {
+		return fmt.Errorf("failed to load organization policy: %w", err)
+	}
+
+	if err := enforcer.WithOrganizationTransaction(context.Background(), orgID, fn); err != nil {
+		return fmt.Errorf("failed to update organization policy: %w", err)
+	}
+
+	return nil
+}
 
 //
-// How to enforce policies in the API:
-//
-// allowed, err := authorization.OrgEnforcer(userID, orgID, resource, action)
-// if err != nil {
-//     // handle error
-// }
-//
-// if allowed {
-// 	 proceed with the action
-// } else {
-// 	 deny access
-// }
+// Private methods and types for multi-tenant enforcer.
 //
 
-type MultiTenantEnforcer struct {
+type multiTenantEnforcer struct {
 	enforcer *casbin.TransactionalEnforcer
 }
 
-func NewMultiTenantEnforcer() (*MultiTenantEnforcer, error) {
+func newMultiTenantEnforcer() (*multiTenantEnforcer, error) {
 	modelPath := os.Getenv("RBAC_MODEL_PATH")
 
 	adapter, err := gormadapter.NewTransactionalAdapterByDB(database.Conn())
@@ -49,12 +73,12 @@ func NewMultiTenantEnforcer() (*MultiTenantEnforcer, error) {
 
 	enforcer.EnableAutoSave(true)
 
-	return &MultiTenantEnforcer{
+	return &multiTenantEnforcer{
 		enforcer: enforcer,
 	}, nil
 }
 
-func (m *MultiTenantEnforcer) LoadOrganizationPolicy(orgID string) error {
+func (m *multiTenantEnforcer) LoadOrganizationPolicy(orgID string) error {
 	if orgID == "" {
 		return fmt.Errorf("orgID cannot be empty")
 	}
@@ -68,7 +92,7 @@ func (m *MultiTenantEnforcer) LoadOrganizationPolicy(orgID string) error {
 	return m.enforcer.LoadFilteredPolicy(filter)
 }
 
-func (m *MultiTenantEnforcer) EnforceOrganization(userID, orgID, resource, action string) (bool, error) {
+func (m *multiTenantEnforcer) EnforceOrganization(userID, orgID, resource, action string) (bool, error) {
 	if userID == "" {
 		return false, fmt.Errorf("userID cannot be empty")
 	}
@@ -82,7 +106,7 @@ func (m *MultiTenantEnforcer) EnforceOrganization(userID, orgID, resource, actio
 	return m.enforcer.Enforce(prefixedUserID, domain, resource, action)
 }
 
-func (m *MultiTenantEnforcer) WithOrganizationTransaction(ctx context.Context, orgID string, fn func(*casbin.Transaction) error) error {
+func (m *multiTenantEnforcer) WithOrganizationTransaction(ctx context.Context, orgID string, fn func(*casbin.Transaction) error) error {
 	if orgID == "" {
 		return fmt.Errorf("orgID cannot be empty")
 	}
