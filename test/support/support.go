@@ -168,7 +168,6 @@ func AuthService(t *testing.T) *authorization.AuthService {
 	return authService
 }
 
-// TODO: this needs to be refactored
 func CreateOrganization(t *testing.T, r *ResourceRegistry, userID uuid.UUID) *models.Organization {
 	organization, err := models.CreateOrganization(RandomName("org"), RandomName("org-display"))
 	require.NoError(t, err)
