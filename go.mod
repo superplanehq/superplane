@@ -21,7 +21,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/playwright-community/playwright-go v0.5200.1
-	github.com/renderedtext/go-tackle v0.0.0-20251117183756-8a104587071d
+	github.com/renderedtext/go-tackle v0.0.0-20251117195301-3a303949d759
 	github.com/sendgrid/sendgrid-go v3.16.1+incompatible
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.3.0
