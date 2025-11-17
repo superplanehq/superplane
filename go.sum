@@ -454,6 +454,8 @@ github.com/remyoudompheng/bigfft v0.0.0-20230126093431-47fa9a501578 h1:VstopitMQ
 github.com/remyoudompheng/bigfft v0.0.0-20230126093431-47fa9a501578/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/renderedtext/go-tackle v0.0.0-20250220144338-fb4f71d1119e h1:6nODLH8JrBVG8Oh/wuNFMqFDP3zyRBSutfZpJoRwOC8=
 github.com/renderedtext/go-tackle v0.0.0-20250220144338-fb4f71d1119e/go.mod h1:IfWH6x6erQ2Y4C7+BdP/fzOCN+8Szs2atOc6vUDOnvY=
+github.com/renderedtext/go-tackle v0.0.0-20251117183756-8a104587071d h1:qw+b0pypiQ0/xjvjEFdjWfj3F/xnfs0FHqJFpYPLQIs=
+github.com/renderedtext/go-tackle v0.0.0-20251117183756-8a104587071d/go.mod h1:IfWH6x6erQ2Y4C7+BdP/fzOCN+8Szs2atOc6vUDOnvY=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
