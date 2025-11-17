@@ -518,7 +518,7 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 	//
 	err := a.setupDefaultOrganizationRoleMetadataInTransaction(tx, orgID)
 	if err != nil {
-		log.Errorf("Error setting up default organization role metadata: %v", err)
+		log.Errorf("Error setting up default organization role metadata for %s: %v", orgID, err)
 		tx.Rollback()
 		return err
 	}
@@ -551,13 +551,13 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("failed to setup organization roles: %w", err)
+		return fmt.Errorf("failed to setup organization roles for %s: %w", orgID, err)
 	}
 
 	err = a.LoadPolicy()
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("failed to load policies: %w", err)
+		return fmt.Errorf("failed to load policies after setting up organization roles for %s: %w", orgID, err)
 	}
 
 	tx.Commit()
