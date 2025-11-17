@@ -29,6 +29,15 @@ func Verify(userID, orgID, resource, action string) (bool, error) {
 	return allowed, nil
 }
 
+func Provision(orgID string) error {
+	authService, err := NewAuthService()
+	if err != nil {
+		return fmt.Errorf("failed to create auth service: %w", err)
+	}
+
+	return authService.Provision(orgID)
+}
+
 func Update(orgID string, fn func(*casbin.Transaction) error) error {
 	if fn == nil {
 		return fmt.Errorf("update function cannot be nil")
@@ -85,11 +94,22 @@ func (m *multiTenantEnforcer) LoadOrganizationPolicy(orgID string) error {
 
 	domain := prefixDomain(models.DomainTypeOrganization, orgID)
 
-	filter := gormadapter.Filter{
-		V1: []string{domain},
+	// Load both policy (p) and grouping (g) rules for this
+	// organization's domain:
+	// - p rules store domain in V1
+	// - g rules store domain in V2 (user/role/group in V0/V1)
+	filters := []gormadapter.Filter{
+		{
+			Ptype: []string{"p"},
+			V1:    []string{domain},
+		},
+		{
+			Ptype: []string{"g"},
+			V2:    []string{domain},
+		},
 	}
 
-	return m.enforcer.LoadFilteredPolicy(filter)
+	return m.enforcer.LoadFilteredPolicy(filters)
 }
 
 func (m *multiTenantEnforcer) EnforceOrganization(userID, orgID, resource, action string) (bool, error) {
