@@ -1,4 +1,4 @@
-package authorization2
+package org
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/casbin/casbin/v2"
+	"github.com/superplanehq/superplane/pkg/authorization2/base"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -73,7 +74,7 @@ func newProvisioner(tx *gorm.DB, orgID string, ownerID string) *provisioner {
 func (p *provisioner) initializeEnforcer() error {
 	var err error
 
-	p.enforcer, err = enforcer()
+	p.enforcer, err = base.Enforcer()
 	if err != nil {
 		return fmt.Errorf("failed to create enforcer: %w", err)
 	}

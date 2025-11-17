@@ -1,25 +1,31 @@
-package authorization2
+package org
 
 import (
 	"fmt"
 
 	"github.com/casbin/casbin/v2"
-	gormadapter "github.com/casbin/gorm-adapter/v3"
+	"github.com/superplanehq/superplane/pkg/authorization2/base"
 	"github.com/superplanehq/superplane/pkg/models"
+
+	gormadapter "github.com/casbin/gorm-adapter/v3"
 )
 
-type orgverifier struct {
+//
+// Verifier for organization-level permissions.
+//
+
+type Verifier struct {
 	enforcer *casbin.TransactionalEnforcer
 
 	domain string
 	user   string
 }
 
-func OrgVerifier(orgID string, userID string) (*orgverifier, error) {
+func NewVerifier(orgID string, userID string) (*Verifier, error) {
 	domain := fmt.Sprintf("%s:%s", models.DomainTypeOrganization, orgID)
 	user := fmt.Sprintf("user:%s", userID)
 
-	enforcer, err := enforcer()
+	enforcer, err := base.Enforcer()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create enforcer: %w", err)
 	}
@@ -40,49 +46,49 @@ func OrgVerifier(orgID string, userID string) (*orgverifier, error) {
 		return nil, fmt.Errorf("failed to load filtered policies: %w", err)
 	}
 
-	return &orgverifier{
+	return &Verifier{
 		enforcer: enforcer,
 		domain:   domain,
 		user:     user,
 	}, nil
 }
 
-func (v *orgverifier) CanReadCanvas() (bool, error) {
+func (v *Verifier) CanReadCanvas() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "canvas", "read")
 }
 
-func (v *orgverifier) CanCreateCanvas() (bool, error) {
+func (v *Verifier) CanCreateCanvas() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "canvas", "create")
 }
 
-func (v *orgverifier) CanUpdateCanvas() (bool, error) {
+func (v *Verifier) CanUpdateCanvas() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "canvas", "update")
 }
 
-func (v *orgverifier) CanDeleteCanvas() (bool, error) {
+func (v *Verifier) CanDeleteCanvas() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "canvas", "delete")
 }
 
-func (v *orgverifier) CanCreateMember() (bool, error) {
+func (v *Verifier) CanCreateMember() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "member", "create")
 }
 
-func (v *orgverifier) CanDeleteMember() (bool, error) {
+func (v *Verifier) CanDeleteMember() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "member", "delete")
 }
 
-func (v *orgverifier) CanUpdateMember() (bool, error) {
+func (v *Verifier) CanUpdateMember() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "member", "update")
 }
 
-func (v *orgverifier) CanReadMember() (bool, error) {
+func (v *Verifier) CanReadMember() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "member", "read")
 }
 
-func (v *orgverifier) CanUpdateOrg() (bool, error) {
+func (v *Verifier) CanUpdateOrg() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "org", "update")
 }
 
-func (v *orgverifier) CanDeleteOrg() (bool, error) {
+func (v *Verifier) CanDeleteOrg() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "org", "delete")
 }

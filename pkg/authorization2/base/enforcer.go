@@ -1,4 +1,4 @@
-package authorization2
+package base
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 )
 
-func enforcer() (*casbin.TransactionalEnforcer, error) {
+func Enforcer() (*casbin.TransactionalEnforcer, error) {
 	modelPath := os.Getenv("RBAC_MODEL_PATH")
 
 	adapter, err := gormadapter.NewTransactionalAdapterByDB(database.Conn())

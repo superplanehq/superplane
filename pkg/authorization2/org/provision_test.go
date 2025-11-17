@@ -1,4 +1,4 @@
-package authorization2_test
+package org
 
 import (
 	"testing"
@@ -7,8 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-
-	auth "github.com/superplanehq/superplane/pkg/authorization2"
 )
 
 func TestProvision(t *testing.T) {
@@ -26,7 +24,7 @@ func TestProvision(t *testing.T) {
 	user, err := models.CreateUser(org.ID, account.ID, "user1@example.com", "Peter Parker")
 	require.NoError(t, err)
 
-	err = auth.Provision(database.Conn(), org.ID.String(), user.ID.String())
+	err = Provision(database.Conn(), org.ID.String(), user.ID.String())
 	require.NoError(t, err)
 
 	t.Run("creates default roles", func(t *testing.T) {
@@ -48,7 +46,7 @@ func TestProvision(t *testing.T) {
 	})
 
 	t.Run("verify that the org owner has correct permissions", func(t *testing.T) {
-		verifier, err := auth.OrgVerifier(org.ID.String(), user.ID.String())
+		verifier, err := NewVerifier(org.ID.String(), user.ID.String())
 		require.NoError(t, err)
 
 		can, err = verifier.CanReadCanvas()
