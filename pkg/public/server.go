@@ -416,6 +416,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	// TODO: the organization creation should be in a transaction
 	// Create the organization and set up roles for it.
 	//
+	log.Infof("Creating organization %s for account %s", req.Name, account.Email)
 	organization, err := models.CreateOrganization(req.Name, "")
 	if err != nil {
 		log.Errorf("Error creating organization: %v", err)
@@ -423,6 +424,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Infof("Setting up organization roles for %s (%s)", organization.Name, organization.ID)
 	err = s.authService.SetupOrganizationRoles(organization.ID.String())
 	if err != nil {
 		log.Errorf("Error setting up organization roles for %s: %v", organization.Name, err)
@@ -434,6 +436,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	//
 	// Create the owner user for it
 	//
+	log.Infof("Creating user for new organization %s (%s)", organization.Name, organization.ID)
 	user, err := models.CreateUser(organization.ID, account.ID, account.Email, account.Name)
 	if err != nil {
 		log.Errorf("Error creating user for new organization: %v", err)
@@ -442,6 +445,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Infof("User %s created - setting it as owner for %s (%s)", user.ID, organization.Name, organization.ID)
 	err = s.authService.CreateOrganizationOwner(user.ID.String(), organization.ID.String())
 	if err != nil {
 		log.Errorf("Error creating organization owner for %s: %v", organization.Name, err)
@@ -449,6 +453,8 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to create organization owner", http.StatusInternalServerError)
 		return
 	}
+
+	log.Infof("Organization %s created successfully", organization.Name)
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
