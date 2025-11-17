@@ -2,7 +2,6 @@ package authorization
 
 import (
 	"bytes"
-	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -26,7 +25,7 @@ const (
 var _ Authorization = (*AuthService)(nil)
 
 type AuthService struct {
-	enforcer              *casbin.TransactionalEnforcer
+	enforcer              *casbin.SyncedEnforcer
 	orgPolicyTemplates    [][5]string
 	canvasPolicyTemplates [][5]string
 }
@@ -41,7 +40,7 @@ func NewAuthService() (*AuthService, error) {
 		return nil, fmt.Errorf("failed to create casbin adapter: %w", err)
 	}
 
-	enforcer, err := casbin.NewTransactionalEnforcer(modelPath, adapter)
+	enforcer, err := casbin.NewSyncedEnforcer(modelPath, adapter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin enforcer: %w", err)
 	}
@@ -89,18 +88,28 @@ func (a *AuthService) CheckOrganizationPermission(userID, orgID, resource, actio
 }
 
 func (a *AuthService) checkPermission(userID, domainID, domainType, resource, action string) (bool, error) {
+	domain := prefixDomain(domainType, domainID)
+	filters := []gormadapter.Filter{
+		{
+			Ptype: []string{"p"},
+			V1:    []string{domain},
+		},
+		{
+			Ptype: []string{"g"},
+			V2:    []string{domain},
+		},
+	}
 
 	//
 	// We always reload policies before checking for permissions.
 	// Due to the lack of proper support for distributed enforcers in casbin,
 	// we have no way to reliably know if policies on this instance are up to date.
 	//
-	err := a.enforcer.LoadPolicy()
+	err := a.enforcer.LoadFilteredPolicy(filters)
 	if err != nil {
 		return false, err
 	}
 
-	domain := prefixDomain(domainType, domainID)
 	prefixedUserID := prefixUserID(userID)
 	allowed, err := a.enforcer.Enforce(prefixedUserID, domain, resource, action)
 	if err != nil {
@@ -157,51 +166,16 @@ func (a *AuthService) DeleteGroup(domainID string, domainType string, groupName 
 		return fmt.Errorf("failed to delete group metadata: %w", err)
 	}
 
-	//
-	// casbin.Transaction does not expose RemoveFilteredGruopingPolicy,
-	// so we need to fetch them before.
-	//
-	groupRolePolicies, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to get group role assignments: %w", err)
-	}
-
-	userGroupPolicies, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to get users in group: %w", err)
-	}
-
-	err = a.enforcer.WithTransaction(context.Background(), func(casbinTx *casbin.Transaction) error {
-
-		//
-		// Remove group role assignments (group -> role -> domain)
-		//
-		for _, policy := range groupRolePolicies {
-			params := make([]any, len(policy))
-			for i, v := range policy {
-				params[i] = v
-			}
-
-			_, err := casbinTx.RemoveGroupingPolicy(params...)
-			if err != nil {
-				return fmt.Errorf("failed to remove group role assignment: %w", err)
-			}
+	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
+	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
+		_, err := enforcerTx.RemoveFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
+		if err != nil {
+			return fmt.Errorf("failed to remove group role assignments: %w", err)
 		}
 
-		//
-		// Remove users from group (user -> group -> domain)
-		//
-		for _, policy := range userGroupPolicies {
-			params := make([]any, len(policy))
-			for i, v := range policy {
-				params[i] = v
-			}
-			_, err := casbinTx.RemoveGroupingPolicy(params...)
-			if err != nil {
-				return fmt.Errorf("failed to remove users from group: %w", err)
-			}
+		_, err = enforcerTx.RemoveFilteredGroupingPolicy(1, prefixedGroupName, domain)
+		if err != nil {
+			return fmt.Errorf("failed to remove users from group: %w", err)
 		}
 
 		return nil
@@ -255,8 +229,9 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 	}
 
 	prefixedOldRole := prefixRoleName(currentRole)
-	err = a.enforcer.WithTransaction(context.Background(), func(casbinTx *casbin.Transaction) error {
-		ruleRemoved, err := casbinTx.RemoveGroupingPolicy(prefixedGroupName, prefixedOldRole, domain)
+	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
+	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
+		ruleRemoved, err := enforcerTx.RemoveGroupingPolicy(prefixedGroupName, prefixedOldRole, domain)
 		if err != nil {
 			return fmt.Errorf("failed to remove old group role: %w", err)
 		}
@@ -265,7 +240,7 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 		}
 
 		prefixedNewRole := prefixRoleName(newRole)
-		ruleAdded, err := casbinTx.AddGroupingPolicy(prefixedGroupName, prefixedNewRole, domain)
+		ruleAdded, err := enforcerTx.AddGroupingPolicy(prefixedGroupName, prefixedNewRole, domain)
 		if err != nil {
 			return fmt.Errorf("failed to add new group role: %w", err)
 		}
@@ -518,16 +493,17 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 	// If this succeeds, we commit the tx we started above.
 	// Otherwise, we fail it, rolling back the metadata changes.
 	//
-	err = a.enforcer.WithTransaction(context.Background(), func(casbinTx *casbin.Transaction) error {
+	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
+	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
 		for _, policy := range a.orgPolicyTemplates {
 			switch policy[0] {
 			case "g":
-				_, err := casbinTx.AddGroupingPolicy(policy[1], policy[2], domain)
+				_, err := enforcerTx.AddGroupingPolicy(policy[1], policy[2], domain)
 				if err != nil {
 					return fmt.Errorf("failed to add grouping policy: %w", err)
 				}
 			case "p":
-				_, err := casbinTx.AddPolicy(policy[1], domain, policy[3], policy[4])
+				_, err := enforcerTx.AddPolicy(policy[1], domain, policy[3], policy[4])
 				if err != nil {
 					return fmt.Errorf("failed to add policy: %w", err)
 				}
@@ -658,18 +634,19 @@ func (a *AuthService) SetupCanvasRoles(canvasID string) error {
 		return err
 	}
 
-	err = a.enforcer.WithTransaction(context.Background(), func(casbinTx *casbin.Transaction) error {
+	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
+	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
 		for _, policy := range a.canvasPolicyTemplates {
 			switch policy[0] {
 			case "g":
 				// g,lower_role,higher_role,canvas:{CANVAS_ID}
-				_, err := casbinTx.AddGroupingPolicy(policy[1], policy[2], domain)
+				_, err := enforcerTx.AddGroupingPolicy(policy[1], policy[2], domain)
 				if err != nil {
 					return fmt.Errorf("failed to add grouping policy: %w", err)
 				}
 			case "p":
 				// p,role,canvas:{CANVAS_ID},resource,action
-				_, err := casbinTx.AddPolicy(policy[1], domain, policy[3], policy[4])
+				_, err := enforcerTx.AddPolicy(policy[1], domain, policy[3], policy[4])
 				if err != nil {
 					return fmt.Errorf("failed to add policy: %w", err)
 				}
@@ -1110,9 +1087,10 @@ func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefi
 		return fmt.Errorf("failed to upsert role metadata for role %s: %w", roleDefinition.Name, err)
 	}
 
-	err = a.enforcer.WithTransaction(context.Background(), func(casbinTx *casbin.Transaction) error {
+	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
+	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
 		for _, permission := range roleDefinition.Permissions {
-			_, err := casbinTx.AddPolicy(prefixedRoleName, domain, permission.Resource, permission.Action)
+			_, err := enforcerTx.AddPolicy(prefixedRoleName, domain, permission.Resource, permission.Action)
 			if err != nil {
 				return fmt.Errorf("failed to add policy for role %s: %w", roleDefinition.Name, err)
 			}
@@ -1120,7 +1098,7 @@ func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefi
 
 		if roleDefinition.InheritsFrom != nil {
 			prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
-			_, err := casbinTx.AddGroupingPolicy(prefixedRoleName, prefixedInheritedRole, domain)
+			_, err := enforcerTx.AddGroupingPolicy(prefixedRoleName, prefixedInheritedRole, domain)
 			if err != nil {
 				return fmt.Errorf("failed to add inheritance for role %s: %w", roleDefinition.Name, err)
 			}
@@ -1161,55 +1139,27 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 		}
 	}
 
-	//
-	// RemoveFilteredPolicy and RemoveFilteredGroupingPolicy
-	// are not available in casbin.Transaction,
-	// so we need to fetch the policies before deleting them.
-	//
-	existingPoliciesToRemove, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
-	if err != nil {
-		return fmt.Errorf("failed to get existing policies for role %s: %w", roleDefinition.Name, err)
-	}
-
-	existingGroupingPoliciesToRemove, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
-	if err != nil {
-		return fmt.Errorf("failed to get existing inheritance for role %s: %w", roleDefinition.Name, err)
-	}
-
 	tx := database.Conn().Begin()
-	err = models.UpsertRoleMetadataInTransaction(tx, roleDefinition.Name, roleDefinition.DomainType, domainID, roleDefinition.DisplayName, roleDefinition.Description)
+	err := models.UpsertRoleMetadataInTransaction(tx, roleDefinition.Name, roleDefinition.DomainType, domainID, roleDefinition.DisplayName, roleDefinition.Description)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to upsert role metadata for role %s: %w", roleDefinition.Name, err)
 	}
 
-	err = a.enforcer.WithTransaction(context.Background(), func(casbinTx *casbin.Transaction) error {
-		// Remove existing policies
-		for _, policy := range existingPoliciesToRemove {
-			params := make([]any, len(policy))
-			for i, v := range policy {
-				params[i] = v
-			}
-			_, err := casbinTx.RemovePolicy(params...)
-			if err != nil {
-				return fmt.Errorf("failed to remove existing policies for role %s: %w", roleDefinition.Name, err)
-			}
+	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
+	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
+		_, err = enforcerTx.RemoveFilteredPolicy(0, prefixedRoleName, domain)
+		if err != nil {
+			return fmt.Errorf("failed to remove existing policies for role %s: %w", roleDefinition.Name, err)
 		}
 
-		// Remove existing inheritance
-		for _, policy := range existingGroupingPoliciesToRemove {
-			params := make([]any, len(policy))
-			for i, v := range policy {
-				params[i] = v
-			}
-			_, err := casbinTx.RemoveGroupingPolicy(params...)
-			if err != nil {
-				return fmt.Errorf("failed to remove existing inheritance for role %s: %w", roleDefinition.Name, err)
-			}
+		_, err = enforcerTx.RemoveFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+		if err != nil {
+			return fmt.Errorf("failed to remove existing inheritance for role %s: %w", roleDefinition.Name, err)
 		}
 
 		for _, permission := range roleDefinition.Permissions {
-			_, err := casbinTx.AddPolicy(prefixedRoleName, domain, permission.Resource, permission.Action)
+			_, err := enforcerTx.AddPolicy(prefixedRoleName, domain, permission.Resource, permission.Action)
 			if err != nil {
 				return fmt.Errorf("failed to add policy for role %s: %w", roleDefinition.Name, err)
 			}
@@ -1217,7 +1167,7 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 
 		if roleDefinition.InheritsFrom != nil {
 			prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
-			_, err := casbinTx.AddGroupingPolicy(prefixedRoleName, prefixedInheritedRole, domain)
+			_, err := enforcerTx.AddGroupingPolicy(prefixedRoleName, prefixedInheritedRole, domain)
 			if err != nil {
 				return fmt.Errorf("failed to add inheritance for role %s: %w", roleDefinition.Name, err)
 			}
@@ -1248,68 +1198,28 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 		return fmt.Errorf("role %s not found in domain %s", roleName, domain)
 	}
 
-	//
-	// RemoveFilteredPolicy and RemoveFilteredGroupingPolicy
-	// are not available in casbin.Transaction,
-	// so we need to fetch the policies before deleting them.
-	//
-	policiesToRemove, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
-	if err != nil {
-		return fmt.Errorf("failed to get policies for role %s: %w", roleName, err)
-	}
-
-	inheritancePoliciesToRemove, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
-	if err != nil {
-		return fmt.Errorf("failed to get inheritance for role %s: %w", roleName, err)
-	}
-
-	usersWithRolePolicies, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedRoleName, domain)
-	if err != nil {
-		return fmt.Errorf("failed to get users for role %s: %w", roleName, err)
-	}
-
 	tx := database.Conn().Begin()
-	err = models.DeleteRoleMetadataInTransaction(tx, roleName, domainType, domainID)
+	err := models.DeleteRoleMetadataInTransaction(tx, roleName, domainType, domainID)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete role metadata for role %s: %w", roleName, err)
 	}
 
-	err = a.enforcer.WithTransaction(context.Background(), func(casbinTx *casbin.Transaction) error {
-		// Remove policies where this role is the subject
-		for _, policy := range policiesToRemove {
-			params := make([]any, len(policy))
-			for i, v := range policy {
-				params[i] = v
-			}
-			_, err := casbinTx.RemovePolicy(params...)
-			if err != nil {
-				return fmt.Errorf("failed to remove policies for role %s: %w", roleName, err)
-			}
+	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
+	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
+		_, err = enforcerTx.RemoveFilteredPolicy(0, prefixedRoleName, domain)
+		if err != nil {
+			return fmt.Errorf("failed to remove existing policies for role %s: %w", roleName, err)
 		}
 
-		// Remove inheritance where this role inherits from others
-		for _, policy := range inheritancePoliciesToRemove {
-			params := make([]any, len(policy))
-			for i, v := range policy {
-				params[i] = v
-			}
-			_, err := casbinTx.RemoveGroupingPolicy(params...)
-			if err != nil {
-				return fmt.Errorf("failed to remove inheritance for role %s: %w", roleName, err)
-			}
+		_, err = enforcerTx.RemoveFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+		if err != nil {
+			return fmt.Errorf("failed to remove inheritance for role %s: %w", roleName, err)
 		}
 
-		// Remove users/groups assigned to this role
-		for _, policy := range usersWithRolePolicies {
-			params := make([]any, len(policy))
-			for i, v := range policy {
-				params[i] = v
-			}
-			_, err := casbinTx.RemoveGroupingPolicy(params...)
-			if err != nil {
-				return fmt.Errorf("failed to remove users from role %s: %w", roleName, err)
-			}
+		_, err = enforcerTx.RemoveFilteredGroupingPolicy(1, prefixedRoleName, domain)
+		if err != nil {
+			return fmt.Errorf("failed to remove users from role %s: %w", roleName, err)
 		}
 
 		return nil
