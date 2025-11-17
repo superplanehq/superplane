@@ -3,7 +3,7 @@ module github.com/superplanehq/superplane
 go 1.25
 
 require (
-	github.com/casbin/casbin/v2 v2.132.0
+	github.com/casbin/casbin/v2 v2.134.0
 	github.com/casbin/gorm-adapter/v3 v3.37.0
 	github.com/coreos/go-oidc/v3 v3.14.1
 	github.com/expr-lang/expr v1.17.2

@@ -208,7 +208,14 @@ func (a *AuthService) DeleteGroup(domainID string, domainType string, groupName 
 		return fmt.Errorf("failed to remove casbin grouping policies for group: %w", err)
 	}
 
+	err = a.LoadPolicy()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to load policies after group deletion: %w", err)
+	}
+
 	tx.Commit()
+	a.publishReloadMessage()
 	return nil
 }
 
@@ -275,6 +282,12 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to update casbin grouping policies: %w", err)
+	}
+
+	err = a.LoadPolicy()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to load policies after group update: %w", err)
 	}
 
 	tx.Commit()
@@ -541,6 +554,12 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 		return fmt.Errorf("failed to setup organization roles: %w", err)
 	}
 
+	err = a.LoadPolicy()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to load policies: %w", err)
+	}
+
 	tx.Commit()
 	a.publishReloadMessage()
 	return nil
@@ -674,6 +693,12 @@ func (a *AuthService) SetupCanvasRoles(canvasID string) error {
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to setup canvas roles: %w", err)
+	}
+
+	err = a.LoadPolicy()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to load policies: %w", err)
 	}
 
 	tx.Commit()
@@ -1126,6 +1151,12 @@ func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefi
 		return fmt.Errorf("failed to create custom role: %w", err)
 	}
 
+	err = a.LoadPolicy()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to load policies: %w", err)
+	}
+
 	tx.Commit()
 	a.publishReloadMessage()
 	return nil
@@ -1224,6 +1255,12 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 		return fmt.Errorf("failed to update custom role: %w", err)
 	}
 
+	err = a.LoadPolicy()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to load policies: %w", err)
+	}
+
 	tx.Commit()
 	a.publishReloadMessage()
 	return nil
@@ -1312,6 +1349,12 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete custom role: %w", err)
+	}
+
+	err = a.LoadPolicy()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to load policies: %w", err)
 	}
 
 	tx.Commit()
