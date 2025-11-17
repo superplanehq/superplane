@@ -1,27 +1,22 @@
-import * as React from "react"
+import * as React from "react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "../card"
-import { ApprovalItem, type ApprovalItemProps } from "../approvalItem"
-import { ItemGroup, ItemSeparator } from "../item"
-import { Button } from "../button"
-import { Hand } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "../card";
+import { ApprovalItem, type ApprovalItemProps } from "../approvalItem";
+import { ItemGroup, ItemSeparator } from "../item";
+import { Button } from "../button";
+import { Hand } from "lucide-react";
 
 export interface ApprovalProps {
-  title: string
-  status?: string
-  version?: string
-  approvals?: ApprovalItemProps[]
-  footerContent?: React.ReactNode
-  className?: string
-  selected?: boolean
-  collapsed?: boolean
+  title: string;
+  status?: string;
+  version?: string;
+  approvals?: ApprovalItemProps[];
+  footerContent?: React.ReactNode;
+  className?: string;
+  selected?: boolean;
+  collapsed?: boolean;
 }
 
 export const Approval: React.FC<ApprovalProps> = ({
@@ -34,8 +29,8 @@ export const Approval: React.FC<ApprovalProps> = ({
   collapsed = false,
 }) => {
   if (collapsed) {
-    const pendingCount = approvals?.filter(approval => !approval.approved).length || 0
-    const totalCount = approvals?.length || 0
+    const pendingCount = approvals?.filter((approval) => !approval.approved).length || 0;
+    const totalCount = approvals?.length || 0;
 
     return (
       <div className={cn("flex w-fit flex-col items-center", className)}>
@@ -47,23 +42,14 @@ export const Approval: React.FC<ApprovalProps> = ({
         >
           <Hand className="size-10" />
         </div>
-        <CardTitle className="text-base font-semibold text-neutral-900 pt-1">
-          {title}
-        </CardTitle>
-        <Button
-          variant="linkSubdued"
-          className="justify-center text-sm"
-          asChild
-        >
-          <a
-            href="#"
-            className="flex items-center"
-          >
+        <CardTitle className="text-base font-semibold text-neutral-900 pt-1">{title}</CardTitle>
+        <Button variant="linkSubdued" className="justify-center text-sm" asChild>
+          <a href="#" className="flex items-center">
             {pendingCount}/{totalCount} pending
           </a>
         </Button>
       </div>
-    )
+    );
   }
 
   return (
@@ -71,27 +57,17 @@ export const Approval: React.FC<ApprovalProps> = ({
       <Card
         className={cn(
           "flex h-full w-full flex-col overflow-hidden p-0 rounded-3xl",
-          selected
-            ? "border-[3px] border-black shadow-none"
-            : "border-none shadow-lg",
+          selected ? "border-[3px] border-black shadow-none" : "border-none shadow-lg",
         )}
       >
-        <CardHeader
-          className="space-y-2 rounded-t-3xl px-8 py-6 text-base text-neutral-900 bg-yellow-300"
-        >
+        <CardHeader className="space-y-2 rounded-t-3xl px-8 py-6 text-base text-neutral-900 bg-yellow-300">
           <CardTitle>{title}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-6 rounded-none px-8 py-6 bg-white">
           {status && (
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {status}
-            </div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{status}</div>
           )}
-          {version && (
-            <div className="text-2xl font-bold text-neutral-900">
-              {version}
-            </div>
-          )}
+          {version && <div className="text-2xl font-bold text-neutral-900">{version}</div>}
           {approvals && approvals.length > 0 ? (
             <ItemGroup className="w-full">
               {approvals.map((approval, index) => (
@@ -107,5 +83,5 @@ export const Approval: React.FC<ApprovalProps> = ({
         </CardContent>
       </Card>
     </div>
-  )
-}
+  );
+};

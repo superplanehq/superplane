@@ -8,6 +8,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -326,6 +327,10 @@ func (a *Approval) Configuration() []configuration.Field {
 
 func (a *Approval) Setup(ctx components.SetupContext) error {
 	return nil
+}
+
+func (a *Approval) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+	return ctx.DefaultProcessing()
 }
 
 func (a *Approval) Execute(ctx components.ExecutionContext) error {

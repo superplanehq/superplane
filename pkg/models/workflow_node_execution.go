@@ -125,7 +125,6 @@ func ListPendingNodeExecutions() ([]WorkflowNodeExecution, error) {
 	var executions []WorkflowNodeExecution
 	query := database.Conn().
 		Where("state = ?", WorkflowNodeExecutionStatePending).
-		Where("parent_execution_id IS NULL").
 		Order("created_at DESC")
 
 	err := query.Find(&executions).Error
@@ -205,23 +204,24 @@ func FindNodeExecutionInTransaction(tx *gorm.DB, workflowID, id uuid.UUID) (*Wor
 	return &execution, nil
 }
 
-func ListPendingChildExecutions() ([]WorkflowNodeExecution, error) {
-	return ListPendingChildExecutionsInTransaction(database.Conn())
+func FindNodeExecutionWithNodeID(workflowID, id uuid.UUID, nodeID string) (*WorkflowNodeExecution, error) {
+	return FindNodeExecutionWithNodeIDInTransaction(database.Conn(), workflowID, id, nodeID)
 }
 
-func ListPendingChildExecutionsInTransaction(tx *gorm.DB) ([]WorkflowNodeExecution, error) {
-	var executions []WorkflowNodeExecution
+func FindNodeExecutionWithNodeIDInTransaction(tx *gorm.DB, workflowID, id uuid.UUID, nodeID string) (*WorkflowNodeExecution, error) {
+	var execution WorkflowNodeExecution
 	err := tx.
-		Where("state = ?", WorkflowNodeExecutionStatePending).
-		Where("parent_execution_id IS NOT NULL").
-		Find(&executions).
+		Where("id = ?", id).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		First(&execution).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return executions, nil
+	return &execution, nil
 }
 
 func FindChildExecutionsForMultiple(parentExecutionIDs []string) ([]WorkflowNodeExecution, error) {
@@ -278,19 +278,9 @@ func (e *WorkflowNodeExecution) Start() error {
 }
 
 func (e *WorkflowNodeExecution) StartInTransaction(tx *gorm.DB) error {
-	//
-	// Update the workflow node state to processing.
-	//
-	node, err := FindWorkflowNode(tx, e.WorkflowID, e.NodeID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-
-	if node != nil {
-		err = node.UpdateState(tx, WorkflowNodeStateProcessing)
-		if err != nil {
-			return err
-		}
+	// Just a sanity check that we are not trying to start and already started execution.
+	if e.State != WorkflowNodeExecutionStatePending {
+		return fmt.Errorf("cannot start execution %s in state %s", e.ID, e.State)
 	}
 
 	//
@@ -480,4 +470,26 @@ func (e *WorkflowNodeExecution) CreateRequest(tx *gorm.DB, reqType string, spec 
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}).Error
+}
+
+// FindLastExecutionPerNode finds the most recent execution for each node in a workflow
+// using DISTINCT ON to get one execution per node_id, ordered by created_at DESC
+func FindLastExecutionPerNode(workflowID uuid.UUID) ([]WorkflowNodeExecution, error) {
+	var executions []WorkflowNodeExecution
+	err := database.Conn().
+		Raw(`
+			SELECT DISTINCT ON (node_id) *
+			FROM workflow_node_executions
+			WHERE workflow_id = ?
+			AND parent_execution_id IS NULL
+			ORDER BY node_id, created_at DESC
+		`, workflowID).
+		Scan(&executions).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
 }

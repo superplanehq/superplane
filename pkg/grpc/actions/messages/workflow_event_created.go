@@ -1,9 +1,6 @@
 package messages
 
 import (
-	"time"
-
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -12,12 +9,12 @@ import (
 const WorkflowEventCreatedRoutingKey = "workflow-event-created"
 
 type WorkflowEventCreatedMessage struct {
-	message *pb.EventCreated
+	message *pb.WorkflowNodeEventMessage
 }
 
 func NewWorkflowEventCreatedMessage(workflowId string, event *models.WorkflowEvent) WorkflowEventCreatedMessage {
 	return WorkflowEventCreatedMessage{
-		message: &pb.EventCreated{
+		message: &pb.WorkflowNodeEventMessage{
 			Id:         event.ID.String(),
 			WorkflowId: workflowId,
 			NodeId:     event.NodeID,
@@ -28,26 +25,4 @@ func NewWorkflowEventCreatedMessage(workflowId string, event *models.WorkflowEve
 
 func (m WorkflowEventCreatedMessage) Publish() error {
 	return Publish(WorkflowExchange, WorkflowEventCreatedRoutingKey, toBytes(m.message))
-}
-
-func (m WorkflowEventCreatedMessage) PublishWithDelay(delay time.Duration) {
-	go func() {
-		time.Sleep(delay)
-		err := m.Publish()
-		if err != nil {
-			log.Errorf("failed to publish workflow event: %v", err)
-		}
-	}()
-}
-
-func PublishManyWorkflowEventsWithDelay(workflowID string, events []models.WorkflowEvent, delay time.Duration) {
-	go func() {
-		time.Sleep(delay)
-		for _, event := range events {
-			err := NewWorkflowEventCreatedMessage(workflowID, &event).Publish()
-			if err != nil {
-				log.Errorf("failed to publish workflow event: %v", err)
-			}
-		}
-	}()
 }

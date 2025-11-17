@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/superplanehq/superplane/pkg/components"
 )
 
 func TestTimeGate_Name(t *testing.T) {
@@ -81,8 +82,58 @@ func TestTimeGate_Configuration(t *testing.T) {
 func TestTimeGate_Actions(t *testing.T) {
 	tg := &TimeGate{}
 	actions := tg.Actions()
-	assert.Len(t, actions, 1)
-	assert.Equal(t, "timeReached", actions[0].Name)
+
+	if len(actions) < 2 {
+		t.Fatalf("expected at least 2 actions, got %d: %+v", len(actions), actions)
+	}
+
+	var hasTimeReached, hasPushThrough bool
+	for _, a := range actions {
+		if a.Name == "timeReached" {
+			hasTimeReached = true
+		}
+		if a.Name == "pushThrough" {
+			hasPushThrough = true
+		}
+	}
+
+	assert.True(t, hasTimeReached)
+	assert.True(t, hasPushThrough)
+}
+
+// High-signal tests for action handling behavior
+type actionMockExecutionStateContext struct {
+	finished bool
+	passed   bool
+	failed   bool
+}
+
+func (m *actionMockExecutionStateContext) IsFinished() bool { return m.finished }
+func (m *actionMockExecutionStateContext) Pass(outputs map[string][]any) error {
+	m.passed = true
+	m.finished = true
+	return nil
+}
+func (m *actionMockExecutionStateContext) Fail(reason, message string) error {
+	m.failed = true
+	m.finished = true
+	return nil
+}
+
+func TestTimeGate_HandleAction_PushThrough_Finishes(t *testing.T) {
+	tg := &TimeGate{}
+
+	mockState := &actionMockExecutionStateContext{}
+	ctx := components.ActionContext{
+		Name:                  "pushThrough",
+		ExecutionStateContext: mockState,
+		Parameters:            map[string]any{},
+	}
+
+	err := tg.HandleAction(ctx)
+	assert.NoError(t, err)
+	assert.True(t, mockState.passed)
+	assert.True(t, mockState.finished)
 }
 
 func TestParseTimeString(t *testing.T) {
@@ -617,11 +668,11 @@ func TestParseDayInYear(t *testing.T) {
 	tg := &TimeGate{}
 
 	tests := []struct {
-		name         string
-		input        string
+		name          string
+		input         string
 		expectedMonth int
 		expectedDay   int
-		hasError     bool
+		hasError      bool
 	}{
 		{"valid Christmas", "12/25", 12, 25, false},
 		{"valid New Year", "01/01", 1, 1, false},

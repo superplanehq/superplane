@@ -132,7 +132,7 @@ class GitStats
   end
 
   def header
-    @header ||= "WEEK".ljust(FIRST_COLUMN_WIDTH) + @weeks.map { |w| w.week.to_s.ljust(2) }.join(' ')
+    @header ||= "WEEK".ljust(FIRST_COLUMN_WIDTH + 1) + @weeks.map { |w| w.week.to_s.ljust(3) }.join(' ')
   end
 
   def separator
@@ -145,9 +145,9 @@ def show_numbers(label, numbers)
 
   str += numbers.map do |n|
     if n == 0
-      "\e[36m .\e[0m"
+      "\e[36m  .\e[0m"
     else
-      n.to_s.rjust(2)
+      n.to_s.rjust(3)
     end
   end.join(' ')
 

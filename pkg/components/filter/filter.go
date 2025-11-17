@@ -8,6 +8,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -93,7 +94,7 @@ func (f *Filter) Execute(ctx components.ExecutionContext) error {
 
 	outputs := map[string][]any{}
 	if matches {
-		outputs[components.DefaultOutputChannel.Name] = []any{ctx.Data}
+		outputs[components.DefaultOutputChannel.Name] = []any{make(map[string]any)}
 	}
 
 	return ctx.ExecutionStateContext.Pass(outputs)
@@ -109,4 +110,8 @@ func (f *Filter) HandleAction(ctx components.ActionContext) error {
 
 func (f *Filter) Setup(ctx components.SetupContext) error {
 	return nil
+}
+
+func (f *Filter) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+	return ctx.DefaultProcessing()
 }

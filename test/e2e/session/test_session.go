@@ -1,12 +1,14 @@
-package e2e
+package session
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -22,9 +24,28 @@ type TestSession struct {
 	page      pw.Page
 	timeoutMs float64
 
-	baseURL string
-	orgID   string
-	account *models.Account
+	BaseURL string
+	OrgID   uuid.UUID
+	Account *models.Account
+}
+
+func NewTestSession(t *testing.T, context pw.BrowserContext, page pw.Page, timeoutMs float64, baseURL string) *TestSession {
+	sess := &TestSession{
+		t:         t,
+		context:   context,
+		page:      page,
+		timeoutMs: timeoutMs,
+		BaseURL:   baseURL,
+	}
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			sess.TakeScreenshot()
+		}
+		sess.Close()
+	})
+
+	return sess
 }
 
 func (s *TestSession) Start() {
@@ -42,24 +63,36 @@ func (s *TestSession) Close() {
 func (s *TestSession) Page() pw.Page { return s.page }
 
 func (s *TestSession) Visit(path string) {
-	_, err := s.page.Goto(s.baseURL+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(s.timeoutMs)})
+	_, err := s.page.Goto(s.BaseURL+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(s.timeoutMs)})
 	if err != nil {
 		s.t.Fatalf("goto: %v", err)
 	}
 }
 
 func (s *TestSession) AssertText(text string) {
-	if err := s.page.Locator("text=" + text).WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.timeoutMs)}); err != nil {
+	locator := s.page.Locator("text=" + text).First()
+	if err := locator.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.timeoutMs)}); err != nil {
 		s.t.Fatalf("text %q not found: %v", text, err)
 	}
 }
 
 func (s *TestSession) TakeScreenshot() {
 	path := fmt.Sprintf("/app/tmp/screenshots/%s-%d.png", s.t.Name(), time.Now().UnixMilli())
+	dir := filepath.Dir(path)
+
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		s.t.Logf("screenshot mkdir %s: %v", dir, err)
+		return
+	}
+
 	s.t.Logf("Taking screenshot: %s", path)
 
-	if _, err := s.page.Screenshot(pw.PageScreenshotOptions{Path: pw.String(path), FullPage: pw.Bool(true), Type: pw.ScreenshotTypePng}); err != nil {
-		s.t.Fatalf("screenshot: %v", err)
+	if _, err := s.page.Screenshot(pw.PageScreenshotOptions{
+		Path:     pw.String(path),
+		FullPage: pw.Bool(true),
+		Type:     pw.ScreenshotTypePng,
+	}); err != nil {
+		s.t.Logf("screenshot error: %v", err)
 	}
 }
 
@@ -91,7 +124,7 @@ func (s *TestSession) resetDatabase() {
 func (s *TestSession) Login() {
 	secret := os.Getenv("JWT_SECRET")
 	signer := spjwt.NewSigner(secret)
-	token, err := signer.Generate(s.account.ID.String(), 24*time.Hour)
+	token, err := signer.Generate(s.Account.ID.String(), 24*time.Hour)
 	if err != nil {
 		s.t.Fatalf("jwt: %v", err)
 	}
@@ -99,7 +132,7 @@ func (s *TestSession) Login() {
 	if err := s.context.AddCookies([]pw.OptionalCookie{{
 		Name:     "account_token",
 		Value:    token,
-		URL:      pw.String(s.baseURL + "/"),
+		URL:      pw.String(s.BaseURL + "/"),
 		HttpOnly: pw.Bool(true),
 	}}); err != nil {
 		s.t.Fatalf("add cookie: %v", err)
@@ -143,8 +176,8 @@ func (s *TestSession) setupUserAndOrganization() {
 		_ = svc.CreateOrganizationOwner(user.ID.String(), organization.ID.String())
 	}
 
-	s.orgID = organization.ID.String()
-	s.account = account
+	s.OrgID = organization.ID
+	s.Account = account
 }
 
 func (s *TestSession) Click(q queries.Query) {
@@ -166,7 +199,7 @@ func (s *TestSession) FillIn(q queries.Query, value string) {
 }
 
 func (s *TestSession) VisitHomePage() {
-	s.Visit("/" + s.orgID + "/")
+	s.Visit("/" + s.OrgID.String() + "/")
 }
 
 func (s *TestSession) DragAndDrop(source queries.Query, target queries.Query, offsetX, offsetY int) {
@@ -239,4 +272,39 @@ func (s *TestSession) AssertURLContains(part string) {
 	if !strings.Contains(current, part) {
 		s.t.Fatalf("expected URL to contain %q, got %q", part, current)
 	}
+}
+
+func (s *TestSession) ScrollToTheBottomOfPage() {
+	s.t.Log("Scrolling to the bottom of the page")
+
+	script := `
+		() => {
+			try {
+				// Scroll main window
+				const doc = document.scrollingElement || document.documentElement || document.body;
+				if (doc) {
+					doc.scrollTo(0, doc.scrollHeight);
+				}
+
+				// Also scroll any large scrollable containers
+				const candidates = Array.from(document.querySelectorAll('*'))
+					.filter(el => {
+						const style = window.getComputedStyle(el);
+						return (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
+					});
+
+				for (const el of candidates) {
+					el.scrollTop = el.scrollHeight;
+				}
+			} catch (e) {
+				console.error('scroll error', e);
+			}
+		}
+	`
+
+	if _, err := s.page.Evaluate(script, nil); err != nil {
+		s.t.Fatalf("scrolling to the bottom of the page: %v", err)
+	}
+
+	time.Sleep(300 * time.Millisecond)
 }

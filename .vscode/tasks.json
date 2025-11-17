@@ -1,0 +1,44 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Test Current File",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/vscode_run_tests.sh",
+      "args": ["file", "${relativeFile}"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test Current Line",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/vscode_run_tests.sh",
+      "args": ["line", "${relativeFile}", "${lineNumber}"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test All",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/vscode_run_tests.sh",
+      "args": ["all"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

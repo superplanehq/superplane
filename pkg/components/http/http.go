@@ -10,6 +10,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -130,6 +131,10 @@ func (e *HTTP) Actions() []components.Action {
 
 func (e *HTTP) HandleAction(ctx components.ActionContext) error {
 	return fmt.Errorf("http does not support actions")
+}
+
+func (e *HTTP) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+	return ctx.DefaultProcessing()
 }
 
 func (e *HTTP) Execute(ctx components.ExecutionContext) error {

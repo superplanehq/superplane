@@ -1,12 +1,7 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import { Plus } from "lucide-react"
+import type { Meta, StoryObj } from "@storybook/react";
+import { Plus } from "lucide-react";
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "./index"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./index";
 
 const meta = {
   title: "shadcn Primitives/Tooltip",
@@ -52,28 +47,28 @@ const meta = {
       </Tooltip>
     </TooltipProvider>
   ),
-} satisfies Meta<typeof TooltipContent>
+} satisfies Meta<typeof TooltipContent>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<typeof meta>
+type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {}
+export const Default: Story = {};
 
 export const Bottom: Story = {
   args: {
     side: "bottom",
   },
-}
+};
 
 export const Left: Story = {
   args: {
     side: "left",
   },
-}
+};
 
 export const Right: Story = {
   args: {
     side: "right",
   },
-}
+};

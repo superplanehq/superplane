@@ -1,14 +1,14 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { Checkbox } from './index';
+import { Checkbox } from "./index";
 
 const meta: Meta<typeof Checkbox> = {
-  title: 'shadcn Primitives/Checkbox',
+  title: "shadcn Primitives/Checkbox",
   component: Checkbox,
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
     disabled: {
-      control: { type: 'boolean' },
+      control: { type: "boolean" },
     },
   },
 };

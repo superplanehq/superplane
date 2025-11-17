@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+
 package Superplane.Authorization;
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/authorization";
@@ -16,4 +18,8 @@ message Permission {
   string resource = 1;
   string action = 2;
   DomainType domain_type = 3;
+}
+
+message ReloadPolicyMessage {
+  google.protobuf.Timestamp timestamp = 1;
 }

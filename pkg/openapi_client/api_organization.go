@@ -20,15 +20,14 @@ import (
 	"strings"
 )
 
-
 // OrganizationAPIService OrganizationAPI service
 type OrganizationAPIService service
 
 type ApiOrganizationsCreateInvitationRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *OrganizationAPIService
-	id string
-	body *OrganizationsCreateInvitationBody
+	id         string
+	body       *OrganizationsCreateInvitationBody
 }
 
 func (r ApiOrganizationsCreateInvitationRequest) Body(body OrganizationsCreateInvitationBody) ApiOrganizationsCreateInvitationRequest {
@@ -45,26 +44,27 @@ OrganizationsCreateInvitation Create an organization invitation
 
 Invites a user to join an organization by email
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id
- @return ApiOrganizationsCreateInvitationRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiOrganizationsCreateInvitationRequest
 */
 func (a *OrganizationAPIService) OrganizationsCreateInvitation(ctx context.Context, id string) ApiOrganizationsCreateInvitationRequest {
 	return ApiOrganizationsCreateInvitationRequest{
 		ApiService: a,
-		ctx: ctx,
-		id: id,
+		ctx:        ctx,
+		id:         id,
 	}
 }
 
 // Execute executes the request
-//  @return OrganizationsCreateInvitationResponse
+//
+//	@return OrganizationsCreateInvitationResponse
 func (a *OrganizationAPIService) OrganizationsCreateInvitationExecute(r ApiOrganizationsCreateInvitationRequest) (*OrganizationsCreateInvitationResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *OrganizationsCreateInvitationResponse
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *OrganizationsCreateInvitationResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsCreateInvitation")
@@ -123,14 +123,14 @@ func (a *OrganizationAPIService) OrganizationsCreateInvitationExecute(r ApiOrgan
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -147,9 +147,9 @@ func (a *OrganizationAPIService) OrganizationsCreateInvitationExecute(r ApiOrgan
 }
 
 type ApiOrganizationsDeleteOrganizationRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *OrganizationAPIService
-	id string
+	id         string
 }
 
 func (r ApiOrganizationsDeleteOrganizationRequest) Execute() (map[string]interface{}, *http.Response, error) {
@@ -161,26 +161,27 @@ OrganizationsDeleteOrganization Delete an organization
 
 Deletes the specified organization (can be referenced by ID or name)
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id
- @return ApiOrganizationsDeleteOrganizationRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiOrganizationsDeleteOrganizationRequest
 */
 func (a *OrganizationAPIService) OrganizationsDeleteOrganization(ctx context.Context, id string) ApiOrganizationsDeleteOrganizationRequest {
 	return ApiOrganizationsDeleteOrganizationRequest{
 		ApiService: a,
-		ctx: ctx,
-		id: id,
+		ctx:        ctx,
+		id:         id,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *OrganizationAPIService) OrganizationsDeleteOrganizationExecute(r ApiOrganizationsDeleteOrganizationRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsDeleteOrganization")
@@ -234,14 +235,14 @@ func (a *OrganizationAPIService) OrganizationsDeleteOrganizationExecute(r ApiOrg
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -258,9 +259,9 @@ func (a *OrganizationAPIService) OrganizationsDeleteOrganizationExecute(r ApiOrg
 }
 
 type ApiOrganizationsDescribeOrganizationRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *OrganizationAPIService
-	id string
+	id         string
 }
 
 func (r ApiOrganizationsDescribeOrganizationRequest) Execute() (*OrganizationsDescribeOrganizationResponse, *http.Response, error) {
@@ -272,26 +273,27 @@ OrganizationsDescribeOrganization Get organization details
 
 Returns the details of a specific organization (can be referenced by ID or name)
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id
- @return ApiOrganizationsDescribeOrganizationRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiOrganizationsDescribeOrganizationRequest
 */
 func (a *OrganizationAPIService) OrganizationsDescribeOrganization(ctx context.Context, id string) ApiOrganizationsDescribeOrganizationRequest {
 	return ApiOrganizationsDescribeOrganizationRequest{
 		ApiService: a,
-		ctx: ctx,
-		id: id,
+		ctx:        ctx,
+		id:         id,
 	}
 }
 
 // Execute executes the request
-//  @return OrganizationsDescribeOrganizationResponse
+//
+//	@return OrganizationsDescribeOrganizationResponse
 func (a *OrganizationAPIService) OrganizationsDescribeOrganizationExecute(r ApiOrganizationsDescribeOrganizationRequest) (*OrganizationsDescribeOrganizationResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *OrganizationsDescribeOrganizationResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *OrganizationsDescribeOrganizationResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsDescribeOrganization")
@@ -345,14 +347,14 @@ func (a *OrganizationAPIService) OrganizationsDescribeOrganizationExecute(r ApiO
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -369,9 +371,9 @@ func (a *OrganizationAPIService) OrganizationsDescribeOrganizationExecute(r ApiO
 }
 
 type ApiOrganizationsListInvitationsRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *OrganizationAPIService
-	id string
+	id         string
 }
 
 func (r ApiOrganizationsListInvitationsRequest) Execute() (*OrganizationsListInvitationsResponse, *http.Response, error) {
@@ -383,26 +385,27 @@ OrganizationsListInvitations List organization invitations
 
 Returns pending invitations for an organization
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id
- @return ApiOrganizationsListInvitationsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiOrganizationsListInvitationsRequest
 */
 func (a *OrganizationAPIService) OrganizationsListInvitations(ctx context.Context, id string) ApiOrganizationsListInvitationsRequest {
 	return ApiOrganizationsListInvitationsRequest{
 		ApiService: a,
-		ctx: ctx,
-		id: id,
+		ctx:        ctx,
+		id:         id,
 	}
 }
 
 // Execute executes the request
-//  @return OrganizationsListInvitationsResponse
+//
+//	@return OrganizationsListInvitationsResponse
 func (a *OrganizationAPIService) OrganizationsListInvitationsExecute(r ApiOrganizationsListInvitationsRequest) (*OrganizationsListInvitationsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *OrganizationsListInvitationsResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *OrganizationsListInvitationsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsListInvitations")
@@ -456,14 +459,14 @@ func (a *OrganizationAPIService) OrganizationsListInvitationsExecute(r ApiOrgani
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -480,9 +483,9 @@ func (a *OrganizationAPIService) OrganizationsListInvitationsExecute(r ApiOrgani
 }
 
 type ApiOrganizationsRemoveInvitationRequest struct {
-	ctx context.Context
-	ApiService *OrganizationAPIService
-	id string
+	ctx          context.Context
+	ApiService   *OrganizationAPIService
+	id           string
 	invitationId string
 }
 
@@ -495,28 +498,29 @@ OrganizationsRemoveInvitation Remove an organization invitation
 
 Removes an organization invitation
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id
- @param invitationId
- @return ApiOrganizationsRemoveInvitationRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@param invitationId
+	@return ApiOrganizationsRemoveInvitationRequest
 */
 func (a *OrganizationAPIService) OrganizationsRemoveInvitation(ctx context.Context, id string, invitationId string) ApiOrganizationsRemoveInvitationRequest {
 	return ApiOrganizationsRemoveInvitationRequest{
-		ApiService: a,
-		ctx: ctx,
-		id: id,
+		ApiService:   a,
+		ctx:          ctx,
+		id:           id,
 		invitationId: invitationId,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *OrganizationAPIService) OrganizationsRemoveInvitationExecute(r ApiOrganizationsRemoveInvitationRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsRemoveInvitation")
@@ -571,14 +575,14 @@ func (a *OrganizationAPIService) OrganizationsRemoveInvitationExecute(r ApiOrgan
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -595,10 +599,10 @@ func (a *OrganizationAPIService) OrganizationsRemoveInvitationExecute(r ApiOrgan
 }
 
 type ApiOrganizationsRemoveUserRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *OrganizationAPIService
-	id string
-	userId string
+	id         string
+	userId     string
 }
 
 func (r ApiOrganizationsRemoveUserRequest) Execute() (map[string]interface{}, *http.Response, error) {
@@ -610,28 +614,29 @@ OrganizationsRemoveUser Remove a user from an organization
 
 Removes a user from an organization (can be referenced by ID or name)
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id
- @param userId
- @return ApiOrganizationsRemoveUserRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@param userId
+	@return ApiOrganizationsRemoveUserRequest
 */
 func (a *OrganizationAPIService) OrganizationsRemoveUser(ctx context.Context, id string, userId string) ApiOrganizationsRemoveUserRequest {
 	return ApiOrganizationsRemoveUserRequest{
 		ApiService: a,
-		ctx: ctx,
-		id: id,
-		userId: userId,
+		ctx:        ctx,
+		id:         id,
+		userId:     userId,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *OrganizationAPIService) OrganizationsRemoveUserExecute(r ApiOrganizationsRemoveUserRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsRemoveUser")
@@ -686,14 +691,14 @@ func (a *OrganizationAPIService) OrganizationsRemoveUserExecute(r ApiOrganizatio
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -710,11 +715,11 @@ func (a *OrganizationAPIService) OrganizationsRemoveUserExecute(r ApiOrganizatio
 }
 
 type ApiOrganizationsUpdateInvitationRequest struct {
-	ctx context.Context
-	ApiService *OrganizationAPIService
-	id string
+	ctx          context.Context
+	ApiService   *OrganizationAPIService
+	id           string
 	invitationId string
-	body *OrganizationsUpdateInvitationBody
+	body         *OrganizationsUpdateInvitationBody
 }
 
 func (r ApiOrganizationsUpdateInvitationRequest) Body(body OrganizationsUpdateInvitationBody) ApiOrganizationsUpdateInvitationRequest {
@@ -731,28 +736,29 @@ OrganizationsUpdateInvitation Update an organization invitation
 
 Updates an organization invitation
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id
- @param invitationId
- @return ApiOrganizationsUpdateInvitationRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@param invitationId
+	@return ApiOrganizationsUpdateInvitationRequest
 */
 func (a *OrganizationAPIService) OrganizationsUpdateInvitation(ctx context.Context, id string, invitationId string) ApiOrganizationsUpdateInvitationRequest {
 	return ApiOrganizationsUpdateInvitationRequest{
-		ApiService: a,
-		ctx: ctx,
-		id: id,
+		ApiService:   a,
+		ctx:          ctx,
+		id:           id,
 		invitationId: invitationId,
 	}
 }
 
 // Execute executes the request
-//  @return OrganizationsUpdateInvitationResponse
+//
+//	@return OrganizationsUpdateInvitationResponse
 func (a *OrganizationAPIService) OrganizationsUpdateInvitationExecute(r ApiOrganizationsUpdateInvitationRequest) (*OrganizationsUpdateInvitationResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPut
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *OrganizationsUpdateInvitationResponse
+		localVarHTTPMethod  = http.MethodPut
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *OrganizationsUpdateInvitationResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsUpdateInvitation")
@@ -812,14 +818,14 @@ func (a *OrganizationAPIService) OrganizationsUpdateInvitationExecute(r ApiOrgan
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -836,10 +842,10 @@ func (a *OrganizationAPIService) OrganizationsUpdateInvitationExecute(r ApiOrgan
 }
 
 type ApiOrganizationsUpdateOrganizationRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *OrganizationAPIService
-	id string
-	body *OrganizationsUpdateOrganizationBody
+	id         string
+	body       *OrganizationsUpdateOrganizationBody
 }
 
 func (r ApiOrganizationsUpdateOrganizationRequest) Body(body OrganizationsUpdateOrganizationBody) ApiOrganizationsUpdateOrganizationRequest {
@@ -856,26 +862,27 @@ OrganizationsUpdateOrganization Update an organization
 
 Updates the specified organization (can be referenced by ID or name)
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id
- @return ApiOrganizationsUpdateOrganizationRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiOrganizationsUpdateOrganizationRequest
 */
 func (a *OrganizationAPIService) OrganizationsUpdateOrganization(ctx context.Context, id string) ApiOrganizationsUpdateOrganizationRequest {
 	return ApiOrganizationsUpdateOrganizationRequest{
 		ApiService: a,
-		ctx: ctx,
-		id: id,
+		ctx:        ctx,
+		id:         id,
 	}
 }
 
 // Execute executes the request
-//  @return OrganizationsUpdateOrganizationResponse
+//
+//	@return OrganizationsUpdateOrganizationResponse
 func (a *OrganizationAPIService) OrganizationsUpdateOrganizationExecute(r ApiOrganizationsUpdateOrganizationRequest) (*OrganizationsUpdateOrganizationResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPatch
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *OrganizationsUpdateOrganizationResponse
+		localVarHTTPMethod  = http.MethodPatch
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *OrganizationsUpdateOrganizationResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsUpdateOrganization")
@@ -934,14 +941,14 @@ func (a *OrganizationAPIService) OrganizationsUpdateOrganizationExecute(r ApiOrg
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

@@ -6,10 +6,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 )
 
 const TestConsumerService = "TestConsumerService"
-const TestExchangeName = "superplane.canvas-exchange"
 
 type TestConsumer struct {
 	amqpURL        string
@@ -22,7 +22,7 @@ type TestConsumer struct {
 func New(amqpURL string, routingKey string) TestConsumer {
 	return TestConsumer{
 		amqpURL:        amqpURL,
-		exchangeName:   TestExchangeName,
+		exchangeName:   messages.WorkflowExchange,
 		routingKey:     routingKey,
 		messageChannel: make(chan bool),
 		consumer:       tackle.NewConsumer(),

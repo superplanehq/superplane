@@ -3,10 +3,10 @@ package e2e
 import (
 	"testing"
 
-	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
+	"github.com/superplanehq/superplane/test/e2e/session"
 )
 
 func TestCustomComponents(t *testing.T) {
@@ -24,7 +24,7 @@ func TestCustomComponents(t *testing.T) {
 
 type CustomComponentsSteps struct {
 	t           *testing.T
-	session     *TestSession
+	session     *session.TestSession
 	canvasName  string
 	workflowID  string
 	componentID string
@@ -47,7 +47,7 @@ func (s *CustomComponentsSteps) GivenADeploymentComponentExists() {
 	source := q.TestID("building-block-noop")
 	target := q.TestID("rf__wrapper")
 
-	s.session.DragAndDrop(source, target, 400, 250)
+	s.session.DragAndDrop(source, target, 500, 250)
 	s.session.Sleep(300)
 	s.session.Click(q.TestID("add-node-button"))
 	s.session.Click(q.Text("Save"))
@@ -65,12 +65,12 @@ func (s *CustomComponentsSteps) GivenACanvasWithComponentExists() {
 
 	source1 := q.TestID("building-block-start")
 	target1 := q.TestID("rf__wrapper")
-	s.session.DragAndDrop(source1, target1, 200, 250)
+	s.session.DragAndDrop(source1, target1, 500, 250)
 	s.session.Click(q.TestID("add-node-button"))
 
 	source2 := q.TestID("building-block-e2e-deployment-component")
 	target2 := q.TestID("rf__wrapper")
-	s.session.DragAndDrop(source2, target2, 600, 250)
+	s.session.DragAndDrop(source2, target2, 900, 250)
 	s.session.Click(q.TestID("add-node-button"))
 
 	// connect: drag from Start node's output handle to the component's input handle
@@ -81,6 +81,7 @@ func (s *CustomComponentsSteps) GivenACanvasWithComponentExists() {
 
 	// save canvas
 	s.session.Click(q.TestID("save-canvas-button"))
+	s.session.Sleep(1000)
 }
 
 func (s *CustomComponentsSteps) GivenNodeHasOneExecution() {
@@ -94,7 +95,7 @@ func (s *CustomComponentsSteps) GivenNodeHasOneExecution() {
 	s.session.Sleep(1000)
 
 	// hack to refresh the page
-	s.session.Visit("/" + s.session.orgID + "/")
+	s.session.Visit("/" + s.session.OrgID.String() + "/")
 	s.session.Click(q.Text(s.canvasName))
 	s.session.Sleep(500)
 }
@@ -104,8 +105,7 @@ func (s *CustomComponentsSteps) ClickExpand() {
 }
 
 func (s *CustomComponentsSteps) AssertNavigatedToNodeRunPage() {
-	orgUUID := uuid.MustParse(s.session.orgID)
-	wf, err := models.FindWorkflowByName(s.canvasName, orgUUID)
+	wf, err := models.FindWorkflowByName(s.canvasName, s.session.OrgID)
 	require.NoError(s.t, err)
 	s.workflowID = wf.ID.String()
 

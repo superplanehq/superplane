@@ -20,14 +20,13 @@ import (
 	"strings"
 )
 
-
 // IntegrationAPIService IntegrationAPI service
 type IntegrationAPIService service
 
 type ApiIntegrationsCreateIntegrationRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *IntegrationAPIService
-	body *IntegrationsCreateIntegrationRequest
+	body       *IntegrationsCreateIntegrationRequest
 }
 
 func (r ApiIntegrationsCreateIntegrationRequest) Body(body IntegrationsCreateIntegrationRequest) ApiIntegrationsCreateIntegrationRequest {
@@ -44,24 +43,25 @@ IntegrationsCreateIntegration Create a new canvas integration
 
 Creates a new canvas integration
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiIntegrationsCreateIntegrationRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiIntegrationsCreateIntegrationRequest
 */
 func (a *IntegrationAPIService) IntegrationsCreateIntegration(ctx context.Context) ApiIntegrationsCreateIntegrationRequest {
 	return ApiIntegrationsCreateIntegrationRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return IntegrationsCreateIntegrationResponse
+//
+//	@return IntegrationsCreateIntegrationResponse
 func (a *IntegrationAPIService) IntegrationsCreateIntegrationExecute(r ApiIntegrationsCreateIntegrationRequest) (*IntegrationsCreateIntegrationResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *IntegrationsCreateIntegrationResponse
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *IntegrationsCreateIntegrationResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.IntegrationsCreateIntegration")
@@ -119,14 +119,14 @@ func (a *IntegrationAPIService) IntegrationsCreateIntegrationExecute(r ApiIntegr
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -143,11 +143,11 @@ func (a *IntegrationAPIService) IntegrationsCreateIntegrationExecute(r ApiIntegr
 }
 
 type ApiIntegrationsDescribeIntegrationRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *IntegrationAPIService
-	idOrName string
+	idOrName   string
 	domainType *string
-	domainId *string
+	domainId   *string
 }
 
 func (r ApiIntegrationsDescribeIntegrationRequest) DomainType(domainType string) ApiIntegrationsDescribeIntegrationRequest {
@@ -169,26 +169,27 @@ IntegrationsDescribeIntegration Describe an integration
 
 Describe an integration
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param idOrName
- @return ApiIntegrationsDescribeIntegrationRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param idOrName
+	@return ApiIntegrationsDescribeIntegrationRequest
 */
 func (a *IntegrationAPIService) IntegrationsDescribeIntegration(ctx context.Context, idOrName string) ApiIntegrationsDescribeIntegrationRequest {
 	return ApiIntegrationsDescribeIntegrationRequest{
 		ApiService: a,
-		ctx: ctx,
-		idOrName: idOrName,
+		ctx:        ctx,
+		idOrName:   idOrName,
 	}
 }
 
 // Execute executes the request
-//  @return IntegrationsDescribeIntegrationResponse
+//
+//	@return IntegrationsDescribeIntegrationResponse
 func (a *IntegrationAPIService) IntegrationsDescribeIntegrationExecute(r ApiIntegrationsDescribeIntegrationRequest) (*IntegrationsDescribeIntegrationResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *IntegrationsDescribeIntegrationResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *IntegrationsDescribeIntegrationResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.IntegrationsDescribeIntegration")
@@ -251,14 +252,14 @@ func (a *IntegrationAPIService) IntegrationsDescribeIntegrationExecute(r ApiInte
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -275,10 +276,10 @@ func (a *IntegrationAPIService) IntegrationsDescribeIntegrationExecute(r ApiInte
 }
 
 type ApiIntegrationsListIntegrationsRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *IntegrationAPIService
 	domainType *string
-	domainId *string
+	domainId   *string
 }
 
 func (r ApiIntegrationsListIntegrationsRequest) DomainType(domainType string) ApiIntegrationsListIntegrationsRequest {
@@ -300,24 +301,25 @@ IntegrationsListIntegrations List integrations
 
 List integrations
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiIntegrationsListIntegrationsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiIntegrationsListIntegrationsRequest
 */
 func (a *IntegrationAPIService) IntegrationsListIntegrations(ctx context.Context) ApiIntegrationsListIntegrationsRequest {
 	return ApiIntegrationsListIntegrationsRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return IntegrationsListIntegrationsResponse
+//
+//	@return IntegrationsListIntegrationsResponse
 func (a *IntegrationAPIService) IntegrationsListIntegrationsExecute(r ApiIntegrationsListIntegrationsRequest) (*IntegrationsListIntegrationsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *IntegrationsListIntegrationsResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *IntegrationsListIntegrationsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.IntegrationsListIntegrations")
@@ -379,14 +381,14 @@ func (a *IntegrationAPIService) IntegrationsListIntegrationsExecute(r ApiIntegra
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -403,12 +405,12 @@ func (a *IntegrationAPIService) IntegrationsListIntegrationsExecute(r ApiIntegra
 }
 
 type ApiIntegrationsListResourcesRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *IntegrationAPIService
-	idOrName string
+	idOrName   string
 	domainType *string
-	domainId *string
-	type_ *string
+	domainId   *string
+	type_      *string
 }
 
 func (r ApiIntegrationsListResourcesRequest) DomainType(domainType string) ApiIntegrationsListResourcesRequest {
@@ -435,26 +437,27 @@ IntegrationsListResources List integration resources
 
 List integration resources
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param idOrName
- @return ApiIntegrationsListResourcesRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param idOrName
+	@return ApiIntegrationsListResourcesRequest
 */
 func (a *IntegrationAPIService) IntegrationsListResources(ctx context.Context, idOrName string) ApiIntegrationsListResourcesRequest {
 	return ApiIntegrationsListResourcesRequest{
 		ApiService: a,
-		ctx: ctx,
-		idOrName: idOrName,
+		ctx:        ctx,
+		idOrName:   idOrName,
 	}
 }
 
 // Execute executes the request
-//  @return IntegrationsListResourcesResponse
+//
+//	@return IntegrationsListResourcesResponse
 func (a *IntegrationAPIService) IntegrationsListResourcesExecute(r ApiIntegrationsListResourcesRequest) (*IntegrationsListResourcesResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *IntegrationsListResourcesResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *IntegrationsListResourcesResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.IntegrationsListResources")
@@ -520,14 +523,14 @@ func (a *IntegrationAPIService) IntegrationsListResourcesExecute(r ApiIntegratio
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -544,10 +547,10 @@ func (a *IntegrationAPIService) IntegrationsListResourcesExecute(r ApiIntegratio
 }
 
 type ApiIntegrationsUpdateIntegrationRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *IntegrationAPIService
-	idOrName string
-	body *IntegrationsUpdateIntegrationBody
+	idOrName   string
+	body       *IntegrationsUpdateIntegrationBody
 }
 
 func (r ApiIntegrationsUpdateIntegrationRequest) Body(body IntegrationsUpdateIntegrationBody) ApiIntegrationsUpdateIntegrationRequest {
@@ -564,26 +567,27 @@ IntegrationsUpdateIntegration Update an integration
 
 Updates an existing integration
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param idOrName
- @return ApiIntegrationsUpdateIntegrationRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param idOrName
+	@return ApiIntegrationsUpdateIntegrationRequest
 */
 func (a *IntegrationAPIService) IntegrationsUpdateIntegration(ctx context.Context, idOrName string) ApiIntegrationsUpdateIntegrationRequest {
 	return ApiIntegrationsUpdateIntegrationRequest{
 		ApiService: a,
-		ctx: ctx,
-		idOrName: idOrName,
+		ctx:        ctx,
+		idOrName:   idOrName,
 	}
 }
 
 // Execute executes the request
-//  @return IntegrationsUpdateIntegrationResponse
+//
+//	@return IntegrationsUpdateIntegrationResponse
 func (a *IntegrationAPIService) IntegrationsUpdateIntegrationExecute(r ApiIntegrationsUpdateIntegrationRequest) (*IntegrationsUpdateIntegrationResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPatch
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *IntegrationsUpdateIntegrationResponse
+		localVarHTTPMethod  = http.MethodPatch
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *IntegrationsUpdateIntegrationResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.IntegrationsUpdateIntegration")
@@ -642,14 +646,14 @@ func (a *IntegrationAPIService) IntegrationsUpdateIntegrationExecute(r ApiIntegr
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

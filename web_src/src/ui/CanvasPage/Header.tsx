@@ -272,6 +272,13 @@ export function Header({
                         </span>
                       </DropdownItem>
 
+                      <DropdownItem href={`/${organizationId}/settings/integrations`}>
+                        <span className="flex items-center gap-x-2">
+                          <MaterialSymbol name="integration_instructions" data-slot="icon" size="sm" />
+                          <DropdownLabel>Integrations</DropdownLabel>
+                        </span>
+                      </DropdownItem>
+
                       <DropdownItem href="/">
                         <span className="flex items-center gap-x-2">
                           <MaterialSymbol name="swap_horiz" data-slot="icon" size="sm" />

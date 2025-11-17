@@ -20,14 +20,13 @@ import (
 	"strings"
 )
 
-
 // ComponentAPIService ComponentAPI service
 type ComponentAPIService service
 
 type ApiComponentsDescribeComponentRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *ComponentAPIService
-	name string
+	name       string
 }
 
 func (r ApiComponentsDescribeComponentRequest) Execute() (*ComponentsDescribeComponentResponse, *http.Response, error) {
@@ -39,26 +38,27 @@ ComponentsDescribeComponent Describe component
 
 Returns a component by its name
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param name
- @return ApiComponentsDescribeComponentRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param name
+	@return ApiComponentsDescribeComponentRequest
 */
 func (a *ComponentAPIService) ComponentsDescribeComponent(ctx context.Context, name string) ApiComponentsDescribeComponentRequest {
 	return ApiComponentsDescribeComponentRequest{
 		ApiService: a,
-		ctx: ctx,
-		name: name,
+		ctx:        ctx,
+		name:       name,
 	}
 }
 
 // Execute executes the request
-//  @return ComponentsDescribeComponentResponse
+//
+//	@return ComponentsDescribeComponentResponse
 func (a *ComponentAPIService) ComponentsDescribeComponentExecute(r ApiComponentsDescribeComponentRequest) (*ComponentsDescribeComponentResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *ComponentsDescribeComponentResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ComponentsDescribeComponentResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ComponentAPIService.ComponentsDescribeComponent")
@@ -112,14 +112,14 @@ func (a *ComponentAPIService) ComponentsDescribeComponentExecute(r ApiComponents
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -136,9 +136,9 @@ func (a *ComponentAPIService) ComponentsDescribeComponentExecute(r ApiComponents
 }
 
 type ApiComponentsListComponentActionsRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *ComponentAPIService
-	name string
+	name       string
 }
 
 func (r ApiComponentsListComponentActionsRequest) Execute() (*ComponentsListComponentActionsResponse, *http.Response, error) {
@@ -150,26 +150,27 @@ ComponentsListComponentActions List component actions
 
 Returns available actions for a component
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param name
- @return ApiComponentsListComponentActionsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param name
+	@return ApiComponentsListComponentActionsRequest
 */
 func (a *ComponentAPIService) ComponentsListComponentActions(ctx context.Context, name string) ApiComponentsListComponentActionsRequest {
 	return ApiComponentsListComponentActionsRequest{
 		ApiService: a,
-		ctx: ctx,
-		name: name,
+		ctx:        ctx,
+		name:       name,
 	}
 }
 
 // Execute executes the request
-//  @return ComponentsListComponentActionsResponse
+//
+//	@return ComponentsListComponentActionsResponse
 func (a *ComponentAPIService) ComponentsListComponentActionsExecute(r ApiComponentsListComponentActionsRequest) (*ComponentsListComponentActionsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *ComponentsListComponentActionsResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ComponentsListComponentActionsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ComponentAPIService.ComponentsListComponentActions")
@@ -223,14 +224,14 @@ func (a *ComponentAPIService) ComponentsListComponentActionsExecute(r ApiCompone
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -247,7 +248,7 @@ func (a *ComponentAPIService) ComponentsListComponentActionsExecute(r ApiCompone
 }
 
 type ApiComponentsListComponentsRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *ComponentAPIService
 }
 
@@ -260,24 +261,25 @@ ComponentsListComponents List components
 
 Returns a list of all components
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiComponentsListComponentsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiComponentsListComponentsRequest
 */
 func (a *ComponentAPIService) ComponentsListComponents(ctx context.Context) ApiComponentsListComponentsRequest {
 	return ApiComponentsListComponentsRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return ComponentsListComponentsResponse
+//
+//	@return ComponentsListComponentsResponse
 func (a *ComponentAPIService) ComponentsListComponentsExecute(r ApiComponentsListComponentsRequest) (*ComponentsListComponentsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *ComponentsListComponentsResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ComponentsListComponentsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ComponentAPIService.ComponentsListComponents")
@@ -330,14 +332,14 @@ func (a *ComponentAPIService) ComponentsListComponentsExecute(r ApiComponentsLis
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

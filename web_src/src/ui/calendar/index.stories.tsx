@@ -1,9 +1,9 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import * as React from "react"
+import type { Meta, StoryObj } from "@storybook/react";
+import * as React from "react";
 
-import { Calendar } from "./index"
+import { Calendar } from "./index";
 
-type CalendarArgs = React.ComponentProps<typeof Calendar>
+type CalendarArgs = React.ComponentProps<typeof Calendar>;
 
 const meta = {
   title: "shadcn Primitives/Calendar",
@@ -34,18 +34,18 @@ const meta = {
     buttonVariant: "ghost",
     showOutsideDays: true,
   },
-} satisfies Meta<CalendarArgs>
+} satisfies Meta<CalendarArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<CalendarArgs>
+type Story = StoryObj<CalendarArgs>;
 
 const CalendarPreview = (args: CalendarArgs) => {
-  const [selection, setSelection] = React.useState<unknown>()
+  const [selection, setSelection] = React.useState<unknown>();
 
   React.useEffect(() => {
-    setSelection(undefined)
-  }, [args.mode])
+    setSelection(undefined);
+  }, [args.mode]);
 
   return (
     <Calendar
@@ -53,19 +53,19 @@ const CalendarPreview = (args: CalendarArgs) => {
       selected={selection as CalendarArgs["selected"]}
       onSelect={setSelection as CalendarArgs["onSelect"]}
     />
-  )
-}
+  );
+};
 
 export const Default: Story = {
   render: (args) => <CalendarPreview {...args} />,
-}
+};
 
 export const WithWeekNumbers: Story = {
   args: {
     showWeekNumber: true,
   },
   render: (args) => <CalendarPreview {...args} />,
-}
+};
 
 export const RangeSelection: Story = {
   args: {
@@ -73,4 +73,4 @@ export const RangeSelection: Story = {
     captionLayout: "dropdown",
   },
   render: (args) => <CalendarPreview {...args} />,
-}
+};

@@ -84,11 +84,12 @@ func NewServer(
 	appEnv string,
 	templateDir string,
 	authorizationService authorization.Authorization,
+	blockSignup bool,
 	middlewares ...mux.MiddlewareFunc,
 ) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir)
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
@@ -677,13 +678,8 @@ func (s *Server) setupDevProxy(webBasePath string) {
 
 	origDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
-		originalPath := req.URL.Path
-
 		origDirector(req)
-
 		req.Host = target.Host
-
-		log.Infof("Proxying: %s → %s", originalPath, req.URL.Path)
 	}
 
 	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

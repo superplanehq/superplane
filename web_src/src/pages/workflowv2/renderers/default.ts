@@ -2,7 +2,7 @@ import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-c
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "./types";
 import { TriggerProps } from "@/ui/trigger";
-import { formatTimeAgo } from "@/utils/date";
+import { flattenObject } from "@/lib/utils";
 
 /**
  * Default renderer for trigger types that don't have a specific renderer.
@@ -10,11 +10,11 @@ import { formatTimeAgo } from "@/utils/date";
  */
 export const defaultTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    return {title: event.id!, subtitle: formatTimeAgo(new Date(event.createdAt!))};
+    return { title: event.id!, subtitle: "" };
   },
 
-  getRootEventValues: (_: WorkflowsWorkflowEvent): Record<string, string> => {
-    return {};
+  getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
+    return flattenObject(event.data || {});
   },
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: any) => {
@@ -26,7 +26,7 @@ export const defaultTriggerRenderer: TriggerRenderer = {
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: [],
       zeroStateText: "No events yet",
-    }
+    };
 
     if (lastEvent) {
       props.lastEventData = {

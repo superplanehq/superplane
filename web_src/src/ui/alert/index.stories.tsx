@@ -1,9 +1,9 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import { AlertCircle } from "lucide-react"
+import type { Meta, StoryObj } from "@storybook/react";
+import { AlertCircle } from "lucide-react";
 
-import { Alert, AlertDescription, AlertTitle } from "./index"
+import { Alert, AlertDescription, AlertTitle } from "./index";
 
-type AlertArgs = React.ComponentProps<typeof Alert>
+type AlertArgs = React.ComponentProps<typeof Alert>;
 
 const meta = {
   title: "shadcn Primitives/Alert",
@@ -24,24 +24,22 @@ const meta = {
   args: {
     variant: "default",
   },
-} satisfies Meta<AlertArgs>
+} satisfies Meta<AlertArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<AlertArgs>
+type Story = StoryObj<AlertArgs>;
 
 const renderAlert = (args: AlertArgs) => (
   <Alert {...args}>
     <AlertTitle>Heads up!</AlertTitle>
-    <AlertDescription>
-      You can add components to your app using the CLI.
-    </AlertDescription>
+    <AlertDescription>You can add components to your app using the CLI.</AlertDescription>
   </Alert>
-)
+);
 
 export const Default: Story = {
   render: renderAlert,
-}
+};
 
 export const Destructive: Story = {
   args: {
@@ -51,9 +49,7 @@ export const Destructive: Story = {
     <Alert {...args}>
       <AlertCircle className="h-4 w-4" />
       <AlertTitle>Error</AlertTitle>
-      <AlertDescription>
-        Your session has expired. Please log in again.
-      </AlertDescription>
+      <AlertDescription>Your session has expired. Please log in again.</AlertDescription>
     </Alert>
   ),
-}
+};

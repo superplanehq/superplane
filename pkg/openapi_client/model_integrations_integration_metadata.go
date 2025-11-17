@@ -21,12 +21,12 @@ var _ MappedNullable = &IntegrationsIntegrationMetadata{}
 
 // IntegrationsIntegrationMetadata struct for IntegrationsIntegrationMetadata
 type IntegrationsIntegrationMetadata struct {
-	Id *string `json:"id,omitempty"`
-	Name *string `json:"name,omitempty"`
-	CreatedBy *string `json:"createdBy,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	Id         *string                  `json:"id,omitempty"`
+	Name       *string                  `json:"name,omitempty"`
+	CreatedBy  *string                  `json:"createdBy,omitempty"`
+	CreatedAt  *time.Time               `json:"createdAt,omitempty"`
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
-	DomainId *string `json:"domainId,omitempty"`
+	DomainId   *string                  `json:"domainId,omitempty"`
 }
 
 // NewIntegrationsIntegrationMetadata instantiates a new IntegrationsIntegrationMetadata object
@@ -243,7 +243,7 @@ func (o *IntegrationsIntegrationMetadata) SetDomainId(v string) {
 }
 
 func (o IntegrationsIntegrationMetadata) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -308,5 +308,3 @@ func (v *NullableIntegrationsIntegrationMetadata) UnmarshalJSON(src []byte) erro
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

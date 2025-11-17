@@ -1,27 +1,12 @@
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
-import {
-  ConfigurationField,
-  ConfigurationSelectOption,
-} from "@/api-client";
+import { ConfigurationField, ConfigurationSelectOption } from "@/api-client";
 
 interface ConfigurationFieldModalProps {
   isOpen: boolean;
@@ -30,20 +15,15 @@ interface ConfigurationFieldModalProps {
   onSave: (field: ConfigurationField) => void;
 }
 
-export function ConfigurationFieldModal({
-  isOpen,
-  onClose,
-  field,
-  onSave,
-}: ConfigurationFieldModalProps) {
-  const [configFieldForm, setConfigFieldForm] = useState<
-    Partial<ConfigurationField>
-  >({
+export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: ConfigurationFieldModalProps) {
+  const [configFieldForm, setConfigFieldForm] = useState<Partial<ConfigurationField>>({
     name: "",
     label: "",
     type: "string",
     description: "",
+    placeholder: "",
     required: false,
+    defaultValue: "",
     typeOptions: {},
   });
 
@@ -57,7 +37,9 @@ export function ConfigurationFieldModal({
         label: "",
         type: "string",
         description: "",
+        placeholder: "",
         required: false,
+        defaultValue: "",
         typeOptions: {},
       });
     }
@@ -69,7 +51,9 @@ export function ConfigurationFieldModal({
       label: "",
       type: "string",
       description: "",
+      placeholder: "",
       required: false,
+      defaultValue: "",
       typeOptions: {},
     });
     onClose();
@@ -80,6 +64,18 @@ export function ConfigurationFieldModal({
       return;
     }
 
+    if (!configFieldForm.required && !configFieldForm.defaultValue?.trim()) {
+      return;
+    }
+
+    // Validate number constraints
+    if (configFieldForm.type === "number") {
+      const numberOptions = configFieldForm.typeOptions?.number;
+      if (!numberOptions || (numberOptions.min === undefined && numberOptions.max === undefined)) {
+        return;
+      }
+    }
+
     // Validate options for select/multi_select types
     if (configFieldForm.type === "select") {
       const options = configFieldForm.typeOptions?.select?.options || [];
@@ -88,9 +84,7 @@ export function ConfigurationFieldModal({
       }
 
       // Validate that all options have both label and value
-      const hasInvalidOption = options.some(
-        (opt) => !opt.label?.trim() || !opt.value?.trim()
-      );
+      const hasInvalidOption = options.some((opt) => !opt.label?.trim() || !opt.value?.trim());
       if (hasInvalidOption) {
         return;
       }
@@ -101,9 +95,7 @@ export function ConfigurationFieldModal({
       }
 
       // Validate that all options have both label and value
-      const hasInvalidOption = options.some(
-        (opt) => !opt.label?.trim() || !opt.value?.trim()
-      );
+      const hasInvalidOption = options.some((opt) => !opt.label?.trim() || !opt.value?.trim());
       if (hasInvalidOption) {
         return;
       }
@@ -117,6 +109,12 @@ export function ConfigurationFieldModal({
   const currentOptions = isSelect
     ? configFieldForm.typeOptions?.select?.options || []
     : configFieldForm.typeOptions?.multiSelect?.options || [];
+
+  const isNumberFieldValid = () => {
+    if (configFieldForm.type !== "number") return true;
+    const numberOptions = configFieldForm.typeOptions?.number;
+    return numberOptions && (numberOptions.min !== undefined || numberOptions.max !== undefined);
+  };
 
   const updateOptions = (newOptions: ConfigurationSelectOption[]) => {
     if (isSelect) {
@@ -142,14 +140,10 @@ export function ConfigurationFieldModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-w-2xl" showCloseButton={false}>
         <VisuallyHidden>
-          <DialogTitle>
-            {field ? "Edit Configuration Field" : "Add Configuration Field"}
-          </DialogTitle>
-          <DialogDescription>
-            Configure the blueprint configuration field
-          </DialogDescription>
+          <DialogTitle>{field ? "Edit Configuration Field" : "Add Configuration Field"}</DialogTitle>
+          <DialogDescription>Configure the blueprint configuration field</DialogDescription>
         </VisuallyHidden>
-        <div className="p-6">
+        <div className="p-1 max-h-[calc(100vh-5rem)] overflow-y-auto">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-6">
             {field ? "Edit Configuration Field" : "Add Configuration Field"}
           </h3>
@@ -157,21 +151,16 @@ export function ConfigurationFieldModal({
           <div className="space-y-4">
             {/* Field Name */}
             <div>
-              <Label className="block text-sm font-medium mb-2">
-                Field Name *
-              </Label>
+              <Label className="block text-sm font-medium mb-2">Field Name *</Label>
               <Input
                 type="text"
                 value={configFieldForm.name || ""}
-                onChange={(e) =>
-                  setConfigFieldForm({ ...configFieldForm, name: e.target.value })
-                }
+                onChange={(e) => setConfigFieldForm({ ...configFieldForm, name: e.target.value })}
                 placeholder="e.g., threshold_expression"
                 autoFocus
               />
               <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                This is the internal name used in templates (e.g.,
-                $config.threshold_expression)
+                This is the internal name used in templates (e.g., $config.threshold_expression)
               </p>
             </div>
 
@@ -189,9 +178,7 @@ export function ConfigurationFieldModal({
                 }
                 placeholder="e.g., Threshold Expression"
               />
-              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                Display name shown in the UI
-              </p>
+              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Display name shown in the UI</p>
             </div>
 
             {/* Field Type */}
@@ -199,9 +186,34 @@ export function ConfigurationFieldModal({
               <Label className="block text-sm font-medium mb-2">Type *</Label>
               <Select
                 value={configFieldForm.type || "string"}
-                onValueChange={(val) =>
-                  setConfigFieldForm({ ...configFieldForm, type: val })
-                }
+                onValueChange={(val) => {
+                  const newTypeOptions = { ...configFieldForm.typeOptions };
+
+                  // Set required type options based on field type
+                  if (val === "number") {
+                    // Backend requires at least min or max to be set for number fields
+                    // Initialize with empty values so user must configure them
+                    newTypeOptions.number = {
+                      min: undefined,
+                      max: undefined,
+                    };
+                  } else if (val === "select") {
+                    if (!newTypeOptions.select) {
+                      newTypeOptions.select = { options: [] };
+                    }
+                  } else if (val === "multi_select") {
+                    if (!newTypeOptions.multiSelect) {
+                      newTypeOptions.multiSelect = { options: [] };
+                    }
+                  }
+
+                  setConfigFieldForm({
+                    ...configFieldForm,
+                    type: val,
+                    defaultValue: "",
+                    typeOptions: newTypeOptions,
+                  });
+                }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -218,9 +230,66 @@ export function ConfigurationFieldModal({
               </Select>
             </div>
 
+            {/* Number Options Section (for number type) */}
+            {configFieldForm.type === "number" && (
+              <div className="space-y-3">
+                <Label className="block text-sm font-medium">Number Constraints</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="block text-xs font-medium mb-1 text-gray-600 dark:text-zinc-400">
+                      Minimum Value
+                    </Label>
+                    <Input
+                      type="number"
+                      value={configFieldForm.typeOptions?.number?.min || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setConfigFieldForm({
+                          ...configFieldForm,
+                          typeOptions: {
+                            ...configFieldForm.typeOptions,
+                            number: {
+                              ...configFieldForm.typeOptions?.number,
+                              min: value ? parseFloat(value) : undefined,
+                            },
+                          },
+                        });
+                      }}
+                      placeholder="No limit"
+                    />
+                  </div>
+                  <div>
+                    <Label className="block text-xs font-medium mb-1 text-gray-600 dark:text-zinc-400">
+                      Maximum Value
+                    </Label>
+                    <Input
+                      type="number"
+                      value={configFieldForm.typeOptions?.number?.max || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setConfigFieldForm({
+                          ...configFieldForm,
+                          typeOptions: {
+                            ...configFieldForm.typeOptions,
+                            number: {
+                              ...configFieldForm.typeOptions?.number,
+                              max: value ? parseFloat(value) : undefined,
+                            },
+                          },
+                        });
+                      }}
+                      placeholder="No limit"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-zinc-400">
+                  At least one constraint is required for number fields
+                </p>
+              </div>
+            )}
+
             {/* Options Section (for select and multi_select types) */}
-            {(configFieldForm.type === "select" ||
-              configFieldForm.type === "multi_select") && (
+            {(configFieldForm.type === "select" || configFieldForm.type === "multi_select") && (
               <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <Label className="block text-sm font-medium">Options *</Label>
@@ -228,10 +297,7 @@ export function ConfigurationFieldModal({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      updateOptions([
-                        ...currentOptions,
-                        { label: "", value: "" },
-                      ]);
+                      updateOptions([...currentOptions, { label: "", value: "" }]);
                     }}
                   >
                     <Plus />
@@ -275,9 +341,7 @@ export function ConfigurationFieldModal({
                           variant="ghost"
                           size="icon-sm"
                           onClick={() => {
-                            const newOptions = currentOptions.filter(
-                              (_, i: number) => i !== index
-                            );
+                            const newOptions = currentOptions.filter((_, i: number) => i !== index);
                             updateOptions(newOptions);
                           }}
                         >
@@ -296,9 +360,7 @@ export function ConfigurationFieldModal({
 
             {/* Field Description */}
             <div>
-              <Label className="block text-sm font-medium mb-2">
-                Description
-              </Label>
+              <Label className="block text-sm font-medium mb-2">Description</Label>
               <Input
                 type="text"
                 value={configFieldForm.description || ""}
@@ -312,6 +374,97 @@ export function ConfigurationFieldModal({
               />
             </div>
 
+            {/* Field Placeholder */}
+            <div>
+              <Label className="block text-sm font-medium mb-2">Placeholder</Label>
+              <Input
+                type="text"
+                value={configFieldForm.placeholder || ""}
+                onChange={(e) =>
+                  setConfigFieldForm({
+                    ...configFieldForm,
+                    placeholder: e.target.value,
+                  })
+                }
+                placeholder="Optional placeholder text"
+              />
+            </div>
+
+            {/* Default Value - only show when field is not required */}
+            {!configFieldForm.required && (
+              <div>
+                <Label className="block text-sm font-medium mb-2">Default Value *</Label>
+                {configFieldForm.type === "boolean" ? (
+                  <Select
+                    value={configFieldForm.defaultValue || ""}
+                    onValueChange={(val) => setConfigFieldForm({ ...configFieldForm, defaultValue: val })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select default value" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">True</SelectItem>
+                      <SelectItem value="false">False</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : configFieldForm.type === "select" ? (
+                  <Select
+                    value={configFieldForm.defaultValue || ""}
+                    onValueChange={(val) => setConfigFieldForm({ ...configFieldForm, defaultValue: val })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select default value" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(configFieldForm.typeOptions?.select?.options || []).map((option) => (
+                        <SelectItem key={option.value} value={option.value || ""}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : configFieldForm.type === "number" ? (
+                  <Input
+                    type="number"
+                    value={configFieldForm.defaultValue || ""}
+                    onChange={(e) =>
+                      setConfigFieldForm({
+                        ...configFieldForm,
+                        defaultValue: e.target.value,
+                      })
+                    }
+                    placeholder="Enter default number value"
+                  />
+                ) : configFieldForm.type === "date" ? (
+                  <Input
+                    type="date"
+                    value={configFieldForm.defaultValue || ""}
+                    onChange={(e) =>
+                      setConfigFieldForm({
+                        ...configFieldForm,
+                        defaultValue: e.target.value,
+                      })
+                    }
+                  />
+                ) : (
+                  <Input
+                    type={configFieldForm.type === "url" ? "url" : "text"}
+                    value={configFieldForm.defaultValue || ""}
+                    onChange={(e) =>
+                      setConfigFieldForm({
+                        ...configFieldForm,
+                        defaultValue: e.target.value,
+                      })
+                    }
+                    placeholder={`Enter default ${configFieldForm.type} value`}
+                  />
+                )}
+                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                  Default value is required when field is not required
+                </p>
+              </div>
+            )}
+
             {/* Required Checkbox */}
             <div className="flex items-center gap-2">
               <input
@@ -321,6 +474,7 @@ export function ConfigurationFieldModal({
                   setConfigFieldForm({
                     ...configFieldForm,
                     required: e.target.checked,
+                    defaultValue: e.target.checked ? "" : configFieldForm.defaultValue,
                   })
                 }
                 className="h-4 w-4 rounded border-gray-300 dark:border-zinc-700"
@@ -340,7 +494,10 @@ export function ConfigurationFieldModal({
               variant="default"
               onClick={handleSave}
               disabled={
-                !configFieldForm.name?.trim() || !configFieldForm.label?.trim()
+                !configFieldForm.name?.trim() ||
+                !configFieldForm.label?.trim() ||
+                (!configFieldForm.required && !configFieldForm.defaultValue?.trim()) ||
+                !isNumberFieldValid()
               }
             >
               {field ? "Save Changes" : "Add Field"}

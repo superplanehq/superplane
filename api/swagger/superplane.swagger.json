@@ -2637,6 +2637,50 @@
           "WorkflowNode"
         ]
       }
+    },
+    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue/{itemId}": {
+      "delete": {
+        "summary": "Delete item from a node's queue",
+        "description": "Deletes a specific item in a node's queue",
+        "operationId": "Workflows_DeleteNodeQueueItem",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsDeleteNodeQueueItemResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "WorkflowNode"
+        ]
+      }
     }
   },
   "definitions": {
@@ -3005,6 +3049,10 @@
             "type": "object",
             "$ref": "#/definitions/ConfigurationValidationRule"
           }
+        },
+        "placeholder": {
+          "type": "string",
+          "title": "Optional placeholder text for UI inputs"
         }
       }
     },
@@ -4405,6 +4453,9 @@
         }
       }
     },
+    "WorkflowsDeleteNodeQueueItemResponse": {
+      "type": "object"
+    },
     "WorkflowsDeleteWorkflowResponse": {
       "type": "object"
     },
@@ -4596,43 +4647,14 @@
     "WorkflowsWorkflow": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
+        "metadata": {
+          "$ref": "#/definitions/WorkflowsWorkflowMetadata"
         },
-        "organizationId": {
-          "type": "string"
+        "spec": {
+          "$ref": "#/definitions/WorkflowsWorkflowSpec"
         },
-        "name": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "nodes": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsNode"
-          }
-        },
-        "edges": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsEdge"
-          }
-        },
-        "createdBy": {
-          "$ref": "#/definitions/SuperplaneWorkflowsUserRef",
-          "title": "Creator reference"
+        "status": {
+          "$ref": "#/definitions/WorkflowsWorkflowStatus"
         }
       }
     },
@@ -4657,6 +4679,34 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "WorkflowsWorkflowMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdBy": {
+          "$ref": "#/definitions/SuperplaneWorkflowsUserRef"
         }
       }
     },
@@ -4737,9 +4787,57 @@
         "input": {
           "type": "object"
         },
+        "rootEvent": {
+          "$ref": "#/definitions/WorkflowsWorkflowEvent"
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "WorkflowsWorkflowSpec": {
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsNode"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsEdge"
+          }
+        }
+      }
+    },
+    "WorkflowsWorkflowStatus": {
+      "type": "object",
+      "properties": {
+        "lastExecutions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
+          }
+        },
+        "nextQueueItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNodeQueueItem"
+          }
+        },
+        "lastEvents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowEvent"
+          }
         }
       }
     },

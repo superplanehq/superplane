@@ -22,6 +22,7 @@ func Test__WorkflowNodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,
@@ -56,12 +57,12 @@ func Test__WorkflowNodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	//
 	go func() {
 		executor1 := NewWorkflowNodeExecutor(r.Registry)
-		results <- executor1.LockAndProcessNodeExecution(*execution)
+		results <- executor1.LockAndProcessNodeExecution(execution.ID)
 	}()
 
 	go func() {
 		executor2 := NewWorkflowNodeExecutor(r.Registry)
-		results <- executor2.LockAndProcessNodeExecution(*execution)
+		results <- executor2.LockAndProcessNodeExecution(execution.ID)
 	}()
 
 	// Collect results - one should succeed (return nil) and one should get ErrRecordLocked
@@ -117,6 +118,7 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecution(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,
@@ -145,7 +147,7 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecution(t *testing.T) {
 	// and moves the parent execution to started state.
 	//
 	executor := NewWorkflowNodeExecutor(r.Registry)
-	err := executor.LockAndProcessNodeExecution(*execution)
+	err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
 	// Verify parent execution moved to started state
@@ -188,6 +190,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,
@@ -222,7 +225,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	// The approval component doesn't call Pass() in Execute(), so it should remain in started state.
 	//
 	executor := NewWorkflowNodeExecutor(r.Registry)
-	err = executor.LockAndProcessNodeExecution(*execution)
+	err = executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
 	// Verify execution moved to started state but not finished,
@@ -260,6 +263,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,
@@ -288,7 +292,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	// The noop component calls Pass() in Execute(), which should finish the execution.
 	//
 	executor := NewWorkflowNodeExecutor(r.Registry)
-	err := executor.LockAndProcessNodeExecution(*execution)
+	err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
 	// Verify execution moved to finished state with passed result
@@ -296,6 +300,90 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, updatedExecution.State)
 	assert.Equal(t, models.WorkflowNodeExecutionResultPassed, updatedExecution.Result)
+}
+
+func Test__WorkflowNodeExecutor_BlueprintNodeExecutionFailsWhenConfigurationCannotBeBuilt(t *testing.T) {
+	r := support.Setup(t)
+
+	//
+	// Create a blueprint with a noop node that has invalid configuration.
+	// The configuration references a variable that doesn't exist, which should
+	// cause the configuration builder to fail.
+	//
+	invalidConfiguration := map[string]any{
+		"invalid_field": "{{ .nonexistent_variable }}",
+	}
+
+	blueprint := support.CreateBlueprint(
+		t,
+		r.Organization.ID,
+		[]models.Node{
+			{
+				ID:            "noop1",
+				Type:          models.NodeTypeComponent,
+				Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
+				Configuration: invalidConfiguration,
+			},
+		},
+		[]models.Edge{},
+		[]models.BlueprintOutputChannel{
+			{
+				Name:              "default",
+				NodeID:            "noop1",
+				NodeOutputChannel: "default",
+			},
+		},
+	)
+
+	//
+	// Create a workflow with a trigger and a blueprint node.
+	//
+	triggerNode := "trigger-1"
+	blueprintNode := "blueprint-1"
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: blueprintNode,
+				Type:   models.NodeTypeBlueprint,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: blueprintNode, Channel: "default"},
+		},
+	)
+
+	//
+	// Create a root event and a pending execution for the blueprint node.
+	//
+	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
+	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, blueprintNode, rootEvent.ID, rootEvent.ID, nil)
+
+	//
+	// Process the execution and verify it fails due to configuration build error.
+	// LockAndProcessNodeExecution should not return an error,
+	// since this isn't a runtime error, but a configuration error.
+	//
+	executor := NewWorkflowNodeExecutor(r.Registry)
+	err := executor.LockAndProcessNodeExecution(execution.ID)
+	require.NoError(t, err)
+
+	//
+	// Verify the execution was marked as failed with an error reason.
+	//
+	failedExecution, err := models.FindNodeExecution(workflow.ID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, failedExecution.State)
+	assert.Equal(t, models.WorkflowNodeExecutionResultReasonError, failedExecution.ResultReason)
+	assert.Contains(t, failedExecution.ResultMessage, "error building configuration for execution of node")
 }
 
 func countConcurrentExecutionResults(t *testing.T, results []error) (successCount int, lockedCount int) {

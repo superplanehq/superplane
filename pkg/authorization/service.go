@@ -13,6 +13,7 @@ import (
 	gormadapter "github.com/casbin/gorm-adapter/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -137,6 +138,7 @@ func (a *AuthService) CreateGroup(domainID string, domainType string, groupName 
 	}
 
 	tx.Commit()
+	a.publishReloadMessage()
 	return nil
 }
 
@@ -276,6 +278,7 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 	}
 
 	tx.Commit()
+	a.publishReloadMessage()
 	return nil
 }
 
@@ -310,6 +313,7 @@ func (a *AuthService) AddUserToGroup(domainID string, domainType string, userID 
 		log.Infof("user %s is already a member of group %s", userID, group)
 	}
 
+	a.publishReloadMessage()
 	return nil
 }
 
@@ -327,6 +331,7 @@ func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, us
 		return fmt.Errorf("user %s is not a member of group %s", userID, group)
 	}
 
+	a.publishReloadMessage()
 	return nil
 }
 
@@ -436,6 +441,7 @@ func (a *AuthService) AssignRole(userID, role, domainID string, domainType strin
 		log.Infof("role %s already exists for user %s", role, userID)
 	}
 
+	a.publishReloadMessage()
 	return nil
 }
 
@@ -450,6 +456,7 @@ func (a *AuthService) RemoveRole(userID, role, domainID string, domainType strin
 	if !ruleRemoved {
 		log.Infof("role %s not found for user %s", role, userID)
 	}
+	a.publishReloadMessage()
 	return nil
 }
 
@@ -535,6 +542,7 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 	}
 
 	tx.Commit()
+	a.publishReloadMessage()
 	return nil
 }
 
@@ -669,6 +677,7 @@ func (a *AuthService) SetupCanvasRoles(canvasID string) error {
 	}
 
 	tx.Commit()
+	a.publishReloadMessage()
 	return nil
 }
 
@@ -1118,6 +1127,7 @@ func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefi
 	}
 
 	tx.Commit()
+	a.publishReloadMessage()
 	return nil
 }
 
@@ -1215,6 +1225,7 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 	}
 
 	tx.Commit()
+	a.publishReloadMessage()
 	return nil
 }
 
@@ -1304,6 +1315,7 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 	}
 
 	tx.Commit()
+	a.publishReloadMessage()
 	return nil
 }
 
@@ -1599,4 +1611,15 @@ func useIfNonEmpty(a, b string) string {
 	}
 
 	return b
+}
+
+func (a *AuthService) publishReloadMessage() {
+	message := messages.NewRBACPolicyReloadMessage()
+	if err := message.Publish(); err != nil {
+		log.Warnf("Failed to publish RBAC reload message: %v", err)
+	}
+}
+
+func (a *AuthService) LoadPolicy() error {
+	return a.enforcer.LoadPolicy()
 }

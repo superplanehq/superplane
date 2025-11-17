@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
 import {
   Select,
@@ -9,11 +9,11 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-} from "./index"
+} from "./index";
 
 type SelectStoryArgs = React.ComponentProps<typeof Select> & {
-  placeholder: string
-}
+  placeholder: string;
+};
 
 const meta = {
   title: "shadcn Primitives/Select",
@@ -42,17 +42,14 @@ const meta = {
     disabled: false,
     placeholder: "Select a fruit",
   },
-} satisfies Meta<SelectStoryArgs>
+} satisfies Meta<SelectStoryArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<SelectStoryArgs>
+type Story = StoryObj<SelectStoryArgs>;
 
 const renderSelect = ({ placeholder, defaultValue, ...props }: SelectStoryArgs) => (
-  <Select
-    {...props}
-    defaultValue={defaultValue ? defaultValue : undefined}
-  >
+  <Select {...props} defaultValue={defaultValue ? defaultValue : undefined}>
     <SelectTrigger title="Select" className="w-64">
       <SelectValue placeholder={placeholder} />
     </SelectTrigger>
@@ -86,11 +83,11 @@ const renderSelect = ({ placeholder, defaultValue, ...props }: SelectStoryArgs) 
       </SelectGroup>
     </SelectContent>
   </Select>
-)
+);
 
 export const Default: Story = {
   render: renderSelect,
-}
+};
 
 export const Disabled: Story = {
   args: {
@@ -100,4 +97,4 @@ export const Disabled: Story = {
   argTypes: {
     defaultValue: { control: { disable: true } },
   },
-}
+};

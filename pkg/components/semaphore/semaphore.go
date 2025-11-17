@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -116,15 +117,16 @@ func (s *Semaphore) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "ref",
-			Label:    "Workflow ref",
-			Type:     configuration.FieldTypeString,
-			Required: true,
+			Name:        "pipelineFile",
+			Label:       "Pipeline file",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "e.g. .semaphore/semaphore.yml",
 		},
 		{
-			Name:     "pipelineFile",
-			Label:    "Pipeline File",
-			Type:     configuration.FieldTypeString,
+			Name:     "ref",
+			Label:    "Pipeline file location",
+			Type:     configuration.FieldTypeGitRef,
 			Required: true,
 		},
 		{
@@ -154,6 +156,10 @@ func (s *Semaphore) Configuration() []configuration.Field {
 			},
 		},
 	}
+}
+
+func (s *Semaphore) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+	return ctx.DefaultProcessing()
 }
 
 func (s *Semaphore) Setup(ctx components.SetupContext) error {

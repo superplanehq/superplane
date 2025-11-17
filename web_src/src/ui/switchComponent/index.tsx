@@ -45,20 +45,23 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
   isCompactView,
   hideHandle = false,
 }) => {
-  const spec = stages.length > 0 ? {
-    title: "path",
-    tooltipTitle: "paths applied",
-    values: stages.map(stage => ({
-      badges: [
-        { label: stage.pathName, bgColor: "bg-gray-500", textColor: "text-white" },
-        { label: stage.field, bgColor: "bg-purple-100", textColor: "text-purple-700" },
-        { label: stage.operator, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: stage.value, bgColor: "bg-green-100", textColor: "text-green-700" }
-      ]
-    }))
-  } : undefined;
+  const spec =
+    stages.length > 0
+      ? {
+          title: "path",
+          tooltipTitle: "paths applied",
+          values: stages.map((stage) => ({
+            badges: [
+              { label: stage.pathName, bgColor: "bg-gray-500", textColor: "text-white" },
+              { label: stage.field, bgColor: "bg-purple-100", textColor: "text-purple-700" },
+              { label: stage.operator, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+              { label: stage.value, bgColor: "bg-green-100", textColor: "text-green-700" },
+            ],
+          })),
+        }
+      : undefined;
 
-  const eventSections: EventSection[] = stages.map(stage => ({
+  const eventSections: EventSection[] = stages.map((stage) => ({
     title: stage.pathName,
     receivedAt: stage.receivedAt,
     eventState: stage.eventState,
@@ -75,7 +78,7 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
           transform: "translateY(-50%)",
         }}
       />
-    )
+    ),
   }));
 
   return (

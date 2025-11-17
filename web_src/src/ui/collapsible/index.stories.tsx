@@ -1,12 +1,12 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import { ChevronsUpDown } from "lucide-react"
-import * as React from "react"
+import type { Meta, StoryObj } from "@storybook/react";
+import { ChevronsUpDown } from "lucide-react";
+import * as React from "react";
 
-import { Button } from "../button"
+import { Button } from "../button";
 
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./index"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./index";
 
-type CollapsibleArgs = React.ComponentProps<typeof Collapsible>
+type CollapsibleArgs = React.ComponentProps<typeof Collapsible>;
 
 const meta = {
   title: "shadcn Primitives/Collapsible",
@@ -23,20 +23,20 @@ const meta = {
   args: {
     open: false,
   },
-} satisfies Meta<CollapsibleArgs>
+} satisfies Meta<CollapsibleArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<CollapsibleArgs>
+type Story = StoryObj<CollapsibleArgs>;
 
 const CollapsiblePreview = (args: CollapsibleArgs) => {
-  const [open, setOpen] = React.useState(args.open ?? false)
+  const [open, setOpen] = React.useState(args.open ?? false);
 
   React.useEffect(() => {
     if (args.open !== undefined) {
-      setOpen(args.open)
+      setOpen(args.open);
     }
-  }, [args.open])
+  }, [args.open]);
 
   return (
     <Collapsible {...args} open={open} onOpenChange={setOpen} className="w-72">
@@ -47,20 +47,20 @@ const CollapsiblePreview = (args: CollapsibleArgs) => {
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="rounded-md border border-dashed px-4 py-3 text-sm text-muted-foreground">
-        Share team updates, meeting notes, or onboarding instructions inside a
-        collapsible panel to keep the interface tidy.
+        Share team updates, meeting notes, or onboarding instructions inside a collapsible panel to keep the interface
+        tidy.
       </CollapsibleContent>
     </Collapsible>
-  )
-}
+  );
+};
 
 export const Default: Story = {
   render: (args) => <CollapsiblePreview {...args} />,
-}
+};
 
 export const InitiallyOpen: Story = {
   args: {
     open: true,
   },
   render: (args) => <CollapsiblePreview {...args} />,
-}
+};

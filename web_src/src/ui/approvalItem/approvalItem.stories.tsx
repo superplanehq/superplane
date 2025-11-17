@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { ApprovalItem } from "./index"
-import { ItemGroup, ItemSeparator } from "../item"
+import { ApprovalItem } from "./index";
+import { ItemGroup, ItemSeparator } from "../item";
 
 const meta = {
   title: "ui/ApprovalItem",
@@ -27,11 +27,11 @@ const meta = {
       control: { type: "boolean" },
     },
   },
-} satisfies Meta<typeof ApprovalItem>
+} satisfies Meta<typeof ApprovalItem>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<typeof meta>
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
@@ -39,7 +39,7 @@ export const Default: Story = {
     approved: true,
     href: "#",
   },
-}
+};
 
 export const Pending: Story = {
   args: {
@@ -47,7 +47,7 @@ export const Pending: Story = {
     approved: false,
     href: "#",
   },
-}
+};
 
 export const WithAvatar: Story = {
   args: {
@@ -57,7 +57,7 @@ export const WithAvatar: Story = {
     approverAvatar: "https://i.pravatar.cc/150?img=12",
     href: "#",
   },
-}
+};
 
 export const Interactive: Story = {
   args: {
@@ -67,14 +67,10 @@ export const Interactive: Story = {
   },
   render: (args) => (
     <div className="w-full max-w-3xl">
-      <ApprovalItem
-        {...args}
-        onApprove={() => console.log("Approved!")}
-        onReject={() => console.log("Rejected!")}
-      />
+      <ApprovalItem {...args} onApprove={() => console.log("Approved!")} onReject={() => console.log("Rejected!")} />
     </div>
   ),
-}
+};
 
 export const FourItems: Story = {
   args: {
@@ -83,32 +79,16 @@ export const FourItems: Story = {
   },
   render: () => (
     <ItemGroup className="w-full max-w-3xl">
-      <ApprovalItem
-        title="Compliance"
-        approved={true}
-        href="#"
-      />
+      <ApprovalItem title="Compliance" approved={true} href="#" />
       <ItemSeparator />
-      <ApprovalItem
-        title="Product Lead"
-        approved={false}
-        href="#"
-      />
+      <ApprovalItem title="Product Lead" approved={false} href="#" />
       <ItemSeparator />
-      <ApprovalItem
-        title="Engineering Lead"
-        approved={false}
-        href="#"
-      />
+      <ApprovalItem title="Engineering Lead" approved={false} href="#" />
       <ItemSeparator />
-      <ApprovalItem
-        title="Security Team"
-        approved={true}
-        href="#"
-      />
+      <ApprovalItem title="Security Team" approved={true} href="#" />
     </ItemGroup>
   ),
-}
+};
 
 export const WithAvatars: Story = {
   args: {
@@ -125,17 +105,9 @@ export const WithAvatars: Story = {
         href="#"
       />
       <ItemSeparator />
-      <ApprovalItem
-        title="Product Lead"
-        approved={false}
-        href="#"
-      />
+      <ApprovalItem title="Product Lead" approved={false} href="#" />
       <ItemSeparator />
-      <ApprovalItem
-        title="Engineering Lead"
-        approved={false}
-        href="#"
-      />
+      <ApprovalItem title="Engineering Lead" approved={false} href="#" />
       <ItemSeparator />
       <ApprovalItem
         title="Alex Mitrovic"
@@ -146,7 +118,7 @@ export const WithAvatars: Story = {
       />
     </ItemGroup>
   ),
-}
+};
 
 export const InteractiveFourItems: Story = {
   args: {
@@ -188,4 +160,4 @@ export const InteractiveFourItems: Story = {
       />
     </ItemGroup>
   ),
-}
+};

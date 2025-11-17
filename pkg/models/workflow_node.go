@@ -22,6 +22,7 @@ const (
 type WorkflowNode struct {
 	WorkflowID    uuid.UUID `gorm:"primaryKey"`
 	NodeID        string    `gorm:"primaryKey"`
+	ParentNodeID  *string
 	Name          string
 	State         string
 	Type          string
@@ -167,6 +168,7 @@ type WorkflowNodeQueueItem struct {
 	// for that event with a simple query.
 	//
 	RootEventID uuid.UUID
+	RootEvent   *WorkflowEvent `gorm:"foreignKey:RootEventID"`
 
 	//
 	// The reference to a WorkflowEvent record,
@@ -182,6 +184,7 @@ func (i *WorkflowNodeQueueItem) Delete(tx *gorm.DB) error {
 func ListNodeQueueItems(workflowID uuid.UUID, nodeID string, limit int, beforeTime *time.Time) ([]WorkflowNodeQueueItem, error) {
 	var queueItems []WorkflowNodeQueueItem
 	query := database.Conn().
+		Preload("RootEvent").
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
 		Order("created_at DESC").
@@ -211,4 +214,39 @@ func CountNodeQueueItems(workflowID uuid.UUID, nodeID string) (int64, error) {
 	}
 
 	return totalCount, nil
+}
+
+// FindNextQueueItemPerNode finds the next (oldest) queue item for each node in a workflow
+// using DISTINCT ON to get one queue item per node_id, ordered by created_at ASC
+func FindNextQueueItemPerNode(workflowID uuid.UUID) ([]WorkflowNodeQueueItem, error) {
+	var queueItems []WorkflowNodeQueueItem
+	err := database.Conn().
+		Raw(`
+			SELECT DISTINCT ON (node_id) *
+			FROM workflow_node_queue_items
+			WHERE workflow_id = ?
+			ORDER BY node_id, created_at ASC
+		`, workflowID).
+		Scan(&queueItems).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return queueItems, nil
+}
+
+func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*WorkflowNodeQueueItem, error) {
+	var queueItem WorkflowNodeQueueItem
+	err := database.Conn().
+		Where("workflow_id = ? AND id = ?", workflowID, queueItemID).
+		First(&queueItem).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &queueItem, nil
 }

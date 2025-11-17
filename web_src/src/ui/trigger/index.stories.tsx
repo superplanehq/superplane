@@ -1,16 +1,18 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { Trigger, type TriggerProps } from './';
-import githubIcon from '@/assets/icons/integrations/github.svg';
-import dockerIcon from '@/assets/icons/integrations/docker.svg';
+import type { Meta, StoryObj } from "@storybook/react";
+import { Trigger, type TriggerProps } from "./";
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import dockerIcon from "@/assets/icons/integrations/docker.svg";
 
-const createTriggerProps = (baseProps: Omit<TriggerProps, keyof import('../types/componentActions').ComponentActionsProps>): TriggerProps => ({
+const createTriggerProps = (
+  baseProps: Omit<TriggerProps, keyof import("../types/componentActions").ComponentActionsProps>,
+): TriggerProps => ({
   ...baseProps,
-  onRun: () => console.log('Run clicked!'),
-  onDuplicate: () => console.log('Duplicate clicked!'),
-  onEdit: () => console.log('Edit clicked!'),
-  onDeactivate: () => console.log('Deactivate clicked!'),
-  onToggleView: () => console.log('Toggle view clicked!'),
-  onDelete: () => console.log('Delete clicked!'),
+  onRun: () => console.log("Run clicked!"),
+  onDuplicate: () => console.log("Duplicate clicked!"),
+  onEdit: () => console.log("Edit clicked!"),
+  onDeactivate: () => console.log("Deactivate clicked!"),
+  onToggleView: () => console.log("Toggle view clicked!"),
+  onDelete: () => console.log("Delete clicked!"),
 });
 
 const GithubProps: TriggerProps = createTriggerProps({
@@ -37,12 +39,12 @@ const GithubProps: TriggerProps = createTriggerProps({
 });
 
 const meta: Meta<typeof Trigger> = {
-  title: 'ui/Trigger',
+  title: "ui/Trigger",
   component: Trigger,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 };
 
 export default meta;

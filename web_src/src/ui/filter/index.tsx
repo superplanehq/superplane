@@ -12,7 +12,6 @@ export interface FilterProps extends ComponentActionsProps {
   collapsedBackground?: string;
 }
 
-
 export const Filter: React.FC<FilterProps> = ({
   title = "Filter events based on branch",
   expression,
@@ -32,17 +31,19 @@ export const Filter: React.FC<FilterProps> = ({
 }) => {
   const filters = useMemo(() => parseExpression(expression || ""), [expression]);
 
-  const spec = expression ? {
-    title: "filter",
-    tooltipTitle: "filters applied",
-    values: filters
-  } : undefined;
+  const spec = expression
+    ? {
+        title: "filter",
+        tooltipTitle: "filters applied",
+        values: filters,
+      }
+    : undefined;
 
   const eventSections: EventSection[] = [];
   if (lastEvent) {
     eventSections.push({
       title: "Last Event",
-      ...lastEvent
+      ...lastEvent,
     });
   }
 

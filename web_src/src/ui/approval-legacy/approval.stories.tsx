@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { Approval, type ApprovalProps } from "./index"
+import { Approval, type ApprovalProps } from "./index";
 
 const meta = {
   title: "ui/ApprovalLegacy",
@@ -38,11 +38,11 @@ const meta = {
       table: { disable: true },
     },
   },
-} satisfies Meta<typeof Approval>
+} satisfies Meta<typeof Approval>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<typeof meta>
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
@@ -100,7 +100,7 @@ export const Default: Story = {
       },
     ] satisfies ApprovalProps["approvals"],
   },
-}
+};
 
 export const ZeroState: Story = {
   args: {
@@ -110,7 +110,7 @@ export const ZeroState: Story = {
     approvals: [],
     selected: false,
   },
-}
+};
 
 export const Collapsed: Story = {
   args: {
@@ -146,4 +146,4 @@ export const Collapsed: Story = {
       },
     ] satisfies ApprovalProps["approvals"],
   },
-}
+};

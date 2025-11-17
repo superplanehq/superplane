@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,14 +29,19 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		return nil, err
 	}
 
+	expandedNodes, err := expandNodes(organizationID, nodes)
+	if err != nil {
+		return nil, err
+	}
+
 	createdBy := uuid.MustParse(userID)
 
 	now := time.Now()
 	workflow := models.Workflow{
 		ID:             uuid.New(),
 		OrganizationID: uuid.MustParse(organizationID),
-		Name:           pbWorkflow.Name,
-		Description:    pbWorkflow.Description,
+		Name:           pbWorkflow.Metadata.Name,
+		Description:    pbWorkflow.Metadata.Description,
 		CreatedBy:      &createdBy,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
@@ -53,17 +59,26 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		}
 
 		//
-		// Create the workflow node records
+		// Create the workflow node records (including internal blueprint nodes)
 		//
-		for _, node := range nodes {
+		for _, node := range expandedNodes {
+			// Set ParentNodeID for internal nodes (IDs like parent:child)
+			var parentNodeID *string
+			if idx := strings.Index(node.ID, ":"); idx != -1 {
+				parent := node.ID[:idx]
+				parentNodeID = &parent
+			}
+
 			workflowNode := models.WorkflowNode{
 				WorkflowID:    workflow.ID,
 				NodeID:        node.ID,
+				ParentNodeID:  parentNodeID,
 				Name:          node.Name,
 				State:         models.WorkflowNodeStateReady,
 				Type:          node.Type,
 				Ref:           datatypes.NewJSONType(node.Ref),
 				Configuration: datatypes.NewJSONType(node.Configuration),
+				Metadata:      datatypes.NewJSONType(node.Metadata),
 				CreatedAt:     &now,
 				UpdatedAt:     &now,
 			}
@@ -81,6 +96,6 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 	}
 
 	return &pb.CreateWorkflowResponse{
-		Workflow: SerializeWorkflow(&workflow),
+		Workflow: SerializeWorkflow(&workflow, false),
 	}, nil
 }

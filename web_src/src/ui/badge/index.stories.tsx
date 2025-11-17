@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { Badge } from "./index"
+import { Badge } from "./index";
 
 const meta = {
   title: "shadcn Primitives/Badge",
@@ -25,28 +25,28 @@ const meta = {
     variant: "default",
     children: "Badge",
   },
-} satisfies Meta<typeof Badge>
+} satisfies Meta<typeof Badge>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<typeof Badge>
+type Story = StoryObj<typeof Badge>;
 
-export const Default: Story = {}
+export const Default: Story = {};
 
 export const Secondary: Story = {
   args: {
     variant: "secondary",
   },
-}
+};
 
 export const Destructive: Story = {
   args: {
     variant: "destructive",
   },
-}
+};
 
 export const Outline: Story = {
   args: {
     variant: "outline",
   },
-}
+};

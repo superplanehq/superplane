@@ -58,6 +58,11 @@ type CustomRoleManager interface {
 	IsDefaultRole(roleName string, domainType string) bool
 }
 
+// Policy reload interface
+type PolicyReloader interface {
+	LoadPolicy() error
+}
+
 // Authorization interface
 type Authorization interface {
 	PermissionChecker
@@ -67,6 +72,7 @@ type Authorization interface {
 	UserAccessQuery
 	RoleDefinitionQuery
 	CustomRoleManager
+	PolicyReloader
 }
 
 type RoleDefinition struct {

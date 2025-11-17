@@ -8,6 +8,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -98,11 +99,11 @@ func (f *If) Execute(ctx components.ExecutionContext) error {
 	var outputs map[string][]any
 	if matches {
 		outputs = map[string][]any{
-			ChannelNameTrue: {ctx.Data},
+			ChannelNameTrue: {make(map[string]any)},
 		}
 	} else {
 		outputs = map[string][]any{
-			ChannelNameFalse: {ctx.Data},
+			ChannelNameFalse: {make(map[string]any)},
 		}
 	}
 
@@ -119,4 +120,8 @@ func (f *If) HandleAction(ctx components.ActionContext) error {
 
 func (f *If) Setup(ctx components.SetupContext) error {
 	return nil
+}
+
+func (f *If) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+	return ctx.DefaultProcessing()
 }

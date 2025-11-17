@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
@@ -57,6 +58,13 @@ type Component interface {
 	 * Setup the component.
 	 */
 	Setup(ctx SetupContext) error
+
+	/*
+	 * ProcessQueueItem is called when a queue item for this component's node
+	 * is ready to be processed. Implementations should create the appropriate
+	 * execution or handle the item synchronously using the provided context.
+	 */
+	ProcessQueueItem(ctx ProcessQueueContext) (*models.WorkflowNodeExecution, error)
 
 	/*
 	 * Passes full execution control to the component.
@@ -136,6 +144,7 @@ type MetadataContext interface {
  * ExecutionStateContext allows components to control execution lifecycle.
  */
 type ExecutionStateContext interface {
+	IsFinished() bool
 	Pass(outputs map[string][]any) error
 	Fail(reason, message string) error
 }
@@ -175,6 +184,59 @@ type ActionContext struct {
 	AuthContext           AuthContext
 	RequestContext        RequestContext
 	IntegrationContext    IntegrationContext
+}
+
+/*
+ * ProcessQueueContext is provided to components to process a node's queue item.
+ * It mirrors the data the queue worker would otherwise use to create executions.
+ */
+type ProcessQueueContext struct {
+	// IDs and configuration
+	WorkflowID    string
+	NodeID        string
+	Configuration any
+
+	// Input event data and references
+	RootEventID string
+	EventID     string
+	// SourceNodeID is the upstream node id that produced the event
+	SourceNodeID string
+	Input        any
+
+	// CreateExecution creates a pending execution for this queue item.
+	CreateExecution func() (uuid.UUID, error)
+
+	// DequeueItem marks the queue item as processed.
+	DequeueItem func() error
+
+	// UpdateNodeState updates the state of the node.
+	UpdateNodeState func(state string) error
+
+	// DefaultProcessing performs the default processing for the queue item.
+	// Convenience method to avoid boilerplate in components that just want default behavior,
+	// where an execution is created and the item is dequeued.
+	DefaultProcessing func() (*models.WorkflowNodeExecution, error)
+
+	// GetExecutionMetadata retrieves the execution metadata for a given execution ID.
+	GetExecutionMetadata func(uuid.UUID) (map[string]any, error)
+	SetExecutionMetadata func(uuid.UUID, any) error
+
+	// CountIncomingEdges returns the number of incoming edges for this node
+	CountIncomingEdges func() (int, error)
+
+	// CountDistinctIncomingSources returns the number of distinct upstream
+	// source nodes connected to this node (ignoring multiple channels from the
+	// same source)
+	CountDistinctIncomingSources func() (int, error)
+
+	// PassExecution marks the execution as passed with the provided outputs.
+	PassExecution func(execID uuid.UUID, outputs map[string][]any) (*models.WorkflowNodeExecution, error)
+
+	// FailExecution marks the execution as failed with the provided reason and message.
+	FailExecution func(execID uuid.UUID, reason, message string) (*models.WorkflowNodeExecution, error)
+
+	FindExecutionIDByKV func(key string, value string) (uuid.UUID, bool, error)
+	SetExecutionKV      func(execID uuid.UUID, key string, value string) error
 }
 
 type AuthContext interface {

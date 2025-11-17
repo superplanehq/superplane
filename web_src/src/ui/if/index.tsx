@@ -24,7 +24,6 @@ const HANDLE_STYLE = {
   background: "transparent",
 };
 
-
 export const If: React.FC<IfProps> = ({
   title = "If processed events",
   expression,
@@ -48,11 +47,13 @@ export const If: React.FC<IfProps> = ({
 }) => {
   const conditions = useMemo(() => parseExpression(expression || ""), [expression]);
 
-  const spec = expression ? {
-    title: "condition",
-    tooltipTitle: "conditions applied",
-    values: conditions
-  } : undefined;
+  const spec = expression
+    ? {
+        title: "condition",
+        tooltipTitle: "conditions applied",
+        values: conditions,
+      }
+    : undefined;
 
   const eventSections: EventSection[] = [];
   if (trueEvent) {
@@ -71,7 +72,7 @@ export const If: React.FC<IfProps> = ({
             transform: "translateY(-50%)",
           }}
         />
-      )
+      ),
     });
   }
   if (falseEvent) {
@@ -90,7 +91,7 @@ export const If: React.FC<IfProps> = ({
             transform: "translateY(-50%)",
           }}
         />
-      )
+      ),
     });
   }
 

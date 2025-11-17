@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import { ArrowRightSquare, MoreHorizontal } from "lucide-react"
+import type { Meta, StoryObj } from "@storybook/react";
+import { ArrowRightSquare, MoreHorizontal } from "lucide-react";
 
 import {
   Breadcrumb,
@@ -9,9 +9,9 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "./index"
+} from "./index";
 
-type BreadcrumbArgs = React.ComponentProps<typeof Breadcrumb>
+type BreadcrumbArgs = React.ComponentProps<typeof Breadcrumb>;
 
 const meta = {
   title: "shadcn Primitives/Breadcrumb",
@@ -25,17 +25,17 @@ const meta = {
       control: { type: "text" },
     },
   },
-} satisfies Meta<BreadcrumbArgs>
+} satisfies Meta<BreadcrumbArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<BreadcrumbArgs>
+type Story = StoryObj<BreadcrumbArgs>;
 
 const renderTrail = (children: React.ReactNode) => (
   <Breadcrumb>
     <BreadcrumbList>{children}</BreadcrumbList>
   </Breadcrumb>
-)
+);
 
 export const Default: Story = {
   render: () =>
@@ -54,7 +54,7 @@ export const Default: Story = {
         </BreadcrumbItem>
       </>,
     ),
-}
+};
 
 export const WithCustomSeparator: Story = {
   render: () =>
@@ -77,7 +77,7 @@ export const WithCustomSeparator: Story = {
         </BreadcrumbItem>
       </>,
     ),
-}
+};
 
 export const WithEllipsis: Story = {
   render: () =>
@@ -102,4 +102,4 @@ export const WithEllipsis: Story = {
         </BreadcrumbItem>
       </>,
     ),
-}
+};

@@ -182,8 +182,11 @@ docs/WorkflowsUpdateWorkflowBody.md
 docs/WorkflowsUpdateWorkflowResponse.md
 docs/WorkflowsWorkflow.md
 docs/WorkflowsWorkflowEvent.md
+docs/WorkflowsWorkflowMetadata.md
 docs/WorkflowsWorkflowNodeExecution.md
 docs/WorkflowsWorkflowNodeQueueItem.md
+docs/WorkflowsWorkflowSpec.md
+docs/WorkflowsWorkflowStatus.md
 git_push.sh
 model_auth_token.go
 model_authorization_domain_type.go
@@ -332,8 +335,11 @@ model_workflows_update_workflow_body.go
 model_workflows_update_workflow_response.go
 model_workflows_workflow.go
 model_workflows_workflow_event.go
+model_workflows_workflow_metadata.go
 model_workflows_workflow_node_execution.go
 model_workflows_workflow_node_queue_item.go
+model_workflows_workflow_spec.go
+model_workflows_workflow_status.go
 response.go
 test/api_blueprint_test.go
 test/api_canvas_test.go

@@ -95,7 +95,7 @@ const ephemeralNodes: Node[] = [
         headerColor: "bg-blue-100",
         collapsedBackground: "bg-blue-100",
         parameters: [
-          { icon: "settings", items: { "TTL": "2d 15h" } },
+          { icon: "settings", items: { TTL: "2d 15h" } },
           { icon: "settings", items: { "Max Envs": "50" } },
         ],
         metadata: [

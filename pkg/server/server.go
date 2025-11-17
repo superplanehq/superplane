@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/public"
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/services"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers"
 
 	// Import components and triggers to register them via init()
@@ -33,7 +34,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 )
 
-func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) {
+func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, authService authorization.Authorization) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -71,13 +72,6 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_BLUEPRINT_NODE_EXECUTOR") == "yes" {
-		log.Println("Starting Pending Node Execution Worker")
-
-		w := workers.NewBlueprintNodeExecutor(registry)
-		go w.Start(context.Background())
-	}
-
 	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
 		log.Println("Starting Node Request Worker")
 
@@ -88,7 +82,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Workflow Node Queue Worker")
 
-		w := workers.NewWorkflowNodeQueueWorker()
+		w := workers.NewWorkflowNodeQueueWorker(registry)
 		go w.Start(context.Background())
 	}
 
@@ -105,11 +99,17 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		w := workers.NewWebhookCleanupWorker(registry)
 		go w.Start(context.Background())
 	}
+
+	if os.Getenv("START_RBAC_POLICY_RELOAD_CONSUMER") == "yes" {
+		log.Println("Starting RBAC Policy Reload Consumer")
+		rbacPolicyReloadConsumer := workers.NewRBACPolicyReloadConsumer(rabbitMQURL, authService)
+		go rbacPolicyReloadConsumer.Start()
+	}
 }
 
 func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(encryptor, authService, registry, 50051)
+	grpc.RunServer(encryptor, authService, registry, lookupInternalAPIPort())
 }
 
 func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
@@ -122,8 +122,9 @@ func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwt
 
 	appEnv := os.Getenv("APP_ENV")
 	templateDir := os.Getenv("TEMPLATE_DIR")
+	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
 
-	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, appEnv, templateDir, authService)
+	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, appEnv, templateDir, authService, blockSignup)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}
@@ -182,11 +183,54 @@ func lookupPublicAPIPort() int {
 	return port
 }
 
+func lookupInternalAPIPort() int {
+	port := 50051
+
+	if p := os.Getenv("INTERNAL_API_PORT"); p != "" {
+		if v, errConv := strconv.Atoi(p); errConv == nil && v > 0 {
+			port = v
+		} else {
+			log.Warnf("Invalid INTERNAL_API_PORT %q, falling back to 50051", p)
+		}
+	}
+
+	return port
+}
+
+func configureLogging() {
+	appEnv := os.Getenv("APP_ENV")
+
+	if appEnv == "development" || appEnv == "test" {
+		log.SetFormatter(&log.TextFormatter{
+			FullTimestamp:   false,
+			TimestampFormat: time.Stamp,
+		})
+	} else {
+		log.SetFormatter(&log.TextFormatter{
+			FullTimestamp:   true,
+			TimestampFormat: time.StampMilli,
+		})
+	}
+}
+
+func setupOtelMetrics() {
+	if os.Getenv("OTEL_ENABLED") != "yes" {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := telemetry.InitMetrics(ctx); err != nil {
+		log.Warnf("Failed to initialize OpenTelemetry metrics: %v", err)
+	} else {
+		log.Info("OpenTelemetry metrics initialized")
+	}
+}
+
 func Start() {
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp:   true,
-		TimestampFormat: time.StampMilli,
-	})
+	configureLogging()
+	setupOtelMetrics()
 
 	encryptionKey := os.Getenv("ENCRYPTION_KEY")
 	if encryptionKey == "" {
@@ -236,7 +280,7 @@ func Start() {
 		go startInternalAPI(encryptorInstance, authService, registry)
 	}
 
-	startWorkers(jwtSigner, encryptorInstance, registry, baseURL)
+	startWorkers(jwtSigner, encryptorInstance, registry, baseURL, authService)
 
 	log.Println("Superplane is UP.")
 

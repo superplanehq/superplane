@@ -1,17 +1,11 @@
-import * as React from "react"
-import type { LucideProps } from "lucide-react"
-import * as LucideIcons from "lucide-react"
+import * as React from "react";
+import type { LucideProps } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
-import { Badge, type BadgeProps } from "../badge"
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemMedia,
-  ItemTitle,
-} from "../item"
+import { Badge, type BadgeProps } from "../badge";
+import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from "../item";
 
 const STATUS_STYLES = {
   success: {
@@ -34,83 +28,69 @@ const STATUS_STYLES = {
     text: "text-sky-600",
     icon: "info",
   },
-} as const
+} as const;
 
-type StatusKey = keyof typeof STATUS_STYLES
+type StatusKey = keyof typeof STATUS_STYLES;
 
-type IconComponent = React.ComponentType<LucideProps>
+type IconComponent = React.ComponentType<LucideProps>;
 
 interface EventItemBadge extends Omit<BadgeProps, "variant"> {
-  label: string
-  icon?: string
-  variant?: BadgeProps["variant"]
+  label: string;
+  icon?: string;
+  variant?: BadgeProps["variant"];
 }
 
 export interface EventItemProps {
-  status: StatusKey
-  title: string
-  badges?: EventItemBadge[]
-  href?: string
-  timestamp?: React.ReactNode
-  statusIcon?: string
-  className?: string
+  status: StatusKey;
+  title: string;
+  badges?: EventItemBadge[];
+  href?: string;
+  timestamp?: React.ReactNode;
+  statusIcon?: string;
+  className?: string;
 }
 
-const FALLBACK_ICON = "bell"
+const FALLBACK_ICON = "bell";
 
 function resolveIcon(slug?: string, fallback: string = FALLBACK_ICON): IconComponent {
-  const source = slug ?? fallback
+  const source = slug ?? fallback;
 
   const pascal = source
     .split("-")
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join("")
+    .join("");
 
-  const candidate = (LucideIcons as Record<string, unknown>)[pascal]
+  const candidate = (LucideIcons as Record<string, unknown>)[pascal];
 
   if (
     typeof candidate === "function" ||
     (typeof candidate === "object" && candidate && "render" in (candidate as object))
   ) {
-    return candidate as IconComponent
+    return candidate as IconComponent;
   }
 
   const fallbackPascal = fallback
     .split("-")
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join("")
+    .join("");
 
-  const fallbackCandidate = (LucideIcons as Record<string, unknown>)[fallbackPascal]
+  const fallbackCandidate = (LucideIcons as Record<string, unknown>)[fallbackPascal];
 
   if (
     typeof fallbackCandidate === "function" ||
-    (typeof fallbackCandidate === "object" &&
-      fallbackCandidate &&
-      "render" in (fallbackCandidate as object))
+    (typeof fallbackCandidate === "object" && fallbackCandidate && "render" in (fallbackCandidate as object))
   ) {
-    return fallbackCandidate as IconComponent
+    return fallbackCandidate as IconComponent;
   }
 
-  return LucideIcons.Circle
+  return LucideIcons.Circle;
 }
 
-const EventItem: React.FC<EventItemProps> = ({
-  status,
-  title,
-  badges,
-  href,
-  timestamp,
-  statusIcon,
-  className,
-}) => {
-  const statusConfig = STATUS_STYLES[status]
-  const StatusIcon = resolveIcon(statusIcon, statusConfig.icon)
+const EventItem: React.FC<EventItemProps> = ({ status, title, badges, href, timestamp, statusIcon, className }) => {
+  const statusConfig = STATUS_STYLES[status];
+  const StatusIcon = resolveIcon(statusIcon, statusConfig.icon);
 
-  const baseClassName = cn(
-    "w-full rounded-full transition-colors",
-    statusConfig.background,
-    className,
-  )
+  const baseClassName = cn("w-full rounded-full transition-colors", statusConfig.background, className);
 
   const children = (
     <>
@@ -127,7 +107,7 @@ const EventItem: React.FC<EventItemProps> = ({
           {badges?.length ? (
             <span className="flex shrink-0 gap-1">
               {badges.map(({ label, icon, variant, className: badgeClassName, ...badgeProps }) => {
-                const BadgeIcon = icon ? resolveIcon(icon) : null
+                const BadgeIcon = icon ? resolveIcon(icon) : null;
 
                 return (
                   <Badge
@@ -139,13 +119,11 @@ const EventItem: React.FC<EventItemProps> = ({
                     {BadgeIcon ? <BadgeIcon className="size-3" /> : null}
                     {label}
                   </Badge>
-                )
+                );
               })}
             </span>
           ) : null}
-          <span className="min-w-0 flex-1 truncate text-sm font-medium leading-snug">
-            {title}
-          </span>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium leading-snug">{title}</span>
         </ItemTitle>
       </ItemContent>
       {timestamp ? (
@@ -154,27 +132,23 @@ const EventItem: React.FC<EventItemProps> = ({
         </ItemActions>
       ) : null}
     </>
-  )
+  );
 
   if (href) {
     return (
-      <Item
-        size="xs"
-        className={cn(baseClassName, "flex-nowrap overflow-hidden")}
-        asChild
-      >
+      <Item size="xs" className={cn(baseClassName, "flex-nowrap overflow-hidden")} asChild>
         <a href={href} className="flex w-full items-stretch gap-2 overflow-hidden min-w-0">
           {children}
         </a>
       </Item>
-    )
+    );
   }
 
   return (
     <Item size="xs" className={cn(baseClassName, "flex-nowrap overflow-hidden min-w-0")}>
       {children}
     </Item>
-  )
-}
+  );
+};
 
-export { EventItem }
+export { EventItem };
