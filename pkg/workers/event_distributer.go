@@ -15,6 +15,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
 )
 
+const (
+	defaultAutoDelete = true
+	defaultDurable    = false
+	defaultExclusive  = true
+	defaultRetries    = int32(0)
+	defaultDeadQueue  = false
+)
+
 // EventDistributer coordinates message consumption from RabbitMQ
 // and distributes events to websocket clients
 type EventDistributer struct {
@@ -101,12 +109,10 @@ func (e *EventDistributer) consumeMessages(amqpURL, exchange, routingKey string,
 		consumer.SetLogger(logger)
 
 		// Start the consumer with appropriate options
-		err := consumer.Start(&tackle.Options{
-			URL:            amqpURL,
-			RemoteExchange: exchange,
-			Service:        queueName,
-			RoutingKey:     routingKey,
-		}, handler)
+		err := consumer.Start(
+			getConsumerOptions(amqpURL, exchange, queueName, routingKey),
+			handler,
+		)
 
 		if err != nil {
 			log.Errorf("Error consuming messages from %s: %v", routingKey, err)
@@ -148,4 +154,24 @@ func createRandomString(length int) (string, error) {
 	}
 
 	return string(result), nil
+}
+
+func getConsumerOptions(amqpURL, exchange, queueName, routingKey string) *tackle.Options {
+	autoDelete := defaultAutoDelete
+	durable := defaultDurable
+	exclusive := defaultExclusive
+	retries := defaultRetries
+	enableDeadQueue := defaultDeadQueue
+
+	return &tackle.Options{
+		URL:             amqpURL,
+		RemoteExchange:  exchange,
+		Service:         queueName,
+		RoutingKey:      routingKey,
+		AutoDeleted:     &autoDelete,
+		Durable:         &durable,
+		Exclusive:       &exclusive,
+		MaxRetries:      &retries,
+		EnableDeadQueue: &enableDeadQueue,
+	}
 }
