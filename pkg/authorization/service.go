@@ -572,7 +572,6 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 
 	log.Infof("Transaction committed for %s", orgID)
 
-	a.publishReloadMessage()
 	return nil
 }
 
