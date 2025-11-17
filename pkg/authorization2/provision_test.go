@@ -12,6 +12,9 @@ import (
 )
 
 func TestProvision(t *testing.T) {
+	var can bool
+	var err error
+
 	database.TruncateTables()
 
 	account, err := models.CreateAccount("Example Account", "example-account")
@@ -48,10 +51,32 @@ func TestProvision(t *testing.T) {
 		verifier, err := auth.OrgVerifier(org.ID.String(), user.ID.String())
 		require.NoError(t, err)
 
-		assertCan(t, verifier.CanCreateCanvas())
-		assertCan(t, verifier.CanReadCanvas())
-		assertCan(t, verifier.CanUpdateCanvas())
-		assertCan(t, verifier.CanDeleteCanvas())
+		can, err = verifier.CanReadCanvas()
+		assertCan(t, can, err)
+
+		can, err = verifier.CanCreateCanvas()
+		assertCan(t, can, err)
+
+		can, err = verifier.CanUpdateCanvas()
+		assertCan(t, can, err)
+
+		can, err = verifier.CanDeleteCanvas()
+		assertCan(t, can, err)
+
+		can, err = verifier.CanCreateMember()
+		assertCan(t, can, err)
+
+		can, err = verifier.CanUpdateMember()
+		assertCan(t, can, err)
+
+		can, err = verifier.CanDeleteMember()
+		assertCan(t, can, err)
+
+		can, err = verifier.CanUpdateOrg()
+		assertCan(t, can, err)
+
+		can, err = verifier.CanDeleteOrg()
+		assertCan(t, can, err)
 	})
 }
 

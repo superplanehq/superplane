@@ -40,25 +40,49 @@ func OrgVerifier(orgID string, userID string) (*orgverifier, error) {
 		return nil, fmt.Errorf("failed to load filtered policies: %w", err)
 	}
 
-	return &verifier{
+	return &orgverifier{
 		enforcer: enforcer,
 		domain:   domain,
 		user:     user,
 	}, nil
 }
 
-func (v *verifier) CanReadCanvas() (bool, error) {
+func (v *orgverifier) CanReadCanvas() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "canvas", "read")
 }
 
-func (v *verifier) CanCreateCanvas() (bool, error) {
+func (v *orgverifier) CanCreateCanvas() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "canvas", "create")
 }
 
-func (v *verifier) CanUpdateCanvas() (bool, error) {
+func (v *orgverifier) CanUpdateCanvas() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "canvas", "update")
 }
 
-func (v *verifier) CanDeleteCanvas() (bool, error) {
+func (v *orgverifier) CanDeleteCanvas() (bool, error) {
 	return v.enforcer.Enforce(v.user, v.domain, "canvas", "delete")
+}
+
+func (v *orgverifier) CanCreateMember() (bool, error) {
+	return v.enforcer.Enforce(v.user, v.domain, "member", "create")
+}
+
+func (v *orgverifier) CanDeleteMember() (bool, error) {
+	return v.enforcer.Enforce(v.user, v.domain, "member", "delete")
+}
+
+func (v *orgverifier) CanUpdateMember() (bool, error) {
+	return v.enforcer.Enforce(v.user, v.domain, "member", "update")
+}
+
+func (v *orgverifier) CanReadMember() (bool, error) {
+	return v.enforcer.Enforce(v.user, v.domain, "member", "read")
+}
+
+func (v *orgverifier) CanUpdateOrg() (bool, error) {
+	return v.enforcer.Enforce(v.user, v.domain, "org", "update")
+}
+
+func (v *orgverifier) CanDeleteOrg() (bool, error) {
+	return v.enforcer.Enforce(v.user, v.domain, "org", "delete")
 }
