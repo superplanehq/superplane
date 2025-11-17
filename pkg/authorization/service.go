@@ -508,10 +508,6 @@ func (a *AuthService) GetCanvasUsersForRole(role string, canvasID string) ([]str
 }
 
 func (a *AuthService) SetupOrganizationRoles(orgID string) error {
-	return a.Provision(orgID)
-}
-
-func (a *AuthService) Provision(orgID string) error {
 	domain := prefixDomain(models.DomainTypeOrganization, orgID)
 
 	tx := database.Conn().Begin()
