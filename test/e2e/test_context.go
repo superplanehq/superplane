@@ -38,7 +38,6 @@ func (s *TestContext) Start() {
 	os.Setenv("WEB_BASE_PATH", "")
 	os.Setenv("START_GRPC_GATEWAY", "yes")
 	os.Setenv("GRPC_SERVER_ADDR", "127.0.0.1:50052")
-	os.Setenv("CASBIN_AUTO_RELOAD", "yes")
 	os.Setenv("START_EVENT_DISTRIBUTER", "yes")
 	os.Setenv("START_CONSUMERS", "yes")
 	os.Setenv("START_WORKFLOW_EVENT_ROUTER", "yes")
