@@ -516,12 +516,15 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 	// First, we update our own database tables,
 	// with the metadata about the roles that will be created in casbin.
 	//
+	log.Infof("Setting up default organization role metadata for %s", orgID)
 	err := a.setupDefaultOrganizationRoleMetadataInTransaction(tx, orgID)
 	if err != nil {
 		log.Errorf("Error setting up default organization role metadata for %s: %v", orgID, err)
 		tx.Rollback()
 		return err
 	}
+
+	log.Infof("Role metadata added - adding policies for %s", orgID)
 
 	//
 	// Then, we make all the casbin policy changes in a transaction.
@@ -550,17 +553,25 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 	})
 
 	if err != nil {
+		log.Errorf("Error adding policies for %s: %v", orgID, err)
 		tx.Rollback()
 		return fmt.Errorf("failed to setup organization roles for %s: %w", orgID, err)
 	}
 
+	log.Infof("Policies added - loading policies for %s", orgID)
 	err = a.LoadPolicy()
 	if err != nil {
+		log.Errorf("Error loading policies after setting up organization roles for %s: %v", orgID, err)
 		tx.Rollback()
 		return fmt.Errorf("failed to load policies after setting up organization roles for %s: %w", orgID, err)
 	}
 
+	log.Infof("Policies loaded - committing transaction for %s", orgID)
+
 	tx.Commit()
+
+	log.Infof("Transaction committed for %s", orgID)
+
 	a.publishReloadMessage()
 	return nil
 }

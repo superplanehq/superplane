@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/gorm"
 )
@@ -99,6 +100,8 @@ func UpsertRoleMetadata(roleName, domainType, domainID, displayName, description
 }
 
 func UpsertRoleMetadataInTransaction(tx *gorm.DB, roleName, domainType, domainID, displayName, description string) error {
+	log.Infof("Upserting role metadata for %s (%s) in %s", roleName, domainID, domainType)
+
 	var metadata RoleMetadata
 	err := tx.
 		Where("role_name = ?", roleName).
@@ -108,6 +111,7 @@ func UpsertRoleMetadataInTransaction(tx *gorm.DB, roleName, domainType, domainID
 		Error
 
 	if err == gorm.ErrRecordNotFound {
+		log.Infof("Role metadata not found for %s (%s) in %s - creating new one", roleName, domainID, domainType)
 		metadata = RoleMetadata{
 			RoleName:    roleName,
 			DomainType:  domainType,
@@ -119,9 +123,11 @@ func UpsertRoleMetadataInTransaction(tx *gorm.DB, roleName, domainType, domainID
 	}
 
 	if err != nil {
+		log.Errorf("Error finding role metadata for %s (%s) in %s: %v", roleName, domainID, domainType, err)
 		return err
 	}
 
+	log.Infof("Role metadata found for %s (%s) in %s - updating", roleName, domainID, domainType)
 	metadata.DisplayName = displayName
 	metadata.Description = description
 	return metadata.UpdateInTransaction(tx)
