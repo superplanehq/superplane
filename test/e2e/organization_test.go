@@ -14,12 +14,12 @@ func TestOrganizationCreation(t *testing.T) {
 
 	t.Run("creating a new organization from the create page", func(t *testing.T) {
 		orgName := "E2E Created Organization"
-
 		steps.start()
 		steps.visitCreateOrganizationPage()
 		steps.fillInOrganizationName(orgName)
 		steps.submitOrganizationForm()
 		steps.assertOrganizationSavedInDB(orgName)
+		steps.assertRedirectedToOrganizationHome(orgName)
 	})
 }
 
@@ -54,4 +54,12 @@ func (s *organizationCreationSteps) assertOrganizationSavedInDB(name string) {
 	org, err := models.FindOrganizationByName(name)
 	require.NoError(s.t, err)
 	require.Equal(s.t, name, org.Name)
+}
+
+func (s *organizationCreationSteps) assertRedirectedToOrganizationHome(name string) {
+	org, err := models.FindOrganizationByName(name)
+	require.NoError(s.t, err)
+
+	currentURL := s.session.Page().URL()
+	require.Contains(s.t, currentURL, "/"+org.ID.String())
 }
