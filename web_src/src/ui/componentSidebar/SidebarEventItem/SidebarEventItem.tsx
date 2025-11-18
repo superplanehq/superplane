@@ -202,7 +202,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     }, 1500);
 
     return () => {
-      console.log("Clearing interval");
       clearInterval(pollInterval);
     };
   }, []);
