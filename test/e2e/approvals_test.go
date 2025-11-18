@@ -106,7 +106,7 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
 
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
 	s.canvas.AddApproval("Approval", models.Position{X: 1000, Y: 200})
-	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
+	s.canvas.AddNoop("Output", models.Position{X: 1600, Y: 200})
 
 	s.canvas.Connect("Start", "Approval")
 	s.canvas.Connect("Approval", "Output")
