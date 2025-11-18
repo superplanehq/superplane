@@ -61,6 +61,14 @@ interface ComponentSidebarProps {
   onLoadMoreQueue?: () => void;
   getHasMoreQueue?: () => boolean;
   getLoadingMoreQueue?: () => boolean;
+
+  // Execution chain lazy loading
+  loadExecutionChain?: (
+    eventId: string,
+    nodeId?: string,
+    currentExecution?: Record<string, unknown>,
+    forceReload?: boolean,
+  ) => Promise<any[]>;
 }
 
 export const ComponentSidebar = ({
@@ -104,6 +112,7 @@ export const ComponentSidebar = ({
   getAllQueueEvents,
   getHasMoreQueue,
   getLoadingMoreQueue,
+  loadExecutionChain,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
@@ -411,6 +420,7 @@ export const ComponentSidebar = ({
                       onPushThrough={onPushThrough}
                       supportsPushThrough={supportsPushThrough}
                       onReEmit={onReEmit}
+                      loadExecutionChain={loadExecutionChain}
                     />
                   ))}
                   {hasMoreItems && !searchQuery && statusFilter === "all" && (
@@ -462,6 +472,7 @@ export const ComponentSidebar = ({
                         onPushThrough={onPushThrough}
                         supportsPushThrough={supportsPushThrough}
                         onReEmit={onReEmit}
+                        loadExecutionChain={loadExecutionChain}
                       />
                     );
                   })}
@@ -500,6 +511,7 @@ export const ComponentSidebar = ({
                           onCancelQueueItem={onCancelQueueItem}
                           onPushThrough={onPushThrough}
                           supportsPushThrough={supportsPushThrough}
+                          loadExecutionChain={loadExecutionChain}
                         />
                       );
                     })}

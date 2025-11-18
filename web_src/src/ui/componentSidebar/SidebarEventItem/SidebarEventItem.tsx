@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon } from "@/lib/utils";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
@@ -41,6 +41,12 @@ interface SidebarEventItemProps {
   onPushThrough?: (executionId: string) => void;
   supportsPushThrough?: boolean;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
+  loadExecutionChain?: (
+    eventId: string,
+    nodeId?: string,
+    currentExecution?: Record<string, unknown>,
+    forceReload?: boolean,
+  ) => Promise<any[]>;
 }
 
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
@@ -55,6 +61,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   onPushThrough,
   supportsPushThrough,
   onReEmit,
+  loadExecutionChain,
 }) => {
   // Determine default active tab based on available data
   const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" | "executionChain" => {
@@ -62,7 +69,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     if (tabData.current) return "current";
     if (tabData.root) return "root";
     if (tabData.payload) return "payload";
-    if (tabData.executionChain) return "executionChain";
+    // Execution chain will be loaded lazily, so don't default to it
     return "current";
   }, [tabData]);
 
@@ -71,8 +78,134 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const [modalPayload, setModalPayload] = useState<any>(null);
   const [copiedExecutions, setCopiedExecutions] = useState<Set<string>>(new Set());
   const [payloadCopied, setPayloadCopied] = useState(false);
+  const [executionChainData, setExecutionChainData] = useState<ExecutionChainItem[] | null>(null);
+  const [executionChainLoading, setExecutionChainLoading] = useState(false);
+
+  // Function to load execution chain data lazily
+  const loadExecutionChainData = useCallback(
+    async (forceReload = false) => {
+      if (!loadExecutionChain || executionChainLoading) return;
+
+      if (executionChainData && !forceReload) return;
+
+      const rootEventId = tabData?.root?.["Event ID"];
+      if (!rootEventId || typeof rootEventId !== "string") return;
+
+      try {
+        if (!forceReload) {
+          setExecutionChainLoading(true);
+        }
+        const currentNodeId = event.nodeId || tabData?.current?.["Node ID"] || "";
+        const currentExecution = tabData?.current;
+
+        const rawExecutionChain = await loadExecutionChain(rootEventId, currentNodeId, currentExecution, forceReload);
+
+        const processedChainData = rawExecutionChain.map((exec: any) => {
+          const getSidebarEventItemState = (exec: any) => {
+            if (exec.state === "STATE_FINISHED") {
+              if (exec.result === "RESULT_PASSED") {
+                return ChainExecutionState.COMPLETED;
+              }
+              return ChainExecutionState.FAILED;
+            }
+
+            if (exec.state === "STATE_STARTED" || exec.state === "STATE_PENDING") {
+              return ChainExecutionState.RUNNING;
+            }
+
+            return ChainExecutionState.FAILED;
+          };
+
+          let payload: Record<string, unknown> = {};
+          if (exec.outputs) {
+            const outputData: unknown[] = Object.values(exec.outputs)?.find((output) => {
+              return Array.isArray(output) && output?.length > 0;
+            }) as unknown[];
+
+            if (outputData?.length > 0) {
+              const output = outputData?.[0] as Record<string, unknown>;
+              if (output["data"]) {
+                payload = (output["data"] as Record<string, unknown>) || {};
+              } else {
+                payload = output || {};
+              }
+            }
+          }
+
+          const mainItem: ExecutionChainItem = {
+            name: exec.nodeId || "Unknown",
+            nodeId: exec.nodeId || "",
+            executionId: exec.id || "",
+            payload,
+            state: getSidebarEventItemState(exec),
+            children:
+              exec?.childExecutions && exec.childExecutions.length > 0
+                ? exec.childExecutions
+                    .slice()
+                    .sort((a: any, b: any) => {
+                      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                      return timeA - timeB;
+                    })
+                    .map((childExec: any) => ({
+                      name: childExec?.nodeId?.split(":")?.at(-1) || "Unknown",
+                      state: getSidebarEventItemState(childExec),
+                    }))
+                : undefined,
+          };
+
+          return mainItem;
+        });
+
+        setExecutionChainData(processedChainData);
+      } catch (error) {
+        console.error("Failed to load execution chain:", error);
+        if (!forceReload) {
+          setExecutionChainData([]);
+        }
+      } finally {
+        if (!forceReload) {
+          setExecutionChainLoading(false);
+        }
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loadExecutionChain, tabData, event.nodeId],
+  );
 
   const navigate = useNavigate();
+
+  // Use ref to track current values without causing re-renders
+  const pollingRef = useRef<{
+    activeTab: string;
+    hasInProgress: boolean;
+    loadData: (() => void) | null;
+  }>({
+    activeTab,
+    hasInProgress: executionChainData?.some((item) => item.state === ChainExecutionState.RUNNING) || false,
+    loadData: null,
+  });
+
+  pollingRef.current.activeTab = activeTab;
+  pollingRef.current.hasInProgress =
+    executionChainData?.some((item) => item.state === ChainExecutionState.RUNNING) || false;
+  pollingRef.current.loadData = () => loadExecutionChainData(true);
+
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      const { activeTab: currentTab, hasInProgress, loadData } = pollingRef.current;
+
+      if (currentTab === "executionChain" && hasInProgress && loadData) {
+        console.log("🔄 Polling execution chain data due to in-progress items");
+        loadData();
+      }
+    }, 1500);
+
+    return () => {
+      console.log("Clearing interval");
+      clearInterval(pollInterval);
+    };
+  }, []);
 
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
@@ -155,9 +288,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         setActiveTab(defaultTab);
       } else if (activeTab === "payload" && !tabData.payload) {
         setActiveTab(defaultTab);
-      } else if (activeTab === "executionChain" && !tabData.executionChain) {
-        setActiveTab(defaultTab);
       }
+      // For execution chain, don't auto-switch away since it's loaded on demand
     }
   }, [tabData, activeTab, getDefaultActiveTab]);
 
@@ -218,13 +350,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       animation = "animate-spin";
       break;
   }
-
-  const totalExecutionsCount = useMemo(() => {
-    if (!tabData?.executionChain) return 0;
-
-    const childCount = tabData.executionChain.reduce((acc, execution) => acc + (execution.children?.length || 0), 0);
-    return childCount + tabData.executionChain.length;
-  }, [tabData?.executionChain]);
 
   return (
     <div
@@ -296,9 +421,14 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     Root
                   </button>
                 )}
-                {tabData.executionChain && (
+                {(tabData?.executionChain || tabData?.root) && (
                   <button
-                    onClick={() => setActiveTab("executionChain")}
+                    onClick={() => {
+                      setActiveTab("executionChain");
+                      if (activeTab !== "executionChain") {
+                        loadExecutionChainData();
+                      }
+                    }}
                     className={`px-5 py-1 text-sm font-medium ${
                       activeTab === "executionChain"
                         ? "text-black border-b-1 border-black"
@@ -406,109 +536,33 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             </div>
           )}
 
-          {tabData && activeTab === "executionChain" && tabData.executionChain && (
+          {activeTab === "executionChain" && (tabData?.root || executionChainData) && (
             <div className="w-full flex flex-col px-2 py-2">
-              <div className="text-sm text-gray-500 ml-2">
-                {totalExecutionsCount} execution{totalExecutionsCount === 1 ? "" : "s"}
-              </div>
-              {tabData.executionChain.map((execution, index) => (
-                <div key={index} className="flex flex-col">
-                  {/* Main execution */}
-                  <div className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0 group hover:bg-gray-100">
-                    <div className="flex-shrink-0">
-                      {execution.state === ChainExecutionState.COMPLETED
-                        ? React.createElement(resolveIcon("circle-check"), {
-                            size: 16,
-                            className: "text-green-600",
-                          })
-                        : execution.state === ChainExecutionState.FAILED
-                          ? React.createElement(resolveIcon("x"), {
-                              size: 16,
-                              className: "text-red-600",
-                            })
-                          : execution.state === ChainExecutionState.RUNNING
-                            ? React.createElement(resolveIcon("refresh-cw"), {
-                                size: 16,
-                                className: "text-blue-600 animate-spin",
-                              })
-                            : React.createElement(resolveIcon("circle"), {
-                                size: 16,
-                                className: "text-gray-400",
-                              })}
-                    </div>
-                    <span className="text-sm text-gray-800 truncate flex-1">{execution.name}</span>
-                    {/* Hover Icons */}
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {/* See Group (Expand/Collapse) */}
-                      {execution.children && execution.children.length > 0 && (
-                        <SimpleTooltip content="See Group">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleExpandCustomComponentExecution(execution);
-                            }}
-                            className="p-1 rounded text-gray-500"
-                          >
-                            {React.createElement(resolveIcon("expand"), { size: 14 })}
-                          </button>
-                        </SimpleTooltip>
-                      )}
-                      {/* Copy Link */}
-                      <SimpleTooltip
-                        content={
-                          copiedExecutions.has(`${execution.nodeId}-${execution.executionId}`) ? "Copied!" : "Copy Link"
-                        }
-                        hideOnClick={false}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            copyExecutionLink(execution);
-                          }}
-                          className="p-1 rounded text-gray-500"
-                        >
-                          {React.createElement(resolveIcon("link"), { size: 14 })}
-                        </button>
-                      </SimpleTooltip>
-                      {/* Payload */}
-                      <SimpleTooltip content="Payload">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            showExecutionPayload(execution);
-                          }}
-                          className="p-1 rounded text-gray-500"
-                        >
-                          {React.createElement(resolveIcon("code"), { size: 14 })}
-                        </button>
-                      </SimpleTooltip>
-                    </div>
+              {executionChainLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-sm text-gray-500">Loading execution chain...</div>
+                </div>
+              ) : executionChainData && executionChainData.length > 0 ? (
+                <>
+                  <div className="text-sm text-gray-500 ml-2">
+                    {executionChainData.length} execution{executionChainData.length === 1 ? "" : "s"}
                   </div>
-                  {/* Children executions */}
-                  {execution.children &&
-                    execution.children.map((child, childIndex) => (
-                      <div
-                        key={`${index}-${childIndex}`}
-                        className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0"
-                      >
+                  {executionChainData.map((execution, index) => (
+                    <div key={index} className="flex flex-col">
+                      {/* Main execution */}
+                      <div className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0 group hover:bg-gray-100">
                         <div className="flex-shrink-0">
-                          {React.createElement(resolveIcon("corner-down-right"), {
-                            size: 16,
-                            className: "text-gray-400",
-                          })}
-                        </div>
-                        <div className="flex-shrink-0">
-                          {child.state === ChainExecutionState.COMPLETED
+                          {execution.state === ChainExecutionState.COMPLETED
                             ? React.createElement(resolveIcon("circle-check"), {
                                 size: 16,
                                 className: "text-green-600",
                               })
-                            : child.state === ChainExecutionState.FAILED
+                            : execution.state === ChainExecutionState.FAILED
                               ? React.createElement(resolveIcon("x"), {
                                   size: 16,
                                   className: "text-red-600",
                                 })
-                              : child.state === ChainExecutionState.RUNNING
+                              : execution.state === ChainExecutionState.RUNNING
                                 ? React.createElement(resolveIcon("refresh-cw"), {
                                     size: 16,
                                     className: "text-blue-600 animate-spin",
@@ -518,11 +572,101 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                                     className: "text-gray-400",
                                   })}
                         </div>
-                        <span className="text-sm text-gray-700 truncate flex-1">{child.name}</span>
+                        <span className="text-sm text-gray-800 truncate flex-1">{execution.name}</span>
+                        {/* Hover Icons */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* See Group (Expand/Collapse) */}
+                          {execution.children && execution.children.length > 0 && (
+                            <SimpleTooltip content="See Group">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleExpandCustomComponentExecution(execution);
+                                }}
+                                className="p-1 rounded text-gray-500"
+                              >
+                                {React.createElement(resolveIcon("expand"), { size: 14 })}
+                              </button>
+                            </SimpleTooltip>
+                          )}
+                          {/* Copy Link */}
+                          <SimpleTooltip
+                            content={
+                              copiedExecutions.has(`${execution.nodeId}-${execution.executionId}`)
+                                ? "Copied!"
+                                : "Copy Link"
+                            }
+                            hideOnClick={false}
+                          >
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyExecutionLink(execution);
+                              }}
+                              className="p-1 rounded text-gray-500"
+                            >
+                              {React.createElement(resolveIcon("link"), { size: 14 })}
+                            </button>
+                          </SimpleTooltip>
+                          {/* Payload */}
+                          <SimpleTooltip content="Payload">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                showExecutionPayload(execution);
+                              }}
+                              className="p-1 rounded text-gray-500"
+                            >
+                              {React.createElement(resolveIcon("code"), { size: 14 })}
+                            </button>
+                          </SimpleTooltip>
+                        </div>
                       </div>
-                    ))}
+                      {/* Children executions */}
+                      {execution.children &&
+                        execution.children.map((child, childIndex) => (
+                          <div
+                            key={`${index}-${childIndex}`}
+                            className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0"
+                          >
+                            <div className="flex-shrink-0">
+                              {React.createElement(resolveIcon("corner-down-right"), {
+                                size: 16,
+                                className: "text-gray-400",
+                              })}
+                            </div>
+                            <div className="flex-shrink-0">
+                              {child.state === ChainExecutionState.COMPLETED
+                                ? React.createElement(resolveIcon("circle-check"), {
+                                    size: 16,
+                                    className: "text-green-600",
+                                  })
+                                : child.state === ChainExecutionState.FAILED
+                                  ? React.createElement(resolveIcon("x"), {
+                                      size: 16,
+                                      className: "text-red-600",
+                                    })
+                                  : child.state === ChainExecutionState.RUNNING
+                                    ? React.createElement(resolveIcon("refresh-cw"), {
+                                        size: 16,
+                                        className: "text-blue-600 animate-spin",
+                                      })
+                                    : React.createElement(resolveIcon("circle"), {
+                                        size: 16,
+                                        className: "text-gray-400",
+                                      })}
+                            </div>
+                            <span className="text-sm text-gray-700 truncate flex-1">{child.name}</span>
+                          </div>
+                        ))}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-sm text-gray-500">No execution chain data available</div>
                 </div>
-              ))}
+              )}
             </div>
           )}
 
