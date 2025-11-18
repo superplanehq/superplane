@@ -152,8 +152,7 @@ function LeftHandle({ data, nodeId }: BlockProps) {
 
   // Highlight if: 1) part of hovered edge, or 2) user is dragging a connection
   const isHighlighted =
-    (hoveredEdge && hoveredEdge.target === nodeId) ||
-    (connectingFrom && connectingFrom.nodeId !== nodeId);
+    (hoveredEdge && hoveredEdge.target === nodeId) || (connectingFrom && connectingFrom.nodeId !== nodeId);
 
   return (
     <Handle
