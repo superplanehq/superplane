@@ -72,8 +72,10 @@ func FindWorkflowNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*Workfl
 func ListWorkflowNodesReady() ([]WorkflowNode, error) {
 	var nodes []WorkflowNode
 	err := database.Conn().
-		Where("state = ?", WorkflowNodeStateReady).
-		Where("type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
+		Distinct().
+		Joins("JOIN workflow_node_queue_items ON workflow_nodes.workflow_id = workflow_node_queue_items.workflow_id AND workflow_nodes.node_id = workflow_node_queue_items.node_id").
+		Where("workflow_nodes.state = ?", WorkflowNodeStateReady).
+		Where("workflow_nodes.type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
 		Find(&nodes).
 		Error
 
