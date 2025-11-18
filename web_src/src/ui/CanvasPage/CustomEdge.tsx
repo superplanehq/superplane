@@ -12,8 +12,10 @@ export function CustomEdge({
   targetPosition,
   style = {},
   selected,
+  data,
 }: EdgeProps) {
   const { setEdges } = useReactFlow();
+  const isHovered = data?.isHovered || false;
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -41,18 +43,24 @@ export function CustomEdge({
     [id, setEdges],
   );
 
-  // Update style based on selection state
+  // Update style based on selection and hover state
   const edgeStyle = {
     ...style,
-    stroke: selected ? "#3B82F6" : style.stroke || "#C9D5E1",
+    stroke: selected || isHovered ? "#3B82F6" : style.stroke || "#C9D5E1",
     strokeWidth: selected ? 3 : style.strokeWidth || 3,
   };
 
   return (
     <>
-      <BaseEdge path={edgePath} style={edgeStyle} onClick={onEdgeClick} />
+      <BaseEdge
+        path={edgePath}
+        style={edgeStyle}
+        onClick={onEdgeClick}
+        interactionWidth={20}
+        className={isHovered ? "hovered" : undefined}
+      />
       <EdgeLabelRenderer>
-        {selected && (
+        {(selected || isHovered) && (
           <div
             style={{
               position: "absolute",
@@ -60,6 +68,7 @@ export function CustomEdge({
               pointerEvents: "all",
               width: "40px",
               height: "40px",
+              zIndex: 1001,
             }}
             className="nodrag nopan group flex items-center justify-center"
           >

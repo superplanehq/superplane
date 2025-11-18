@@ -101,6 +101,10 @@ function CanvasContent({
   onNodeDoubleClick,
   onBuildingBlockDrop,
   onZoomChange,
+  onEdgeMouseEnter,
+  onEdgeMouseLeave,
+  onConnectStart,
+  onConnectEnd,
 }: {
   nodes: Node[];
   edges: Edge[];
@@ -112,6 +116,10 @@ function CanvasContent({
   onNodeDoubleClick?: (event: any, node: Node) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onZoomChange?: (zoom: number) => void;
+  onEdgeMouseEnter?: (event: React.MouseEvent, edge: any) => void;
+  onEdgeMouseLeave?: () => void;
+  onConnectStart?: (event: any, params: { nodeId: string | null; handleId: string | null }) => void;
+  onConnectEnd?: () => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -180,7 +188,11 @@ function CanvasContent({
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
+      onConnectStart={onConnectStart}
+      onConnectEnd={onConnectEnd}
       onNodeDoubleClick={onNodeDoubleClick}
+      onEdgeMouseEnter={onEdgeMouseEnter}
+      onEdgeMouseLeave={onEdgeMouseLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onMove={handleMove}
@@ -365,6 +377,33 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     [handleNodeEdit, handleNodeDelete, handleNodeDuplicate],
   );
 
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; handleId: string | null } | null>(null);
+
+  const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: any) => {
+    setHoveredEdgeId(edge.id);
+  }, []);
+
+  const handleEdgeMouseLeave = useCallback(() => {
+    setHoveredEdgeId(null);
+  }, []);
+
+  const handleConnectStart = useCallback((_event: any, params: { nodeId: string | null; handleId: string | null }) => {
+    if (params.nodeId) {
+      setConnectingFrom({ nodeId: params.nodeId, handleId: params.handleId });
+    }
+  }, []);
+
+  const handleConnectEnd = useCallback(() => {
+    setConnectingFrom(null);
+  }, []);
+
+  // Find the hovered edge to get its source and target
+  const hoveredEdge = useMemo(() => {
+    if (!hoveredEdgeId) return null;
+    return props.edges?.find((e) => e.id === hoveredEdgeId);
+  }, [hoveredEdgeId, props.edges]);
+
   const edgeTypes = useMemo(
     () => ({
       custom: CustomEdge,
@@ -372,14 +411,30 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     [],
   );
 
-  // Style edges with custom type
+  // Style edges with custom type and hover state
   const styledEdges = useMemo(
     () =>
       props.edges.map((edge) => ({
         ...edge,
         type: "custom",
+        data: { ...edge.data, isHovered: edge.id === hoveredEdgeId },
+        zIndex: edge.id === hoveredEdgeId ? 1000 : 1,
       })),
-    [props.edges],
+    [props.edges, hoveredEdgeId],
+  );
+
+  // Add hovered edge and connecting state to nodes
+  const nodesWithHoveredEdge = useMemo(
+    () =>
+      props.nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          _hoveredEdge: hoveredEdge,
+          _connectingFrom: connectingFrom,
+        },
+      })),
+    [props.nodes, hoveredEdge, connectingFrom],
   );
 
   const handleLogoClick = useCallback(() => {
@@ -419,7 +474,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         <div className="flex-1 relative h-full w-full">
           <ReactFlowProvider>
             <CanvasContent
-              nodes={props.nodes}
+              nodes={nodesWithHoveredEdge}
               edges={styledEdges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
@@ -429,6 +484,10 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
               onNodeDoubleClick={props.onNodeDoubleClick}
               onBuildingBlockDrop={handleBuildingBlockDrop}
               onZoomChange={setCanvasZoom}
+              onEdgeMouseEnter={handleEdgeMouseEnter}
+              onEdgeMouseLeave={handleEdgeMouseLeave}
+              onConnectStart={handleConnectStart}
+              onConnectEnd={handleConnectEnd}
             />
           </ReactFlowProvider>
         </div>
