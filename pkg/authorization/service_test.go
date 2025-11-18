@@ -631,9 +631,7 @@ func Test__AuthService_SyncDefaultRoles(t *testing.T) {
 
 	t.Run("sync default roles for existing entities", func(t *testing.T) {
 		// First check that we have missing permissions
-		newOrg, err := models.CreateOrganization("test-org", "Test Organization")
-		require.NoError(t, err)
-		_, err = models.CreateCanvas(uuid.New(), newOrg.ID, "Test Canvas", "Test Canvas")
+		_, err := models.CreateOrganization("test-org", "Test Organization")
 		require.NoError(t, err)
 		missingOrgsBefore, err := r.AuthService.DetectMissingPermissions()
 		require.NoError(t, err)

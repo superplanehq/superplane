@@ -52,12 +52,12 @@ func DomainTypeToProto(domainType string) pbAuth.DomainType {
 	}
 }
 
-func ValidateIntegration(canvas *models.Canvas, integrationRef *integrationpb.IntegrationRef) (*models.Integration, error) {
+func ValidateIntegration(orgID uuid.UUID, integrationRef *integrationpb.IntegrationRef) (*models.Integration, error) {
 	if integrationRef.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "integration name is required")
 	}
 
-	integration, err := models.FindIntegrationByName(models.DomainTypeOrganization, canvas.OrganizationID, integrationRef.Name)
+	integration, err := models.FindIntegrationByName(models.DomainTypeOrganization, orgID, integrationRef.Name)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationRef.Name)
 	}

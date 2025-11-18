@@ -27,6 +27,11 @@ const (
 	MetaDescOrgViewer = "Read-only access to organization resources and information."
 )
 
+var (
+	ErrNameAlreadyUsed         = fmt.Errorf("name already used")
+	ErrInvitationAlreadyExists = fmt.Errorf("invitation already exists")
+)
+
 func ValidateDomainType(domainType string) error {
 	if domainType != DomainTypeOrganization {
 		return fmt.Errorf("invalid domain type %s", domainType)
