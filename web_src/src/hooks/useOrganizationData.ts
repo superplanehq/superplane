@@ -25,11 +25,7 @@ import {
   organizationsCreateInvitation,
   organizationsRemoveInvitation,
 } from "../api-client/sdk.gen";
-import {
-  RolesCreateRoleRequest,
-  AuthorizationDomainType,
-  OrganizationsRemoveUserData,
-} from "@/api-client";
+import { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
 import { withOrganizationHeader } from "../utils/withOrganizationHeader";
 
 // Query Keys

@@ -7,7 +7,11 @@ import {
   integrationsListResources,
 } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import type { AuthorizationDomainType, IntegrationsCreateIntegrationData, IntegrationsUpdateIntegrationData } from "@/api-client/types.gen";
+import type {
+  AuthorizationDomainType,
+  IntegrationsCreateIntegrationData,
+  IntegrationsUpdateIntegrationData,
+} from "@/api-client/types.gen";
 
 export const integrationKeys = {
   all: ["integrations"] as const,
@@ -15,12 +19,8 @@ export const integrationKeys = {
     [...integrationKeys.all, "domain", domainId, domainType] as const,
   detail: (domainId: string, domainType: AuthorizationDomainType, integrationId: string) =>
     [...integrationKeys.byDomain(domainId, domainType), "detail", integrationId] as const,
-  resources: (
-    domainId: string,
-    domainType: AuthorizationDomainType,
-    integrationId: string,
-    resourceType: string,
-  ) => [...integrationKeys.detail(domainId, domainType, integrationId), "resources", resourceType] as const,
+  resources: (domainId: string, domainType: AuthorizationDomainType, integrationId: string, resourceType: string) =>
+    [...integrationKeys.detail(domainId, domainType, integrationId), "resources", resourceType] as const,
 };
 
 export const useIntegrations = (domainId: string, domainType: AuthorizationDomainType) => {
@@ -40,11 +40,7 @@ export const useIntegrations = (domainId: string, domainType: AuthorizationDomai
   });
 };
 
-export const useIntegration = (
-  domainId: string,
-  domainType: AuthorizationDomainType,
-  integrationId: string,
-) => {
+export const useIntegration = (domainId: string, domainType: AuthorizationDomainType, integrationId: string) => {
   return useQuery({
     queryKey: integrationKeys.detail(domainId, domainType, integrationId),
     queryFn: async () => {
@@ -80,10 +76,7 @@ export interface UpdateIntegrationParams extends CreateIntegrationParams {
   id: string;
 }
 
-export const useCreateIntegration = (
-  domainId: string,
-  domainType: AuthorizationDomainType,
-) => {
+export const useCreateIntegration = (domainId: string, domainType: AuthorizationDomainType) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -132,11 +125,7 @@ export const useCreateIntegration = (
   });
 };
 
-export const useUpdateIntegration = (
-  domainId: string,
-  domainType: AuthorizationDomainType,
-  integrationId: string,
-) => {
+export const useUpdateIntegration = (domainId: string, domainType: AuthorizationDomainType, integrationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -191,11 +180,7 @@ export const useUpdateIntegration = (
   });
 };
 
-export const useDeleteIntegration = (
-  domainId: string,
-  domainType: AuthorizationDomainType,
-  integrationId: string,
-) => {
+export const useDeleteIntegration = (domainId: string, domainType: AuthorizationDomainType, integrationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({

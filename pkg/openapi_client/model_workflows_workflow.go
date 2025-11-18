@@ -21,8 +21,8 @@ var _ MappedNullable = &WorkflowsWorkflow{}
 // WorkflowsWorkflow struct for WorkflowsWorkflow
 type WorkflowsWorkflow struct {
 	Metadata *WorkflowsWorkflowMetadata `json:"metadata,omitempty"`
-	Spec *WorkflowsWorkflowSpec `json:"spec,omitempty"`
-	Status *WorkflowsWorkflowStatus `json:"status,omitempty"`
+	Spec     *WorkflowsWorkflowSpec     `json:"spec,omitempty"`
+	Status   *WorkflowsWorkflowStatus   `json:"status,omitempty"`
 }
 
 // NewWorkflowsWorkflow instantiates a new WorkflowsWorkflow object
@@ -139,7 +139,7 @@ func (o *WorkflowsWorkflow) SetStatus(v WorkflowsWorkflowStatus) {
 }
 
 func (o WorkflowsWorkflow) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,5 +195,3 @@ func (v *NullableWorkflowsWorkflow) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

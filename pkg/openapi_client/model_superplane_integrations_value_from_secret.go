@@ -21,7 +21,7 @@ var _ MappedNullable = &SuperplaneIntegrationsValueFromSecret{}
 // SuperplaneIntegrationsValueFromSecret struct for SuperplaneIntegrationsValueFromSecret
 type SuperplaneIntegrationsValueFromSecret struct {
 	Name *string `json:"name,omitempty"`
-	Key *string `json:"key,omitempty"`
+	Key  *string `json:"key,omitempty"`
 }
 
 // NewSuperplaneIntegrationsValueFromSecret instantiates a new SuperplaneIntegrationsValueFromSecret object
@@ -106,7 +106,7 @@ func (o *SuperplaneIntegrationsValueFromSecret) SetKey(v string) {
 }
 
 func (o SuperplaneIntegrationsValueFromSecret) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,5 +159,3 @@ func (v *NullableSuperplaneIntegrationsValueFromSecret) UnmarshalJSON(src []byte
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

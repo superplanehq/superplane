@@ -34,11 +34,7 @@ export const useSecrets = (domainId: string, domainType: AuthorizationDomainType
   });
 };
 
-export const useSecret = (
-  domainId: string,
-  domainType: AuthorizationDomainType,
-  secretId: string,
-) => {
+export const useSecret = (domainId: string, domainType: AuthorizationDomainType, secretId: string) => {
   return useQuery({
     queryKey: secretKeys.detail(domainId, domainType, secretId),
     queryFn: async () => {
@@ -113,11 +109,7 @@ export interface UpdateSecretParams {
   environmentVariables: Array<{ name: string; value: string }>;
 }
 
-export const useUpdateSecret = (
-  domainId: string,
-  domainType: AuthorizationDomainType,
-  secretId: string,
-) => {
+export const useUpdateSecret = (domainId: string, domainType: AuthorizationDomainType, secretId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({

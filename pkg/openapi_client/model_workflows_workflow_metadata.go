@@ -21,13 +21,13 @@ var _ MappedNullable = &WorkflowsWorkflowMetadata{}
 
 // WorkflowsWorkflowMetadata struct for WorkflowsWorkflowMetadata
 type WorkflowsWorkflowMetadata struct {
-	Id *string `json:"id,omitempty"`
-	OrganizationId *string `json:"organizationId,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
-	CreatedBy *SuperplaneWorkflowsUserRef `json:"createdBy,omitempty"`
+	Id             *string                     `json:"id,omitempty"`
+	OrganizationId *string                     `json:"organizationId,omitempty"`
+	Name           *string                     `json:"name,omitempty"`
+	Description    *string                     `json:"description,omitempty"`
+	CreatedAt      *time.Time                  `json:"createdAt,omitempty"`
+	UpdatedAt      *time.Time                  `json:"updatedAt,omitempty"`
+	CreatedBy      *SuperplaneWorkflowsUserRef `json:"createdBy,omitempty"`
 }
 
 // NewWorkflowsWorkflowMetadata instantiates a new WorkflowsWorkflowMetadata object
@@ -272,7 +272,7 @@ func (o *WorkflowsWorkflowMetadata) SetCreatedBy(v SuperplaneWorkflowsUserRef) {
 }
 
 func (o WorkflowsWorkflowMetadata) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -340,5 +340,3 @@ func (v *NullableWorkflowsWorkflowMetadata) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-
