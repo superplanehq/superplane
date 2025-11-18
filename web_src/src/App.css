@@ -312,3 +312,7 @@
     @apply bg-background text-foreground;
   }
 }
+
+.json-viewer-hide-types .w-rjv-type:not([data-type="null"]) {
+  display: none !important;
+}

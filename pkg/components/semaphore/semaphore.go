@@ -29,7 +29,7 @@ type NodeMetadata struct {
 
 type ExecutionMetadata struct {
 	Workflow *Workflow      `json:"workflow"`
-	Data     map[string]any `json:"data"`
+	Data     map[string]any `json:"data,omitempty"`
 }
 
 type Workflow struct {
