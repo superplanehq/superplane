@@ -14,7 +14,7 @@ import (
 func Test__ListUsers(t *testing.T) {
 	r := support.Setup(t)
 
-	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String(), r.AuthService)
+	resp, err := ListUsers(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), r.AuthService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Len(t, resp.Users, 1)
@@ -24,8 +24,8 @@ func Test__ListUsers(t *testing.T) {
 		assert.NotEmpty(t, user.Status.RoleAssignments)
 		for _, roleAssignment := range user.Status.RoleAssignments {
 			assert.NotEmpty(t, roleAssignment.RoleName)
-			assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, roleAssignment.DomainType)
-			assert.Equal(t, r.Canvas.ID.String(), roleAssignment.DomainId)
+			assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, roleAssignment.DomainType)
+			assert.Equal(t, r.Organization.ID.String(), roleAssignment.DomainId)
 		}
 	}
 }

@@ -95,6 +95,10 @@ func FindUser(org, id, email string) (*models.User, error) {
 }
 
 func GetUsersWithRolesInDomain(domainID, domainType string, authService authorization.Authorization) ([]*pbUsers.User, error) {
+	if domainType != models.DomainTypeOrganization {
+		return nil, status.Error(codes.InvalidArgument, "domain type must be organization")
+	}
+
 	roleDefinitions, err := authService.GetAllRoleDefinitions(domainType, domainID)
 	if err != nil {
 		return nil, err
@@ -115,14 +119,7 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 	userRoleMap := make(map[string][]*pbUsers.UserRoleAssignment)
 
 	for _, roleDef := range roleDefinitions {
-		var userIDs []string
-
-		if domainType == models.DomainTypeOrganization {
-			userIDs, err = authService.GetOrgUsersForRole(roleDef.Name, domainID)
-		} else {
-			userIDs, err = authService.GetCanvasUsersForRole(roleDef.Name, domainID)
-		}
-
+		userIDs, err := authService.GetOrgUsersForRole(roleDef.Name, domainID)
 		if err != nil {
 			continue
 		}

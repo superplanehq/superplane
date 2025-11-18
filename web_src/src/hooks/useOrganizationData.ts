@@ -23,15 +23,9 @@ import {
   organizationsRemoveUser,
   organizationsListInvitations,
   organizationsCreateInvitation,
-  organizationsUpdateInvitation,
   organizationsRemoveInvitation,
 } from "../api-client/sdk.gen";
-import {
-  RolesCreateRoleRequest,
-  AuthorizationDomainType,
-  OrganizationsRemoveUserData,
-  OrganizationsUpdateInvitationData,
-} from "@/api-client";
+import { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
 import { withOrganizationHeader } from "../utils/withOrganizationHeader";
 
 // Query Keys
@@ -254,37 +248,6 @@ export const useCreateInvitation = (
             email: email,
           },
         }),
-      );
-      return response.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.invitations(organizationId) });
-
-      if (data.invitation?.state === "accepted") {
-        queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) });
-      }
-    },
-    onError: options?.onError,
-  });
-};
-
-export const useUpdateInvitation = (
-  organizationId: string,
-  options?: {
-    onError?: (error: Error) => void;
-  },
-) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ invitationId, canvasIds }: { invitationId: string; canvasIds: string[] }) => {
-      const response = await organizationsUpdateInvitation(
-        withOrganizationHeader({
-          path: { id: organizationId, invitationId },
-          body: {
-            canvasIds: canvasIds,
-          },
-        } as OrganizationsUpdateInvitationData),
       );
       return response.data;
     },

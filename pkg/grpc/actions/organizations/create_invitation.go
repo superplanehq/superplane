@@ -148,13 +148,11 @@ func serializeInvitations(invitations []models.OrganizationInvitation) []*pb.Inv
 }
 
 func serializeInvitation(invitation *models.OrganizationInvitation) *pb.Invitation {
-	canvasIDs := invitation.CanvasIDs.Data()
 	pbInvitation := &pb.Invitation{
 		Id:             invitation.ID.String(),
 		OrganizationId: invitation.OrganizationID.String(),
 		Email:          invitation.Email,
 		State:          string(invitation.State),
-		CanvasIds:      canvasIDs,
 		CreatedAt:      timestamppb.New(invitation.CreatedAt),
 	}
 

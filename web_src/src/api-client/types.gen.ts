@@ -4,7 +4,7 @@ export type AuthToken = {
   valueFrom?: SuperplaneIntegrationsValueFrom;
 };
 
-export type AuthorizationDomainType = "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+export type AuthorizationDomainType = "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
 
 export type AuthorizationPermission = {
   resource?: string;
@@ -393,7 +393,6 @@ export type OrganizationsInvitation = {
   organizationId?: string;
   email?: string;
   state?: string;
-  canvasIds?: Array<string>;
   createdAt?: string;
 };
 
@@ -415,14 +414,6 @@ export type OrganizationsOrganizationMetadata = {
 
 export type OrganizationsRemoveInvitationResponse = {
   [key: string]: unknown;
-};
-
-export type OrganizationsUpdateInvitationBody = {
-  canvasIds?: Array<string>;
-};
-
-export type OrganizationsUpdateInvitationResponse = {
-  invitation?: OrganizationsInvitation;
 };
 
 export type OrganizationsUpdateOrganizationBody = {
@@ -615,7 +606,6 @@ export type SuperplaneIntegrationsValueFrom = {
 };
 
 export type SuperplaneIntegrationsValueFromSecret = {
-  domainType?: AuthorizationDomainType;
   name?: string;
   key?: string;
 };
@@ -1305,7 +1295,7 @@ export type GroupsListGroupsData = {
   body?: never;
   path?: never;
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/groups";
@@ -1360,7 +1350,7 @@ export type GroupsDeleteGroupData = {
     groupName: string;
   };
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/groups/{groupName}";
@@ -1390,7 +1380,7 @@ export type GroupsDescribeGroupData = {
     groupName: string;
   };
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/groups/{groupName}";
@@ -1447,7 +1437,7 @@ export type GroupsListGroupUsersData = {
     groupName: string;
   };
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/groups/{groupName}/users";
@@ -1530,7 +1520,7 @@ export type IntegrationsListIntegrationsData = {
   body?: never;
   path?: never;
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/integrations";
@@ -1589,7 +1579,7 @@ export type IntegrationsDescribeIntegrationData = {
     idOrName: string;
   };
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/integrations/{idOrName}";
@@ -1650,7 +1640,7 @@ export type IntegrationsListResourcesData = {
     idOrName: string;
   };
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
     type?: string;
   };
@@ -1901,36 +1891,6 @@ export type OrganizationsRemoveInvitationResponses = {
 export type OrganizationsRemoveInvitationResponse2 =
   OrganizationsRemoveInvitationResponses[keyof OrganizationsRemoveInvitationResponses];
 
-export type OrganizationsUpdateInvitationData = {
-  body: OrganizationsUpdateInvitationBody;
-  path: {
-    id: string;
-    invitationId: string;
-  };
-  query?: never;
-  url: "/api/v1/organizations/{id}/invitations/{invitationId}";
-};
-
-export type OrganizationsUpdateInvitationErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type OrganizationsUpdateInvitationError =
-  OrganizationsUpdateInvitationErrors[keyof OrganizationsUpdateInvitationErrors];
-
-export type OrganizationsUpdateInvitationResponses = {
-  /**
-   * A successful response.
-   */
-  200: OrganizationsUpdateInvitationResponse;
-};
-
-export type OrganizationsUpdateInvitationResponse2 =
-  OrganizationsUpdateInvitationResponses[keyof OrganizationsUpdateInvitationResponses];
-
 export type OrganizationsRemoveUserData = {
   body?: never;
   path: {
@@ -1963,7 +1923,7 @@ export type RolesListRolesData = {
   body?: never;
   path?: never;
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/roles";
@@ -2018,7 +1978,7 @@ export type RolesDeleteRoleData = {
     roleName: string;
   };
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/roles/{roleName}";
@@ -2048,7 +2008,7 @@ export type RolesDescribeRoleData = {
     roleName: string;
   };
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/roles/{roleName}";
@@ -2130,7 +2090,7 @@ export type SecretsListSecretsData = {
   body?: never;
   path?: never;
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/secrets";
@@ -2185,7 +2145,7 @@ export type SecretsDeleteSecretData = {
     idOrName: string;
   };
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/secrets/{idOrName}";
@@ -2215,7 +2175,7 @@ export type SecretsDescribeSecretData = {
     idOrName: string;
   };
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/secrets/{idOrName}";
@@ -2322,7 +2282,7 @@ export type UsersListUsersData = {
   body?: never;
   path?: never;
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/users";
@@ -2352,7 +2312,7 @@ export type UsersListUserPermissionsData = {
     userId: string;
   };
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/users/{userId}/permissions";
@@ -2383,7 +2343,7 @@ export type UsersListUserRolesData = {
     userId: string;
   };
   query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION" | "DOMAIN_TYPE_CANVAS";
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
   url: "/api/v1/users/{userId}/roles";

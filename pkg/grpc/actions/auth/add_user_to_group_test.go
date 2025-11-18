@@ -70,31 +70,4 @@ func Test_AddUserToGroup(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 		assert.Equal(t, "user not found", s.Message())
 	})
-
-	t.Run("canvas group does not exist -> error", func(t *testing.T) {
-		newUser := support.CreateUser(t, r, r.Organization.ID)
-		_, err = AddUserToGroup(ctx, orgID, models.DomainTypeCanvas, r.Canvas.ID.String(), newUser.ID.String(), "", "non-existent-group", r.AuthService)
-		require.Error(t, err)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.Unknown, s.Code())
-		assert.Contains(t, s.Message(), "group non-existent-group does not exist")
-	})
-
-	t.Run("add user to canvas group", func(t *testing.T) {
-		groupName := support.RandomName("canvas-group")
-		err = r.AuthService.CreateGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, groupName, models.RoleCanvasAdmin, "", "")
-		require.NoError(t, err)
-
-		newUser := support.CreateUser(t, r, r.Organization.ID)
-		_, err = AddUserToGroup(ctx, orgID, models.DomainTypeCanvas, r.Canvas.ID.String(), newUser.ID.String(), "", groupName, r.AuthService)
-		require.NoError(t, err)
-
-		response, err := ListGroupUsers(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String(), groupName, r.AuthService)
-		require.NoError(t, err)
-		assert.Len(t, response.Users, 1)
-		assert.True(t, slices.ContainsFunc(response.Users, func(user *users.User) bool {
-			return user.Metadata.Id == newUser.ID.String() && user.Metadata.Email == newUser.Email
-		}))
-	})
 }

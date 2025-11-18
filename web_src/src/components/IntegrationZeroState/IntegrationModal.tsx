@@ -14,6 +14,7 @@ import {
   useIntegrationForm,
 } from "../IntegrationForm";
 import type { IntegrationsIntegration } from "@/api-client/types.gen";
+import { AuthorizationDomainType } from "@/api-client/types.gen";
 
 interface IntegrationModalProps {
   open: boolean;
@@ -22,7 +23,7 @@ interface IntegrationModalProps {
   canvasId: string;
   organizationId: string;
   onSuccess?: (integrationId: string) => void;
-  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION";
+  domainType?: AuthorizationDomainType;
   editingIntegration?: IntegrationsIntegration;
 }
 
@@ -33,7 +34,7 @@ export function IntegrationModal({
   canvasId,
   organizationId: organizationId,
   onSuccess,
-  domainType = "DOMAIN_TYPE_CANVAS",
+  domainType = "DOMAIN_TYPE_ORGANIZATION",
   editingIntegration,
 }: IntegrationModalProps) {
   const [isCreating, setIsCreating] = useState(false);

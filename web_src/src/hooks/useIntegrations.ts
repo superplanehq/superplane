@@ -7,23 +7,23 @@ import {
   integrationsListResources,
 } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import type { IntegrationsCreateIntegrationData, IntegrationsUpdateIntegrationData } from "@/api-client/types.gen";
+import type {
+  AuthorizationDomainType,
+  IntegrationsCreateIntegrationData,
+  IntegrationsUpdateIntegrationData,
+} from "@/api-client/types.gen";
 
 export const integrationKeys = {
   all: ["integrations"] as const,
-  byDomain: (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") =>
+  byDomain: (domainId: string, domainType: AuthorizationDomainType) =>
     [...integrationKeys.all, "domain", domainId, domainType] as const,
-  detail: (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", integrationId: string) =>
+  detail: (domainId: string, domainType: AuthorizationDomainType, integrationId: string) =>
     [...integrationKeys.byDomain(domainId, domainType), "detail", integrationId] as const,
-  resources: (
-    domainId: string,
-    domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION",
-    integrationId: string,
-    resourceType: string,
-  ) => [...integrationKeys.detail(domainId, domainType, integrationId), "resources", resourceType] as const,
+  resources: (domainId: string, domainType: AuthorizationDomainType, integrationId: string, resourceType: string) =>
+    [...integrationKeys.detail(domainId, domainType, integrationId), "resources", resourceType] as const,
 };
 
-export const useIntegrations = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => {
+export const useIntegrations = (domainId: string, domainType: AuthorizationDomainType) => {
   return useQuery({
     queryKey: integrationKeys.byDomain(domainId, domainType),
     queryFn: async () => {
@@ -40,11 +40,7 @@ export const useIntegrations = (domainId: string, domainType: "DOMAIN_TYPE_CANVA
   });
 };
 
-export const useIntegration = (
-  domainId: string,
-  domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION",
-  integrationId: string,
-) => {
+export const useIntegration = (domainId: string, domainType: AuthorizationDomainType, integrationId: string) => {
   return useQuery({
     queryKey: integrationKeys.detail(domainId, domainType, integrationId),
     queryFn: async () => {
@@ -80,10 +76,7 @@ export interface UpdateIntegrationParams extends CreateIntegrationParams {
   id: string;
 }
 
-export const useCreateIntegration = (
-  domainId: string,
-  domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION",
-) => {
+export const useCreateIntegration = (domainId: string, domainType: AuthorizationDomainType) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -132,11 +125,7 @@ export const useCreateIntegration = (
   });
 };
 
-export const useUpdateIntegration = (
-  domainId: string,
-  domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION",
-  integrationId: string,
-) => {
+export const useUpdateIntegration = (domainId: string, domainType: AuthorizationDomainType, integrationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -191,11 +180,7 @@ export const useUpdateIntegration = (
   });
 };
 
-export const useDeleteIntegration = (
-  domainId: string,
-  domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION",
-  integrationId: string,
-) => {
+export const useDeleteIntegration = (domainId: string, domainType: AuthorizationDomainType, integrationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -213,7 +198,7 @@ export const useDeleteIntegration = (
 
 export const useIntegrationResources = (
   domainId: string,
-  domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION",
+  domainType: AuthorizationDomainType,
   integrationId: string,
   resourceType: string,
 ) => {

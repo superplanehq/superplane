@@ -19,8 +19,6 @@ func ListUserPermissions(ctx context.Context, domainType string, domainID string
 	switch domainType {
 	case models.DomainTypeOrganization:
 		roles, err = authService.GetUserRolesForOrg(userID, domainID)
-	case models.DomainTypeCanvas:
-		roles, err = authService.GetUserRolesForCanvas(userID, domainID)
 	default:
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}

@@ -107,9 +107,6 @@ import type {
   OrganizationsRemoveInvitationData,
   OrganizationsRemoveInvitationResponse2,
   OrganizationsRemoveInvitationError,
-  OrganizationsUpdateInvitationData,
-  OrganizationsUpdateInvitationResponse2,
-  OrganizationsUpdateInvitationError,
   OrganizationsRemoveUserData,
   OrganizationsRemoveUserResponse,
   OrganizationsRemoveUserError,
@@ -823,27 +820,6 @@ export const organizationsRemoveInvitation = <ThrowOnError extends boolean = tru
   >({
     url: "/api/v1/organizations/{id}/invitations/{invitationId}",
     ...options,
-  });
-};
-
-/**
- * Update an organization invitation
- * Updates an organization invitation
- */
-export const organizationsUpdateInvitation = <ThrowOnError extends boolean = true>(
-  options: Options<OrganizationsUpdateInvitationData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).put<
-    OrganizationsUpdateInvitationResponse2,
-    OrganizationsUpdateInvitationError,
-    ThrowOnError
-  >({
-    url: "/api/v1/organizations/{id}/invitations/{invitationId}",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
   });
 };
 

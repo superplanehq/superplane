@@ -91,7 +91,7 @@ func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook
 		return err
 	}
 
-	resourceManager, err := w.registry.NewResourceManager(context.Background(), integration)
+	resourceManager, err := w.registry.NewResourceManagerInTransaction(context.Background(), tx, integration)
 	if err != nil {
 		return err
 	}

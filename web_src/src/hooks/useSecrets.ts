@@ -7,17 +7,17 @@ import {
   secretsDeleteSecret,
 } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import type { SecretsCreateSecretData, SecretsUpdateSecretData } from "@/api-client/types.gen";
+import type { AuthorizationDomainType, SecretsCreateSecretData, SecretsUpdateSecretData } from "@/api-client/types.gen";
 
 export const secretKeys = {
   all: ["secrets"] as const,
-  byDomain: (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") =>
+  byDomain: (domainId: string, domainType: AuthorizationDomainType) =>
     [...secretKeys.all, "domain", domainId, domainType] as const,
-  detail: (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", secretId: string) =>
+  detail: (domainId: string, domainType: AuthorizationDomainType, secretId: string) =>
     [...secretKeys.byDomain(domainId, domainType), "detail", secretId] as const,
 };
 
-export const useSecrets = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => {
+export const useSecrets = (domainId: string, domainType: AuthorizationDomainType) => {
   return useQuery({
     queryKey: secretKeys.byDomain(domainId, domainType),
     queryFn: async () => {
@@ -34,11 +34,7 @@ export const useSecrets = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | 
   });
 };
 
-export const useSecret = (
-  domainId: string,
-  domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION",
-  secretId: string,
-) => {
+export const useSecret = (domainId: string, domainType: AuthorizationDomainType, secretId: string) => {
   return useQuery({
     queryKey: secretKeys.detail(domainId, domainType, secretId),
     queryFn: async () => {
@@ -64,7 +60,7 @@ export interface CreateSecretParams {
   environmentVariables: Array<{ name: string; value: string }>;
 }
 
-export const useCreateSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => {
+export const useCreateSecret = (domainId: string, domainType: AuthorizationDomainType) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -113,11 +109,7 @@ export interface UpdateSecretParams {
   environmentVariables: Array<{ name: string; value: string }>;
 }
 
-export const useUpdateSecret = (
-  domainId: string,
-  domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION",
-  secretId: string,
-) => {
+export const useUpdateSecret = (domainId: string, domainType: AuthorizationDomainType, secretId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -171,7 +163,7 @@ export const useUpdateSecret = (
   });
 };
 
-export const useDeleteSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => {
+export const useDeleteSecret = (domainId: string, domainType: AuthorizationDomainType) => {
   const queryClient = useQueryClient();
 
   return useMutation({
