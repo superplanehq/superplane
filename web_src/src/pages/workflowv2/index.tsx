@@ -1,7 +1,7 @@
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -12,6 +12,7 @@ import {
   ComponentsEdge,
   ComponentsNode,
   TriggersTrigger,
+  WorkflowsListEventExecutionsResponse,
   WorkflowsWorkflow,
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowNodeExecution,
@@ -46,11 +47,7 @@ import {
   SidebarEvent,
 } from "@/ui/CanvasPage";
 import { EventState } from "@/ui/componentBase";
-import {
-  ChainExecutionState,
-  ExecutionChainItem,
-  TabData,
-} from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
+import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
@@ -180,8 +177,8 @@ export function WorkflowPageV2() {
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
   }, [storeVersion]);
 
-  // Execution chain data based on node executions from store
-  const { executionChainMap } = useExecutionChainData(workflowId!, nodeExecutionsMap);
+  // Execution chain data utilities for lazy loading
+  const { loadExecutionChain } = useExecutionChainData(workflowId!, queryClient, workflow);
 
   const saveWorkflowSnapshot = useCallback(
     (currentWorkflow: WorkflowsWorkflow) => {
@@ -448,45 +445,10 @@ export function WorkflowPageV2() {
     [currentHistoryNode, queueHistoryQuery.isLoadingMore],
   );
 
-  const workflowEdges = useMemo(() => workflow?.spec?.edges || [], [workflow?.spec?.edges]);
-
   /**
    * Builds a topological path to find all nodes that should execute before the given target node.
    * This follows the directed graph structure of the workflow to determine execution order.
    */
-  const getNodesBeforeTarget = useCallback(
-    (targetNodeId: string): Set<string> => {
-      if (workflowEdges.length === 0) {
-        return new Set();
-      }
-
-      const nodesBefore = new Set<string>();
-
-      const incomingEdges = new Map<string, string[]>();
-      workflowEdges.forEach((edge) => {
-        if (!incomingEdges.has(edge.targetId!)) {
-          incomingEdges.set(edge.targetId!, []);
-        }
-        incomingEdges.get(edge.targetId!)!.push(edge.sourceId!);
-      });
-
-      const visited = new Set<string>();
-      const dfs = (nodeId: string) => {
-        if (visited.has(nodeId)) return;
-        visited.add(nodeId);
-
-        const incomingNodes = incomingEdges.get(nodeId) || [];
-        incomingNodes.forEach((sourceNodeId) => {
-          nodesBefore.add(sourceNodeId);
-          dfs(sourceNodeId);
-        });
-      };
-
-      dfs(targetNodeId);
-      return nodesBefore;
-    },
-    [workflowEdges],
-  );
 
   const getTabData = useCallback(
     (nodeId: string, event: SidebarEvent): TabData | undefined => {
@@ -625,144 +587,11 @@ export function WorkflowPageV2() {
 
       tabData.payload = payload;
 
-      // Execution Chain tab: get execution chain for the root event
-      if (execution.rootEvent?.id) {
-        const executionChain = executionChainMap[execution.rootEvent.id];
-        if (executionChain && executionChain.length > 0) {
-          const currentExecutionTime = execution.createdAt ? new Date(execution.createdAt).getTime() : Date.now();
-
-          const nodesBefore = getNodesBeforeTarget(nodeId);
-          nodesBefore.add(nodeId);
-
-          const executionsUpToCurrent = executionChain.filter((exec) => {
-            const execTime = exec.createdAt ? new Date(exec.createdAt).getTime() : 0;
-            const isNodeBefore = nodesBefore.has(exec.nodeId || "");
-            const isBeforeCurrentTime = execTime <= currentExecutionTime;
-            return isNodeBefore && isBeforeCurrentTime;
-          });
-
-          // Sort the filtered executions by creation time to get chronological order
-          executionsUpToCurrent.sort((a, b) => {
-            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            return timeA - timeB;
-          });
-
-          // Group executions by node to create hierarchy
-          const nodeExecutions: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
-          executionsUpToCurrent.forEach((exec) => {
-            const execNodeId = exec.nodeId || "unknown";
-            if (!nodeExecutions[execNodeId]) {
-              nodeExecutions[execNodeId] = [];
-            }
-            nodeExecutions[execNodeId].push(exec);
-          });
-
-          const sortedNodeEntries = Object.values(nodeExecutions)
-            .flatMap((execs) => execs)
-            .sort((execsA, execsB) => {
-              const timeA = execsA.createdAt ? new Date(execsA.createdAt).getTime() : 0;
-              const timeB = execsB.createdAt ? new Date(execsB.createdAt).getTime() : 0;
-              return timeA - timeB;
-            });
-
-          const nodesById = workflow?.spec?.nodes?.reduce(
-            (acc, node) => {
-              if (!node?.id) return acc;
-              acc[node.id] = node;
-              return acc;
-            },
-            {} as Record<string, ComponentsNode>,
-          );
-
-          const chainData = sortedNodeEntries.map((exec) => {
-            const nodeInfo = nodesById?.[exec.nodeId || ""];
-
-            const getSidebarEventItemState = (exec: WorkflowsWorkflowNodeExecution) => {
-              if (exec.state === "STATE_FINISHED") {
-                if (exec.result === "RESULT_PASSED") {
-                  return ChainExecutionState.COMPLETED;
-                }
-                return ChainExecutionState.FAILED;
-              }
-
-              if (exec.state === "STATE_STARTED" || exec.state === "STATE_PENDING") {
-                return ChainExecutionState.RUNNING;
-              }
-
-              return ChainExecutionState.FAILED;
-            };
-
-            const childrenNodesById =
-              nodeInfo?.type === "TYPE_BLUEPRINT"
-                ? blueprints
-                    .find((bp) => bp.id === nodeInfo?.blueprint?.id)
-                    ?.nodes?.reduce(
-                      (acc, node) => {
-                        if (!node?.id) return acc;
-                        acc[node.id] = node;
-                        return acc;
-                      },
-                      {} as Record<string, ComponentsNode>,
-                    )
-                : {};
-
-            let payload: Record<string, unknown> = {};
-
-            if (exec.outputs) {
-              const outputData: unknown[] = Object.values(exec.outputs)?.find((output) => {
-                return Array.isArray(output) && output?.length > 0;
-              }) as unknown[];
-
-              if (outputData?.length > 0) {
-                const output = outputData?.[0] as Record<string, unknown>;
-                if (output["data"]) {
-                  payload = (output["data"] as Record<string, unknown>) || {};
-                } else {
-                  payload = output || {};
-                }
-              }
-            }
-
-            const mainItem: ExecutionChainItem = {
-              name: nodeInfo?.name || exec.nodeId || "Unknown",
-              nodeId: exec.nodeId || "",
-              executionId: exec.id || "",
-              payload,
-              state: getSidebarEventItemState(exec),
-              children:
-                exec?.childExecutions && exec.childExecutions.length > 0
-                  ? exec.childExecutions
-                      .slice()
-                      .sort((a, b) => {
-                        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                        return timeA - timeB;
-                      })
-                      .map((childExec) => {
-                        const childrenNodeId = childExec?.nodeId?.split(":")?.at(-1);
-                        const childNode = childrenNodesById?.[childrenNodeId || ""];
-                        const childNodeName = childNode?.name || childrenNodeId;
-                        return {
-                          name: childNodeName || "Unknown",
-                          state: getSidebarEventItemState(childExec),
-                        };
-                      })
-                  : undefined,
-            };
-
-            return mainItem;
-          });
-
-          if (chainData.length > 0) {
-            tabData.executionChain = chainData;
-          }
-        }
-      }
+      // Execution Chain will be loaded lazily when requested
 
       return Object.keys(tabData).length > 0 ? tabData : undefined;
     },
-    [workflow, blueprints, nodeExecutionsMap, nodeEventsMap, executionChainMap, getNodesBeforeTarget],
+    [workflow, nodeExecutionsMap, nodeEventsMap, nodeQueueItemsMap],
   );
 
   const getNodeEditData = useCallback(
@@ -1336,6 +1165,7 @@ export function WorkflowPageV2() {
       getHasMoreQueue={getHasMoreQueue}
       getLoadingMoreQueue={getLoadingMoreQueue}
       onReEmit={handleReEmit}
+      loadExecutionChain={loadExecutionChain}
       breadcrumbs={[
         {
           label: "Canvases",
@@ -1349,44 +1179,110 @@ export function WorkflowPageV2() {
   );
 }
 
-function useExecutionChainData(
-  workflowId: string,
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-) {
-  // Get all unique root event IDs from executions
-  const rootEventIds = useMemo(() => {
-    const eventIds = new Set<string>();
-    Object.values(nodeExecutionsMap).forEach((executions) => {
-      executions.forEach((execution) => {
-        if (execution.rootEvent?.id) {
-          eventIds.add(execution.rootEvent.id);
-        }
-      });
-    });
-    return Array.from(eventIds);
-  }, [nodeExecutionsMap]);
+function useExecutionChainData(workflowId: string, queryClient: QueryClient, workflow?: WorkflowsWorkflow) {
+  const loadExecutionChain = useCallback(
+    async (
+      eventId: string,
+      nodeId?: string,
+      currentExecution?: Record<string, unknown>,
+      forceReload = false,
+    ): Promise<WorkflowsWorkflowNodeExecution[]> => {
+      const queryOptions = eventExecutionsQueryOptions(workflowId, eventId);
 
-  // Fetch execution chains for each unique root event
-  const executionChainResults = useQueries({
-    queries: rootEventIds.map((eventId) => eventExecutionsQueryOptions(workflowId, eventId)),
+      let allExecutions: WorkflowsWorkflowNodeExecution[] = [];
+
+      if (!forceReload) {
+        const cachedData = queryClient.getQueryData(queryOptions.queryKey);
+        if (cachedData) {
+          allExecutions = (cachedData as WorkflowsListEventExecutionsResponse)?.executions || [];
+        }
+      }
+
+      if (allExecutions.length === 0) {
+        if (forceReload) {
+          await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+        }
+        const data = await queryClient.fetchQuery(queryOptions);
+        allExecutions = (data as WorkflowsListEventExecutionsResponse)?.executions || [];
+      }
+
+      // Apply topological filtering - the logic you wanted back!
+      if (!allExecutions.length || !workflow || !nodeId) return allExecutions;
+
+      const currentExecutionTime = currentExecution?.createdAt
+        ? new Date(currentExecution.createdAt as string).getTime()
+        : Date.now();
+      const nodesBefore = getNodesBeforeTarget(nodeId, workflow);
+      nodesBefore.add(nodeId); // Include current node
+
+      const executionsUpToCurrent = allExecutions.filter((exec) => {
+        const execTime = exec.createdAt ? new Date(exec.createdAt).getTime() : 0;
+        const isNodeBefore = nodesBefore.has(exec.nodeId || "");
+        const isBeforeCurrentTime = execTime <= currentExecutionTime;
+        return isNodeBefore && isBeforeCurrentTime;
+      });
+
+      // Sort the filtered executions by creation time to get chronological order
+      executionsUpToCurrent.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeA - timeB;
+      });
+
+      return executionsUpToCurrent;
+    },
+    [workflowId, queryClient, workflow],
+  );
+
+  return { loadExecutionChain };
+}
+
+// Helper function to build topological path to find all nodes that should execute before the given target node
+function getNodesBeforeTarget(targetNodeId: string, workflow: WorkflowsWorkflow): Set<string> {
+  const nodesBefore = new Set<string>();
+  if (!workflow?.spec?.edges) return nodesBefore;
+
+  // Build adjacency list for the workflow graph
+  const adjacencyList: Record<string, string[]> = {};
+  workflow.spec.edges.forEach((edge) => {
+    if (!edge.sourceId || !edge.targetId) return;
+    if (!adjacencyList[edge.sourceId]) {
+      adjacencyList[edge.sourceId] = [];
+    }
+    adjacencyList[edge.sourceId].push(edge.targetId);
   });
 
-  // Check if any queries are still loading
-  const isLoading = executionChainResults.some((result) => result.isLoading);
+  // DFS to find all nodes that can reach the target
+  const visited = new Set<string>();
+  const canReachTarget = (nodeId: string): boolean => {
+    if (visited.has(nodeId)) return false; // Avoid cycles
+    if (nodeId === targetNodeId) return true;
 
-  // Build map of eventId -> execution chain
-  const executionChainMap = useMemo(() => {
-    const map: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
-    rootEventIds.forEach((eventId, index) => {
-      const result = executionChainResults[index];
-      if (result.data?.executions && result.data.executions.length > 0) {
-        map[eventId] = result.data.executions;
-      }
-    });
-    return map;
-  }, [executionChainResults, rootEventIds]);
+    visited.add(nodeId);
+    const neighbors = adjacencyList[nodeId] || [];
+    const canReach = neighbors.some((neighbor) => canReachTarget(neighbor));
+    visited.delete(nodeId); // Allow revisiting in different paths
 
-  return { executionChainMap, isLoading };
+    return canReach;
+  };
+
+  // Check all nodes to see which ones can reach the target
+  const allNodeIds = new Set<string>();
+  workflow.spec.edges?.forEach((edge) => {
+    if (edge.sourceId) allNodeIds.add(edge.sourceId);
+    if (edge.targetId) allNodeIds.add(edge.targetId);
+  });
+  workflow.spec.nodes?.forEach((node) => {
+    if (node.id) allNodeIds.add(node.id);
+  });
+
+  allNodeIds.forEach((nodeId) => {
+    if (canReachTarget(nodeId)) {
+      nodesBefore.add(nodeId);
+    }
+  });
+
+  return nodesBefore;
 }
 
 function prepareData(

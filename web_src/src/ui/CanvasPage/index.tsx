@@ -164,6 +164,14 @@ export interface CanvasPageProps {
   getAllQueueEvents?: (nodeId: string) => SidebarEvent[];
   getHasMoreQueue?: (nodeId: string) => boolean;
   getLoadingMoreQueue?: (nodeId: string) => boolean;
+
+  // Execution chain lazy loading
+  loadExecutionChain?: (
+    eventId: string,
+    nodeId?: string,
+    currentExecution?: Record<string, unknown>,
+    forceReload?: boolean,
+  ) => Promise<any[]>;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -467,6 +475,7 @@ function CanvasPage(props: CanvasPageProps) {
             getHasMoreQueue={props.getHasMoreQueue}
             getLoadingMoreQueue={props.getLoadingMoreQueue}
             onReEmit={props.onReEmit}
+            loadExecutionChain={props.loadExecutionChain}
           />
         </div>
       </div>
@@ -546,6 +555,7 @@ function Sidebar({
   getAllQueueEvents,
   getHasMoreQueue,
   getLoadingMoreQueue,
+  loadExecutionChain,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -572,6 +582,7 @@ function Sidebar({
   getAllQueueEvents?: (nodeId: string) => SidebarEvent[];
   getHasMoreQueue?: (nodeId: string) => boolean;
   getLoadingMoreQueue?: (nodeId: string) => boolean;
+  loadExecutionChain?: (eventId: string) => Promise<any[]>;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -664,6 +675,7 @@ function Sidebar({
       getHasMoreQueue={() => getHasMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
       getLoadingMoreQueue={() => getLoadingMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
       onReEmit={onReEmit}
+      loadExecutionChain={loadExecutionChain}
     />
   );
 }
