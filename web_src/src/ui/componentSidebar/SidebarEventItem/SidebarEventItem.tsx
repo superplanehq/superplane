@@ -196,7 +196,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       const { activeTab: currentTab, hasInProgress, loadData } = pollingRef.current;
 
       if (currentTab === "executionChain" && hasInProgress && loadData) {
-        console.log("🔄 Polling execution chain data due to in-progress items");
         loadData();
       }
     }, 1500);
@@ -521,8 +520,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     color: "#24292e",
                     padding: "8px",
                   }}
+                  className="json-viewer-hide-types"
                   displayObjectSize={false}
-                  displayDataTypes={false}
                   enableClipboard={false}
                 />
               </div>
@@ -722,8 +721,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     backgroundColor: "#ffffff",
                     color: "#24292e",
                   }}
+                  className="json-viewer-hide-types"
                   displayObjectSize={false}
-                  displayDataTypes={false}
                   enableClipboard={false}
                 />
               </div>
