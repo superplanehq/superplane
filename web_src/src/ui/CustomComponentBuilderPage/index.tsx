@@ -118,7 +118,10 @@ function CanvasContent({
   onZoomChange?: (zoom: number) => void;
   onEdgeMouseEnter?: (event: React.MouseEvent, edge: any) => void;
   onEdgeMouseLeave?: () => void;
-  onConnectStart?: (event: any, params: { nodeId: string | null; handleId: string | null }) => void;
+  onConnectStart?: (
+    event: any,
+    params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
+  ) => void;
   onConnectEnd?: () => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
