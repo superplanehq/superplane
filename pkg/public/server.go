@@ -413,23 +413,15 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//
-	// TODO: the organization creation should be in a transaction
-	// Create the organization and set up roles for it.
+	// Create the organization
 	//
+	tx := database.Conn().Begin()
 	log.Infof("Creating organization %s for account %s", req.Name, account.Email)
-	organization, err := models.CreateOrganization(req.Name, "")
+	organization, err := models.CreateOrganizationInTransaction(tx, req.Name, "")
 	if err != nil {
-		log.Errorf("Error creating organization: %v", err)
+		tx.Rollback()
+		log.Errorf("Error creating organization %s: %v", req.Name, err)
 		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
-		return
-	}
-
-	log.Infof("Setting up organization roles for %s (%s)", organization.Name, organization.ID)
-	err = s.authService.SetupOrganizationRoles(organization.ID.String())
-	if err != nil {
-		log.Errorf("Error setting up organization roles for %s: %v", organization.Name, err)
-		models.HardDeleteOrganization(organization.ID.String())
-		http.Error(w, "Failed to set up organization roles", http.StatusInternalServerError)
 		return
 	}
 
@@ -437,24 +429,34 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	// Create the owner user for it
 	//
 	log.Infof("Creating user for new organization %s (%s)", organization.Name, organization.ID)
-	user, err := models.CreateUser(organization.ID, account.ID, account.Email, account.Name)
+	user, err := models.CreateUserInTransaction(tx, organization.ID, account.ID, account.Email, account.Name)
 	if err != nil {
-		log.Errorf("Error creating user for new organization: %v", err)
-		models.HardDeleteOrganization(organization.ID.String())
+		tx.Rollback()
+		log.Errorf("Error creating user for new organization %s (%s): %v", organization.Name, organization.ID, err)
 		http.Error(w, "Failed to create user account", http.StatusInternalServerError)
 		return
 	}
 
-	log.Infof("User %s created - setting it as owner for %s (%s)", user.ID, organization.Name, organization.ID)
-	err = s.authService.CreateOrganizationOwner(user.ID.String(), organization.ID.String())
+	//
+	// Finally, set up RBAC for the new organization.
+	//
+	log.Infof("Setting up RBAC policies for new organization %s (%s)", organization.Name, organization.ID)
+	err = s.authService.SetupOrganization(tx, organization.ID.String(), user.ID.String())
 	if err != nil {
-		log.Errorf("Error creating organization owner for %s: %v", organization.Name, err)
-		models.HardDeleteOrganization(organization.ID.String())
-		http.Error(w, "Failed to create organization owner", http.StatusInternalServerError)
+		tx.Rollback()
+		log.Errorf("Error setting up RBAC policies for %s (%s): %v", organization.Name, organization.ID, err)
+		http.Error(w, "Failed to set up organization roles", http.StatusInternalServerError)
 		return
 	}
 
-	log.Infof("Organization %s created successfully", organization.Name)
+	err = tx.Commit().Error
+	if err != nil {
+		log.Errorf("Error committing transaction for organization %s (%s) creation: %v", organization.Name, organization.ID, err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+
+	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()

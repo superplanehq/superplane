@@ -172,8 +172,17 @@ func (s *TestSession) setupUserAndOrganization() {
 	}
 
 	if svc, err := authorization.NewAuthService(); err == nil {
-		_ = svc.SetupOrganizationRoles(organization.ID.String())
-		_ = svc.CreateOrganizationOwner(user.ID.String(), organization.ID.String())
+		tx := database.Conn().Begin()
+		err = svc.SetupOrganization(tx, organization.ID.String(), user.ID.String())
+		if err != nil {
+			tx.Rollback()
+			s.t.Fatalf("setup organization error: %v", err)
+		}
+
+		err = tx.Commit().Error
+		if err != nil {
+			s.t.Fatalf("commit transaction: %v", err)
+		}
 	}
 
 	s.OrgID = organization.ID

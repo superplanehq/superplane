@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
@@ -63,7 +64,17 @@ func Test_DescribeGroup(t *testing.T) {
 	t.Run("different organization - group not found", func(t *testing.T) {
 		anotherOrg, err := models.CreateOrganization("test-org", "Test Organization")
 		require.NoError(t, err)
-		require.NoError(t, r.AuthService.SetupOrganizationRoles(anotherOrg.ID.String()))
+		tx := database.Conn().Begin()
+		err = r.AuthService.SetupOrganization(tx, orgID, r.User.String())
+		if !assert.NoError(t, err) {
+			tx.Rollback()
+			t.FailNow()
+		}
+
+		err = tx.Commit().Error
+		if !assert.NoError(t, err) {
+			t.FailNow()
+		}
 
 		_, err = DescribeGroup(ctx, models.DomainTypeOrganization, anotherOrg.ID.String(), "test-group", r.AuthService)
 		assert.Error(t, err)
