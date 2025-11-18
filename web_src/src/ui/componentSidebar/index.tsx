@@ -299,7 +299,7 @@ export const ComponentSidebar = ({
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-gray-200 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize handle */}
@@ -316,7 +316,7 @@ export const ComponentSidebar = ({
           }`}
         />
       </div>
-      <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-gray-200 bg-gray-50">
+      <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-border bg-gray-50">
         <div className="flex flex-col items-start gap-3 w-full mt-2">
           <div
             className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
@@ -341,17 +341,16 @@ export const ComponentSidebar = ({
           </div>
           <div
             onClick={() => onClose?.()}
-            className="flex items-center justify-center gap-1 absolute top-6 right-2 text-xs font-medium cursor-pointer"
+            className="flex items-center justify-center absolute top-6 right-3 cursor-pointer"
           >
-            <span>Close</span>
-            <X size={14} />
+            <X size={18} />
           </div>
         </div>
       </div>
       {page !== "overview" ? (
         <>
           {/* Back to Overview Section */}
-          <div className="px-3 py-2 border-b-1 border-gray-200">
+          <div className="px-3 py-2 border-b-1 border-border">
             <button
               onClick={handleBackToOverview}
               className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800 cursor-pointer"
@@ -364,7 +363,7 @@ export const ComponentSidebar = ({
           {/* Full History Header with Search and Filter */}
           <div className="px-3 py-3">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold uppercase text-gray-500">
+              <h2 className="text-xs font-semibold uppercase text-gray-500">
                 {page === "history" ? "Full History" : "Queue"}
               </h2>
             </div>
@@ -377,14 +376,14 @@ export const ComponentSidebar = ({
                   placeholder="Search events..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-3 py-1.5 border border-gray-200 rounded-md text-sm focus:outline-none "
+                  className="w-full pl-10 pr-3 py-1.5 border border-border rounded-md text-sm focus:outline-none "
                 />
               </div>
               {/* Status Filter */}
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as ChainExecutionState)}
-                className="px-3 py-1.5 border border-gray-200 rounded-md text-sm focus:outline-none placeholder:text-gray-400 text-gray-400"
+                className="px-3 py-1.5 border border-border rounded-md text-sm focus:outline-none placeholder:text-gray-400 text-gray-400"
               >
                 <option value="all" className="text-gray-400">
                   All Statuses
@@ -428,7 +427,7 @@ export const ComponentSidebar = ({
                       <button
                         onClick={handleLoadMoreItems}
                         disabled={loadingMoreItems}
-                        className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed rounded-md px-2 py-1.5 border border-gray-200 shadow-xs"
+                        className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed rounded-md px-2 py-1.5 border border-border shadow-xs"
                       >
                         {loadingMoreItems ? null : <Plus size={16} />}
                         {loadingMoreItems ? "Loading..." : `Show ${showMoreCount > 10 ? "10" : showMoreCount} more`}
@@ -444,15 +443,15 @@ export const ComponentSidebar = ({
         // Overview (Original Content)
         <>
           {metadata.length > 0 && (
-            <div className="px-3 py-1 border-b-1 border-gray-200">
+            <div className="px-3 py-1 border-b-1 border-border">
               <MetadataList
                 items={metadata}
-                className="border-b-0 text-gray-500 font-medium gap-2 flex flex-col py-2 font-mono"
+                className="border-b-0 text-gray-500 font-medium gap-2 flex flex-col py-2"
               />
             </div>
           )}
-          <div className="px-3 py-1 border-b-1 border-gray-200 pb-3 text-left">
-            <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Latest events</h2>
+          <div className="px-3 py-1 border-b-1 border-border pb-3 text-left">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Latest events</h2>
             <div className="flex flex-col gap-2">
               {latestEvents.length === 0 ? (
                 <div className="text-center py-4 text-gray-500 text-sm">No events found</div>
@@ -491,7 +490,7 @@ export const ComponentSidebar = ({
           </div>
           {!hideQueueEvents && (
             <div className="px-3 py-1 pb-3 text-left">
-              <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Next in queue</h2>
+              <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Next in queue</h2>
               <div className="flex flex-col gap-2">
                 {nextInQueueEvents.length === 0 ? (
                   <div className="text-center py-4 text-gray-500 text-sm">Queue is empty</div>
