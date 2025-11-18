@@ -96,10 +96,6 @@ func FindIntegrationByName(domainType string, domainID uuid.UUID, name string) (
 	return &integration, nil
 }
 
-func FindIntegrationByID(id uuid.UUID) (*Integration, error) {
-	return FindIntegrationByIDInTransaction(database.Conn(), id)
-}
-
 func FindIntegrationByIDInTransaction(tx *gorm.DB, id uuid.UUID) (*Integration, error) {
 	integration := Integration{}
 

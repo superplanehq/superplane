@@ -155,7 +155,7 @@ func (r *Registry) getAuthFn(ctx context.Context, tx *gorm.DB, integration *mode
 	switch integration.AuthType {
 	case models.IntegrationAuthTypeToken:
 		secretInfo := integration.Auth.Data().Token.ValueFrom.Secret
-		provider, err := r.secretProvider(tx, secretInfo, integration)
+		provider, err := secrets.NewProvider(tx, r.Encryptor, secretInfo.Name, integration.DomainType, integration.DomainID)
 		if err != nil {
 			return nil, fmt.Errorf("error creating secret provider: %v", err)
 		}
@@ -176,10 +176,6 @@ func (r *Registry) getAuthFn(ctx context.Context, tx *gorm.DB, integration *mode
 	}
 
 	return nil, fmt.Errorf("integration auth type %s not supported", integration.AuthType)
-}
-
-func (r *Registry) secretProvider(tx *gorm.DB, secretDef *models.ValueDefinitionFromSecret, integration *models.Integration) (secrets.Provider, error) {
-	return secrets.NewProvider(tx, r.Encryptor, secretDef.Name, integration.DomainType, integration.DomainID)
 }
 
 func (r *Registry) ListTriggers() []triggers.Trigger {

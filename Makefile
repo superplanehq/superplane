@@ -90,6 +90,9 @@ dev.setup:
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 
+dev.start.fg:
+	docker compose $(DOCKER_COMPOSE_OPTS) up
+
 dev.start:
 	docker compose $(DOCKER_COMPOSE_OPTS) up -d
 	echo "Waiting for services to start..."
