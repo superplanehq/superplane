@@ -295,26 +295,26 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   let EventIcon = resolveIcon("check");
   let EventColor = "text-green-700";
   let EventBackground = "bg-green-200";
-  let iconBorderColor = "border-gray-700";
-  let iconSize = 8;
+  let titleColor = "text-black";
+  let iconSize = 16;
   let iconContainerSize = 4;
-  let iconStrokeWidth = 3;
+  let iconStrokeWidth = 2;
   let animation = "";
 
   switch (event.state) {
     case "processed":
-      EventIcon = resolveIcon("check");
+      EventIcon = resolveIcon("circle-check");
       EventColor = "text-green-700";
       EventBackground = "bg-green-200";
-      iconBorderColor = "border-green-700";
-      iconSize = 8;
+      titleColor = "text-green-800";
+      iconSize = 16;
       break;
     case "discarded":
-      EventIcon = resolveIcon("x");
+      EventIcon = resolveIcon("circle-x");
       EventColor = "text-red-700";
       EventBackground = "bg-red-200";
-      iconBorderColor = "border-red-700";
-      iconSize = 8;
+      titleColor = "text-red-800";
+      iconSize = 16;
       break;
     case "waiting":
       if (variant === "queue") {
@@ -322,19 +322,15 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         EventIcon = resolveIcon("circle-dashed");
         EventColor = "text-gray-500";
         EventBackground = "bg-gray-100";
-        iconBorderColor = "";
-        iconSize = 20;
-        iconContainerSize = 5;
-        iconStrokeWidth = 2;
+        titleColor = "text-gray-600";
+        iconSize = 16;
         animation = "";
       } else {
         EventIcon = resolveIcon("refresh-cw");
         EventColor = "text-blue-700";
         EventBackground = "bg-blue-100";
-        iconBorderColor = "";
-        iconSize = 17;
-        iconContainerSize = 5;
-        iconStrokeWidth = 2;
+        titleColor = "text-blue-800";
+        iconSize = 16;
         animation = "animate-spin";
       }
       break;
@@ -342,10 +338,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       EventIcon = resolveIcon("refresh-cw");
       EventColor = "text-blue-700";
       EventBackground = "bg-blue-100";
-      iconBorderColor = "";
-      iconSize = 17;
-      iconContainerSize = 5;
-      iconStrokeWidth = 2;
+      titleColor = "text-blue-800";
+      iconSize = 16;
       animation = "animate-spin";
       break;
   }
@@ -365,14 +359,14 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           }}
         >
           <div
-            className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center border-[1.5px] ${EventColor} ${iconBorderColor} ${animation}`}
+            className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center ${EventColor} ${animation}`}
           >
             <EventIcon size={iconSize} strokeWidth={iconStrokeWidth} className="thick" />
           </div>
-          <span className="truncate text-sm text-black font-medium">{event.title}</span>
+          <span className={`truncate text-sm font-medium ${titleColor}`}>{event.title}</span>
         </div>
         {event.subtitle && (
-          <span className="text-sm text-gray-500 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
+          <span className="text-xs text-black/50 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
         )}
 
         <SidebarEventActionsMenu
@@ -391,7 +385,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       </div>
 
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
-        <div className="rounded-sm bg-white border-1 border-gray-800 text-gray-500 w-full">
+        <div className="rounded-sm bg-white outline outline-black/20 text-gray-500 w-full mb-0.5">
           {/* Tab Navigation */}
           {tabData && (
             <div className="flex justify-between items-center border-b-1 border-gray-200">
@@ -456,7 +450,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
           {/* Tab Content */}
           {tabData && activeTab === "current" && tabData.current && (
-            <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
+            <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
               {Object.entries(tabData.current).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
                   <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
@@ -474,7 +468,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           )}
 
           {tabData && activeTab === "root" && tabData.root && (
-            <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
+            <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
               {Object.entries(tabData.root).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
                   <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
@@ -671,7 +665,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
           {/* Fallback to original values display if no tabData */}
           {!tabData && event.values && Object.entries(event.values).length > 0 && (
-            <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
+            <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
               {Object.entries(event.values || {}).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
                   <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>

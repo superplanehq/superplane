@@ -118,7 +118,10 @@ function CanvasContent({
   onZoomChange?: (zoom: number) => void;
   onEdgeMouseEnter?: (event: React.MouseEvent, edge: any) => void;
   onEdgeMouseLeave?: () => void;
-  onConnectStart?: (event: any, params: { nodeId: string | null; handleId: string | null }) => void;
+  onConnectStart?: (
+    event: any,
+    params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
+  ) => void;
   onConnectEnd?: () => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
@@ -378,7 +381,11 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   );
 
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
-  const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; handleId: string | null } | null>(null);
+  const [connectingFrom, setConnectingFrom] = useState<{
+    nodeId: string;
+    handleId: string | null;
+    handleType: "source" | "target" | null;
+  } | null>(null);
 
   const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: any) => {
     setHoveredEdgeId(edge.id);
@@ -388,11 +395,17 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     setHoveredEdgeId(null);
   }, []);
 
-  const handleConnectStart = useCallback((_event: any, params: { nodeId: string | null; handleId: string | null }) => {
-    if (params.nodeId) {
-      setConnectingFrom({ nodeId: params.nodeId, handleId: params.handleId });
-    }
-  }, []);
+  const handleConnectStart = useCallback(
+    (
+      _event: any,
+      params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
+    ) => {
+      if (params.nodeId) {
+        setConnectingFrom({ nodeId: params.nodeId, handleId: params.handleId, handleType: params.handleType });
+      }
+    },
+    [],
+  );
 
   const handleConnectEnd = useCallback(() => {
     setConnectingFrom(null);
@@ -418,7 +431,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         ...edge,
         type: "custom",
         data: { ...edge.data, isHovered: edge.id === hoveredEdgeId },
-        zIndex: edge.id === hoveredEdgeId ? 1000 : 1,
+        zIndex: edge.id === hoveredEdgeId ? 1000 : 0,
       })),
     [props.edges, hoveredEdgeId],
   );
@@ -432,9 +445,10 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           ...node.data,
           _hoveredEdge: hoveredEdge,
           _connectingFrom: connectingFrom,
+          _allEdges: props.edges,
         },
       })),
-    [props.nodes, hoveredEdge, connectingFrom],
+    [props.nodes, hoveredEdge, connectingFrom, props.edges],
   );
 
   const handleLogoClick = useCallback(() => {

@@ -149,10 +149,25 @@ function LeftHandle({ data, nodeId }: BlockProps) {
   // Check if this handle is part of the hovered edge (this is the target)
   const hoveredEdge = (data as any)._hoveredEdge;
   const connectingFrom = (data as any)._connectingFrom;
+  const allEdges = (data as any)._allEdges || [];
 
-  // Highlight if: 1) part of hovered edge, or 2) user is dragging a connection
+  // Check if already connected to the source being dragged
+  const isAlreadyConnected = connectingFrom
+    ? allEdges.some(
+        (edge: any) =>
+          edge.source === connectingFrom.nodeId &&
+          edge.sourceHandle === connectingFrom.handleId &&
+          edge.target === nodeId,
+      )
+    : false;
+
+  // Highlight if: 1) part of hovered edge, or 2) user is dragging from a source handle on a different node AND not already connected
   const isHighlighted =
-    (hoveredEdge && hoveredEdge.target === nodeId) || (connectingFrom && connectingFrom.nodeId !== nodeId);
+    (hoveredEdge && hoveredEdge.target === nodeId) ||
+    (connectingFrom &&
+      connectingFrom.nodeId !== nodeId &&
+      connectingFrom.handleType === "source" &&
+      !isAlreadyConnected);
 
   return (
     <Handle
@@ -198,12 +213,25 @@ function RightHandle({ data, nodeId }: BlockProps) {
   // Get hovered edge info and connecting state
   const hoveredEdge = (data as any)._hoveredEdge;
   const connectingFrom = (data as any)._connectingFrom;
+  const allEdges = (data as any)._allEdges || [];
 
   // Single channel: render one handle that respects collapsed state
   if (channels.length === 1) {
+    // Check if already connected to the target being dragged
+    const isAlreadyConnected = connectingFrom
+      ? allEdges.some(
+          (edge: any) =>
+            edge.source === nodeId && edge.sourceHandle === channels[0] && edge.target === connectingFrom.nodeId,
+        )
+      : false;
+
     const isHighlighted =
       (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channels[0]) ||
-      (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channels[0]);
+      (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channels[0]) ||
+      (connectingFrom &&
+        connectingFrom.nodeId !== nodeId &&
+        connectingFrom.handleType === "target" &&
+        !isAlreadyConnected);
 
     return (
       <Handle
@@ -227,9 +255,21 @@ function RightHandle({ data, nodeId }: BlockProps) {
   return (
     <>
       {channels.map((channel, index) => {
+        // Check if already connected to the target being dragged
+        const isAlreadyConnected = connectingFrom
+          ? allEdges.some(
+              (edge: any) =>
+                edge.source === nodeId && edge.sourceHandle === channel && edge.target === connectingFrom.nodeId,
+            )
+          : false;
+
         const isHighlighted =
           (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channel) ||
-          (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channel);
+          (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channel) ||
+          (connectingFrom &&
+            connectingFrom.nodeId !== nodeId &&
+            connectingFrom.handleType === "target" &&
+            !isAlreadyConnected);
 
         return (
           <div

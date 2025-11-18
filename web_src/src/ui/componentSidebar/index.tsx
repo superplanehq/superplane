@@ -1,12 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { resolveIcon } from "@/lib/utils";
 import { ArrowLeft, Plus, Search, TextAlignStart, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { MetadataItem, MetadataList } from "../metadataList";
+import { ChildEventsState } from "../composite";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
-import { ChainExecutionState, TabData } from "./SidebarEventItem/SidebarEventItem";
+import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
+
+const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
+  { value: "processed", label: "Processed" },
+  { value: "discarded", label: "Failed" },
+  { value: "running", label: "Running" },
+];
 interface ComponentSidebarProps {
   isOpen?: boolean;
   setIsOpen?: (isOpen: boolean) => void;
@@ -122,7 +131,7 @@ export const ComponentSidebar = ({
 
   const [page, setPage] = useState<"overview" | "history" | "queue">("overview");
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ChainExecutionState | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -290,16 +299,26 @@ export const ComponentSidebar = ({
   }, [allEvents, statusFilter, searchQuery]);
 
   const statusOptions = React.useMemo(() => {
-    const statuses = new Set(allEvents.map((event) => event.state));
-    return Array.from(statuses).filter(Boolean);
+    const statuses = new Set<ChildEventsState>();
+    allEvents.forEach((event) => {
+      if (event.state) {
+        statuses.add(event.state);
+      }
+    });
+    return Array.from(statuses);
   }, [allEvents]);
+
+  const extraStatusOptions = React.useMemo(
+    () => statusOptions.filter((status) => !DEFAULT_STATUS_OPTIONS.some((option) => option.value === status)),
+    [statusOptions],
+  );
 
   if (!isOpen) return null;
 
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-gray-200 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize handle */}
@@ -316,12 +335,12 @@ export const ComponentSidebar = ({
           }`}
         />
       </div>
-      <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-gray-200 bg-gray-50">
+      <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-border bg-gray-50">
         <div className="flex flex-col items-start gap-3 w-full mt-2">
           <div
-            className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
+            className={`w-7 h-7 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
           >
-            {iconSrc ? <img src={iconSrc} alt={title} className="w-7 h-7" /> : <Icon size={22} className={iconColor} />}
+            {iconSrc ? <img src={iconSrc} alt={title} className="w-6 h-6" /> : <Icon size={16} className={iconColor} />}
           </div>
           <div className="flex justify-between gap-3 w-full">
             <h2 className="text-xl font-semibold">{title}</h2>
@@ -341,20 +360,19 @@ export const ComponentSidebar = ({
           </div>
           <div
             onClick={() => onClose?.()}
-            className="flex items-center justify-center gap-1 absolute top-6 right-2 text-xs font-medium cursor-pointer"
+            className="flex items-center justify-center absolute top-6 right-3 cursor-pointer"
           >
-            <span>Close</span>
-            <X size={14} />
+            <X size={18} />
           </div>
         </div>
       </div>
       {page !== "overview" ? (
         <>
           {/* Back to Overview Section */}
-          <div className="px-3 py-2 border-b-1 border-gray-200">
+          <div className="px-3 py-2 border-b-1 border-border">
             <button
               onClick={handleBackToOverview}
-              className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800 cursor-pointer"
+              className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 cursor-pointer"
             >
               <ArrowLeft size={16} />
               Back to Overview
@@ -364,37 +382,46 @@ export const ComponentSidebar = ({
           {/* Full History Header with Search and Filter */}
           <div className="px-3 py-3">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold uppercase text-gray-500">
+              <h2 className="text-xs font-semibold uppercase text-gray-500">
                 {page === "history" ? "Full History" : "Queue"}
               </h2>
             </div>
             <div className="flex gap-2">
               {/* Search Input */}
               <div className="relative flex-1">
-                <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
+                <Search size={16} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500" />
+                <Input
                   type="text"
                   placeholder="Search events..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-3 py-1.5 border border-gray-200 rounded-md text-sm focus:outline-none "
+                  className="pl-8 h-9 text-sm"
                 />
               </div>
               {/* Status Filter */}
-              <select
+              <Select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as ChainExecutionState)}
-                className="px-3 py-1.5 border border-gray-200 rounded-md text-sm focus:outline-none placeholder:text-gray-400 text-gray-400"
+                onValueChange={(value) => setStatusFilter(value as ChildEventsState | "all")}
               >
-                <option value="all" className="text-gray-400">
-                  All Statuses
-                </option>
-                {statusOptions.map((status) => (
-                  <option key={status} value={status} className="text-gray-400">
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-[160px] h-9 text-sm text-gray-500">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-gray-500">
+                    All Statuses
+                  </SelectItem>
+                  {DEFAULT_STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value} className="text-gray-500">
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                  {extraStatusOptions.map((status) => (
+                    <SelectItem key={status} value={status} className="text-gray-500">
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -428,7 +455,7 @@ export const ComponentSidebar = ({
                       <button
                         onClick={handleLoadMoreItems}
                         disabled={loadingMoreItems}
-                        className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed rounded-md px-2 py-1.5 border border-gray-200 shadow-xs"
+                        className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed rounded-md px-2 py-1.5 border border-border shadow-xs"
                       >
                         {loadingMoreItems ? null : <Plus size={16} />}
                         {loadingMoreItems ? "Loading..." : `Show ${showMoreCount > 10 ? "10" : showMoreCount} more`}
@@ -444,15 +471,15 @@ export const ComponentSidebar = ({
         // Overview (Original Content)
         <>
           {metadata.length > 0 && (
-            <div className="px-3 py-1 border-b-1 border-gray-200">
+            <div className="px-3 py-1 border-b-1 border-border">
               <MetadataList
                 items={metadata}
-                className="border-b-0 text-gray-500 font-medium gap-2 flex flex-col py-2 font-mono"
+                className="border-b-0 text-gray-500 font-medium gap-1.5 flex flex-col py-2"
               />
             </div>
           )}
-          <div className="px-3 py-1 border-b-1 border-gray-200 pb-3 text-left">
-            <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Latest events</h2>
+          <div className="px-3 py-1 border-b-1 border-border pb-3 text-left">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Latest events</h2>
             <div className="flex flex-col gap-2">
               {latestEvents.length === 0 ? (
                 <div className="text-center py-4 text-gray-500 text-sm">No events found</div>
@@ -479,7 +506,7 @@ export const ComponentSidebar = ({
                   {handleSeeFullHistory && (
                     <button
                       onClick={handleSeeFullHistory}
-                      className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
+                      className="text-sm text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
                     >
                       <TextAlignStart size={16} />
                       See full history
@@ -491,7 +518,7 @@ export const ComponentSidebar = ({
           </div>
           {!hideQueueEvents && (
             <div className="px-3 py-1 pb-3 text-left">
-              <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Next in queue</h2>
+              <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Next in queue</h2>
               <div className="flex flex-col gap-2">
                 {nextInQueueEvents.length === 0 ? (
                   <div className="text-center py-4 text-gray-500 text-sm">Queue is empty</div>
