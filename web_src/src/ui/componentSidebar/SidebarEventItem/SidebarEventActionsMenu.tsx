@@ -75,7 +75,7 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="ml-1 h-6 w-6 flex items-center justify-center rounded hover:bg-black/5 text-gray-600"
+          className="h-6 w-6 flex items-center justify-center rounded hover:bg-black/5 text-gray-600"
           aria-label="Open actions"
           onClick={(e) => e.stopPropagation()}
         >

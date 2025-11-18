@@ -366,7 +366,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           <span className={`truncate text-sm font-medium ${titleColor}`}>{event.title}</span>
         </div>
         {event.subtitle && (
-          <span className="text-sm text-black/50 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
+          <span className="text-xs text-black/50 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
         )}
 
         <SidebarEventActionsMenu
@@ -385,7 +385,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       </div>
 
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
-        <div className="rounded-sm bg-white border-1 border-gray-800 text-gray-500 w-full">
+        <div className="rounded-sm bg-white outline outline-black/20 text-gray-500 w-full mb-0.5">
           {/* Tab Navigation */}
           {tabData && (
             <div className="flex justify-between items-center border-b-1 border-gray-200">
@@ -450,7 +450,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
           {/* Tab Content */}
           {tabData && activeTab === "current" && tabData.current && (
-            <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
+            <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
               {Object.entries(tabData.current).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
                   <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
@@ -468,7 +468,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           )}
 
           {tabData && activeTab === "root" && tabData.root && (
-            <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
+            <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
               {Object.entries(tabData.root).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
                   <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
@@ -665,7 +665,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
           {/* Fallback to original values display if no tabData */}
           {!tabData && event.values && Object.entries(event.values).length > 0 && (
-            <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
+            <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
               {Object.entries(event.values || {}).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
                   <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>

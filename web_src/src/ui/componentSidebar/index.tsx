@@ -1,12 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { resolveIcon } from "@/lib/utils";
 import { ArrowLeft, Plus, Search, TextAlignStart, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { MetadataItem, MetadataList } from "../metadataList";
+import { ChildEventsState } from "../composite";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
-import { ChainExecutionState, TabData } from "./SidebarEventItem/SidebarEventItem";
+import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
+
+const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
+  { value: "processed", label: "Processed" },
+  { value: "discarded", label: "Failed" },
+  { value: "running", label: "Running" },
+];
 interface ComponentSidebarProps {
   isOpen?: boolean;
   setIsOpen?: (isOpen: boolean) => void;
@@ -122,7 +131,7 @@ export const ComponentSidebar = ({
 
   const [page, setPage] = useState<"overview" | "history" | "queue">("overview");
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ChainExecutionState | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -290,9 +299,19 @@ export const ComponentSidebar = ({
   }, [allEvents, statusFilter, searchQuery]);
 
   const statusOptions = React.useMemo(() => {
-    const statuses = new Set(allEvents.map((event) => event.state));
-    return Array.from(statuses).filter(Boolean);
+    const statuses = new Set<ChildEventsState>();
+    allEvents.forEach((event) => {
+      if (event.state) {
+        statuses.add(event.state);
+      }
+    });
+    return Array.from(statuses);
   }, [allEvents]);
+
+  const extraStatusOptions = React.useMemo(
+    () => statusOptions.filter((status) => !DEFAULT_STATUS_OPTIONS.some((option) => option.value === status)),
+    [statusOptions],
+  );
 
   if (!isOpen) return null;
 
@@ -353,7 +372,7 @@ export const ComponentSidebar = ({
           <div className="px-3 py-2 border-b-1 border-border">
             <button
               onClick={handleBackToOverview}
-              className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800 cursor-pointer"
+              className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 cursor-pointer"
             >
               <ArrowLeft size={16} />
               Back to Overview
@@ -370,30 +389,39 @@ export const ComponentSidebar = ({
             <div className="flex gap-2">
               {/* Search Input */}
               <div className="relative flex-1">
-                <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
+                <Search size={16} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500" />
+                <Input
                   type="text"
                   placeholder="Search events..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-3 py-1.5 border border-border rounded-md text-sm focus:outline-none "
+                  className="pl-8 h-9 text-sm"
                 />
               </div>
               {/* Status Filter */}
-              <select
+              <Select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as ChainExecutionState)}
-                className="px-3 py-1.5 border border-border rounded-md text-sm focus:outline-none placeholder:text-gray-400 text-gray-400"
+                onValueChange={(value) => setStatusFilter(value as ChildEventsState | "all")}
               >
-                <option value="all" className="text-gray-400">
-                  All Statuses
-                </option>
-                {statusOptions.map((status) => (
-                  <option key={status} value={status} className="text-gray-400">
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-[160px] h-9 text-sm text-gray-500">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-gray-500">
+                    All Statuses
+                  </SelectItem>
+                  {DEFAULT_STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value} className="text-gray-500">
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                  {extraStatusOptions.map((status) => (
+                    <SelectItem key={status} value={status} className="text-gray-500">
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -478,7 +506,7 @@ export const ComponentSidebar = ({
                   {handleSeeFullHistory && (
                     <button
                       onClick={handleSeeFullHistory}
-                      className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
+                      className="text-sm text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
                     >
                       <TextAlignStart size={16} />
                       See full history
