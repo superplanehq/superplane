@@ -1,5 +1,7 @@
 package authorization
 
+import "gorm.io/gorm"
+
 // Permission checking interface
 type PermissionChecker interface {
 	CheckCanvasPermission(userID, canvasID, resource, action string) (bool, error)
@@ -28,11 +30,10 @@ type RoleManager interface {
 
 // Setup and initialization interface
 type AuthorizationSetup interface {
-	SetupOrganizationRoles(orgID string) error
+	SetupOrganization(tx *gorm.DB, orgID, ownerID string) error
+	DestroyOrganization(tx *gorm.DB, orgID string) error
 	SetupCanvasRoles(canvasID string) error
-	DestroyOrganizationRoles(orgID string) error
 	DestroyCanvasRoles(canvasID string) error
-	CreateOrganizationOwner(userID, orgID string) error
 }
 
 // User access and role query interface

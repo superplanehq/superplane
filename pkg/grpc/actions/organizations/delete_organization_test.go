@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	uuid "github.com/google/uuid"
@@ -40,5 +41,42 @@ func Test__DeleteOrganization(t *testing.T) {
 
 		_, err = models.FindOrganizationByID(r.Organization.ID.String())
 		assert.Error(t, err)
+	})
+}
+
+func Test__DeleteOrganization_TransactionRollback(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	t.Run("auth service failure rolls back organization soft-deletion", func(t *testing.T) {
+		//
+		// Verify organization exists and is not soft-deleted
+		//
+		foundOrg, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.False(t, foundOrg.DeletedAt.Valid)
+
+		//
+		// Use an authentication service that fails
+		//
+		mockAuth := &mockAuthService{
+			Authorization: r.AuthService,
+			Error:         errors.New("ooops"),
+		}
+
+		//
+		// Try to delete organization
+		// It should fail due to destroy organization error.
+		//
+		_, err = DeleteOrganization(ctx, mockAuth, r.Organization.ID.String())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "ooops")
+
+		//
+		// Verify organization is NOT soft-deleted after transaction rollback
+		//
+		foundOrg, err = models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.False(t, foundOrg.DeletedAt.Valid)
 	})
 }

@@ -73,6 +73,10 @@ func FindOrganizationByName(name string) (*Organization, error) {
 }
 
 func CreateOrganization(name, description string) (*Organization, error) {
+	return CreateOrganizationInTransaction(database.Conn(), name, description)
+}
+
+func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Organization, error) {
 	now := time.Now()
 	organization := Organization{
 		Name:             name,
@@ -82,7 +86,7 @@ func CreateOrganization(name, description string) (*Organization, error) {
 		UpdatedAt:        &now,
 	}
 
-	err := database.Conn().
+	err := tx.
 		Clauses(clause.Returning{}).
 		Create(&organization).
 		Error
@@ -99,7 +103,11 @@ func CreateOrganization(name, description string) (*Organization, error) {
 }
 
 func SoftDeleteOrganization(id string) error {
-	return database.Conn().
+	return SoftDeleteOrganizationInTransaction(database.Conn(), id)
+}
+
+func SoftDeleteOrganizationInTransaction(tx *gorm.DB, id string) error {
+	return tx.
 		Where("id = ?", id).
 		Delete(&Organization{}).
 		Error

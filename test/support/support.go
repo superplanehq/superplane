@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -86,17 +87,35 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	// Create organization and user
 	//
 	var err error
-	organization, err := models.CreateOrganization(RandomName("org"), RandomName("org-display"))
-	require.NoError(t, err)
-	r.AuthService.SetupOrganizationRoles(organization.ID.String())
-	require.NoError(t, err)
+	tx := database.Conn().Begin()
+	organization, err := models.CreateOrganizationInTransaction(tx, RandomName("org"), RandomName("org-display"))
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
 
-	account, err := models.CreateAccount("test@example.com", "test")
-	require.NoError(t, err)
-	user, err := models.CreateUser(organization.ID, account.ID, account.Email, account.Name)
-	require.NoError(t, err)
-	err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgOwner, organization.ID.String(), models.DomainTypeOrganization)
-	require.NoError(t, err)
+	account, err := models.CreateAccountInTransaction(tx, "test@example.com", "test")
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	user, err := models.CreateUserInTransaction(tx, organization.ID, account.ID, account.Email, account.Name)
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	err = r.AuthService.SetupOrganization(tx, organization.ID.String(), user.ID.String())
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	err = tx.Commit().Error
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
 
 	r.Account = account
 	r.User = user.ID
@@ -169,12 +188,24 @@ func AuthService(t *testing.T) *authorization.AuthService {
 }
 
 func CreateOrganization(t *testing.T, r *ResourceRegistry, userID uuid.UUID) *models.Organization {
-	organization, err := models.CreateOrganization(RandomName("org"), RandomName("org-display"))
-	require.NoError(t, err)
-	r.AuthService.SetupOrganizationRoles(organization.ID.String())
-	require.NoError(t, err)
-	err = r.AuthService.AssignRole(userID.String(), models.RoleOrgOwner, organization.ID.String(), models.DomainTypeOrganization)
-	require.NoError(t, err)
+	tx := database.Conn().Begin()
+	organization, err := models.CreateOrganizationInTransaction(tx, RandomName("org"), RandomName("org-display"))
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	err = r.AuthService.SetupOrganization(tx, organization.ID.String(), userID.String())
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	err = tx.Commit().Error
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+
 	return organization
 }
 

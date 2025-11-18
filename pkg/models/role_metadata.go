@@ -188,3 +188,33 @@ func FindRoleMetadataByNames(roleNames []string, domainType, domainID string) (m
 	}
 	return result, nil
 }
+
+func DeleteMetadataForOrganization(tx *gorm.DB, domainType, domainID string) error {
+	//
+	// Delete role metadata
+	//
+	err := tx.
+		Where("domain_type = ?", domainType).
+		Where("domain_id = ?", domainID).
+		Delete(&RoleMetadata{}).
+		Error
+
+	if err != nil {
+		return err
+	}
+
+	//
+	// Delete group metadata
+	//
+	err = tx.
+		Where("domain_type = ?", domainType).
+		Where("domain_id = ?", domainID).
+		Delete(&GroupMetadata{}).
+		Error
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

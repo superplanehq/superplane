@@ -405,31 +405,6 @@ func Test__AuthService_AccessibleResources(t *testing.T) {
 	})
 }
 
-func Test__AuthService_CreateOrganizationOwner(t *testing.T) {
-	r := support.Setup(t)
-	userID := r.User.String()
-	orgID := r.Organization.ID.String()
-
-	t.Run("create organization owner", func(t *testing.T) {
-		err := r.AuthService.CreateOrganizationOwner(userID, orgID)
-		require.NoError(t, err)
-
-		// Verify owner permissions
-		allowed, err := r.AuthService.CheckOrganizationPermission(userID, orgID, models.DomainTypeOrganization, "update")
-		require.NoError(t, err)
-		assert.True(t, allowed)
-
-		roles, err := r.AuthService.GetUserRolesForOrg(userID, orgID)
-		require.NoError(t, err)
-		flatRoles := make(map[string]bool)
-		for _, role := range roles {
-			flatRoles[role.Name] = true
-		}
-
-		require.True(t, flatRoles[models.RoleOrgOwner])
-	})
-}
-
 func Test__AuthService_RoleHierarchy(t *testing.T) {
 	r := support.Setup(t)
 	userID := r.User.String()
@@ -536,8 +511,18 @@ func Test__AuthService_CrossDomainPermissions(t *testing.T) {
 		orgID := uuid.New().String()
 		canvasID := uuid.New().String()
 
-		err := r.AuthService.SetupOrganizationRoles(orgID)
-		require.NoError(t, err)
+		tx := database.Conn().Begin()
+		err := r.AuthService.SetupOrganization(tx, orgID, userID)
+		if !assert.NoError(t, err) {
+			tx.Rollback()
+			t.FailNow()
+		}
+
+		err = tx.Commit().Error
+		if !assert.NoError(t, err) {
+			t.FailNow()
+		}
+
 		err = r.AuthService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
 
@@ -552,13 +537,11 @@ func Test__AuthService_CrossDomainPermissions(t *testing.T) {
 	})
 
 	t.Run("canvas role does not grant org permissions", func(t *testing.T) {
-		userID := r.User.String()
+		userID := uuid.New().String()
 		canvasID := uuid.New().String()
 		orgID := uuid.New().String()
 
 		err := r.AuthService.SetupCanvasRoles(canvasID)
-		require.NoError(t, err)
-		err = r.AuthService.SetupOrganizationRoles(orgID)
 		require.NoError(t, err)
 
 		// Assign canvas owner role

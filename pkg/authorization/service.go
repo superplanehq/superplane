@@ -151,8 +151,7 @@ func (a *AuthService) CreateGroup(domainID string, domainType string, groupName 
 		return fmt.Errorf("group %s already exists with role %s in %s %s", groupName, role, domainType, domainID)
 	}
 
-	tx.Commit()
-	return nil
+	return tx.Commit().Error
 }
 
 func (a *AuthService) DeleteGroup(domainID string, domainType string, groupName string) error {
@@ -186,8 +185,7 @@ func (a *AuthService) DeleteGroup(domainID string, domainType string, groupName 
 		return fmt.Errorf("failed to remove casbin grouping policies for group: %w", err)
 	}
 
-	tx.Commit()
-	return nil
+	return tx.Commit().Error
 }
 
 func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName string, newRole string, displayName string, description string) error {
@@ -256,8 +254,7 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 		return fmt.Errorf("failed to update casbin grouping policies: %w", err)
 	}
 
-	tx.Commit()
-	return nil
+	return tx.Commit().Error
 }
 
 func (a *AuthService) AddUserToGroup(domainID string, domainType string, userID string, group string) error {
@@ -370,6 +367,14 @@ func (a *AuthService) GetGroupRole(domainID string, domainType string, group str
 }
 
 func (a *AuthService) AssignRole(userID, role, domainID string, domainType string) error {
+	adapter := a.enforcer.GetAdapter().(*gormadapter.Adapter)
+
+	return adapter.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
+		return a.assignRoleWithEnforcer(enforcerTx, userID, role, domainID, domainType)
+	})
+}
+
+func (a *AuthService) assignRoleWithEnforcer(enforcer casbin.IEnforcer, userID, role, domainID, domainType string) error {
 	domain := prefixDomain(domainType, domainID)
 	prefixedRole := prefixRoleName(role)
 
@@ -386,29 +391,28 @@ func (a *AuthService) AssignRole(userID, role, domainID string, domainType strin
 
 	// If not a default role, check if it's a custom role that exists
 	if !isValidDefaultRole {
-		policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRole, domain)
+		policies, _ := enforcer.GetFilteredPolicy(0, prefixedRole, domain)
 		if len(policies) == 0 {
 			return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
 		}
 	}
 
 	prefixedUserID := prefixUserID(userID)
-
-	existingRoles, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID, "", domain)
+	existingRoles, err := enforcer.GetFilteredGroupingPolicy(0, prefixedUserID, "", domain)
 	if err != nil {
 		return fmt.Errorf("failed to get existing roles for user: %w", err)
 	}
 
 	for _, existingRole := range existingRoles {
 		if strings.HasPrefix(existingRole[1], "role:") {
-			_, err := a.enforcer.RemoveGroupingPolicy(prefixedUserID, existingRole[1], domain)
+			_, err := enforcer.RemoveGroupingPolicy(prefixedUserID, existingRole[1], domain)
 			if err != nil {
 				log.Warnf("failed to remove existing role %s for user %s: %v", existingRole[1], userID, err)
 			}
 		}
 	}
 
-	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedUserID, prefixedRole, domain)
+	ruleAdded, err := enforcer.AddGroupingPolicy(prefixedUserID, prefixedRole, domain)
 	if err != nil {
 		return fmt.Errorf("failed to add role: %w", err)
 	}
@@ -469,10 +473,8 @@ func (a *AuthService) GetCanvasUsersForRole(role string, canvasID string) ([]str
 	return unprefixedUsers, nil
 }
 
-func (a *AuthService) SetupOrganizationRoles(orgID string) error {
+func (a *AuthService) SetupOrganization(tx *gorm.DB, orgID, ownerID string) error {
 	domain := prefixDomain(models.DomainTypeOrganization, orgID)
-
-	tx := database.Conn().Begin()
 
 	//
 	// First, we update our own database tables,
@@ -482,7 +484,6 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 	err := a.setupDefaultOrganizationRoleMetadataInTransaction(tx, orgID)
 	if err != nil {
 		log.Errorf("Error setting up default organization role metadata for %s: %v", orgID, err)
-		tx.Rollback()
 		return err
 	}
 
@@ -495,6 +496,10 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 	//
 	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
 	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
+
+		//
+		// Setup organization policies from templates
+		//
 		for _, policy := range a.orgPolicyTemplates {
 			switch policy[0] {
 			case "g":
@@ -512,41 +517,60 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 			}
 		}
 
+		//
+		// Setup the organization owner
+		//
+		err = a.assignRoleWithEnforcer(enforcerTx, ownerID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
+		if err != nil {
+			return fmt.Errorf("failed to assign organization owner: %w", err)
+		}
+
 		return nil
 	})
 
 	if err != nil {
 		log.Errorf("Error adding policies for %s: %v", orgID, err)
-		tx.Rollback()
 		return fmt.Errorf("failed to setup organization roles for %s: %w", orgID, err)
 	}
 
 	log.Infof("Policies added - loading policies for %s", orgID)
 
-	tx.Commit()
-
-	log.Infof("Transaction committed for %s", orgID)
-
 	return nil
 }
 
-func (a *AuthService) DestroyOrganizationRoles(orgID string) error {
+func (a *AuthService) DestroyOrganization(tx *gorm.DB, orgID string) error {
 	domain := fmt.Sprintf("org:%s", orgID)
-	ok, err := a.enforcer.RemoveFilteredGroupingPolicy(2, domain)
+
+	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
+	err := db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
+		ok, err := a.enforcer.RemoveFilteredGroupingPolicy(2, domain)
+		if err != nil {
+			return fmt.Errorf("failed to remove organization roles: %w", err)
+		}
+
+		if !ok {
+			return fmt.Errorf("organization roles not found for %s", orgID)
+		}
+
+		ok, err = a.enforcer.RemoveFilteredPolicy(1, domain)
+		if err != nil {
+			return fmt.Errorf("failed to remove organization policies: %w", err)
+		}
+
+		if !ok {
+			return fmt.Errorf("organization policies not found for %s", orgID)
+		}
+
+		return nil
+	})
 
 	if err != nil {
-		return fmt.Errorf("failed to remove organization roles: %w", err)
-	}
-	if !ok {
-		return fmt.Errorf("organization roles not found for %s", orgID)
+		return fmt.Errorf("failed to remove policies for %s: %w", orgID, err)
 	}
 
-	ok, err = a.enforcer.RemoveFilteredPolicy(1, domain)
+	err = models.DeleteMetadataForOrganization(tx, models.DomainTypeOrganization, orgID)
 	if err != nil {
-		return fmt.Errorf("failed to remove organization policies: %w", err)
-	}
-	if !ok {
-		return fmt.Errorf("organization policies not found for %s", orgID)
+		return fmt.Errorf("failed to delete organization metadata for %s: %w", orgID, err)
 	}
 
 	return nil
@@ -661,9 +685,7 @@ func (a *AuthService) SetupCanvasRoles(canvasID string) error {
 		return fmt.Errorf("failed to setup canvas roles: %w", err)
 	}
 
-	tx.Commit()
-
-	return nil
+	return tx.Commit().Error
 }
 
 func (a *AuthService) DestroyCanvasRoles(canvasID string) error {
@@ -818,10 +840,6 @@ func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domai
 	}
 
 	return hierarchy, nil
-}
-
-func (a *AuthService) CreateOrganizationOwner(userID, orgID string) error {
-	return a.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
 }
 
 func (a *AuthService) SyncDefaultRoles() error {
@@ -1112,8 +1130,7 @@ func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefi
 		return fmt.Errorf("failed to create custom role: %w", err)
 	}
 
-	tx.Commit()
-	return nil
+	return tx.Commit().Error
 }
 
 func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefinition) error {
@@ -1181,8 +1198,7 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 		return fmt.Errorf("failed to update custom role: %w", err)
 	}
 
-	tx.Commit()
-	return nil
+	return tx.Commit().Error
 }
 
 func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleName string) error {
@@ -1230,8 +1246,7 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 		return fmt.Errorf("failed to delete custom role: %w", err)
 	}
 
-	tx.Commit()
-	return nil
+	return tx.Commit().Error
 }
 
 // IsDefaultRole checks if a role is a default system role
