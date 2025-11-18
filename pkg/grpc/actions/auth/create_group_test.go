@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -40,28 +39,6 @@ func Test_CreateGroup(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, groups, "test-group")
 		assert.Len(t, groups, 1)
-	})
-
-	t.Run("successful canvas group creation", func(t *testing.T) {
-		req := &pb.CreateGroupRequest{
-			Group: &pb.Group{
-				Metadata: &pb.Group_Metadata{
-					Name: "canvas-group",
-				},
-				Spec: &pb.Group_Spec{
-					Role:        models.RoleCanvasAdmin,
-					DisplayName: "canvas-group",
-					Description: "canvas-group",
-				},
-			},
-		}
-
-		resp, err := CreateGroup(ctx, "canvas", r.Canvas.ID.String(), req.Group, r.AuthService)
-		require.NoError(t, err)
-		assert.NotNil(t, resp)
-		assert.Equal(t, "canvas-group", resp.Group.Metadata.Name)
-		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, resp.Group.Metadata.DomainType)
-		assert.Equal(t, r.Canvas.ID.String(), resp.Group.Metadata.DomainId)
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {

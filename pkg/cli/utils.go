@@ -35,11 +35,6 @@ func getOneOrAnotherFlag(cmd *cobra.Command, flag1, flag2 string, required bool)
 }
 
 func getDomainOrExit(client *openapi_client.APIClient, cmd *cobra.Command) (string, string) {
-	canvasIdOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", false)
-	if canvasIdOrName != "" {
-		return string(openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_CANVAS), canvasIdOrName
-	}
-
 	response, _, err := client.MeAPI.MeMe(context.Background()).Execute()
 	Check(err)
 

@@ -35,7 +35,6 @@ import (
 type ResourceRegistry struct {
 	User             uuid.UUID
 	UserModel        *models.User
-	Canvas           *models.Canvas
 	Organization     *models.Organization
 	Account          *models.Account
 	Integration      *models.Integration
@@ -123,31 +122,25 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	r.Organization = organization
 
 	//
-	// Create canvas
-	//
-	r.Canvas = CreateCanvas(t, &r, r.Organization.ID, r.User)
-
-	//
 	// Create integration
 	//
 	if options.Integration {
-		secret, err := CreateCanvasSecret(t, &r, map[string]string{"key": "test"})
+		secret, err := CreateSecret(t, &r, map[string]string{"key": "test"})
 		require.NoError(t, err)
 		integration, err := models.CreateIntegration(&models.Integration{
 			Name:       RandomName("integration"),
 			CreatedBy:  r.User,
 			Type:       models.IntegrationTypeSemaphore,
-			DomainType: models.DomainTypeCanvas,
-			DomainID:   r.Canvas.ID,
+			DomainType: models.DomainTypeOrganization,
+			DomainID:   r.Organization.ID,
 			URL:        r.SemaphoreAPIMock.Server.URL,
 			AuthType:   models.IntegrationAuthTypeToken,
 			Auth: datatypes.NewJSONType(models.IntegrationAuth{
 				Token: &models.IntegrationAuthToken{
 					ValueFrom: models.ValueDefinitionFrom{
 						Secret: &models.ValueDefinitionFromSecret{
-							DomainType: models.DomainTypeCanvas,
-							Name:       secret.Name,
-							Key:        "key",
+							Name: secret.Name,
+							Key:  "key",
 						},
 					},
 				},
@@ -161,15 +154,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	return &r
 }
 
-func CreateCanvasSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
-	data, err := json.Marshal(secretData)
-	require.NoError(t, err)
-	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeCanvas, r.Canvas.ID, data)
-	require.NoError(t, err)
-	return secret, nil
-}
-
-func CreateOrganizationSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
+func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
 	data, err := json.Marshal(secretData)
 	require.NoError(t, err)
 	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, data)
@@ -207,16 +192,6 @@ func CreateOrganization(t *testing.T, r *ResourceRegistry, userID uuid.UUID) *mo
 	}
 
 	return organization
-}
-
-func CreateCanvas(t *testing.T, r *ResourceRegistry, organizationID, userID uuid.UUID) *models.Canvas {
-	canvas, err := models.CreateCanvas(userID, organizationID, RandomName("canvas"), "Test Canvas")
-	require.NoError(t, err)
-	err = r.AuthService.SetupCanvasRoles(canvas.ID.String())
-	require.NoError(t, err)
-	err = r.AuthService.AssignRole(userID.String(), models.RoleCanvasOwner, canvas.ID.String(), models.DomainTypeCanvas)
-	require.NoError(t, err)
-	return canvas
 }
 
 func CreateUser(t *testing.T, r *ResourceRegistry, organizationID uuid.UUID) *models.User {

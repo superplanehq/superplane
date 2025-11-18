@@ -22,7 +22,7 @@ var _ MappedNullable = &IntegrationsResourceRef{}
 type IntegrationsResourceRef struct {
 	Type *string `json:"type,omitempty"`
 	Name *string `json:"name,omitempty"`
-	Id   *string `json:"id,omitempty"`
+	Id *string `json:"id,omitempty"`
 }
 
 // NewIntegrationsResourceRef instantiates a new IntegrationsResourceRef object
@@ -139,7 +139,7 @@ func (o *IntegrationsResourceRef) SetId(v string) {
 }
 
 func (o IntegrationsResourceRef) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,3 +195,5 @@ func (v *NullableIntegrationsResourceRef) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

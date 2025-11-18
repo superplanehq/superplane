@@ -20,9 +20,8 @@ var _ MappedNullable = &SuperplaneIntegrationsValueFromSecret{}
 
 // SuperplaneIntegrationsValueFromSecret struct for SuperplaneIntegrationsValueFromSecret
 type SuperplaneIntegrationsValueFromSecret struct {
-	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
-	Name       *string                  `json:"name,omitempty"`
-	Key        *string                  `json:"key,omitempty"`
+	Name *string `json:"name,omitempty"`
+	Key *string `json:"key,omitempty"`
 }
 
 // NewSuperplaneIntegrationsValueFromSecret instantiates a new SuperplaneIntegrationsValueFromSecret object
@@ -31,8 +30,6 @@ type SuperplaneIntegrationsValueFromSecret struct {
 // will change when the set of required properties is changed
 func NewSuperplaneIntegrationsValueFromSecret() *SuperplaneIntegrationsValueFromSecret {
 	this := SuperplaneIntegrationsValueFromSecret{}
-	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
-	this.DomainType = &domainType
 	return &this
 }
 
@@ -41,41 +38,7 @@ func NewSuperplaneIntegrationsValueFromSecret() *SuperplaneIntegrationsValueFrom
 // but it doesn't guarantee that properties required by API are set
 func NewSuperplaneIntegrationsValueFromSecretWithDefaults() *SuperplaneIntegrationsValueFromSecret {
 	this := SuperplaneIntegrationsValueFromSecret{}
-	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
-	this.DomainType = &domainType
 	return &this
-}
-
-// GetDomainType returns the DomainType field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationsValueFromSecret) GetDomainType() AuthorizationDomainType {
-	if o == nil || IsNil(o.DomainType) {
-		var ret AuthorizationDomainType
-		return ret
-	}
-	return *o.DomainType
-}
-
-// GetDomainTypeOk returns a tuple with the DomainType field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationsValueFromSecret) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
-	if o == nil || IsNil(o.DomainType) {
-		return nil, false
-	}
-	return o.DomainType, true
-}
-
-// HasDomainType returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationsValueFromSecret) HasDomainType() bool {
-	if o != nil && !IsNil(o.DomainType) {
-		return true
-	}
-
-	return false
-}
-
-// SetDomainType gets a reference to the given AuthorizationDomainType and assigns it to the DomainType field.
-func (o *SuperplaneIntegrationsValueFromSecret) SetDomainType(v AuthorizationDomainType) {
-	o.DomainType = &v
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
@@ -143,7 +106,7 @@ func (o *SuperplaneIntegrationsValueFromSecret) SetKey(v string) {
 }
 
 func (o SuperplaneIntegrationsValueFromSecret) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -152,9 +115,6 @@ func (o SuperplaneIntegrationsValueFromSecret) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneIntegrationsValueFromSecret) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.DomainType) {
-		toSerialize["domainType"] = o.DomainType
-	}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
 	}
@@ -199,3 +159,5 @@ func (v *NullableSuperplaneIntegrationsValueFromSecret) UnmarshalJSON(src []byte
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

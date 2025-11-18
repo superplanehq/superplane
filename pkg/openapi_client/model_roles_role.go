@@ -21,7 +21,7 @@ var _ MappedNullable = &RolesRole{}
 // RolesRole struct for RolesRole
 type RolesRole struct {
 	Metadata *RolesRoleMetadata `json:"metadata,omitempty"`
-	Spec     *RolesRoleSpec     `json:"spec,omitempty"`
+	Spec *RolesRoleSpec `json:"spec,omitempty"`
 }
 
 // NewRolesRole instantiates a new RolesRole object
@@ -106,7 +106,7 @@ func (o *RolesRole) SetSpec(v RolesRoleSpec) {
 }
 
 func (o RolesRole) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,3 +159,5 @@ func (v *NullableRolesRole) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

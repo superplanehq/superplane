@@ -20,8 +20,8 @@ var _ MappedNullable = &IntegrationsCreateIntegrationRequest{}
 
 // IntegrationsCreateIntegrationRequest struct for IntegrationsCreateIntegrationRequest
 type IntegrationsCreateIntegrationRequest struct {
-	DomainType  *AuthorizationDomainType `json:"domainType,omitempty"`
-	DomainId    *string                  `json:"domainId,omitempty"`
+	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
+	DomainId *string `json:"domainId,omitempty"`
 	Integration *IntegrationsIntegration `json:"integration,omitempty"`
 }
 
@@ -143,7 +143,7 @@ func (o *IntegrationsCreateIntegrationRequest) SetIntegration(v IntegrationsInte
 }
 
 func (o IntegrationsCreateIntegrationRequest) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -199,3 +199,5 @@ func (v *NullableIntegrationsCreateIntegrationRequest) UnmarshalJSON(src []byte)
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

@@ -29,13 +29,4 @@ func Test_DescribeRole(t *testing.T) {
 		assert.Contains(t, resp.Role.Spec.Description, "Can manage canvases, users, groups, and roles")
 		assert.Contains(t, resp.Role.Spec.InheritedRole.Spec.Description, "Read-only access to organization resources")
 	})
-
-	t.Run("successful canvas role description", func(t *testing.T) {
-		resp, err := DescribeRole(ctx, models.DomainTypeCanvas, r.Canvas.ID.String(), models.RoleCanvasAdmin, r.AuthService)
-		require.NoError(t, err)
-		assert.NotNil(t, resp.Role)
-		assert.Equal(t, models.RoleCanvasAdmin, resp.Role.Metadata.Name)
-		assert.Equal(t, "Admin", resp.Role.Spec.DisplayName)
-		assert.Contains(t, resp.Role.Spec.Description, "Can manage stages, events, connections, and secrets")
-	})
 }

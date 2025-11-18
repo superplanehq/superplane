@@ -20,14 +20,15 @@ import (
 	"strings"
 )
 
+
 // RolesAPIService RolesAPI service
 type RolesAPIService service
 
 type ApiRolesAssignRoleRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *RolesAPIService
-	roleName   string
-	body       *RolesAssignRoleBody
+	roleName string
+	body *RolesAssignRoleBody
 }
 
 func (r ApiRolesAssignRoleRequest) Body(body RolesAssignRoleBody) ApiRolesAssignRoleRequest {
@@ -44,27 +45,26 @@ RolesAssignRole Assign role
 
 Assigns a role to a user within a domain
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param roleName
-	@return ApiRolesAssignRoleRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param roleName
+ @return ApiRolesAssignRoleRequest
 */
 func (a *RolesAPIService) RolesAssignRole(ctx context.Context, roleName string) ApiRolesAssignRoleRequest {
 	return ApiRolesAssignRoleRequest{
 		ApiService: a,
-		ctx:        ctx,
-		roleName:   roleName,
+		ctx: ctx,
+		roleName: roleName,
 	}
 }
 
 // Execute executes the request
-//
-//	@return map[string]interface{}
+//  @return map[string]interface{}
 func (a *RolesAPIService) RolesAssignRoleExecute(r ApiRolesAssignRoleRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue map[string]interface{}
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "RolesAPIService.RolesAssignRole")
@@ -123,14 +123,14 @@ func (a *RolesAPIService) RolesAssignRoleExecute(r ApiRolesAssignRoleRequest) (m
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -147,9 +147,9 @@ func (a *RolesAPIService) RolesAssignRoleExecute(r ApiRolesAssignRoleRequest) (m
 }
 
 type ApiRolesCreateRoleRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *RolesAPIService
-	body       *RolesCreateRoleRequest
+	body *RolesCreateRoleRequest
 }
 
 func (r ApiRolesCreateRoleRequest) Body(body RolesCreateRoleRequest) ApiRolesCreateRoleRequest {
@@ -166,25 +166,24 @@ RolesCreateRole Create role
 
 Creates a new custom role with specified permissions
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiRolesCreateRoleRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiRolesCreateRoleRequest
 */
 func (a *RolesAPIService) RolesCreateRole(ctx context.Context) ApiRolesCreateRoleRequest {
 	return ApiRolesCreateRoleRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return RolesCreateRoleResponse
+//  @return RolesCreateRoleResponse
 func (a *RolesAPIService) RolesCreateRoleExecute(r ApiRolesCreateRoleRequest) (*RolesCreateRoleResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *RolesCreateRoleResponse
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *RolesCreateRoleResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "RolesAPIService.RolesCreateRole")
@@ -242,14 +241,14 @@ func (a *RolesAPIService) RolesCreateRoleExecute(r ApiRolesCreateRoleRequest) (*
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -266,11 +265,11 @@ func (a *RolesAPIService) RolesCreateRoleExecute(r ApiRolesCreateRoleRequest) (*
 }
 
 type ApiRolesDeleteRoleRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *RolesAPIService
-	roleName   string
+	roleName string
 	domainType *string
-	domainId   *string
+	domainId *string
 }
 
 func (r ApiRolesDeleteRoleRequest) DomainType(domainType string) ApiRolesDeleteRoleRequest {
@@ -292,27 +291,26 @@ RolesDeleteRole Delete role
 
 Deletes an existing custom role
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param roleName
-	@return ApiRolesDeleteRoleRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param roleName
+ @return ApiRolesDeleteRoleRequest
 */
 func (a *RolesAPIService) RolesDeleteRole(ctx context.Context, roleName string) ApiRolesDeleteRoleRequest {
 	return ApiRolesDeleteRoleRequest{
 		ApiService: a,
-		ctx:        ctx,
-		roleName:   roleName,
+		ctx: ctx,
+		roleName: roleName,
 	}
 }
 
 // Execute executes the request
-//
-//	@return map[string]interface{}
+//  @return map[string]interface{}
 func (a *RolesAPIService) RolesDeleteRoleExecute(r ApiRolesDeleteRoleRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodDelete
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue map[string]interface{}
+		localVarHTTPMethod   = http.MethodDelete
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "RolesAPIService.RolesDeleteRole")
@@ -375,14 +373,14 @@ func (a *RolesAPIService) RolesDeleteRoleExecute(r ApiRolesDeleteRoleRequest) (m
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -399,11 +397,11 @@ func (a *RolesAPIService) RolesDeleteRoleExecute(r ApiRolesDeleteRoleRequest) (m
 }
 
 type ApiRolesDescribeRoleRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *RolesAPIService
-	roleName   string
+	roleName string
 	domainType *string
-	domainId   *string
+	domainId *string
 }
 
 func (r ApiRolesDescribeRoleRequest) DomainType(domainType string) ApiRolesDescribeRoleRequest {
@@ -425,27 +423,26 @@ RolesDescribeRole Describe role
 
 Returns detailed information about a specific role including permissions and inheritance
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param roleName
-	@return ApiRolesDescribeRoleRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param roleName
+ @return ApiRolesDescribeRoleRequest
 */
 func (a *RolesAPIService) RolesDescribeRole(ctx context.Context, roleName string) ApiRolesDescribeRoleRequest {
 	return ApiRolesDescribeRoleRequest{
 		ApiService: a,
-		ctx:        ctx,
-		roleName:   roleName,
+		ctx: ctx,
+		roleName: roleName,
 	}
 }
 
 // Execute executes the request
-//
-//	@return RolesDescribeRoleResponse
+//  @return RolesDescribeRoleResponse
 func (a *RolesAPIService) RolesDescribeRoleExecute(r ApiRolesDescribeRoleRequest) (*RolesDescribeRoleResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *RolesDescribeRoleResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *RolesDescribeRoleResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "RolesAPIService.RolesDescribeRole")
@@ -508,14 +505,14 @@ func (a *RolesAPIService) RolesDescribeRoleExecute(r ApiRolesDescribeRoleRequest
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -532,10 +529,10 @@ func (a *RolesAPIService) RolesDescribeRoleExecute(r ApiRolesDescribeRoleRequest
 }
 
 type ApiRolesListRolesRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *RolesAPIService
 	domainType *string
-	domainId   *string
+	domainId *string
 }
 
 func (r ApiRolesListRolesRequest) DomainType(domainType string) ApiRolesListRolesRequest {
@@ -557,25 +554,24 @@ RolesListRoles List roles
 
 Returns available roles for a specific domain type with their permissions and inheritance
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiRolesListRolesRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiRolesListRolesRequest
 */
 func (a *RolesAPIService) RolesListRoles(ctx context.Context) ApiRolesListRolesRequest {
 	return ApiRolesListRolesRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return RolesListRolesResponse
+//  @return RolesListRolesResponse
 func (a *RolesAPIService) RolesListRolesExecute(r ApiRolesListRolesRequest) (*RolesListRolesResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *RolesListRolesResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *RolesListRolesResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "RolesAPIService.RolesListRoles")
@@ -637,14 +633,14 @@ func (a *RolesAPIService) RolesListRolesExecute(r ApiRolesListRolesRequest) (*Ro
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -661,10 +657,10 @@ func (a *RolesAPIService) RolesListRolesExecute(r ApiRolesListRolesRequest) (*Ro
 }
 
 type ApiRolesUpdateRoleRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *RolesAPIService
-	roleName   string
-	body       *RolesUpdateRoleBody
+	roleName string
+	body *RolesUpdateRoleBody
 }
 
 func (r ApiRolesUpdateRoleRequest) Body(body RolesUpdateRoleBody) ApiRolesUpdateRoleRequest {
@@ -681,27 +677,26 @@ RolesUpdateRole Update role
 
 Updates an existing custom role with new permissions
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param roleName
-	@return ApiRolesUpdateRoleRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param roleName
+ @return ApiRolesUpdateRoleRequest
 */
 func (a *RolesAPIService) RolesUpdateRole(ctx context.Context, roleName string) ApiRolesUpdateRoleRequest {
 	return ApiRolesUpdateRoleRequest{
 		ApiService: a,
-		ctx:        ctx,
-		roleName:   roleName,
+		ctx: ctx,
+		roleName: roleName,
 	}
 }
 
 // Execute executes the request
-//
-//	@return RolesUpdateRoleResponse
+//  @return RolesUpdateRoleResponse
 func (a *RolesAPIService) RolesUpdateRoleExecute(r ApiRolesUpdateRoleRequest) (*RolesUpdateRoleResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPut
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *RolesUpdateRoleResponse
+		localVarHTTPMethod   = http.MethodPut
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *RolesUpdateRoleResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "RolesAPIService.RolesUpdateRole")
@@ -760,14 +755,14 @@ func (a *RolesAPIService) RolesUpdateRoleExecute(r ApiRolesUpdateRoleRequest) (*
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

@@ -46,9 +46,8 @@ type ValueDefinitionFrom struct {
 }
 
 type ValueDefinitionFromSecret struct {
-	DomainType string `json:"domain_type"`
-	Name       string `json:"name"`
-	Key        string `json:"key"`
+	Name string `json:"name"`
+	Key  string `json:"key"`
 }
 
 func CreateIntegration(integration *Integration) (*Integration, error) {

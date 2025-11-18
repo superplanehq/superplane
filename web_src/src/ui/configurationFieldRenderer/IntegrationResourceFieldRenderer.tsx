@@ -1,7 +1,7 @@
 import React from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
 import { useIntegrations, useIntegrationResources } from "@/hooks/useIntegrations";
-import { ConfigurationField } from "../../api-client";
+import { AuthorizationDomainType, ConfigurationField } from "../../api-client";
 
 interface IntegrationResourceFieldRendererProps {
   field: ConfigurationField;
@@ -9,7 +9,7 @@ interface IntegrationResourceFieldRendererProps {
   onChange: (value: string | undefined) => void;
   allValues?: Record<string, any>;
   domainId?: string;
-  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION";
+  domainType?: AuthorizationDomainType;
 }
 
 export const IntegrationResourceFieldRenderer = ({
@@ -37,7 +37,7 @@ export const IntegrationResourceFieldRenderer = ({
   const selectedIntegrationId = integrationFieldName ? allValues?.[integrationFieldName] : undefined;
 
   // Fetch integrations to get the selected integration details
-  const { data: integrations } = useIntegrations(domainId ?? "", domainType ?? "DOMAIN_TYPE_CANVAS");
+  const { data: integrations } = useIntegrations(domainId ?? "", domainType ?? "DOMAIN_TYPE_ORGANIZATION");
 
   // Find the selected integration
   const selectedIntegration = React.useMemo(() => {
@@ -52,7 +52,7 @@ export const IntegrationResourceFieldRenderer = ({
     error: resourcesError,
   } = useIntegrationResources(
     domainId ?? "",
-    domainType ?? "DOMAIN_TYPE_CANVAS",
+    domainType ?? "DOMAIN_TYPE_ORGANIZATION",
     selectedIntegrationId ?? "",
     resourceType ?? "",
   );

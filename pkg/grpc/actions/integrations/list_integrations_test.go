@@ -17,14 +17,14 @@ func Test__ListIntegrations(t *testing.T) {
 	defer r.Close()
 
 	t.Run("returns list of integrations", func(t *testing.T) {
-		res, err := ListIntegrations(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String())
+		res, err := ListIntegrations(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Integrations, 1)
 		assert.Equal(t, r.Integration.ID.String(), res.Integrations[0].Metadata.Id)
 		assert.Equal(t, r.Integration.Name, res.Integrations[0].Metadata.Name)
 		assert.Equal(t, r.Integration.DomainID.String(), res.Integrations[0].Metadata.DomainId)
-		assert.Equal(t, authpb.DomainType_DOMAIN_TYPE_CANVAS, res.Integrations[0].Metadata.DomainType)
+		assert.Equal(t, authpb.DomainType_DOMAIN_TYPE_ORGANIZATION, res.Integrations[0].Metadata.DomainType)
 		assert.NotEmpty(t, res.Integrations[0].Metadata.CreatedAt)
 		assert.Equal(t, r.Integration.CreatedBy.String(), res.Integrations[0].Metadata.CreatedBy)
 		assert.Equal(t, models.IntegrationTypeSemaphore, res.Integrations[0].Spec.Type)

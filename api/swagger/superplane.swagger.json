@@ -533,8 +533,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -615,8 +614,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -663,8 +661,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -751,8 +748,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -873,8 +869,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -955,8 +950,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1043,8 +1037,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1320,50 +1313,6 @@
         "tags": [
           "Organization"
         ]
-      },
-      "put": {
-        "summary": "Update an organization invitation",
-        "description": "Updates an organization invitation",
-        "operationId": "Organizations_UpdateInvitation",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/OrganizationsUpdateInvitationResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "invitationId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/OrganizationsUpdateInvitationBody"
-            }
-          }
-        ],
-        "tags": [
-          "Organization"
-        ]
       }
     },
     "/api/v1/organizations/{id}/users/{userId}": {
@@ -1431,8 +1380,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1513,8 +1461,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1561,8 +1508,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1683,8 +1629,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1765,8 +1710,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1813,8 +1757,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1951,8 +1894,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -2001,8 +1943,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -2051,8 +1992,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -2696,8 +2636,7 @@
       "type": "string",
       "enum": [
         "DOMAIN_TYPE_UNSPECIFIED",
-        "DOMAIN_TYPE_ORGANIZATION",
-        "DOMAIN_TYPE_CANVAS"
+        "DOMAIN_TYPE_ORGANIZATION"
       ],
       "default": "DOMAIN_TYPE_UNSPECIFIED",
       "title": "Enums"
@@ -3654,12 +3593,6 @@
         "state": {
           "type": "string"
         },
-        "canvasIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
@@ -3710,25 +3643,6 @@
     },
     "OrganizationsRemoveInvitationResponse": {
       "type": "object"
-    },
-    "OrganizationsUpdateInvitationBody": {
-      "type": "object",
-      "properties": {
-        "canvasIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "OrganizationsUpdateInvitationResponse": {
-      "type": "object",
-      "properties": {
-        "invitation": {
-          "$ref": "#/definitions/OrganizationsInvitation"
-        }
-      }
     },
     "OrganizationsUpdateOrganizationBody": {
       "type": "object",
@@ -4135,9 +4049,6 @@
     "SuperplaneIntegrationsValueFromSecret": {
       "type": "object",
       "properties": {
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
         "name": {
           "type": "string"
         },

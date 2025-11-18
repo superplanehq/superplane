@@ -1,14 +1,14 @@
 import React from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
 import { useIntegrations } from "@/hooks/useIntegrations";
-import { ConfigurationField } from "../../api-client";
+import { AuthorizationDomainType, ConfigurationField } from "../../api-client";
 
 interface IntegrationFieldRendererProps {
   field: ConfigurationField;
   value: string;
   onChange: (value: string | undefined) => void;
   domainId?: string;
-  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION";
+  domainType?: AuthorizationDomainType;
 }
 
 export const IntegrationFieldRenderer = ({
@@ -21,7 +21,7 @@ export const IntegrationFieldRenderer = ({
   const integrationType = field.typeOptions?.integration?.type;
 
   // Fetch integrations if we have the required context
-  const { data: integrations, isLoading } = useIntegrations(domainId ?? "", domainType ?? "DOMAIN_TYPE_CANVAS");
+  const { data: integrations, isLoading } = useIntegrations(domainId ?? "", domainType ?? "DOMAIN_TYPE_ORGANIZATION");
 
   // Filter integrations by type
   const filteredIntegrations = React.useMemo(() => {

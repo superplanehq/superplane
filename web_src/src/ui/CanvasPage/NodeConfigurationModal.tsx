@@ -1,4 +1,4 @@
-import { ConfigurationField } from "@/api-client";
+import { AuthorizationDomainType, ConfigurationField } from "@/api-client";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCallback, useEffect, useState } from "react";
 
@@ -19,7 +19,7 @@ interface NodeConfigurationModalProps {
   configurationFields: ConfigurationField[];
   onSave: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string) => void;
   domainId?: string;
-  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION";
+  domainType?: AuthorizationDomainType;
 }
 
 export function NodeConfigurationModal({

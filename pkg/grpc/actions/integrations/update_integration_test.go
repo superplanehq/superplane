@@ -21,10 +21,7 @@ func Test__UpdateIntegration(t *testing.T) {
 	defer r.Close()
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	canvasSecret, err := support.CreateCanvasSecret(t, r, map[string]string{"key": "value"})
-	require.NoError(t, err)
-
-	orgSecret, err := support.CreateOrganizationSecret(t, r, map[string]string{"key": "value"})
+	secret, err := support.CreateSecret(t, r, map[string]string{"key": "value"})
 	require.NoError(t, err)
 
 	createIntegrationSpec := &protos.Integration{
@@ -38,7 +35,7 @@ func Test__UpdateIntegration(t *testing.T) {
 				Token: &protos.Integration_Auth_Token{
 					ValueFrom: &protos.ValueFrom{
 						Secret: &protos.ValueFromSecret{
-							Name: canvasSecret.Name,
+							Name: secret.Name,
 							Key:  "key",
 						},
 					},
@@ -47,11 +44,11 @@ func Test__UpdateIntegration(t *testing.T) {
 		},
 	}
 
-	createdIntegration, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), createIntegrationSpec)
+	createdIntegration, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), createIntegrationSpec)
 	require.NoError(t, err)
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
-		_, err := UpdateIntegration(context.Background(), r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), createdIntegration.Integration.Metadata.Id, &protos.Integration{})
+		_, err := UpdateIntegration(context.Background(), r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), createdIntegration.Integration.Metadata.Id, &protos.Integration{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())
@@ -65,7 +62,7 @@ func Test__UpdateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), createdIntegration.Integration.Metadata.Id, integration)
+		_, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), createdIntegration.Integration.Metadata.Id, integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -84,7 +81,7 @@ func Test__UpdateIntegration(t *testing.T) {
 					Token: &protos.Integration_Auth_Token{
 						ValueFrom: &protos.ValueFrom{
 							Secret: &protos.ValueFromSecret{
-								Name: canvasSecret.Name,
+								Name: secret.Name,
 								Key:  "key",
 							},
 						},
@@ -93,7 +90,7 @@ func Test__UpdateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), "nonexistent-id", integration)
+		_, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), "nonexistent-id", integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
@@ -113,7 +110,7 @@ func Test__UpdateIntegration(t *testing.T) {
 					Token: &protos.Integration_Auth_Token{
 						ValueFrom: &protos.ValueFrom{
 							Secret: &protos.ValueFromSecret{
-								Name: canvasSecret.Name,
+								Name: secret.Name,
 								Key:  "key",
 							},
 						},
@@ -122,13 +119,13 @@ func Test__UpdateIntegration(t *testing.T) {
 			},
 		}
 
-		response, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), createdIntegration.Integration.Metadata.Id, integration)
+		response, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), createdIntegration.Integration.Metadata.Id, integration)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		assert.Equal(t, newName, response.Integration.Metadata.Name)
 		assert.Equal(t, createdIntegration.Integration.Metadata.Id, response.Integration.Metadata.Id)
-		assert.Equal(t, authpb.DomainType_DOMAIN_TYPE_CANVAS, response.Integration.Metadata.DomainType)
-		assert.Equal(t, r.Canvas.ID.String(), response.Integration.Metadata.DomainId)
+		assert.Equal(t, authpb.DomainType_DOMAIN_TYPE_ORGANIZATION, response.Integration.Metadata.DomainType)
+		assert.Equal(t, r.Organization.ID.String(), response.Integration.Metadata.DomainId)
 	})
 
 	t.Run("update integration by name", func(t *testing.T) {
@@ -143,7 +140,7 @@ func Test__UpdateIntegration(t *testing.T) {
 					Token: &protos.Integration_Auth_Token{
 						ValueFrom: &protos.ValueFrom{
 							Secret: &protos.ValueFromSecret{
-								Name: canvasSecret.Name,
+								Name: secret.Name,
 								Key:  "key",
 							},
 						},
@@ -152,7 +149,7 @@ func Test__UpdateIntegration(t *testing.T) {
 			},
 		}
 
-		testIntegration, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), createIntegrationSpec)
+		testIntegration, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), createIntegrationSpec)
 		require.NoError(t, err)
 
 		newName := support.RandomName("updated-integration-name")
@@ -167,7 +164,7 @@ func Test__UpdateIntegration(t *testing.T) {
 					Token: &protos.Integration_Auth_Token{
 						ValueFrom: &protos.ValueFrom{
 							Secret: &protos.ValueFromSecret{
-								Name: canvasSecret.Name,
+								Name: secret.Name,
 								Key:  "key",
 							},
 						},
@@ -176,41 +173,11 @@ func Test__UpdateIntegration(t *testing.T) {
 			},
 		}
 
-		response, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), testIntegration.Integration.Metadata.Name, integration)
+		response, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), testIntegration.Integration.Metadata.Name, integration)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		assert.Equal(t, newName, response.Integration.Metadata.Name)
 		assert.Equal(t, testIntegration.Integration.Metadata.Id, response.Integration.Metadata.Id)
-	})
-
-	t.Run("update canvas integration with organization secret", func(t *testing.T) {
-		newName := support.RandomName("updated-integration-org-secret")
-		integration := &protos.Integration{
-			Metadata: &protos.Integration_Metadata{
-				Name: newName,
-			},
-			Spec: &protos.Integration_Spec{
-				Type: models.IntegrationTypeSemaphore,
-				Auth: &protos.Integration_Auth{
-					Use: protos.Integration_AUTH_TYPE_TOKEN,
-					Token: &protos.Integration_Auth_Token{
-						ValueFrom: &protos.ValueFrom{
-							Secret: &protos.ValueFromSecret{
-								DomainType: authpb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-								Name:       orgSecret.Name,
-								Key:        "key",
-							},
-						},
-					},
-				},
-			},
-		}
-
-		response, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), createdIntegration.Integration.Metadata.Id, integration)
-		require.NoError(t, err)
-		require.NotNil(t, response)
-		assert.Equal(t, newName, response.Integration.Metadata.Name)
-		assert.Equal(t, createdIntegration.Integration.Metadata.Id, response.Integration.Metadata.Id)
 	})
 
 	t.Run("invalid secret", func(t *testing.T) {
@@ -234,7 +201,7 @@ func Test__UpdateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), createdIntegration.Integration.Metadata.Id, integration)
+		_, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), createdIntegration.Integration.Metadata.Id, integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())

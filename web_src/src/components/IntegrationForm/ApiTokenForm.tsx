@@ -33,7 +33,7 @@ export function ApiTokenForm({
   newSecretValue = "",
   setNewSecretValue,
 }: ApiTokenFormProps) {
-  const { data: selectedSecret } = useSecret(canvasId, "DOMAIN_TYPE_CANVAS", integrationData.apiToken.secretName);
+  const { data: selectedSecret } = useSecret(canvasId, "DOMAIN_TYPE_ORGANIZATION", integrationData.apiToken.secretName);
 
   // In edit mode, show a simplified form that updates the secret value directly
   if (isEditMode && integrationData.apiToken.secretName) {

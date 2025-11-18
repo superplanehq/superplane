@@ -22,7 +22,7 @@ func Test__DescribeSecret(t *testing.T) {
 	encryptor := &crypto.NoOpEncryptor{}
 
 	t.Run("secret does not exist -> error", func(t *testing.T) {
-		_, err := DescribeSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), uuid.NewString())
+		_, err := DescribeSecret(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), uuid.NewString())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -33,10 +33,10 @@ func Test__DescribeSecret(t *testing.T) {
 		local := map[string]string{"test": "test"}
 		data, _ := json.Marshal(local)
 
-		_, err := models.CreateSecret("test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeCanvas, r.Canvas.ID, data)
+		_, err := models.CreateSecret("test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeOrganization, r.Organization.ID, data)
 		require.NoError(t, err)
 
-		response, err := DescribeSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), "test")
+		response, err := DescribeSecret(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), "test")
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Secret)

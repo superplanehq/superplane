@@ -1,4 +1,4 @@
-import { ConfigurationField } from "../../api-client";
+import { AuthorizationDomainType, ConfigurationField } from "../../api-client";
 
 export interface ValidationError {
   field: string;
@@ -12,7 +12,7 @@ export interface FieldRendererProps {
   onChange: (value: unknown) => void;
   allValues?: Record<string, unknown>;
   domainId?: string;
-  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION";
+  domainType?: AuthorizationDomainType;
   hasError?: boolean;
   validationErrors?: ValidationError[] | Set<string>;
   fieldPath?: string;

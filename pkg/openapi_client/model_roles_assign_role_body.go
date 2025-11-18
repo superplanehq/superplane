@@ -21,9 +21,9 @@ var _ MappedNullable = &RolesAssignRoleBody{}
 // RolesAssignRoleBody struct for RolesAssignRoleBody
 type RolesAssignRoleBody struct {
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
-	DomainId   *string                  `json:"domainId,omitempty"`
-	UserId     *string                  `json:"userId,omitempty"`
-	UserEmail  *string                  `json:"userEmail,omitempty"`
+	DomainId *string `json:"domainId,omitempty"`
+	UserId *string `json:"userId,omitempty"`
+	UserEmail *string `json:"userEmail,omitempty"`
 }
 
 // NewRolesAssignRoleBody instantiates a new RolesAssignRoleBody object
@@ -176,7 +176,7 @@ func (o *RolesAssignRoleBody) SetUserEmail(v string) {
 }
 
 func (o RolesAssignRoleBody) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -235,3 +235,5 @@ func (v *NullableRolesAssignRoleBody) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

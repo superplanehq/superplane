@@ -103,18 +103,6 @@ service Organizations {
       tags: "Organization";
     };
   }
-
-  rpc UpdateInvitation(UpdateInvitationRequest) returns (UpdateInvitationResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/organizations/{id}/invitations/{invitation_id}"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update an organization invitation";
-      description: "Updates an organization invitation";
-      tags: "Organization";
-    };
-  }
 }
 
 message Organization {
@@ -157,8 +145,7 @@ message Invitation {
   string organization_id = 2;
   string email = 3;
   string state = 4;
-  repeated string canvas_ids = 5;
-  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp created_at = 5;
 }
 
 message CreateInvitationRequest {
@@ -184,16 +171,6 @@ message RemoveInvitationRequest {
 }
 
 message RemoveInvitationResponse {}
-
-message UpdateInvitationRequest {
-  string id = 1;
-  string invitation_id = 2;
-  repeated string canvas_ids = 3;
-}
-
-message UpdateInvitationResponse {
-  Invitation invitation = 1;
-}
 
 message RemoveUserRequest {
   string id = 1;

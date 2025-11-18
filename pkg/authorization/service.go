@@ -17,23 +17,20 @@ import (
 )
 
 const (
-	OrgIDTemplate    = "{ORG_ID}"
-	CanvasIDTemplate = "{CANVAS_ID}"
+	OrgIDTemplate = "{ORG_ID}"
 )
 
 // implements Authorization
 var _ Authorization = (*AuthService)(nil)
 
 type AuthService struct {
-	enforcer              *casbin.SyncedEnforcer
-	orgPolicyTemplates    [][5]string
-	canvasPolicyTemplates [][5]string
+	enforcer           *casbin.SyncedEnforcer
+	orgPolicyTemplates [][5]string
 }
 
 func NewAuthService() (*AuthService, error) {
 	modelPath := os.Getenv("RBAC_MODEL_PATH")
 	orgPolicyPath := os.Getenv("RBAC_ORG_POLICY_PATH")
-	canvasPolicyPath := os.Getenv("RBAC_CANVAS_POLICY_PATH")
 
 	adapter, err := gormadapter.NewTransactionalAdapterByDB(database.Conn())
 	if err != nil {
@@ -55,32 +52,18 @@ func NewAuthService() (*AuthService, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read org policies: %w", err)
 	}
-	canvasPoliciesCsv, err := os.ReadFile(canvasPolicyPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read canvas policies: %w", err)
-	}
 
 	orgPolicyTemplates, err := parsePoliciesFromCsv(orgPoliciesCsv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse org policies: %w", err)
 	}
 
-	canvasPolicyTemplates, err := parsePoliciesFromCsv(canvasPoliciesCsv)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse canvas policies: %w", err)
-	}
-
 	service := &AuthService{
-		enforcer:              enforcer,
-		orgPolicyTemplates:    orgPolicyTemplates,
-		canvasPolicyTemplates: canvasPolicyTemplates,
+		enforcer:           enforcer,
+		orgPolicyTemplates: orgPolicyTemplates,
 	}
 
 	return service, nil
-}
-
-func (a *AuthService) CheckCanvasPermission(userID, canvasID, resource, action string) (bool, error) {
-	return a.checkPermission(userID, canvasID, models.DomainTypeCanvas, resource, action)
 }
 
 func (a *AuthService) CheckOrganizationPermission(userID, orgID, resource, action string) (bool, error) {
@@ -381,7 +364,6 @@ func (a *AuthService) assignRoleWithEnforcer(enforcer casbin.IEnforcer, userID, 
 	// Check if it's a default role
 	validRoles := map[string][]string{
 		models.DomainTypeOrganization: {models.RoleOrgViewer, models.RoleOrgAdmin, models.RoleOrgOwner},
-		models.DomainTypeCanvas:       {models.RoleCanvasViewer, models.RoleCanvasAdmin, models.RoleCanvasOwner},
 	}
 
 	isValidDefaultRole := false
@@ -443,23 +425,6 @@ func (a *AuthService) GetOrgUsersForRole(role string, orgID string) ([]string, e
 	prefixedRole := prefixRoleName(role)
 	orgDomain := fmt.Sprintf("org:%s", orgID)
 	users, err := a.enforcer.GetUsersForRole(prefixedRole, orgDomain)
-	if err != nil {
-		return nil, err
-	}
-
-	unprefixedUsers := []string{}
-	for _, user := range users {
-		if strings.HasPrefix(user, "user:") {
-			unprefixedUsers = append(unprefixedUsers, strings.TrimPrefix(user, "user:"))
-		}
-	}
-	return unprefixedUsers, nil
-}
-
-func (a *AuthService) GetCanvasUsersForRole(role string, canvasID string) ([]string, error) {
-	prefixedRole := prefixRoleName(role)
-	canvasDomain := fmt.Sprintf("canvas:%s", canvasID)
-	users, err := a.enforcer.GetUsersForRole(prefixedRole, canvasDomain)
 	if err != nil {
 		return nil, err
 	}
@@ -576,23 +541,6 @@ func (a *AuthService) DestroyOrganization(tx *gorm.DB, orgID string) error {
 	return nil
 }
 
-func (a *AuthService) GetAccessibleCanvasesForUser(userID string) ([]string, error) {
-	prefixedUserID := prefixUserID(userID)
-	canvases, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID)
-	if err != nil {
-		return nil, err
-	}
-
-	canvasIDs := []string{}
-	prefixLen := len("canvas:")
-	for _, canvas := range canvases {
-		if strings.HasPrefix(canvas[2], "canvas:") {
-			canvasIDs = append(canvasIDs, canvas[2][prefixLen:])
-		}
-	}
-	return canvasIDs, nil
-}
-
 func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error) {
 	orgDomain := fmt.Sprintf("org:%s", orgID)
 	prefixedUserID := prefixUserID(userID)
@@ -618,96 +566,6 @@ func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDe
 	}
 
 	return roles, nil
-}
-
-func (a *AuthService) GetUserRolesForCanvas(userID string, canvasID string) ([]*RoleDefinition, error) {
-	canvasDomain := fmt.Sprintf("canvas:%s", canvasID)
-	prefixedUserID := prefixUserID(userID)
-	roleNames, err := a.enforcer.GetImplicitRolesForUser(prefixedUserID, canvasDomain)
-	if err != nil {
-		return nil, err
-	}
-
-	unprefixedRoleNames := []string{}
-	for _, roleName := range roleNames {
-		if strings.HasPrefix(roleName, "role:") {
-			unprefixedRoleNames = append(unprefixedRoleNames, strings.TrimPrefix(roleName, "role:"))
-		}
-	}
-
-	roles := []*RoleDefinition{}
-	for _, roleName := range unprefixedRoleNames {
-		roleDef, err := a.GetRoleDefinition(roleName, models.DomainTypeCanvas, canvasID)
-		if err != nil {
-			continue
-		}
-		roles = append(roles, roleDef)
-	}
-
-	return roles, nil
-}
-
-func (a *AuthService) SetupCanvasRoles(canvasID string) error {
-	domain := fmt.Sprintf("canvas:%s", canvasID)
-
-	tx := database.Conn().Begin()
-	err := a.setupDefaultCanvasRoleMetadataInTransaction(tx, canvasID)
-	if err != nil {
-		log.Errorf("Error setting up default canvas role metadata: %v", err)
-		tx.Rollback()
-		return err
-	}
-
-	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
-	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
-		for _, policy := range a.canvasPolicyTemplates {
-			switch policy[0] {
-			case "g":
-				// g,lower_role,higher_role,canvas:{CANVAS_ID}
-				_, err := enforcerTx.AddGroupingPolicy(policy[1], policy[2], domain)
-				if err != nil {
-					return fmt.Errorf("failed to add grouping policy: %w", err)
-				}
-			case "p":
-				// p,role,canvas:{CANVAS_ID},resource,action
-				_, err := enforcerTx.AddPolicy(policy[1], domain, policy[3], policy[4])
-				if err != nil {
-					return fmt.Errorf("failed to add policy: %w", err)
-				}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to setup canvas roles: %w", err)
-	}
-
-	return tx.Commit().Error
-}
-
-func (a *AuthService) DestroyCanvasRoles(canvasID string) error {
-	domain := fmt.Sprintf("canvas:%s", canvasID)
-
-	ok, err := a.enforcer.RemoveFilteredGroupingPolicy(2, domain)
-	if err != nil {
-		return fmt.Errorf("failed to remove canvas roles: %w", err)
-	}
-	if !ok {
-		return fmt.Errorf("canvas roles not found for %s", canvasID)
-	}
-
-	ok, err = a.enforcer.RemoveFilteredPolicy(1, domain)
-	if err != nil {
-		return fmt.Errorf("failed to remove canvas policies: %w", err)
-	}
-	if !ok {
-		return fmt.Errorf("canvas policies not found for %s", canvasID)
-	}
-
-	return nil
 }
 
 func (a *AuthService) GetRoleDefinition(roleName string, domainType string, domainID string) (*RoleDefinition, error) {
@@ -847,26 +705,17 @@ func (a *AuthService) SyncDefaultRoles() error {
 		return fmt.Errorf("failed to sync organization default roles: %w", err)
 	}
 
-	if err := a.syncCanvasDefaultRoles(); err != nil {
-		return fmt.Errorf("failed to sync canvas default roles: %w", err)
-	}
-
-	log.Info("Successfully synced default roles for all organizations and canvases")
+	log.Info("Successfully synced default roles for all organizations")
 	return nil
 }
 
-func (a *AuthService) DetectMissingPermissions() ([]string, []string, error) {
+func (a *AuthService) DetectMissingPermissions() ([]string, error) {
 	orgs, err := a.getOrganizationsWithMissingPermissions()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to detect missing organization permissions: %w", err)
+		return nil, fmt.Errorf("failed to detect missing organization permissions: %w", err)
 	}
 
-	canvases, err := a.getCanvasesWithMissingPermissions()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to detect missing canvas permissions: %w", err)
-	}
-
-	return orgs, canvases, nil
+	return orgs, nil
 }
 
 func (a *AuthService) getOrganizationsWithMissingPermissions() ([]string, error) {
@@ -889,28 +738,6 @@ func (a *AuthService) getOrganizationsWithMissingPermissions() ([]string, error)
 	}
 
 	return missingOrgIDs, nil
-}
-
-func (a *AuthService) getCanvasesWithMissingPermissions() ([]string, error) {
-	canvases, err := models.GetCanvasIDs()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get canvas IDs: %w", err)
-	}
-
-	var missingCanvasIDs []string
-	for _, canvasID := range canvases {
-		domain := fmt.Sprintf("canvas:%s", canvasID)
-		hasMissing, err := a.domainHasMissingPermissions(domain, a.canvasPolicyTemplates)
-		if err != nil {
-			log.Warnf("Error checking permissions for canvas %s: %v", canvasID, err)
-			continue
-		}
-		if hasMissing {
-			missingCanvasIDs = append(missingCanvasIDs, canvasID)
-		}
-	}
-
-	return missingCanvasIDs, nil
 }
 
 func (a *AuthService) domainHasMissingPermissions(domain string, policyTemplates [][5]string) (bool, error) {
@@ -963,30 +790,6 @@ func (a *AuthService) syncOrganizationDefaultRoles() error {
 	return nil
 }
 
-func (a *AuthService) syncCanvasDefaultRoles() error {
-	canvasIDs, err := a.getCanvasesWithMissingPermissions()
-	if err != nil {
-		return fmt.Errorf("failed to get canvases with missing permissions: %w", err)
-	}
-
-	if len(canvasIDs) == 0 {
-		log.Debug("No canvases with missing permissions found")
-		return nil
-	}
-
-	log.Infof("Found %d canvases with missing permissions", len(canvasIDs))
-
-	for _, canvasID := range canvasIDs {
-		if err := a.SyncCanvasRoles(canvasID); err != nil {
-			log.Errorf("Failed to sync roles for canvas %s: %v", canvasID, err)
-			continue
-		}
-		log.Infof("Synced default roles for canvas %s", canvasID)
-	}
-
-	return nil
-}
-
 func (a *AuthService) SyncOrganizationRoles(orgID string) error {
 	domain := fmt.Sprintf("org:%s", orgID)
 
@@ -994,18 +797,6 @@ func (a *AuthService) SyncOrganizationRoles(orgID string) error {
 	err := a.applyDefaultPolicies(domain, a.orgPolicyTemplates)
 	if err != nil {
 		return fmt.Errorf("failed to apply default org policies: %w", err)
-	}
-
-	return nil
-}
-
-func (a *AuthService) SyncCanvasRoles(canvasID string) error {
-	domain := fmt.Sprintf("canvas:%s", canvasID)
-
-	// First, apply default permissions from CSV templates
-	err := a.applyDefaultPolicies(domain, a.canvasPolicyTemplates)
-	if err != nil {
-		return fmt.Errorf("failed to apply default canvas policies: %w", err)
 	}
 
 	return nil
@@ -1047,7 +838,7 @@ func (a *AuthService) applyDefaultPolicies(domain string, policyTemplates [][5]s
 // Example usage function for checking and syncing missing permissions
 func (a *AuthService) CheckAndSyncMissingPermissions() error {
 	// First, detect missing permissions
-	missingOrgs, missingCanvases, err := a.DetectMissingPermissions()
+	missingOrgs, err := a.DetectMissingPermissions()
 	if err != nil {
 		return fmt.Errorf("failed to detect missing permissions: %w", err)
 	}
@@ -1059,22 +850,15 @@ func (a *AuthService) CheckAndSyncMissingPermissions() error {
 		}
 	}
 
-	if len(missingCanvases) > 0 {
-		log.Infof("Found %d canvases with missing permissions:", len(missingCanvases))
-		for _, canvas := range missingCanvases {
-			log.Info(canvas)
-		}
-	}
-
 	// If there are missing permissions, sync them
-	if len(missingOrgs) > 0 || len(missingCanvases) > 0 {
+	if len(missingOrgs) > 0 {
 		log.Info("Syncing missing default roles...")
 		if err := a.SyncDefaultRoles(); err != nil {
 			return fmt.Errorf("failed to sync default roles: %w", err)
 		}
 		log.Info("Successfully synced all missing permissions")
 	} else {
-		log.Info("No missing permissions found - all organizations and canvases are up to date")
+		log.Info("No missing permissions found - all organizations are up to date")
 	}
 
 	return nil
@@ -1249,11 +1033,9 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 	return tx.Commit().Error
 }
 
-// IsDefaultRole checks if a role is a default system role
 func (a *AuthService) IsDefaultRole(roleName string, domainType string) bool {
 	defaultRoles := map[string][]string{
 		models.DomainTypeOrganization: {models.RoleOrgOwner, models.RoleOrgAdmin, models.RoleOrgViewer},
-		models.DomainTypeCanvas:       {models.RoleCanvasOwner, models.RoleCanvasAdmin, models.RoleCanvasViewer},
 	}
 
 	roles, exists := defaultRoles[domainType]
@@ -1423,12 +1205,9 @@ func (a *AuthService) getRolesFromPolicies(domain string) ([]string, error) {
 
 func (a *AuthService) getRoleDescription(roleName string) string {
 	descriptions := map[string]string{
-		models.RoleOrgViewer:    models.DescOrgViewer,
-		models.RoleOrgAdmin:     models.DescOrgAdmin,
-		models.RoleOrgOwner:     models.DescOrgOwner,
-		models.RoleCanvasViewer: models.DescCanvasViewer,
-		models.RoleCanvasAdmin:  models.DescCanvasAdmin,
-		models.RoleCanvasOwner:  models.DescCanvasOwner,
+		models.RoleOrgViewer: models.DescOrgViewer,
+		models.RoleOrgAdmin:  models.DescOrgAdmin,
+		models.RoleOrgOwner:  models.DescOrgOwner,
 	}
 
 	if description, exists := descriptions[roleName]; exists {
@@ -1449,9 +1228,8 @@ func contains(slice []string, item string) bool {
 func (a *AuthService) getDomainTypeFromDomain(domain string) string {
 	if strings.HasPrefix(domain, "org:") {
 		return models.DomainTypeOrganization
-	} else if strings.HasPrefix(domain, "canvas:") {
-		return models.DomainTypeCanvas
 	}
+
 	return ""
 }
 
@@ -1480,38 +1258,6 @@ func (a *AuthService) setupDefaultOrganizationRoleMetadataInTransaction(tx *gorm
 
 	for _, role := range defaultRoles {
 		if err := models.UpsertRoleMetadataInTransaction(tx, role.name, models.DomainTypeOrganization, orgID, role.displayName, role.description); err != nil {
-			return fmt.Errorf("failed to upsert role metadata for %s: %w", role.name, err)
-		}
-	}
-
-	return nil
-}
-
-func (a *AuthService) setupDefaultCanvasRoleMetadataInTransaction(tx *gorm.DB, canvasID string) error {
-	defaultRoles := []struct {
-		name        string
-		displayName string
-		description string
-	}{
-		{
-			name:        models.RoleCanvasOwner,
-			displayName: models.DisplayNameOwner,
-			description: models.MetaDescCanvasOwner,
-		},
-		{
-			name:        models.RoleCanvasAdmin,
-			displayName: models.DisplayNameAdmin,
-			description: models.MetaDescCanvasAdmin,
-		},
-		{
-			name:        models.RoleCanvasViewer,
-			displayName: models.DisplayNameViewer,
-			description: models.MetaDescCanvasViewer,
-		},
-	}
-
-	for _, role := range defaultRoles {
-		if err := models.UpsertRoleMetadataInTransaction(tx, role.name, models.DomainTypeCanvas, canvasID, role.displayName, role.description); err != nil {
 			return fmt.Errorf("failed to upsert role metadata for %s: %w", role.name, err)
 		}
 	}

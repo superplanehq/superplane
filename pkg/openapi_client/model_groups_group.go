@@ -21,8 +21,8 @@ var _ MappedNullable = &GroupsGroup{}
 // GroupsGroup struct for GroupsGroup
 type GroupsGroup struct {
 	Metadata *GroupsGroupMetadata `json:"metadata,omitempty"`
-	Spec     *GroupsGroupSpec     `json:"spec,omitempty"`
-	Status   *GroupsGroupStatus   `json:"status,omitempty"`
+	Spec *GroupsGroupSpec `json:"spec,omitempty"`
+	Status *GroupsGroupStatus `json:"status,omitempty"`
 }
 
 // NewGroupsGroup instantiates a new GroupsGroup object
@@ -139,7 +139,7 @@ func (o *GroupsGroup) SetStatus(v GroupsGroupStatus) {
 }
 
 func (o GroupsGroup) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,3 +195,5 @@ func (v *NullableGroupsGroup) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+
