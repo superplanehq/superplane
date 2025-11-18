@@ -968,7 +968,11 @@ function CanvasContent({
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
-  const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; handleId: string | null } | null>(null);
+  const [connectingFrom, setConnectingFrom] = useState<{
+    nodeId: string;
+    handleId: string | null;
+    handleType: "source" | "target" | null;
+  } | null>(null);
 
   const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: any) => {
     setHoveredEdgeId(edge.id);
@@ -978,11 +982,17 @@ function CanvasContent({
     setHoveredEdgeId(null);
   }, []);
 
-  const handleConnectStart = useCallback((_event: any, params: { nodeId: string | null; handleId: string | null }) => {
-    if (params.nodeId) {
-      setConnectingFrom({ nodeId: params.nodeId, handleId: params.handleId });
-    }
-  }, []);
+  const handleConnectStart = useCallback(
+    (
+      _event: any,
+      params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
+    ) => {
+      if (params.nodeId) {
+        setConnectingFrom({ nodeId: params.nodeId, handleId: params.handleId, handleType: params.handleType });
+      }
+    },
+    [],
+  );
 
   const handleConnectEnd = useCallback(() => {
     setConnectingFrom(null);
@@ -1002,9 +1012,10 @@ function CanvasContent({
         _callbacksRef: callbacksRef,
         _hoveredEdge: hoveredEdge,
         _connectingFrom: connectingFrom,
+        _allEdges: state.edges,
       },
     }));
-  }, [state.nodes, hoveredEdge, connectingFrom]);
+  }, [state.nodes, hoveredEdge, connectingFrom, state.edges]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -1018,7 +1029,7 @@ function CanvasContent({
         ...e,
         ...EDGE_STYLE,
         data: { ...e.data, isHovered: e.id === hoveredEdgeId },
-        zIndex: e.id === hoveredEdgeId ? 1000 : 1,
+        zIndex: e.id === hoveredEdgeId ? 1000 : 0,
       })),
     [state.edges, hoveredEdgeId],
   );
