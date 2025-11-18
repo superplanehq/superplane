@@ -474,7 +474,7 @@ export const ComponentSidebar = ({
             <div className="px-3 py-1 border-b-1 border-border">
               <MetadataList
                 items={metadata}
-                className="border-b-0 text-gray-500 font-medium gap-2 flex flex-col py-2"
+                className="border-b-0 text-gray-500 font-medium gap-1.5 flex flex-col py-2"
               />
             </div>
           )}
