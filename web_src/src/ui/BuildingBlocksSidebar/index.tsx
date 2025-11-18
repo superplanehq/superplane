@@ -53,7 +53,7 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
 
   // Initialize showWip from localStorage
   const [showWip, setShowWip] = useState(() => {
-    const storedShowWip = localStorage.getItem('buildingBlocksShowWip');
+    const storedShowWip = localStorage.getItem("buildingBlocksShowWip");
     if (storedShowWip !== null) {
       return JSON.parse(storedShowWip);
     }
@@ -62,7 +62,7 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
 
   // Save showWip to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('buildingBlocksShowWip', JSON.stringify(showWip));
+    localStorage.setItem("buildingBlocksShowWip", JSON.stringify(showWip));
   }, [showWip]);
 
   const categoryOrder: Record<string, number> = {
@@ -84,7 +84,7 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
 
   return (
     <div
-      className="w-[360px] h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col"
+      className="absolute left-0 top-0 z-20 w-[360px] h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col shadow-2xl"
       data-testid="building-blocks-sidebar"
     >
       <div className="flex items-center gap-2 px-4 py-4 relative">

@@ -9,6 +9,7 @@ package components
 import (
 	_struct "github.com/golang/protobuf/ptypes/struct"
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
+	configuration "github.com/superplanehq/superplane/pkg/protos/configuration"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -70,7 +71,7 @@ func (x Node_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Node_Type.Descriptor instead.
 func (Node_Type) EnumDescriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{22, 0}
+	return file_components_proto_rawDescGZIP(), []int{9, 0}
 }
 
 type ListComponentsRequest struct {
@@ -246,7 +247,7 @@ type Component struct {
 	Name           string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Label          string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
 	Description    string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Configuration  []*ConfigurationField  `protobuf:"bytes,4,rep,name=configuration,proto3" json:"configuration,omitempty"`
+	Configuration  []*configuration.Field `protobuf:"bytes,4,rep,name=configuration,proto3" json:"configuration,omitempty"`
 	OutputChannels []*OutputChannel       `protobuf:"bytes,5,rep,name=output_channels,json=outputChannels,proto3" json:"output_channels,omitempty"`
 	Icon           string                 `protobuf:"bytes,6,opt,name=icon,proto3" json:"icon,omitempty"`
 	Color          string                 `protobuf:"bytes,7,opt,name=color,proto3" json:"color,omitempty"`
@@ -305,7 +306,7 @@ func (x *Component) GetDescription() string {
 	return ""
 }
 
-func (x *Component) GetConfiguration() []*ConfigurationField {
+func (x *Component) GetConfiguration() []*configuration.Field {
 	if x != nil {
 		return x.Configuration
 	}
@@ -333,722 +334,6 @@ func (x *Component) GetColor() string {
 	return ""
 }
 
-type ConfigurationField struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	Name                 string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Type                 string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	Description          string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Required             bool                   `protobuf:"varint,4,opt,name=required,proto3" json:"required,omitempty"`
-	DefaultValue         *string                `protobuf:"bytes,5,opt,name=default_value,json=defaultValue,proto3,oneof" json:"default_value,omitempty"`
-	Label                string                 `protobuf:"bytes,6,opt,name=label,proto3" json:"label,omitempty"`
-	VisibilityConditions []*VisibilityCondition `protobuf:"bytes,7,rep,name=visibility_conditions,json=visibilityConditions,proto3" json:"visibility_conditions,omitempty"`
-	TypeOptions          *TypeOptions           `protobuf:"bytes,8,opt,name=type_options,json=typeOptions,proto3,oneof" json:"type_options,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
-}
-
-func (x *ConfigurationField) Reset() {
-	*x = ConfigurationField{}
-	mi := &file_components_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ConfigurationField) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ConfigurationField) ProtoMessage() {}
-
-func (x *ConfigurationField) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ConfigurationField.ProtoReflect.Descriptor instead.
-func (*ConfigurationField) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *ConfigurationField) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *ConfigurationField) GetType() string {
-	if x != nil {
-		return x.Type
-	}
-	return ""
-}
-
-func (x *ConfigurationField) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
-func (x *ConfigurationField) GetRequired() bool {
-	if x != nil {
-		return x.Required
-	}
-	return false
-}
-
-func (x *ConfigurationField) GetDefaultValue() string {
-	if x != nil && x.DefaultValue != nil {
-		return *x.DefaultValue
-	}
-	return ""
-}
-
-func (x *ConfigurationField) GetLabel() string {
-	if x != nil {
-		return x.Label
-	}
-	return ""
-}
-
-func (x *ConfigurationField) GetVisibilityConditions() []*VisibilityCondition {
-	if x != nil {
-		return x.VisibilityConditions
-	}
-	return nil
-}
-
-func (x *ConfigurationField) GetTypeOptions() *TypeOptions {
-	if x != nil {
-		return x.TypeOptions
-	}
-	return nil
-}
-
-type TypeOptions struct {
-	state         protoimpl.MessageState  `protogen:"open.v1"`
-	Number        *NumberTypeOptions      `protobuf:"bytes,1,opt,name=number,proto3,oneof" json:"number,omitempty"`
-	Select        *SelectTypeOptions      `protobuf:"bytes,2,opt,name=select,proto3,oneof" json:"select,omitempty"`
-	MultiSelect   *MultiSelectTypeOptions `protobuf:"bytes,3,opt,name=multi_select,json=multiSelect,proto3,oneof" json:"multi_select,omitempty"`
-	Integration   *IntegrationTypeOptions `protobuf:"bytes,4,opt,name=integration,proto3,oneof" json:"integration,omitempty"`
-	List          *ListTypeOptions        `protobuf:"bytes,5,opt,name=list,proto3,oneof" json:"list,omitempty"`
-	Object        *ObjectTypeOptions      `protobuf:"bytes,6,opt,name=object,proto3,oneof" json:"object,omitempty"`
-	Resource      *ResourceTypeOptions    `protobuf:"bytes,7,opt,name=resource,proto3,oneof" json:"resource,omitempty"`
-	Time          *TimeTypeOptions        `protobuf:"bytes,8,opt,name=time,proto3,oneof" json:"time,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *TypeOptions) Reset() {
-	*x = TypeOptions{}
-	mi := &file_components_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *TypeOptions) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*TypeOptions) ProtoMessage() {}
-
-func (x *TypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use TypeOptions.ProtoReflect.Descriptor instead.
-func (*TypeOptions) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *TypeOptions) GetNumber() *NumberTypeOptions {
-	if x != nil {
-		return x.Number
-	}
-	return nil
-}
-
-func (x *TypeOptions) GetSelect() *SelectTypeOptions {
-	if x != nil {
-		return x.Select
-	}
-	return nil
-}
-
-func (x *TypeOptions) GetMultiSelect() *MultiSelectTypeOptions {
-	if x != nil {
-		return x.MultiSelect
-	}
-	return nil
-}
-
-func (x *TypeOptions) GetIntegration() *IntegrationTypeOptions {
-	if x != nil {
-		return x.Integration
-	}
-	return nil
-}
-
-func (x *TypeOptions) GetList() *ListTypeOptions {
-	if x != nil {
-		return x.List
-	}
-	return nil
-}
-
-func (x *TypeOptions) GetObject() *ObjectTypeOptions {
-	if x != nil {
-		return x.Object
-	}
-	return nil
-}
-
-func (x *TypeOptions) GetResource() *ResourceTypeOptions {
-	if x != nil {
-		return x.Resource
-	}
-	return nil
-}
-
-func (x *TypeOptions) GetTime() *TimeTypeOptions {
-	if x != nil {
-		return x.Time
-	}
-	return nil
-}
-
-type NumberTypeOptions struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Min           *int32                 `protobuf:"varint,1,opt,name=min,proto3,oneof" json:"min,omitempty"`
-	Max           *int32                 `protobuf:"varint,2,opt,name=max,proto3,oneof" json:"max,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *NumberTypeOptions) Reset() {
-	*x = NumberTypeOptions{}
-	mi := &file_components_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *NumberTypeOptions) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*NumberTypeOptions) ProtoMessage() {}
-
-func (x *NumberTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use NumberTypeOptions.ProtoReflect.Descriptor instead.
-func (*NumberTypeOptions) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *NumberTypeOptions) GetMin() int32 {
-	if x != nil && x.Min != nil {
-		return *x.Min
-	}
-	return 0
-}
-
-func (x *NumberTypeOptions) GetMax() int32 {
-	if x != nil && x.Max != nil {
-		return *x.Max
-	}
-	return 0
-}
-
-type TimeTypeOptions struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Format        *string                `protobuf:"bytes,1,opt,name=format,proto3,oneof" json:"format,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *TimeTypeOptions) Reset() {
-	*x = TimeTypeOptions{}
-	mi := &file_components_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *TimeTypeOptions) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*TimeTypeOptions) ProtoMessage() {}
-
-func (x *TimeTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use TimeTypeOptions.ProtoReflect.Descriptor instead.
-func (*TimeTypeOptions) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *TimeTypeOptions) GetFormat() string {
-	if x != nil && x.Format != nil {
-		return *x.Format
-	}
-	return ""
-}
-
-type SelectTypeOptions struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Options       []*SelectOption        `protobuf:"bytes,1,rep,name=options,proto3" json:"options,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SelectTypeOptions) Reset() {
-	*x = SelectTypeOptions{}
-	mi := &file_components_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SelectTypeOptions) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SelectTypeOptions) ProtoMessage() {}
-
-func (x *SelectTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SelectTypeOptions.ProtoReflect.Descriptor instead.
-func (*SelectTypeOptions) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *SelectTypeOptions) GetOptions() []*SelectOption {
-	if x != nil {
-		return x.Options
-	}
-	return nil
-}
-
-type MultiSelectTypeOptions struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Options       []*SelectOption        `protobuf:"bytes,1,rep,name=options,proto3" json:"options,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *MultiSelectTypeOptions) Reset() {
-	*x = MultiSelectTypeOptions{}
-	mi := &file_components_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *MultiSelectTypeOptions) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MultiSelectTypeOptions) ProtoMessage() {}
-
-func (x *MultiSelectTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MultiSelectTypeOptions.ProtoReflect.Descriptor instead.
-func (*MultiSelectTypeOptions) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *MultiSelectTypeOptions) GetOptions() []*SelectOption {
-	if x != nil {
-		return x.Options
-	}
-	return nil
-}
-
-type IntegrationTypeOptions struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *IntegrationTypeOptions) Reset() {
-	*x = IntegrationTypeOptions{}
-	mi := &file_components_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *IntegrationTypeOptions) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*IntegrationTypeOptions) ProtoMessage() {}
-
-func (x *IntegrationTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use IntegrationTypeOptions.ProtoReflect.Descriptor instead.
-func (*IntegrationTypeOptions) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *IntegrationTypeOptions) GetType() string {
-	if x != nil {
-		return x.Type
-	}
-	return ""
-}
-
-type ResourceTypeOptions struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ResourceTypeOptions) Reset() {
-	*x = ResourceTypeOptions{}
-	mi := &file_components_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ResourceTypeOptions) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ResourceTypeOptions) ProtoMessage() {}
-
-func (x *ResourceTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ResourceTypeOptions.ProtoReflect.Descriptor instead.
-func (*ResourceTypeOptions) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *ResourceTypeOptions) GetType() string {
-	if x != nil {
-		return x.Type
-	}
-	return ""
-}
-
-type ListTypeOptions struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	ItemDefinition *ListItemDefinition    `protobuf:"bytes,1,opt,name=item_definition,json=itemDefinition,proto3" json:"item_definition,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *ListTypeOptions) Reset() {
-	*x = ListTypeOptions{}
-	mi := &file_components_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListTypeOptions) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListTypeOptions) ProtoMessage() {}
-
-func (x *ListTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListTypeOptions.ProtoReflect.Descriptor instead.
-func (*ListTypeOptions) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *ListTypeOptions) GetItemDefinition() *ListItemDefinition {
-	if x != nil {
-		return x.ItemDefinition
-	}
-	return nil
-}
-
-type ObjectTypeOptions struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Schema        []*ConfigurationField  `protobuf:"bytes,1,rep,name=schema,proto3" json:"schema,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ObjectTypeOptions) Reset() {
-	*x = ObjectTypeOptions{}
-	mi := &file_components_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ObjectTypeOptions) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ObjectTypeOptions) ProtoMessage() {}
-
-func (x *ObjectTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ObjectTypeOptions.ProtoReflect.Descriptor instead.
-func (*ObjectTypeOptions) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *ObjectTypeOptions) GetSchema() []*ConfigurationField {
-	if x != nil {
-		return x.Schema
-	}
-	return nil
-}
-
-type SelectOption struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Label         string                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
-	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SelectOption) Reset() {
-	*x = SelectOption{}
-	mi := &file_components_proto_msgTypes[15]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SelectOption) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SelectOption) ProtoMessage() {}
-
-func (x *SelectOption) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[15]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SelectOption.ProtoReflect.Descriptor instead.
-func (*SelectOption) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{15}
-}
-
-func (x *SelectOption) GetLabel() string {
-	if x != nil {
-		return x.Label
-	}
-	return ""
-}
-
-func (x *SelectOption) GetValue() string {
-	if x != nil {
-		return x.Value
-	}
-	return ""
-}
-
-type VisibilityCondition struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Field         string                 `protobuf:"bytes,1,opt,name=field,proto3" json:"field,omitempty"`
-	Values        []string               `protobuf:"bytes,2,rep,name=values,proto3" json:"values,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *VisibilityCondition) Reset() {
-	*x = VisibilityCondition{}
-	mi := &file_components_proto_msgTypes[16]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *VisibilityCondition) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*VisibilityCondition) ProtoMessage() {}
-
-func (x *VisibilityCondition) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[16]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use VisibilityCondition.ProtoReflect.Descriptor instead.
-func (*VisibilityCondition) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{16}
-}
-
-func (x *VisibilityCondition) GetField() string {
-	if x != nil {
-		return x.Field
-	}
-	return ""
-}
-
-func (x *VisibilityCondition) GetValues() []string {
-	if x != nil {
-		return x.Values
-	}
-	return nil
-}
-
-type ListItemDefinition struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	Schema        []*ConfigurationField  `protobuf:"bytes,2,rep,name=schema,proto3" json:"schema,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListItemDefinition) Reset() {
-	*x = ListItemDefinition{}
-	mi := &file_components_proto_msgTypes[17]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListItemDefinition) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListItemDefinition) ProtoMessage() {}
-
-func (x *ListItemDefinition) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[17]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListItemDefinition.ProtoReflect.Descriptor instead.
-func (*ListItemDefinition) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{17}
-}
-
-func (x *ListItemDefinition) GetType() string {
-	if x != nil {
-		return x.Type
-	}
-	return ""
-}
-
-func (x *ListItemDefinition) GetSchema() []*ConfigurationField {
-	if x != nil {
-		return x.Schema
-	}
-	return nil
-}
-
 type OutputChannel struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -1060,7 +345,7 @@ type OutputChannel struct {
 
 func (x *OutputChannel) Reset() {
 	*x = OutputChannel{}
-	mi := &file_components_proto_msgTypes[18]
+	mi := &file_components_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1072,7 +357,7 @@ func (x *OutputChannel) String() string {
 func (*OutputChannel) ProtoMessage() {}
 
 func (x *OutputChannel) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[18]
+	mi := &file_components_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1085,7 +370,7 @@ func (x *OutputChannel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OutputChannel.ProtoReflect.Descriptor instead.
 func (*OutputChannel) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{18}
+	return file_components_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *OutputChannel) GetName() string {
@@ -1118,7 +403,7 @@ type ListComponentActionsRequest struct {
 
 func (x *ListComponentActionsRequest) Reset() {
 	*x = ListComponentActionsRequest{}
-	mi := &file_components_proto_msgTypes[19]
+	mi := &file_components_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1130,7 +415,7 @@ func (x *ListComponentActionsRequest) String() string {
 func (*ListComponentActionsRequest) ProtoMessage() {}
 
 func (x *ListComponentActionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[19]
+	mi := &file_components_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1143,7 +428,7 @@ func (x *ListComponentActionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListComponentActionsRequest.ProtoReflect.Descriptor instead.
 func (*ListComponentActionsRequest) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{19}
+	return file_components_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListComponentActionsRequest) GetName() string {
@@ -1157,14 +442,14 @@ type ComponentAction struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	Parameters    []*ConfigurationField  `protobuf:"bytes,3,rep,name=parameters,proto3" json:"parameters,omitempty"`
+	Parameters    []*configuration.Field `protobuf:"bytes,3,rep,name=parameters,proto3" json:"parameters,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ComponentAction) Reset() {
 	*x = ComponentAction{}
-	mi := &file_components_proto_msgTypes[20]
+	mi := &file_components_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1176,7 +461,7 @@ func (x *ComponentAction) String() string {
 func (*ComponentAction) ProtoMessage() {}
 
 func (x *ComponentAction) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[20]
+	mi := &file_components_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1189,7 +474,7 @@ func (x *ComponentAction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ComponentAction.ProtoReflect.Descriptor instead.
 func (*ComponentAction) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{20}
+	return file_components_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ComponentAction) GetName() string {
@@ -1206,7 +491,7 @@ func (x *ComponentAction) GetDescription() string {
 	return ""
 }
 
-func (x *ComponentAction) GetParameters() []*ConfigurationField {
+func (x *ComponentAction) GetParameters() []*configuration.Field {
 	if x != nil {
 		return x.Parameters
 	}
@@ -1222,7 +507,7 @@ type ListComponentActionsResponse struct {
 
 func (x *ListComponentActionsResponse) Reset() {
 	*x = ListComponentActionsResponse{}
-	mi := &file_components_proto_msgTypes[21]
+	mi := &file_components_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1234,7 +519,7 @@ func (x *ListComponentActionsResponse) String() string {
 func (*ListComponentActionsResponse) ProtoMessage() {}
 
 func (x *ListComponentActionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[21]
+	mi := &file_components_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1247,7 +532,7 @@ func (x *ListComponentActionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListComponentActionsResponse.ProtoReflect.Descriptor instead.
 func (*ListComponentActionsResponse) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{21}
+	return file_components_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListComponentActionsResponse) GetActions() []*ComponentAction {
@@ -1275,7 +560,7 @@ type Node struct {
 
 func (x *Node) Reset() {
 	*x = Node{}
-	mi := &file_components_proto_msgTypes[22]
+	mi := &file_components_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1287,7 +572,7 @@ func (x *Node) String() string {
 func (*Node) ProtoMessage() {}
 
 func (x *Node) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[22]
+	mi := &file_components_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1300,7 +585,7 @@ func (x *Node) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Node.ProtoReflect.Descriptor instead.
 func (*Node) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{22}
+	return file_components_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Node) GetId() string {
@@ -1383,7 +668,7 @@ type Position struct {
 
 func (x *Position) Reset() {
 	*x = Position{}
-	mi := &file_components_proto_msgTypes[23]
+	mi := &file_components_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1395,7 +680,7 @@ func (x *Position) String() string {
 func (*Position) ProtoMessage() {}
 
 func (x *Position) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[23]
+	mi := &file_components_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1408,7 +693,7 @@ func (x *Position) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Position.ProtoReflect.Descriptor instead.
 func (*Position) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{23}
+	return file_components_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Position) GetX() int32 {
@@ -1436,7 +721,7 @@ type Edge struct {
 
 func (x *Edge) Reset() {
 	*x = Edge{}
-	mi := &file_components_proto_msgTypes[24]
+	mi := &file_components_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1448,7 +733,7 @@ func (x *Edge) String() string {
 func (*Edge) ProtoMessage() {}
 
 func (x *Edge) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[24]
+	mi := &file_components_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1461,7 +746,7 @@ func (x *Edge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Edge.ProtoReflect.Descriptor instead.
 func (*Edge) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{24}
+	return file_components_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Edge) GetSourceId() string {
@@ -1494,7 +779,7 @@ type Node_ComponentRef struct {
 
 func (x *Node_ComponentRef) Reset() {
 	*x = Node_ComponentRef{}
-	mi := &file_components_proto_msgTypes[25]
+	mi := &file_components_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1506,7 +791,7 @@ func (x *Node_ComponentRef) String() string {
 func (*Node_ComponentRef) ProtoMessage() {}
 
 func (x *Node_ComponentRef) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[25]
+	mi := &file_components_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1519,7 +804,7 @@ func (x *Node_ComponentRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Node_ComponentRef.ProtoReflect.Descriptor instead.
 func (*Node_ComponentRef) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{22, 0}
+	return file_components_proto_rawDescGZIP(), []int{9, 0}
 }
 
 func (x *Node_ComponentRef) GetName() string {
@@ -1538,7 +823,7 @@ type Node_TriggerRef struct {
 
 func (x *Node_TriggerRef) Reset() {
 	*x = Node_TriggerRef{}
-	mi := &file_components_proto_msgTypes[26]
+	mi := &file_components_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1550,7 +835,7 @@ func (x *Node_TriggerRef) String() string {
 func (*Node_TriggerRef) ProtoMessage() {}
 
 func (x *Node_TriggerRef) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[26]
+	mi := &file_components_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1563,7 +848,7 @@ func (x *Node_TriggerRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Node_TriggerRef.ProtoReflect.Descriptor instead.
 func (*Node_TriggerRef) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{22, 1}
+	return file_components_proto_rawDescGZIP(), []int{9, 1}
 }
 
 func (x *Node_TriggerRef) GetName() string {
@@ -1582,7 +867,7 @@ type Node_BlueprintRef struct {
 
 func (x *Node_BlueprintRef) Reset() {
 	*x = Node_BlueprintRef{}
-	mi := &file_components_proto_msgTypes[27]
+	mi := &file_components_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1594,7 +879,7 @@ func (x *Node_BlueprintRef) String() string {
 func (*Node_BlueprintRef) ProtoMessage() {}
 
 func (x *Node_BlueprintRef) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[27]
+	mi := &file_components_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1607,7 +892,7 @@ func (x *Node_BlueprintRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Node_BlueprintRef.ProtoReflect.Descriptor instead.
 func (*Node_BlueprintRef) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{22, 2}
+	return file_components_proto_rawDescGZIP(), []int{9, 2}
 }
 
 func (x *Node_BlueprintRef) GetId() string {
@@ -1621,7 +906,7 @@ var File_components_proto protoreflect.FileDescriptor
 
 const file_components_proto_rawDesc = "" +
 	"\n" +
-	"\x10components.proto\x12\x15Superplane.Components\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x17\n" +
+	"\x10components.proto\x12\x15Superplane.Components\x1a\x13configuration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x17\n" +
 	"\x15ListComponentsRequest\"Z\n" +
 	"\x16ListComponentsResponse\x12@\n" +
 	"\n" +
@@ -1630,83 +915,26 @@ const file_components_proto_rawDesc = "" +
 	"\x18DescribeComponentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"[\n" +
 	"\x19DescribeComponentResponse\x12>\n" +
-	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\xa1\x02\n" +
+	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\x97\x02\n" +
 	"\tComponent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12O\n" +
-	"\rconfiguration\x18\x04 \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration\x12M\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12E\n" +
+	"\rconfiguration\x18\x04 \x03(\v2\x1f.Superplane.Configuration.FieldR\rconfiguration\x12M\n" +
 	"\x0foutput_channels\x18\x05 \x03(\v2$.Superplane.Components.OutputChannelR\x0eoutputChannels\x12\x12\n" +
 	"\x04icon\x18\x06 \x01(\tR\x04icon\x12\x14\n" +
-	"\x05color\x18\a \x01(\tR\x05color\"\x8a\x03\n" +
-	"\x12ConfigurationField\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
-	"\x04type\x18\x02 \x01(\tR\x04type\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1a\n" +
-	"\brequired\x18\x04 \x01(\bR\brequired\x12(\n" +
-	"\rdefault_value\x18\x05 \x01(\tH\x00R\fdefaultValue\x88\x01\x01\x12\x14\n" +
-	"\x05label\x18\x06 \x01(\tR\x05label\x12_\n" +
-	"\x15visibility_conditions\x18\a \x03(\v2*.Superplane.Components.VisibilityConditionR\x14visibilityConditions\x12J\n" +
-	"\ftype_options\x18\b \x01(\v2\".Superplane.Components.TypeOptionsH\x01R\vtypeOptions\x88\x01\x01B\x10\n" +
-	"\x0e_default_valueB\x0f\n" +
-	"\r_type_options\"\xbf\x05\n" +
-	"\vTypeOptions\x12E\n" +
-	"\x06number\x18\x01 \x01(\v2(.Superplane.Components.NumberTypeOptionsH\x00R\x06number\x88\x01\x01\x12E\n" +
-	"\x06select\x18\x02 \x01(\v2(.Superplane.Components.SelectTypeOptionsH\x01R\x06select\x88\x01\x01\x12U\n" +
-	"\fmulti_select\x18\x03 \x01(\v2-.Superplane.Components.MultiSelectTypeOptionsH\x02R\vmultiSelect\x88\x01\x01\x12T\n" +
-	"\vintegration\x18\x04 \x01(\v2-.Superplane.Components.IntegrationTypeOptionsH\x03R\vintegration\x88\x01\x01\x12?\n" +
-	"\x04list\x18\x05 \x01(\v2&.Superplane.Components.ListTypeOptionsH\x04R\x04list\x88\x01\x01\x12E\n" +
-	"\x06object\x18\x06 \x01(\v2(.Superplane.Components.ObjectTypeOptionsH\x05R\x06object\x88\x01\x01\x12K\n" +
-	"\bresource\x18\a \x01(\v2*.Superplane.Components.ResourceTypeOptionsH\x06R\bresource\x88\x01\x01\x12?\n" +
-	"\x04time\x18\b \x01(\v2&.Superplane.Components.TimeTypeOptionsH\aR\x04time\x88\x01\x01B\t\n" +
-	"\a_numberB\t\n" +
-	"\a_selectB\x0f\n" +
-	"\r_multi_selectB\x0e\n" +
-	"\f_integrationB\a\n" +
-	"\x05_listB\t\n" +
-	"\a_objectB\v\n" +
-	"\t_resourceB\a\n" +
-	"\x05_time\"Q\n" +
-	"\x11NumberTypeOptions\x12\x15\n" +
-	"\x03min\x18\x01 \x01(\x05H\x00R\x03min\x88\x01\x01\x12\x15\n" +
-	"\x03max\x18\x02 \x01(\x05H\x01R\x03max\x88\x01\x01B\x06\n" +
-	"\x04_minB\x06\n" +
-	"\x04_max\"9\n" +
-	"\x0fTimeTypeOptions\x12\x1b\n" +
-	"\x06format\x18\x01 \x01(\tH\x00R\x06format\x88\x01\x01B\t\n" +
-	"\a_format\"R\n" +
-	"\x11SelectTypeOptions\x12=\n" +
-	"\aoptions\x18\x01 \x03(\v2#.Superplane.Components.SelectOptionR\aoptions\"W\n" +
-	"\x16MultiSelectTypeOptions\x12=\n" +
-	"\aoptions\x18\x01 \x03(\v2#.Superplane.Components.SelectOptionR\aoptions\",\n" +
-	"\x16IntegrationTypeOptions\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\")\n" +
-	"\x13ResourceTypeOptions\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\"e\n" +
-	"\x0fListTypeOptions\x12R\n" +
-	"\x0fitem_definition\x18\x01 \x01(\v2).Superplane.Components.ListItemDefinitionR\x0eitemDefinition\"V\n" +
-	"\x11ObjectTypeOptions\x12A\n" +
-	"\x06schema\x18\x01 \x03(\v2).Superplane.Components.ConfigurationFieldR\x06schema\":\n" +
-	"\fSelectOption\x12\x14\n" +
-	"\x05label\x18\x01 \x01(\tR\x05label\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\"C\n" +
-	"\x13VisibilityCondition\x12\x14\n" +
-	"\x05field\x18\x01 \x01(\tR\x05field\x12\x16\n" +
-	"\x06values\x18\x02 \x03(\tR\x06values\"k\n" +
-	"\x12ListItemDefinition\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\x12A\n" +
-	"\x06schema\x18\x02 \x03(\v2).Superplane.Components.ConfigurationFieldR\x06schema\"[\n" +
+	"\x05color\x18\a \x01(\tR\x05color\"[\n" +
 	"\rOutputChannel\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\"1\n" +
 	"\x1bListComponentActionsRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"\x92\x01\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\x88\x01\n" +
 	"\x0fComponentAction\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x02 \x01(\tR\vdescription\x12I\n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12?\n" +
 	"\n" +
-	"parameters\x18\x03 \x03(\v2).Superplane.Components.ConfigurationFieldR\n" +
+	"parameters\x18\x03 \x03(\v2\x1f.Superplane.Configuration.FieldR\n" +
 	"parameters\"`\n" +
 	"\x1cListComponentActionsResponse\x12@\n" +
 	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xae\x05\n" +
@@ -1764,7 +992,7 @@ func file_components_proto_rawDescGZIP() []byte {
 }
 
 var file_components_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_components_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_components_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_components_proto_goTypes = []any{
 	(Node_Type)(0),                       // 0: Superplane.Components.Node.Type
 	(*ListComponentsRequest)(nil),        // 1: Superplane.Components.ListComponentsRequest
@@ -1772,71 +1000,44 @@ var file_components_proto_goTypes = []any{
 	(*DescribeComponentRequest)(nil),     // 3: Superplane.Components.DescribeComponentRequest
 	(*DescribeComponentResponse)(nil),    // 4: Superplane.Components.DescribeComponentResponse
 	(*Component)(nil),                    // 5: Superplane.Components.Component
-	(*ConfigurationField)(nil),           // 6: Superplane.Components.ConfigurationField
-	(*TypeOptions)(nil),                  // 7: Superplane.Components.TypeOptions
-	(*NumberTypeOptions)(nil),            // 8: Superplane.Components.NumberTypeOptions
-	(*TimeTypeOptions)(nil),              // 9: Superplane.Components.TimeTypeOptions
-	(*SelectTypeOptions)(nil),            // 10: Superplane.Components.SelectTypeOptions
-	(*MultiSelectTypeOptions)(nil),       // 11: Superplane.Components.MultiSelectTypeOptions
-	(*IntegrationTypeOptions)(nil),       // 12: Superplane.Components.IntegrationTypeOptions
-	(*ResourceTypeOptions)(nil),          // 13: Superplane.Components.ResourceTypeOptions
-	(*ListTypeOptions)(nil),              // 14: Superplane.Components.ListTypeOptions
-	(*ObjectTypeOptions)(nil),            // 15: Superplane.Components.ObjectTypeOptions
-	(*SelectOption)(nil),                 // 16: Superplane.Components.SelectOption
-	(*VisibilityCondition)(nil),          // 17: Superplane.Components.VisibilityCondition
-	(*ListItemDefinition)(nil),           // 18: Superplane.Components.ListItemDefinition
-	(*OutputChannel)(nil),                // 19: Superplane.Components.OutputChannel
-	(*ListComponentActionsRequest)(nil),  // 20: Superplane.Components.ListComponentActionsRequest
-	(*ComponentAction)(nil),              // 21: Superplane.Components.ComponentAction
-	(*ListComponentActionsResponse)(nil), // 22: Superplane.Components.ListComponentActionsResponse
-	(*Node)(nil),                         // 23: Superplane.Components.Node
-	(*Position)(nil),                     // 24: Superplane.Components.Position
-	(*Edge)(nil),                         // 25: Superplane.Components.Edge
-	(*Node_ComponentRef)(nil),            // 26: Superplane.Components.Node.ComponentRef
-	(*Node_TriggerRef)(nil),              // 27: Superplane.Components.Node.TriggerRef
-	(*Node_BlueprintRef)(nil),            // 28: Superplane.Components.Node.BlueprintRef
-	(*_struct.Struct)(nil),               // 29: google.protobuf.Struct
+	(*OutputChannel)(nil),                // 6: Superplane.Components.OutputChannel
+	(*ListComponentActionsRequest)(nil),  // 7: Superplane.Components.ListComponentActionsRequest
+	(*ComponentAction)(nil),              // 8: Superplane.Components.ComponentAction
+	(*ListComponentActionsResponse)(nil), // 9: Superplane.Components.ListComponentActionsResponse
+	(*Node)(nil),                         // 10: Superplane.Components.Node
+	(*Position)(nil),                     // 11: Superplane.Components.Position
+	(*Edge)(nil),                         // 12: Superplane.Components.Edge
+	(*Node_ComponentRef)(nil),            // 13: Superplane.Components.Node.ComponentRef
+	(*Node_TriggerRef)(nil),              // 14: Superplane.Components.Node.TriggerRef
+	(*Node_BlueprintRef)(nil),            // 15: Superplane.Components.Node.BlueprintRef
+	(*configuration.Field)(nil),          // 16: Superplane.Configuration.Field
+	(*_struct.Struct)(nil),               // 17: google.protobuf.Struct
 }
 var file_components_proto_depIdxs = []int32{
 	5,  // 0: Superplane.Components.ListComponentsResponse.components:type_name -> Superplane.Components.Component
 	5,  // 1: Superplane.Components.DescribeComponentResponse.component:type_name -> Superplane.Components.Component
-	6,  // 2: Superplane.Components.Component.configuration:type_name -> Superplane.Components.ConfigurationField
-	19, // 3: Superplane.Components.Component.output_channels:type_name -> Superplane.Components.OutputChannel
-	17, // 4: Superplane.Components.ConfigurationField.visibility_conditions:type_name -> Superplane.Components.VisibilityCondition
-	7,  // 5: Superplane.Components.ConfigurationField.type_options:type_name -> Superplane.Components.TypeOptions
-	8,  // 6: Superplane.Components.TypeOptions.number:type_name -> Superplane.Components.NumberTypeOptions
-	10, // 7: Superplane.Components.TypeOptions.select:type_name -> Superplane.Components.SelectTypeOptions
-	11, // 8: Superplane.Components.TypeOptions.multi_select:type_name -> Superplane.Components.MultiSelectTypeOptions
-	12, // 9: Superplane.Components.TypeOptions.integration:type_name -> Superplane.Components.IntegrationTypeOptions
-	14, // 10: Superplane.Components.TypeOptions.list:type_name -> Superplane.Components.ListTypeOptions
-	15, // 11: Superplane.Components.TypeOptions.object:type_name -> Superplane.Components.ObjectTypeOptions
-	13, // 12: Superplane.Components.TypeOptions.resource:type_name -> Superplane.Components.ResourceTypeOptions
-	9,  // 13: Superplane.Components.TypeOptions.time:type_name -> Superplane.Components.TimeTypeOptions
-	16, // 14: Superplane.Components.SelectTypeOptions.options:type_name -> Superplane.Components.SelectOption
-	16, // 15: Superplane.Components.MultiSelectTypeOptions.options:type_name -> Superplane.Components.SelectOption
-	18, // 16: Superplane.Components.ListTypeOptions.item_definition:type_name -> Superplane.Components.ListItemDefinition
-	6,  // 17: Superplane.Components.ObjectTypeOptions.schema:type_name -> Superplane.Components.ConfigurationField
-	6,  // 18: Superplane.Components.ListItemDefinition.schema:type_name -> Superplane.Components.ConfigurationField
-	6,  // 19: Superplane.Components.ComponentAction.parameters:type_name -> Superplane.Components.ConfigurationField
-	21, // 20: Superplane.Components.ListComponentActionsResponse.actions:type_name -> Superplane.Components.ComponentAction
-	0,  // 21: Superplane.Components.Node.type:type_name -> Superplane.Components.Node.Type
-	29, // 22: Superplane.Components.Node.configuration:type_name -> google.protobuf.Struct
-	29, // 23: Superplane.Components.Node.metadata:type_name -> google.protobuf.Struct
-	24, // 24: Superplane.Components.Node.position:type_name -> Superplane.Components.Position
-	26, // 25: Superplane.Components.Node.component:type_name -> Superplane.Components.Node.ComponentRef
-	28, // 26: Superplane.Components.Node.blueprint:type_name -> Superplane.Components.Node.BlueprintRef
-	27, // 27: Superplane.Components.Node.trigger:type_name -> Superplane.Components.Node.TriggerRef
-	1,  // 28: Superplane.Components.Components.ListComponents:input_type -> Superplane.Components.ListComponentsRequest
-	3,  // 29: Superplane.Components.Components.DescribeComponent:input_type -> Superplane.Components.DescribeComponentRequest
-	20, // 30: Superplane.Components.Components.ListComponentActions:input_type -> Superplane.Components.ListComponentActionsRequest
-	2,  // 31: Superplane.Components.Components.ListComponents:output_type -> Superplane.Components.ListComponentsResponse
-	4,  // 32: Superplane.Components.Components.DescribeComponent:output_type -> Superplane.Components.DescribeComponentResponse
-	22, // 33: Superplane.Components.Components.ListComponentActions:output_type -> Superplane.Components.ListComponentActionsResponse
-	31, // [31:34] is the sub-list for method output_type
-	28, // [28:31] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	16, // 2: Superplane.Components.Component.configuration:type_name -> Superplane.Configuration.Field
+	6,  // 3: Superplane.Components.Component.output_channels:type_name -> Superplane.Components.OutputChannel
+	16, // 4: Superplane.Components.ComponentAction.parameters:type_name -> Superplane.Configuration.Field
+	8,  // 5: Superplane.Components.ListComponentActionsResponse.actions:type_name -> Superplane.Components.ComponentAction
+	0,  // 6: Superplane.Components.Node.type:type_name -> Superplane.Components.Node.Type
+	17, // 7: Superplane.Components.Node.configuration:type_name -> google.protobuf.Struct
+	17, // 8: Superplane.Components.Node.metadata:type_name -> google.protobuf.Struct
+	11, // 9: Superplane.Components.Node.position:type_name -> Superplane.Components.Position
+	13, // 10: Superplane.Components.Node.component:type_name -> Superplane.Components.Node.ComponentRef
+	15, // 11: Superplane.Components.Node.blueprint:type_name -> Superplane.Components.Node.BlueprintRef
+	14, // 12: Superplane.Components.Node.trigger:type_name -> Superplane.Components.Node.TriggerRef
+	1,  // 13: Superplane.Components.Components.ListComponents:input_type -> Superplane.Components.ListComponentsRequest
+	3,  // 14: Superplane.Components.Components.DescribeComponent:input_type -> Superplane.Components.DescribeComponentRequest
+	7,  // 15: Superplane.Components.Components.ListComponentActions:input_type -> Superplane.Components.ListComponentActionsRequest
+	2,  // 16: Superplane.Components.Components.ListComponents:output_type -> Superplane.Components.ListComponentsResponse
+	4,  // 17: Superplane.Components.Components.DescribeComponent:output_type -> Superplane.Components.DescribeComponentResponse
+	9,  // 18: Superplane.Components.Components.ListComponentActions:output_type -> Superplane.Components.ListComponentActionsResponse
+	16, // [16:19] is the sub-list for method output_type
+	13, // [13:16] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_components_proto_init() }
@@ -1844,17 +1045,13 @@ func file_components_proto_init() {
 	if File_components_proto != nil {
 		return
 	}
-	file_components_proto_msgTypes[5].OneofWrappers = []any{}
-	file_components_proto_msgTypes[6].OneofWrappers = []any{}
-	file_components_proto_msgTypes[7].OneofWrappers = []any{}
-	file_components_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_components_proto_rawDesc), len(file_components_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   28,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

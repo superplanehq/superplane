@@ -1,53 +1,53 @@
-import React from 'react'
-import type { Meta, StoryObj } from '@storybook/react'
-import { Switch } from './switch'
+import React from "react";
+import type { Meta, StoryObj } from "@storybook/react";
+import { Switch } from "./switch";
 
 const meta: Meta<typeof Switch> = {
-  title: 'Components/Switch',
+  title: "Components/Switch",
   component: Switch,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
     checked: {
-      control: 'boolean',
+      control: "boolean",
     },
     disabled: {
-      control: 'boolean',
+      control: "boolean",
     },
     color: {
-      control: 'select',
-      options: ['blue', 'green', 'indigo'],
+      control: "select",
+      options: ["blue", "green", "indigo"],
     },
   },
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {},
-}
+};
 
 export const Checked: Story = {
   args: {
     checked: true,
   },
-}
+};
 
 export const Disabled: Story = {
   args: {
     disabled: true,
   },
-}
+};
 
 export const CheckedDisabled: Story = {
   args: {
     checked: true,
     disabled: true,
   },
-}
+};
 
 export const Colors: Story = {
   render: () => (
@@ -57,4 +57,4 @@ export const Colors: Story = {
       <Switch checked onChange={() => {}} color="indigo" />
     </div>
   ),
-}
+};

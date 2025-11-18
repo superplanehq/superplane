@@ -20,9 +20,9 @@ var _ MappedNullable = &ComponentsComponentAction{}
 
 // ComponentsComponentAction struct for ComponentsComponentAction
 type ComponentsComponentAction struct {
-	Name *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Parameters []ComponentsConfigurationField `json:"parameters,omitempty"`
+	Name        *string              `json:"name,omitempty"`
+	Description *string              `json:"description,omitempty"`
+	Parameters  []ConfigurationField `json:"parameters,omitempty"`
 }
 
 // NewComponentsComponentAction instantiates a new ComponentsComponentAction object
@@ -107,9 +107,9 @@ func (o *ComponentsComponentAction) SetDescription(v string) {
 }
 
 // GetParameters returns the Parameters field value if set, zero value otherwise.
-func (o *ComponentsComponentAction) GetParameters() []ComponentsConfigurationField {
+func (o *ComponentsComponentAction) GetParameters() []ConfigurationField {
 	if o == nil || IsNil(o.Parameters) {
-		var ret []ComponentsConfigurationField
+		var ret []ConfigurationField
 		return ret
 	}
 	return o.Parameters
@@ -117,7 +117,7 @@ func (o *ComponentsComponentAction) GetParameters() []ComponentsConfigurationFie
 
 // GetParametersOk returns a tuple with the Parameters field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsComponentAction) GetParametersOk() ([]ComponentsConfigurationField, bool) {
+func (o *ComponentsComponentAction) GetParametersOk() ([]ConfigurationField, bool) {
 	if o == nil || IsNil(o.Parameters) {
 		return nil, false
 	}
@@ -133,13 +133,13 @@ func (o *ComponentsComponentAction) HasParameters() bool {
 	return false
 }
 
-// SetParameters gets a reference to the given []ComponentsConfigurationField and assigns it to the Parameters field.
-func (o *ComponentsComponentAction) SetParameters(v []ComponentsConfigurationField) {
+// SetParameters gets a reference to the given []ConfigurationField and assigns it to the Parameters field.
+func (o *ComponentsComponentAction) SetParameters(v []ConfigurationField) {
 	o.Parameters = v
 }
 
 func (o ComponentsComponentAction) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,5 +195,3 @@ func (v *NullableComponentsComponentAction) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

@@ -4,6 +4,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
@@ -49,7 +52,19 @@ type Component interface {
 	/*
 	 * The configuration fields exposed by the component.
 	 */
-	Configuration() []ConfigurationField
+	Configuration() []configuration.Field
+
+	/*
+	 * Setup the component.
+	 */
+	Setup(ctx SetupContext) error
+
+	/*
+	 * ProcessQueueItem is called when a queue item for this component's node
+	 * is ready to be processed. Implementations should create the appropriate
+	 * execution or handle the item synchronously using the provided context.
+	 */
+	ProcessQueueItem(ctx ProcessQueueContext) (*models.WorkflowNodeExecution, error)
 
 	/*
 	 * Passes full execution control to the component.
@@ -86,12 +101,34 @@ type OutputChannel struct {
  * to control the state and metadata of each execution of it.
  */
 type ExecutionContext struct {
+	ID                    string
+	WorkflowID            string
 	Data                  any
 	Configuration         any
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
 	RequestContext        RequestContext
 	AuthContext           AuthContext
+	IntegrationContext    IntegrationContext
+}
+
+/*
+ * ExecutionContext allows the component
+ * to control the state and metadata of each execution of it.
+ */
+type SetupContext struct {
+	Configuration      any
+	MetadataContext    MetadataContext
+	RequestContext     RequestContext
+	AuthContext        AuthContext
+	IntegrationContext IntegrationContext
+}
+
+/*
+ * IntegrationContext allows components to access integrations.
+ */
+type IntegrationContext interface {
+	GetIntegration(ID string) (integrations.ResourceManager, error)
 }
 
 /*
@@ -107,6 +144,7 @@ type MetadataContext interface {
  * ExecutionStateContext allows components to control execution lifecycle.
  */
 type ExecutionStateContext interface {
+	IsFinished() bool
 	Pass(outputs map[string][]any) error
 	Fail(reason, message string) error
 }
@@ -130,7 +168,7 @@ type Action struct {
 	Name           string
 	Description    string
 	UserAccessible bool
-	Parameters     []ConfigurationField
+	Parameters     []configuration.Field
 }
 
 /*
@@ -144,6 +182,61 @@ type ActionContext struct {
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
 	AuthContext           AuthContext
+	RequestContext        RequestContext
+	IntegrationContext    IntegrationContext
+}
+
+/*
+ * ProcessQueueContext is provided to components to process a node's queue item.
+ * It mirrors the data the queue worker would otherwise use to create executions.
+ */
+type ProcessQueueContext struct {
+	// IDs and configuration
+	WorkflowID    string
+	NodeID        string
+	Configuration any
+
+	// Input event data and references
+	RootEventID string
+	EventID     string
+	// SourceNodeID is the upstream node id that produced the event
+	SourceNodeID string
+	Input        any
+
+	// CreateExecution creates a pending execution for this queue item.
+	CreateExecution func() (uuid.UUID, error)
+
+	// DequeueItem marks the queue item as processed.
+	DequeueItem func() error
+
+	// UpdateNodeState updates the state of the node.
+	UpdateNodeState func(state string) error
+
+	// DefaultProcessing performs the default processing for the queue item.
+	// Convenience method to avoid boilerplate in components that just want default behavior,
+	// where an execution is created and the item is dequeued.
+	DefaultProcessing func() (*models.WorkflowNodeExecution, error)
+
+	// GetExecutionMetadata retrieves the execution metadata for a given execution ID.
+	GetExecutionMetadata func(uuid.UUID) (map[string]any, error)
+	SetExecutionMetadata func(uuid.UUID, any) error
+
+	// CountIncomingEdges returns the number of incoming edges for this node
+	CountIncomingEdges func() (int, error)
+
+	// CountDistinctIncomingSources returns the number of distinct upstream
+	// source nodes connected to this node (ignoring multiple channels from the
+	// same source)
+	CountDistinctIncomingSources func() (int, error)
+
+	// PassExecution marks the execution as passed with the provided outputs.
+	PassExecution func(execID uuid.UUID, outputs map[string][]any) (*models.WorkflowNodeExecution, error)
+
+	// FailExecution marks the execution as failed with the provided reason and message.
+	FailExecution func(execID uuid.UUID, reason, message string) (*models.WorkflowNodeExecution, error)
+
+	FindExecutionIDByKV func(key string, value string) (uuid.UUID, bool, error)
+	SetExecutionKV      func(execID uuid.UUID, key string, value string) error
 }
 
 type AuthContext interface {
@@ -157,154 +250,4 @@ type User struct {
 	ID    string `mapstructure:"id" json:"id"`
 	Name  string `mapstructure:"name" json:"name"`
 	Email string `mapstructure:"email" json:"email"`
-}
-
-const (
-	FieldTypeString              = "string"
-	FieldTypeNumber              = "number"
-	FieldTypeBool                = "boolean"
-	FieldTypeSelect              = "select"
-	FieldTypeMultiSelect         = "multi-select"
-	FieldTypeIntegration         = "integration"
-	FieldTypeIntegrationResource = "integration-resource"
-	FieldTypeList                = "list"
-	FieldTypeObject              = "object"
-	FieldTypeTime                = "time"
-	FieldTypeUser                = "user"
-	FieldTypeRole                = "role"
-	FieldTypeGroup               = "group"
-)
-
-type ConfigurationField struct {
-	/*
-	 * Unique name identifier for the field
-	 */
-	Name string `json:"name"`
-
-	/*
-	 * Human-readable label for the field (displayed in forms)
-	 */
-	Label string `json:"label"`
-
-	/*
-	 * Type of the field. Supported types are:
-	 * - string
-	 * - number
-	 * - boolean
-	 * - select
-	 * - multi_select
-	 * - integration
-	 * - date
-	 * - url
-	 * - list
-	 * - object
-	 */
-	Type        string `json:"type"`
-	Description string `json:"description"`
-	Required    bool   `json:"required"`
-	Default     any    `json:"default"`
-
-	/*
-	 * Type-specific options for fields.
-	 * The structure depends on the field type.
-	 */
-	TypeOptions *TypeOptions `json:"type_options,omitempty"`
-
-	/*
-	 * Used for controlling when the field is visible.
-	 * No visibility conditions - always visible.
-	 */
-	VisibilityConditions []VisibilityCondition `json:"visibility_conditions,omitempty"`
-}
-
-/*
- * TypeOptions contains type-specific configuration for fields.
- */
-type TypeOptions struct {
-	Number      *NumberTypeOptions      `json:"number,omitempty"`
-	Select      *SelectTypeOptions      `json:"select,omitempty"`
-	MultiSelect *MultiSelectTypeOptions `json:"multi_select,omitempty"`
-	Integration *IntegrationTypeOptions `json:"integration,omitempty"`
-	Resource    *ResourceTypeOptions    `json:"resource,omitempty"`
-	List        *ListTypeOptions        `json:"list,omitempty"`
-	Object      *ObjectTypeOptions      `json:"object,omitempty"`
-	Time        *TimeTypeOptions        `json:"time,omitempty"`
-}
-
-/*
- * ResourceTypeOptions specifies which resource type to display
- */
-type ResourceTypeOptions struct {
-	Type string `json:"type"`
-}
-
-/*
- * NumberTypeOptions specifies constraints for number fields
- */
-type NumberTypeOptions struct {
-	Min *int `json:"min,omitempty"`
-	Max *int `json:"max,omitempty"`
-}
-
-/*
- * TimeTypeOptions specifies format and constraints for time fields
- */
-type TimeTypeOptions struct {
-	Format string `json:"format,omitempty"` // Expected format, e.g., "HH:MM", "HH:MM:SS"
-}
-
-/*
- * SelectTypeOptions specifies options for select fields
- */
-type SelectTypeOptions struct {
-	Options []FieldOption `json:"options"`
-}
-
-/*
- * MultiSelectTypeOptions specifies options for multi_select fields
- */
-type MultiSelectTypeOptions struct {
-	Options []FieldOption `json:"options"`
-}
-
-/*
- * IntegrationTypeOptions specifies which integration type to display
- */
-type IntegrationTypeOptions struct {
-	Type string `json:"type"`
-}
-
-/*
- * ListTypeOptions defines the structure of list items
- */
-type ListTypeOptions struct {
-	ItemDefinition *ListItemDefinition `json:"item_definition"`
-}
-
-/*
- * ObjectTypeOptions defines the schema for object fields
- */
-type ObjectTypeOptions struct {
-	Schema []ConfigurationField `json:"schema"`
-}
-
-/*
- * FieldOption represents a selectable option for select / multi_select field types
- */
-type FieldOption struct {
-	Label string
-	Value string
-}
-
-/*
- * ListItemDefinition defines the structure of items in an 'list' field
- */
-type ListItemDefinition struct {
-	Type   string
-	Schema []ConfigurationField
-}
-
-type VisibilityCondition struct {
-	Field  string   `json:"field"`
-	Values []string `json:"values"`
 }

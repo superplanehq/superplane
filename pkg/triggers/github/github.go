@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
@@ -34,9 +34,9 @@ type Repository struct {
 }
 
 type Configuration struct {
-	Integration string   `json:"integration"`
-	Repository  string   `json:"repository"`
-	Events      []string `json:"events"`
+	Integration string `json:"integration"`
+	Repository  string `json:"repository"`
+	EventType   string `json:"eventType"`
 }
 
 func (g *GitHub) Name() string {
@@ -59,15 +59,15 @@ func (g *GitHub) Color() string {
 	return "gray"
 }
 
-func (g *GitHub) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{
+func (g *GitHub) Configuration() []configuration.Field {
+	return []configuration.Field{
 		{
 			Name:     "integration",
 			Label:    "GitHub integration",
-			Type:     components.FieldTypeIntegration,
+			Type:     configuration.FieldTypeIntegration,
 			Required: true,
-			TypeOptions: &components.TypeOptions{
-				Integration: &components.IntegrationTypeOptions{
+			TypeOptions: &configuration.TypeOptions{
+				Integration: &configuration.IntegrationTypeOptions{
 					Type: "github",
 				},
 			},
@@ -75,34 +75,34 @@ func (g *GitHub) Configuration() []components.ConfigurationField {
 		{
 			Name:     "repository",
 			Label:    "Repository",
-			Type:     components.FieldTypeIntegrationResource,
+			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
-			VisibilityConditions: []components.VisibilityCondition{
+			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "integration",
 					Values: []string{"*"},
 				},
 			},
-			TypeOptions: &components.TypeOptions{
-				Resource: &components.ResourceTypeOptions{
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
 					Type: "repository",
 				},
 			},
 		},
 		{
-			Name:     "events",
-			Label:    "Events",
-			Type:     components.FieldTypeMultiSelect,
+			Name:     "eventType",
+			Label:    "Event Type",
+			Type:     configuration.FieldTypeSelect,
 			Required: true,
-			VisibilityConditions: []components.VisibilityCondition{
+			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "repository",
 					Values: []string{"*"},
 				},
 			},
-			TypeOptions: &components.TypeOptions{
-				MultiSelect: &components.MultiSelectTypeOptions{
-					Options: []components.FieldOption{
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
 						{
 							Value: "push",
 							Label: "Push",
@@ -210,9 +210,7 @@ func (g *GitHub) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) 
 	//
 	// If event is not in the list of chosen events, ignore it.
 	//
-	if !slices.ContainsFunc(config.Events, func(event string) bool {
-		return event == eventType
-	}) {
+	if config.EventType != eventType {
 		return http.StatusOK, nil
 	}
 

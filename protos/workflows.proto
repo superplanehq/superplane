@@ -95,6 +95,17 @@ service Workflows {
     };
   }
 
+  rpc DeleteNodeQueueItem(DeleteNodeQueueItemRequest) returns (DeleteNodeQueueItemResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/workflows/{workflow_id}/nodes/{node_id}/queue/{item_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete item from a node's queue";
+      description: "Deletes a specific item in a node's queue";
+      tags: "WorkflowNode";
+    };
+  }
+
   rpc ListNodeExecutions(ListNodeExecutionsRequest) returns (ListNodeExecutionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/workflows/{workflow_id}/nodes/{node_id}/executions"
@@ -219,16 +230,30 @@ message UserRef {
 }
 
 message Workflow {
-  string id = 1;
-  string organization_id = 2;
-  string name = 3;
-  string description = 4;
-  google.protobuf.Timestamp created_at = 5;
-  google.protobuf.Timestamp updated_at = 6;
-  repeated Components.Node nodes = 7;
-  repeated Components.Edge edges = 8;
-  // Creator reference
-  UserRef created_by = 9;
+  message Metadata {
+    string id = 1;
+    string organization_id = 2;
+    string name = 3;
+    string description = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
+    UserRef created_by = 7;
+  }
+
+  message Spec {
+    repeated Components.Node nodes = 1;
+    repeated Components.Edge edges = 2;
+  }
+
+  message Status {
+    repeated WorkflowNodeExecution last_executions = 1;
+    repeated WorkflowNodeQueueItem next_queue_items = 2;
+    repeated WorkflowEvent last_events = 3;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
+  Status status = 3;
 }
 
 message ListNodeEventsRequest {
@@ -269,6 +294,14 @@ message ListNodeQueueItemsResponse {
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
 }
+
+message DeleteNodeQueueItemRequest {
+  string workflow_id = 1;
+  string node_id = 2;
+  string item_id = 3;
+}
+
+message DeleteNodeQueueItemResponse {}
 
 message ListNodeExecutionsRequest {
   string workflow_id = 1;
@@ -339,7 +372,8 @@ message WorkflowNodeQueueItem {
   string workflow_id = 2;
   string node_id = 3;
   google.protobuf.Struct input = 4;
-  google.protobuf.Timestamp created_at = 5;
+  WorkflowEvent root_event = 5;
+  google.protobuf.Timestamp created_at = 6;
 }
 
 message InvokeNodeExecutionActionRequest {
@@ -386,28 +420,21 @@ message ListEventExecutionsResponse {
 // Standalone messages
 //
 
-message EventCreated {
+message WorkflowNodeEventMessage {
   string id = 1;
   string workflow_id = 2;
   string node_id = 3;
   google.protobuf.Timestamp timestamp = 4;
 }
 
-message ExecutionCreated {
+message WorkflowNodeExecutionMessage {
   string id = 1;
   string workflow_id = 2;
   string node_id = 3;
   google.protobuf.Timestamp timestamp = 4;
 }
 
-message ExecutionStarted {
-  string id = 1;
-  string workflow_id = 2;
-  string node_id = 3;
-  google.protobuf.Timestamp timestamp = 4;
-}
-
-message ExecutionFinished {
+message WorkflowNodeQueueItemMessage {
   string id = 1;
   string workflow_id = 2;
   string node_id = 3;

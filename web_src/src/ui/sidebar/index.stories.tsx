@@ -1,20 +1,7 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import {
-  Calendar,
-  ChevronUp,
-  Home,
-  Inbox,
-  Search,
-  Settings,
-  User2,
-} from "lucide-react"
+import type { Meta, StoryObj } from "@storybook/react";
+import { Calendar, ChevronUp, Home, Inbox, Search, Settings, User2 } from "lucide-react";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../dropdownMenu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../dropdownMenu";
 
 import {
   Sidebar,
@@ -29,7 +16,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
-} from "./index"
+} from "./index";
 
 const meta = {
   title: "shadcn Primitives/Sidebar",
@@ -64,19 +51,17 @@ const meta = {
           <Story />
           <main className="flex-1 p-6">
             <SidebarTrigger />
-            <p className="mt-4 text-sm text-muted-foreground">
-              Toggle the sidebar to see the different variants.
-            </p>
+            <p className="mt-4 text-sm text-muted-foreground">Toggle the sidebar to see the different variants.</p>
           </main>
         </div>
       </SidebarProvider>
     ),
   ],
-} satisfies Meta<typeof Sidebar>
+} satisfies Meta<typeof Sidebar>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<typeof Sidebar>
+type Story = StoryObj<typeof Sidebar>;
 
 const items = [
   { title: "Home", icon: Home, href: "#" },
@@ -84,7 +69,7 @@ const items = [
   { title: "Calendar", icon: Calendar, href: "#" },
   { title: "Search", icon: Search, href: "#" },
   { title: "Settings", icon: Settings, href: "#" },
-]
+];
 
 export const Simple: Story = {
   render: (args) => (
@@ -112,7 +97,7 @@ export const Simple: Story = {
       <SidebarFooter />
     </Sidebar>
   ),
-}
+};
 
 export const WithFooterMenu: Story = {
   render: (args) => (
@@ -130,10 +115,7 @@ export const WithFooterMenu: Story = {
                   <ChevronUp className="ml-auto" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent
-                side="top"
-                className="w-(--radix-popper-anchor-width)"
-              >
+              <DropdownMenuContent side="top" className="w-(--radix-popper-anchor-width)">
                 <DropdownMenuItem>Account</DropdownMenuItem>
                 <DropdownMenuItem>Billing</DropdownMenuItem>
                 <DropdownMenuItem>Sign out</DropdownMenuItem>
@@ -144,4 +126,4 @@ export const WithFooterMenu: Story = {
       </SidebarFooter>
     </Sidebar>
   ),
-}
+};

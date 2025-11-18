@@ -73,7 +73,7 @@ func (o *ComponentsListComponentActionsResponse) SetActions(v []ComponentsCompon
 }
 
 func (o ComponentsListComponentActionsResponse) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,5 +123,3 @@ func (v *NullableComponentsListComponentActionsResponse) UnmarshalJSON(src []byt
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

@@ -3,9 +3,11 @@ package workflows
 import (
 	"context"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -35,14 +37,19 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		return nil, err
 	}
 
+	expandedNodes, err := expandNodes(organizationID, nodes)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
 		// Update the workflow record first
 		//
-		existingWorkflow.Name = pbWorkflow.Name
-		existingWorkflow.Description = pbWorkflow.Description
+		existingWorkflow.Name = pbWorkflow.Metadata.Name
+		existingWorkflow.Description = pbWorkflow.Metadata.Description
 		existingWorkflow.UpdatedAt = &now
 		existingWorkflow.Edges = datatypes.NewJSONSlice(edges)
 		err := tx.Save(&existingWorkflow).Error
@@ -53,7 +60,7 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		//
 		// Update the workflow node records
 		//
-		existingNodes, err := models.FindWorkflowNodes(existingWorkflow.ID)
+		existingNodes, err := models.FindWorkflowNodesInTransaction(tx, existingWorkflow.ID)
 		if err != nil {
 			return err
 		}
@@ -62,7 +69,7 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		// Go through each node in the new workflow, creating / updating it,
 		// and tracking which nodes we've seen, to delete nodes that are no longer in the workflow at the end.
 		//
-		for _, node := range nodes {
+		for _, node := range expandedNodes {
 			workflowNode, err := upsertNode(tx, existingNodes, node, workflowID)
 			if err != nil {
 				return err
@@ -74,7 +81,7 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 			}
 		}
 
-		return deleteNodes(tx, existingNodes, nodes, workflowID)
+		return deleteNodes(tx, existingNodes, expandedNodes, workflowID)
 	})
 
 	if err != nil {
@@ -82,7 +89,7 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 	}
 
 	return &pb.UpdateWorkflowResponse{
-		Workflow: SerializeWorkflow(existingWorkflow),
+		Workflow: SerializeWorkflow(existingWorkflow, true),
 	}, nil
 }
 
@@ -109,6 +116,14 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		existingNode.Configuration = datatypes.NewJSONType(node.Configuration)
 		existingNode.Position = datatypes.NewJSONType(node.Position)
 		existingNode.IsCollapsed = node.IsCollapsed
+		existingNode.Metadata = datatypes.NewJSONType(node.Metadata)
+		// Set parent if internal namespaced id
+		if idx := strings.Index(node.ID, ":"); idx != -1 {
+			parent := node.ID[:idx]
+			existingNode.ParentNodeID = &parent
+		} else {
+			existingNode.ParentNodeID = nil
+		}
 		existingNode.UpdatedAt = &now
 		err := tx.Save(&existingNode).Error
 		if err != nil {
@@ -121,9 +136,17 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 	//
 	// Node doesn't exist, create it
 	//
+	// Derive ParentNodeID for internal nodes
+	var parentNodeID *string
+	if idx := strings.Index(node.ID, ":"); idx != -1 {
+		parent := node.ID[:idx]
+		parentNodeID = &parent
+	}
+
 	workflowNode := models.WorkflowNode{
 		WorkflowID:    workflowID,
 		NodeID:        node.ID,
+		ParentNodeID:  parentNodeID,
 		Name:          node.Name,
 		State:         models.WorkflowNodeStateReady,
 		Type:          node.Type,
@@ -131,6 +154,7 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		Configuration: datatypes.NewJSONType(node.Configuration),
 		Position:      datatypes.NewJSONType(node.Position),
 		IsCollapsed:   node.IsCollapsed,
+		Metadata:      datatypes.NewJSONType(node.Metadata),
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
 	}
@@ -147,6 +171,8 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 	switch node.Type {
 	case models.NodeTypeTrigger:
 		return setupTrigger(ctx, tx, encryptor, registry, node)
+	case models.NodeTypeComponent:
+		return setupComponent(tx, registry, node)
 	}
 
 	return nil
@@ -163,9 +189,30 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		Configuration:      node.Configuration.Data(),
 		MetadataContext:    contexts.NewNodeMetadataContext(&node),
 		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
-		IntegrationContext: contexts.NewIntegrationContext(registry),
+		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
 		EventContext:       contexts.NewEventContext(tx, &node),
 		WebhookContext:     contexts.NewWebhookContext(ctx, tx, encryptor, &node),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return tx.Save(&node).Error
+}
+
+func setupComponent(tx *gorm.DB, registry *registry.Registry, node models.WorkflowNode) error {
+	ref := node.Ref.Data()
+	component, err := registry.GetComponent(ref.Component.Name)
+	if err != nil {
+		return err
+	}
+
+	err = component.Setup(components.SetupContext{
+		Configuration:      node.Configuration.Data(),
+		MetadataContext:    contexts.NewNodeMetadataContext(&node),
+		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
+		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
 	})
 
 	if err != nil {

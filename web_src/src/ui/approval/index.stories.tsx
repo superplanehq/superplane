@@ -1,21 +1,23 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { Approval, type ApprovalProps } from './';
+import type { Meta, StoryObj } from "@storybook/react";
+import { Approval, type ApprovalProps } from "./";
 
-const createApprovalProps = (baseProps: Omit<ApprovalProps, keyof import('../types/componentActions').ComponentActionsProps>): ApprovalProps => ({
+const createApprovalProps = (
+  baseProps: Omit<ApprovalProps, keyof import("../types/componentActions").ComponentActionsProps>,
+): ApprovalProps => ({
   ...baseProps,
-  onRun: () => console.log('Run clicked!'),
-  onDuplicate: () => console.log('Duplicate clicked!'),
-  onEdit: () => console.log('Edit clicked!'),
-  onDeactivate: () => console.log('Deactivate clicked!'),
-  onToggleView: () => console.log('Toggle view clicked!'),
-  onDelete: () => console.log('Delete clicked!'),
+  onRun: () => console.log("Run clicked!"),
+  onDuplicate: () => console.log("Duplicate clicked!"),
+  onEdit: () => console.log("Edit clicked!"),
+  onDeactivate: () => console.log("Deactivate clicked!"),
+  onToggleView: () => console.log("Toggle view clicked!"),
+  onDelete: () => console.log("Delete clicked!"),
 });
 
 const approveRelease: ApprovalProps = createApprovalProps({
   title: "Approve Release",
   description: "New releases are deployed to staging for testing and require approvals.",
   iconSlug: "hand",
-  iconColor: "text-orange-500",
+  iconColor: "text-orange-800",
   headerColor: "bg-orange-100",
   approvals: [
     {
@@ -25,7 +27,7 @@ const approveRelease: ApprovalProps = createApprovalProps({
       requireArtifacts: [
         {
           label: "CVE Report",
-        }
+        },
       ],
       onApprove: (artifacts) => console.log("Security approved with artifacts:", artifacts),
       onReject: (comment) => console.log("Security rejected with comment:", comment),
@@ -63,12 +65,12 @@ const approveRelease: ApprovalProps = createApprovalProps({
 });
 
 const meta: Meta<typeof Approval> = {
-  title: 'ui/Approval',
+  title: "ui/Approval",
   component: Approval,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 };
 
 export default meta;

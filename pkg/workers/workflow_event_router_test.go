@@ -3,16 +3,29 @@ package workers
 import (
 	"testing"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
 
 func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	router := NewWorkflowEventRouter()
+	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
+
+	amqpURL, _ := config.RabbitMQURL()
+	eventConsumer := testconsumer.New(amqpURL, messages.WorkflowEventCreatedRoutingKey)
+	queueConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemCreatedRoutingKey)
+	eventConsumer.Start()
+	queueConsumer.Start()
+	defer eventConsumer.Stop()
+	defer queueConsumer.Stop()
 
 	//
 	// Create a simple workflow with just a trigger and a component nodes.
@@ -22,6 +35,7 @@ func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{NodeID: node1, Type: models.NodeTypeTrigger},
 			{NodeID: node2, Type: models.NodeTypeComponent},
@@ -35,7 +49,7 @@ func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	// Create the root event for the trigger node, and process it.
 	//
 	event := support.EmitWorkflowEventForNode(t, workflow.ID, node1, "default", nil)
-	err := router.LockAndProcessEvent(*event)
+	err := router.LockAndProcessEvent(logger, *event)
 	require.NoError(t, err)
 
 	//
@@ -51,11 +65,23 @@ func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	require.Len(t, queueItems, 1)
 	assert.Equal(t, node2, queueItems[0].NodeID)
 	assert.Equal(t, event.ID, queueItems[0].EventID)
+
+	assert.True(t, eventConsumer.HasReceivedMessage())
+	assert.True(t, queueConsumer.HasReceivedMessage())
 }
 
 func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	router := NewWorkflowEventRouter()
+	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
+
+	amqpURL, _ := config.RabbitMQURL()
+	eventConsumer := testconsumer.New(amqpURL, messages.WorkflowEventCreatedRoutingKey)
+	queueConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemCreatedRoutingKey)
+	eventConsumer.Start()
+	queueConsumer.Start()
+	defer eventConsumer.Stop()
+	defer queueConsumer.Stop()
 
 	trigger1 := "trigger-1"
 	node1 := "component-1"
@@ -63,6 +89,7 @@ func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{NodeID: trigger1, Type: models.NodeTypeTrigger},
 			{NodeID: node1, Type: models.NodeTypeComponent},
@@ -90,7 +117,7 @@ func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	outputEvent := events[0]
-	err = router.LockAndProcessEvent(outputEvent)
+	err = router.LockAndProcessEvent(logger, outputEvent)
 	require.NoError(t, err)
 
 	updatedEvent, err := models.FindWorkflowEvent(outputEvent.ID)
@@ -102,11 +129,20 @@ func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	require.Len(t, queueItems, 1)
 	assert.Equal(t, node2, queueItems[0].NodeID)
 	assert.Equal(t, outputEvent.ID, queueItems[0].EventID)
+
+	assert.True(t, eventConsumer.HasReceivedMessage())
+	assert.True(t, queueConsumer.HasReceivedMessage())
 }
 
 func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing.T) {
 	router := NewWorkflowEventRouter()
+	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
 
 	//
 	// Create a blueprint with this structure:
@@ -132,6 +168,7 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{
 				NodeID: "trigger-1",
@@ -186,7 +223,7 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	childOutputEvent := events[0]
-	err = router.LockAndProcessEvent(childOutputEvent)
+	err = router.LockAndProcessEvent(logger, childOutputEvent)
 	require.NoError(t, err)
 
 	parent, err := models.FindNodeExecution(workflow.ID, parentExecution.ID)
@@ -197,11 +234,19 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 	require.NoError(t, err)
 	assert.Len(t, filterEventsByChannel(parentOutputEvents, "up"), 1)
 	assert.Len(t, filterEventsByChannel(parentOutputEvents, "down"), 0)
+
+	assert.True(t, executionConsumer.HasReceivedMessage())
 }
 
 func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	router := NewWorkflowEventRouter()
+	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
 
 	//
 	// Create a blueprint with this structure:
@@ -225,6 +270,7 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{
 				NodeID: "trigger-1",
@@ -279,7 +325,7 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 5)
 	childOutputEvent := events[0]
-	err = router.LockAndProcessEvent(childOutputEvent)
+	err = router.LockAndProcessEvent(logger, childOutputEvent)
 	require.NoError(t, err)
 
 	parent, err := models.FindNodeExecution(workflow.ID, parentExecution.ID)
@@ -289,6 +335,8 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	parentOutputEvents, err := models.ListWorkflowEvents(workflow.ID, customComponentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, filterEventsByChannel(parentOutputEvents, "default"), 5)
+
+	assert.True(t, executionConsumer.HasReceivedMessage())
 }
 
 func filterEventsByChannel(events []models.WorkflowEvent, channel string) []models.WorkflowEvent {

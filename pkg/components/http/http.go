@@ -9,6 +9,8 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -50,27 +52,31 @@ func (e *HTTP) Color() string {
 	return "blue"
 }
 
+func (e *HTTP) Setup(ctx components.SetupContext) error {
+	return nil
+}
+
 func (e *HTTP) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }
 
-func (e *HTTP) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{
+func (e *HTTP) Configuration() []configuration.Field {
+	return []configuration.Field{
 		{
 			Name:     "url",
 			Label:    "URL",
-			Type:     components.FieldTypeString,
+			Type:     configuration.FieldTypeString,
 			Required: true,
 		},
 		{
 			Name:     "method",
-			Type:     components.FieldTypeSelect,
+			Type:     configuration.FieldTypeSelect,
 			Label:    "Method",
 			Required: true,
 			Default:  "POST",
-			TypeOptions: &components.TypeOptions{
-				Select: &components.SelectTypeOptions{
-					Options: []components.FieldOption{
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
 						{Label: "GET", Value: "GET"},
 						{Label: "POST", Value: "POST"},
 						{Label: "PUT", Value: "PUT"},
@@ -82,32 +88,32 @@ func (e *HTTP) Configuration() []components.ConfigurationField {
 		},
 		{
 			Name:     "payload",
-			Type:     components.FieldTypeObject,
+			Type:     configuration.FieldTypeObject,
 			Label:    "Payload",
 			Required: false,
-			VisibilityConditions: []components.VisibilityCondition{
+			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "method", Values: []string{"POST", "PUT"}},
 			},
 		},
 		{
 			Name:     "headers",
 			Label:    "Headers",
-			Type:     components.FieldTypeList,
+			Type:     configuration.FieldTypeList,
 			Required: false,
-			TypeOptions: &components.TypeOptions{
-				List: &components.ListTypeOptions{
-					ItemDefinition: &components.ListItemDefinition{
-						Type: components.FieldTypeObject,
-						Schema: []components.ConfigurationField{
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
 							{
 								Name:     "name",
-								Type:     components.FieldTypeString,
+								Type:     configuration.FieldTypeString,
 								Label:    "Header Name",
 								Required: true,
 							},
 							{
 								Name:     "value",
-								Type:     components.FieldTypeString,
+								Type:     configuration.FieldTypeString,
 								Label:    "Header value",
 								Required: true,
 							},
@@ -125,6 +131,10 @@ func (e *HTTP) Actions() []components.Action {
 
 func (e *HTTP) HandleAction(ctx components.ActionContext) error {
 	return fmt.Errorf("http does not support actions")
+}
+
+func (e *HTTP) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+	return ctx.DefaultProcessing()
 }
 
 func (e *HTTP) Execute(ctx components.ExecutionContext) error {

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/gorm"
 )
@@ -99,10 +100,18 @@ func UpsertRoleMetadata(roleName, domainType, domainID, displayName, description
 }
 
 func UpsertRoleMetadataInTransaction(tx *gorm.DB, roleName, domainType, domainID, displayName, description string) error {
+	log.Infof("Upserting role metadata for %s (%s) in %s", roleName, domainID, domainType)
+
 	var metadata RoleMetadata
-	err := tx.Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).First(&metadata).Error
+	err := tx.
+		Where("role_name = ?", roleName).
+		Where("domain_type = ?", domainType).
+		Where("domain_id = ?", domainID).
+		First(&metadata).
+		Error
 
 	if err == gorm.ErrRecordNotFound {
+		log.Infof("Role metadata not found for %s (%s) in %s - creating new one", roleName, domainID, domainType)
 		metadata = RoleMetadata{
 			RoleName:    roleName,
 			DomainType:  domainType,
@@ -111,10 +120,14 @@ func UpsertRoleMetadataInTransaction(tx *gorm.DB, roleName, domainType, domainID
 			Description: description,
 		}
 		return metadata.CreateInTransaction(tx)
-	} else if err != nil {
+	}
+
+	if err != nil {
+		log.Errorf("Error finding role metadata for %s (%s) in %s: %v", roleName, domainID, domainType, err)
 		return err
 	}
 
+	log.Infof("Role metadata found for %s (%s) in %s - updating", roleName, domainID, domainType)
 	metadata.DisplayName = displayName
 	metadata.Description = description
 	return metadata.UpdateInTransaction(tx)
@@ -174,4 +187,34 @@ func FindRoleMetadataByNames(roleNames []string, domainType, domainID string) (m
 		result[metadata[i].RoleName] = &metadata[i]
 	}
 	return result, nil
+}
+
+func DeleteMetadataForOrganization(tx *gorm.DB, domainType, domainID string) error {
+	//
+	// Delete role metadata
+	//
+	err := tx.
+		Where("domain_type = ?", domainType).
+		Where("domain_id = ?", domainID).
+		Delete(&RoleMetadata{}).
+		Error
+
+	if err != nil {
+		return err
+	}
+
+	//
+	// Delete group metadata
+	//
+	err = tx.
+		Where("domain_type = ?", domainType).
+		Where("domain_id = ?", domainID).
+		Delete(&GroupMetadata{}).
+		Error
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

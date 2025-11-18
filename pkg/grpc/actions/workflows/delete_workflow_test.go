@@ -40,6 +40,7 @@ func Test__DeleteWorkflow(t *testing.T) {
 		workflow, _ := support.CreateWorkflow(
 			t,
 			r.Organization.ID,
+			r.User,
 			[]models.WorkflowNode{
 				{
 					NodeID: "node-1",
@@ -114,6 +115,7 @@ func Test__DeleteWorkflow(t *testing.T) {
 		workflow, _ := support.CreateWorkflow(
 			t,
 			r.Organization.ID,
+			r.User,
 			[]models.WorkflowNode{
 				{
 					NodeID: "node-1",

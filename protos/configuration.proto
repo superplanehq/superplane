@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package Superplane.Configuration;
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/configuration";
+
+message Field {
+  string name = 1;
+  string type = 2;
+  string description = 3;
+  bool required = 4;
+  optional string default_value = 5;
+  string label = 6;
+  repeated VisibilityCondition visibility_conditions = 7;
+  optional TypeOptions type_options = 8;
+  repeated RequiredCondition required_conditions = 9;
+  repeated ValidationRule validation_rules = 10;
+  // Optional placeholder text for UI inputs
+  optional string placeholder = 11;
+}
+
+message TypeOptions {
+  optional NumberTypeOptions number = 1;
+  optional SelectTypeOptions select = 2;
+  optional MultiSelectTypeOptions multi_select = 3;
+  optional IntegrationTypeOptions integration = 4;
+  optional ListTypeOptions list = 5;
+  optional ObjectTypeOptions object = 6;
+  optional ResourceTypeOptions resource = 7;
+  optional TimeTypeOptions time = 8;
+  optional DateTypeOptions date = 9;
+  optional DateTimeTypeOptions datetime = 10;
+}
+
+message NumberTypeOptions {
+  optional int32 min = 1;
+  optional int32 max = 2;
+}
+
+message TimeTypeOptions {
+  optional string format = 1;
+}
+
+message DateTypeOptions {
+  optional string format = 1;
+}
+
+message DateTimeTypeOptions {
+  optional string format = 1;
+}
+
+message SelectTypeOptions {
+  repeated SelectOption options = 1;
+}
+
+message MultiSelectTypeOptions {
+  repeated SelectOption options = 1;
+}
+
+message IntegrationTypeOptions {
+  string type = 1;
+}
+
+message ResourceTypeOptions {
+  string type = 1;
+}
+
+message ListTypeOptions {
+  ListItemDefinition item_definition = 1;
+}
+
+message ObjectTypeOptions {
+  repeated Field schema = 1;
+}
+
+message SelectOption {
+  string label = 1;
+  string value = 2;
+}
+
+message VisibilityCondition {
+  string field = 1;
+  repeated string values = 2;
+}
+
+message ListItemDefinition {
+  string type = 1;
+  repeated Field schema = 2;
+}
+
+message RequiredCondition {
+  string field = 1;
+  repeated string values = 2;
+}
+
+message ValidationRule {
+  string type = 1;
+  string compare_with = 2;
+  optional string message = 3;
+}

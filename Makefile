@@ -11,11 +11,10 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 #
 # Long sausage command to run tests with gotestsum
 #
-# - starts a docker container
-# - sets DB_NAME=superplane_test
+# - starts a docker container for unit tests
 # - mounts tmp/screenshots
-# - export junit report
-# - sets paralellism to 1
+# - exports junit report
+# - sets parallelism to 1
 #
 GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml 
 
@@ -24,24 +23,33 @@ GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_t
 #
 
 lint:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app revive -formatter friendly -config lint.toml ./...
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app revive -formatter friendly -config lint.toml ./...
 
 tidy:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod tidy
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app go mod tidy
 
 test.setup:
+	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
+	@if [ ! -f ".env.docker" ]; then cp .env.docker.example .env.docker; fi
 	@mkdir -p tmp/screenshots
 	docker compose $(DOCKER_COMPOSE_OPTS) build
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go get ./...
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
-test.e2e.setup:
-	$(MAKE) test.setup
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm ci"
+test.start:
+	docker compose $(DOCKER_COMPOSE_OPTS) up -d
+	sleep 5
 
 test.down:
 	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
+
+test.e2e.setup:
+	$(MAKE) test.setup
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "cd web_src && npm ci"
+
+test.e2e:
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app gotestsum --format short --junitfile junit-report.xml --packages="$(E2E_TEST_PACKAGES)" -- -p 1
 
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
@@ -49,35 +57,74 @@ test:
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
-test.e2e:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app go test ./test/e2e/... -p 1 -v
-
 test.shell:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
+
+setup.playwright:
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "bash scripts/docker/retry.sh 6 2s go install github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1"
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "bash scripts/docker/retry.sh 6 2s playwright install chromium-headless-shell --with-deps"
+
+#
+# Code formatting
+#
+
+format.go:
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -s -w .
+
+format.go.check:
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -s -l . | tee /dev/stderr | if read; then exit 1; else exit 0; fi
+
+format.js:
+	cd web_src && npm run format
+
+format.js.check:
+	cd web_src && npm run format:check
 
 #
 # Targets for dev environment
 #
 
 dev.setup:
+	@if [ ! -f ".env.docker" ]; then cp .env.docker.example .env.docker; fi
 	docker compose $(DOCKER_COMPOSE_OPTS) build
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 
-dev.start:
+dev.start.fg:
 	docker compose $(DOCKER_COMPOSE_OPTS) up
+
+dev.start:
+	docker compose $(DOCKER_COMPOSE_OPTS) up -d
+	echo "Waiting for services to start..."
+	sleep 20 # usually takes some time for the DB and the app to be ready
+	echo "Dev environment started. Access the app at http://localhost:8000"
+
+dev.logs:
+	docker compose $(DOCKER_COMPOSE_OPTS) logs -f
+
+dev.logs.app:
+	docker compose $(DOCKER_COMPOSE_OPTS) logs -f app
+
+dev.down:
+	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
 
 dev.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app /bin/bash
 
+dev.db.console:
+	$(MAKE) db.console DB_NAME=superplane_dev
+
+check.db.structure:
+	bash ./scripts/verify_db_structure_clean.sh
+
 check.build.ui:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run build"
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "cd web_src && npm run build"
 
 check.build.app:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app go build cmd/server/main.go
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app go build cmd/server/main.go
 
 storybook:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash -c "cd web_src && npm install && npm run storybook"
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app /bin/bash -c "cd web_src && npm install && npm run storybook"
 
 ui.setup:
 	npm install
@@ -107,6 +154,10 @@ db.migrate:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
 
+db.migrate.all:
+	$(MAKE) db.migrate DB_NAME=superplane_dev
+	$(MAKE) db.migrate DB_NAME=superplane_test
+
 db.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
 
@@ -117,8 +168,16 @@ db.delete:
 # Protobuf compilation
 #
 
-MODULES := authorization,organizations,secrets,integrations,canvases,users,groups,roles,me,components,triggers,blueprints,workflows
-REST_API_MODULES := authorization,organizations,secrets,integrations,canvases,users,groups,roles,me,components,triggers,blueprints,workflows
+gen:
+	$(MAKE) pb.gen
+	$(MAKE) openapi.spec.gen
+	$(MAKE) openapi.client.gen
+	$(MAKE) openapi.web.client.gen
+	$(MAKE) format.go
+	$(MAKE) format.js
+
+MODULES := authorization,organizations,secrets,integrations,canvases,users,groups,roles,me,configuration,components,triggers,blueprints,workflows
+REST_API_MODULES := authorization,organizations,secrets,integrations,canvases,users,groups,roles,me,configuration,components,triggers,blueprints,workflows
 pb.gen:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)

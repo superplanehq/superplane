@@ -43,21 +43,6 @@ func Test_ListGroupUsers(t *testing.T) {
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
 
-	t.Run("successful canvas group get users", func(t *testing.T) {
-		require.NoError(t, r.AuthService.CreateGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas group description"))
-		require.NoError(t, r.AuthService.AddUserToGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, r.User.String(), "canvas-group"))
-
-		resp, err := ListGroupUsers(ctx, models.DomainTypeCanvas, r.Canvas.ID.String(), "canvas-group", r.AuthService)
-		require.NoError(t, err)
-		assert.NotNil(t, resp)
-		assert.Len(t, resp.Users, 1)
-		assert.Equal(t, r.User.String(), resp.Users[0].Metadata.Id)
-		assert.NotNil(t, resp.Group)
-		assert.Equal(t, "canvas-group", resp.Group.Metadata.Name)
-		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, resp.Group.Metadata.DomainType)
-		assert.Equal(t, r.Canvas.ID.String(), resp.Group.Metadata.DomainId)
-	})
-
 	t.Run("empty group - no users", func(t *testing.T) {
 		require.NoError(t, r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "empty-group", models.RoleOrgViewer, "Empty Group", "Empty group description"))
 

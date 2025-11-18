@@ -811,10 +811,9 @@ func (x *ValueFrom) GetSecret() *ValueFromSecret {
 }
 
 type ValueFromSecret struct {
-	state         protoimpl.MessageState   `protogen:"open.v1"`
-	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
-	Name          string                   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Key           string                   `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Key           string                 `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -847,13 +846,6 @@ func (x *ValueFromSecret) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ValueFromSecret.ProtoReflect.Descriptor instead.
 func (*ValueFromSecret) Descriptor() ([]byte, []int) {
 	return file_integrations_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *ValueFromSecret) GetDomainType() authorization.DomainType {
-	if x != nil {
-		return x.DomainType
-	}
-	return authorization.DomainType(0)
 }
 
 func (x *ValueFromSecret) GetName() string {
@@ -1190,10 +1182,8 @@ const file_integrations_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02id\x18\x03 \x01(\tR\x02id\"M\n" +
 	"\tValueFrom\x12@\n" +
-	"\x06secret\x18\x03 \x01(\v2(.Superplane.Integrations.ValueFromSecretR\x06secret\"~\n" +
-	"\x0fValueFromSecret\x12E\n" +
-	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
-	"domainType\x12\x12\n" +
+	"\x06secret\x18\x03 \x01(\v2(.Superplane.Integrations.ValueFromSecretR\x06secret\"7\n" +
+	"\x0fValueFromSecret\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
 	"\x03key\x18\x03 \x01(\tR\x03key2\x9e\t\n" +
 	"\fIntegrations\x12\xcb\x01\n" +
@@ -1265,28 +1255,27 @@ var file_integrations_proto_depIdxs = []int32{
 	18, // 13: Superplane.Integrations.Integration.spec:type_name -> Superplane.Integrations.Integration.Spec
 	20, // 14: Superplane.Integrations.IntegrationRef.domain_type:type_name -> Superplane.Authorization.DomainType
 	15, // 15: Superplane.Integrations.ValueFrom.secret:type_name -> Superplane.Integrations.ValueFromSecret
-	20, // 16: Superplane.Integrations.ValueFromSecret.domain_type:type_name -> Superplane.Authorization.DomainType
-	21, // 17: Superplane.Integrations.Integration.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	20, // 18: Superplane.Integrations.Integration.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
-	0,  // 19: Superplane.Integrations.Integration.Auth.use:type_name -> Superplane.Integrations.Integration.AuthType
-	19, // 20: Superplane.Integrations.Integration.Auth.token:type_name -> Superplane.Integrations.Integration.Auth.Token
-	17, // 21: Superplane.Integrations.Integration.Spec.auth:type_name -> Superplane.Integrations.Integration.Auth
-	14, // 22: Superplane.Integrations.Integration.Auth.Token.value_from:type_name -> Superplane.Integrations.ValueFrom
-	5,  // 23: Superplane.Integrations.Integrations.ListIntegrations:input_type -> Superplane.Integrations.ListIntegrationsRequest
-	7,  // 24: Superplane.Integrations.Integrations.ListResources:input_type -> Superplane.Integrations.ListResourcesRequest
-	9,  // 25: Superplane.Integrations.Integrations.DescribeIntegration:input_type -> Superplane.Integrations.DescribeIntegrationRequest
-	1,  // 26: Superplane.Integrations.Integrations.CreateIntegration:input_type -> Superplane.Integrations.CreateIntegrationRequest
-	3,  // 27: Superplane.Integrations.Integrations.UpdateIntegration:input_type -> Superplane.Integrations.UpdateIntegrationRequest
-	6,  // 28: Superplane.Integrations.Integrations.ListIntegrations:output_type -> Superplane.Integrations.ListIntegrationsResponse
-	8,  // 29: Superplane.Integrations.Integrations.ListResources:output_type -> Superplane.Integrations.ListResourcesResponse
-	10, // 30: Superplane.Integrations.Integrations.DescribeIntegration:output_type -> Superplane.Integrations.DescribeIntegrationResponse
-	2,  // 31: Superplane.Integrations.Integrations.CreateIntegration:output_type -> Superplane.Integrations.CreateIntegrationResponse
-	4,  // 32: Superplane.Integrations.Integrations.UpdateIntegration:output_type -> Superplane.Integrations.UpdateIntegrationResponse
-	28, // [28:33] is the sub-list for method output_type
-	23, // [23:28] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	21, // 16: Superplane.Integrations.Integration.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	20, // 17: Superplane.Integrations.Integration.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
+	0,  // 18: Superplane.Integrations.Integration.Auth.use:type_name -> Superplane.Integrations.Integration.AuthType
+	19, // 19: Superplane.Integrations.Integration.Auth.token:type_name -> Superplane.Integrations.Integration.Auth.Token
+	17, // 20: Superplane.Integrations.Integration.Spec.auth:type_name -> Superplane.Integrations.Integration.Auth
+	14, // 21: Superplane.Integrations.Integration.Auth.Token.value_from:type_name -> Superplane.Integrations.ValueFrom
+	5,  // 22: Superplane.Integrations.Integrations.ListIntegrations:input_type -> Superplane.Integrations.ListIntegrationsRequest
+	7,  // 23: Superplane.Integrations.Integrations.ListResources:input_type -> Superplane.Integrations.ListResourcesRequest
+	9,  // 24: Superplane.Integrations.Integrations.DescribeIntegration:input_type -> Superplane.Integrations.DescribeIntegrationRequest
+	1,  // 25: Superplane.Integrations.Integrations.CreateIntegration:input_type -> Superplane.Integrations.CreateIntegrationRequest
+	3,  // 26: Superplane.Integrations.Integrations.UpdateIntegration:input_type -> Superplane.Integrations.UpdateIntegrationRequest
+	6,  // 27: Superplane.Integrations.Integrations.ListIntegrations:output_type -> Superplane.Integrations.ListIntegrationsResponse
+	8,  // 28: Superplane.Integrations.Integrations.ListResources:output_type -> Superplane.Integrations.ListResourcesResponse
+	10, // 29: Superplane.Integrations.Integrations.DescribeIntegration:output_type -> Superplane.Integrations.DescribeIntegrationResponse
+	2,  // 30: Superplane.Integrations.Integrations.CreateIntegration:output_type -> Superplane.Integrations.CreateIntegrationResponse
+	4,  // 31: Superplane.Integrations.Integrations.UpdateIntegration:output_type -> Superplane.Integrations.UpdateIntegrationResponse
+	27, // [27:32] is the sub-list for method output_type
+	22, // [22:27] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_integrations_proto_init() }

@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg22.04+1)
+-- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -114,7 +114,7 @@ CREATE TABLE public.canvases (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100) NOT NULL,
+    ptype character varying(100),
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -305,6 +305,21 @@ CREATE TABLE public.workflow_events (
 
 
 --
+-- Name: workflow_node_execution_kvs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_node_execution_kvs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    execution_id uuid NOT NULL,
+    key text NOT NULL,
+    value text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    workflow_id uuid NOT NULL,
+    node_id character varying(128) NOT NULL
+);
+
+
+--
 -- Name: workflow_node_executions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -376,7 +391,8 @@ CREATE TABLE public.workflow_nodes (
     webhook_id uuid,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     "position" jsonb DEFAULT '{}'::jsonb NOT NULL,
-    is_collapsed boolean DEFAULT false NOT NULL
+    is_collapsed boolean DEFAULT false NOT NULL,
+    parent_node_id character varying(128)
 );
 
 
@@ -612,6 +628,14 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
+-- Name: workflow_node_execution_kvs workflow_node_execution_kvs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_kvs
+    ADD CONSTRAINT workflow_node_execution_kvs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: workflow_node_requests workflow_node_execution_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -765,10 +789,31 @@ CREATE INDEX idx_workflow_events_workflow_node_id ON public.workflow_events USIN
 
 
 --
+-- Name: idx_workflow_node_execution_kvs_ekv; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_execution_kvs_ekv ON public.workflow_node_execution_kvs USING btree (execution_id, key, value);
+
+
+--
+-- Name: idx_workflow_node_execution_kvs_workflow_node_key_value; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_execution_kvs_workflow_node_key_value ON public.workflow_node_execution_kvs USING btree (workflow_id, node_id, key, value);
+
+
+--
 -- Name: idx_workflow_node_executions_workflow_node_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_workflow_node_executions_workflow_node_id ON public.workflow_node_executions USING btree (workflow_id, node_id);
+
+
+--
+-- Name: idx_workflow_nodes_parent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_nodes_parent ON public.workflow_nodes USING btree (workflow_id, parent_node_id);
 
 
 --
@@ -799,6 +844,30 @@ ALTER TABLE ONLY public.account_providers
 
 ALTER TABLE ONLY public.canvases
     ADD CONSTRAINT canvases_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: workflow_node_execution_kvs fk_wnek_workflow; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_kvs
+    ADD CONSTRAINT fk_wnek_workflow FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_execution_kvs fk_wnek_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_kvs
+    ADD CONSTRAINT fk_wnek_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_nodes fk_workflow_nodes_parent; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_nodes
+    ADD CONSTRAINT fk_workflow_nodes_parent FOREIGN KEY (workflow_id, parent_node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
 
 
 --
@@ -839,6 +908,14 @@ ALTER TABLE ONLY public.webhooks
 
 ALTER TABLE ONLY public.workflow_events
     ADD CONSTRAINT workflow_events_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_execution_kvs workflow_node_execution_kvs_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_kvs
+    ADD CONSTRAINT workflow_node_execution_kvs_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
 
 
 --
@@ -950,7 +1027,7 @@ ALTER TABLE ONLY public.workflow_nodes
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg22.04+1)
+-- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -969,7 +1046,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251103203701	f
+20251118202435	f
 \.
 
 

@@ -1,13 +1,22 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
-import { resolveIcon } from "@/lib/utils";
-import { Button } from "../button";
 import { Avatar } from "@/components/Avatar/avatar";
-import { Save, Undo2 } from "lucide-react";
-import { Dropdown, DropdownButton, DropdownDivider, DropdownHeader, DropdownItem, DropdownLabel, DropdownMenu, DropdownSection } from "@/components/Dropdown/dropdown";
-import { Text } from "@/components/Text/text";
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownDivider,
+  DropdownHeader,
+  DropdownItem,
+  DropdownLabel,
+  DropdownMenu,
+  DropdownSection,
+} from "@/components/Dropdown/dropdown";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
+import { Text } from "@/components/Text/text";
 import { useAccount } from "@/contexts/AccountContext";
 import { useOrganization } from "@/hooks/useOrganizationData";
+import { resolveIcon } from "@/lib/utils";
+import { Save, Undo2 } from "lucide-react";
+import { Button } from "../button";
 
 export interface BreadcrumbItem {
   label: string;
@@ -31,9 +40,19 @@ interface HeaderProps {
   saveButtonHidden?: boolean;
 }
 
-export function Header({ breadcrumbs, onSave, onUndo, canUndo, onLogoClick, organizationId, unsavedMessage, saveIsPrimary, saveButtonHidden }: HeaderProps) {
+export function Header({
+  breadcrumbs,
+  onSave,
+  onUndo,
+  canUndo,
+  onLogoClick,
+  organizationId,
+  unsavedMessage,
+  saveIsPrimary,
+  saveButtonHidden,
+}: HeaderProps) {
   const { account } = useAccount();
-  const { data: organization } = useOrganization(organizationId || '');
+  const { data: organization } = useOrganization(organizationId || "");
 
   return (
     <>
@@ -47,18 +66,10 @@ export function Header({ breadcrumbs, onSave, onUndo, canUndo, onLogoClick, orga
                 className="cursor-pointer hover:opacity-80 transition-opacity"
                 aria-label="Go to organization homepage"
               >
-                <img
-                  src={SuperplaneLogo}
-                  alt="Logo"
-                  className="w-8 h-8"
-                />
+                <img src={SuperplaneLogo} alt="Logo" className="w-8 h-8" />
               </button>
             ) : (
-              <img
-                src={SuperplaneLogo}
-                alt="Logo"
-                className="w-8 h-8"
-              />
+              <img src={SuperplaneLogo} alt="Logo" className="w-8 h-8" />
             )}
           </div>
 
@@ -69,9 +80,7 @@ export function Header({ breadcrumbs, onSave, onUndo, canUndo, onLogoClick, orga
 
               return (
                 <div key={index} className="flex items-center">
-                  {index > 0 && (
-                    <div className="w-2 mx-2">/</div>
-                  )}
+                  {index > 0 && <div className="w-2 mx-2">/</div>}
                   {item.href || item.onClick ? (
                     <a
                       href={item.href}
@@ -79,26 +88,46 @@ export function Header({ breadcrumbs, onSave, onUndo, canUndo, onLogoClick, orga
                       className="hover:text-black transition-colors flex items-center gap-2"
                     >
                       {item.iconSrc && (
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${item.iconBackground || ""}`}>
+                        <div
+                          className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                            item.iconBackground || ""
+                          }`}
+                        >
                           <img src={item.iconSrc} alt="" className="w-5 h-5" />
                         </div>
                       )}
                       {IconComponent && (
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${item.iconBackground || ""}`}>
+                        <div
+                          className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                            item.iconBackground || ""
+                          }`}
+                        >
                           <IconComponent size={16} className={item.iconColor || ""} />
                         </div>
                       )}
                       {item.label}
                     </a>
                   ) : (
-                    <span className={`flex items-center gap-2 ${index === breadcrumbs.length - 1 ? "text-black font-medium" : ""}`}>
+                    <span
+                      className={`flex items-center gap-2 ${
+                        index === breadcrumbs.length - 1 ? "text-black font-medium" : ""
+                      }`}
+                    >
                       {item.iconSrc && (
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${item.iconBackground || ""}`}>
+                        <div
+                          className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                            item.iconBackground || ""
+                          }`}
+                        >
                           <img src={item.iconSrc} alt="" className="w-5 h-5" />
                         </div>
                       )}
                       {IconComponent && (
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${item.iconBackground || ""}`}>
+                        <div
+                          className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                            item.iconBackground || ""
+                          }`}
+                        >
                           <IconComponent size={16} className={item.iconColor || ""} />
                         </div>
                       )}
@@ -118,17 +147,18 @@ export function Header({ breadcrumbs, onSave, onUndo, canUndo, onLogoClick, orga
               </span>
             )}
             {onUndo && canUndo && (
-              <Button
-                onClick={onUndo}
-                size="sm"
-                variant="outline"
-              >
+              <Button onClick={onUndo} size="sm" variant="outline">
                 <Undo2 />
                 Revert
               </Button>
             )}
             {onSave && !saveButtonHidden && (
-              <Button onClick={onSave} size="sm" variant={saveIsPrimary ? "default" : "outline"}>
+              <Button
+                onClick={onSave}
+                size="sm"
+                variant={saveIsPrimary ? "default" : "outline"}
+                data-testid="save-canvas-button"
+              >
                 <Save />
                 Save
               </Button>
@@ -145,8 +175,16 @@ export function Header({ breadcrumbs, onSave, onUndo, canUndo, onLogoClick, orga
                     <span className="truncate max-w-[150px]">{organization?.metadata?.name || account?.name}</span>
                     <Avatar
                       src={account?.avatar_url}
-                      initials={account?.name ? account.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
-                      alt={account?.name || 'User'}
+                      initials={
+                        account?.name
+                          ? account.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()
+                          : "?"
+                      }
+                      alt={account?.name || "User"}
                       className="w-5 h-5"
                     />
                   </DropdownButton>
@@ -157,13 +195,21 @@ export function Header({ breadcrumbs, onSave, onUndo, canUndo, onLogoClick, orga
                       <div className="flex items-center space-x-3">
                         <Avatar
                           src={account?.avatar_url}
-                          initials={account?.name ? account.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
-                          alt={account?.name || 'User'}
+                          initials={
+                            account?.name
+                              ? account.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")
+                                  .toUpperCase()
+                              : "?"
+                          }
+                          alt={account?.name || "User"}
                           className="size-8"
                         />
                         <div className="flex-1 min-w-0">
-                          <Text className="font-medium truncate">{account?.name || 'Loading...'}</Text>
-                          <Text className="text-sm text-zinc-500 truncate">{account?.email || 'Loading...'}</Text>
+                          <Text className="font-medium truncate">{account?.name || "Loading..."}</Text>
+                          <Text className="text-sm text-zinc-500 truncate">{account?.email || "Loading..."}</Text>
                         </div>
                       </div>
                     </DropdownHeader>
@@ -172,7 +218,7 @@ export function Header({ breadcrumbs, onSave, onUndo, canUndo, onLogoClick, orga
                     <DropdownSection>
                       <DropdownItem href={`/${organizationId}/settings/profile`}>
                         <span className="flex items-center gap-x-2">
-                          <MaterialSymbol name="person" data-slot="icon" size='sm' />
+                          <MaterialSymbol name="person" data-slot="icon" size="sm" />
                           <DropdownLabel>Profile</DropdownLabel>
                         </span>
                       </DropdownItem>
@@ -184,12 +230,14 @@ export function Header({ breadcrumbs, onSave, onUndo, canUndo, onLogoClick, orga
                     <DropdownHeader>
                       <div className="flex items-center space-x-3">
                         <Avatar
-                          initials={(organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
-                          alt={organization?.metadata?.name || 'Organization'}
+                          initials={(organization?.metadata?.name || "Organization").charAt(0).toUpperCase()}
+                          alt={organization?.metadata?.name || "Organization"}
                           className="size-8"
                         />
                         <div className="flex-1 min-w-0">
-                          <Text className="font-medium truncate max-w-[150px] truncate-ellipsis">{organization?.metadata?.name || 'Organization'}</Text>
+                          <Text className="font-medium truncate max-w-[150px] truncate-ellipsis">
+                            {organization?.metadata?.name || "Organization"}
+                          </Text>
                         </div>
                       </div>
                     </DropdownHeader>
@@ -198,35 +246,42 @@ export function Header({ breadcrumbs, onSave, onUndo, canUndo, onLogoClick, orga
                     <DropdownSection>
                       <DropdownItem href={`/${organizationId}/settings/general`}>
                         <span className="flex items-center gap-x-2">
-                          <MaterialSymbol name="business" data-slot="icon" size='sm' />
+                          <MaterialSymbol name="business" data-slot="icon" size="sm" />
                           <DropdownLabel>Organization Settings</DropdownLabel>
                         </span>
                       </DropdownItem>
 
                       <DropdownItem href={`/${organizationId}/settings/members`}>
                         <span className="flex items-center gap-x-2">
-                          <MaterialSymbol name="person" data-slot="icon" size='sm' />
+                          <MaterialSymbol name="person" data-slot="icon" size="sm" />
                           <DropdownLabel>Members</DropdownLabel>
                         </span>
                       </DropdownItem>
 
                       <DropdownItem href={`/${organizationId}/settings/groups`}>
                         <span className="flex items-center gap-x-2">
-                          <MaterialSymbol name="group" data-slot="icon" size='sm' />
+                          <MaterialSymbol name="group" data-slot="icon" size="sm" />
                           <DropdownLabel>Groups</DropdownLabel>
                         </span>
                       </DropdownItem>
 
                       <DropdownItem href={`/${organizationId}/settings/roles`}>
                         <span className="flex items-center gap-x-2">
-                          <MaterialSymbol name="shield" data-slot="icon" size='sm' />
+                          <MaterialSymbol name="shield" data-slot="icon" size="sm" />
                           <DropdownLabel>Roles</DropdownLabel>
+                        </span>
+                      </DropdownItem>
+
+                      <DropdownItem href={`/${organizationId}/settings/integrations`}>
+                        <span className="flex items-center gap-x-2">
+                          <MaterialSymbol name="integration_instructions" data-slot="icon" size="sm" />
+                          <DropdownLabel>Integrations</DropdownLabel>
                         </span>
                       </DropdownItem>
 
                       <DropdownItem href="/">
                         <span className="flex items-center gap-x-2">
-                          <MaterialSymbol name="swap_horiz" data-slot="icon" size='sm' />
+                          <MaterialSymbol name="swap_horiz" data-slot="icon" size="sm" />
                           <DropdownLabel>Change organization</DropdownLabel>
                         </span>
                       </DropdownItem>
@@ -236,11 +291,13 @@ export function Header({ breadcrumbs, onSave, onUndo, canUndo, onLogoClick, orga
 
                     {/* Sign Out Section */}
                     <DropdownSection>
-                      <DropdownItem onClick={() => {
-                        window.location.href = '/logout';
-                      }}>
+                      <DropdownItem
+                        onClick={() => {
+                          window.location.href = "/logout";
+                        }}
+                      >
                         <span className="flex items-center gap-x-2">
-                          <MaterialSymbol name="logout" data-slot="icon" size='sm' />
+                          <MaterialSymbol name="logout" data-slot="icon" size="sm" />
                           <DropdownLabel>Sign Out</DropdownLabel>
                         </span>
                       </DropdownItem>

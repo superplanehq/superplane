@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -23,7 +23,7 @@ type Blueprint struct {
 	UpdatedAt      *time.Time
 	Nodes          datatypes.JSONSlice[Node]
 	Edges          datatypes.JSONSlice[Edge]
-	Configuration  datatypes.JSONSlice[components.ConfigurationField]
+	Configuration  datatypes.JSONSlice[configuration.Field]
 	OutputChannels datatypes.JSONSlice[BlueprintOutputChannel]
 }
 
@@ -55,7 +55,6 @@ func (b *Blueprint) FindEdges(sourceID string, channel string) []Edge {
 	return edges
 }
 
-// TODO: this is where input channels come in
 func (b *Blueprint) FindRootNode() *Node {
 	hasIncoming := make(map[string]bool)
 	for _, edge := range b.Edges {

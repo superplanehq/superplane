@@ -1,19 +1,18 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { SidebarActionsDropdown } from './SidebarActionsDropdown';
-import { useState } from 'react';
+import type { Meta, StoryObj } from "@storybook/react";
+import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
+import { useState } from "react";
 
 const meta: Meta<typeof SidebarActionsDropdown> = {
-  title: 'ui/SidebarActionsDropdown',
+  title: "ui/SidebarActionsDropdown",
   component: SidebarActionsDropdown,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 };
 
 export default meta;
 type Story = StoryObj<typeof meta>;
-
 
 export const Default: Story = {
   render: (args) => {
@@ -79,24 +78,25 @@ export const InteractiveToggle: Story = {
   render: () => {
     const [isActive, setIsActive] = useState(true);
 
-
     return (
       <div className="p-8 bg-gray-50 rounded-lg">
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
             <h3 className="text-lg font-semibold">Interactive Component</h3>
-            <p className="text-sm text-gray-600">
-              Status: {isActive ? 'Active' : 'Inactive'}
-            </p>
+            <p className="text-sm text-gray-600">Status: {isActive ? "Active" : "Inactive"}</p>
           </div>
           <SidebarActionsDropdown
             onRun={() => {
               console.log("Run action triggered");
             }}
-            onDeactivate={isActive ? () => {
-              setIsActive(!isActive);
-              console.log(`Component ${isActive ? 'deactivated' : 'activated'}`);
-            } : undefined}
+            onDeactivate={
+              isActive
+                ? () => {
+                    setIsActive(!isActive);
+                    console.log(`Component ${isActive ? "deactivated" : "activated"}`);
+                  }
+                : undefined
+            }
             onDocs={() => {
               console.log("Documentation action triggered");
             }}
@@ -111,9 +111,7 @@ export const InteractiveToggle: Story = {
             }}
           />
         </div>
-        <div className="text-sm text-gray-500">
-          Try the different actions to see the interactive behavior.
-        </div>
+        <div className="text-sm text-gray-500">Try the different actions to see the interactive behavior.</div>
       </div>
     );
   },

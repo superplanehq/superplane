@@ -7,11 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CanvasPage, type CanvasNode } from "./index";
 import type { BlockData } from "./Block";
 import { createGetSidebarData } from "./storybooks/getSidebarData";
-import {
-  getStorybookData,
-  isInStorybook,
-  navigateToStory,
-} from "./storybooks/navigation";
+import { getStorybookData, isInStorybook, navigateToStory } from "./storybooks/navigation";
 
 const meta = {
   title: "Pages/CanvasPage",
@@ -45,46 +41,36 @@ export const BlueprintExecutionPage: Story = {
     const dynamicTitle = executionData?.title || args.title;
     const subworkflowData = SubWorkflowsMap[executionData?.title];
 
-
     // Only override breadcrumbs if we have execution data, otherwise use args.breadcrumbs
-    const dynamicBreadcrumbs = subworkflowData?.breadcrumbs
-      ? subworkflowData?.breadcrumbs
-      : args.breadcrumbs;
+    const dynamicBreadcrumbs = subworkflowData?.breadcrumbs ? subworkflowData?.breadcrumbs : args.breadcrumbs;
 
-    const dynamicEdges = subworkflowData?.edges
-      ? subworkflowData?.edges
-      : args.edges;
+    const dynamicEdges = subworkflowData?.edges ? subworkflowData?.edges : args.edges;
 
-    const dynamicNodes = subworkflowData?.nodes
-      ? subworkflowData?.nodes
-      : args.nodes;
+    const dynamicNodes = subworkflowData?.nodes ? subworkflowData?.nodes : args.nodes;
 
     // Initialize local nodes state when dynamicNodes changes
     useEffect(() => {
       if (dynamicNodes) {
-        console.log('Setting initial nodes:', dynamicNodes.length);
+        console.log("Setting initial nodes:", dynamicNodes.length);
         setNodes(dynamicNodes);
       }
     }, [dynamicNodes]);
 
-    const getSidebarData = useMemo(
-      () => createGetSidebarData(nodes ?? []),
-      [nodes]
-    );
+    const getSidebarData = useMemo(() => createGetSidebarData(nodes ?? []), [nodes]);
 
     const toggleNodeCollapse = (nodeId: string) => {
-      console.log('toggleNodeCollapse called for nodeId:', nodeId);
-      setNodes(prevNodes => {
-        console.log('Current nodes:', prevNodes.length);
-        const newNodes = prevNodes.map(node => {
+      console.log("toggleNodeCollapse called for nodeId:", nodeId);
+      setNodes((prevNodes) => {
+        console.log("Current nodes:", prevNodes.length);
+        const newNodes = prevNodes.map((node) => {
           if (node.id !== nodeId) return node;
 
-          console.log('Found node to toggle:', nodeId, node.data);
+          console.log("Found node to toggle:", nodeId, node.data);
           const nodeData = { ...node.data } as unknown as BlockData;
 
           // Toggle collapse state based on node type
           if (nodeData.type === "composite" && nodeData.composite) {
-            console.log('Toggling composite from', nodeData.composite.collapsed, 'to', !nodeData.composite.collapsed);
+            console.log("Toggling composite from", nodeData.composite.collapsed, "to", !nodeData.composite.collapsed);
             nodeData.composite = {
               ...nodeData.composite,
               collapsed: !nodeData.composite.collapsed,
@@ -92,7 +78,7 @@ export const BlueprintExecutionPage: Story = {
           }
 
           if (nodeData.type === "approval" && nodeData.approval) {
-            console.log('Toggling approval from', nodeData.approval.collapsed, 'to', !nodeData.approval.collapsed);
+            console.log("Toggling approval from", nodeData.approval.collapsed, "to", !nodeData.approval.collapsed);
             nodeData.approval = {
               ...nodeData.approval,
               collapsed: !nodeData.approval.collapsed,
@@ -100,7 +86,7 @@ export const BlueprintExecutionPage: Story = {
           }
 
           if (nodeData.type === "trigger" && nodeData.trigger) {
-            console.log('Toggling trigger from', nodeData.trigger.collapsed, 'to', !nodeData.trigger.collapsed);
+            console.log("Toggling trigger from", nodeData.trigger.collapsed, "to", !nodeData.trigger.collapsed);
             nodeData.trigger = {
               ...nodeData.trigger,
               collapsed: !nodeData.trigger.collapsed,
@@ -108,10 +94,10 @@ export const BlueprintExecutionPage: Story = {
           }
 
           const updatedNode: CanvasNode = { ...node, data: nodeData as unknown as Record<string, unknown> };
-          console.log('Updated node:', updatedNode);
+          console.log("Updated node:", updatedNode);
           return updatedNode;
         });
-        console.log('Returning new nodes:', newNodes.length);
+        console.log("Returning new nodes:", newNodes.length);
         return newNodes;
       });
     };
@@ -140,7 +126,7 @@ export const BlueprintExecutionPage: Story = {
           onToggleView={(nodeId) => {
             console.log("Toggle view action for node:", nodeId);
             console.log("Current nodes before toggle:", nodes.length);
-            console.log("Node data before toggle:", nodes.find(n => n.id === nodeId)?.data);
+            console.log("Node data before toggle:", nodes.find((n) => n.id === nodeId)?.data);
             toggleNodeCollapse(nodeId);
           }}
           onDeactivate={(nodeId) => {
@@ -153,16 +139,11 @@ export const BlueprintExecutionPage: Story = {
         {/* Debug info for Storybook (only visible in development) */}
         {isInStorybook() && executionData && (
           <div className="absolute top-16 right-4 z-30 bg-black/80 text-white p-3 rounded text-xs max-w-md">
-            <div className="font-bold mb-2">
-              📊 Execution Data (Storybook Only)
-            </div>
+            <div className="font-bold mb-2">📊 Execution Data (Storybook Only)</div>
             <div>From: {executionData.parentWorkflow}</div>
             <div>Node: {executionData.nodeId}</div>
             <div>Title: {executionData.title}</div>
-            <div>
-              Timestamp:{" "}
-              {new Date(executionData.timestamp).toLocaleTimeString()}
-            </div>
+            <div>Timestamp: {new Date(executionData.timestamp).toLocaleTimeString()}</div>
           </div>
         )}
       </div>

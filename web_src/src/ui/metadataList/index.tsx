@@ -14,8 +14,8 @@ export interface MetadataListProps {
 
 export const MetadataList: React.FC<MetadataListProps> = ({
   items,
-  className = "px-2 py-3 border-b text-gray-500 flex flex-col gap-2",
-  iconSize = 19
+  className = "px-2 py-3 border-b text-gray-500 flex flex-col gap-1.5",
+  iconSize = 16,
 }) => {
   if (!items || items.length === 0) {
     return null;

@@ -3,10 +3,10 @@ package e2e
 import (
 	"testing"
 
-	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
+	"github.com/superplanehq/superplane/test/e2e/session"
 )
 
 func TestHomePage(t *testing.T) {
@@ -30,7 +30,7 @@ func TestHomePage(t *testing.T) {
 
 type TestHomePageSteps struct {
 	t       *testing.T
-	session *TestSession
+	session *session.TestSession
 }
 
 func (steps *TestHomePageSteps) Start() {
@@ -40,12 +40,11 @@ func (steps *TestHomePageSteps) Start() {
 }
 
 func (steps *TestHomePageSteps) VisitHomePage() {
-	steps.session.Visit("/" + steps.session.orgID + "/")
+	steps.session.Visit("/" + steps.session.OrgID.String() + "/")
 }
 
 func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
-	orgUUID := uuid.MustParse(steps.session.orgID)
-	canvas, err := models.FindWorkflowByName(canvasName, orgUUID)
+	canvas, err := models.FindWorkflowByName(canvasName, steps.session.OrgID)
 
 	assert.NoError(steps.t, err)
 	assert.Equal(steps.t, canvasName, canvas.Name)
@@ -63,8 +62,7 @@ func (steps *TestHomePageSteps) FillInNewCanvasForm(canvasName string) {
 }
 
 func (steps *TestHomePageSteps) AssertComponentSavedInDB(s string) {
-	orgUUID := uuid.MustParse(steps.session.orgID)
-	component, err := models.FindBlueprintByName(s, orgUUID)
+	component, err := models.FindBlueprintByName(s, steps.session.OrgID)
 
 	assert.NoError(steps.t, err)
 	assert.Equal(steps.t, s, component.Name)

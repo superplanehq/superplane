@@ -4,26 +4,33 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"golang.org/x/sync/semaphore"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 type WorkflowNodeQueueWorker struct {
+	registry  *registry.Registry
 	semaphore *semaphore.Weighted
+	logger    *log.Entry
 }
 
-func NewWorkflowNodeQueueWorker() *WorkflowNodeQueueWorker {
+func NewWorkflowNodeQueueWorker(registry *registry.Registry) *WorkflowNodeQueueWorker {
 	return &WorkflowNodeQueueWorker{
+		registry:  registry,
 		semaphore: semaphore.NewWeighted(25),
+		logger:    log.WithFields(log.Fields{"worker": "WorkflowNodeQueueWorker"}),
 	}
 }
 
@@ -36,99 +43,119 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			tickStart := time.Now()
+
 			nodes, err := models.ListWorkflowNodesReady()
 			if err != nil {
-				w.log("Error finding workflow nodes ready to be processed: %v", err)
+				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
 
 			for _, node := range nodes {
+				logger := logging.ForNode(w.logger, node)
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
-					w.log("Error acquiring semaphore: %v", err)
+					logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
 
 				go func(node models.WorkflowNode) {
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessNode(node); err != nil {
-						w.log("Error processing workflow node - workflow=%s, node=%s: %v", node.WorkflowID, node.NodeID, err)
+					if err := w.LockAndProcessNode(logger, node); err != nil {
+						logger.Errorf("Error processing: %v", err)
 					}
 				}(node)
 			}
+
+			telemetry.RecordQueueWorkerTickDuration(context.Background(), time.Since(tickStart))
 		}
 	}
 }
 
-func (w *WorkflowNodeQueueWorker) LockAndProcessNode(node models.WorkflowNode) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.WorkflowNode) error {
+	var exec *models.WorkflowNodeExecution
+	var queueItem *models.WorkflowNodeQueueItem
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		n, err := models.LockWorkflowNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
-			w.log("Node node=%s workflow=%s already being processed - skipping", node.NodeID, node.WorkflowID)
+			logger.Info("Node already being processed - skipping")
 			return nil
 		}
 
-		return w.processNode(tx, n)
+		exec, queueItem, err = w.processNode(tx, logger, n)
+		return err
 	})
+
+	if err == nil {
+		if exec != nil {
+			messages.NewWorkflowExecutionMessage(
+				exec.WorkflowID.String(),
+				exec.ID.String(),
+				exec.NodeID,
+			).Publish()
+		}
+
+		if queueItem != nil {
+			messages.NewWorkflowQueueItemMessage(
+				queueItem.WorkflowID.String(),
+				queueItem.ID.String(),
+				queueItem.NodeID,
+			).Publish(true)
+		}
+	}
+
+	return err
 }
 
-func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.WorkflowNode) error {
+func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.WorkflowNode) (*models.WorkflowNodeExecution, *models.WorkflowNodeQueueItem, error) {
 	queueItem, err := node.FirstQueueItem(tx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
+			return nil, nil, nil
 		}
 
-		return err
+		return nil, nil, err
 	}
 
-	w.log("De-queueing item %s for node=%s workflow=%s", queueItem.ID, node.NodeID, node.WorkflowID)
-	return w.createNodeExecution(tx, node, queueItem)
+	logger = logging.ForQueueItem(logger, *queueItem)
+	logger.Info("Processing queue item")
+
+	ctx, err := contexts.BuildProcessQueueContext(tx, node, queueItem)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var exec *models.WorkflowNodeExecution
+	switch node.Type {
+	case models.NodeTypeComponent:
+		/*
+		* For component nodes, delegate to the component's ProcessQueueItem implementation to handle
+		* the processing.
+		 */
+		exec, err = w.processComponentNode(ctx, node)
+	case models.NodeTypeBlueprint:
+		/*
+		* For blueprint nodes, use the default processing logic.
+		* Blueprint nodes do not have custom processing logic.
+		 */
+		exec, err = ctx.DefaultProcessing()
+	default:
+		return nil, nil, fmt.Errorf("unsupported node type: %s", node.Type)
+	}
+
+	return exec, queueItem, err
 }
 
-func (w *WorkflowNodeQueueWorker) createNodeExecution(tx *gorm.DB, node *models.WorkflowNode, queueItem *models.WorkflowNodeQueueItem) error {
-	event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
+func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *components.ProcessQueueContext, node *models.WorkflowNode) (*models.WorkflowNodeExecution, error) {
+	ref := node.Ref.Data()
+
+	if ref.Component == nil || ref.Component.Name == "" {
+		return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
+	}
+
+	comp, err := w.registry.GetComponent(ref.Component.Name)
 	if err != nil {
-		return fmt.Errorf("failed to event %s: %w", queueItem.EventID, err)
+		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
 	}
 
-	config, err := contexts.NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
-		WithRootEvent(&queueItem.RootEventID).
-		WithPreviousExecution(event.ExecutionID).
-		WithInput(event.Data.Data()).
-		Build(node.Configuration.Data())
-
-	if err != nil {
-		return err
-	}
-
-	now := time.Now()
-	nodeExecution := models.WorkflowNodeExecution{
-		WorkflowID:          queueItem.WorkflowID,
-		NodeID:              node.NodeID,
-		RootEventID:         queueItem.RootEventID,
-		EventID:             event.ID,
-		PreviousExecutionID: event.ExecutionID,
-		State:               models.WorkflowNodeExecutionStatePending,
-		Configuration:       datatypes.NewJSONType(config),
-		CreatedAt:           &now,
-		UpdatedAt:           &now,
-	}
-
-	err = tx.Create(&nodeExecution).Error
-	if err != nil {
-		return err
-	}
-
-	err = queueItem.Delete(tx)
-	if err != nil {
-		return err
-	}
-
-	messages.NewWorkflowExecutionCreatedMessage(nodeExecution.WorkflowID.String(), &nodeExecution).PublishWithDelay(1 * time.Second)
-
-	return node.UpdateState(tx, models.WorkflowNodeStateProcessing)
-}
-
-func (w *WorkflowNodeQueueWorker) log(format string, v ...any) {
-	log.Printf("[WorkflowNodeQueueWorker] "+format, v...)
+	return comp.ProcessQueueItem(*ctx)
 }

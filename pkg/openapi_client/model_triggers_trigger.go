@@ -20,12 +20,12 @@ var _ MappedNullable = &TriggersTrigger{}
 
 // TriggersTrigger struct for TriggersTrigger
 type TriggersTrigger struct {
-	Name *string `json:"name,omitempty"`
-	Label *string `json:"label,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Icon *string `json:"icon,omitempty"`
-	Color *string `json:"color,omitempty"`
-	Configuration []ComponentsConfigurationField `json:"configuration,omitempty"`
+	Name          *string              `json:"name,omitempty"`
+	Label         *string              `json:"label,omitempty"`
+	Description   *string              `json:"description,omitempty"`
+	Icon          *string              `json:"icon,omitempty"`
+	Color         *string              `json:"color,omitempty"`
+	Configuration []ConfigurationField `json:"configuration,omitempty"`
 }
 
 // NewTriggersTrigger instantiates a new TriggersTrigger object
@@ -206,9 +206,9 @@ func (o *TriggersTrigger) SetColor(v string) {
 }
 
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
-func (o *TriggersTrigger) GetConfiguration() []ComponentsConfigurationField {
+func (o *TriggersTrigger) GetConfiguration() []ConfigurationField {
 	if o == nil || IsNil(o.Configuration) {
-		var ret []ComponentsConfigurationField
+		var ret []ConfigurationField
 		return ret
 	}
 	return o.Configuration
@@ -216,7 +216,7 @@ func (o *TriggersTrigger) GetConfiguration() []ComponentsConfigurationField {
 
 // GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *TriggersTrigger) GetConfigurationOk() ([]ComponentsConfigurationField, bool) {
+func (o *TriggersTrigger) GetConfigurationOk() ([]ConfigurationField, bool) {
 	if o == nil || IsNil(o.Configuration) {
 		return nil, false
 	}
@@ -232,13 +232,13 @@ func (o *TriggersTrigger) HasConfiguration() bool {
 	return false
 }
 
-// SetConfiguration gets a reference to the given []ComponentsConfigurationField and assigns it to the Configuration field.
-func (o *TriggersTrigger) SetConfiguration(v []ComponentsConfigurationField) {
+// SetConfiguration gets a reference to the given []ConfigurationField and assigns it to the Configuration field.
+func (o *TriggersTrigger) SetConfiguration(v []ConfigurationField) {
 	o.Configuration = v
 }
 
 func (o TriggersTrigger) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -303,5 +303,3 @@ func (v *NullableTriggersTrigger) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

@@ -1,22 +1,21 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { resolveIcon } from "@/lib/utils";
-import { TextAlignStart, X } from "lucide-react";
-import React, { JSX, useCallback, useEffect, useRef, useState } from "react";
-import { ChildEvents, ChildEventsInfo } from "../childEvents";
-import { ChildEventsState } from "../composite";
+import { ArrowLeft, Plus, Search, TextAlignStart, X } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { MetadataItem, MetadataList } from "../metadataList";
+import { ChildEventsState } from "../composite";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
+import { SidebarEventItem } from "./SidebarEventItem";
+import { TabData } from "./SidebarEventItem/SidebarEventItem";
+import { SidebarEvent } from "./types";
 
-interface SidebarEvent {
-  id: string;
-  title: string;
-  subtitle?: string;
-  state: ChildEventsState;
-  isOpen: boolean;
-  receivedAt?: Date;
-  values?: Record<string, string>;
-  childEventsInfo?: ChildEventsInfo;
-}
-
+const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
+  { value: "processed", label: "Processed" },
+  { value: "discarded", label: "Failed" },
+  { value: "running", label: "Running" },
+];
 interface ComponentSidebarProps {
   isOpen?: boolean;
   setIsOpen?: (isOpen: boolean) => void;
@@ -29,14 +28,14 @@ interface ComponentSidebarProps {
   iconSlug?: string;
   iconColor?: string;
   iconBackground?: string;
-  moreInQueueCount: number;
+  totalInQueueCount: number;
+  totalInHistoryCount: number;
   hideQueueEvents?: boolean;
 
-  onExpandChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
-  onReRunChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
   onEventClick?: (event: SidebarEvent) => void;
   onClose?: () => void;
   onSeeFullHistory?: () => void;
+  onSeeQueue?: () => void;
 
   // Action handlers
   onRun?: () => void;
@@ -49,7 +48,36 @@ interface ComponentSidebarProps {
   onDeactivate?: () => void;
   onToggleView?: () => void;
   onDelete?: () => void;
+  onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   isCompactView?: boolean;
+
+  // Tab data function to get tab data for each event
+  getTabData?: (event: SidebarEvent) => TabData | undefined;
+
+  // Queue actions
+  onCancelQueueItem?: (id: string) => void;
+  onPushThrough?: (executionId: string) => void;
+  supportsPushThrough?: boolean;
+
+  // Full history props
+  getAllHistoryEvents?: () => SidebarEvent[];
+  onLoadMoreHistory?: () => void;
+  getHasMoreHistory?: () => boolean;
+  getLoadingMoreHistory?: () => boolean;
+
+  // Queue pr ops
+  getAllQueueEvents?: () => SidebarEvent[];
+  onLoadMoreQueue?: () => void;
+  getHasMoreQueue?: () => boolean;
+  getLoadingMoreQueue?: () => boolean;
+
+  // Execution chain lazy loading
+  loadExecutionChain?: (
+    eventId: string,
+    nodeId?: string,
+    currentExecution?: Record<string, unknown>,
+    forceReload?: boolean,
+  ) => Promise<any[]>;
 }
 
 export const ComponentSidebar = ({
@@ -60,14 +88,14 @@ export const ComponentSidebar = ({
   iconSlug,
   iconColor,
   iconBackground,
-  onExpandChildEvents,
-  onReRunChildEvents,
   onEventClick,
   onClose,
   latestEvents,
   nextInQueueEvents,
-  moreInQueueCount = 0,
+  totalInQueueCount = 0,
+  totalInHistoryCount = 0,
   hideQueueEvents = false,
+  onSeeQueue,
   onSeeFullHistory,
   onRun,
   runDisabled,
@@ -79,7 +107,21 @@ export const ComponentSidebar = ({
   onDeactivate,
   onToggleView,
   onDelete,
+  onReEmit,
   isCompactView = false,
+  getTabData,
+  onCancelQueueItem,
+  onPushThrough,
+  supportsPushThrough,
+  onLoadMoreHistory,
+  getAllHistoryEvents,
+  getHasMoreHistory,
+  getLoadingMoreHistory,
+  onLoadMoreQueue,
+  getAllQueueEvents,
+  getHasMoreQueue,
+  getLoadingMoreQueue,
+  loadExecutionChain,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
@@ -87,11 +129,19 @@ export const ComponentSidebar = ({
   // Keep expanded state stable across parent re-renders
   const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
 
+  const [page, setPage] = useState<"overview" | "history" | "queue">("overview");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
+
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
     const seeded = new Set(openEventIds);
-    latestEvents.forEach(e => { if (e.isOpen) seeded.add(e.id); });
-    nextInQueueEvents.forEach(e => { if (e.isOpen) seeded.add(e.id); });
+    latestEvents.forEach((e) => {
+      if (e.isOpen) seeded.add(e.id);
+    });
+    nextInQueueEvents.forEach((e) => {
+      if (e.isOpen) seeded.add(e.id);
+    });
     if (seeded.size !== openEventIds.size) setOpenEventIds(seeded);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestEvents, nextInQueueEvents]);
@@ -137,140 +187,138 @@ export const ComponentSidebar = ({
     }
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
-  const createEventItem = (event: SidebarEvent, index: number, variant: 'latest' | 'queue' = 'latest'): JSX.Element => {
-    let EventIcon = resolveIcon("check");
-    let EventColor = "text-green-700";
-    let EventBackground = "bg-green-200";
-    let iconBorderColor = "border-gray-700";
-    let iconSize = 8;
-    let iconContainerSize = 4;
-    let iconStrokeWidth = 3;
-    let animation = "";
+  const handleToggleOpen = useCallback((eventId: string) => {
+    setOpenEventIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(eventId)) next.delete(eventId);
+      else next.add(eventId);
+      return next;
+    });
+  }, []);
 
-    switch (event.state) {
-      case "processed":
-        EventIcon = resolveIcon("check");
-        EventColor = "text-green-700";
-        EventBackground = "bg-green-200";
-        iconBorderColor = "border-green-700";
-        iconSize = 8;
-        break;
-      case "discarded":
-        EventIcon = resolveIcon("x");
-        EventColor = "text-red-700";
-        EventBackground = "bg-red-200";
-        iconBorderColor = "border-red-700";
-        iconSize = 8;
-        break;
-      case "waiting":
-        if (variant === 'queue') {
-          // Match node card styling (neutral grey + dashed icon)
-          EventIcon = resolveIcon("circle-dashed");
-          EventColor = "text-gray-500";
-          EventBackground = "bg-gray-100";
-          iconBorderColor = "";
-          iconSize = 20;
-          iconContainerSize = 5;
-          iconStrokeWidth = 2;
-          animation = "";
-        } else {
-          EventIcon = resolveIcon("refresh-cw");
-          EventColor = "text-blue-700";
-          EventBackground = "bg-blue-100";
-          iconBorderColor = "";
-          iconSize = 17;
-          iconContainerSize = 5;
-          iconStrokeWidth = 2;
-          animation = "animate-spin";
-        }
-        break;
-        break;
-      case "running":
-        EventIcon = resolveIcon("refresh-cw");
-        EventColor = "text-blue-700";
-        EventBackground = "bg-blue-100";
-        iconBorderColor = "";
-        iconSize = 17;
-        iconContainerSize = 5;
-        iconStrokeWidth = 2;
-        animation = "animate-spin";
-        break;
+  const handleSeeQueue = useCallback(() => {
+    setPage("queue");
+    onSeeQueue?.();
+  }, [onSeeQueue]);
+
+  const handleSeeFullHistory = useCallback(() => {
+    setPage("history");
+    onSeeFullHistory?.();
+  }, [onSeeFullHistory]);
+
+  const handleBackToOverview = useCallback(() => {
+    setPage("overview");
+    setSearchQuery("");
+    setStatusFilter("all");
+  }, []);
+
+  const allEvents = React.useMemo(() => {
+    if (page === "overview") return [];
+
+    switch (page) {
+      case "history":
+        return getAllHistoryEvents?.() || [];
+      case "queue":
+        return getAllQueueEvents?.() || [];
+      default:
+        return [];
+    }
+  }, [getAllHistoryEvents, getAllQueueEvents, page]);
+
+  const hasMoreItems = React.useMemo(() => {
+    if (page === "overview") return false;
+
+    switch (page) {
+      case "history":
+        return getHasMoreHistory?.() || false;
+      case "queue":
+        return getHasMoreQueue?.() || false;
+      default:
+        return false;
+    }
+  }, [getHasMoreHistory, getHasMoreQueue, page]);
+
+  const loadingMoreItems = React.useMemo(() => {
+    if (page === "overview") return false;
+
+    switch (page) {
+      case "history":
+        return getLoadingMoreHistory?.() || false;
+      case "queue":
+        return getLoadingMoreQueue?.() || false;
+      default:
+        return false;
+    }
+  }, [getLoadingMoreHistory, getLoadingMoreQueue, page]);
+
+  const handleLoadMoreItems = React.useCallback(() => {
+    if (page === "overview") return;
+
+    switch (page) {
+      case "history":
+        return onLoadMoreHistory?.();
+      case "queue":
+        return onLoadMoreQueue?.();
+      default:
+        return;
+    }
+  }, [onLoadMoreHistory, onLoadMoreQueue, page]);
+
+  const showMoreCount = React.useMemo(() => {
+    if (page === "overview") return 0;
+
+    switch (page) {
+      case "history":
+        return totalInHistoryCount - allEvents.length;
+      case "queue":
+        return totalInQueueCount - allEvents.length;
+      default:
+        return 0;
+    }
+  }, [allEvents, totalInHistoryCount, totalInQueueCount, page]);
+
+  const filteredHistoryEvents = React.useMemo(() => {
+    if (!allEvents) return [];
+    let events = allEvents;
+
+    if (statusFilter !== "all") {
+      events = events.filter((event) => event.state === statusFilter);
     }
 
-    const isOpen = openEventIds.has(event.id) || event.isOpen;
-    return (
-      <div
-        key={event.title + index}
-        className={`flex flex-col items-center justify-between gap-1 px-2 py-1.5 rounded-md ${EventBackground} ${EventColor}`}
-      >
-        <div
-          className="flex items-center gap-3 rounded-md w-full min-w-0 cursor-pointer"
-          onClick={(e) => {
-            e.stopPropagation();
-            // Toggle local expanded state (persist across re-renders)
-            setOpenEventIds(prev => {
-              const next = new Set(prev);
-              if (next.has(event.id)) next.delete(event.id); else next.add(event.id);
-              return next;
-            });
-            onEventClick?.(event);
-          }}
-        >
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div
-              className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center border-[1.5px] ${EventColor} ${iconBorderColor} ${animation}`}
-            >
-              <EventIcon size={iconSize} strokeWidth={iconStrokeWidth} className="thick   " />
-            </div>
-            <span className="truncate text-sm text-black font-medium">{event.title}</span>
-          </div>
-          {event.subtitle && (
-            <span className="text-sm text-gray-500 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
-          )}
-        </div>
-        {isOpen &&
-          ((event.values && Object.entries(event.values).length > 0) ||
-            (event.childEventsInfo && event.childEventsInfo.count > 0)) && (
-            <div className="rounded-sm bg-white border-1 border-gray-200 text-gray-500 w-full">
-              {event.values && Object.entries(event.values).length > 0 && (
-                <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
-                  {Object.entries(event.values || {}).map(([key, value]) => (
-                    <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                      <span className="text-sm flex-shrink-0 text-right w-[25%]">{key}:</span>
-                      <span className="text-sm flex-1 truncate text-left w-[75%] hover:underline">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      events = events.filter(
+        (event) =>
+          event.title.toLowerCase().includes(query) ||
+          event.subtitle?.toLowerCase().includes(query) ||
+          Object.values(event.values || {}).some((value) => String(value).toLowerCase().includes(query)),
+      );
+    }
 
-              {event.childEventsInfo && event.childEventsInfo.count > 0 && (
-                <div
-                  className={`w-full bg-gray-100 rounded-b-sm px-4 py-3 ${
-                    event.values && Object.entries(event.values).length > 0
-                      ? "border-t-1 border-gray-200"
-                      : " rounded-t-sm"
-                  }`}
-                >
-                  <ChildEvents
-                    childEventsInfo={event.childEventsInfo}
-                    onExpandChildEvents={onExpandChildEvents}
-                    onReRunChildEvents={onReRunChildEvents}
-                    className="font-medium"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-      </div>
-    );
-  };
+    return events;
+  }, [allEvents, statusFilter, searchQuery]);
+
+  const statusOptions = React.useMemo(() => {
+    const statuses = new Set<ChildEventsState>();
+    allEvents.forEach((event) => {
+      if (event.state) {
+        statuses.add(event.state);
+      }
+    });
+    return Array.from(statuses);
+  }, [allEvents]);
+
+  const extraStatusOptions = React.useMemo(
+    () => statusOptions.filter((status) => !DEFAULT_STATUS_OPTIONS.some((option) => option.value === status)),
+    [statusOptions],
+  );
 
   if (!isOpen) return null;
 
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-gray-200 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize handle */}
@@ -287,12 +335,12 @@ export const ComponentSidebar = ({
           }`}
         />
       </div>
-      <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-gray-200 bg-gray-50">
+      <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-border bg-gray-50">
         <div className="flex flex-col items-start gap-3 w-full mt-2">
           <div
-            className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
+            className={`w-7 h-7 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
           >
-            {iconSrc ? <img src={iconSrc} alt={title} className="w-7 h-7" /> : <Icon size={22} className={iconColor} />}
+            {iconSrc ? <img src={iconSrc} alt={title} className="w-6 h-6" /> : <Icon size={16} className={iconColor} />}
           </div>
           <div className="flex justify-between gap-3 w-full">
             <h2 className="text-xl font-semibold">{title}</h2>
@@ -312,68 +360,203 @@ export const ComponentSidebar = ({
           </div>
           <div
             onClick={() => onClose?.()}
-            className="flex items-center justify-center gap-1 absolute top-6 right-2 text-xs font-medium cursor-pointer"
+            className="flex items-center justify-center absolute top-6 right-3 cursor-pointer"
           >
-            <span>Close</span>
-            <X size={14} />
+            <X size={18} />
           </div>
         </div>
       </div>
-      {metadata.length > 0 && (
-        <div className="px-3 py-1 border-b-1 border-gray-200">
-          <MetadataList
-            items={metadata}
-            className="border-b-0 text-gray-500 font-medium gap-2 flex flex-col py-2 font-mono"
-          />
-        </div>
-      )}
-      <div className="px-3 py-1 border-b-1 border-gray-200 pb-3 text-left">
-        <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Latest events</h2>
-        <div className="flex flex-col gap-2">
-          {latestEvents.length === 0 ? (
-            <div className="text-center py-4 text-gray-500 text-sm">No events found</div>
-          ) : (
-            <>
-              {latestEvents.slice(0, 5).map((event, index) => {
-                return createEventItem(event, index, 'latest');
-              })}
-              {moreInQueueCount > 0 && (
-                <button
-                  onClick={() => onSeeFullHistory?.()}
-                  className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
-                >
-                  <TextAlignStart size={16} />
-                  See full history
-                </button>
+      {page !== "overview" ? (
+        <>
+          {/* Back to Overview Section */}
+          <div className="px-3 py-2 border-b-1 border-border">
+            <button
+              onClick={handleBackToOverview}
+              className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 cursor-pointer"
+            >
+              <ArrowLeft size={16} />
+              Back to Overview
+            </button>
+          </div>
+
+          {/* Full History Header with Search and Filter */}
+          <div className="px-3 py-3">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold uppercase text-gray-500">
+                {page === "history" ? "Full History" : "Queue"}
+              </h2>
+            </div>
+            <div className="flex gap-2">
+              {/* Search Input */}
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500" />
+                <Input
+                  type="text"
+                  placeholder="Search events..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 h-9 text-sm"
+                />
+              </div>
+              {/* Status Filter */}
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => setStatusFilter(value as ChildEventsState | "all")}
+              >
+                <SelectTrigger className="w-[160px] h-9 text-sm text-gray-500">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-gray-500">
+                    All Statuses
+                  </SelectItem>
+                  {DEFAULT_STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value} className="text-gray-500">
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                  {extraStatusOptions.map((status) => (
+                    <SelectItem key={status} value={status} className="text-gray-500">
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Full History Events List */}
+          <div className="px-3 py-1 pb-3">
+            <div className="flex flex-col gap-2">
+              {filteredHistoryEvents.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 text-sm">
+                  {searchQuery || statusFilter !== "all" ? "No matching events found" : "No events found"}
+                </div>
+              ) : (
+                <>
+                  {filteredHistoryEvents.map((event, index) => (
+                    <SidebarEventItem
+                      key={event.id}
+                      event={event}
+                      index={index}
+                      variant={page === "history" ? "latest" : "queue"}
+                      isOpen={openEventIds.has(event.id) || event.isOpen}
+                      onToggleOpen={handleToggleOpen}
+                      onEventClick={onEventClick}
+                      tabData={getTabData?.(event)}
+                      onPushThrough={onPushThrough}
+                      supportsPushThrough={supportsPushThrough}
+                      onReEmit={onReEmit}
+                      loadExecutionChain={loadExecutionChain}
+                    />
+                  ))}
+                  {hasMoreItems && !searchQuery && statusFilter === "all" && (
+                    <div className="flex justify-center pt-1">
+                      <button
+                        onClick={handleLoadMoreItems}
+                        disabled={loadingMoreItems}
+                        className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed rounded-md px-2 py-1.5 border border-border shadow-xs"
+                      >
+                        {loadingMoreItems ? null : <Plus size={16} />}
+                        {loadingMoreItems ? "Loading..." : `Show ${showMoreCount > 10 ? "10" : showMoreCount} more`}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
-            </>
-          )}
-        </div>
-      </div>
-      {!hideQueueEvents && (
-        <div className="px-3 py-1 pb-3 text-left">
-          <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Next in queue</h2>
-          <div className="flex flex-col gap-2">
-            {nextInQueueEvents.length === 0 ? (
-              <div className="text-center py-4 text-gray-500 text-sm">Queue is empty</div>
-            ) : (
-              <>
-                {nextInQueueEvents.slice(0, 5).map((event, index) => {
-                  return createEventItem(event, index, 'queue');
-                })}
-                {moreInQueueCount > 0 && (
-                  <button
-                    onClick={() => onSeeFullHistory?.()}
-                    className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
-                  >
-                    <TextAlignStart size={16} />
-                    {moreInQueueCount} more in the queue
-                  </button>
-                )}
-              </>
-            )}
+            </div>
           </div>
-        </div>
+        </>
+      ) : (
+        // Overview (Original Content)
+        <>
+          {metadata.length > 0 && (
+            <div className="px-3 py-1 border-b-1 border-border">
+              <MetadataList
+                items={metadata}
+                className="border-b-0 text-gray-500 font-medium gap-1.5 flex flex-col py-2"
+              />
+            </div>
+          )}
+          <div className="px-3 py-1 border-b-1 border-border pb-3 text-left">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Latest events</h2>
+            <div className="flex flex-col gap-2">
+              {latestEvents.length === 0 ? (
+                <div className="text-center py-4 text-gray-500 text-sm">No events found</div>
+              ) : (
+                <>
+                  {latestEvents.slice(0, 5).map((event, index) => {
+                    return (
+                      <SidebarEventItem
+                        key={event.id}
+                        event={event}
+                        index={index}
+                        variant="latest"
+                        isOpen={openEventIds.has(event.id) || event.isOpen}
+                        onToggleOpen={handleToggleOpen}
+                        onEventClick={onEventClick}
+                        tabData={getTabData?.(event)}
+                        onPushThrough={onPushThrough}
+                        supportsPushThrough={supportsPushThrough}
+                        onReEmit={onReEmit}
+                        loadExecutionChain={loadExecutionChain}
+                      />
+                    );
+                  })}
+                  {handleSeeFullHistory && (
+                    <button
+                      onClick={handleSeeFullHistory}
+                      className="text-sm text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
+                    >
+                      <TextAlignStart size={16} />
+                      See full history
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+          {!hideQueueEvents && (
+            <div className="px-3 py-1 pb-3 text-left">
+              <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Next in queue</h2>
+              <div className="flex flex-col gap-2">
+                {nextInQueueEvents.length === 0 ? (
+                  <div className="text-center py-4 text-gray-500 text-sm">Queue is empty</div>
+                ) : (
+                  <>
+                    {nextInQueueEvents.slice(0, 5).map((event, index) => {
+                      return (
+                        <SidebarEventItem
+                          key={event.id}
+                          event={event}
+                          index={index}
+                          variant="queue"
+                          isOpen={openEventIds.has(event.id) || event.isOpen}
+                          onToggleOpen={handleToggleOpen}
+                          onEventClick={onEventClick}
+                          tabData={getTabData?.(event)}
+                          onCancelQueueItem={onCancelQueueItem}
+                          onPushThrough={onPushThrough}
+                          supportsPushThrough={supportsPushThrough}
+                          loadExecutionChain={loadExecutionChain}
+                        />
+                      );
+                    })}
+                    {totalInQueueCount > 5 && (
+                      <button
+                        onClick={handleSeeQueue}
+                        className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
+                      >
+                        <TextAlignStart size={16} />
+                        {totalInQueueCount - 5} more in the queue
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

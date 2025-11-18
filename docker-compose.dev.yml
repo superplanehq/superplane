@@ -8,12 +8,14 @@ services:
     tty: true
 
     command: bash /app/docker-entrypoint.dev.sh
+    env_file:
+      - .env.docker
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"
       DB_NAME: "superplane_dev"
       DB_USERNAME: "postgres"
-      DB_POOL_SIZE: "5"
+      DB_POOL_SIZE: "2"
       POSTGRES_DB_SSL: "false"
       APP_ENV: development
       APPLICATION_NAME: "superplane"
@@ -22,7 +24,13 @@ services:
       SWAGGER_BASE_PATH: "/app/api/swagger"
       RBAC_MODEL_PATH: "/app/rbac/rbac_model.conf"
       RBAC_ORG_POLICY_PATH: "/app/rbac/rbac_org_policy.csv"
-      RBAC_CANVAS_POLICY_PATH: "/app/rbac/rbac_canvas_policy.csv"
+      # Ensure Go build cache initializes in a writable, persisted location
+      # This fixes: "failed to initialize build cache at /.cache/go-build: permission denied"
+      # and keeps the cache across container restarts (since /app is bind-mounted)
+      GOCACHE: "/app/tmp/go-build"
+      XDG_CACHE_HOME: "/app/tmp"
+      # Lock Playwright browsers location so install and runtime match
+      PLAYWRIGHT_BROWSERS_PATH: "/app/tmp/ms-playwright"
       START_PUBLIC_API: "yes"
       START_INTERNAL_API: "yes"
       START_GRPC_GATEWAY: "yes"
@@ -32,7 +40,6 @@ services:
       START_EVENT_DISTRIBUTER: "yes"
       START_WORKFLOW_EVENT_ROUTER: "yes"
       START_WORKFLOW_NODE_EXECUTOR: "yes"
-      START_BLUEPRINT_NODE_EXECUTOR: "yes"
       START_WORKFLOW_NODE_QUEUE_WORKER: "yes"
       START_NODE_REQUEST_WORKER: "yes"
       START_WEBHOOK_PROVISIONER: "yes"
@@ -51,6 +58,7 @@ services:
       SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Superplane}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@superplane.com}
+      BLOCK_SIGNUP: ${BLOCK_SIGNUP:-no}
 
     ports:
       - 5173:5173

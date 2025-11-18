@@ -1,65 +1,73 @@
-import { useState, forwardRef, useImperativeHandle, useMemo } from 'react'
-import { Button } from '../../../components/Button/button'
-import { Input, InputGroup } from '../../../components/Input/input'
-import { Avatar } from '../../../components/Avatar/avatar'
-import { Checkbox } from '../../../components/Checkbox/checkbox'
-import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
-import { Text } from '../../../components/Text/text'
-import {
-  useOrganizationUsers,
-  useOrganizationGroupUsers,
-  useAddUserToGroup
-} from '../../../hooks/useOrganizationData'
+import { useState, forwardRef, useImperativeHandle, useMemo } from "react";
+import { Button } from "../../../components/Button/button";
+import { Input, InputGroup } from "../../../components/Input/input";
+import { Avatar } from "../../../components/Avatar/avatar";
+import { Checkbox } from "../../../components/Checkbox/checkbox";
+import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
+import { Text } from "../../../components/Text/text";
+import { useOrganizationUsers, useOrganizationGroupUsers, useAddUserToGroup } from "../../../hooks/useOrganizationData";
 
 interface AddMembersSectionProps {
-  showRoleSelection?: boolean
-  organizationId: string
-  groupName?: string
-  onMemberAdded?: () => void
-  className?: string
+  showRoleSelection?: boolean;
+  organizationId: string;
+  groupName?: string;
+  onMemberAdded?: () => void;
+  className?: string;
 }
 
 export interface AddMembersSectionRef {
-  refreshExistingMembers: () => void
+  refreshExistingMembers: () => void;
 }
 
 const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSectionProps>(
   ({ organizationId, groupName, onMemberAdded, className }, ref) => {
-    const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
-    const [memberSearchTerm, setMemberSearchTerm] = useState('')
+    const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
+    const [memberSearchTerm, setMemberSearchTerm] = useState("");
 
     // React Query hooks
-    const { data: orgUsers = [], isLoading: loadingOrgUsers, error: orgUsersError } = useOrganizationUsers(organizationId)
-    const { data: groupUsers = [], isLoading: loadingGroupUsers, error: groupUsersError } = useOrganizationGroupUsers(organizationId, groupName || '')
-    
-    // Mutations
-    const addUserToGroupMutation = useAddUserToGroup(organizationId)
+    const {
+      data: orgUsers = [],
+      isLoading: loadingOrgUsers,
+      error: orgUsersError,
+    } = useOrganizationUsers(organizationId);
+    const {
+      data: groupUsers = [],
+      isLoading: loadingGroupUsers,
+      error: groupUsersError,
+    } = useOrganizationGroupUsers(organizationId, groupName || "");
 
-    const isInviting = addUserToGroupMutation.isPending
-    const error = orgUsersError || groupUsersError
+    // Mutations
+    const addUserToGroupMutation = useAddUserToGroup(organizationId);
+
+    const isInviting = addUserToGroupMutation.isPending;
+    const error = orgUsersError || groupUsersError;
 
     // Calculate available members (org users who aren't in the group)
     const existingMembers = useMemo(() => {
-      if (!groupName) return []
+      if (!groupName) return [];
 
-      const existingMemberIds = new Set(groupUsers.map(user => user.metadata?.id))
-      return orgUsers.filter(user => !existingMemberIds.has(user.metadata?.id))
-    }, [orgUsers, groupUsers, groupName])
+      const existingMemberIds = new Set(groupUsers.map((user) => user.metadata?.id));
+      return orgUsers.filter((user) => !existingMemberIds.has(user.metadata?.id));
+    }, [orgUsers, groupUsers, groupName]);
 
-    const loadingMembers = loadingOrgUsers || loadingGroupUsers
+    const loadingMembers = loadingOrgUsers || loadingGroupUsers;
 
     // Expose refresh function to parent
-    useImperativeHandle(ref, () => ({
-      refreshExistingMembers: () => {
-        // No need to manually refresh - React Query will handle it
-      }
-    }), [])
+    useImperativeHandle(
+      ref,
+      () => ({
+        refreshExistingMembers: () => {
+          // No need to manually refresh - React Query will handle it
+        },
+      }),
+      [],
+    );
 
     const handleExistingMembersSubmit = async () => {
-      if (selectedMembers.size === 0) return
+      if (selectedMembers.size === 0) return;
 
       try {
-        const selectedUsers = existingMembers.filter(member => selectedMembers.has(member.metadata?.id || ''))
+        const selectedUsers = existingMembers.filter((member) => selectedMembers.has(member.metadata?.id || ""));
 
         // Process each selected member
         for (const member of selectedUsers) {
@@ -68,66 +76,65 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
             try {
               await addUserToGroupMutation.mutateAsync({
                 groupName,
-                userId: member.metadata?.id || '',
-                organizationId
-              })
+                userId: member.metadata?.id || "",
+                organizationId,
+              });
             } catch (err) {
               // If userId fails, try with email
               if (member.metadata?.email) {
                 await addUserToGroupMutation.mutateAsync({
                   groupName,
                   userEmail: member.metadata?.email,
-                  organizationId
-                })
+                  organizationId,
+                });
               } else {
-                throw err
+                throw err;
               }
             }
           }
         }
 
-        setSelectedMembers(new Set())
-        setMemberSearchTerm('')
+        setSelectedMembers(new Set());
+        setMemberSearchTerm("");
 
-        onMemberAdded?.()
+        onMemberAdded?.();
       } catch {
-        console.error('Failed to add existing members')
+        console.error("Failed to add existing members");
       }
-    }
+    };
 
     const handleSelectAll = () => {
-      const filteredMembers = getFilteredExistingMembers()
+      const filteredMembers = getFilteredExistingMembers();
       if (selectedMembers.size === filteredMembers.length) {
-        setSelectedMembers(new Set())
+        setSelectedMembers(new Set());
       } else {
-        setSelectedMembers(new Set(filteredMembers.map(m => m.metadata!.id!)))
+        setSelectedMembers(new Set(filteredMembers.map((m) => m.metadata!.id!)));
       }
-    }
+    };
 
     const getFilteredExistingMembers = () => {
-      if (!memberSearchTerm) return existingMembers
+      if (!memberSearchTerm) return existingMembers;
 
-      return existingMembers.filter(member =>
-        member.spec?.displayName?.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
-        member.metadata?.email?.toLowerCase().includes(memberSearchTerm.toLowerCase())
-      )
-    }
+      return existingMembers.filter(
+        (member) =>
+          member.spec?.displayName?.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
+          member.metadata?.email?.toLowerCase().includes(memberSearchTerm.toLowerCase()),
+      );
+    };
 
     return (
-      <div className={`bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 ${className}`}>
+      <div
+        className={`bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 ${className}`}
+      >
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <p className="text-sm">
-              {error instanceof Error ? error.message : 'Failed to fetch data'}
-            </p>
+            <p className="text-sm">{error instanceof Error ? error.message : "Failed to fetch data"}</p>
           </div>
         )}
 
         <div className="flex items-center justify-between mb-4">
           <div>
-            <Text className="font-semibold text-zinc-900 dark:text-white mb-1">
-              Add members
-            </Text>
+            <Text className="font-semibold text-zinc-900 dark:text-white mb-1">Add members</Text>
           </div>
         </div>
 
@@ -152,7 +159,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                 disabled={loadingMembers || getFilteredExistingMembers().length === 0}
               >
                 <MaterialSymbol name="select_all" size="sm" />
-                {selectedMembers.size === getFilteredExistingMembers().length ? 'Deselect All' : 'Select All'}
+                {selectedMembers.size === getFilteredExistingMembers().length ? "Deselect All" : "Select All"}
               </Button>
               <Button
                 color="blue"
@@ -161,7 +168,9 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                 disabled={selectedMembers.size === 0 || isInviting}
               >
                 <MaterialSymbol name="add" size="sm" />
-                {isInviting ? 'Adding...' : `Add ${selectedMembers.size} member${selectedMembers.size === 1 ? '' : 's'}`}
+                {isInviting
+                  ? "Adding..."
+                  : `Add ${selectedMembers.size} member${selectedMembers.size === 1 ? "" : "s"}`}
               </Button>
             </div>
           </div>
@@ -175,30 +184,35 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
               {getFilteredExistingMembers().length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-zinc-500 dark:text-zinc-400">
-                    {memberSearchTerm ? 'No members found matching your search' : 'All organization members are already in this group'}
+                    {memberSearchTerm
+                      ? "No members found matching your search"
+                      : "All organization members are already in this group"}
                   </p>
                 </div>
               ) : (
                 <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
                   {getFilteredExistingMembers().map((member) => (
-                    <div key={member.metadata!.id!} className="p-3 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                    <div
+                      key={member.metadata!.id!}
+                      className="p-3 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                    >
                       <Checkbox
                         checked={selectedMembers.has(member.metadata!.id!)}
                         onChange={(checked) => {
-                          setSelectedMembers(prev => {
-                            const newSet = new Set(prev)
+                          setSelectedMembers((prev) => {
+                            const newSet = new Set(prev);
                             if (checked) {
-                              newSet.add(member.metadata!.id!)
+                              newSet.add(member.metadata!.id!);
                             } else {
-                              newSet.delete(member.metadata!.id!)
+                              newSet.delete(member.metadata!.id!);
                             }
-                            return newSet
-                          })
+                            return newSet;
+                          });
                         }}
                       />
                       <Avatar
                         src={member.spec?.accountProviders?.[0]?.avatarUrl}
-                        initials={member.spec?.displayName?.charAt(0) || 'U'}
+                        initials={member.spec?.displayName?.charAt(0) || "U"}
                         className="size-8"
                       />
                       <div className="flex-1 min-w-0">
@@ -217,9 +231,10 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
           )}
         </div>
       </div>
-    )
-  })
+    );
+  },
+);
 
-AddMembersSectionComponent.displayName = 'AddMembersSection'
+AddMembersSectionComponent.displayName = "AddMembersSection";
 
-export const AddMembersSection = AddMembersSectionComponent
+export const AddMembersSection = AddMembersSectionComponent;

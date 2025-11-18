@@ -1,13 +1,13 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { MetadataList } from './';
+import type { Meta, StoryObj } from "@storybook/react";
+import { MetadataList } from "./";
 
 const meta: Meta<typeof MetadataList> = {
-  title: 'ui/MetadataList',
+  title: "ui/MetadataList",
   component: MetadataList,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 };
 
 export default meta;

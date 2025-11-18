@@ -22,11 +22,11 @@ func Test__DeleteSecret(t *testing.T) {
 	local := map[string]string{"test": "test"}
 	data, _ := json.Marshal(local)
 
-	_, err := models.CreateSecret("test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeCanvas, r.Canvas.ID, data)
+	_, err := models.CreateSecret("test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeOrganization, r.Organization.ID, data)
 	require.NoError(t, err)
 
 	t.Run("secret does not exist -> error", func(t *testing.T) {
-		_, err := DeleteSecret(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String(), "test2")
+		_, err := DeleteSecret(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), "test2")
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -34,10 +34,10 @@ func Test__DeleteSecret(t *testing.T) {
 	})
 
 	t.Run("secret is deleted", func(t *testing.T) {
-		_, err := DeleteSecret(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String(), "test")
+		_, err := DeleteSecret(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), "test")
 		require.NoError(t, err)
 
-		_, err = models.FindSecretByName(models.DomainTypeCanvas, r.Canvas.ID, "test")
+		_, err = models.FindSecretByName(models.DomainTypeOrganization, r.Organization.ID, "test")
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	})
 }

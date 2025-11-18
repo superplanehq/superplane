@@ -7,6 +7,8 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -46,12 +48,12 @@ func (f *Filter) Color() string {
 	return "red"
 }
 
-func (f *Filter) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{
+func (f *Filter) Configuration() []configuration.Field {
+	return []configuration.Field{
 		{
 			Name:        "expression",
 			Label:       "Filter Expression",
-			Type:        components.FieldTypeString,
+			Type:        configuration.FieldTypeString,
 			Description: "Boolean expression to filter data",
 			Required:    true,
 		},
@@ -92,7 +94,7 @@ func (f *Filter) Execute(ctx components.ExecutionContext) error {
 
 	outputs := map[string][]any{}
 	if matches {
-		outputs[components.DefaultOutputChannel.Name] = []any{ctx.Data}
+		outputs[components.DefaultOutputChannel.Name] = []any{make(map[string]any)}
 	}
 
 	return ctx.ExecutionStateContext.Pass(outputs)
@@ -104,4 +106,12 @@ func (f *Filter) Actions() []components.Action {
 
 func (f *Filter) HandleAction(ctx components.ActionContext) error {
 	return fmt.Errorf("filter does not support actions")
+}
+
+func (f *Filter) Setup(ctx components.SetupContext) error {
+	return nil
+}
+
+func (f *Filter) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+	return ctx.DefaultProcessing()
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
@@ -32,22 +33,6 @@ func Test_DescribeGroup(t *testing.T) {
 		assert.NotEmpty(t, resp.Group.Spec.Description)
 	})
 
-	t.Run("successful get canvas group", func(t *testing.T) {
-		err = r.AuthService.CreateGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas group description")
-		require.NoError(t, err)
-
-		resp, err := DescribeGroup(ctx, models.DomainTypeCanvas, r.Canvas.ID.String(), "canvas-group", r.AuthService)
-		require.NoError(t, err)
-		assert.NotNil(t, resp)
-		assert.NotNil(t, resp.Group)
-		assert.Equal(t, "canvas-group", resp.Group.Metadata.Name)
-		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, resp.Group.Metadata.DomainType)
-		assert.Equal(t, r.Canvas.ID.String(), resp.Group.Metadata.DomainId)
-		assert.Equal(t, "canvas_admin", resp.Group.Spec.Role)
-		assert.NotEmpty(t, resp.Group.Spec.DisplayName)
-		assert.NotEmpty(t, resp.Group.Spec.Description)
-	})
-
 	t.Run("group not found", func(t *testing.T) {
 		_, err := DescribeGroup(ctx, models.DomainTypeOrganization, orgID, "non-existent-group", r.AuthService)
 		assert.Error(t, err)
@@ -63,7 +48,17 @@ func Test_DescribeGroup(t *testing.T) {
 	t.Run("different organization - group not found", func(t *testing.T) {
 		anotherOrg, err := models.CreateOrganization("test-org", "Test Organization")
 		require.NoError(t, err)
-		require.NoError(t, r.AuthService.SetupOrganizationRoles(anotherOrg.ID.String()))
+		tx := database.Conn().Begin()
+		err = r.AuthService.SetupOrganization(tx, orgID, r.User.String())
+		if !assert.NoError(t, err) {
+			tx.Rollback()
+			t.FailNow()
+		}
+
+		err = tx.Commit().Error
+		if !assert.NoError(t, err) {
+			t.FailNow()
+		}
 
 		_, err = DescribeGroup(ctx, models.DomainTypeOrganization, anotherOrg.ID.String(), "test-group", r.AuthService)
 		assert.Error(t, err)

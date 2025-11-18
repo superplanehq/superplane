@@ -8,8 +8,12 @@ import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 export type WaitState = "success" | "failed" | "running";
 
 export interface WaitExecutionItem {
+  title: string;
   receivedAt?: Date;
+  completedAt?: Date;
   state?: WaitState;
+  values?: Record<string, string>;
+  expectedDuration?: number; // Expected wait duration in milliseconds
 }
 
 export interface WaitProps extends ComponentActionsProps {
@@ -19,6 +23,7 @@ export interface WaitProps extends ComponentActionsProps {
     unit: "seconds" | "minutes" | "hours";
   };
   lastExecution?: WaitExecutionItem;
+  nextInQueue?: { title: string; subtitle?: string };
   collapsed?: boolean;
   selected?: boolean;
   collapsedBackground?: string;
@@ -41,6 +46,7 @@ export const Wait: React.FC<WaitProps> = ({
   title = "Wait",
   duration,
   lastExecution,
+  nextInQueue,
   collapsed = false,
   selected = false,
   collapsedBackground,
@@ -87,6 +93,36 @@ export const Wait: React.FC<WaitProps> = ({
     return "text-white";
   }, []);
 
+  // Live countdown timer for running waits
+  const [timeLeft, setTimeLeft] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (lastExecution?.state === "running" && lastExecution.receivedAt && lastExecution.expectedDuration) {
+      const receivedAt = lastExecution.receivedAt;
+      const expectedDuration = lastExecution.expectedDuration;
+
+      // Calculate initial time left
+      const elapsed = Date.now() - receivedAt.getTime();
+      setTimeLeft(Math.max(0, expectedDuration - elapsed));
+
+      // Update every second
+      const interval = setInterval(() => {
+        const elapsed = Date.now() - receivedAt.getTime();
+        const remaining = Math.max(0, expectedDuration - elapsed);
+        setTimeLeft(remaining);
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      setTimeLeft(null);
+    }
+  }, [lastExecution?.state, lastExecution?.receivedAt, lastExecution?.expectedDuration]);
+
+  // Format timestamp for "Done at"
+  const formatTimestamp = (date: Date): string => {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
   if (collapsed) {
     return (
       <SelectionWrapper selected={selected}>
@@ -122,7 +158,7 @@ export const Wait: React.FC<WaitProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-2 border-border rounded-md w-[26rem] bg-white">
+      <div className="flex flex-col border-1 border-border rounded-md w-[26rem] bg-white">
         <ComponentHeader
           iconSlug="alarm-clock"
           iconBackground={iconBackground || "bg-yellow-100"}
@@ -144,7 +180,7 @@ export const Wait: React.FC<WaitProps> = ({
         {!hideLastRun && (
           <div className="px-4 py-3 border-b">
             <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-              <span className="uppercase text-sm font-medium">Last Run</span>
+              <span className="uppercase text-xs font-semibold tracking-wide">Last Run</span>
             </div>
 
             {lastExecution && lastExecution.state && lastExecution.receivedAt ? (
@@ -161,14 +197,14 @@ export const Wait: React.FC<WaitProps> = ({
                         className: getStateIconColor(lastExecution.state),
                       })}
                     </div>
-                    <span className="text-sm">
-                      {lastExecution.state === "running" ? "Running..." : lastExecution.state === "success" ? "Completed" : "Failed"}
-                    </span>
+                    <span className="text-sm font-medium truncate">{lastExecution.title}</span>
                   </div>
                   <span className="text-xs text-gray-500">
-                    {calcRelativeTimeFromDiff(
-                      new Date().getTime() - lastExecution.receivedAt.getTime()
-                    )}
+                    {lastExecution.state === "running" && timeLeft !== null
+                      ? `Time left: ${calcRelativeTimeFromDiff(timeLeft)}`
+                      : lastExecution.completedAt
+                        ? `Done at: ${formatTimestamp(lastExecution.completedAt)}`
+                        : ""}
                   </span>
                 </div>
               </div>
@@ -180,6 +216,25 @@ export const Wait: React.FC<WaitProps> = ({
                 <span className="text-sm">No executions received yet</span>
               </div>
             )}
+          </div>
+        )}
+
+        {nextInQueue && (
+          <div className="px-4 pt-3 pb-6">
+            <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
+              <span className="uppercase text-xs font-semibold tracking-wide">Next In Queue</span>
+            </div>
+            <div className="flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100 min-w-0">
+              <div className="flex items-center gap-2 text-gray-500 min-w-0 flex-1">
+                <div className="w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center">
+                  {React.createElement(resolveIcon("circle-dashed"), { size: 20, className: "text-gray-500" })}
+                </div>
+                <span className="truncate text-sm">{nextInQueue.title}</span>
+              </div>
+              {nextInQueue.subtitle && (
+                <span className="text-sm truncate text-gray-500 flex-shrink-0 max-w-[40%]">{nextInQueue.subtitle}</span>
+              )}
+            </div>
           </div>
         )}
       </div>

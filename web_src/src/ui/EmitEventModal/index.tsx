@@ -1,86 +1,79 @@
-import { useState, useEffect, useRef } from 'react'
-import { Play } from 'lucide-react'
-import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Heading } from '@/components/Heading/heading'
-import { showSuccessToast, showErrorToast } from '@/utils/toast'
-import Editor from '@monaco-editor/react'
-import type { editor } from 'monaco-editor'
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import Editor from "@monaco-editor/react";
+import { Play } from "lucide-react";
+import type { editor } from "monaco-editor";
+import { useEffect, useRef, useState } from "react";
 
 interface EmitEventModalProps {
-  isOpen: boolean
-  onClose: () => void
-  nodeId: string
-  nodeName: string
-  workflowId: string
-  organizationId: string
-  channels: string[]
-  onEmit: (channel: string, data: any) => Promise<void>
+  isOpen: boolean;
+  onClose: () => void;
+  nodeId: string;
+  nodeName: string;
+  workflowId: string;
+  organizationId: string;
+  channels: string[];
+  onEmit: (channel: string, data: any) => Promise<void>;
 }
 
-export const EmitEventModal = ({
-  isOpen,
-  onClose,
-  nodeName,
-  channels,
-  onEmit,
-}: EmitEventModalProps) => {
-  const [selectedChannel, setSelectedChannel] = useState<string>(channels[0] || 'default')
-  const [eventData, setEventData] = useState<string>('{}')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit }: EmitEventModalProps) => {
+  const [selectedChannel, setSelectedChannel] = useState<string>(channels[0] || "default");
+  const [eventData, setEventData] = useState<string>("{}");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   // Cleanup editor when component unmounts
   useEffect(() => {
     return () => {
       if (editorRef.current) {
-        editorRef.current.dispose()
-        editorRef.current = null
+        editorRef.current.dispose();
+        editorRef.current = null;
       }
-    }
-  }, [])
+    };
+  }, []);
 
   const handleClose = () => {
-    setSelectedChannel(channels[0] || 'default')
-    setEventData('{}')
-    setIsSubmitting(false)
-    onClose()
-  }
+    setSelectedChannel(channels[0] || "default");
+    setEventData("{}");
+    setIsSubmitting(false);
+    onClose();
+  };
 
   const handleSubmit = async () => {
     try {
-      setIsSubmitting(true)
+      setIsSubmitting(true);
 
       // Validate JSON
-      let parsedData
+      let parsedData;
       try {
-        parsedData = JSON.parse(eventData)
+        parsedData = JSON.parse(eventData);
       } catch (e) {
-        showErrorToast('Invalid JSON format')
-        setIsSubmitting(false)
-        return
+        showErrorToast("Invalid JSON format");
+        setIsSubmitting(false);
+        return;
       }
 
-      await onEmit(selectedChannel, parsedData)
-      showSuccessToast('Event emitted successfully')
-      handleClose()
+      await onEmit(selectedChannel, parsedData);
+      showSuccessToast("Event emitted successfully");
+      handleClose();
     } catch (error) {
-      console.error('Error emitting event:', error)
-      showErrorToast('Failed to emit event')
-      setIsSubmitting(false)
+      console.error("Error emitting event:", error);
+      showErrorToast("Failed to emit event");
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-w-3xl max-h-[80vh]">
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
+          <DialogTitle className="flex items-center gap-3">
             <Play className="text-blue-600 dark:text-blue-400" size={24} />
-            <Heading level={3} className="!mb-0">Emit Event</Heading>
-          </div>
+            Emit Event
+          </DialogTitle>
 
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
             Manually emit an output event for node: <strong>{nodeName}</strong>
@@ -108,14 +101,14 @@ export const EmitEventModal = ({
                 height="300px"
                 defaultLanguage="json"
                 value={eventData}
-                onChange={(value) => setEventData(value || '{}')}
+                onChange={(value) => setEventData(value || "{}")}
                 onMount={(editor) => {
-                  editorRef.current = editor
+                  editorRef.current = editor;
                 }}
                 options={{
                   minimap: { enabled: false },
                   fontSize: 13,
-                  lineNumbers: 'on',
+                  lineNumbers: "on",
                   scrollBeyondLastLine: false,
                   automaticLayout: true,
                 }}
@@ -124,16 +117,21 @@ export const EmitEventModal = ({
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
+            <Button
+              data-testid="emit-event-cancel-button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isSubmitting}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={isSubmitting}>
+            <Button data-testid="emit-event-submit-button" onClick={handleSubmit} disabled={isSubmitting}>
               <Play size={16} />
-              {isSubmitting ? 'Emitting...' : 'Emit Event'}
+              {isSubmitting ? "Emitting..." : "Emit Event"}
             </Button>
           </DialogFooter>
         </div>
       </DialogContent>
     </Dialog>
-  )
-}
+  );
+};

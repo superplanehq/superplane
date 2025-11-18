@@ -6,10 +6,10 @@ import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
 import { SpecsTooltip } from "../componentBase/SpecsTooltip";
 import { ComponentBaseSpecValue } from "../componentBase";
-import Tippy from '@tippyjs/react/headless';
-import JsonView from '@uiw/react-json-view';
-import { lightTheme } from '@uiw/react-json-view/light';
-import 'tippy.js/dist/tippy.css';
+import Tippy from "@tippyjs/react/headless";
+import JsonView from "@uiw/react-json-view";
+import { lightTheme } from "@uiw/react-json-view/light";
+import "tippy.js/dist/tippy.css";
 
 export type HttpState = "success" | "failed" | "running";
 
@@ -100,19 +100,19 @@ export const Http: React.FC<HttpProps> = ({
   // Convert headers to spec values for tooltip
   const headerSpecValues: ComponentBaseSpecValue[] = React.useMemo(() => {
     if (!headers || headers.length === 0) return [];
-    return headers.map(header => ({
+    return headers.map((header) => ({
       badges: [
         {
           label: header.name,
           bgColor: "bg-blue-100",
-          textColor: "text-blue-800"
+          textColor: "text-blue-800",
         },
         {
           label: header.value,
           bgColor: "bg-gray-100",
-          textColor: "text-gray-800"
-        }
-      ]
+          textColor: "text-gray-800",
+        },
+      ],
     }));
   }, [headers]);
 
@@ -152,7 +152,7 @@ export const Http: React.FC<HttpProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-2 border-border rounded-md w-[26rem] bg-white">
+      <div className="flex flex-col border-1 border-border rounded-md w-[26rem] bg-white">
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
@@ -181,9 +181,7 @@ export const Http: React.FC<HttpProps> = ({
                 <span className="px-2 py-1 rounded-md text-xs font-mono font-medium bg-blue-100 text-blue-800">
                   {method || "GET"}
                 </span>
-                <span className="text-gray-700 font-mono text-xs truncate">
-                  {url}
-                </span>
+                <span className="text-gray-700 font-mono text-xs truncate">{url}</span>
               </div>
 
               {/* Payload Tooltip */}
@@ -196,11 +194,12 @@ export const Http: React.FC<HttpProps> = ({
                           <JsonView
                             value={payload}
                             style={{
-                              fontSize: '12px',
-                              fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
-                              backgroundColor: 'transparent',
-                              textAlign: 'left',
-                              ...lightTheme
+                              fontSize: "12px",
+                              fontFamily:
+                                'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+                              backgroundColor: "transparent",
+                              textAlign: "left",
+                              ...lightTheme,
                             }}
                             displayDataTypes={false}
                             displayObjectSize={false}
@@ -224,18 +223,13 @@ export const Http: React.FC<HttpProps> = ({
               {/* Headers Tooltip */}
               {headerSpecValues.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <SpecsTooltip
-                    specTitle="headers"
-                    tooltipTitle="request headers"
-                    specValues={headerSpecValues}
-                  >
+                  <SpecsTooltip specTitle="headers" tooltipTitle="request headers" specValues={headerSpecValues}>
                     <span className="text-xs bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
                       {headerSpecValues.length} header{headerSpecValues.length > 1 ? "s" : ""}
                     </span>
                   </SpecsTooltip>
                 </div>
               )}
-
             </div>
           </div>
         )}
@@ -244,7 +238,7 @@ export const Http: React.FC<HttpProps> = ({
         {!hideLastRun && (
           <div className="px-4 py-3 border-b">
             <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-              <span className="uppercase text-sm font-medium">Last Run</span>
+              <span className="uppercase text-xs font-semibold tracking-wide">Last Run</span>
             </div>
 
             {lastExecution && lastExecution.state && lastExecution.receivedAt ? (
@@ -262,19 +256,13 @@ export const Http: React.FC<HttpProps> = ({
                       })}
                     </div>
                     {lastExecution.statusCode ? (
-                      <span className="text-sm font-medium">
-                        Status: {lastExecution.statusCode}
-                      </span>
+                      <span className="text-sm font-medium">Status: {lastExecution.statusCode}</span>
                     ) : (
-                      <span className="text-sm">
-                        {lastExecution.state === "running" ? "Running..." : "Failed"}
-                      </span>
+                      <span className="text-sm">{lastExecution.state === "running" ? "Running..." : "Failed"}</span>
                     )}
                   </div>
                   <span className="text-xs text-gray-500">
-                    {calcRelativeTimeFromDiff(
-                      new Date().getTime() - lastExecution.receivedAt.getTime()
-                    )}
+                    {calcRelativeTimeFromDiff(new Date().getTime() - lastExecution.receivedAt.getTime())}
                   </span>
                 </div>
               </div>

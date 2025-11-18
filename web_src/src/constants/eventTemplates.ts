@@ -1,5 +1,5 @@
-import GithubLogo from '@/assets/github-mark.svg';
-import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
+import GithubLogo from "@/assets/github-mark.svg";
+import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 export interface EventTemplate {
   name: string;
@@ -7,17 +7,17 @@ export interface EventTemplate {
   icon?: string;
   image?: string;
   eventType: string;
-  nodeType: 'event_source' | 'stage';
+  nodeType: "event_source" | "stage";
   getEventData: () => unknown;
 }
 
 export const EVENT_TEMPLATES: EventTemplate[] = [
   {
-    name: 'GitHub - Push Event',
-    description: 'Event emitted when code is pushed to a GitHub repository',
+    name: "GitHub - Push Event",
+    description: "Event emitted when code is pushed to a GitHub repository",
     image: GithubLogo,
-    eventType: 'push',
-    nodeType: 'event_source' as const,
+    eventType: "push",
+    nodeType: "event_source" as const,
     getEventData: () => ({
       ref: "refs/heads/main",
       before: "2364960799e343f8cb594a81b1f34e7219f8254a",
@@ -36,7 +36,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
           html_url: "https://github.com/superplanehq",
           type: "Organization",
           user_view_type: "public",
-          site_admin: false
+          site_admin: false,
         },
         html_url: "https://github.com/superplanehq/superplane",
         description: null,
@@ -55,13 +55,13 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       },
       pusher: {
         name: "lucaspin",
-        email: "lucas@superplane.com"
+        email: "lucas@superplane.com",
       },
       organization: {
         login: "superplanehq",
         url: "https://api.github.com/orgs/superplanehq",
         avatar_url: "https://avatars.githubusercontent.com/u/210748804?v=4",
-        description: null
+        description: null,
       },
       sender: {
         login: "lucaspin",
@@ -71,7 +71,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
         html_url: "https://github.com/lucaspin",
         type: "User",
         user_view_type: "public",
-        site_admin: false
+        site_admin: false,
       },
       created: false,
       deleted: false,
@@ -89,17 +89,15 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
           author: {
             name: "Lucas Pinheiro",
             email: "lucas@superplane.com",
-            username: "lucaspin"
+            username: "lucaspin",
           },
           committer: {
             name: "GitHub",
             email: "noreply@github.com",
-            username: "web-flow"
+            username: "web-flow",
           },
           added: [],
-          removed: [
-            "pkg/openapi_client/model_status_history.go"
-          ],
+          removed: ["pkg/openapi_client/model_status_history.go"],
           modified: [
             "api/swagger/superplane.swagger.json",
             "pkg/grpc/actions/event_sources/create_event_source.go",
@@ -120,9 +118,9 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
             "web_src/src/pages/canvas/components/EventSourceSidebar.tsx",
             "web_src/src/pages/canvas/components/EventStateItem.tsx",
             "web_src/src/pages/canvas/components/nodes/event_source.tsx",
-            "web_src/src/pages/canvas/index.tsx"
-          ]
-        }
+            "web_src/src/pages/canvas/index.tsx",
+          ],
+        },
       ],
       head_commit: {
         id: "7fcca06c1b2b2c482df382248610d46cfd789837",
@@ -134,17 +132,15 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
         author: {
           name: "Lucas Pinheiro",
           email: "lucas@superplane.com",
-          username: "lucaspin"
+          username: "lucaspin",
         },
         committer: {
           name: "GitHub",
           email: "noreply@github.com",
-          username: "web-flow"
+          username: "web-flow",
         },
         added: [],
-        removed: [
-          "pkg/openapi_client/model_status_history.go"
-        ],
+        removed: ["pkg/openapi_client/model_status_history.go"],
         modified: [
           "api/swagger/superplane.swagger.json",
           "pkg/grpc/actions/event_sources/create_event_source.go",
@@ -165,30 +161,30 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
           "web_src/src/pages/canvas/components/EventSourceSidebar.tsx",
           "web_src/src/pages/canvas/components/EventStateItem.tsx",
           "web_src/src/pages/canvas/components/nodes/event_source.tsx",
-          "web_src/src/pages/canvas/index.tsx"
-        ]
-      }
-    })
+          "web_src/src/pages/canvas/index.tsx",
+        ],
+      },
+    }),
   },
   {
-    name: 'Semaphore - Pipeline Done Event',
-    description: 'Event emitted when a Semaphore CI/CD pipeline completes',
+    name: "Semaphore - Pipeline Done Event",
+    description: "Event emitted when a Semaphore CI/CD pipeline completes",
     image: SemaphoreLogo,
-    eventType: 'pipeline_done',
-    nodeType: 'event_source' as const,
+    eventType: "pipeline_done",
+    nodeType: "event_source" as const,
     getEventData: () => ({
       version: "1.0.0",
       organization: {
         name: "superplanehq",
-        id: crypto.randomUUID()
+        id: crypto.randomUUID(),
       },
       project: {
         name: "superplane",
-        id: crypto.randomUUID()
+        id: crypto.randomUUID(),
       },
       repository: {
         url: "https://github.com/superplanehq/superplane",
-        slug: "superplanehq/superplane"
+        slug: "superplanehq/superplane",
       },
       revision: {
         sender: {
@@ -202,13 +198,13 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
         commit_message: "refactor(ui): display only last processed event in event source node (#315)",
         branch: {
           name: "main",
-          commit_range: "2364960799e343f8cb594a81b1f34e7219f8254a...7fcca06c1b2b2c482df382248610d46cfd789837"
-        }
+          commit_range: "2364960799e343f8cb594a81b1f34e7219f8254a...7fcca06c1b2b2c482df382248610d46cfd789837",
+        },
       },
       workflow: {
         initial_pipeline_id: crypto.randomUUID(),
         id: crypto.randomUUID(),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       },
       pipeline: {
         yaml_file_name: "semaphore.yml",
@@ -224,7 +220,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
         id: crypto.randomUUID(),
         error_description: "",
         done_at: new Date().toISOString(),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       },
       blocks: [
         {
@@ -238,45 +234,45 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
               result: "passed",
               name: "Test",
               index: 1,
-              id: crypto.randomUUID()
+              id: crypto.randomUUID(),
             },
             {
               status: "finished",
               result: "passed",
               name: "Build",
               index: 2,
-              id: crypto.randomUUID()
+              id: crypto.randomUUID(),
             },
             {
               status: "finished",
               result: "passed",
               name: "Lint",
               index: 0,
-              id: crypto.randomUUID()
-            }
-          ]
-        }
-      ]
-    })
+              id: crypto.randomUUID(),
+            },
+          ],
+        },
+      ],
+    }),
   },
   {
-    name: 'Custom WebHook',
-    description: 'Create your own custom webhook event with custom data',
-    icon: 'webhook',
-    eventType: 'custom',
-    nodeType: 'event_source' as const,
-    getEventData: () => ({})
+    name: "Custom WebHook",
+    description: "Create your own custom webhook event with custom data",
+    icon: "webhook",
+    eventType: "custom",
+    nodeType: "event_source" as const,
+    getEventData: () => ({}),
   },
   {
-    name: 'SuperPlane - Execution Finished Event',
-    description: 'Event emitted when a SuperPlane stage execution completes',
-    icon: 'task_alt',
-    eventType: 'execution_finished',
-    nodeType: 'stage' as const,
+    name: "SuperPlane - Execution Finished Event",
+    description: "Event emitted when a SuperPlane stage execution completes",
+    icon: "task_alt",
+    eventType: "execution_finished",
+    nodeType: "stage" as const,
     getEventData: () => ({
       type: "execution_finished",
       stage: {
-        id: crypto.randomUUID()
+        id: crypto.randomUUID(),
       },
       execution: {
         created_at: new Date().toISOString(),
@@ -284,8 +280,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
         id: crypto.randomUUID(),
         result: "passed",
         result_message: "",
-        result_reason: ""
+        result_reason: "",
       },
-    })
-  }
+    }),
+  },
 ];

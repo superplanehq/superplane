@@ -1,10 +1,10 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./index"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./index";
 
-type TabsStoryArgs = React.ComponentProps<typeof Tabs>
+type TabsStoryArgs = React.ComponentProps<typeof Tabs>;
 
 const meta = {
   title: "shadcn Primitives/Tabs",
@@ -40,50 +40,39 @@ const meta = {
     dir: "ltr",
     className: "w-96",
   },
-} satisfies Meta<TabsStoryArgs>
+} satisfies Meta<TabsStoryArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<TabsStoryArgs>
+type Story = StoryObj<TabsStoryArgs>;
 
 const renderTabs = ({ className, orientation, ...props }: TabsStoryArgs) => {
-  const orientationValue = orientation ?? "horizontal"
-  const isVertical = orientationValue === "vertical"
+  const orientationValue = orientation ?? "horizontal";
+  const isVertical = orientationValue === "vertical";
 
   return (
     <Tabs
       {...props}
       orientation={orientationValue}
-      className={cn(
-        isVertical ? "flex max-w-xl gap-6" : "w-96",
-        className,
-      )}
+      className={cn(isVertical ? "flex max-w-xl gap-6" : "w-96", className)}
     >
-      <TabsList
-        className={cn(isVertical ? "flex h-full w-44 flex-col" : "grid grid-cols-2")}
-      >
+      <TabsList className={cn(isVertical ? "flex h-full w-44 flex-col" : "grid grid-cols-2")}>
         <TabsTrigger value="account">Account</TabsTrigger>
         <TabsTrigger value="password">Password</TabsTrigger>
       </TabsList>
-      <TabsContent
-        value="account"
-        className={cn("mt-2", isVertical && "mt-0 flex-1")}
-      >
+      <TabsContent value="account" className={cn("mt-2", isVertical && "mt-0 flex-1")}>
         Make changes to your account here.
       </TabsContent>
-      <TabsContent
-        value="password"
-        className={cn("mt-2", isVertical && "mt-0 flex-1")}
-      >
+      <TabsContent value="password" className={cn("mt-2", isVertical && "mt-0 flex-1")}>
         Change your password here.
       </TabsContent>
     </Tabs>
-  )
-}
+  );
+};
 
 export const Default: Story = {
   render: renderTabs,
-}
+};
 
 export const Vertical: Story = {
   args: {
@@ -94,4 +83,4 @@ export const Vertical: Story = {
   argTypes: {
     className: { control: { disable: true } },
   },
-}
+};

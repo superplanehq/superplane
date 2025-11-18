@@ -92,7 +92,7 @@ func TruncateTables() error {
 		truncate table canvases, integrations,
 		secrets, accounts, account_providers, users, organizations, organization_invitations,
 		casbin_rule, role_metadata, group_metadata,
-		blueprints, workflows, workflow_nodes, workflow_events, workflow_node_executions,
+		blueprints, workflows, workflow_nodes, workflow_events, workflow_node_execution_kvs, workflow_node_executions,
 		workflow_node_queue_items, workflow_node_requests, webhooks;
 	`).Error
 }

@@ -84,11 +84,12 @@ func NewServer(
 	appEnv string,
 	templateDir string,
 	authorizationService authorization.Authorization,
+	blockSignup bool,
 	middlewares ...mux.MiddlewareFunc,
 ) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir)
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
@@ -412,42 +413,50 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//
-	// TODO: the organization creation should be in a transaction
-	// Create the organization and set up roles for it.
+	// Create the organization
 	//
-	organization, err := models.CreateOrganization(req.Name, "")
+	tx := database.Conn().Begin()
+	log.Infof("Creating organization %s for account %s", req.Name, account.Email)
+	organization, err := models.CreateOrganizationInTransaction(tx, req.Name, "")
 	if err != nil {
-		log.Errorf("Error creating organization: %v", err)
+		tx.Rollback()
+		log.Errorf("Error creating organization %s: %v", req.Name, err)
 		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
-		return
-	}
-
-	err = s.authService.SetupOrganizationRoles(organization.ID.String())
-	if err != nil {
-		log.Errorf("Error setting up organization roles for %s: %v", organization.Name, err)
-		models.HardDeleteOrganization(organization.ID.String())
-		http.Error(w, "Failed to set up organization roles", http.StatusInternalServerError)
 		return
 	}
 
 	//
 	// Create the owner user for it
 	//
-	user, err := models.CreateUser(organization.ID, account.ID, account.Email, account.Name)
+	log.Infof("Creating user for new organization %s (%s)", organization.Name, organization.ID)
+	user, err := models.CreateUserInTransaction(tx, organization.ID, account.ID, account.Email, account.Name)
 	if err != nil {
-		log.Errorf("Error creating user for new organization: %v", err)
-		models.HardDeleteOrganization(organization.ID.String())
+		tx.Rollback()
+		log.Errorf("Error creating user for new organization %s (%s): %v", organization.Name, organization.ID, err)
 		http.Error(w, "Failed to create user account", http.StatusInternalServerError)
 		return
 	}
 
-	err = s.authService.CreateOrganizationOwner(user.ID.String(), organization.ID.String())
+	//
+	// Finally, set up RBAC for the new organization.
+	//
+	log.Infof("Setting up RBAC policies for new organization %s (%s)", organization.Name, organization.ID)
+	err = s.authService.SetupOrganization(tx, organization.ID.String(), user.ID.String())
 	if err != nil {
-		log.Errorf("Error creating organization owner for %s: %v", organization.Name, err)
-		models.HardDeleteOrganization(organization.ID.String())
-		http.Error(w, "Failed to create organization owner", http.StatusInternalServerError)
+		tx.Rollback()
+		log.Errorf("Error setting up RBAC policies for %s (%s): %v", organization.Name, organization.ID, err)
+		http.Error(w, "Failed to set up organization roles", http.StatusInternalServerError)
 		return
 	}
+
+	err = tx.Commit().Error
+	if err != nil {
+		log.Errorf("Error committing transaction for organization %s (%s) creation: %v", organization.Name, organization.ID, err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+
+	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
@@ -677,13 +686,8 @@ func (s *Server) setupDevProxy(webBasePath string) {
 
 	origDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
-		originalPath := req.URL.Path
-
 		origDirector(req)
-
 		req.Host = target.Host
-
-		log.Infof("Proxying: %s → %s", originalPath, req.URL.Path)
 	}
 
 	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

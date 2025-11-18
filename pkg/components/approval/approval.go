@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -256,25 +258,25 @@ func (a *Approval) OutputChannels(configuration any) []components.OutputChannel 
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }
 
-func (a *Approval) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{
+func (a *Approval) Configuration() []configuration.Field {
+	return []configuration.Field{
 		{
 			Name:  "items",
 			Label: "Items",
-			Type:  components.FieldTypeList,
-			TypeOptions: &components.TypeOptions{
-				List: &components.ListTypeOptions{
-					ItemDefinition: &components.ListItemDefinition{
-						Type: components.FieldTypeObject,
-						Schema: []components.ConfigurationField{
+			Type:  configuration.FieldTypeList,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
 							{
 								Name:     "type",
 								Label:    "Type",
-								Type:     components.FieldTypeSelect,
+								Type:     configuration.FieldTypeSelect,
 								Required: true,
-								TypeOptions: &components.TypeOptions{
-									Select: &components.SelectTypeOptions{
-										Options: []components.FieldOption{
+								TypeOptions: &configuration.TypeOptions{
+									Select: &configuration.SelectTypeOptions{
+										Options: []configuration.FieldOption{
 											{Value: "user", Label: "User"},
 											{Value: "role", Label: "Role"},
 											{Value: "group", Label: "Group"},
@@ -285,8 +287,8 @@ func (a *Approval) Configuration() []components.ConfigurationField {
 							{
 								Name:  "user",
 								Label: "User",
-								Type:  components.FieldTypeUser,
-								VisibilityConditions: []components.VisibilityCondition{
+								Type:  configuration.FieldTypeUser,
+								VisibilityConditions: []configuration.VisibilityCondition{
 									{
 										Field:  "type",
 										Values: []string{"user"},
@@ -296,8 +298,8 @@ func (a *Approval) Configuration() []components.ConfigurationField {
 							{
 								Name:  "role",
 								Label: "Role",
-								Type:  components.FieldTypeRole,
-								VisibilityConditions: []components.VisibilityCondition{
+								Type:  configuration.FieldTypeRole,
+								VisibilityConditions: []configuration.VisibilityCondition{
 									{
 										Field:  "type",
 										Values: []string{"role"},
@@ -307,8 +309,8 @@ func (a *Approval) Configuration() []components.ConfigurationField {
 							{
 								Name:  "group",
 								Label: "Group",
-								Type:  components.FieldTypeGroup,
-								VisibilityConditions: []components.VisibilityCondition{
+								Type:  configuration.FieldTypeGroup,
+								VisibilityConditions: []configuration.VisibilityCondition{
 									{
 										Field:  "type",
 										Values: []string{"group"},
@@ -321,6 +323,14 @@ func (a *Approval) Configuration() []components.ConfigurationField {
 			},
 		},
 	}
+}
+
+func (a *Approval) Setup(ctx components.SetupContext) error {
+	return nil
+}
+
+func (a *Approval) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+	return ctx.DefaultProcessing()
 }
 
 func (a *Approval) Execute(ctx components.ExecutionContext) error {
@@ -345,18 +355,18 @@ func (a *Approval) Actions() []components.Action {
 			Name:           "approve",
 			Description:    "Approve this execution",
 			UserAccessible: true,
-			Parameters: []components.ConfigurationField{
+			Parameters: []configuration.Field{
 				{
 					Name:        "index",
 					Label:       "Item Index",
-					Type:        components.FieldTypeNumber,
+					Type:        configuration.FieldTypeNumber,
 					Description: "Index of the item being fulfilled",
 					Required:    true,
 				},
 				{
 					Name:        "comment",
 					Label:       "Comment",
-					Type:        components.FieldTypeString,
+					Type:        configuration.FieldTypeString,
 					Description: "Leave a comment before approving",
 					Required:    false,
 				},
@@ -366,18 +376,18 @@ func (a *Approval) Actions() []components.Action {
 			Name:           "reject",
 			Description:    "Reject this approval requirement",
 			UserAccessible: true,
-			Parameters: []components.ConfigurationField{
+			Parameters: []configuration.Field{
 				{
 					Name:        "index",
 					Label:       "Item Index",
-					Type:        components.FieldTypeNumber,
+					Type:        configuration.FieldTypeNumber,
 					Description: "Index of the item being rejected",
 					Required:    true,
 				},
 				{
 					Name:        "reason",
 					Label:       "Reason",
-					Type:        components.FieldTypeString,
+					Type:        configuration.FieldTypeString,
 					Description: "Reason for rejection",
 					Required:    true,
 				},

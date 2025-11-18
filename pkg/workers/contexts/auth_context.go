@@ -8,16 +8,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 type AuthContext struct {
+	tx                *gorm.DB
 	orgID             uuid.UUID
 	authService       authorization.Authorization
 	authenticatedUser *models.User
 }
 
-func NewAuthContext(orgID uuid.UUID, authService authorization.Authorization, authenticatedUser *models.User) components.AuthContext {
+func NewAuthContext(tx *gorm.DB, orgID uuid.UUID, authService authorization.Authorization, authenticatedUser *models.User) components.AuthContext {
 	return &AuthContext{
+		tx:                tx,
 		orgID:             orgID,
 		authService:       authService,
 		authenticatedUser: authenticatedUser,
@@ -37,7 +40,7 @@ func (c *AuthContext) AuthenticatedUser() *components.User {
 }
 
 func (c *AuthContext) GetUser(id uuid.UUID) (*components.User, error) {
-	user, err := models.FindActiveUserByID(c.orgID.String(), id.String())
+	user, err := models.FindActiveUserByIDInTransaction(c.tx, c.orgID.String(), id.String())
 	if err != nil {
 		return nil, err
 	}

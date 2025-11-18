@@ -1,13 +1,13 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { Noop } from './';
+import type { Meta, StoryObj } from "@storybook/react";
+import { Noop } from "./";
 
 const meta: Meta<typeof Noop> = {
-  title: 'ui/Noop',
+  title: "ui/Noop",
   component: Noop,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 };
 
 export default meta;
@@ -19,7 +19,7 @@ export const Default: Story = {
     lastEvent: {
       receivedAt: new Date(),
       eventState: "success",
-      eventTitle: "Build completed successfully"
-    }
+      eventTitle: "Build completed successfully",
+    },
   },
 };

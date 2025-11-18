@@ -1,0 +1,216 @@
+package configuration
+
+const (
+	FieldTypeString              = "string"
+	FieldTypeNumber              = "number"
+	FieldTypeBool                = "boolean"
+	FieldTypeSelect              = "select"
+	FieldTypeMultiSelect         = "multi-select"
+	FieldTypeIntegration         = "integration"
+	FieldTypeIntegrationResource = "integration-resource"
+	// FieldTypeGitRef is a semantic string for Git references (e.g., refs/heads/main, refs/tags/v1.0.0)
+	// It behaves like a string in validation, but allows the UI to render a specialized control.
+	FieldTypeGitRef    = "git-ref"
+	FieldTypeList      = "list"
+	FieldTypeObject    = "object"
+	FieldTypeTime      = "time"
+	FieldTypeDate      = "date"
+	FieldTypeDateTime  = "datetime"
+	FieldTypeDayInYear = "day-in-year"
+	FieldTypeUser      = "user"
+	FieldTypeRole      = "role"
+	FieldTypeGroup     = "group"
+)
+
+type Field struct {
+	/*
+	 * Unique name identifier for the field
+	 */
+	Name string `json:"name"`
+
+	/*
+	 * Human-readable label for the field (displayed in forms)
+	 */
+	Label string `json:"label"`
+
+	/*
+	 * Optional placeholder shown in the UI input for this field
+	 */
+	Placeholder string `json:"placeholder,omitempty"`
+
+	/*
+	 * Type of the field. Supported types are:
+	 * - string
+	 * - number
+	 * - boolean
+	 * - select
+	 * - multi_select
+	 * - integration
+	 * - date
+	 * - url
+	 * - list
+	 * - object
+	 */
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+	Default     any    `json:"default"`
+
+	/*
+	 * Type-specific options for fields.
+	 * The structure depends on the field type.
+	 */
+	TypeOptions *TypeOptions `json:"type_options,omitempty"`
+
+	/*
+	 * Used for controlling when the field is visible.
+	 * No visibility conditions - always visible.
+	 */
+	VisibilityConditions []VisibilityCondition `json:"visibility_conditions,omitempty"`
+
+	/*
+	 * Used for controlling when the field is required based on other field values.
+	 * If specified, the field is only required when these conditions are met.
+	 */
+	RequiredConditions []RequiredCondition `json:"required_conditions,omitempty"`
+
+	/*
+	 * Used for defining validation rules that compare this field with other fields.
+	 * For example, ensuring startTime < endTime or startDateTime < endDateTime.
+	 */
+	ValidationRules []ValidationRule `json:"validation_rules,omitempty"`
+}
+
+/*
+ * TypeOptions contains type-specific configuration for fields.
+ */
+type TypeOptions struct {
+	Number      *NumberTypeOptions      `json:"number,omitempty"`
+	Select      *SelectTypeOptions      `json:"select,omitempty"`
+	MultiSelect *MultiSelectTypeOptions `json:"multi_select,omitempty"`
+	Integration *IntegrationTypeOptions `json:"integration,omitempty"`
+	Resource    *ResourceTypeOptions    `json:"resource,omitempty"`
+	List        *ListTypeOptions        `json:"list,omitempty"`
+	Object      *ObjectTypeOptions      `json:"object,omitempty"`
+	Time        *TimeTypeOptions        `json:"time,omitempty"`
+	Date        *DateTypeOptions        `json:"date,omitempty"`
+	DateTime    *DateTimeTypeOptions    `json:"datetime,omitempty"`
+	DayInYear   *DayInYearTypeOptions   `json:"day_in_year,omitempty"`
+}
+
+/*
+ * ResourceTypeOptions specifies which resource type to display
+ */
+type ResourceTypeOptions struct {
+	Type string `json:"type"`
+}
+
+/*
+ * NumberTypeOptions specifies constraints for number fields
+ */
+type NumberTypeOptions struct {
+	Min *int `json:"min,omitempty"`
+	Max *int `json:"max,omitempty"`
+}
+
+/*
+ * TimeTypeOptions specifies format and constraints for time fields
+ */
+type TimeTypeOptions struct {
+	Format string `json:"format,omitempty"` // Expected format, e.g., "HH:MM", "HH:MM:SS"
+}
+
+/*
+ * DateTypeOptions specifies format and constraints for date fields
+ */
+type DateTypeOptions struct {
+	Format string `json:"format,omitempty"` // Expected format, e.g., "YYYY-MM-DD", "MM/DD/YYYY"
+}
+
+/*
+ * DateTimeTypeOptions specifies format and constraints for datetime fields
+ */
+type DateTimeTypeOptions struct {
+	Format string `json:"format,omitempty"` // Expected format, e.g., "2006-01-02T15:04", "YYYY-MM-DDTHH:MM"
+}
+
+/*
+ * DayInYearTypeOptions specifies format and constraints for day-in-year fields
+ */
+type DayInYearTypeOptions struct {
+	Format string `json:"format,omitempty"` // Expected format, defaults to "MM/DD", e.g., "12/25"
+}
+
+/*
+ * SelectTypeOptions specifies options for select fields
+ */
+type SelectTypeOptions struct {
+	Options []FieldOption `json:"options"`
+}
+
+/*
+ * MultiSelectTypeOptions specifies options for multi_select fields
+ */
+type MultiSelectTypeOptions struct {
+	Options []FieldOption `json:"options"`
+}
+
+/*
+ * IntegrationTypeOptions specifies which integration type to display
+ */
+type IntegrationTypeOptions struct {
+	Type string `json:"type"`
+}
+
+/*
+ * ListTypeOptions defines the structure of list items
+ */
+type ListTypeOptions struct {
+	ItemDefinition *ListItemDefinition `json:"item_definition"`
+}
+
+/*
+ * ObjectTypeOptions defines the schema for object fields
+ */
+type ObjectTypeOptions struct {
+	Schema []Field `json:"schema"`
+}
+
+/*
+ * FieldOption represents a selectable option for select / multi_select field types
+ */
+type FieldOption struct {
+	Label string
+	Value string
+}
+
+/*
+ * ListItemDefinition defines the structure of items in an 'list' field
+ */
+type ListItemDefinition struct {
+	Type   string
+	Schema []Field
+}
+
+type VisibilityCondition struct {
+	Field  string   `json:"field"`
+	Values []string `json:"values"`
+}
+
+type RequiredCondition struct {
+	Field  string   `json:"field"`
+	Values []string `json:"values"`
+}
+
+const (
+	ValidationRuleLessThan    = "less_than"
+	ValidationRuleGreaterThan = "greater_than"
+	ValidationRuleEqual       = "equal"
+	ValidationRuleNotEqual    = "not_equal"
+)
+
+type ValidationRule struct {
+	Type        string `json:"type"`         // less_than, greater_than, equal, not_equal
+	CompareWith string `json:"compare_with"` // field name to compare with
+	Message     string `json:"message"`      // custom error message
+}

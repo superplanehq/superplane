@@ -3,6 +3,7 @@ package models
 import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/gorm"
 )
 
 type Account struct {
@@ -12,8 +13,12 @@ type Account struct {
 }
 
 func CreateAccount(name, email string) (*Account, error) {
+	return CreateAccountInTransaction(database.Conn(), name, email)
+}
+
+func CreateAccountInTransaction(tx *gorm.DB, name, email string) (*Account, error) {
 	account := &Account{Name: name, Email: email}
-	err := database.Conn().Create(account).Error
+	err := tx.Create(account).Error
 	if err != nil {
 		return nil, err
 	}

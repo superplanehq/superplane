@@ -182,20 +182,18 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 	// Access the data from the root event with root().*
 	// Only available on workflow-level nodes.
 	//
-	if b.parentBlueprintNode == nil {
-		exprOptions = append(exprOptions, expr.Function("root", func(params ...any) (any, error) {
-			if b.rootEventID == nil {
-				return nil, fmt.Errorf("no root event found")
-			}
+	exprOptions = append(exprOptions, expr.Function("root", func(params ...any) (any, error) {
+		if b.rootEventID == nil {
+			return nil, fmt.Errorf("no root event found")
+		}
 
-			e, err := models.FindWorkflowEvent(*b.rootEventID)
-			if err != nil {
-				return nil, err
-			}
+		e, err := models.FindWorkflowEventInTransaction(b.tx, *b.rootEventID)
+		if err != nil {
+			return nil, err
+		}
 
-			return e.Data.Data(), nil
-		}))
-	}
+		return e.Data.Data(), nil
+	}))
 
 	vm, err := expr.Compile(expression, exprOptions...)
 	if err != nil {
@@ -240,7 +238,6 @@ func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNod
 				event_id,
 				previous_execution_id,
 				parent_execution_id,
-				blueprint_id,
 				state,
 				result,
 				result_reason,
@@ -263,7 +260,6 @@ func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNod
 				wne.event_id,
 				wne.previous_execution_id,
 				wne.parent_execution_id,
-				wne.blueprint_id,
 				wne.state,
 				wne.result,
 				wne.result_reason,

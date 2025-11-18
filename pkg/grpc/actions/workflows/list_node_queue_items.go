@@ -5,9 +5,12 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -66,13 +69,23 @@ func SerializeNodeQueueItems(queueItems []models.WorkflowNodeQueueItem) ([]*pb.W
 			return nil, err
 		}
 
-		result = append(result, &pb.WorkflowNodeQueueItem{
+		serializedQueueItem := &pb.WorkflowNodeQueueItem{
 			Id:         queueItem.ID.String(),
 			WorkflowId: queueItem.WorkflowID.String(),
 			NodeId:     queueItem.NodeID,
 			CreatedAt:  timestamppb.New(*queueItem.CreatedAt),
 			Input:      input,
-		})
+		}
+
+		if queueItem.RootEvent != nil {
+			serializedQueueItem.RootEvent, err = SerializeWorkflowEvent(*queueItem.RootEvent)
+			if err != nil {
+				log.Errorf("Failed to serialize workflow event: %v", err)
+				return nil, status.Error(codes.Internal, "failed to list node queue items")
+			}
+		}
+
+		result = append(result, serializedQueueItem)
 	}
 
 	return result, nil

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	compb "github.com/superplanehq/superplane/pkg/protos/components"
+	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
@@ -20,7 +20,7 @@ func serializeTriggers(in []triggers.Trigger) []*pb.Trigger {
 	out := make([]*pb.Trigger, len(in))
 	for i, trigger := range in {
 		configFields := trigger.Configuration()
-		configuration := make([]*compb.ConfigurationField, len(configFields))
+		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = actions.ConfigurationFieldToProto(field)
 		}

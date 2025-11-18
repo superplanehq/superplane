@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package Superplane.Blueprints;
 
+import "configuration.proto";
 import "components.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
@@ -130,7 +131,7 @@ message Blueprint {
   google.protobuf.Timestamp updated_at = 6;
   repeated Components.Node nodes = 7;
   repeated Components.Edge edges = 8;
-  repeated Components.ConfigurationField configuration = 9;
+  repeated Configuration.Field configuration = 9;
   repeated OutputChannel output_channels = 10;
   string icon = 11;
   string color = 12;

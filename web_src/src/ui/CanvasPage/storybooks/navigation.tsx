@@ -3,8 +3,7 @@ export function isInStorybook() {
     typeof window !== "undefined" &&
     (window.location.pathname.includes("storybook") ||
       window.location.search.includes("path=/story/") ||
-      (window.parent !== window &&
-        window.parent.location.pathname.includes("storybook")))
+      (window.parent !== window && window.parent.location.pathname.includes("storybook")))
   );
 }
 
@@ -65,21 +64,17 @@ export const getStorybookData = () => {
   return null;
 };
 
-export const handleNodeExpand =
-  (nodeId: string, nodeData: unknown) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const nodeTitle = (nodeData as any).label;
+export const handleNodeExpand = (nodeId: string, nodeData: unknown) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nodeTitle = (nodeData as any).label;
 
-    const executionData = {
-      title: nodeTitle,
-      parentWorkflow: 'Simple Deployment',
-      nodeId: nodeId,
-      timestamp: Date.now(),
-    };
+  const executionData = {
+    title: nodeTitle,
+    parentWorkflow: "Simple Deployment",
+    nodeId: nodeId,
+    timestamp: Date.now(),
+  };
 
-    navigateToStoryWithData(
-      "pages-canvaspage--blueprint-execution-page",
-      executionData
-    );
-    return;
-  }
+  navigateToStoryWithData("pages-canvaspage--blueprint-execution-page", executionData);
+  return;
+};

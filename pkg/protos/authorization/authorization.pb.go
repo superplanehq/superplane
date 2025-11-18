@@ -27,7 +27,6 @@ type DomainType int32
 const (
 	DomainType_DOMAIN_TYPE_UNSPECIFIED  DomainType = 0
 	DomainType_DOMAIN_TYPE_ORGANIZATION DomainType = 1
-	DomainType_DOMAIN_TYPE_CANVAS       DomainType = 2
 )
 
 // Enum value maps for DomainType.
@@ -35,12 +34,10 @@ var (
 	DomainType_name = map[int32]string{
 		0: "DOMAIN_TYPE_UNSPECIFIED",
 		1: "DOMAIN_TYPE_ORGANIZATION",
-		2: "DOMAIN_TYPE_CANVAS",
 	}
 	DomainType_value = map[string]int32{
 		"DOMAIN_TYPE_UNSPECIFIED":  0,
 		"DOMAIN_TYPE_ORGANIZATION": 1,
-		"DOMAIN_TYPE_CANVAS":       2,
 	}
 )
 
@@ -142,12 +139,11 @@ const file_authorization_proto_rawDesc = "" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x16\n" +
 	"\x06action\x18\x02 \x01(\tR\x06action\x12E\n" +
 	"\vdomain_type\x18\x03 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
-	"domainType*_\n" +
+	"domainType*G\n" +
 	"\n" +
 	"DomainType\x12\x1b\n" +
 	"\x17DOMAIN_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
-	"\x18DOMAIN_TYPE_ORGANIZATION\x10\x01\x12\x16\n" +
-	"\x12DOMAIN_TYPE_CANVAS\x10\x02B=Z;github.com/superplanehq/superplane/pkg/protos/authorizationb\x06proto3"
+	"\x18DOMAIN_TYPE_ORGANIZATION\x10\x01B=Z;github.com/superplanehq/superplane/pkg/protos/authorizationb\x06proto3"
 
 var (
 	file_authorization_proto_rawDescOnce sync.Once

@@ -1,36 +1,34 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { SpecsTooltip } from './SpecsTooltip';
-import { ComponentBaseSpecValue } from './index';
-import { ListFilter } from 'lucide-react';
+import type { Meta, StoryObj } from "@storybook/react";
+import { SpecsTooltip } from "./SpecsTooltip";
+import { ComponentBaseSpecValue } from "./index";
+import { ListFilter } from "lucide-react";
 
 const mockSpecValuesSingle: ComponentBaseSpecValue[] = [
   {
     badges: [
       { label: "branch=main", bgColor: "bg-blue-500", textColor: "text-blue-700" },
-      { label: "event=push", bgColor: "bg-green-500", textColor: "text-green-700" }
-    ]
-  }
+      { label: "event=push", bgColor: "bg-green-500", textColor: "text-green-700" },
+    ],
+  },
 ];
 
 const mockSpecValuesMultiple: ComponentBaseSpecValue[] = [
   {
     badges: [
       { label: "tag=latest", bgColor: "bg-purple-500", textColor: "text-purple-600" },
-      { label: "push", bgColor: "bg-orange-500", textColor: "text-orange-600" }
-    ]
+      { label: "push", bgColor: "bg-orange-500", textColor: "text-orange-600" },
+    ],
   },
   {
-    badges: [
-      { label: "tag=v1.0", bgColor: "bg-blue-500", textColor: "text-blue-500" }
-    ]
+    badges: [{ label: "tag=v1.0", bgColor: "bg-blue-500", textColor: "text-blue-500" }],
   },
   {
     badges: [
       { label: "branch=develop", bgColor: "bg-cyan-500", textColor: "text-cyan-700" },
       { label: "event=pull_request", bgColor: "bg-yellow-500", textColor: "text-yellow-700" },
-      { label: "status=open", bgColor: "bg-red-500", textColor: "text-red-500" }
-    ]
-  }
+      { label: "status=open", bgColor: "bg-red-500", textColor: "text-red-500" },
+    ],
+  },
 ];
 
 const mockSpecValuesComplex: ComponentBaseSpecValue[] = [
@@ -38,16 +36,16 @@ const mockSpecValuesComplex: ComponentBaseSpecValue[] = [
     badges: [
       { label: "env=production", bgColor: "bg-red-600", textColor: "text-red-700" },
       { label: "region=us-east-1", bgColor: "bg-blue-700", textColor: "text-blue-800" },
-      { label: "tier=critical", bgColor: "bg-amber-800", textColor: "text-amber-900" }
-    ]
+      { label: "tier=critical", bgColor: "bg-amber-800", textColor: "text-amber-900" },
+    ],
   },
   {
     badges: [
       { label: "env=staging", bgColor: "bg-yellow-600", textColor: "text-yellow-700" },
       { label: "region=us-west-2", bgColor: "bg-blue-700", textColor: "text-blue-800" },
-      { label: "tier=standard", bgColor: "bg-emerald-600", textColor: "text-emerald-700" }
-    ]
-  }
+      { label: "tier=standard", bgColor: "bg-emerald-600", textColor: "text-emerald-700" },
+    ],
+  },
 ];
 
 // Mock badge component similar to what's in ComponentBase
@@ -61,20 +59,20 @@ const MockSpecsBadge: React.FC<{ count: number; title: string }> = ({ count, tit
 );
 
 const meta: Meta<typeof SpecsTooltip> = {
-  title: 'ui/ComponentBase/SpecsTooltip',
+  title: "ui/ComponentBase/SpecsTooltip",
   component: SpecsTooltip,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
     specTitle: {
-      control: 'text',
+      control: "text",
       description: 'The title of the specification type (e.g., "filter", "condition")',
     },
     specValues: {
-      control: 'object',
-      description: 'Array of specification values with badges',
+      control: "object",
+      description: "Array of specification values with badges",
     },
   },
 };

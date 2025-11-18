@@ -31,7 +31,11 @@ func (u *User) Delete() error {
 }
 
 func (u *User) Restore() error {
-	return database.Conn().Unscoped().
+	return u.RestoreInTransaction(database.Conn())
+}
+
+func (u *User) RestoreInTransaction(tx *gorm.DB) error {
+	return tx.Unscoped().
 		Model(u).
 		Update("deleted_at", nil).
 		Error
@@ -90,9 +94,13 @@ func FindMaybeDeletedUserByID(orgID, id string) (*User, error) {
 }
 
 func FindActiveUserByID(orgID, id string) (*User, error) {
+	return FindActiveUserByIDInTransaction(database.Conn(), orgID, id)
+}
+
+func FindActiveUserByIDInTransaction(tx *gorm.DB, orgID, id string) (*User, error) {
 	var user User
 
-	err := database.Conn().
+	err := tx.
 		Where("id = ?", id).
 		Where("organization_id = ?", orgID).
 		First(&user).
@@ -148,4 +156,15 @@ func FindOrganizationsForAccount(email string) ([]Organization, error) {
 		Error
 
 	return organizations, err
+}
+
+func FindAnyUserByEmail(email string) (*User, error) {
+	var user User
+
+	err := database.Conn().
+		Where("email = ?", email).
+		First(&user).
+		Error
+
+	return &user, err
 }

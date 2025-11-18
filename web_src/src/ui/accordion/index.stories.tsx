@@ -1,13 +1,8 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "./index"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./index";
 
-type AccordionArgs = React.ComponentProps<typeof Accordion>
+type AccordionArgs = React.ComponentProps<typeof Accordion>;
 
 const meta = {
   title: "shadcn Primitives/Accordion",
@@ -36,11 +31,11 @@ const meta = {
     type: "single",
     collapsible: true,
   },
-} satisfies Meta<AccordionArgs>
+} satisfies Meta<AccordionArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<AccordionArgs>
+type Story = StoryObj<AccordionArgs>;
 
 const items = [
   {
@@ -51,15 +46,14 @@ const items = [
   {
     id: "item-2",
     title: "Is it styled?",
-    content:
-      "Yes. It comes with default styles that match the other components' aesthetic.",
+    content: "Yes. It comes with default styles that match the other components' aesthetic.",
   },
   {
     id: "item-3",
     title: "Is it animated?",
     content: "Yes. It's animated by default, but you can disable it if needed.",
   },
-]
+];
 
 const renderAccordion = (args: AccordionArgs) => (
   <Accordion {...args}>
@@ -70,11 +64,11 @@ const renderAccordion = (args: AccordionArgs) => (
       </AccordionItem>
     ))}
   </Accordion>
-)
+);
 
 export const Default: Story = {
   render: renderAccordion,
-}
+};
 
 export const Multiple: Story = {
   args: {
@@ -85,4 +79,4 @@ export const Multiple: Story = {
   argTypes: {
     collapsible: { control: { disable: true } },
   },
-}
+};

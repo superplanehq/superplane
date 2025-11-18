@@ -2,11 +2,13 @@ package organizations
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -155,5 +157,72 @@ func Test__CreateInvitation(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 		assert.Contains(t, s.Message(), "Failed to create invitation")
+	})
+}
+
+type mockAuthService struct {
+	authorization.Authorization
+	Error error
+}
+
+func (m *mockAuthService) AssignRole(userID, role, domainID string, domainType string) error {
+	if m.Error != nil {
+		return m.Error
+	}
+	return m.Authorization.AssignRole(userID, role, domainID, domainType)
+}
+
+func (m *mockAuthService) DestroyOrganization(tx *gorm.DB, orgID string) error {
+	if m.Error != nil {
+		return m.Error
+	}
+	return m.Authorization.DestroyOrganization(tx, orgID)
+}
+
+func Test__CreateInvitation_TransactionRollback(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	t.Run("auth service failure rolls back invitation and user creation", func(t *testing.T) {
+		account, err := models.CreateAccount("invited@example.com", "Invited User")
+		require.NoError(t, err)
+
+		//
+		// Use an authentication service that fails,
+		//
+		mockAuth := &mockAuthService{
+			Authorization: r.AuthService,
+			Error:         errors.New("oops"),
+		}
+
+		//
+		// Try to create invitation
+		// It should fail due to role assignment error.
+		//
+		_, err = CreateInvitation(ctx, mockAuth, r.Organization.ID.String(), account.Email)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "oops")
+
+		//
+		// Verify that no invitation was created
+		//
+		invitations, err := models.ListInvitationsInState(r.Organization.ID.String(), models.InvitationStateAccepted)
+		require.NoError(t, err)
+		for _, inv := range invitations {
+			assert.NotEqual(t, account.Email, inv.Email, "Invitation should not exist after transaction rollback")
+		}
+
+		//
+		// Verify that no user was created for this account
+		//
+		_, err = models.FindActiveUserByEmail(r.Organization.ID.String(), account.Email)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound, "User should not exist after transaction rollback")
+
+		//
+		// Verify the account still exists
+		//
+		foundAccount, err := models.FindAccountByEmail(account.Email)
+		require.NoError(t, err)
+		assert.Equal(t, account.ID, foundAccount.ID)
 	})
 }

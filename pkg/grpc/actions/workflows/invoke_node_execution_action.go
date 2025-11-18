@@ -8,7 +8,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -65,7 +67,7 @@ func InvokeNodeExecutionAction(
 		return nil, fmt.Errorf("action '%s' not found for component '%s'", actionName, node.Ref.Data().Component.Name)
 	}
 
-	if err := components.ValidateConfiguration(actionDef.Parameters, parameters); err != nil {
+	if err := configuration.ValidateConfiguration(actionDef.Parameters, parameters); err != nil {
 		return nil, fmt.Errorf("action parameter validation failed: %w", err)
 	}
 
@@ -74,24 +76,33 @@ func InvokeNodeExecutionAction(
 		return nil, fmt.Errorf("user not found: %w", err)
 	}
 
+	tx := database.Conn()
 	actionCtx := components.ActionContext{
 		Name:                  actionName,
 		Parameters:            parameters,
 		Configuration:         node.Configuration.Data(),
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
-		AuthContext:           contexts.NewAuthContext(orgID, authService, user),
+		AuthContext:           contexts.NewAuthContext(tx, orgID, authService, user),
+		RequestContext:        contexts.NewExecutionRequestContext(database.Conn(), execution),
+		IntegrationContext:    contexts.NewIntegrationContext(tx, registry),
 	}
 
 	err = component.HandleAction(actionCtx)
 	if err != nil {
-		return nil, fmt.Errorf("action execution failed: %w", err)
+		return nil, status.Errorf(codes.InvalidArgument, "action execution failed: %v", err)
 	}
 
 	err = database.Conn().Save(&execution).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to save execution: %w", err)
 	}
+
+	messages.NewWorkflowExecutionMessage(
+		execution.WorkflowID.String(),
+		execution.ID.String(),
+		execution.NodeID,
+	).Publish()
 
 	return &pb.InvokeNodeExecutionActionResponse{}, nil
 }

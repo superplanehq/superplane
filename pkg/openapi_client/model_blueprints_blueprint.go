@@ -21,19 +21,19 @@ var _ MappedNullable = &BlueprintsBlueprint{}
 
 // BlueprintsBlueprint struct for BlueprintsBlueprint
 type BlueprintsBlueprint struct {
-	Id *string `json:"id,omitempty"`
-	OrganizationId *string `json:"organizationId,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
-	Nodes []ComponentsNode `json:"nodes,omitempty"`
-	Edges []ComponentsEdge `json:"edges,omitempty"`
-	Configuration []ComponentsConfigurationField `json:"configuration,omitempty"`
+	Id             *string                             `json:"id,omitempty"`
+	OrganizationId *string                             `json:"organizationId,omitempty"`
+	Name           *string                             `json:"name,omitempty"`
+	Description    *string                             `json:"description,omitempty"`
+	CreatedAt      *time.Time                          `json:"createdAt,omitempty"`
+	UpdatedAt      *time.Time                          `json:"updatedAt,omitempty"`
+	Nodes          []ComponentsNode                    `json:"nodes,omitempty"`
+	Edges          []ComponentsEdge                    `json:"edges,omitempty"`
+	Configuration  []ConfigurationField                `json:"configuration,omitempty"`
 	OutputChannels []SuperplaneBlueprintsOutputChannel `json:"outputChannels,omitempty"`
-	Icon *string `json:"icon,omitempty"`
-	Color *string `json:"color,omitempty"`
-	CreatedBy *SuperplaneBlueprintsUserRef `json:"createdBy,omitempty"`
+	Icon           *string                             `json:"icon,omitempty"`
+	Color          *string                             `json:"color,omitempty"`
+	CreatedBy      *SuperplaneBlueprintsUserRef        `json:"createdBy,omitempty"`
 }
 
 // NewBlueprintsBlueprint instantiates a new BlueprintsBlueprint object
@@ -310,9 +310,9 @@ func (o *BlueprintsBlueprint) SetEdges(v []ComponentsEdge) {
 }
 
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
-func (o *BlueprintsBlueprint) GetConfiguration() []ComponentsConfigurationField {
+func (o *BlueprintsBlueprint) GetConfiguration() []ConfigurationField {
 	if o == nil || IsNil(o.Configuration) {
-		var ret []ComponentsConfigurationField
+		var ret []ConfigurationField
 		return ret
 	}
 	return o.Configuration
@@ -320,7 +320,7 @@ func (o *BlueprintsBlueprint) GetConfiguration() []ComponentsConfigurationField 
 
 // GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *BlueprintsBlueprint) GetConfigurationOk() ([]ComponentsConfigurationField, bool) {
+func (o *BlueprintsBlueprint) GetConfigurationOk() ([]ConfigurationField, bool) {
 	if o == nil || IsNil(o.Configuration) {
 		return nil, false
 	}
@@ -336,8 +336,8 @@ func (o *BlueprintsBlueprint) HasConfiguration() bool {
 	return false
 }
 
-// SetConfiguration gets a reference to the given []ComponentsConfigurationField and assigns it to the Configuration field.
-func (o *BlueprintsBlueprint) SetConfiguration(v []ComponentsConfigurationField) {
+// SetConfiguration gets a reference to the given []ConfigurationField and assigns it to the Configuration field.
+func (o *BlueprintsBlueprint) SetConfiguration(v []ConfigurationField) {
 	o.Configuration = v
 }
 
@@ -470,7 +470,7 @@ func (o *BlueprintsBlueprint) SetCreatedBy(v SuperplaneBlueprintsUserRef) {
 }
 
 func (o BlueprintsBlueprint) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -556,5 +556,3 @@ func (v *NullableBlueprintsBlueprint) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

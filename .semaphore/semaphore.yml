@@ -19,37 +19,34 @@ blocks:
       prologue:
         commands:
           - checkout
+          - make test.setup
+          - make test.start
       jobs:
-        - name: "\U0001F9EA Test"
-          commands:
-            - make test.setup
-            - make test
-        - name: "\U0001F9EA Lint"
+        - name: "Lint"
           commands:
             - make lint
-      epilogue:
-        always:
-          commands:
-            - test-results publish junit-report.xml
 
-  - name: "\U0001F9EA E2E"
-    dependencies: []
-    task:
-      env_vars:
-        - name: DOCKER_BUILDKIT
-          value: "1"
-      prologue:
-        commands:
-          - checkout
-      jobs:
-        - name: "\U0001F9EA E2E Tests"
+        - name: "Unit Tests"
           commands:
-            - make test.e2e.setup
+            - make test
+
+        - name: "E2E Tests"
+          commands:
+            - make setup.playwright
             - make test.e2e
+
+        - name: "Check: DB structure"
+          commands:
+            - make check.db.structure
+
+        - name: "Check: Go Format"
+          commands:
+            - make format.go.check
+
       epilogue:
         always:
           commands:
-            - test-results publish junit-report.xml
+            - "[ -f junit-report.xml ] && test-results publish junit-report.xml"
 
   - name: "🔨 Frontend Build"
     dependencies: []
@@ -82,6 +79,11 @@ blocks:
             - npm ci
             - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
             - npm run test:run
+        - name: "Format Check"
+          commands:
+            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules
+            - cd web_src && npm ci && cd ..
+            - make format.js.check
 
 after_pipeline:
   task:

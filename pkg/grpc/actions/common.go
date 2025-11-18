@@ -6,11 +6,12 @@ import (
 	"fmt"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
@@ -37,8 +38,6 @@ func ProtoToDomainType(domainType pbAuth.DomainType) (string, error) {
 	switch domainType {
 	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
 		return models.DomainTypeOrganization, nil
-	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
-		return models.DomainTypeCanvas, nil
 	default:
 		return "", status.Error(codes.InvalidArgument, "invalid domain type")
 	}
@@ -46,8 +45,6 @@ func ProtoToDomainType(domainType pbAuth.DomainType) (string, error) {
 
 func DomainTypeToProto(domainType string) pbAuth.DomainType {
 	switch domainType {
-	case models.DomainTypeCanvas:
-		return pbAuth.DomainType_DOMAIN_TYPE_CANVAS
 	case models.DomainTypeOrganization:
 		return pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION
 	default:
@@ -55,27 +52,12 @@ func DomainTypeToProto(domainType string) pbAuth.DomainType {
 	}
 }
 
-func ValidateIntegration(canvas *models.Canvas, integrationRef *integrationpb.IntegrationRef) (*models.Integration, error) {
+func ValidateIntegration(orgID uuid.UUID, integrationRef *integrationpb.IntegrationRef) (*models.Integration, error) {
 	if integrationRef.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "integration name is required")
 	}
 
-	//
-	// If the integration used is on the organization level, we need to find it there.
-	//
-	if integrationRef.DomainType == pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION {
-		integration, err := models.FindIntegrationByName(models.DomainTypeOrganization, canvas.OrganizationID, integrationRef.Name)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationRef.Name)
-		}
-
-		return integration, nil
-	}
-
-	//
-	// Otherwise, we look for it on the canvas level.
-	//
-	integration, err := models.FindIntegrationByName(models.DomainTypeCanvas, canvas.ID, integrationRef.Name)
+	integration, err := models.FindIntegrationByName(models.DomainTypeOrganization, orgID, integrationRef.Name)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationRef.Name)
 	}
@@ -108,50 +90,12 @@ func ValidateResource(ctx context.Context, registry *registry.Registry, integrat
 	return resource, nil
 }
 
-func GetDomainForSecret(domainTypeForResource string, domainIdForResource *uuid.UUID, domainType pbAuth.DomainType) (string, *uuid.UUID, error) {
-	domainTypeForSecret, err := ProtoToDomainType(domainType)
-	if err != nil {
-		domainTypeForSecret = domainTypeForResource
-	}
-
-	//
-	// If an organization-level resource is being created,
-	// the secret must be on the organization level as well.
-	//
-	if domainTypeForResource == models.DomainTypeOrganization {
-		if domainTypeForSecret != models.DomainTypeOrganization {
-			return "", nil, fmt.Errorf("integration on organization level must use organization-level secret")
-		}
-
-		return domainTypeForSecret, domainIdForResource, nil
-	}
-
-	//
-	// If a canvas-level resource is being created and a canvas-level secret is being used,
-	// we can just re-use the same domain type and ID for the resource.
-	//
-	if domainTypeForSecret == models.DomainTypeCanvas {
-		return domainTypeForSecret, domainIdForResource, nil
-	}
-
-	//
-	// If a canvas-level resource is being created and is using a org-level secret,
-	// we need to find the organization ID for the canvas where the resource is being created.
-	//
-	canvas, err := models.FindUnscopedCanvasByID(domainIdForResource.String())
-	if err != nil {
-		return "", nil, fmt.Errorf("canvas not found")
-	}
-
-	return models.DomainTypeOrganization, &canvas.OrganizationID, nil
-}
-
-func numberTypeOptionsToProto(opts *components.NumberTypeOptions) *componentpb.NumberTypeOptions {
+func numberTypeOptionsToProto(opts *configuration.NumberTypeOptions) *configpb.NumberTypeOptions {
 	if opts == nil {
 		return nil
 	}
 
-	pbOpts := &componentpb.NumberTypeOptions{}
+	pbOpts := &configpb.NumberTypeOptions{}
 	if opts.Min != nil {
 		min := int32(*opts.Min)
 		pbOpts.Min = &min
@@ -163,16 +107,16 @@ func numberTypeOptionsToProto(opts *components.NumberTypeOptions) *componentpb.N
 	return pbOpts
 }
 
-func selectTypeOptionsToProto(opts *components.SelectTypeOptions) *componentpb.SelectTypeOptions {
+func selectTypeOptionsToProto(opts *configuration.SelectTypeOptions) *configpb.SelectTypeOptions {
 	if opts == nil {
 		return nil
 	}
 
-	pbOpts := &componentpb.SelectTypeOptions{
-		Options: make([]*componentpb.SelectOption, len(opts.Options)),
+	pbOpts := &configpb.SelectTypeOptions{
+		Options: make([]*configpb.SelectOption, len(opts.Options)),
 	}
 	for i, opt := range opts.Options {
-		pbOpts.Options[i] = &componentpb.SelectOption{
+		pbOpts.Options[i] = &configpb.SelectOption{
 			Label: opt.Label,
 			Value: opt.Value,
 		}
@@ -180,16 +124,16 @@ func selectTypeOptionsToProto(opts *components.SelectTypeOptions) *componentpb.S
 	return pbOpts
 }
 
-func multiSelectTypeOptionsToProto(opts *components.MultiSelectTypeOptions) *componentpb.MultiSelectTypeOptions {
+func multiSelectTypeOptionsToProto(opts *configuration.MultiSelectTypeOptions) *configpb.MultiSelectTypeOptions {
 	if opts == nil {
 		return nil
 	}
 
-	pbOpts := &componentpb.MultiSelectTypeOptions{
-		Options: make([]*componentpb.SelectOption, len(opts.Options)),
+	pbOpts := &configpb.MultiSelectTypeOptions{
+		Options: make([]*configpb.SelectOption, len(opts.Options)),
 	}
 	for i, opt := range opts.Options {
-		pbOpts.Options[i] = &componentpb.SelectOption{
+		pbOpts.Options[i] = &configpb.SelectOption{
 			Label: opt.Label,
 			Value: opt.Value,
 		}
@@ -197,39 +141,39 @@ func multiSelectTypeOptionsToProto(opts *components.MultiSelectTypeOptions) *com
 	return pbOpts
 }
 
-func integrationTypeOptionsToProto(opts *components.IntegrationTypeOptions) *componentpb.IntegrationTypeOptions {
+func integrationTypeOptionsToProto(opts *configuration.IntegrationTypeOptions) *configpb.IntegrationTypeOptions {
 	if opts == nil {
 		return nil
 	}
 
-	return &componentpb.IntegrationTypeOptions{
+	return &configpb.IntegrationTypeOptions{
 		Type: opts.Type,
 	}
 }
 
-func resourceTypeOptionsToProto(opts *components.ResourceTypeOptions) *componentpb.ResourceTypeOptions {
+func resourceTypeOptionsToProto(opts *configuration.ResourceTypeOptions) *configpb.ResourceTypeOptions {
 	if opts == nil {
 		return nil
 	}
 
-	return &componentpb.ResourceTypeOptions{
+	return &configpb.ResourceTypeOptions{
 		Type: opts.Type,
 	}
 }
 
-func listTypeOptionsToProto(opts *components.ListTypeOptions) *componentpb.ListTypeOptions {
+func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListTypeOptions {
 	if opts == nil || opts.ItemDefinition == nil {
 		return nil
 	}
 
-	pbOpts := &componentpb.ListTypeOptions{
-		ItemDefinition: &componentpb.ListItemDefinition{
+	pbOpts := &configpb.ListTypeOptions{
+		ItemDefinition: &configpb.ListItemDefinition{
 			Type: opts.ItemDefinition.Type,
 		},
 	}
 
 	if len(opts.ItemDefinition.Schema) > 0 {
-		pbOpts.ItemDefinition.Schema = make([]*componentpb.ConfigurationField, len(opts.ItemDefinition.Schema))
+		pbOpts.ItemDefinition.Schema = make([]*configpb.Field, len(opts.ItemDefinition.Schema))
 		for i, schemaField := range opts.ItemDefinition.Schema {
 			pbOpts.ItemDefinition.Schema[i] = ConfigurationFieldToProto(schemaField)
 		}
@@ -238,13 +182,13 @@ func listTypeOptionsToProto(opts *components.ListTypeOptions) *componentpb.ListT
 	return pbOpts
 }
 
-func objectTypeOptionsToProto(opts *components.ObjectTypeOptions) *componentpb.ObjectTypeOptions {
+func objectTypeOptionsToProto(opts *configuration.ObjectTypeOptions) *configpb.ObjectTypeOptions {
 	if opts == nil || len(opts.Schema) == 0 {
 		return nil
 	}
 
-	pbOpts := &componentpb.ObjectTypeOptions{
-		Schema: make([]*componentpb.ConfigurationField, len(opts.Schema)),
+	pbOpts := &configpb.ObjectTypeOptions{
+		Schema: make([]*configpb.Field, len(opts.Schema)),
 	}
 	for i, schemaField := range opts.Schema {
 		pbOpts.Schema[i] = ConfigurationFieldToProto(schemaField)
@@ -253,12 +197,48 @@ func objectTypeOptionsToProto(opts *components.ObjectTypeOptions) *componentpb.O
 	return pbOpts
 }
 
-func typeOptionsToProto(opts *components.TypeOptions) *componentpb.TypeOptions {
+func timeTypeOptionsToProto(opts *configuration.TimeTypeOptions) *configpb.TimeTypeOptions {
 	if opts == nil {
 		return nil
 	}
 
-	return &componentpb.TypeOptions{
+	pbOpts := &configpb.TimeTypeOptions{}
+	if opts.Format != "" {
+		pbOpts.Format = &opts.Format
+	}
+	return pbOpts
+}
+
+func dateTypeOptionsToProto(opts *configuration.DateTypeOptions) *configpb.DateTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.DateTypeOptions{}
+	if opts.Format != "" {
+		pbOpts.Format = &opts.Format
+	}
+	return pbOpts
+}
+
+func dateTimeTypeOptionsToProto(opts *configuration.DateTimeTypeOptions) *configpb.DateTimeTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.DateTimeTypeOptions{}
+	if opts.Format != "" {
+		pbOpts.Format = &opts.Format
+	}
+	return pbOpts
+}
+
+func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	return &configpb.TypeOptions{
 		Number:      numberTypeOptionsToProto(opts.Number),
 		Select:      selectTypeOptionsToProto(opts.Select),
 		MultiSelect: multiSelectTypeOptionsToProto(opts.MultiSelect),
@@ -266,11 +246,14 @@ func typeOptionsToProto(opts *components.TypeOptions) *componentpb.TypeOptions {
 		Resource:    resourceTypeOptionsToProto(opts.Resource),
 		List:        listTypeOptionsToProto(opts.List),
 		Object:      objectTypeOptionsToProto(opts.Object),
+		Time:        timeTypeOptionsToProto(opts.Time),
+		Date:        dateTypeOptionsToProto(opts.Date),
+		Datetime:    dateTimeTypeOptionsToProto(opts.DateTime),
 	}
 }
 
-func ConfigurationFieldToProto(field components.ConfigurationField) *componentpb.ConfigurationField {
-	pbField := &componentpb.ConfigurationField{
+func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
+	pbField := &configpb.Field{
 		Name:        field.Name,
 		Label:       field.Label,
 		Type:        field.Type,
@@ -287,12 +270,41 @@ func ConfigurationFieldToProto(field components.ConfigurationField) *componentpb
 		}
 	}
 
+	// Map placeholder if provided
+	if field.Placeholder != "" {
+		ph := field.Placeholder
+		pbField.Placeholder = &ph
+	}
+
 	if len(field.VisibilityConditions) > 0 {
-		pbField.VisibilityConditions = make([]*componentpb.VisibilityCondition, len(field.VisibilityConditions))
+		pbField.VisibilityConditions = make([]*configpb.VisibilityCondition, len(field.VisibilityConditions))
 		for i, cond := range field.VisibilityConditions {
-			pbField.VisibilityConditions[i] = &componentpb.VisibilityCondition{
+			pbField.VisibilityConditions[i] = &configpb.VisibilityCondition{
 				Field:  cond.Field,
 				Values: cond.Values,
+			}
+		}
+	}
+
+	if len(field.RequiredConditions) > 0 {
+		pbField.RequiredConditions = make([]*configpb.RequiredCondition, len(field.RequiredConditions))
+		for i, cond := range field.RequiredConditions {
+			pbField.RequiredConditions[i] = &configpb.RequiredCondition{
+				Field:  cond.Field,
+				Values: cond.Values,
+			}
+		}
+	}
+
+	if len(field.ValidationRules) > 0 {
+		pbField.ValidationRules = make([]*configpb.ValidationRule, len(field.ValidationRules))
+		for i, rule := range field.ValidationRules {
+			pbField.ValidationRules[i] = &configpb.ValidationRule{
+				Type:        rule.Type,
+				CompareWith: rule.CompareWith,
+			}
+			if rule.Message != "" {
+				pbField.ValidationRules[i].Message = &rule.Message
 			}
 		}
 	}
@@ -300,12 +312,12 @@ func ConfigurationFieldToProto(field components.ConfigurationField) *componentpb
 	return pbField
 }
 
-func protoToNumberTypeOptions(pbOpts *componentpb.NumberTypeOptions) *components.NumberTypeOptions {
+func protoToNumberTypeOptions(pbOpts *configpb.NumberTypeOptions) *configuration.NumberTypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
-	opts := &components.NumberTypeOptions{}
+	opts := &configuration.NumberTypeOptions{}
 	if pbOpts.Min != nil {
 		min := int(*pbOpts.Min)
 		opts.Min = &min
@@ -317,16 +329,16 @@ func protoToNumberTypeOptions(pbOpts *componentpb.NumberTypeOptions) *components
 	return opts
 }
 
-func protoToSelectTypeOptions(pbOpts *componentpb.SelectTypeOptions) *components.SelectTypeOptions {
+func protoToSelectTypeOptions(pbOpts *configpb.SelectTypeOptions) *configuration.SelectTypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
-	opts := &components.SelectTypeOptions{
-		Options: make([]components.FieldOption, len(pbOpts.Options)),
+	opts := &configuration.SelectTypeOptions{
+		Options: make([]configuration.FieldOption, len(pbOpts.Options)),
 	}
 	for i, pbOpt := range pbOpts.Options {
-		opts.Options[i] = components.FieldOption{
+		opts.Options[i] = configuration.FieldOption{
 			Label: pbOpt.Label,
 			Value: pbOpt.Value,
 		}
@@ -334,16 +346,16 @@ func protoToSelectTypeOptions(pbOpts *componentpb.SelectTypeOptions) *components
 	return opts
 }
 
-func protoToMultiSelectTypeOptions(pbOpts *componentpb.MultiSelectTypeOptions) *components.MultiSelectTypeOptions {
+func protoToMultiSelectTypeOptions(pbOpts *configpb.MultiSelectTypeOptions) *configuration.MultiSelectTypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
-	opts := &components.MultiSelectTypeOptions{
-		Options: make([]components.FieldOption, len(pbOpts.Options)),
+	opts := &configuration.MultiSelectTypeOptions{
+		Options: make([]configuration.FieldOption, len(pbOpts.Options)),
 	}
 	for i, pbOpt := range pbOpts.Options {
-		opts.Options[i] = components.FieldOption{
+		opts.Options[i] = configuration.FieldOption{
 			Label: pbOpt.Label,
 			Value: pbOpt.Value,
 		}
@@ -351,39 +363,39 @@ func protoToMultiSelectTypeOptions(pbOpts *componentpb.MultiSelectTypeOptions) *
 	return opts
 }
 
-func protoToIntegrationTypeOptions(pbOpts *componentpb.IntegrationTypeOptions) *components.IntegrationTypeOptions {
+func protoToIntegrationTypeOptions(pbOpts *configpb.IntegrationTypeOptions) *configuration.IntegrationTypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
-	return &components.IntegrationTypeOptions{
+	return &configuration.IntegrationTypeOptions{
 		Type: pbOpts.Type,
 	}
 }
 
-func protoToResourceTypeOptions(pbOpts *componentpb.ResourceTypeOptions) *components.ResourceTypeOptions {
+func protoToResourceTypeOptions(pbOpts *configpb.ResourceTypeOptions) *configuration.ResourceTypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
-	return &components.ResourceTypeOptions{
+	return &configuration.ResourceTypeOptions{
 		Type: pbOpts.Type,
 	}
 }
 
-func protoToListTypeOptions(pbOpts *componentpb.ListTypeOptions) *components.ListTypeOptions {
+func protoToListTypeOptions(pbOpts *configpb.ListTypeOptions) *configuration.ListTypeOptions {
 	if pbOpts == nil || pbOpts.ItemDefinition == nil {
 		return nil
 	}
 
-	opts := &components.ListTypeOptions{
-		ItemDefinition: &components.ListItemDefinition{
+	opts := &configuration.ListTypeOptions{
+		ItemDefinition: &configuration.ListItemDefinition{
 			Type: pbOpts.ItemDefinition.Type,
 		},
 	}
 
 	if len(pbOpts.ItemDefinition.Schema) > 0 {
-		opts.ItemDefinition.Schema = make([]components.ConfigurationField, len(pbOpts.ItemDefinition.Schema))
+		opts.ItemDefinition.Schema = make([]configuration.Field, len(pbOpts.ItemDefinition.Schema))
 		for i, pbSchemaField := range pbOpts.ItemDefinition.Schema {
 			opts.ItemDefinition.Schema[i] = ProtoToConfigurationField(pbSchemaField)
 		}
@@ -392,13 +404,13 @@ func protoToListTypeOptions(pbOpts *componentpb.ListTypeOptions) *components.Lis
 	return opts
 }
 
-func protoToObjectTypeOptions(pbOpts *componentpb.ObjectTypeOptions) *components.ObjectTypeOptions {
+func protoToObjectTypeOptions(pbOpts *configpb.ObjectTypeOptions) *configuration.ObjectTypeOptions {
 	if pbOpts == nil || len(pbOpts.Schema) == 0 {
 		return nil
 	}
 
-	opts := &components.ObjectTypeOptions{
-		Schema: make([]components.ConfigurationField, len(pbOpts.Schema)),
+	opts := &configuration.ObjectTypeOptions{
+		Schema: make([]configuration.Field, len(pbOpts.Schema)),
 	}
 	for i, pbSchemaField := range pbOpts.Schema {
 		opts.Schema[i] = ProtoToConfigurationField(pbSchemaField)
@@ -407,12 +419,48 @@ func protoToObjectTypeOptions(pbOpts *componentpb.ObjectTypeOptions) *components
 	return opts
 }
 
-func protoToTypeOptions(pbOpts *componentpb.TypeOptions) *components.TypeOptions {
+func protoToTimeTypeOptions(pbOpts *configpb.TimeTypeOptions) *configuration.TimeTypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
-	return &components.TypeOptions{
+	opts := &configuration.TimeTypeOptions{}
+	if pbOpts.Format != nil {
+		opts.Format = *pbOpts.Format
+	}
+	return opts
+}
+
+func protoToDateTypeOptions(pbOpts *configpb.DateTypeOptions) *configuration.DateTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.DateTypeOptions{}
+	if pbOpts.Format != nil {
+		opts.Format = *pbOpts.Format
+	}
+	return opts
+}
+
+func protoToDateTimeTypeOptions(pbOpts *configpb.DateTimeTypeOptions) *configuration.DateTimeTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.DateTimeTypeOptions{}
+	if pbOpts.Format != nil {
+		opts.Format = *pbOpts.Format
+	}
+	return opts
+}
+
+func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	return &configuration.TypeOptions{
 		Number:      protoToNumberTypeOptions(pbOpts.Number),
 		Select:      protoToSelectTypeOptions(pbOpts.Select),
 		MultiSelect: protoToMultiSelectTypeOptions(pbOpts.MultiSelect),
@@ -420,11 +468,14 @@ func protoToTypeOptions(pbOpts *componentpb.TypeOptions) *components.TypeOptions
 		Resource:    protoToResourceTypeOptions(pbOpts.Resource),
 		List:        protoToListTypeOptions(pbOpts.List),
 		Object:      protoToObjectTypeOptions(pbOpts.Object),
+		Time:        protoToTimeTypeOptions(pbOpts.Time),
+		Date:        protoToDateTypeOptions(pbOpts.Date),
+		DateTime:    protoToDateTimeTypeOptions(pbOpts.Datetime),
 	}
 }
 
-func ProtoToConfigurationField(pbField *componentpb.ConfigurationField) components.ConfigurationField {
-	field := components.ConfigurationField{
+func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
+	field := configuration.Field{
 		Name:        pbField.Name,
 		Label:       pbField.Label,
 		Type:        pbField.Type,
@@ -437,12 +488,39 @@ func ProtoToConfigurationField(pbField *componentpb.ConfigurationField) componen
 		field.Default = *pbField.DefaultValue
 	}
 
+	if pbField.Placeholder != nil {
+		field.Placeholder = *pbField.Placeholder
+	}
+
 	if len(pbField.VisibilityConditions) > 0 {
-		field.VisibilityConditions = make([]components.VisibilityCondition, len(pbField.VisibilityConditions))
+		field.VisibilityConditions = make([]configuration.VisibilityCondition, len(pbField.VisibilityConditions))
 		for i, pbCond := range pbField.VisibilityConditions {
-			field.VisibilityConditions[i] = components.VisibilityCondition{
+			field.VisibilityConditions[i] = configuration.VisibilityCondition{
 				Field:  pbCond.Field,
 				Values: pbCond.Values,
+			}
+		}
+	}
+
+	if len(pbField.RequiredConditions) > 0 {
+		field.RequiredConditions = make([]configuration.RequiredCondition, len(pbField.RequiredConditions))
+		for i, pbCond := range pbField.RequiredConditions {
+			field.RequiredConditions[i] = configuration.RequiredCondition{
+				Field:  pbCond.Field,
+				Values: pbCond.Values,
+			}
+		}
+	}
+
+	if len(pbField.ValidationRules) > 0 {
+		field.ValidationRules = make([]configuration.ValidationRule, len(pbField.ValidationRules))
+		for i, pbRule := range pbField.ValidationRules {
+			field.ValidationRules[i] = configuration.ValidationRule{
+				Type:        pbRule.Type,
+				CompareWith: pbRule.CompareWith,
+			}
+			if pbRule.Message != nil {
+				field.ValidationRules[i].Message = *pbRule.Message
 			}
 		}
 	}

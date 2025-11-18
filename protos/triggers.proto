@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package Superplane.Triggers;
 
-import "components.proto";
+import "configuration.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
@@ -68,5 +68,5 @@ message Trigger {
   string description = 3;
   string icon = 4;
   string color = 5;
-  repeated Components.ConfigurationField configuration = 6;
+  repeated Configuration.Field configuration = 6;
 }

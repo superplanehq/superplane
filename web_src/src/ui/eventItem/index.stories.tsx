@@ -1,8 +1,8 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/react";
 
-import { EventItem } from "./index"
+import { EventItem } from "./index";
 
-type EventItemArgs = React.ComponentProps<typeof EventItem>
+type EventItemArgs = React.ComponentProps<typeof EventItem>;
 
 const meta = {
   title: "ui/Event Item",
@@ -42,13 +42,13 @@ const meta = {
     badges: [{ label: "push" }],
     href: "#",
   },
-} satisfies Meta<EventItemArgs>
+} satisfies Meta<EventItemArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<EventItemArgs>
+type Story = StoryObj<EventItemArgs>;
 
-export const Default: Story = {}
+export const Default: Story = {};
 
 export const Warning: Story = {
   args: {
@@ -57,7 +57,7 @@ export const Warning: Story = {
     timestamp: "Just now",
     badges: [{ label: "alert", variant: "destructive" }],
   },
-}
+};
 
 export const Error: Story = {
   args: {
@@ -66,4 +66,4 @@ export const Error: Story = {
     timestamp: "5m ago",
     badges: [{ label: "payments" }, { label: "priority" }],
   },
-}
+};

@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations"
 )
 
@@ -41,7 +42,7 @@ type Trigger interface {
 	/*
 	 * The configuration fields exposed by the trigger.
 	 */
-	Configuration() []components.ConfigurationField
+	Configuration() []configuration.Field
 
 	/*
 	 * Handler for webhooks

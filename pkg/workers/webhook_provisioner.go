@@ -91,7 +91,7 @@ func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook
 		return err
 	}
 
-	resourceManager, err := w.registry.NewResourceManager(context.Background(), integration)
+	resourceManager, err := w.registry.NewResourceManagerInTransaction(context.Background(), tx, integration)
 	if err != nil {
 		return err
 	}
@@ -102,9 +102,9 @@ func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook
 		return err
 	}
 
-	webhookMetadata, err := resourceManager.SetupWebhookV2(integrations.WebhookOptionsV2{
+	webhookMetadata, err := resourceManager.SetupWebhook(integrations.WebhookOptions{
 		Resource:      resource,
-		Configuration: webhook.Configuration,
+		Configuration: webhook.Configuration.Data(),
 		URL:           fmt.Sprintf("%s/api/v1/webhooks/%s", w.baseURL, webhook.ID.String()),
 		Secret:        secret,
 	})

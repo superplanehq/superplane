@@ -40,8 +40,6 @@ func Test_RemoveUser(t *testing.T) {
 		plainToken, err := crypto.Base64String(64)
 		require.NoError(t, err)
 		require.NoError(t, newUser.UpdateTokenHash(crypto.HashToken(plainToken)))
-		canvas1 := support.CreateCanvas(t, r, r.Organization.ID, newUser.ID)
-		canvas2 := support.CreateCanvas(t, r, r.Organization.ID, newUser.ID)
 
 		//
 		// Remove the user from the organization
@@ -67,16 +65,6 @@ func Test_RemoveUser(t *testing.T) {
 		// Verify no organization roles exist anymore for that user anymore
 		//
 		roles, err := r.AuthService.GetUserRolesForOrg(newUser.ID.String(), orgID)
-		require.NoError(t, err)
-		require.Len(t, roles, 0)
-
-		//
-		// Verify that all the canvas access was lost too
-		//
-		roles, err = r.AuthService.GetUserRolesForCanvas(newUser.ID.String(), canvas1.ID.String())
-		require.NoError(t, err)
-		require.Len(t, roles, 0)
-		roles, err = r.AuthService.GetUserRolesForCanvas(newUser.ID.String(), canvas2.ID.String())
 		require.NoError(t, err)
 		require.Len(t, roles, 0)
 	})

@@ -6,6 +6,8 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -48,30 +50,30 @@ func (w *Wait) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }
 
-func (w *Wait) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{
+func (w *Wait) Configuration() []configuration.Field {
+	return []configuration.Field{
 		{
 			Name:     "duration",
 			Label:    "Set wait interval",
-			Type:     components.FieldTypeObject,
+			Type:     configuration.FieldTypeObject,
 			Required: true,
-			TypeOptions: &components.TypeOptions{
-				Object: &components.ObjectTypeOptions{
-					Schema: []components.ConfigurationField{
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
 						{
 							Name:     "value",
 							Label:    "How long should I wait?",
-							Type:     components.FieldTypeNumber,
+							Type:     configuration.FieldTypeNumber,
 							Required: true,
 						},
 						{
 							Name:     "unit",
 							Label:    "Unit",
-							Type:     components.FieldTypeSelect,
+							Type:     configuration.FieldTypeSelect,
 							Required: true,
-							TypeOptions: &components.TypeOptions{
-								Select: &components.SelectTypeOptions{
-									Options: []components.FieldOption{
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: []configuration.FieldOption{
 										{
 											Label: "Seconds",
 											Value: "seconds",
@@ -115,19 +117,54 @@ func (w *Wait) Actions() []components.Action {
 		{
 			Name: "timeReached",
 		},
+		{
+			Name:           "pushThrough",
+			Description:    "Push Through",
+			UserAccessible: true,
+		},
 	}
 }
 
 func (w *Wait) HandleAction(ctx components.ActionContext) error {
 	switch ctx.Name {
 	case "timeReached":
-		return ctx.ExecutionStateContext.Pass(map[string][]any{
-			components.DefaultOutputChannel.Name: {map[string]any{}},
-		})
+		return w.HandleTimeReached(ctx)
+	case "pushThrough":
+		return w.HandlePushThrough(ctx)
 
 	default:
 		return fmt.Errorf("unknown action: %s", ctx.Name)
 	}
+}
+
+func (w *Wait) HandleTimeReached(ctx components.ActionContext) error {
+	if ctx.ExecutionStateContext.IsFinished() {
+		// already handled, for example via "pushThrough" action
+		return nil
+	}
+
+	return ctx.ExecutionStateContext.Pass(map[string][]any{
+		components.DefaultOutputChannel.Name: {map[string]any{}},
+	})
+}
+
+func (w *Wait) HandlePushThrough(ctx components.ActionContext) error {
+	if ctx.ExecutionStateContext.IsFinished() {
+		// already handled, for example via "timeReached" action
+		return nil
+	}
+
+	return ctx.ExecutionStateContext.Pass(map[string][]any{
+		components.DefaultOutputChannel.Name: {map[string]any{}},
+	})
+}
+
+func (w *Wait) Setup(ctx components.SetupContext) error {
+	return nil
+}
+
+func (w *Wait) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+	return ctx.DefaultProcessing()
 }
 
 func findInterval(spec Spec) time.Duration {

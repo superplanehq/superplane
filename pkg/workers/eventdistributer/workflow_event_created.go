@@ -22,7 +22,7 @@ type WorkflowEventWebsocketEvent struct {
 func HandleWorkflowEventCreated(messageBody []byte, wsHub *ws.Hub) error {
 	log.Debugf("Received execution_created event")
 
-	pbMsg := &pb.EventCreated{}
+	pbMsg := &pb.WorkflowNodeEventMessage{}
 	if err := proto.Unmarshal(messageBody, pbMsg); err != nil {
 		return fmt.Errorf("failed to unmarshal execution_created message: %w", err)
 	}

@@ -533,8 +533,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -615,8 +614,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -663,8 +661,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -751,8 +748,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -873,8 +869,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -955,8 +950,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1043,8 +1037,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1320,50 +1313,6 @@
         "tags": [
           "Organization"
         ]
-      },
-      "put": {
-        "summary": "Update an organization invitation",
-        "description": "Updates an organization invitation",
-        "operationId": "Organizations_UpdateInvitation",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/OrganizationsUpdateInvitationResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "invitationId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/OrganizationsUpdateInvitationBody"
-            }
-          }
-        ],
-        "tags": [
-          "Organization"
-        ]
       }
     },
     "/api/v1/organizations/{id}/users/{userId}": {
@@ -1431,8 +1380,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1513,8 +1461,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1561,8 +1508,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1683,8 +1629,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1765,8 +1710,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1813,8 +1757,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1951,8 +1894,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -2001,8 +1943,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -2051,8 +1992,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -2637,6 +2577,50 @@
           "WorkflowNode"
         ]
       }
+    },
+    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue/{itemId}": {
+      "delete": {
+        "summary": "Delete item from a node's queue",
+        "description": "Deletes a specific item in a node's queue",
+        "operationId": "Workflows_DeleteNodeQueueItem",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsDeleteNodeQueueItemResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "WorkflowNode"
+        ]
+      }
     }
   },
   "definitions": {
@@ -2652,8 +2636,7 @@
       "type": "string",
       "enum": [
         "DOMAIN_TYPE_UNSPECIFIED",
-        "DOMAIN_TYPE_ORGANIZATION",
-        "DOMAIN_TYPE_CANVAS"
+        "DOMAIN_TYPE_ORGANIZATION"
       ],
       "default": "DOMAIN_TYPE_UNSPECIFIED",
       "title": "Enums"
@@ -2714,7 +2697,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
+            "$ref": "#/definitions/ConfigurationField"
           }
         },
         "outputChannels": {
@@ -2806,7 +2789,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
+            "$ref": "#/definitions/ConfigurationField"
           }
         },
         "outputChannels": {
@@ -2837,41 +2820,8 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
+            "$ref": "#/definitions/ConfigurationField"
           }
-        }
-      }
-    },
-    "ComponentsConfigurationField": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "type": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "required": {
-          "type": "boolean"
-        },
-        "defaultValue": {
-          "type": "string"
-        },
-        "label": {
-          "type": "string"
-        },
-        "visibilityConditions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsVisibilityCondition"
-          }
-        },
-        "typeOptions": {
-          "$ref": "#/definitions/ComponentsTypeOptions"
         }
       }
     },
@@ -2897,14 +2847,6 @@
         }
       }
     },
-    "ComponentsIntegrationTypeOptions": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        }
-      }
-    },
     "ComponentsListComponentActionsResponse": {
       "type": "object",
       "properties": {
@@ -2925,41 +2867,6 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/ComponentsComponent"
-          }
-        }
-      }
-    },
-    "ComponentsListItemDefinition": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        },
-        "schema": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
-          }
-        }
-      }
-    },
-    "ComponentsListTypeOptions": {
-      "type": "object",
-      "properties": {
-        "itemDefinition": {
-          "$ref": "#/definitions/ComponentsListItemDefinition"
-        }
-      }
-    },
-    "ComponentsMultiSelectTypeOptions": {
-      "type": "object",
-      "properties": {
-        "options": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsSelectOption"
           }
         }
       }
@@ -3008,31 +2915,6 @@
       ],
       "default": "TYPE_COMPONENT"
     },
-    "ComponentsNumberTypeOptions": {
-      "type": "object",
-      "properties": {
-        "min": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "max": {
-          "type": "integer",
-          "format": "int32"
-        }
-      }
-    },
-    "ComponentsObjectTypeOptions": {
-      "type": "object",
-      "properties": {
-        "schema": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
-          }
-        }
-      }
-    },
     "ComponentsPosition": {
       "type": "object",
       "properties": {
@@ -3046,7 +2928,74 @@
         }
       }
     },
-    "ComponentsResourceTypeOptions": {
+    "ConfigurationDateTimeTypeOptions": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string"
+        }
+      }
+    },
+    "ConfigurationDateTypeOptions": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string"
+        }
+      }
+    },
+    "ConfigurationField": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "defaultValue": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "visibilityConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationVisibilityCondition"
+          }
+        },
+        "typeOptions": {
+          "$ref": "#/definitions/ConfigurationTypeOptions"
+        },
+        "requiredConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationRequiredCondition"
+          }
+        },
+        "validationRules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationValidationRule"
+          }
+        },
+        "placeholder": {
+          "type": "string",
+          "title": "Optional placeholder text for UI inputs"
+        }
+      }
+    },
+    "ConfigurationIntegrationTypeOptions": {
       "type": "object",
       "properties": {
         "type": {
@@ -3054,7 +3003,89 @@
         }
       }
     },
-    "ComponentsSelectOption": {
+    "ConfigurationListItemDefinition": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationField"
+          }
+        }
+      }
+    },
+    "ConfigurationListTypeOptions": {
+      "type": "object",
+      "properties": {
+        "itemDefinition": {
+          "$ref": "#/definitions/ConfigurationListItemDefinition"
+        }
+      }
+    },
+    "ConfigurationMultiSelectTypeOptions": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationSelectOption"
+          }
+        }
+      }
+    },
+    "ConfigurationNumberTypeOptions": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "max": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "ConfigurationObjectTypeOptions": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationField"
+          }
+        }
+      }
+    },
+    "ConfigurationRequiredCondition": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ConfigurationResourceTypeOptions": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "ConfigurationSelectOption": {
       "type": "object",
       "properties": {
         "label": {
@@ -3065,19 +3096,19 @@
         }
       }
     },
-    "ComponentsSelectTypeOptions": {
+    "ConfigurationSelectTypeOptions": {
       "type": "object",
       "properties": {
         "options": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsSelectOption"
+            "$ref": "#/definitions/ConfigurationSelectOption"
           }
         }
       }
     },
-    "ComponentsTimeTypeOptions": {
+    "ConfigurationTimeTypeOptions": {
       "type": "object",
       "properties": {
         "format": {
@@ -3085,36 +3116,56 @@
         }
       }
     },
-    "ComponentsTypeOptions": {
+    "ConfigurationTypeOptions": {
       "type": "object",
       "properties": {
         "number": {
-          "$ref": "#/definitions/ComponentsNumberTypeOptions"
+          "$ref": "#/definitions/ConfigurationNumberTypeOptions"
         },
         "select": {
-          "$ref": "#/definitions/ComponentsSelectTypeOptions"
+          "$ref": "#/definitions/ConfigurationSelectTypeOptions"
         },
         "multiSelect": {
-          "$ref": "#/definitions/ComponentsMultiSelectTypeOptions"
+          "$ref": "#/definitions/ConfigurationMultiSelectTypeOptions"
         },
         "integration": {
-          "$ref": "#/definitions/ComponentsIntegrationTypeOptions"
+          "$ref": "#/definitions/ConfigurationIntegrationTypeOptions"
         },
         "list": {
-          "$ref": "#/definitions/ComponentsListTypeOptions"
+          "$ref": "#/definitions/ConfigurationListTypeOptions"
         },
         "object": {
-          "$ref": "#/definitions/ComponentsObjectTypeOptions"
+          "$ref": "#/definitions/ConfigurationObjectTypeOptions"
         },
         "resource": {
-          "$ref": "#/definitions/ComponentsResourceTypeOptions"
+          "$ref": "#/definitions/ConfigurationResourceTypeOptions"
         },
         "time": {
-          "$ref": "#/definitions/ComponentsTimeTypeOptions"
+          "$ref": "#/definitions/ConfigurationTimeTypeOptions"
+        },
+        "date": {
+          "$ref": "#/definitions/ConfigurationDateTypeOptions"
+        },
+        "datetime": {
+          "$ref": "#/definitions/ConfigurationDateTimeTypeOptions"
         }
       }
     },
-    "ComponentsVisibilityCondition": {
+    "ConfigurationValidationRule": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "compareWith": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "ConfigurationVisibilityCondition": {
       "type": "object",
       "properties": {
         "field": {
@@ -3542,12 +3593,6 @@
         "state": {
           "type": "string"
         },
-        "canvasIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
@@ -3598,25 +3643,6 @@
     },
     "OrganizationsRemoveInvitationResponse": {
       "type": "object"
-    },
-    "OrganizationsUpdateInvitationBody": {
-      "type": "object",
-      "properties": {
-        "canvasIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "OrganizationsUpdateInvitationResponse": {
-      "type": "object",
-      "properties": {
-        "invitation": {
-          "$ref": "#/definitions/OrganizationsInvitation"
-        }
-      }
     },
     "OrganizationsUpdateOrganizationBody": {
       "type": "object",
@@ -4023,9 +4049,6 @@
     "SuperplaneIntegrationsValueFromSecret": {
       "type": "object",
       "properties": {
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
         "name": {
           "type": "string"
         },
@@ -4140,7 +4163,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
+            "$ref": "#/definitions/ConfigurationField"
           }
         }
       }
@@ -4341,6 +4364,9 @@
         }
       }
     },
+    "WorkflowsDeleteNodeQueueItemResponse": {
+      "type": "object"
+    },
     "WorkflowsDeleteWorkflowResponse": {
       "type": "object"
     },
@@ -4532,43 +4558,14 @@
     "WorkflowsWorkflow": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
+        "metadata": {
+          "$ref": "#/definitions/WorkflowsWorkflowMetadata"
         },
-        "organizationId": {
-          "type": "string"
+        "spec": {
+          "$ref": "#/definitions/WorkflowsWorkflowSpec"
         },
-        "name": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "nodes": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsNode"
-          }
-        },
-        "edges": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsEdge"
-          }
-        },
-        "createdBy": {
-          "$ref": "#/definitions/SuperplaneWorkflowsUserRef",
-          "title": "Creator reference"
+        "status": {
+          "$ref": "#/definitions/WorkflowsWorkflowStatus"
         }
       }
     },
@@ -4593,6 +4590,34 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "WorkflowsWorkflowMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdBy": {
+          "$ref": "#/definitions/SuperplaneWorkflowsUserRef"
         }
       }
     },
@@ -4673,9 +4698,57 @@
         "input": {
           "type": "object"
         },
+        "rootEvent": {
+          "$ref": "#/definitions/WorkflowsWorkflowEvent"
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "WorkflowsWorkflowSpec": {
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsNode"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsEdge"
+          }
+        }
+      }
+    },
+    "WorkflowsWorkflowStatus": {
+      "type": "object",
+      "properties": {
+        "lastExecutions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
+          }
+        },
+        "nextQueueItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNodeQueueItem"
+          }
+        },
+        "lastEvents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowEvent"
+          }
         }
       }
     },

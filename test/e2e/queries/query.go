@@ -2,6 +2,7 @@ package queries
 
 import (
 	"fmt"
+	"strings"
 
 	pw "github.com/playwright-community/playwright-go"
 )
@@ -19,7 +20,16 @@ func (q Query) Run(r Runner) pw.Locator { return q.run(r) }
 func (q Query) Describe() string        { return q.describe() }
 
 // Lookup by test ID
-func TestID(testID string) Query {
+func TestID(testIDs ...string) Query {
+	testID := ""
+
+	for i, id := range testIDs {
+		if i > 0 {
+			testID += "-"
+		}
+		testID += strings.ToLower(id)
+	}
+
 	return Query{
 		run: func(r Runner) pw.Locator {
 			return r.Page().GetByTestId(testID).First()

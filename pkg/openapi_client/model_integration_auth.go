@@ -20,8 +20,8 @@ var _ MappedNullable = &IntegrationAuth{}
 
 // IntegrationAuth struct for IntegrationAuth
 type IntegrationAuth struct {
-	Use *IntegrationAuthType `json:"use,omitempty"`
-	Token *AuthToken `json:"token,omitempty"`
+	Use   *IntegrationAuthType `json:"use,omitempty"`
+	Token *AuthToken           `json:"token,omitempty"`
 }
 
 // NewIntegrationAuth instantiates a new IntegrationAuth object
@@ -110,7 +110,7 @@ func (o *IntegrationAuth) SetToken(v AuthToken) {
 }
 
 func (o IntegrationAuth) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -163,5 +163,3 @@ func (v *NullableIntegrationAuth) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

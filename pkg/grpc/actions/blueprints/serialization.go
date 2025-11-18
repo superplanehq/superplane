@@ -1,45 +1,46 @@
 package blueprints
 
 import (
-    "fmt"
+	"fmt"
 
-    "github.com/superplanehq/superplane/pkg/components"
-    "github.com/superplanehq/superplane/pkg/grpc/actions"
-    "github.com/superplanehq/superplane/pkg/models"
-    pb "github.com/superplanehq/superplane/pkg/protos/blueprints"
-    componentpb "github.com/superplanehq/superplane/pkg/protos/components"
-    "github.com/superplanehq/superplane/pkg/registry"
-    "google.golang.org/grpc/codes"
-    "google.golang.org/grpc/status"
-    "google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/blueprints"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func SerializeBlueprint(in *models.Blueprint) *pb.Blueprint {
-    var createdBy *pb.UserRef
-    if in.CreatedBy != nil {
-        idStr := in.CreatedBy.String()
-        name := ""
-        if user, err := models.FindMaybeDeletedUserByID(in.OrganizationID.String(), idStr); err == nil && user != nil {
-            name = user.Name
-        }
-        createdBy = &pb.UserRef{Id: idStr, Name: name}
-    }
+	var createdBy *pb.UserRef
+	if in.CreatedBy != nil {
+		idStr := in.CreatedBy.String()
+		name := ""
+		if user, err := models.FindMaybeDeletedUserByID(in.OrganizationID.String(), idStr); err == nil && user != nil {
+			name = user.Name
+		}
+		createdBy = &pb.UserRef{Id: idStr, Name: name}
+	}
 
-    return &pb.Blueprint{
-        Id:             in.ID.String(),
-        OrganizationId: in.OrganizationID.String(),
-        Name:           in.Name,
-        Description:    in.Description,
-        CreatedAt:      timestamppb.New(*in.CreatedAt),
-        UpdatedAt:      timestamppb.New(*in.UpdatedAt),
-        Icon:           in.Icon,
-        Color:          in.Color,
-        Nodes:          actions.NodesToProto(in.Nodes),
-        Edges:          actions.EdgesToProto(in.Edges),
-        Configuration:  ConfigurationToProto(in.Configuration),
-        OutputChannels: OutputChannelsToProto(in.OutputChannels),
-        CreatedBy:      createdBy,
-    }
+	return &pb.Blueprint{
+		Id:             in.ID.String(),
+		OrganizationId: in.OrganizationID.String(),
+		Name:           in.Name,
+		Description:    in.Description,
+		CreatedAt:      timestamppb.New(*in.CreatedAt),
+		UpdatedAt:      timestamppb.New(*in.UpdatedAt),
+		Icon:           in.Icon,
+		Color:          in.Color,
+		Nodes:          actions.NodesToProto(in.Nodes),
+		Edges:          actions.EdgesToProto(in.Edges),
+		Configuration:  ConfigurationToProto(in.Configuration),
+		OutputChannels: OutputChannelsToProto(in.OutputChannels),
+		CreatedBy:      createdBy,
+	}
 }
 
 func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]models.Node, []models.Edge, error) {
@@ -153,24 +154,24 @@ func validateAcyclic(nodes []*componentpb.Node, edges []*componentpb.Edge) error
 	return nil
 }
 
-func ConfigurationToProto(config []components.ConfigurationField) []*componentpb.ConfigurationField {
+func ConfigurationToProto(config []configuration.Field) []*configpb.Field {
 	if config == nil {
-		return []*componentpb.ConfigurationField{}
+		return []*configpb.Field{}
 	}
 
-	result := make([]*componentpb.ConfigurationField, len(config))
+	result := make([]*configpb.Field, len(config))
 	for i, field := range config {
 		result[i] = actions.ConfigurationFieldToProto(field)
 	}
 	return result
 }
 
-func ProtoToConfiguration(config []*componentpb.ConfigurationField) ([]components.ConfigurationField, error) {
+func ProtoToConfiguration(config []*configpb.Field) ([]configuration.Field, error) {
 	if len(config) == 0 {
-		return []components.ConfigurationField{}, nil
+		return []configuration.Field{}, nil
 	}
 
-	result := make([]components.ConfigurationField, len(config))
+	result := make([]configuration.Field, len(config))
 	for i, field := range config {
 		if field.Name == "" {
 			return nil, status.Errorf(codes.InvalidArgument, "configuration field %d: name is required", i)
@@ -186,19 +187,19 @@ func ProtoToConfiguration(config []*componentpb.ConfigurationField) ([]component
 		// Type-specific validation
 		if field.TypeOptions != nil {
 			switch field.Type {
-			case components.FieldTypeNumber:
+			case configuration.FieldTypeNumber:
 				if field.TypeOptions.Number == nil || (field.TypeOptions.Number.Min == nil && field.TypeOptions.Number.Max == nil) {
 					return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: number type options are required for number type", field.Name)
 				}
-			case components.FieldTypeSelect:
+			case configuration.FieldTypeSelect:
 				if field.TypeOptions.Select == nil || len(field.TypeOptions.Select.Options) == 0 {
 					return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: options are required for select type", field.Name)
 				}
-			case components.FieldTypeMultiSelect:
+			case configuration.FieldTypeMultiSelect:
 				if field.TypeOptions.MultiSelect == nil || len(field.TypeOptions.MultiSelect.Options) == 0 {
 					return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: options are required for multi_select type", field.Name)
 				}
-			case components.FieldTypeIntegration:
+			case configuration.FieldTypeIntegration:
 				if field.TypeOptions.Integration == nil || field.TypeOptions.Integration.Type == "" {
 					return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: integration type is required for integration type", field.Name)
 				}

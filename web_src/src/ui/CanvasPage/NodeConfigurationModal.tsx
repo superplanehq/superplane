@@ -1,4 +1,4 @@
-import { ComponentsConfigurationField } from "@/api-client";
+import { AuthorizationDomainType, ConfigurationField } from "@/api-client";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCallback, useEffect, useState } from "react";
 
@@ -7,20 +7,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
+import { isFieldRequired, validateFieldValue } from "@/utils/components";
 
 interface NodeConfigurationModalProps {
+  mode: "create" | "edit";
   isOpen: boolean;
   onClose: () => void;
   nodeName: string;
   nodeLabel?: string;
   configuration: Record<string, unknown>;
-  configurationFields: ComponentsConfigurationField[];
+  configurationFields: ConfigurationField[];
   onSave: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string) => void;
   domainId?: string;
-  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION";
+  domainType?: AuthorizationDomainType;
 }
 
 export function NodeConfigurationModal({
+  mode,
   isOpen,
   onClose,
   nodeName,
@@ -46,7 +49,7 @@ export function NodeConfigurationModal({
 
   // Recursively validate nested fields in objects and lists
   const validateNestedFields = useCallback(
-    (fields: ComponentsConfigurationField[], values: Record<string, unknown>, parentPath: string = ""): Set<string> => {
+    (fields: ConfigurationField[], values: Record<string, unknown>, parentPath: string = ""): Set<string> => {
       const errors = new Set<string>();
 
       fields.forEach((field) => {
@@ -55,9 +58,20 @@ export function NodeConfigurationModal({
         const fieldPath = parentPath ? `${parentPath}.${field.name}` : field.name;
         const value = values[field.name];
 
-        // Check if this field itself is required and empty
-        if (field.required && isFieldEmpty(value)) {
+        // Check if field is required (either always or conditionally)
+        const fieldIsRequired = field.required || isFieldRequired(field, values);
+        if (fieldIsRequired && isFieldEmpty(value)) {
           errors.add(fieldPath);
+        }
+
+        // Check validation rules (cross-field validation)
+        if (value !== undefined && value !== null && value !== "") {
+          const validationErrors = validateFieldValue(field, value, values);
+
+          if (validationErrors.length > 0) {
+            // Add validation rule errors to the error set
+            errors.add(fieldPath);
+          }
         }
 
         // Handle nested validation for different field types
@@ -101,7 +115,6 @@ export function NodeConfigurationModal({
     if (isFieldEmpty(currentNodeName)) {
       errors.add("nodeName");
     }
-
     setValidationErrors(errors);
     setShowValidation(true);
     return errors.size === 0;
@@ -130,6 +143,7 @@ export function NodeConfigurationModal({
   };
 
   const displayLabel = nodeLabel || nodeName || "Node configuration";
+  const title = mode === "edit" ? `Edit ${displayLabel}` : `New ${displayLabel}`;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -139,7 +153,7 @@ export function NodeConfigurationModal({
         aria-describedby={undefined} /* Disable DialogDescription */
       >
         <DialogHeader className="px-6 pt-6 pb-0 text-left">
-          <DialogTitle>New {displayLabel}</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[80vh]">
           <div className="p-6">
@@ -158,6 +172,7 @@ export function NodeConfigurationModal({
                   )}
                 </Label>
                 <Input
+                  data-testid="node-name-input"
                   type="text"
                   value={currentNodeName}
                   onChange={(e) => setCurrentNodeName(e.target.value)}
@@ -211,7 +226,7 @@ export function NodeConfigurationModal({
                 Cancel
               </Button>
               <Button data-testid="add-node-button" variant="default" onClick={handleSave}>
-                Add
+                {mode === "edit" ? "Save" : "Add"}
               </Button>
             </DialogFooter>
           </div>

@@ -24,6 +24,6 @@ func DescribeWorkflow(ctx context.Context, registry *registry.Registry, organiza
 	}
 
 	return &pb.DescribeWorkflowResponse{
-		Workflow: SerializeWorkflow(&workflow),
+		Workflow: SerializeWorkflow(&workflow, true),
 	}, nil
 }

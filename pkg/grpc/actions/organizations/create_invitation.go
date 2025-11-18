@@ -58,7 +58,7 @@ func handleExistingUser(authService authorization.Authorization, authenticatedUs
 		}
 
 		invitation = i
-		err = user.Restore()
+		err = user.RestoreInTransaction(tx)
 		if err != nil {
 			return status.Error(codes.InvalidArgument, "Failed to restore user")
 		}
@@ -105,27 +105,31 @@ func handleNewUser(authService authorization.Authorization, orgID, userID uuid.U
 	// If an account already exists,
 	// we add a new user for it to the organization immediately.
 	//
-	var invitation *models.OrganizationInvitation
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		i, err := models.CreateInvitationInTransaction(tx, orgID, userID, email, models.InvitationStateAccepted)
-		if err != nil {
-			return status.Errorf(codes.InvalidArgument, "Failed to create invitation: %v", err)
-		}
-
-		invitation = i
-		user, err := models.CreateUserInTransaction(tx, invitation.OrganizationID, account.ID, account.Email, account.Name)
-		if err != nil {
-			return err
-		}
-
-		//
-		// TODO: this is not using the transaction properly
-		//
-		return authService.AssignRole(user.ID.String(), models.RoleOrgViewer, orgID.String(), models.DomainTypeOrganization)
-	})
-
+	tx := database.Conn().Begin()
+	invitation, err := models.CreateInvitationInTransaction(tx, orgID, userID, email, models.InvitationStateAccepted)
 	if err != nil {
+		tx.Rollback()
+		return nil, status.Errorf(codes.InvalidArgument, "Failed to create invitation: %v", err)
+	}
+
+	user, err := models.CreateUserInTransaction(tx, invitation.OrganizationID, account.ID, account.Email, account.Name)
+	if err != nil {
+		tx.Rollback()
+		return nil, status.Errorf(codes.InvalidArgument, "Failed to create user: %v", err)
+	}
+
+	//
+	// TODO: this is not using the transaction properly
+	//
+	err = authService.AssignRole(user.ID.String(), models.RoleOrgViewer, orgID.String(), models.DomainTypeOrganization)
+	if err != nil {
+		tx.Rollback()
 		return nil, err
+	}
+
+	err = tx.Commit().Error
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Failed to commit transaction: %v", err)
 	}
 
 	return &pb.CreateInvitationResponse{
@@ -144,13 +148,11 @@ func serializeInvitations(invitations []models.OrganizationInvitation) []*pb.Inv
 }
 
 func serializeInvitation(invitation *models.OrganizationInvitation) *pb.Invitation {
-	canvasIDs := invitation.CanvasIDs.Data()
 	pbInvitation := &pb.Invitation{
 		Id:             invitation.ID.String(),
 		OrganizationId: invitation.OrganizationID.String(),
 		Email:          invitation.Email,
 		State:          string(invitation.State),
-		CanvasIds:      canvasIDs,
 		CreatedAt:      timestamppb.New(invitation.CreatedAt),
 	}
 

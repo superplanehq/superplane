@@ -187,7 +187,6 @@ message ValueFrom {
 }
 
 message ValueFromSecret {
-  Authorization.DomainType domain_type = 1;
   string name = 2;
   string key = 3;
 }

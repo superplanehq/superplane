@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"time"
 
@@ -12,6 +13,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
+)
+
+const (
+	defaultAutoDelete = true
+	defaultDurable    = false
+	defaultExclusive  = true
+	defaultRetries    = int32(0)
+	defaultDeadQueue  = false
 )
 
 // EventDistributer coordinates message consumption from RabbitMQ
@@ -45,9 +54,9 @@ func (e *EventDistributer) Start() error {
 		Handler    func(delivery tackle.Delivery) error
 	}{
 		{messages.WorkflowExchange, messages.WorkflowEventCreatedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowEventCreated)},
-		{messages.WorkflowExchange, messages.WorkflowExecutionCreatedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecutionCreated)},
-		{messages.WorkflowExchange, messages.WorkflowExecutionStartedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecutionStarted)},
-		{messages.WorkflowExchange, messages.WorkflowExecutionFinishedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecutionFinished)},
+		{messages.WorkflowExchange, messages.WorkflowExecutionRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecution)},
+		{messages.WorkflowExchange, messages.WorkflowQueueItemCreatedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowQueueItemCreated)},
+		{messages.WorkflowExchange, messages.WorkflowQueueItemConsumedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowQueueItemConsumed)},
 	}
 
 	// Start a consumer for each route
@@ -76,7 +85,16 @@ func (e *EventDistributer) createHandler(processFn func([]byte, *ws.Hub) error) 
 
 // consumeMessages sets up a consumer for a specific routing key
 func (e *EventDistributer) consumeMessages(amqpURL, exchange, routingKey string, handler func(delivery tackle.Delivery) error) {
-	queueName := fmt.Sprintf("superplane.%s.%s.consumer", exchange, routingKey)
+	//
+	// Since we are using distributed architecture and the websocket connections are spreaded between many replicas,
+	// We need to create different queue names for each replica, so all will instances receive the messages
+	//
+	randomSuffix, err := createRandomString(10)
+	if err != nil {
+		log.Errorf("Error creating random suffix for queueName: %v", err)
+		return
+	}
+	queueName := fmt.Sprintf("superplane.%s.%s.consumer.%s", exchange, routingKey, randomSuffix)
 
 	for {
 		log.Infof("Connecting to RabbitMQ queue %s for %s events", queueName, routingKey)
@@ -91,12 +109,10 @@ func (e *EventDistributer) consumeMessages(amqpURL, exchange, routingKey string,
 		consumer.SetLogger(logger)
 
 		// Start the consumer with appropriate options
-		err := consumer.Start(&tackle.Options{
-			URL:            amqpURL,
-			RemoteExchange: exchange,
-			Service:        queueName,
-			RoutingKey:     routingKey,
-		}, handler)
+		err := consumer.Start(
+			getConsumerOptions(amqpURL, exchange, queueName, routingKey),
+			handler,
+		)
 
 		if err != nil {
 			log.Errorf("Error consuming messages from %s: %v", routingKey, err)
@@ -116,4 +132,46 @@ func (e *EventDistributer) Shutdown(ctx context.Context) error {
 	log.Info("Shutting down EventDistributer worker")
 	close(e.shutdown)
 	return nil
+}
+
+func createRandomString(length int) (string, error) {
+	charset := "abcdefghijklmnopqrstuvwxyz0123456789"
+
+	if length <= 0 {
+		return "", fmt.Errorf("length must be positive")
+	}
+
+	randomBytes := make([]byte, length)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", err
+	}
+
+	result := make([]byte, length)
+	charsetLen := len(charset)
+	for i, b := range randomBytes {
+		result[i] = charset[int(b)%charsetLen]
+	}
+
+	return string(result), nil
+}
+
+func getConsumerOptions(amqpURL, exchange, queueName, routingKey string) *tackle.Options {
+	autoDelete := defaultAutoDelete
+	durable := defaultDurable
+	exclusive := defaultExclusive
+	retries := defaultRetries
+	enableDeadQueue := defaultDeadQueue
+
+	return &tackle.Options{
+		URL:             amqpURL,
+		RemoteExchange:  exchange,
+		Service:         queueName,
+		RoutingKey:      routingKey,
+		AutoDeleted:     &autoDelete,
+		Durable:         &durable,
+		Exclusive:       &exclusive,
+		MaxRetries:      &retries,
+		EnableDeadQueue: &enableDeadQueue,
+	}
 }

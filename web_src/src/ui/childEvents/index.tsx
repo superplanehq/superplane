@@ -59,6 +59,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
             <ExpandIcon
               size={16}
               className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer mt-1"
+              data-testid="expand-run-button"
               onClick={(e) => {
                 e.stopPropagation();
                 onExpandChildEvents(childEventsInfo);
@@ -84,14 +85,14 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
               item.state === "processed"
                 ? resolveIcon("check")
                 : item.state === "discarded"
-                ? resolveIcon("x")
-                : resolveIcon("clock");
+                  ? resolveIcon("x")
+                  : resolveIcon("clock");
             const colorClass =
               item.state === "processed"
                 ? "text-green-700"
                 : item.state === "discarded"
-                ? "text-red-700"
-                : "text-blue-800";
+                  ? "text-red-700"
+                  : "text-blue-800";
 
             return (
               <div key={`${item.label}-${idx}`} className="flex justify-between items-center gap-3 py-1 w-full">

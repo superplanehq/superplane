@@ -48,27 +48,4 @@ func Test_ListRoles(t *testing.T) {
 		}
 	})
 
-	t.Run("successful list canvas roles", func(t *testing.T) {
-		resp, err := ListRoles(ctx, models.DomainTypeCanvas, r.Canvas.ID.String(), r.AuthService)
-		require.NoError(t, err)
-		assert.Equal(t, len(resp.Roles), 3)
-
-		for _, role := range resp.Roles {
-			assert.NotEmpty(t, role.Spec.DisplayName, "DisplayName should not be empty for role %s", role.Metadata.Name)
-			assert.NotEmpty(t, role.Spec.Description, "Description should not be empty for role %s", role.Metadata.Name)
-
-			switch role.Metadata.Name {
-			case models.RoleCanvasOwner:
-				assert.Equal(t, "Owner", role.Spec.DisplayName)
-				assert.Contains(t, role.Spec.Description, "Full control over canvas settings")
-			case models.RoleCanvasAdmin:
-				assert.Equal(t, "Admin", role.Spec.DisplayName)
-				assert.Contains(t, role.Spec.Description, "Can manage stages, events, connections, and secrets")
-			case models.RoleCanvasViewer:
-				assert.Equal(t, "Viewer", role.Spec.DisplayName)
-				assert.Contains(t, role.Spec.Description, "Read-only access to canvas resources")
-			}
-		}
-	})
-
 }

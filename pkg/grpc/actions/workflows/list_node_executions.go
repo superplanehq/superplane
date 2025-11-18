@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -81,28 +82,49 @@ func SerializeNodeExecutionsForSingleNode(node *models.WorkflowNode, executions 
 }
 
 func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExecutions []models.WorkflowNodeExecution) ([]*pb.WorkflowNodeExecution, error) {
-	//
-	// Fetch all input records
-	//
-	rootEvents, err := models.FindWorkflowEvents(rootEventIDs(executions))
-	if err != nil {
-		return nil, fmt.Errorf("error find input events: %v", err)
-	}
+	var rootEvents, inputEvents, outputEvents []models.WorkflowEvent
+	var rootEventsErr, inputEventsErr, outputEventsErr error
+	var wg sync.WaitGroup
 
 	//
-	// Fetch all input records
+	// Fetch all execution resources in parallel
 	//
-	inputEvents, err := models.FindWorkflowEvents(eventIDs(executions))
-	if err != nil {
-		return nil, fmt.Errorf("error find input events: %v", err)
-	}
+	wg.Add(3)
 
 	//
-	// Fetch all output records
+	// Root events
 	//
-	outputEvents, err := models.FindWorkflowEventsForExecutions(executionIDs(executions))
-	if err != nil {
-		return nil, fmt.Errorf("error find output events: %v", err)
+	go func() {
+		defer wg.Done()
+		rootEvents, rootEventsErr = models.FindWorkflowEvents(rootEventIDs(executions))
+	}()
+
+	//
+	// Input events
+	//
+	go func() {
+		defer wg.Done()
+		inputEvents, inputEventsErr = models.FindWorkflowEvents(eventIDs(executions))
+	}()
+
+	//
+	// Output events
+	//
+	go func() {
+		defer wg.Done()
+		outputEvents, outputEventsErr = models.FindWorkflowEventsForExecutions(executionIDs(executions))
+	}()
+
+	wg.Wait()
+
+	if rootEventsErr != nil {
+		return nil, fmt.Errorf("error finding root events: %v", rootEventsErr)
+	}
+	if inputEventsErr != nil {
+		return nil, fmt.Errorf("error finding input events: %v", inputEventsErr)
+	}
+	if outputEventsErr != nil {
+		return nil, fmt.Errorf("error finding output events: %v", outputEventsErr)
 	}
 
 	//

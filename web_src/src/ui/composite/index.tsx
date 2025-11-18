@@ -7,8 +7,8 @@ import { ChildEvents, type ChildEventsInfo } from "../childEvents";
 import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
 
-export type LastRunState = "success" | "failed" | "running"
-export type ChildEventsState = "processed" | "discarded" | "waiting" | "running"
+export type LastRunState = "success" | "failed" | "running";
+export type ChildEventsState = "processed" | "discarded" | "waiting" | "running";
 
 export interface WaitingInfo {
   icon: string;
@@ -60,90 +60,123 @@ export interface CompositeProps extends ComponentActionsProps {
   onViewMoreEvents?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, maxVisibleEvents = 5, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onViewMoreEvents, startLastValuesOpen = false, selected = false, isMissing = false, onRun, runDisabled, runDisabledTooltip, onEdit, onConfigure, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
+export const Composite: React.FC<CompositeProps> = ({
+  iconSrc,
+  iconSlug,
+  iconColor,
+  iconBackground,
+  headerColor,
+  title,
+  description,
+  metadata,
+  parameters = [],
+  lastRunItem,
+  lastRunItems,
+  maxVisibleEvents = 5,
+  nextInQueue,
+  collapsed = false,
+  collapsedBackground,
+  onExpandChildEvents,
+  onReRunChildEvents,
+  onToggleCollapse,
+  onViewMoreEvents,
+  startLastValuesOpen = false,
+  selected = false,
+  isMissing = false,
+  onRun,
+  runDisabled,
+  runDisabledTooltip,
+  onEdit,
+  onConfigure,
+  onDuplicate,
+  onDeactivate,
+  onToggleView,
+  onDelete,
+  isCompactView,
+}) => {
   // All hooks must be called before any early returns
   const [showLastRunValues, setShowLastRunValues] = React.useState<Record<number, boolean>>(
-    startLastValuesOpen ? { 0: true } : {}
-  )
+    startLastValuesOpen ? { 0: true } : {},
+  );
 
   // Use lastRunItems if provided, otherwise fall back to single lastRunItem
   const eventsToDisplay = React.useMemo(() => {
     if (lastRunItems && lastRunItems.length > 0) {
-      return lastRunItems
+      return lastRunItems;
     } else if (lastRunItem) {
-      return [lastRunItem]
+      return [lastRunItem];
     }
-    return []
-  }, [lastRunItem, lastRunItems])
+    return [];
+  }, [lastRunItem, lastRunItems]);
 
   const visibleEvents = React.useMemo(() => {
-    return eventsToDisplay.slice(0, maxVisibleEvents)
-  }, [eventsToDisplay, maxVisibleEvents])
+    return eventsToDisplay.slice(0, maxVisibleEvents);
+  }, [eventsToDisplay, maxVisibleEvents]);
 
   const hiddenEventsCount = React.useMemo(() => {
-    return Math.max(0, eventsToDisplay.length - maxVisibleEvents)
-  }, [eventsToDisplay.length, maxVisibleEvents])
+    return Math.max(0, eventsToDisplay.length - maxVisibleEvents);
+  }, [eventsToDisplay.length, maxVisibleEvents]);
 
   const toggleEventValues = React.useCallback((index: number) => {
-    setShowLastRunValues(prev => ({
+    setShowLastRunValues((prev) => ({
       ...prev,
-      [index]: !prev[index]
-    }))
-  }, [])
+      [index]: !prev[index],
+    }));
+  }, []);
 
   const getEventIcon = React.useCallback((state: LastRunState) => {
     if (state === "success") {
-      return resolveIcon("check")
+      return resolveIcon("check");
     } else if (state === "running") {
-      return resolveIcon("refresh-cw")
+      return resolveIcon("refresh-cw");
     } else {
-      return resolveIcon("x")
+      return resolveIcon("x");
     }
-  }, [])
+  }, []);
 
   const getEventColor = React.useCallback((state: LastRunState) => {
     if (state === "success") {
-      return "text-green-700"
+      return "text-green-700";
     } else if (state === "running") {
-      return "text-blue-800"
+      return "text-blue-800";
     } else {
-      return "text-red-700"
+      return "text-red-700";
     }
-  }, [])
+  }, []);
 
   const getEventBackground = React.useCallback((state: LastRunState) => {
     if (state === "success") {
-      return "bg-green-200"
+      return "bg-green-200";
     } else if (state === "running") {
-      return "bg-sky-100"
+      return "bg-sky-100";
     } else {
-      return "bg-red-200"
+      return "bg-red-200";
     }
-  }, [])
+  }, []);
 
   const getEventIconBackground = React.useCallback((state: LastRunState) => {
     if (state === "success") {
-      return "bg-green-600"
+      return "bg-green-600";
     } else if (state === "running") {
-      return "bg-none animate-spin"
+      return "bg-none animate-spin";
     } else {
-      return "bg-red-600"
+      return "bg-red-600";
     }
-  }, [])
+  }, []);
 
   const getEventIconColor = React.useCallback((state: LastRunState) => {
     if (state === "success") {
-      return "text-white"
+      return "text-white";
     } else if (state === "running") {
-      return "text-blue-800"
+      return "text-blue-800";
     } else {
-      return "text-white"
+      return "text-white";
     }
-  }, [])
+  }, []);
 
   const NextInQueueIcon = React.useMemo(() => {
-    return resolveIcon("circle-dashed")
-  }, [])
+    return resolveIcon("circle-dashed");
+  }, []);
 
   // Now safe to do early return after all hooks are called
   if (collapsed) {
@@ -175,9 +208,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
                 <React.Fragment key={groupIndex}>
                   {Object.entries(group.items).map(([key, value]) => (
                     <div key={key} className="flex items-center gap-2">
-                      <div className="flex-shrink-0">
-                        {React.createElement(resolveIcon(group.icon), { size: 16 })}
-                      </div>
+                      <div className="flex-shrink-0">{React.createElement(resolveIcon(group.icon), { size: 16 })}</div>
                       <span className="text-xs font-medium flex-shrink-0">{key}:</span>
                       <span className="text-xs truncate">{value}</span>
                     </div>
@@ -188,12 +219,12 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           )}
         </CollapsedComponent>
       </SelectionWrapper>
-    )
+    );
   }
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-2 border-border rounded-md w-[26rem] bg-white" >
+      <div className="flex flex-col border-1 border-border rounded-md w-[26rem] bg-white">
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
@@ -221,20 +252,19 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
               {React.createElement(resolveIcon("alert-triangle"), { className: "h-4 w-4 text-amber-700" })}
             </div>
             <div className="text-sm text-amber-700">
-              <span className="font-medium">Component deleted:</span> This component no longer exists and needs to be removed or replaced.
+              <span className="font-medium">Component deleted:</span> This component no longer exists and needs to be
+              removed or replaced.
             </div>
           </div>
         )}
 
         {parameters.length > 0 && (
-          <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
+          <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-1.5">
             {parameters.map((group, groupIndex) => (
               <React.Fragment key={groupIndex}>
                 {Object.entries(group.items).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-2">
-                    <div className="flex-shrink-0">
-                      {React.createElement(resolveIcon(group.icon), { size: 16 })}
-                    </div>
+                    <div className="flex-shrink-0">{React.createElement(resolveIcon(group.icon), { size: 16 })}</div>
                     <span className="text-sm font-medium flex-shrink-0">{key}:</span>
                     <span className="text-sm truncate">{value}</span>
                   </div>
@@ -247,34 +277,39 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         {metadata && metadata.length > 0 && (
           <MetadataList
             items={metadata}
-            className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2"
+            className="px-2 py-3 border-b text-gray-500 flex flex-col gap-1.5"
             iconSize={16}
           />
         )}
 
         <div className="px-4 py-3 border-b">
           <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-            <span className="uppercase text-sm font-medium">Last Run</span>
+            <span className="uppercase text-xs font-semibold tracking-wide">Last Run</span>
           </div>
 
           {eventsToDisplay.length > 0 ? (
             <div className="flex flex-col gap-2">
               {visibleEvents.map((event, index) => {
-                const EventIcon = getEventIcon(event.state)
-                const eventColor = getEventColor(event.state)
-                const eventBackground = getEventBackground(event.state)
-                const eventIconBackground = getEventIconBackground(event.state)
-                const eventIconColor = getEventIconColor(event.state)
-                const now = new Date()
-                const diff = now.getTime() - new Date(event.receivedAt).getTime()
-                const timeAgo = calcRelativeTimeFromDiff(diff)
+                const EventIcon = getEventIcon(event.state);
+                const eventColor = getEventColor(event.state);
+                const eventBackground = getEventBackground(event.state);
+                const eventIconBackground = getEventIconBackground(event.state);
+                const eventIconColor = getEventIconColor(event.state);
+                const now = new Date();
+                const diff = now.getTime() - new Date(event.receivedAt).getTime();
+                const timeAgo = calcRelativeTimeFromDiff(diff);
 
                 return (
                   <div key={index}>
-                    <div onClick={() => toggleEventValues(index)} className={`flex flex-col items-center justify-between gap-1 px-2 py-2 rounded-md cursor-pointer ${eventBackground} ${eventColor}`}>
+                    <div
+                      onClick={() => toggleEventValues(index)}
+                      className={`flex flex-col items-center justify-between gap-1 px-2 py-2 rounded-md cursor-pointer ${eventBackground} ${eventColor}`}
+                    >
                       <div className="flex items-center gap-3 rounded-md w-full min-w-0">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${eventIconBackground}`}>
+                          <div
+                            className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${eventIconBackground}`}
+                          >
                             <EventIcon size={event.state === "running" ? 16 : 12} className={`${eventIconColor}`} />
                           </div>
                           <span className="truncate text-sm">{event.title}</span>
@@ -306,7 +341,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
                       />
                     )}
                   </div>
-                )
+                );
               })}
               {hiddenEventsCount > 0 && (
                 <div
@@ -330,7 +365,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         {nextInQueue && (
           <div className="px-4 pt-3 pb-6">
             <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-              <span className="uppercase text-sm font-medium">Next In Queue</span>
+              <span className="uppercase text-xs font-semibold tracking-wide">Next In Queue</span>
             </div>
             <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100 min-w-0`}>
               <div className="flex items-center gap-2 text-gray-500 min-w-0 flex-1">
@@ -347,5 +382,5 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         )}
       </div>
     </SelectionWrapper>
-  )
-}
+  );
+};

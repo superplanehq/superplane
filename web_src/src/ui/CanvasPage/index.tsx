@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Background,
   ReactFlow,
@@ -7,13 +8,14 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
+import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ComponentsConfigurationField } from "@/api-client";
+import { ConfigurationField } from "@/api-client";
 import { AiSidebar } from "../ai";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
-import type { ChildEventsInfo } from "../childEvents";
 import { ComponentSidebar } from "../componentSidebar";
+import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import type { MetadataItem } from "../metadataList";
 import { ViewToggle } from "../ViewToggle";
@@ -29,11 +31,14 @@ export interface SidebarEvent {
   id: string;
   title: string;
   subtitle?: string;
-  state: "processed" | "discarded" | "waiting";
+  state: "processed" | "discarded" | "waiting" | "running";
   isOpen: boolean;
   receivedAt?: Date;
   values?: Record<string, string>;
-  childEventsInfo?: ChildEventsInfo;
+  // Optional specific identifiers to avoid overloading `id`
+  executionId?: string;
+  triggerEventId?: string;
+  kind?: "execution" | "trigger" | "queue";
 }
 
 export interface SidebarData {
@@ -45,8 +50,11 @@ export interface SidebarData {
   iconSlug?: string;
   iconColor?: string;
   iconBackground?: string;
-  moreInQueueCount: number;
+  totalInQueueCount: number;
+  totalInHistoryCount: number;
   hideQueueEvents?: boolean;
+  isLoading?: boolean;
+  isComposite?: boolean;
 }
 
 export interface CanvasNode extends ReactFlowNode {
@@ -74,7 +82,7 @@ export interface NodeEditData {
   nodeName: string;
   displayLabel?: string;
   configuration: Record<string, any>;
-  configurationFields: ComponentsConfigurationField[];
+  configurationFields: ConfigurationField[];
 }
 
 export interface NewNodeData {
@@ -105,6 +113,8 @@ export interface CanvasPageProps {
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
+  loadSidebarData?: (nodeId: string) => void;
+  getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
   onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -112,6 +122,9 @@ export interface CanvasPageProps {
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
+  onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
+  onPushThrough?: (nodeId: string, executionId: string) => void;
+  supportsPushThrough?: (nodeId: string) => boolean;
   onDirty?: () => void;
 
   onRun?: (nodeId: string, channel: string, data: any) => void | Promise<void>;
@@ -122,6 +135,7 @@ export interface CanvasPageProps {
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
+  onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
 
   ai?: AiProps;
 
@@ -134,6 +148,30 @@ export interface CanvasPageProps {
   hasUserToggledSidebarRef?: React.MutableRefObject<boolean>;
   isSidebarOpenRef?: React.MutableRefObject<boolean | null>;
   viewportRef?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
+
+  // Optional: control and observe component sidebar state
+  onSidebarChange?: (isOpen: boolean, selectedNodeId: string | null) => void;
+  initialSidebar?: { isOpen?: boolean; nodeId?: string | null };
+
+  // Full history functionality
+  getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
+  onLoadMoreHistory?: (nodeId: string) => void;
+  getHasMoreHistory?: (nodeId: string) => boolean;
+  getLoadingMoreHistory?: (nodeId: string) => boolean;
+
+  // Queue functionality
+  onLoadMoreQueue?: (nodeId: string) => void;
+  getAllQueueEvents?: (nodeId: string) => SidebarEvent[];
+  getHasMoreQueue?: (nodeId: string) => boolean;
+  getLoadingMoreQueue?: (nodeId: string) => boolean;
+
+  // Execution chain lazy loading
+  loadExecutionChain?: (
+    eventId: string,
+    nodeId?: string,
+    currentExecution?: Record<string, unknown>,
+    forceReload?: boolean,
+  ) => Promise<any[]>;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -174,6 +212,9 @@ const nodeTypes = {
         onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
         onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
         onToggleView={callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
+        onToggleCollapse={
+          callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
+        }
         ai={{
           show: callbacks.aiState.sidebarOpen,
           suggestion: callbacks.aiState.suggestions[nodeProps.id] || null,
@@ -186,6 +227,8 @@ const nodeTypes = {
 };
 
 function CanvasPage(props: CanvasPageProps) {
+  const cancelQueueItemRef = useRef<CanvasPageProps["onCancelQueueItem"]>(props.onCancelQueueItem);
+  cancelQueueItemRef.current = props.onCancelQueueItem;
   const state = useCanvasState(props);
   const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(null);
   const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
@@ -283,18 +326,15 @@ function CanvasPage(props: CanvasPageProps) {
     [emitModalData, props],
   );
 
-  const handleBuildingBlockDrop = useCallback(
-    (block: BuildingBlock, position?: { x: number; y: number }) => {
-      setNewNodeData({
-        buildingBlock: block,
-        nodeName: block.name || "",
-        displayLabel: block.label || block.name || "",
-        configuration: {},
-        position,
-      });
-    },
-    [],
-  );
+  const handleBuildingBlockDrop = useCallback((block: BuildingBlock, position?: { x: number; y: number }) => {
+    setNewNodeData({
+      buildingBlock: block,
+      nodeName: block.name || "",
+      displayLabel: block.label || block.name || "",
+      configuration: {},
+      position,
+    });
+  }, []);
 
   const handleSidebarToggle = useCallback(
     (open: boolean) => {
@@ -340,6 +380,18 @@ function CanvasPage(props: CanvasPageProps) {
     },
     [state.toggleNodeCollapse, props.onToggleView],
   );
+
+  const handlePushThrough = (executionId: string) => {
+    if (state.componentSidebar.selectedNodeId && props.onPushThrough) {
+      props.onPushThrough(state.componentSidebar.selectedNodeId, executionId);
+    }
+  };
+
+  const handleCancelQueueItem = (queueId: string) => {
+    if (state.componentSidebar.selectedNodeId && props.onCancelQueueItem) {
+      props.onCancelQueueItem!(state.componentSidebar.selectedNodeId!, queueId);
+    }
+  };
 
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
@@ -401,6 +453,11 @@ function CanvasPage(props: CanvasPageProps) {
           <Sidebar
             state={state}
             getSidebarData={props.getSidebarData}
+            loadSidebarData={props.loadSidebarData}
+            getTabData={props.getTabData}
+            onCancelQueueItem={handleCancelQueueItem}
+            onPushThrough={handlePushThrough}
+            supportsPushThrough={props.supportsPushThrough}
             onRun={handleNodeRun}
             onDuplicate={props.onDuplicate}
             onDocs={props.onDocs}
@@ -409,6 +466,16 @@ function CanvasPage(props: CanvasPageProps) {
             onDelete={handleNodeDelete}
             runDisabled={props.runDisabled}
             runDisabledTooltip={props.runDisabledTooltip}
+            getAllHistoryEvents={props.getAllHistoryEvents}
+            onLoadMoreHistory={props.onLoadMoreHistory}
+            getHasMoreHistory={props.getHasMoreHistory}
+            getLoadingMoreHistory={props.getLoadingMoreHistory}
+            onLoadMoreQueue={props.onLoadMoreQueue}
+            getAllQueueEvents={props.getAllQueueEvents}
+            getHasMoreQueue={props.getHasMoreQueue}
+            getLoadingMoreQueue={props.getLoadingMoreQueue}
+            onReEmit={props.onReEmit}
+            loadExecutionChain={props.loadExecutionChain}
           />
         </div>
       </div>
@@ -416,6 +483,7 @@ function CanvasPage(props: CanvasPageProps) {
       {/* Edit existing node modal */}
       {editingNodeData && (
         <NodeConfigurationModal
+          mode="edit"
           isOpen={true}
           onClose={() => setEditingNodeData(null)}
           nodeName={editingNodeData.nodeName}
@@ -431,6 +499,7 @@ function CanvasPage(props: CanvasPageProps) {
       {/* Add new node modal */}
       {newNodeData && (
         <NodeConfigurationModal
+          mode="create"
           isOpen={true}
           onClose={() => setNewNodeData(null)}
           nodeName={newNodeData.nodeName}
@@ -463,6 +532,11 @@ function CanvasPage(props: CanvasPageProps) {
 function Sidebar({
   state,
   getSidebarData,
+  loadSidebarData,
+  getTabData,
+  onCancelQueueItem,
+  onPushThrough,
+  supportsPushThrough,
   onRun,
   onDuplicate,
   onDocs,
@@ -470,11 +544,26 @@ function Sidebar({
   onDeactivate,
   onToggleView,
   onDelete,
+  onReEmit,
   runDisabled,
   runDisabledTooltip,
+  getAllHistoryEvents,
+  onLoadMoreHistory,
+  getHasMoreHistory,
+  getLoadingMoreHistory,
+  onLoadMoreQueue,
+  getAllQueueEvents,
+  getHasMoreQueue,
+  getLoadingMoreQueue,
+  loadExecutionChain,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
+  loadSidebarData?: (nodeId: string) => void;
+  getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
+  onCancelQueueItem?: (id: string) => void;
+  onPushThrough?: (executionId: string) => void;
+  supportsPushThrough?: (nodeId: string) => boolean;
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
@@ -482,8 +571,18 @@ function Sidebar({
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
+  onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
+  getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
+  onLoadMoreHistory?: (nodeId: string) => void;
+  getHasMoreHistory?: (nodeId: string) => boolean;
+  getLoadingMoreHistory?: (nodeId: string) => boolean;
+  onLoadMoreQueue?: (nodeId: string) => void;
+  getAllQueueEvents?: (nodeId: string) => SidebarEvent[];
+  getHasMoreQueue?: (nodeId: string) => boolean;
+  getLoadingMoreQueue?: (nodeId: string) => boolean;
+  loadExecutionChain?: (eventId: string) => Promise<any[]>;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -494,6 +593,13 @@ function Sidebar({
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
+
+  // Trigger data loading when sidebar opens for a node
+  useEffect(() => {
+    if (state.componentSidebar.selectedNodeId && loadSidebarData) {
+      loadSidebarData(state.componentSidebar.selectedNodeId);
+    }
+  }, [state.componentSidebar.selectedNodeId, loadSidebarData]);
 
   useEffect(() => {
     if (sidebarData?.latestEvents) {
@@ -508,8 +614,26 @@ function Sidebar({
     return null;
   }
 
+  // Show loading state when data is being fetched
+  if (sidebarData.isLoading) {
+    return (
+      <div
+        className="border-l-1 border-gray-200 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
+        style={{ width: "420px" }}
+      >
+        <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+            <p className="text-sm text-gray-500">Loading events...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ComponentSidebar
+      key={state.componentSidebar.selectedNodeId}
       isOpen={state.componentSidebar.isOpen}
       onClose={state.componentSidebar.close}
       latestEvents={latestEvents}
@@ -520,35 +644,38 @@ function Sidebar({
       iconSlug={sidebarData.iconSlug}
       iconColor={sidebarData.iconColor}
       iconBackground={sidebarData.iconBackground}
-      moreInQueueCount={sidebarData.moreInQueueCount}
+      totalInQueueCount={sidebarData.totalInQueueCount}
+      totalInHistoryCount={sidebarData.totalInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
-      onEventClick={(event) => {
-        setLatestEvents((prev) => {
-          return prev.map((e) => {
-            if (e.id === event.id) {
-              return { ...e, isOpen: !e.isOpen };
-            }
-            return e;
-          });
-        });
-        setNextInQueueEvents((prev) => {
-          return prev.map((e) => {
-            if (e.title === event.title) {
-              return { ...e, isOpen: !e.isOpen };
-            }
-            return e;
-          });
-        });
-      }}
+      getTabData={
+        getTabData && state.componentSidebar.selectedNodeId
+          ? (event) => getTabData(state.componentSidebar.selectedNodeId!, event)
+          : undefined
+      }
+      onCancelQueueItem={onCancelQueueItem}
+      onPushThrough={onPushThrough}
+      supportsPushThrough={supportsPushThrough?.(state.componentSidebar.selectedNodeId!)}
       onRun={onRun ? () => onRun(state.componentSidebar.selectedNodeId!) : undefined}
       runDisabled={runDisabled}
       runDisabledTooltip={runDisabledTooltip}
       onDuplicate={onDuplicate ? () => onDuplicate(state.componentSidebar.selectedNodeId!) : undefined}
       onDocs={onDocs ? () => onDocs(state.componentSidebar.selectedNodeId!) : undefined}
-      onConfigure={onConfigure ? () => onConfigure(state.componentSidebar.selectedNodeId!) : undefined}
+      onConfigure={
+        onConfigure && sidebarData?.isComposite ? () => onConfigure(state.componentSidebar.selectedNodeId!) : undefined
+      }
       onDeactivate={onDeactivate ? () => onDeactivate(state.componentSidebar.selectedNodeId!) : undefined}
       onToggleView={onToggleView ? () => onToggleView(state.componentSidebar.selectedNodeId!) : undefined}
       onDelete={onDelete ? () => onDelete(state.componentSidebar.selectedNodeId!) : undefined}
+      getAllHistoryEvents={() => getAllHistoryEvents?.(state.componentSidebar.selectedNodeId!) || []}
+      onLoadMoreHistory={() => onLoadMoreHistory?.(state.componentSidebar.selectedNodeId!)}
+      getHasMoreHistory={() => getHasMoreHistory?.(state.componentSidebar.selectedNodeId!) || false}
+      getLoadingMoreHistory={() => getLoadingMoreHistory?.(state.componentSidebar.selectedNodeId!) || false}
+      onLoadMoreQueue={() => onLoadMoreQueue?.(state.componentSidebar.selectedNodeId!)}
+      getAllQueueEvents={() => getAllQueueEvents?.(state.componentSidebar.selectedNodeId!) || []}
+      getHasMoreQueue={() => getHasMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
+      getLoadingMoreQueue={() => getLoadingMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
+      onReEmit={onReEmit}
+      loadExecutionChain={loadExecutionChain}
     />
   );
 }
@@ -840,15 +967,55 @@ function CanvasContent({
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [connectingFrom, setConnectingFrom] = useState<{
+    nodeId: string;
+    handleId: string | null;
+    handleType: "source" | "target" | null;
+  } | null>(null);
+
+  const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: any) => {
+    setHoveredEdgeId(edge.id);
+  }, []);
+
+  const handleEdgeMouseLeave = useCallback(() => {
+    setHoveredEdgeId(null);
+  }, []);
+
+  const handleConnectStart = useCallback(
+    (
+      _event: any,
+      params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
+    ) => {
+      if (params.nodeId) {
+        setConnectingFrom({ nodeId: params.nodeId, handleId: params.handleId, handleType: params.handleType });
+      }
+    },
+    [],
+  );
+
+  const handleConnectEnd = useCallback(() => {
+    setConnectingFrom(null);
+  }, []);
+
+  // Find the hovered edge to get its source and target
+  const hoveredEdge = useMemo(() => {
+    if (!hoveredEdgeId) return null;
+    return state.edges?.find((e) => e.id === hoveredEdgeId);
+  }, [hoveredEdgeId, state.edges]);
+
   const nodesWithCallbacks = useMemo(() => {
     return state.nodes.map((node) => ({
       ...node,
       data: {
         ...node.data,
         _callbacksRef: callbacksRef,
+        _hoveredEdge: hoveredEdge,
+        _connectingFrom: connectingFrom,
+        _allEdges: state.edges,
       },
     }));
-  }, [state.nodes]);
+  }, [state.nodes, hoveredEdge, connectingFrom, state.edges]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -856,7 +1023,16 @@ function CanvasContent({
     }),
     [],
   );
-  const styledEdges = useMemo(() => state.edges?.map((e) => ({ ...e, ...EDGE_STYLE })), [state.edges]);
+  const styledEdges = useMemo(
+    () =>
+      state.edges?.map((e) => ({
+        ...e,
+        ...EDGE_STYLE,
+        data: { ...e.data, isHovered: e.id === hoveredEdgeId },
+        zIndex: e.id === hoveredEdgeId ? 1000 : 0,
+      })),
+    [state.edges, hoveredEdgeId],
+  );
 
   return (
     <>
@@ -890,11 +1066,15 @@ function CanvasContent({
             onNodesChange={state.onNodesChange}
             onEdgesChange={state.onEdgesChange}
             onConnect={handleConnect}
+            onConnectStart={handleConnectStart}
+            onConnectEnd={handleConnectEnd}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onMove={handleMove}
             onInit={handleInit}
             onPaneClick={handlePaneClick}
+            onEdgeMouseEnter={handleEdgeMouseEnter}
+            onEdgeMouseLeave={handleEdgeMouseLeave}
             defaultViewport={viewport}
             fitView={false}
             style={{ opacity: isInitialized ? 1 : 0 }}

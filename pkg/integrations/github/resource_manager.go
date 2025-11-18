@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"slices"
 	"strconv"
 
 	"github.com/google/go-github/v74/github"
@@ -69,29 +68,11 @@ func parseOwnerFromURL(URL string) (string, error) {
 	return u.Path[1:], nil
 }
 
-// DEPRECATED: will be removed once old canvas infrastructure is removed.
-func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
-	//
-	// If a webhook already exists for this repository,
-	// we update it. If not, we create a new one.
-	//
-	webhookIndex := slices.IndexFunc(options.Children, func(r integrations.Resource) bool {
-		return r.Type() == ResourceTypeWebHook
-	})
-
-	if webhookIndex == -1 {
-		return i.createRepositoryWebhook(options)
-	}
-
-	hook := options.Children[webhookIndex]
-	return i.updateRepositoryWebhook(hook, options)
-}
-
 type WebhookConfiguration struct {
-	Events []string `json:"events"`
+	EventType string `json:"eventType"`
 }
 
-func (i *GitHubResourceManager) SetupWebhookV2(options integrations.WebhookOptionsV2) (any, error) {
+func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions) (any, error) {
 	config := WebhookConfiguration{}
 	err := mapstructure.Decode(options.Configuration, &config)
 	if err != nil {
@@ -100,7 +81,7 @@ func (i *GitHubResourceManager) SetupWebhookV2(options integrations.WebhookOptio
 
 	hook := &github.Hook{
 		Active: github.Ptr(true),
-		Events: config.Events,
+		Events: []string{config.EventType},
 		Config: &github.HookConfig{
 			URL:         &options.URL,
 			Secret:      github.Ptr(string(options.Secret)),
@@ -120,103 +101,7 @@ func (i *GitHubResourceManager) SetupWebhookV2(options integrations.WebhookOptio
 	}, nil
 }
 
-func (i *GitHubResourceManager) getEventTypes(options integrations.WebhookOptions) []string {
-	//
-	// If we are creating a webhook for an internally-scoped event source,
-	// we only need to listen to workflow_run events.
-	//
-	if options.Internal {
-		return []string{"workflow_run"}
-	}
-
-	//
-	// If no event types are selected by the user,
-	// we use a sensible set of default event types.
-	//
-	if len(options.EventTypes) == 0 {
-		return defaultEventTypes
-	}
-
-	//
-	// We always include the workflow_run type of event,
-	// to ensure that we can re-use the same webhook for stage execution updates.
-	//
-	if !slices.Contains(options.EventTypes, "workflow_run") {
-		return append(options.EventTypes, "workflow_run")
-	}
-
-	return options.EventTypes
-}
-
-func (i *GitHubResourceManager) createRepositoryWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
-	hook := &github.Hook{
-		Active: github.Ptr(true),
-		Events: i.getEventTypes(options),
-		Config: &github.HookConfig{
-			URL:         &options.URL,
-			Secret:      github.Ptr(string(options.Key)),
-			ContentType: github.Ptr("json"),
-		},
-	}
-
-	createdHook, _, err := i.client.Repositories.CreateHook(context.Background(), i.Owner, options.Parent.Name(), hook)
-	if err != nil {
-		return nil, fmt.Errorf("error creating webhook: %v", err)
-	}
-
-	return []integrations.Resource{
-		&Webhook{
-			ID:          createdHook.GetID(),
-			WebhookName: *createdHook.Name,
-			WebhookURL:  createdHook.GetURL(),
-		},
-	}, nil
-}
-
-func (i *GitHubResourceManager) updateRepositoryWebhook(hook integrations.Resource, options integrations.WebhookOptions) ([]integrations.Resource, error) {
-	hookID, err := strconv.ParseInt(hook.Id(), 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing webhook ID: %v", err)
-	}
-
-	updatedHook, _, err := i.client.Repositories.EditHook(context.Background(), i.Owner, options.Parent.Name(), hookID, &github.Hook{
-		Active: github.Ptr(true),
-		Events: i.getEventTypes(options),
-		Config: &github.HookConfig{
-			URL:         &options.URL,
-			Secret:      github.Ptr(string(options.Key)),
-			ContentType: github.Ptr("json"),
-		},
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("error updating webhook: %v", err)
-	}
-
-	return []integrations.Resource{
-		&Webhook{
-			ID:          updatedHook.GetID(),
-			WebhookName: *updatedHook.Name,
-			WebhookURL:  updatedHook.GetURL(),
-		},
-	}, nil
-}
-
-func (i *GitHubResourceManager) CleanupWebhook(parentResource integrations.Resource, webhook integrations.Resource) error {
-	hookID, err := strconv.ParseInt(webhook.Id(), 10, 64)
-	if err != nil {
-		return fmt.Errorf("error parsing webhook ID: %v", err)
-	}
-
-	_, err = i.client.Repositories.DeleteHook(context.Background(), i.Owner, parentResource.Name(), hookID)
-	if err != nil {
-		return fmt.Errorf("error deleting webhook: %v", err)
-	}
-
-	return nil
-}
-
-func (i *GitHubResourceManager) CleanupWebhookV2(options integrations.WebhookOptionsV2) error {
+func (i *GitHubResourceManager) CleanupWebhook(options integrations.WebhookOptions) error {
 	webhook := &Webhook{}
 	err := mapstructure.Decode(options.Metadata, &webhook)
 	if err != nil {
@@ -407,6 +292,7 @@ type WorkflowRun struct {
 	ID         int64
 	Status     string
 	Conclusion string
+	HTMLURL    string
 }
 
 func (w *WorkflowRun) Id() string {
@@ -423,4 +309,8 @@ func (w *WorkflowRun) Finished() bool {
 
 func (w *WorkflowRun) Successful() bool {
 	return w.Conclusion == "success"
+}
+
+func (w *WorkflowRun) URL() string {
+	return w.HTMLURL
 }

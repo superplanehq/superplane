@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from "@storybook/react"
-import { Check, Loader2, Settings } from "lucide-react"
+import type { Meta, StoryObj } from "@storybook/react";
+import { Check, Loader2, Settings } from "lucide-react";
 
-import { Button } from "../button"
+import { Button } from "../button";
 
 import {
   ContextMenu,
@@ -18,9 +18,9 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
   ContextMenuTrigger,
-} from "./index"
+} from "./index";
 
-type ContextMenuArgs = React.ComponentProps<typeof ContextMenu>
+type ContextMenuArgs = React.ComponentProps<typeof ContextMenu>;
 
 const meta = {
   title: "shadcn Primitives/ContextMenu",
@@ -37,11 +37,11 @@ const meta = {
   args: {
     modal: false,
   },
-} satisfies Meta<ContextMenuArgs>
+} satisfies Meta<ContextMenuArgs>;
 
-export default meta
+export default meta;
 
-type Story = StoryObj<ContextMenuArgs>
+type Story = StoryObj<ContextMenuArgs>;
 
 const BaseMenu = (args: ContextMenuArgs) => (
   <ContextMenu {...args}>
@@ -71,19 +71,15 @@ const BaseMenu = (args: ContextMenuArgs) => (
         </ContextMenuPortal>
       </ContextMenuSub>
       <ContextMenuSeparator />
-      <ContextMenuCheckboxItem checked>
-        Show status bar
-      </ContextMenuCheckboxItem>
-      <ContextMenuCheckboxItem>
-        Show sidebar
-      </ContextMenuCheckboxItem>
+      <ContextMenuCheckboxItem checked>Show status bar</ContextMenuCheckboxItem>
+      <ContextMenuCheckboxItem>Show sidebar</ContextMenuCheckboxItem>
     </ContextMenuContent>
   </ContextMenu>
-)
+);
 
 export const Default: Story = {
   render: (args) => <BaseMenu {...args} />,
-}
+};
 
 export const WithIndicators: Story = {
   render: (args) => (
@@ -111,4 +107,4 @@ export const WithIndicators: Story = {
       </ContextMenuContent>
     </ContextMenu>
   ),
-}
+};

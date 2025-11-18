@@ -20,14 +20,13 @@ import (
 	"strings"
 )
 
-
 // SecretAPIService SecretAPI service
 type SecretAPIService service
 
 type ApiSecretsCreateSecretRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *SecretAPIService
-	body *SecretsCreateSecretRequest
+	body       *SecretsCreateSecretRequest
 }
 
 func (r ApiSecretsCreateSecretRequest) Body(body SecretsCreateSecretRequest) ApiSecretsCreateSecretRequest {
@@ -44,24 +43,25 @@ SecretsCreateSecret Create a new secret
 
 Creates a new secret
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiSecretsCreateSecretRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiSecretsCreateSecretRequest
 */
 func (a *SecretAPIService) SecretsCreateSecret(ctx context.Context) ApiSecretsCreateSecretRequest {
 	return ApiSecretsCreateSecretRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return SecretsCreateSecretResponse
+//
+//	@return SecretsCreateSecretResponse
 func (a *SecretAPIService) SecretsCreateSecretExecute(r ApiSecretsCreateSecretRequest) (*SecretsCreateSecretResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *SecretsCreateSecretResponse
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *SecretsCreateSecretResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsCreateSecret")
@@ -119,14 +119,14 @@ func (a *SecretAPIService) SecretsCreateSecretExecute(r ApiSecretsCreateSecretRe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -143,11 +143,11 @@ func (a *SecretAPIService) SecretsCreateSecretExecute(r ApiSecretsCreateSecretRe
 }
 
 type ApiSecretsDeleteSecretRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *SecretAPIService
-	idOrName string
+	idOrName   string
 	domainType *string
-	domainId *string
+	domainId   *string
 }
 
 func (r ApiSecretsDeleteSecretRequest) DomainType(domainType string) ApiSecretsDeleteSecretRequest {
@@ -169,26 +169,27 @@ SecretsDeleteSecret Deletes a secret
 
 Deletes the specified secret
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param idOrName
- @return ApiSecretsDeleteSecretRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param idOrName
+	@return ApiSecretsDeleteSecretRequest
 */
 func (a *SecretAPIService) SecretsDeleteSecret(ctx context.Context, idOrName string) ApiSecretsDeleteSecretRequest {
 	return ApiSecretsDeleteSecretRequest{
 		ApiService: a,
-		ctx: ctx,
-		idOrName: idOrName,
+		ctx:        ctx,
+		idOrName:   idOrName,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *SecretAPIService) SecretsDeleteSecretExecute(r ApiSecretsDeleteSecretRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsDeleteSecret")
@@ -251,14 +252,14 @@ func (a *SecretAPIService) SecretsDeleteSecretExecute(r ApiSecretsDeleteSecretRe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -275,11 +276,11 @@ func (a *SecretAPIService) SecretsDeleteSecretExecute(r ApiSecretsDeleteSecretRe
 }
 
 type ApiSecretsDescribeSecretRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *SecretAPIService
-	idOrName string
+	idOrName   string
 	domainType *string
-	domainId *string
+	domainId   *string
 }
 
 func (r ApiSecretsDescribeSecretRequest) DomainType(domainType string) ApiSecretsDescribeSecretRequest {
@@ -301,26 +302,27 @@ SecretsDescribeSecret Get secret details
 
 Returns the details of a specific secret
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param idOrName
- @return ApiSecretsDescribeSecretRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param idOrName
+	@return ApiSecretsDescribeSecretRequest
 */
 func (a *SecretAPIService) SecretsDescribeSecret(ctx context.Context, idOrName string) ApiSecretsDescribeSecretRequest {
 	return ApiSecretsDescribeSecretRequest{
 		ApiService: a,
-		ctx: ctx,
-		idOrName: idOrName,
+		ctx:        ctx,
+		idOrName:   idOrName,
 	}
 }
 
 // Execute executes the request
-//  @return SecretsDescribeSecretResponse
+//
+//	@return SecretsDescribeSecretResponse
 func (a *SecretAPIService) SecretsDescribeSecretExecute(r ApiSecretsDescribeSecretRequest) (*SecretsDescribeSecretResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *SecretsDescribeSecretResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *SecretsDescribeSecretResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsDescribeSecret")
@@ -383,14 +385,14 @@ func (a *SecretAPIService) SecretsDescribeSecretExecute(r ApiSecretsDescribeSecr
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -407,10 +409,10 @@ func (a *SecretAPIService) SecretsDescribeSecretExecute(r ApiSecretsDescribeSecr
 }
 
 type ApiSecretsListSecretsRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *SecretAPIService
 	domainType *string
-	domainId *string
+	domainId   *string
 }
 
 func (r ApiSecretsListSecretsRequest) DomainType(domainType string) ApiSecretsListSecretsRequest {
@@ -432,24 +434,25 @@ SecretsListSecrets List secrets
 
 Returns the list of secrets
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiSecretsListSecretsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiSecretsListSecretsRequest
 */
 func (a *SecretAPIService) SecretsListSecrets(ctx context.Context) ApiSecretsListSecretsRequest {
 	return ApiSecretsListSecretsRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return SecretsListSecretsResponse
+//
+//	@return SecretsListSecretsResponse
 func (a *SecretAPIService) SecretsListSecretsExecute(r ApiSecretsListSecretsRequest) (*SecretsListSecretsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *SecretsListSecretsResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *SecretsListSecretsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsListSecrets")
@@ -511,14 +514,14 @@ func (a *SecretAPIService) SecretsListSecretsExecute(r ApiSecretsListSecretsRequ
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -535,10 +538,10 @@ func (a *SecretAPIService) SecretsListSecretsExecute(r ApiSecretsListSecretsRequ
 }
 
 type ApiSecretsUpdateSecretRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *SecretAPIService
-	idOrName string
-	body *SecretsUpdateSecretBody
+	idOrName   string
+	body       *SecretsUpdateSecretBody
 }
 
 func (r ApiSecretsUpdateSecretRequest) Body(body SecretsUpdateSecretBody) ApiSecretsUpdateSecretRequest {
@@ -555,26 +558,27 @@ SecretsUpdateSecret Updates a secret
 
 Updates the specified secret
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param idOrName
- @return ApiSecretsUpdateSecretRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param idOrName
+	@return ApiSecretsUpdateSecretRequest
 */
 func (a *SecretAPIService) SecretsUpdateSecret(ctx context.Context, idOrName string) ApiSecretsUpdateSecretRequest {
 	return ApiSecretsUpdateSecretRequest{
 		ApiService: a,
-		ctx: ctx,
-		idOrName: idOrName,
+		ctx:        ctx,
+		idOrName:   idOrName,
 	}
 }
 
 // Execute executes the request
-//  @return SecretsUpdateSecretResponse
+//
+//	@return SecretsUpdateSecretResponse
 func (a *SecretAPIService) SecretsUpdateSecretExecute(r ApiSecretsUpdateSecretRequest) (*SecretsUpdateSecretResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPatch
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *SecretsUpdateSecretResponse
+		localVarHTTPMethod  = http.MethodPatch
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *SecretsUpdateSecretResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsUpdateSecret")
@@ -633,14 +637,14 @@ func (a *SecretAPIService) SecretsUpdateSecretExecute(r ApiSecretsUpdateSecretRe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
