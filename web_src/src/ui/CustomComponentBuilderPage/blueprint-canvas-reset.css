@@ -45,18 +45,18 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   pointer-events: auto;
 }
 
 .sp-blueprint-canvas .react-flow__handle:hover {
-  box-shadow: 0 0 0 9px #3B82F6, 0 0 0 18px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 4px #3B82F6, 0 0 0 12px rgba(59, 130, 246, 0.2);
   border-color: #3B82F6 !important;
   z-index: 10;
 }
 
 .sp-blueprint-canvas .react-flow__handle.highlighted {
-  box-shadow: 0 0 0 18px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 7px rgba(59, 130, 246, 0.2);
   border-color: #3B82F6 !important;
 }
