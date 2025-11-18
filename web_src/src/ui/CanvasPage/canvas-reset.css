@@ -15,3 +15,30 @@
 .sp-canvas .react-flow__node .canvas-node-drag-handle:active {
   cursor: grabbing;
 }
+
+.sp-canvas .react-flow__edge {
+  z-index: 1;
+}
+
+.sp-canvas .react-flow__edge.selected,
+.sp-canvas .react-flow__edge.hovered {
+  z-index: 1000 !important;
+}
+
+.sp-canvas .react-flow__edge path {
+  transition: stroke 0.2s ease-in-out;
+}
+
+.sp-canvas .react-flow__connectionline path {
+  stroke: #3B82F6 !important;
+  stroke-width: 3 !important;
+  stroke-dasharray: 8 4 !important;
+}
+
+.sp-canvas .react-flow__handle {
+  transition: all 0.2s ease-in-out;
+}
+
+.sp-canvas .react-flow__handle.highlighted {
+  border-color: #3B82F6 !important;
+}

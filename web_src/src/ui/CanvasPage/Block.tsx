@@ -111,9 +111,9 @@ export function Block(props: BlockProps) {
       <AiPopup {...ai} />
 
       <div className="relative w-fit" onClick={props.onClick}>
-        <LeftHandle data={data} />
+        <LeftHandle data={data} nodeId={props.nodeId} />
         <BlockContent {...props} />
-        <RightHandle data={data} />
+        <RightHandle data={data} nodeId={props.nodeId} />
       </div>
     </>
   );
@@ -131,7 +131,7 @@ const HANDLE_STYLE = {
   background: "transparent",
 };
 
-function LeftHandle({ data }: BlockProps) {
+function LeftHandle({ data, nodeId }: BlockProps) {
   if (data.type === "trigger") return null;
 
   const isCollapsed =
@@ -146,6 +146,14 @@ function LeftHandle({ data }: BlockProps) {
     (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
+  // Check if this handle is part of the hovered edge (this is the target)
+  const hoveredEdge = (data as any)._hoveredEdge;
+  const connectingFrom = (data as any)._connectingFrom;
+
+  // Highlight if: 1) part of hovered edge, or 2) user is dragging a connection
+  const isHighlighted =
+    (hoveredEdge && hoveredEdge.target === nodeId) || (connectingFrom && connectingFrom.nodeId !== nodeId);
+
   return (
     <Handle
       type="target"
@@ -156,11 +164,12 @@ function LeftHandle({ data }: BlockProps) {
         top: isCollapsed ? "50%" : 30,
         transform: isCollapsed ? "translateY(-50%)" : undefined,
       }}
+      className={isHighlighted ? "highlighted" : undefined}
     />
   );
 }
 
-function RightHandle({ data }: BlockProps) {
+function RightHandle({ data, nodeId }: BlockProps) {
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "approval" && data.approval?.collapsed) ||
@@ -186,8 +195,16 @@ function RightHandle({ data }: BlockProps) {
     channels = ["true", "false"];
   }
 
+  // Get hovered edge info and connecting state
+  const hoveredEdge = (data as any)._hoveredEdge;
+  const connectingFrom = (data as any)._connectingFrom;
+
   // Single channel: render one handle that respects collapsed state
   if (channels.length === 1) {
+    const isHighlighted =
+      (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channels[0]) ||
+      (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channels[0]);
+
     return (
       <Handle
         type="source"
@@ -199,6 +216,7 @@ function RightHandle({ data }: BlockProps) {
           top: isCollapsed ? "50%" : 30,
           transform: isCollapsed ? "translateY(-50%)" : undefined,
         }}
+        className={isHighlighted ? "highlighted" : undefined}
       />
     );
   }
@@ -208,66 +226,73 @@ function RightHandle({ data }: BlockProps) {
 
   return (
     <>
-      {channels.map((channel, index) => (
-        <div
-          key={channel}
-          className="absolute"
-          style={{
-            left: "100%",
-            top: baseTop + index * spacing,
-            transform: "translateY(-50%)",
-            paddingLeft: 4,
-          }}
-        >
-          <div className="relative flex items-center">
-            {/* Small line from node */}
-            <div
-              style={{
-                width: 20,
-                height: 3,
-                backgroundColor: "#C9D5E1",
-                pointerEvents: "none",
-                marginRight: 4,
-              }}
-            />
-            {/* Label text */}
-            <span
-              className="text-xs font-medium whitespace-nowrap"
-              style={{
-                color: "#8B9AAC",
-                pointerEvents: "none",
-                paddingLeft: 2,
-                paddingRight: 2,
-              }}
-            >
-              {channel}
-            </span>
-            {/* Small line to handle */}
-            <div
-              style={{
-                width: 16,
-                height: 3,
-                backgroundColor: "#C9D5E1",
-                pointerEvents: "none",
-                marginLeft: 4,
-              }}
-            />
-            {/* Handle (connection point) */}
-            <Handle
-              type="source"
-              position={Position.Right}
-              id={channel}
-              style={{
-                ...HANDLE_STYLE,
-                position: "relative",
-                pointerEvents: "auto",
-                marginLeft: -6,
-                top: 5,
-              }}
-            />
+      {channels.map((channel, index) => {
+        const isHighlighted =
+          (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channel) ||
+          (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channel);
+
+        return (
+          <div
+            key={channel}
+            className="absolute"
+            style={{
+              left: "100%",
+              top: baseTop + index * spacing,
+              transform: "translateY(-50%)",
+              paddingLeft: 4,
+            }}
+          >
+            <div className="relative flex items-center">
+              {/* Small line from node */}
+              <div
+                style={{
+                  width: 20,
+                  height: 3,
+                  backgroundColor: "#C9D5E1",
+                  pointerEvents: "none",
+                  marginRight: 4,
+                }}
+              />
+              {/* Label text */}
+              <span
+                className="text-xs font-medium whitespace-nowrap"
+                style={{
+                  color: "#8B9AAC",
+                  pointerEvents: "none",
+                  paddingLeft: 2,
+                  paddingRight: 2,
+                }}
+              >
+                {channel}
+              </span>
+              {/* Small line to handle */}
+              <div
+                style={{
+                  width: 16,
+                  height: 3,
+                  backgroundColor: "#C9D5E1",
+                  pointerEvents: "none",
+                  marginLeft: 4,
+                }}
+              />
+              {/* Handle (connection point) */}
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={channel}
+                style={{
+                  ...HANDLE_STYLE,
+                  position: "relative",
+                  pointerEvents: "auto",
+                  marginLeft: -6,
+                  top: 5,
+                }}
+                className={isHighlighted ? "highlighted" : undefined}
+              />
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }

@@ -967,15 +967,44 @@ function CanvasContent({
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; handleId: string | null } | null>(null);
+
+  const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: any) => {
+    setHoveredEdgeId(edge.id);
+  }, []);
+
+  const handleEdgeMouseLeave = useCallback(() => {
+    setHoveredEdgeId(null);
+  }, []);
+
+  const handleConnectStart = useCallback((_event: any, params: { nodeId: string | null; handleId: string | null }) => {
+    if (params.nodeId) {
+      setConnectingFrom({ nodeId: params.nodeId, handleId: params.handleId });
+    }
+  }, []);
+
+  const handleConnectEnd = useCallback(() => {
+    setConnectingFrom(null);
+  }, []);
+
+  // Find the hovered edge to get its source and target
+  const hoveredEdge = useMemo(() => {
+    if (!hoveredEdgeId) return null;
+    return state.edges?.find((e) => e.id === hoveredEdgeId);
+  }, [hoveredEdgeId, state.edges]);
+
   const nodesWithCallbacks = useMemo(() => {
     return state.nodes.map((node) => ({
       ...node,
       data: {
         ...node.data,
         _callbacksRef: callbacksRef,
+        _hoveredEdge: hoveredEdge,
+        _connectingFrom: connectingFrom,
       },
     }));
-  }, [state.nodes]);
+  }, [state.nodes, hoveredEdge, connectingFrom]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -983,7 +1012,16 @@ function CanvasContent({
     }),
     [],
   );
-  const styledEdges = useMemo(() => state.edges?.map((e) => ({ ...e, ...EDGE_STYLE })), [state.edges]);
+  const styledEdges = useMemo(
+    () =>
+      state.edges?.map((e) => ({
+        ...e,
+        ...EDGE_STYLE,
+        data: { ...e.data, isHovered: e.id === hoveredEdgeId },
+        zIndex: e.id === hoveredEdgeId ? 1000 : 1,
+      })),
+    [state.edges, hoveredEdgeId],
+  );
 
   return (
     <>
@@ -1017,11 +1055,15 @@ function CanvasContent({
             onNodesChange={state.onNodesChange}
             onEdgesChange={state.onEdgesChange}
             onConnect={handleConnect}
+            onConnectStart={handleConnectStart}
+            onConnectEnd={handleConnectEnd}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onMove={handleMove}
             onInit={handleInit}
             onPaneClick={handlePaneClick}
+            onEdgeMouseEnter={handleEdgeMouseEnter}
+            onEdgeMouseLeave={handleEdgeMouseLeave}
             defaultViewport={viewport}
             fitView={false}
             style={{ opacity: isInitialized ? 1 : 0 }}
