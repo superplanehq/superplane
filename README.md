@@ -51,6 +51,7 @@ make dev.setup && make dev.start
 # Update DB after changes
 
 make db.migrate DB_NAME=superplane_dev
+
 ```
 
 → [Complete Quick Start Guide](docs/getting-started/quick-start.md)
