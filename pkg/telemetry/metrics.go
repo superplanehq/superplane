@@ -159,7 +159,7 @@ func InitMetrics(ctx context.Context) error {
 
 	dbLocksCountHistogramReady.Store(true)
 
-	StartDatabaseLocksReporter(ctx)
+	StartDatabaseLocksReporter(context.Background())
 
 	return nil
 }
