@@ -99,6 +99,13 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		w := workers.NewWebhookCleanupWorker(registry)
 		go w.Start(context.Background())
 	}
+
+	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Workflow Cleanup Worker")
+
+		w := workers.NewWorkflowCleanupWorker()
+		go w.Start(context.Background())
+	}
 }
 
 func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
