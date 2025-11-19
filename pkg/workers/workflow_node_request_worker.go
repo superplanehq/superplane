@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/triggers"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
@@ -40,10 +41,14 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			tickStart := time.Now()
+
 			requests, err := models.ListNodeRequests()
 			if err != nil {
 				w.log("Error finding workflow nodes ready to be processed: %v", err)
 			}
+
+			telemetry.RecordNodeRequestWorkerRequestsCount(context.Background(), len(requests))
 
 			for _, request := range requests {
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
@@ -63,6 +68,8 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 					}
 				}(request)
 			}
+
+			telemetry.RecordNodeRequestWorkerTickDuration(context.Background(), time.Since(tickStart))
 		}
 	}
 }
