@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
@@ -46,6 +47,8 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			tickStart := time.Now()
+
 			executions, err := models.ListPendingNodeExecutions()
 			if err != nil {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
@@ -75,6 +78,8 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 					w.logger.Errorf("Error processing node execution - node=%s, execution=%s: %v", execution.NodeID, execution.ID, err)
 				}(execution)
 			}
+
+			telemetry.RecordExecutorWorkerTickDuration(context.Background(), time.Since(tickStart))
 		}
 	}
 }
