@@ -44,6 +44,8 @@ func (w *WorkflowEventRouter) Start(ctx context.Context) {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
 
+			telemetry.RecordEventWorkerEventsCount(context.Background(), len(events))
+
 			for _, event := range events {
 				logger := logging.ForEvent(w.logger, event)
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
