@@ -22,6 +22,8 @@ var (
 	executorWorkerTickHistogramReady  atomic.Bool
 	executorWorkerNodesCountHistogram metric.Int64Histogram
 	executorWorkerNodesHistogramReady atomic.Bool
+	eventWorkerTickHistogram          metric.Float64Histogram
+	eventWorkerTickHistogramReady     atomic.Bool
 	dbLocksCountHistogram             metric.Int64Histogram
 	dbLocksCountHistogramReady        atomic.Bool
 	dbLocksReporterInitializedFlag    atomic.Bool
@@ -86,6 +88,17 @@ func InitMetrics(ctx context.Context) error {
 
 	executorWorkerNodesHistogramReady.Store(true)
 
+	eventWorkerTickHistogram, err = meter.Float64Histogram(
+		"event_worker.tick.duration.seconds",
+		metric.WithDescription("Duration of each WorkflowEventRouter tick"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	eventWorkerTickHistogramReady.Store(true)
+
 	dbLocksCountHistogram, err = meter.Int64Histogram(
 		"db.locks.count",
 		metric.WithDescription("Number of database locks"),
@@ -132,4 +145,12 @@ func RecordExecutorWorkerNodesCount(ctx context.Context, count int) {
 	}
 
 	executorWorkerNodesCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordEventWorkerTickDuration(ctx context.Context, d time.Duration) {
+	if !eventWorkerTickHistogramReady.Load() {
+		return
+	}
+
+	eventWorkerTickHistogram.Record(ctx, d.Seconds())
 }
