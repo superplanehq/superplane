@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,6 +11,22 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+type ConfigurationBuildError struct {
+	Err         error
+	QueueItem   *models.WorkflowNodeQueueItem
+	Node        *models.WorkflowNode
+	Event       *models.WorkflowEvent
+	RootEventID uuid.UUID
+}
+
+func (e *ConfigurationBuildError) Error() string {
+	return fmt.Sprintf("configuration build failed: %v", e.Err)
+}
+
+func (e *ConfigurationBuildError) Unwrap() error {
+	return e.Err
+}
 
 func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem *models.WorkflowNodeQueueItem) (*components.ProcessQueueContext, error) {
 	event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
@@ -33,7 +50,13 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 
 	config, err := configBuilder.Build(node.Configuration.Data())
 	if err != nil {
-		return nil, err
+		return nil, &ConfigurationBuildError{
+			Err:         err,
+			QueueItem:   queueItem,
+			Node:        node,
+			Event:       event,
+			RootEventID: queueItem.RootEventID,
+		}
 	}
 
 	ctx := &components.ProcessQueueContext{

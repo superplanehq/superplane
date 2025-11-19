@@ -469,3 +469,97 @@ func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	assert.True(t, executionConsumer.HasReceivedMessage())
 	assert.True(t, queueConsumedConsumer.HasReceivedMessage())
 }
+
+func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	logger := log.NewEntry(log.New())
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
+
+	//
+	// Create a simple workflow with a trigger and a component node.
+	// The component node will have a configuration with an invalid expression.
+	//
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	workflow, nodes := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+				// Invalid expression that will fail during Build()
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"field": "{{ chain('nonexistent-node').default[0] }}",
+				}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	//
+	// Create a root event and a queue item for the component node.
+	//
+	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
+	support.CreateWorkflowQueueItem(t, workflow.ID, componentNode, rootEvent.ID, rootEvent.ID)
+
+	//
+	// Verify initial state - node should be ready and queue should have 1 item.
+	//
+	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, componentNode)
+	require.NoError(t, err)
+	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+
+	queueItems, err := models.ListNodeQueueItems(workflow.ID, componentNode, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, queueItems, 1)
+
+	//
+	// Process the node - this should handle the configuration build failure:
+	// - Failed execution should be created
+	// - Node state should remain ready (not updated to processing)
+	// - Queue item should be deleted
+	//
+	err = worker.LockAndProcessNode(logger, *node)
+	require.NoError(t, err)
+
+	// Verify execution was created with finished state and failed result
+	executions, err := models.ListNodeExecutions(workflow.ID, componentNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, executions, 1)
+	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, executions[0].State)
+	assert.Equal(t, models.WorkflowNodeExecutionResultFailed, executions[0].Result)
+	assert.Equal(t, models.WorkflowNodeExecutionResultReasonError, executions[0].ResultReason)
+	assert.Contains(t, executions[0].ResultMessage, "field")
+	assert.Equal(t, rootEvent.ID, executions[0].EventID)
+	assert.Equal(t, rootEvent.ID, executions[0].RootEventID)
+	assert.Equal(t, nodes[1].Configuration, executions[0].Configuration)
+
+	// Verify node state is still ready (not updated to processing)
+	node, err = models.FindWorkflowNode(database.Conn(), workflow.ID, componentNode)
+	require.NoError(t, err)
+	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+
+	// Verify queue item was deleted
+	queueItems, err = models.ListNodeQueueItems(workflow.ID, componentNode, 10, nil)
+	require.NoError(t, err)
+	assert.Len(t, queueItems, 0)
+
+	// Verify execution message was published
+	assert.True(t, executionConsumer.HasReceivedMessage())
+}
