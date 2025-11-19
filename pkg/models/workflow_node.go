@@ -74,8 +74,10 @@ func ListWorkflowNodesReady() ([]WorkflowNode, error) {
 	err := database.Conn().
 		Distinct().
 		Joins("JOIN workflow_node_queue_items ON workflow_nodes.workflow_id = workflow_node_queue_items.workflow_id AND workflow_nodes.node_id = workflow_node_queue_items.node_id").
+		Joins("JOIN workflows ON workflow_nodes.workflow_id = workflows.id").
 		Where("workflow_nodes.state = ?", WorkflowNodeStateReady).
 		Where("workflow_nodes.type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
+		Where("workflows.deleted_at IS NULL").
 		Find(&nodes).
 		Error
 
