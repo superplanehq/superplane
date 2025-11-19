@@ -89,13 +89,8 @@ func Test__WorkflowCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	support.VerifyWorkflowNodeQueueCount(t, workflow.ID, 1)
 
 	// Verify KV and request exist
-	var kvCount int64
-	database.Conn().Model(&models.WorkflowNodeExecutionKV{}).Where("workflow_id = ?", workflow.ID).Count(&kvCount)
-	assert.Equal(t, int64(1), kvCount)
-
-	var requestCount int64
-	database.Conn().Model(&models.WorkflowNodeRequest{}).Where("workflow_id = ?", workflow.ID).Count(&requestCount)
-	assert.Equal(t, int64(1), requestCount)
+	support.VerifyWorkflowNodeExecutionKVCount(t, workflow.ID, 1)
+	support.VerifyWorkflowNodeRequestCount(t, workflow.ID, 1)
 
 	//
 	// Soft delete the workflow using the new soft delete method
@@ -110,15 +105,14 @@ func Test__WorkflowCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	//
 	// Fetch the updated workflow with deleted_at set
 	//
-	var deletedWorkflow models.Workflow
-	err = database.Conn().Unscoped().Where("id = ?", workflow.ID).First(&deletedWorkflow).Error
+	deletedWorkflow, err := models.FindUnscopedWorkflow(workflow.ID)
 	require.NoError(t, err)
 	require.True(t, deletedWorkflow.DeletedAt.Valid, "DeletedAt should be set")
 
 	//
 	// Process the deleted workflow with cleanup worker
 	//
-	err = worker.LockAndProcessWorkflow(deletedWorkflow)
+	err = worker.LockAndProcessWorkflow(*deletedWorkflow)
 	require.NoError(t, err)
 
 	//
@@ -140,11 +134,8 @@ func Test__WorkflowCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	support.VerifyWorkflowNodeQueueCount(t, workflow.ID, 0)
 
 	// KV and request should be deleted
-	database.Conn().Unscoped().Model(&models.WorkflowNodeExecutionKV{}).Where("workflow_id = ?", workflow.ID).Count(&kvCount)
-	assert.Equal(t, int64(0), kvCount)
-
-	database.Conn().Unscoped().Model(&models.WorkflowNodeRequest{}).Where("workflow_id = ?", workflow.ID).Count(&requestCount)
-	assert.Equal(t, int64(0), requestCount)
+	support.VerifyWorkflowNodeExecutionKVCount(t, workflow.ID, 0)
+	support.VerifyWorkflowNodeRequestCount(t, workflow.ID, 0)
 }
 
 func Test__WorkflowCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
@@ -198,15 +189,14 @@ func Test__WorkflowCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 	//
 	// Fetch the updated workflow with deleted_at set
 	//
-	var deletedWorkflow models.Workflow
-	err = database.Conn().Unscoped().Where("id = ?", workflow.ID).First(&deletedWorkflow).Error
+	deletedWorkflow, err := models.FindUnscopedWorkflow(workflow.ID)
 	require.NoError(t, err)
 	require.True(t, deletedWorkflow.DeletedAt.Valid, "DeletedAt should be set")
 
 	//
 	// Process the deleted workflow with cleanup worker
 	//
-	err = worker.LockAndProcessWorkflow(deletedWorkflow)
+	err = worker.LockAndProcessWorkflow(*deletedWorkflow)
 	require.NoError(t, err)
 
 	//
@@ -243,15 +233,14 @@ func Test__WorkflowCleanupWorker_HandlesEmptyWorkflow(t *testing.T) {
 	//
 	// Fetch the updated workflow with deleted_at set
 	//
-	var deletedWorkflow models.Workflow
-	err = database.Conn().Unscoped().Where("id = ?", workflow.ID).First(&deletedWorkflow).Error
+	deletedWorkflow, err := models.FindUnscopedWorkflow(workflow.ID)
 	require.NoError(t, err)
 	require.True(t, deletedWorkflow.DeletedAt.Valid, "DeletedAt should be set")
 
 	//
 	// Process the deleted workflow with cleanup worker
 	//
-	err = worker.LockAndProcessWorkflow(deletedWorkflow)
+	err = worker.LockAndProcessWorkflow(*deletedWorkflow)
 	require.NoError(t, err)
 
 	//
@@ -297,8 +286,7 @@ func Test__WorkflowCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	//
 	// Fetch the updated workflow with deleted_at set
 	//
-	var deletedWorkflow models.Workflow
-	err = database.Conn().Unscoped().Where("id = ?", workflow.ID).First(&deletedWorkflow).Error
+	deletedWorkflow, err := models.FindUnscopedWorkflow(workflow.ID)
 	require.NoError(t, err)
 	require.True(t, deletedWorkflow.DeletedAt.Valid, "DeletedAt should be set")
 
@@ -309,12 +297,12 @@ func Test__WorkflowCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 
 	go func() {
 		worker1 := NewWorkflowCleanupWorker()
-		results <- worker1.LockAndProcessWorkflow(deletedWorkflow)
+		results <- worker1.LockAndProcessWorkflow(*deletedWorkflow)
 	}()
 
 	go func() {
 		worker2 := NewWorkflowCleanupWorker()
-		results <- worker2.LockAndProcessWorkflow(deletedWorkflow)
+		results <- worker2.LockAndProcessWorkflow(*deletedWorkflow)
 	}()
 
 	// Collect results - both should succeed (return nil)

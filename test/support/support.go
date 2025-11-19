@@ -413,3 +413,29 @@ func VerifyWorkflowNodeQueueCount(t *testing.T, workflowID uuid.UUID, expected i
 	require.NoError(t, err)
 	require.Equal(t, expected, int(actual))
 }
+
+func VerifyWorkflowNodeExecutionKVCount(t *testing.T, workflowID uuid.UUID, expected int) {
+	var actual int64
+
+	err := database.Conn().
+		Model(&models.WorkflowNodeExecutionKV{}).
+		Where("workflow_id = ?", workflowID).
+		Count(&actual).
+		Error
+
+	require.NoError(t, err)
+	require.Equal(t, expected, int(actual))
+}
+
+func VerifyWorkflowNodeRequestCount(t *testing.T, workflowID uuid.UUID, expected int) {
+	var actual int64
+
+	err := database.Conn().
+		Model(&models.WorkflowNodeRequest{}).
+		Where("workflow_id = ?", workflowID).
+		Count(&actual).
+		Error
+
+	require.NoError(t, err)
+	require.Equal(t, expected, int(actual))
+}
