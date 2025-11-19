@@ -44,11 +44,12 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
-
 			nodes, err := models.ListWorkflowNodesReady()
 			if err != nil {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
+
+			telemetry.RecordQueueWorkerNodesCount(context.Background(), len(nodes))
 
 			for _, node := range nodes {
 				logger := logging.ForNode(w.logger, node)

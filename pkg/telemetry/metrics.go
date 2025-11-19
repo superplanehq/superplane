@@ -16,6 +16,8 @@ var (
 	meter                          = otel.Meter("superplane")
 	queueWorkerTickHistogram       metric.Float64Histogram
 	queueWorkerHistogramReady      atomic.Bool
+	queueWorkerNodesCountHistogram metric.Int64Histogram
+	queueWorkerNodesHistogramReady atomic.Bool
 	dbLocksCountHistogram          metric.Int64Histogram
 	dbLocksCountHistogramReady     atomic.Bool
 	dbLocksReporterInitializedFlag atomic.Bool
@@ -47,6 +49,17 @@ func InitMetrics(ctx context.Context) error {
 
 	queueWorkerHistogramReady.Store(true)
 
+	queueWorkerNodesCountHistogram, err = meter.Int64Histogram(
+		"queue_worker.tick.nodes.ready",
+		metric.WithDescription("Number of workflow nodes ready to be processed each tick"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	queueWorkerNodesHistogramReady.Store(true)
+
 	dbLocksCountHistogram, err = meter.Int64Histogram(
 		"db.locks.count",
 		metric.WithDescription("Number of database locks"),
@@ -69,4 +82,12 @@ func RecordQueueWorkerTickDuration(ctx context.Context, d time.Duration) {
 	}
 
 	queueWorkerTickHistogram.Record(ctx, d.Seconds())
+}
+
+func RecordQueueWorkerNodesCount(ctx context.Context, count int) {
+	if !queueWorkerNodesHistogramReady.Load() {
+		return
+	}
+
+	queueWorkerNodesCountHistogram.Record(ctx, int64(count))
 }
