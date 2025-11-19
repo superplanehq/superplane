@@ -412,8 +412,15 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	tx := database.Conn().Begin()
 	log.Infof("Creating organization %s for account %s", req.Name, account.Email)
 	organization, err := models.CreateOrganizationInTransaction(tx, req.Name, "")
+
 	if err != nil {
 		tx.Rollback()
+
+		if err.Error() == "name already used" {
+			http.Error(w, "Organization name already in use", http.StatusConflict)
+			return
+		}
+
 		log.Errorf("Error creating organization %s: %v", req.Name, err)
 		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
 		return
