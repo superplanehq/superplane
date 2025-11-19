@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 type WorkflowCleanupWorker struct {
@@ -33,11 +34,14 @@ func (w *WorkflowCleanupWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			tickStart := time.Now()
 			workflows, err := models.ListDeletedWorkflows()
 			if err != nil {
 				w.logger.Errorf("Error finding deleted workflows: %v", err)
 				continue
 			}
+
+			telemetry.RecordWorkflowCleanupWorkerWorkflowsCount(context.Background(), len(workflows))
 
 			for _, workflow := range workflows {
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
@@ -53,6 +57,8 @@ func (w *WorkflowCleanupWorker) Start(ctx context.Context) {
 					}
 				}(workflow)
 			}
+
+			telemetry.RecordWorkflowCleanupWorkerTickDuration(context.Background(), time.Since(tickStart))
 		}
 	}
 }
