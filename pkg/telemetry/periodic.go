@@ -12,10 +12,13 @@ import (
 //
 
 type Periodic struct {
+	ctx context.Context
 }
 
-func NewPeriodic() *Periodic {
-	return &Periodic{}
+func NewPeriodic(ctx context.Context) *Periodic {
+	return &Periodic{
+		ctx: ctx,
+	}
 }
 
 func (p *Periodic) Start() {
@@ -23,25 +26,19 @@ func (p *Periodic) Start() {
 		ticker := time.NewTicker(60 * time.Second)
 		defer ticker.Stop()
 
-		for {
-			select {
-			case <-ticker.C:
-				p.report()
-			}
+		for range ticker.C {
+			p.report()
 		}
 	}()
 }
 
 func (p *Periodic) report() {
 	p.reportDatabaseLocks()
+	p.reportLongQueries()
 	p.reportStuckQueueItems()
 }
 
 func (p *Periodic) reportDatabaseLocks() {
-	if !dbLocksCountHistogramReady.Load() {
-		return
-	}
-
 	var count int64
 
 	err := database.Conn().Raw("select count(*) from pg_locks").Scan(&count).Error
@@ -49,20 +46,33 @@ func (p *Periodic) reportDatabaseLocks() {
 		return
 	}
 
-	dbLocksCountHistogram.Record(context.Background(), count)
+	RecordDBLocksCount(p.ctx, count)
 }
 
 func (p *Periodic) reportStuckQueueItems() {
-	if !stuckQueueItemsCountHistogramReady.Load() {
-		return
-	}
-
 	count, err := countStuckQueueNodes()
 	if err != nil {
 		return
 	}
 
-	queueWorkerStuckItems.Record(context.Background(), count)
+	RecordStuckQueueItemsCount(p.ctx, int(count))
+}
+
+func (p *Periodic) reportLongQueries() {
+	var count int64
+
+	err := database.Conn().Raw(`
+		SELECT COUNT(*)
+		FROM pg_stat_activity
+		WHERE state = 'active'
+		  AND now() - query_start > interval '1 minutes'
+	`).Scan(&count).Error
+
+	if err != nil {
+		return
+	}
+
+	RecordDBLongQueriesCount(p.ctx, count)
 }
 
 func countStuckQueueNodes() (int64, error) {
