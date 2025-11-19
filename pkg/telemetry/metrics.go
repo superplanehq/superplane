@@ -13,47 +13,27 @@ import (
 )
 
 var (
-	meter = otel.Meter("superplane")
+	meter        = otel.Meter("superplane")
+	metricsReady atomic.Bool
 
-	// Queue Worker Metrics
 	queueWorkerTickHistogram       metric.Float64Histogram
-	queueWorkerHistogramReady      atomic.Bool
 	queueWorkerNodesCountHistogram metric.Int64Histogram
-	queueWorkerNodesHistogramReady atomic.Bool
+	queueWorkerStuckItems          metric.Int64Histogram
 
-	// Executor Worker Metrics
 	executorWorkerTickHistogram       metric.Float64Histogram
-	executorWorkerTickHistogramReady  atomic.Bool
 	executorWorkerNodesCountHistogram metric.Int64Histogram
-	executorWorkerNodesHistogramReady atomic.Bool
 
-	// Event Worker Metrics
 	eventWorkerTickHistogram        metric.Float64Histogram
-	eventWorkerTickHistogramReady   atomic.Bool
 	eventWorkerEventsCountHistogram metric.Int64Histogram
-	eventWorkerEventsHistogramReady atomic.Bool
 
-	// Node Request Worker Metrics
 	nodeRequestWorkerTickHistogram          metric.Float64Histogram
-	nodeRequestWorkerTickHistogramReady     atomic.Bool
 	nodeRequestWorkerRequestsCountHistogram metric.Int64Histogram
-	nodeRequestWorkerRequestsHistogramReady atomic.Bool
 
-	// Workflow Cleanup Worker Metrics
 	workflowCleanupWorkerTickHistogram           metric.Float64Histogram
-	workflowCleanupWorkerTickHistogramReady      atomic.Bool
 	workflowCleanupWorkerWorkflowsCountHistogram metric.Int64Histogram
-	workflowCleanupWorkerWorkflowsHistogramReady atomic.Bool
 
-	// Database Locks Metrics
-	dbLocksCountHistogram          metric.Int64Histogram
-	dbLocksCountHistogramReady     atomic.Bool
-	dbLocksReporterInitializedFlag atomic.Bool
-
-	// Stuck Queue Items Metrics
-	queueWorkerStuckItems                  metric.Int64Histogram
-	stuckQueueItemsCountHistogramReady     atomic.Bool
-	stuckQueueItemsReporterInitializedFlag atomic.Bool
+	dbLocksCountHistogram       metric.Int64Histogram
+	dbLongQueriesCountHistogram metric.Int64Histogram
 )
 
 func InitMetrics(ctx context.Context) error {
@@ -80,8 +60,6 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	queueWorkerHistogramReady.Store(true)
-
 	queueWorkerNodesCountHistogram, err = meter.Int64Histogram(
 		"queue_worker.tick.nodes.ready",
 		metric.WithDescription("Number of workflow nodes ready to be processed each tick"),
@@ -90,8 +68,6 @@ func InitMetrics(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	queueWorkerNodesHistogramReady.Store(true)
 
 	executorWorkerTickHistogram, err = meter.Float64Histogram(
 		"executor_worker.tick.duration.seconds",
@@ -102,8 +78,6 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	executorWorkerTickHistogramReady.Store(true)
-
 	executorWorkerNodesCountHistogram, err = meter.Int64Histogram(
 		"executor_worker.tick.nodes.pending",
 		metric.WithDescription("Number of pending workflow node executions each tick"),
@@ -112,8 +86,6 @@ func InitMetrics(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	executorWorkerNodesHistogramReady.Store(true)
 
 	eventWorkerTickHistogram, err = meter.Float64Histogram(
 		"event_worker.tick.duration.seconds",
@@ -124,8 +96,6 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	eventWorkerTickHistogramReady.Store(true)
-
 	eventWorkerEventsCountHistogram, err = meter.Int64Histogram(
 		"event_worker.tick.events.pending",
 		metric.WithDescription("Number of pending workflow events each tick"),
@@ -134,8 +104,6 @@ func InitMetrics(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	eventWorkerEventsHistogramReady.Store(true)
 
 	nodeRequestWorkerTickHistogram, err = meter.Float64Histogram(
 		"node_request_worker.tick.duration.seconds",
@@ -146,8 +114,6 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	nodeRequestWorkerTickHistogramReady.Store(true)
-
 	nodeRequestWorkerRequestsCountHistogram, err = meter.Int64Histogram(
 		"node_request_worker.tick.requests.pending",
 		metric.WithDescription("Number of pending workflow node requests each tick"),
@@ -156,8 +122,6 @@ func InitMetrics(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	nodeRequestWorkerRequestsHistogramReady.Store(true)
 
 	workflowCleanupWorkerTickHistogram, err = meter.Float64Histogram(
 		"workflow_cleanup_worker.tick.duration.seconds",
@@ -168,8 +132,6 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	workflowCleanupWorkerTickHistogramReady.Store(true)
-
 	workflowCleanupWorkerWorkflowsCountHistogram, err = meter.Int64Histogram(
 		"workflow_cleanup_worker.tick.workflows.deleted",
 		metric.WithDescription("Number of deleted workflows processed each tick"),
@@ -178,8 +140,6 @@ func InitMetrics(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	workflowCleanupWorkerWorkflowsHistogramReady.Store(true)
 
 	dbLocksCountHistogram, err = meter.Int64Histogram(
 		"db.locks.count",
@@ -190,7 +150,14 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	dbLocksCountHistogramReady.Store(true)
+	dbLongQueriesCountHistogram, err = meter.Int64Histogram(
+		"db.long_queries.count",
+		metric.WithDescription("Number of long-running database queries"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
 
 	queueWorkerStuckItems, err = meter.Int64Histogram(
 		"queue_items.stuck.count",
@@ -201,20 +168,20 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	stuckQueueItemsCountHistogramReady.Store(true)
-
 	StartPeriodicMetricsReporter()
+
+	metricsReady.Store(true)
 
 	return nil
 }
 
 func StartPeriodicMetricsReporter() {
-	p := NewPeriodic()
+	p := NewPeriodic(context.Background())
 	p.Start()
 }
 
 func RecordQueueWorkerTickDuration(ctx context.Context, d time.Duration) {
-	if !queueWorkerHistogramReady.Load() {
+	if !metricsReady.Load() {
 		return
 	}
 
@@ -222,7 +189,7 @@ func RecordQueueWorkerTickDuration(ctx context.Context, d time.Duration) {
 }
 
 func RecordQueueWorkerNodesCount(ctx context.Context, count int) {
-	if !queueWorkerNodesHistogramReady.Load() {
+	if !metricsReady.Load() {
 		return
 	}
 
@@ -230,7 +197,7 @@ func RecordQueueWorkerNodesCount(ctx context.Context, count int) {
 }
 
 func RecordExecutorWorkerTickDuration(ctx context.Context, d time.Duration) {
-	if !executorWorkerTickHistogramReady.Load() {
+	if !metricsReady.Load() {
 		return
 	}
 
@@ -238,7 +205,7 @@ func RecordExecutorWorkerTickDuration(ctx context.Context, d time.Duration) {
 }
 
 func RecordExecutorWorkerNodesCount(ctx context.Context, count int) {
-	if !executorWorkerNodesHistogramReady.Load() {
+	if !metricsReady.Load() {
 		return
 	}
 
@@ -246,7 +213,7 @@ func RecordExecutorWorkerNodesCount(ctx context.Context, count int) {
 }
 
 func RecordEventWorkerTickDuration(ctx context.Context, d time.Duration) {
-	if !eventWorkerTickHistogramReady.Load() {
+	if !metricsReady.Load() {
 		return
 	}
 
@@ -254,7 +221,7 @@ func RecordEventWorkerTickDuration(ctx context.Context, d time.Duration) {
 }
 
 func RecordEventWorkerEventsCount(ctx context.Context, count int) {
-	if !eventWorkerEventsHistogramReady.Load() {
+	if !metricsReady.Load() {
 		return
 	}
 
@@ -262,7 +229,7 @@ func RecordEventWorkerEventsCount(ctx context.Context, count int) {
 }
 
 func RecordNodeRequestWorkerTickDuration(ctx context.Context, d time.Duration) {
-	if !nodeRequestWorkerTickHistogramReady.Load() {
+	if !metricsReady.Load() {
 		return
 	}
 
@@ -270,7 +237,7 @@ func RecordNodeRequestWorkerTickDuration(ctx context.Context, d time.Duration) {
 }
 
 func RecordNodeRequestWorkerRequestsCount(ctx context.Context, count int) {
-	if !nodeRequestWorkerRequestsHistogramReady.Load() {
+	if !metricsReady.Load() {
 		return
 	}
 
@@ -278,7 +245,7 @@ func RecordNodeRequestWorkerRequestsCount(ctx context.Context, count int) {
 }
 
 func RecordWorkflowCleanupWorkerTickDuration(ctx context.Context, d time.Duration) {
-	if !workflowCleanupWorkerTickHistogramReady.Load() {
+	if !metricsReady.Load() {
 		return
 	}
 
@@ -286,9 +253,33 @@ func RecordWorkflowCleanupWorkerTickDuration(ctx context.Context, d time.Duratio
 }
 
 func RecordWorkflowCleanupWorkerWorkflowsCount(ctx context.Context, count int) {
-	if !workflowCleanupWorkerWorkflowsHistogramReady.Load() {
+	if !metricsReady.Load() {
 		return
 	}
 
 	workflowCleanupWorkerWorkflowsCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordDBLocksCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	dbLocksCountHistogram.Record(ctx, count)
+}
+
+func RecordStuckQueueItemsCount(ctx context.Context, count int) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	queueWorkerStuckItems.Record(ctx, int64(count))
+}
+
+func RecordDBLongQueriesCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	dbLongQueriesCountHistogram.Record(ctx, count)
 }
