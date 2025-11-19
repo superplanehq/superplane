@@ -65,8 +65,14 @@ func (w *WorkflowCleanupWorker) Start(ctx context.Context) {
 
 func (w *WorkflowCleanupWorker) LockAndProcessWorkflow(workflow models.Workflow) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		w.logger.Infof("Processing deleted workflow %s", workflow.ID)
-		return w.processWorkflow(tx, workflow)
+		lockedWorkflow, err := models.LockWorkflow(tx, workflow.ID)
+		if err != nil {
+			w.logger.Info("Workflow already being processed - skipping")
+			return nil
+		}
+
+		w.logger.Infof("Processing deleted workflow %s", lockedWorkflow.ID)
+		return w.processWorkflow(tx, *lockedWorkflow)
 	})
 }
 

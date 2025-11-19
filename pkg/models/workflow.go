@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Workflow struct {
@@ -146,4 +147,22 @@ func ListDeletedWorkflows() ([]Workflow, error) {
 	}
 
 	return workflows, nil
+}
+
+func LockWorkflow(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
+	var workflow Workflow
+
+	err := tx.
+		Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ?", id).
+		Where("deleted_at IS NOT NULL").
+		First(&workflow).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow, nil
 }
