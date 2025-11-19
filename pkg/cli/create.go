@@ -30,41 +30,6 @@ var createCmd = &cobra.Command{
 		c := DefaultClient()
 
 		switch kind {
-		case "Canvas":
-			// Parse YAML to map
-			var yamlData map[string]any
-			err = yaml.Unmarshal(data, &yamlData)
-			Check(err)
-
-			metadata, ok := yamlData["metadata"].(map[string]any)
-			if !ok {
-				Fail("Invalid Canvas YAML: metadata section missing")
-			}
-
-			name, ok := metadata["name"].(string)
-			if !ok {
-				Fail("Invalid Canvas YAML: name field missing")
-			}
-
-			// Create the canvas request
-			request := openapi_client.NewSuperplaneCreateCanvasRequest()
-
-			// Create Canvas with metadata
-			canvas := openapi_client.NewSuperplaneCanvas()
-			canvasMeta := openapi_client.NewSuperplaneCanvasMetadata()
-			canvasMeta.SetName(name)
-			canvas.SetMetadata(*canvasMeta)
-
-			// Set canvas in request
-			request.SetCanvas(*canvas)
-
-			response, _, err := c.CanvasAPI.SuperplaneCreateCanvas(context.Background()).Body(*request).Execute()
-			Check(err)
-
-			// Access the returned canvas
-			canvasResult := response.GetCanvas()
-			fmt.Printf("Canvas '%s' created with ID '%s'.\n", *canvasResult.GetMetadata().Name, *canvasResult.GetMetadata().Id)
-
 		case "Secret":
 			// Parse YAML to map
 			var yamlData map[string]any

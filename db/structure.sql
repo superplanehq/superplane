@@ -93,22 +93,6 @@ CREATE TABLE public.blueprints (
 
 
 --
--- Name: canvases; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.canvases (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    name character varying(128) NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    created_by uuid NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    organization_id uuid NOT NULL,
-    deleted_at timestamp with time zone,
-    description text
-);
-
-
---
 -- Name: casbin_rule; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -476,14 +460,6 @@ ALTER TABLE ONLY public.blueprints
 
 
 --
--- Name: canvases canvases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvases
-    ADD CONSTRAINT canvases_pkey PRIMARY KEY (id);
-
-
---
 -- Name: casbin_rule casbin_rule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -569,14 +545,6 @@ ALTER TABLE ONLY public.secrets
 
 ALTER TABLE ONLY public.secrets
     ADD CONSTRAINT secrets_pkey PRIMARY KEY (id);
-
-
---
--- Name: canvases unique_canvas_in_organization; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvases
-    ADD CONSTRAINT unique_canvas_in_organization UNIQUE (organization_id, name);
 
 
 --
@@ -705,13 +673,6 @@ CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (or
 
 
 --
--- Name: idx_canvases_deleted_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at);
-
-
---
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -829,14 +790,6 @@ CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (orga
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
-
-
---
--- Name: canvases canvases_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvases
-    ADD CONSTRAINT canvases_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 
 --
@@ -1039,7 +992,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251118202435	f
+20251119111132	f
 \.
 
 
