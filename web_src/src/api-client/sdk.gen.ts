@@ -17,24 +17,6 @@ import type {
   BlueprintsUpdateBlueprintData,
   BlueprintsUpdateBlueprintResponse2,
   BlueprintsUpdateBlueprintError,
-  SuperplaneListCanvasesData,
-  SuperplaneListCanvasesResponse2,
-  SuperplaneListCanvasesError,
-  SuperplaneCreateCanvasData,
-  SuperplaneCreateCanvasResponse2,
-  SuperplaneCreateCanvasError,
-  SuperplaneAddUserData,
-  SuperplaneAddUserResponse2,
-  SuperplaneAddUserError,
-  SuperplaneRemoveUserData,
-  SuperplaneRemoveUserResponse2,
-  SuperplaneRemoveUserError,
-  SuperplaneDeleteCanvasData,
-  SuperplaneDeleteCanvasResponse2,
-  SuperplaneDeleteCanvasError,
-  SuperplaneDescribeCanvasData,
-  SuperplaneDescribeCanvasResponse2,
-  SuperplaneDescribeCanvasError,
   ComponentsListComponentsData,
   ComponentsListComponentsResponse2,
   ComponentsListComponentsError,
@@ -108,7 +90,7 @@ import type {
   OrganizationsRemoveInvitationResponse2,
   OrganizationsRemoveInvitationError,
   OrganizationsRemoveUserData,
-  OrganizationsRemoveUserResponse,
+  OrganizationsRemoveUserResponse2,
   OrganizationsRemoveUserError,
   RolesListRolesData,
   RolesListRolesResponse2,
@@ -310,112 +292,6 @@ export const blueprintsUpdateBlueprint = <ThrowOnError extends boolean = true>(
       "Content-Type": "application/json",
       ...options?.headers,
     },
-  });
-};
-
-/**
- * List canvases
- * Returns a list of all canvases
- */
-export const superplaneListCanvases = <ThrowOnError extends boolean = true>(
-  options?: Options<SuperplaneListCanvasesData, ThrowOnError>,
-) => {
-  return (options?.client ?? _heyApiClient).get<
-    SuperplaneListCanvasesResponse2,
-    SuperplaneListCanvasesError,
-    ThrowOnError
-  >({
-    url: "/api/v1/canvases",
-    ...options,
-  });
-};
-
-/**
- * Create a new canvas
- * Creates a new canvas with the given name and organization ID
- */
-export const superplaneCreateCanvas = <ThrowOnError extends boolean = true>(
-  options: Options<SuperplaneCreateCanvasData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).post<
-    SuperplaneCreateCanvasResponse2,
-    SuperplaneCreateCanvasError,
-    ThrowOnError
-  >({
-    url: "/api/v1/canvases",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-};
-
-/**
- * Add a user to a canvas
- * Add a user to a canvas
- */
-export const superplaneAddUser = <ThrowOnError extends boolean = true>(
-  options: Options<SuperplaneAddUserData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).post<SuperplaneAddUserResponse2, SuperplaneAddUserError, ThrowOnError>({
-    url: "/api/v1/canvases/{canvasIdOrName}/users",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-};
-
-/**
- * Remove a user from a canvas
- * Remove a user from a canvas
- */
-export const superplaneRemoveUser = <ThrowOnError extends boolean = true>(
-  options: Options<SuperplaneRemoveUserData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).delete<
-    SuperplaneRemoveUserResponse2,
-    SuperplaneRemoveUserError,
-    ThrowOnError
-  >({
-    url: "/api/v1/canvases/{canvasIdOrName}/users/{userId}",
-    ...options,
-  });
-};
-
-/**
- * Delete a canvas
- * Deletes the specified canvas (can be referenced by ID or name)
- */
-export const superplaneDeleteCanvas = <ThrowOnError extends boolean = true>(
-  options: Options<SuperplaneDeleteCanvasData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).delete<
-    SuperplaneDeleteCanvasResponse2,
-    SuperplaneDeleteCanvasError,
-    ThrowOnError
-  >({
-    url: "/api/v1/canvases/{idOrName}",
-    ...options,
-  });
-};
-
-/**
- * Get canvas details
- * Returns the details of a specific canvas
- */
-export const superplaneDescribeCanvas = <ThrowOnError extends boolean = true>(
-  options: Options<SuperplaneDescribeCanvasData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).get<
-    SuperplaneDescribeCanvasResponse2,
-    SuperplaneDescribeCanvasError,
-    ThrowOnError
-  >({
-    url: "/api/v1/canvases/{id}",
-    ...options,
   });
 };
 
@@ -831,7 +707,7 @@ export const organizationsRemoveUser = <ThrowOnError extends boolean = true>(
   options: Options<OrganizationsRemoveUserData, ThrowOnError>,
 ) => {
   return (options.client ?? _heyApiClient).delete<
-    OrganizationsRemoveUserResponse,
+    OrganizationsRemoveUserResponse2,
     OrganizationsRemoveUserError,
     ThrowOnError
   >({

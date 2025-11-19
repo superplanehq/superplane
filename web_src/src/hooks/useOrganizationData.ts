@@ -17,9 +17,6 @@ import {
   rolesDescribeRole,
   organizationsDescribeOrganization,
   organizationsUpdateOrganization,
-  superplaneListCanvases,
-  superplaneCreateCanvas,
-  superplaneDeleteCanvas,
   organizationsRemoveUser,
   organizationsListInvitations,
   organizationsCreateInvitation,
@@ -524,62 +521,6 @@ export const useUpdateOrganization = (organizationId: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.details(organizationId) });
-    },
-  });
-};
-
-export const useOrganizationCanvases = (organizationId: string) => {
-  return useQuery({
-    queryKey: organizationKeys.canvases(organizationId),
-    queryFn: async () => {
-      const response = await superplaneListCanvases(withOrganizationHeader({ query: { organizationId } }));
-      return response.data?.canvases || [];
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!organizationId,
-  });
-};
-
-export const useCreateCanvas = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: {
-      canvas: {
-        metadata: {
-          name: string;
-          description?: string;
-        };
-      };
-      organizationId: string;
-    }) => {
-      return await superplaneCreateCanvas(
-        withOrganizationHeader({
-          body: params,
-        }),
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.canvases(organizationId) });
-    },
-  });
-};
-
-export const useDeleteCanvas = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: { canvasId: string }) => {
-      return await superplaneDeleteCanvas(
-        withOrganizationHeader({
-          path: { idOrName: params.canvasId },
-          query: { organizationId },
-        }),
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.canvases(organizationId) });
     },
   });
 };

@@ -10,27 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var getCanvasCmd = &cobra.Command{
-	Use:     "canvas [ID]",
-	Short:   "Get canvas details",
-	Long:    `Get details about a specific canvas`,
-	Aliases: []string{"canvases"},
-	Args:    cobra.ExactArgs(1),
-
-	Run: func(cmd *cobra.Command, args []string) {
-		id := args[0]
-		name, _ := cmd.Flags().GetString("name")
-
-		c := DefaultClient()
-		response, _, err := c.CanvasAPI.SuperplaneDescribeCanvas(context.Background(), id).Name(name).Execute()
-		Check(err)
-
-		out, err := yaml.Marshal(response.Canvas)
-		Check(err)
-		fmt.Printf("%s", string(out))
-	},
-}
-
 var getSecretCmd = &cobra.Command{
 	Use:     "secret [ID_OR_NAME]",
 	Short:   "Get secret details",
@@ -105,18 +84,6 @@ var getCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(getCmd)
-
-	// Canvas command
-	getCmd.AddCommand(getCanvasCmd)
-	getCanvasCmd.Flags().String("name", "", "Name of the canvas (alternative to ID)")
-
-	// Secret command
 	getCmd.AddCommand(getSecretCmd)
-	getSecretCmd.Flags().String("canvas-id", "", "ID of the canvas, for canvas-level secrets")
-	getSecretCmd.Flags().String("canvas-name", "", "Name of the canvas, for canvas-level secrets")
-
-	// Integration command
 	getCmd.AddCommand(getIntegrationCmd)
-	getIntegrationCmd.Flags().String("canvas-id", "", "ID of the canvas, for canvas-level integrations")
-	getIntegrationCmd.Flags().String("canvas-name", "", "Name of the canvas, for canvas-level integrations")
 }
