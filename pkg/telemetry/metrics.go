@@ -13,22 +13,22 @@ import (
 )
 
 var (
-	meter                              = otel.Meter("superplane")
-	queueWorkerTickHistogram           metric.Float64Histogram
-	queueWorkerHistogramReady          atomic.Bool
-	queueWorkerNodesCountHistogram     metric.Int64Histogram
-	queueWorkerNodesHistogramReady     atomic.Bool
-	executorWorkerTickHistogram        metric.Float64Histogram
-	executorWorkerTickHistogramReady   atomic.Bool
-	executorWorkerNodesCountHistogram  metric.Int64Histogram
-	executorWorkerNodesHistogramReady  atomic.Bool
-	eventWorkerTickHistogram           metric.Float64Histogram
-	eventWorkerTickHistogramReady      atomic.Bool
-	eventWorkerEventsCountHistogram    metric.Int64Histogram
-	eventWorkerEventsHistogramReady    atomic.Bool
-	dbLocksCountHistogram              metric.Int64Histogram
-	dbLocksCountHistogramReady         atomic.Bool
-	dbLocksReporterInitializedFlag     atomic.Bool
+	meter                             = otel.Meter("superplane")
+	queueWorkerTickHistogram          metric.Float64Histogram
+	queueWorkerHistogramReady         atomic.Bool
+	queueWorkerNodesCountHistogram    metric.Int64Histogram
+	queueWorkerNodesHistogramReady    atomic.Bool
+	executorWorkerTickHistogram       metric.Float64Histogram
+	executorWorkerTickHistogramReady  atomic.Bool
+	executorWorkerNodesCountHistogram metric.Int64Histogram
+	executorWorkerNodesHistogramReady atomic.Bool
+	eventWorkerTickHistogram          metric.Float64Histogram
+	eventWorkerTickHistogramReady     atomic.Bool
+	eventWorkerEventsCountHistogram   metric.Int64Histogram
+	eventWorkerEventsHistogramReady   atomic.Bool
+	dbLocksCountHistogram             metric.Int64Histogram
+	dbLocksCountHistogramReady        atomic.Bool
+	dbLocksReporterInitializedFlag    atomic.Bool
 )
 
 func InitMetrics(ctx context.Context) error {
