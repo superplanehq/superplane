@@ -13,22 +13,36 @@ import (
 )
 
 var (
-	meter                             = otel.Meter("superplane")
-	queueWorkerTickHistogram          metric.Float64Histogram
-	queueWorkerHistogramReady         atomic.Bool
-	queueWorkerNodesCountHistogram    metric.Int64Histogram
-	queueWorkerNodesHistogramReady    atomic.Bool
+	meter = otel.Meter("superplane")
+
+	// Queue Worker Metrics
+	queueWorkerTickHistogram       metric.Float64Histogram
+	queueWorkerHistogramReady      atomic.Bool
+	queueWorkerNodesCountHistogram metric.Int64Histogram
+	queueWorkerNodesHistogramReady atomic.Bool
+
+	// Executor Worker Metrics
 	executorWorkerTickHistogram       metric.Float64Histogram
 	executorWorkerTickHistogramReady  atomic.Bool
 	executorWorkerNodesCountHistogram metric.Int64Histogram
 	executorWorkerNodesHistogramReady atomic.Bool
-	eventWorkerTickHistogram          metric.Float64Histogram
-	eventWorkerTickHistogramReady     atomic.Bool
-	eventWorkerEventsCountHistogram   metric.Int64Histogram
-	eventWorkerEventsHistogramReady   atomic.Bool
-	dbLocksCountHistogram             metric.Int64Histogram
-	dbLocksCountHistogramReady        atomic.Bool
-	dbLocksReporterInitializedFlag    atomic.Bool
+
+	// Event Worker Metrics
+	eventWorkerTickHistogram        metric.Float64Histogram
+	eventWorkerTickHistogramReady   atomic.Bool
+	eventWorkerEventsCountHistogram metric.Int64Histogram
+	eventWorkerEventsHistogramReady atomic.Bool
+
+	// Node Request Worker Metrics
+	nodeRequestWorkerTickHistogram          metric.Float64Histogram
+	nodeRequestWorkerTickHistogramReady     atomic.Bool
+	nodeRequestWorkerRequestsCountHistogram metric.Int64Histogram
+	nodeRequestWorkerRequestsHistogramReady atomic.Bool
+
+	// Database Locks Metrics
+	dbLocksCountHistogram          metric.Int64Histogram
+	dbLocksCountHistogramReady     atomic.Bool
+	dbLocksReporterInitializedFlag atomic.Bool
 )
 
 func InitMetrics(ctx context.Context) error {
@@ -112,6 +126,28 @@ func InitMetrics(ctx context.Context) error {
 
 	eventWorkerEventsHistogramReady.Store(true)
 
+	nodeRequestWorkerTickHistogram, err = meter.Float64Histogram(
+		"node_request_worker.tick.duration.seconds",
+		metric.WithDescription("Duration of each NodeRequestWorker tick"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	nodeRequestWorkerTickHistogramReady.Store(true)
+
+	nodeRequestWorkerRequestsCountHistogram, err = meter.Int64Histogram(
+		"node_request_worker.tick.requests.pending",
+		metric.WithDescription("Number of pending workflow node requests each tick"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	nodeRequestWorkerRequestsHistogramReady.Store(true)
+
 	dbLocksCountHistogram, err = meter.Int64Histogram(
 		"db.locks.count",
 		metric.WithDescription("Number of database locks"),
@@ -174,4 +210,20 @@ func RecordEventWorkerEventsCount(ctx context.Context, count int) {
 	}
 
 	eventWorkerEventsCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordNodeRequestWorkerTickDuration(ctx context.Context, d time.Duration) {
+	if !nodeRequestWorkerTickHistogramReady.Load() {
+		return
+	}
+
+	nodeRequestWorkerTickHistogram.Record(ctx, d.Seconds())
+}
+
+func RecordNodeRequestWorkerRequestsCount(ctx context.Context, count int) {
+	if !nodeRequestWorkerRequestsHistogramReady.Load() {
+		return
+	}
+
+	nodeRequestWorkerRequestsCountHistogram.Record(ctx, int64(count))
 }
