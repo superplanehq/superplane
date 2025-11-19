@@ -123,6 +123,7 @@ func FindUnscopedWorkflow(id uuid.UUID) (*Workflow, error) {
 func FindUnscopedWorkflowInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
 	var workflow Workflow
 	err := tx.
+		Unscoped().
 		Where("id = ?", id).
 		First(&workflow).
 		Error
