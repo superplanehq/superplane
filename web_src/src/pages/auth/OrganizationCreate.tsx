@@ -31,8 +31,17 @@ const OrganizationCreate: React.FC = () => {
         // Redirect to the new organization
         window.location.href = `/${org.id}`;
       } else {
-        const errorData = await response.json();
-        setError(errorData.message || "Failed to create organization");
+        try {
+          const errorData = await response.json();
+          setError(errorData.message || "Failed to create organization");
+        } catch {
+          // If we can't parse the error response, show a generic message based on status
+          if (response.status === 409) {
+            setError("An organization with this name already exists");
+          } else {
+            setError(`Failed to create organization (${response.status})`);
+          }
+        }
       }
     } catch (err) {
       setError("Network error occurred");

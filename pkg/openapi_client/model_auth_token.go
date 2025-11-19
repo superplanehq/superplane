@@ -20,7 +20,7 @@ var _ MappedNullable = &AuthToken{}
 
 // AuthToken struct for AuthToken
 type AuthToken struct {
-	ValueFrom *SuperplaneIntegrationsValueFrom `json:"valueFrom,omitempty"`
+	ValueFrom *IntegrationsValueFrom `json:"valueFrom,omitempty"`
 }
 
 // NewAuthToken instantiates a new AuthToken object
@@ -41,9 +41,9 @@ func NewAuthTokenWithDefaults() *AuthToken {
 }
 
 // GetValueFrom returns the ValueFrom field value if set, zero value otherwise.
-func (o *AuthToken) GetValueFrom() SuperplaneIntegrationsValueFrom {
+func (o *AuthToken) GetValueFrom() IntegrationsValueFrom {
 	if o == nil || IsNil(o.ValueFrom) {
-		var ret SuperplaneIntegrationsValueFrom
+		var ret IntegrationsValueFrom
 		return ret
 	}
 	return *o.ValueFrom
@@ -51,7 +51,7 @@ func (o *AuthToken) GetValueFrom() SuperplaneIntegrationsValueFrom {
 
 // GetValueFromOk returns a tuple with the ValueFrom field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AuthToken) GetValueFromOk() (*SuperplaneIntegrationsValueFrom, bool) {
+func (o *AuthToken) GetValueFromOk() (*IntegrationsValueFrom, bool) {
 	if o == nil || IsNil(o.ValueFrom) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *AuthToken) HasValueFrom() bool {
 	return false
 }
 
-// SetValueFrom gets a reference to the given SuperplaneIntegrationsValueFrom and assigns it to the ValueFrom field.
-func (o *AuthToken) SetValueFrom(v SuperplaneIntegrationsValueFrom) {
+// SetValueFrom gets a reference to the given IntegrationsValueFrom and assigns it to the ValueFrom field.
+func (o *AuthToken) SetValueFrom(v IntegrationsValueFrom) {
 	o.ValueFrom = &v
 }
 

@@ -27,7 +27,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
-	pbSup "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -157,12 +156,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
 
-	err := pbSup.RegisterSuperplaneHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
-	if err != nil {
-		return err
-	}
-
-	err = pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err := pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -418,8 +412,15 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	tx := database.Conn().Begin()
 	log.Infof("Creating organization %s for account %s", req.Name, account.Email)
 	organization, err := models.CreateOrganizationInTransaction(tx, req.Name, "")
+
 	if err != nil {
 		tx.Rollback()
+
+		if err.Error() == "name already used" {
+			http.Error(w, "Organization name already in use", http.StatusConflict)
+			return
+		}
+
 		log.Errorf("Error creating organization %s: %v", req.Name, err)
 		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
 		return

@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 type WorkflowEventRouter struct {
@@ -36,10 +37,14 @@ func (w *WorkflowEventRouter) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			tickStart := time.Now()
+
 			events, err := models.ListPendingWorkflowEvents()
 			if err != nil {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
+
+			telemetry.RecordEventWorkerEventsCount(context.Background(), len(events))
 
 			for _, event := range events {
 				logger := logging.ForEvent(w.logger, event)
@@ -56,6 +61,8 @@ func (w *WorkflowEventRouter) Start(ctx context.Context) {
 					}
 				}(event)
 			}
+
+			telemetry.RecordEventWorkerTickDuration(context.Background(), time.Since(tickStart))
 		}
 	}
 }

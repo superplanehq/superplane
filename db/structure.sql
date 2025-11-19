@@ -93,22 +93,6 @@ CREATE TABLE public.blueprints (
 
 
 --
--- Name: canvases; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.canvases (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    name character varying(128) NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    created_by uuid NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    organization_id uuid NOT NULL,
-    deleted_at timestamp with time zone,
-    description text
-);
-
-
---
 -- Name: casbin_rule; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -477,14 +461,6 @@ ALTER TABLE ONLY public.blueprints
 
 
 --
--- Name: canvases canvases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvases
-    ADD CONSTRAINT canvases_pkey PRIMARY KEY (id);
-
-
---
 -- Name: casbin_rule casbin_rule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -570,14 +546,6 @@ ALTER TABLE ONLY public.secrets
 
 ALTER TABLE ONLY public.secrets
     ADD CONSTRAINT secrets_pkey PRIMARY KEY (id);
-
-
---
--- Name: canvases unique_canvas_in_organization; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvases
-    ADD CONSTRAINT unique_canvas_in_organization UNIQUE (organization_id, name);
 
 
 --
@@ -706,13 +674,6 @@ CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (or
 
 
 --
--- Name: idx_canvases_deleted_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at);
-
-
---
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -776,6 +737,20 @@ CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at)
 
 
 --
+-- Name: idx_workflow_events_execution_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_execution_id ON public.workflow_events USING btree (execution_id);
+
+
+--
+-- Name: idx_workflow_events_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_state ON public.workflow_events USING btree (state);
+
+
+--
 -- Name: idx_workflow_events_workflow_node_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -794,6 +769,20 @@ CREATE INDEX idx_workflow_node_execution_kvs_ekv ON public.workflow_node_executi
 --
 
 CREATE INDEX idx_workflow_node_execution_kvs_workflow_node_key_value ON public.workflow_node_execution_kvs USING btree (workflow_id, node_id, key, value);
+
+
+--
+-- Name: idx_workflow_node_executions_parent_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_parent_state ON public.workflow_node_executions USING btree (parent_execution_id, state);
+
+
+--
+-- Name: idx_workflow_node_executions_state_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_state_created_at ON public.workflow_node_executions USING btree (state, created_at DESC);
 
 
 --
@@ -837,14 +826,6 @@ CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (orga
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
-
-
---
--- Name: canvases canvases_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvases
-    ADD CONSTRAINT canvases_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 
 --

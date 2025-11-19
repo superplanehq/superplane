@@ -335,4 +335,43 @@ func Test__CreateOrganization(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, roles)
 	})
+
+	t.Run("organization creation fails with 409 when name already exists", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		account, err := models.CreateAccount("duplicate@example.com", "Duplicate User")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test")
+		token, err := signer.Generate(account.ID.String(), time.Hour)
+		require.NoError(t, err)
+
+		authService, err := authorization.NewAuthService()
+		require.NoError(t, err)
+
+		encryptor := &crypto.NoOpEncryptor{}
+		r := registry.NewRegistry(encryptor)
+		server, err := NewServer(encryptor, r, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", authService, false)
+		require.NoError(t, err)
+
+		body, err := json.Marshal(OrganizationCreationRequest{Name: "Duplicate Organization"})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/organizations",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		response = execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/organizations",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusConflict, response.Code)
+		assert.Contains(t, response.Body.String(), "Organization name already in use")
+	})
 }
