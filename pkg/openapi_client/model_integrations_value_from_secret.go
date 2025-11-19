@@ -15,34 +15,34 @@ import (
 	"encoding/json"
 )
 
-// checks if the SuperplaneIntegrationsValueFromSecret type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &SuperplaneIntegrationsValueFromSecret{}
+// checks if the IntegrationsValueFromSecret type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &IntegrationsValueFromSecret{}
 
-// SuperplaneIntegrationsValueFromSecret struct for SuperplaneIntegrationsValueFromSecret
-type SuperplaneIntegrationsValueFromSecret struct {
+// IntegrationsValueFromSecret struct for IntegrationsValueFromSecret
+type IntegrationsValueFromSecret struct {
 	Name *string `json:"name,omitempty"`
 	Key  *string `json:"key,omitempty"`
 }
 
-// NewSuperplaneIntegrationsValueFromSecret instantiates a new SuperplaneIntegrationsValueFromSecret object
+// NewIntegrationsValueFromSecret instantiates a new IntegrationsValueFromSecret object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSuperplaneIntegrationsValueFromSecret() *SuperplaneIntegrationsValueFromSecret {
-	this := SuperplaneIntegrationsValueFromSecret{}
+func NewIntegrationsValueFromSecret() *IntegrationsValueFromSecret {
+	this := IntegrationsValueFromSecret{}
 	return &this
 }
 
-// NewSuperplaneIntegrationsValueFromSecretWithDefaults instantiates a new SuperplaneIntegrationsValueFromSecret object
+// NewIntegrationsValueFromSecretWithDefaults instantiates a new IntegrationsValueFromSecret object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewSuperplaneIntegrationsValueFromSecretWithDefaults() *SuperplaneIntegrationsValueFromSecret {
-	this := SuperplaneIntegrationsValueFromSecret{}
+func NewIntegrationsValueFromSecretWithDefaults() *IntegrationsValueFromSecret {
+	this := IntegrationsValueFromSecret{}
 	return &this
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationsValueFromSecret) GetName() string {
+func (o *IntegrationsValueFromSecret) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -52,7 +52,7 @@ func (o *SuperplaneIntegrationsValueFromSecret) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationsValueFromSecret) GetNameOk() (*string, bool) {
+func (o *IntegrationsValueFromSecret) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -60,7 +60,7 @@ func (o *SuperplaneIntegrationsValueFromSecret) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationsValueFromSecret) HasName() bool {
+func (o *IntegrationsValueFromSecret) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -69,12 +69,12 @@ func (o *SuperplaneIntegrationsValueFromSecret) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *SuperplaneIntegrationsValueFromSecret) SetName(v string) {
+func (o *IntegrationsValueFromSecret) SetName(v string) {
 	o.Name = &v
 }
 
 // GetKey returns the Key field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationsValueFromSecret) GetKey() string {
+func (o *IntegrationsValueFromSecret) GetKey() string {
 	if o == nil || IsNil(o.Key) {
 		var ret string
 		return ret
@@ -84,7 +84,7 @@ func (o *SuperplaneIntegrationsValueFromSecret) GetKey() string {
 
 // GetKeyOk returns a tuple with the Key field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationsValueFromSecret) GetKeyOk() (*string, bool) {
+func (o *IntegrationsValueFromSecret) GetKeyOk() (*string, bool) {
 	if o == nil || IsNil(o.Key) {
 		return nil, false
 	}
@@ -92,7 +92,7 @@ func (o *SuperplaneIntegrationsValueFromSecret) GetKeyOk() (*string, bool) {
 }
 
 // HasKey returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationsValueFromSecret) HasKey() bool {
+func (o *IntegrationsValueFromSecret) HasKey() bool {
 	if o != nil && !IsNil(o.Key) {
 		return true
 	}
@@ -101,11 +101,11 @@ func (o *SuperplaneIntegrationsValueFromSecret) HasKey() bool {
 }
 
 // SetKey gets a reference to the given string and assigns it to the Key field.
-func (o *SuperplaneIntegrationsValueFromSecret) SetKey(v string) {
+func (o *IntegrationsValueFromSecret) SetKey(v string) {
 	o.Key = &v
 }
 
-func (o SuperplaneIntegrationsValueFromSecret) MarshalJSON() ([]byte, error) {
+func (o IntegrationsValueFromSecret) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -113,7 +113,7 @@ func (o SuperplaneIntegrationsValueFromSecret) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o SuperplaneIntegrationsValueFromSecret) ToMap() (map[string]interface{}, error) {
+func (o IntegrationsValueFromSecret) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
@@ -124,38 +124,38 @@ func (o SuperplaneIntegrationsValueFromSecret) ToMap() (map[string]interface{}, 
 	return toSerialize, nil
 }
 
-type NullableSuperplaneIntegrationsValueFromSecret struct {
-	value *SuperplaneIntegrationsValueFromSecret
+type NullableIntegrationsValueFromSecret struct {
+	value *IntegrationsValueFromSecret
 	isSet bool
 }
 
-func (v NullableSuperplaneIntegrationsValueFromSecret) Get() *SuperplaneIntegrationsValueFromSecret {
+func (v NullableIntegrationsValueFromSecret) Get() *IntegrationsValueFromSecret {
 	return v.value
 }
 
-func (v *NullableSuperplaneIntegrationsValueFromSecret) Set(val *SuperplaneIntegrationsValueFromSecret) {
+func (v *NullableIntegrationsValueFromSecret) Set(val *IntegrationsValueFromSecret) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableSuperplaneIntegrationsValueFromSecret) IsSet() bool {
+func (v NullableIntegrationsValueFromSecret) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableSuperplaneIntegrationsValueFromSecret) Unset() {
+func (v *NullableIntegrationsValueFromSecret) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableSuperplaneIntegrationsValueFromSecret(val *SuperplaneIntegrationsValueFromSecret) *NullableSuperplaneIntegrationsValueFromSecret {
-	return &NullableSuperplaneIntegrationsValueFromSecret{value: val, isSet: true}
+func NewNullableIntegrationsValueFromSecret(val *IntegrationsValueFromSecret) *NullableIntegrationsValueFromSecret {
+	return &NullableIntegrationsValueFromSecret{value: val, isSet: true}
 }
 
-func (v NullableSuperplaneIntegrationsValueFromSecret) MarshalJSON() ([]byte, error) {
+func (v NullableIntegrationsValueFromSecret) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableSuperplaneIntegrationsValueFromSecret) UnmarshalJSON(src []byte) error {
+func (v *NullableIntegrationsValueFromSecret) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
