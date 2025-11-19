@@ -13,45 +13,36 @@ import (
 )
 
 var (
-<<<<<<< HEAD
-	meter                             = otel.Meter("superplane")
-	queueWorkerTickHistogram          metric.Float64Histogram
-	queueWorkerHistogramReady         atomic.Bool
-	queueWorkerNodesCountHistogram    metric.Int64Histogram
-	queueWorkerNodesHistogramReady    atomic.Bool
+	meter = otel.Meter("superplane")
+
+	// Queue Worker Metrics
+	queueWorkerTickHistogram       metric.Float64Histogram
+	queueWorkerHistogramReady      atomic.Bool
+	queueWorkerNodesCountHistogram metric.Int64Histogram
+	queueWorkerNodesHistogramReady atomic.Bool
+
+	// Executor Worker Metrics
 	executorWorkerTickHistogram       metric.Float64Histogram
 	executorWorkerTickHistogramReady  atomic.Bool
 	executorWorkerNodesCountHistogram metric.Int64Histogram
 	executorWorkerNodesHistogramReady atomic.Bool
-	eventWorkerTickHistogram          metric.Float64Histogram
-	eventWorkerTickHistogramReady     atomic.Bool
-	eventWorkerEventsCountHistogram   metric.Int64Histogram
-	eventWorkerEventsHistogramReady   atomic.Bool
-	dbLocksCountHistogram             metric.Int64Histogram
-	dbLocksCountHistogramReady        atomic.Bool
-	dbLocksReporterInitializedFlag    atomic.Bool
-=======
-	meter                                   = otel.Meter("superplane")
-	queueWorkerTickHistogram                metric.Float64Histogram
-	queueWorkerHistogramReady               atomic.Bool
-	queueWorkerNodesCountHistogram          metric.Int64Histogram
-	queueWorkerNodesHistogramReady          atomic.Bool
-	executorWorkerTickHistogram             metric.Float64Histogram
-	executorWorkerTickHistogramReady        atomic.Bool
-	executorWorkerNodesCountHistogram       metric.Int64Histogram
-	executorWorkerNodesHistogramReady       atomic.Bool
-	eventWorkerTickHistogram                metric.Float64Histogram
-	eventWorkerTickHistogramReady           atomic.Bool
-	eventWorkerEventsCountHistogram         metric.Int64Histogram
-	eventWorkerEventsHistogramReady         atomic.Bool
+
+	// Event Worker Metrics
+	eventWorkerTickHistogram        metric.Float64Histogram
+	eventWorkerTickHistogramReady   atomic.Bool
+	eventWorkerEventsCountHistogram metric.Int64Histogram
+	eventWorkerEventsHistogramReady atomic.Bool
+
+	// Node Request Worker Metrics
 	nodeRequestWorkerTickHistogram          metric.Float64Histogram
 	nodeRequestWorkerTickHistogramReady     atomic.Bool
 	nodeRequestWorkerRequestsCountHistogram metric.Int64Histogram
 	nodeRequestWorkerRequestsHistogramReady atomic.Bool
-	dbLocksCountHistogram                   metric.Int64Histogram
-	dbLocksCountHistogramReady              atomic.Bool
-	dbLocksReporterInitializedFlag          atomic.Bool
->>>>>>> 846fdf994 (feat: Add metrics for the node request worker)
+
+	// Database Locks Metrics
+	dbLocksCountHistogram          metric.Int64Histogram
+	dbLocksCountHistogramReady     atomic.Bool
+	dbLocksReporterInitializedFlag atomic.Bool
 )
 
 func InitMetrics(ctx context.Context) error {
