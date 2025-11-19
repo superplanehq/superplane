@@ -43,6 +43,11 @@ var (
 	dbLocksCountHistogram          metric.Int64Histogram
 	dbLocksCountHistogramReady     atomic.Bool
 	dbLocksReporterInitializedFlag atomic.Bool
+
+	// Stuck Queue Items Metrics
+	queueWorkerStuckItems                  metric.Int64Histogram
+	stuckQueueItemsCountHistogramReady     atomic.Bool
+	stuckQueueItemsReporterInitializedFlag atomic.Bool
 )
 
 func InitMetrics(ctx context.Context) error {
@@ -160,6 +165,19 @@ func InitMetrics(ctx context.Context) error {
 	dbLocksCountHistogramReady.Store(true)
 
 	StartDatabaseLocksReporter(context.Background())
+
+	queueWorkerStuckItems, err = meter.Int64Histogram(
+		"queue_items.stuck.count",
+		metric.WithDescription("Number of stuck workflow node queue items"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	stuckQueueItemsCountHistogramReady.Store(true)
+
+	StartStuckQueueItemsReporter(context.Background())
 
 	return nil
 }
