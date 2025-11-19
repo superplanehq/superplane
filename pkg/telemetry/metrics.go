@@ -40,8 +40,8 @@ var (
 	nodeRequestWorkerRequestsHistogramReady atomic.Bool
 
 	// Workflow Cleanup Worker Metrics
-	workflowCleanupWorkerTickHistogram          metric.Float64Histogram
-	workflowCleanupWorkerTickHistogramReady     atomic.Bool
+	workflowCleanupWorkerTickHistogram           metric.Float64Histogram
+	workflowCleanupWorkerTickHistogramReady      atomic.Bool
 	workflowCleanupWorkerWorkflowsCountHistogram metric.Int64Histogram
 	workflowCleanupWorkerWorkflowsHistogramReady atomic.Bool
 
