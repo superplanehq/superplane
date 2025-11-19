@@ -113,7 +113,7 @@ func (w *WorkflowEventRouter) LockAndProcessEvent(logger *log.Entry, event model
 }
 
 func (w *WorkflowEventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.WorkflowEvent) ([]models.WorkflowNodeQueueItem, *models.WorkflowNodeExecution, error) {
-	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, event.WorkflowID)
+	workflow, err := models.FindWorkflowWithoutOrgScopeInTransaction(tx, event.WorkflowID)
 	if err != nil {
 		return nil, nil, err
 	}

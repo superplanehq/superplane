@@ -116,6 +116,24 @@ func FindWorkflowInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Workflow, err
 	return &workflow, nil
 }
 
+func FindWorkflowWithoutOrgScope(id uuid.UUID) (*Workflow, error) {
+	return FindWorkflowWithoutOrgScopeInTransaction(database.Conn(), id)
+}
+
+func FindWorkflowWithoutOrgScopeInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
+	var workflow Workflow
+	err := tx.
+		Where("id = ?", id).
+		First(&workflow).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow, nil
+}
+
 func FindUnscopedWorkflow(id uuid.UUID) (*Workflow, error) {
 	return FindUnscopedWorkflowInTransaction(database.Conn(), id)
 }
