@@ -13,16 +13,18 @@ import (
 )
 
 var (
-	meter                            = otel.Meter("superplane")
-	queueWorkerTickHistogram         metric.Float64Histogram
-	queueWorkerHistogramReady        atomic.Bool
-	queueWorkerNodesCountHistogram   metric.Int64Histogram
-	queueWorkerNodesHistogramReady   atomic.Bool
-	executorWorkerTickHistogram      metric.Float64Histogram
-	executorWorkerTickHistogramReady atomic.Bool
-	dbLocksCountHistogram            metric.Int64Histogram
-	dbLocksCountHistogramReady       atomic.Bool
-	dbLocksReporterInitializedFlag   atomic.Bool
+	meter                             = otel.Meter("superplane")
+	queueWorkerTickHistogram          metric.Float64Histogram
+	queueWorkerHistogramReady         atomic.Bool
+	queueWorkerNodesCountHistogram    metric.Int64Histogram
+	queueWorkerNodesHistogramReady    atomic.Bool
+	executorWorkerTickHistogram       metric.Float64Histogram
+	executorWorkerTickHistogramReady  atomic.Bool
+	executorWorkerNodesCountHistogram metric.Int64Histogram
+	executorWorkerNodesHistogramReady atomic.Bool
+	dbLocksCountHistogram             metric.Int64Histogram
+	dbLocksCountHistogramReady        atomic.Bool
+	dbLocksReporterInitializedFlag    atomic.Bool
 )
 
 func InitMetrics(ctx context.Context) error {
@@ -73,6 +75,17 @@ func InitMetrics(ctx context.Context) error {
 
 	executorWorkerTickHistogramReady.Store(true)
 
+	executorWorkerNodesCountHistogram, err = meter.Int64Histogram(
+		"executor_worker.tick.nodes.pending",
+		metric.WithDescription("Number of pending workflow node executions each tick"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	executorWorkerNodesHistogramReady.Store(true)
+
 	dbLocksCountHistogram, err = meter.Int64Histogram(
 		"db.locks.count",
 		metric.WithDescription("Number of database locks"),
@@ -111,4 +124,12 @@ func RecordExecutorWorkerTickDuration(ctx context.Context, d time.Duration) {
 	}
 
 	executorWorkerTickHistogram.Record(ctx, d.Seconds())
+}
+
+func RecordExecutorWorkerNodesCount(ctx context.Context, count int) {
+	if !executorWorkerNodesHistogramReady.Load() {
+		return
+	}
+
+	executorWorkerNodesCountHistogram.Record(ctx, int64(count))
 }

@@ -54,6 +54,8 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
 
+			telemetry.RecordExecutorWorkerNodesCount(context.Background(), len(executions))
+
 			for _, execution := range executions {
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
