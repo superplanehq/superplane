@@ -122,21 +122,63 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 
 	ctx, err := contexts.BuildProcessQueueContext(tx, node, queueItem)
 	if err != nil {
-		return nil, nil, err
+
+		//
+		// If the error returned is not a ConfigurationBuildError,
+		// we should retry it, so just return the error as is.
+		//
+		var configErr *contexts.ConfigurationBuildError
+		if !errors.As(err, &configErr) {
+			return nil, nil, err
+		}
+
+		//
+		// If we are dealing with a ConfigurationBuildError,
+		// it means that the queue context cannot properly build
+		// the configuration for the execution.
+		//
+		// Since this error will always happen until the user fixes the node configuration,
+		// we create a failed execution and delete the queue item.
+		//
+		if deleteErr := configErr.QueueItem.Delete(tx); deleteErr != nil {
+			return nil, nil, deleteErr
+		}
+
+		now := time.Now()
+		execution := models.WorkflowNodeExecution{
+			WorkflowID:          configErr.QueueItem.WorkflowID,
+			NodeID:              configErr.Node.NodeID,
+			RootEventID:         configErr.RootEventID,
+			EventID:             configErr.Event.ID,
+			PreviousExecutionID: configErr.Event.ExecutionID,
+			State:               models.WorkflowNodeExecutionStateFinished,
+			Configuration:       configErr.Node.Configuration,
+			Result:              models.WorkflowNodeExecutionResultFailed,
+			ResultReason:        models.WorkflowNodeExecutionResultReasonError,
+			ResultMessage:       configErr.Err.Error(),
+			CreatedAt:           &now,
+			UpdatedAt:           &now,
+		}
+
+		if createErr := tx.Create(&execution).Error; createErr != nil {
+			return nil, nil, createErr
+		}
+
+		return &execution, queueItem, nil
 	}
 
 	var exec *models.WorkflowNodeExecution
 	switch node.Type {
 	case models.NodeTypeComponent:
 		/*
-		* For component nodes, delegate to the component's ProcessQueueItem implementation to handle
-		* the processing.
+		 * For component nodes, delegate to the component's ProcessQueueItem implementation to handle
+		 * the processing.
 		 */
 		exec, err = w.processComponentNode(ctx, node)
 	case models.NodeTypeBlueprint:
 		/*
-		* For blueprint nodes, use the default processing logic.
-		* Blueprint nodes do not have custom processing logic.
+		 * For blueprint nodes, use the default processing logic.
+		 * Blueprint nodes do not have custom processing logic.
 		 */
 		exec, err = ctx.DefaultProcessing()
 	default:
