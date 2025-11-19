@@ -67,7 +67,7 @@ func (w *WorkflowCleanupWorker) LockAndProcessWorkflow(workflow models.Workflow)
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		lockedWorkflow, err := models.LockWorkflow(tx, workflow.ID)
 		if err != nil {
-			w.logger.Info("Workflow already being processed - skipping")
+			w.logger.Infof("Workflow %s already being processed - skipping", workflow.ID)
 			return nil
 		}
 
