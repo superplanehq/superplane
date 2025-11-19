@@ -4,13 +4,11 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/gorm"
 )
 
 func DeleteWorkflow(ctx context.Context, registry *registry.Registry, organizationID uuid.UUID, id string) (*pb.DeleteWorkflowResponse, error) {
@@ -24,27 +22,9 @@ func DeleteWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		return nil, status.Errorf(codes.NotFound, "workflow not found: %v", err)
 	}
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		nodes, err := models.FindWorkflowNodesInTransaction(tx, workflow.ID)
-		if err != nil {
-			return err
-		}
-
-		for _, node := range nodes {
-			err = models.DeleteWorkflowNode(tx, node)
-			if err != nil {
-				return err
-			}
-		}
-
-		err = tx.Delete(&workflow).Error
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
+	// Perform soft delete on the workflow with name suffix
+	// The cleanup worker will handle the actual deletion of nodes and related data
+	err = workflow.SoftDelete()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete workflow: %v", err)
 	}

@@ -1,12 +1,14 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Workflow struct {
@@ -17,6 +19,7 @@ type Workflow struct {
 	CreatedBy      *uuid.UUID
 	CreatedAt      *time.Time
 	UpdatedAt      *time.Time
+	DeletedAt      gorm.DeletedAt `gorm:"index"`
 	Edges          datatypes.JSONSlice[Edge]
 }
 
@@ -65,6 +68,21 @@ func (w *Workflow) FindEdges(sourceID string, channel string) []Edge {
 	return edges
 }
 
+func (w *Workflow) SoftDelete() error {
+	return w.SoftDeleteInTransaction(database.Conn())
+}
+
+func (w *Workflow) SoftDeleteInTransaction(tx *gorm.DB) error {
+	now := time.Now()
+	timestamp := now.Unix()
+
+	newName := fmt.Sprintf("%s (deleted-%d)", w.Name, timestamp)
+	return tx.Model(w).Updates(map[string]interface{}{
+		"deleted_at": now,
+		"name":       newName,
+	}).Error
+}
+
 func FindWorkflow(orgID, id uuid.UUID) (*Workflow, error) {
 	return FindWorkflowInTransaction(database.Conn(), orgID, id)
 }
@@ -98,6 +116,24 @@ func FindWorkflowInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Workflow, err
 	return &workflow, nil
 }
 
+func FindWorkflowWithoutOrgScope(id uuid.UUID) (*Workflow, error) {
+	return FindWorkflowWithoutOrgScopeInTransaction(database.Conn(), id)
+}
+
+func FindWorkflowWithoutOrgScopeInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
+	var workflow Workflow
+	err := tx.
+		Where("id = ?", id).
+		First(&workflow).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow, nil
+}
+
 func FindUnscopedWorkflow(id uuid.UUID) (*Workflow, error) {
 	return FindUnscopedWorkflowInTransaction(database.Conn(), id)
 }
@@ -105,7 +141,41 @@ func FindUnscopedWorkflow(id uuid.UUID) (*Workflow, error) {
 func FindUnscopedWorkflowInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
 	var workflow Workflow
 	err := tx.
+		Unscoped().
 		Where("id = ?", id).
+		First(&workflow).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow, nil
+}
+
+func ListDeletedWorkflows() ([]Workflow, error) {
+	var workflows []Workflow
+	err := database.Conn().
+		Unscoped().
+		Where("deleted_at IS NOT NULL").
+		Find(&workflows).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return workflows, nil
+}
+
+func LockWorkflow(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
+	var workflow Workflow
+
+	err := tx.
+		Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ?", id).
+		Where("deleted_at IS NOT NULL").
 		First(&workflow).
 		Error
 

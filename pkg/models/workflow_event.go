@@ -168,7 +168,9 @@ func CountRootWorkflowEvents(workflowID uuid.UUID) (int64, error) {
 func ListPendingWorkflowEvents() ([]WorkflowEvent, error) {
 	var events []WorkflowEvent
 	err := database.Conn().
-		Where("state = ?", WorkflowEventStatePending).
+		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
+		Where("workflow_events.state = ?", WorkflowEventStatePending).
+		Where("workflows.deleted_at IS NULL").
 		Find(&events).
 		Error
 

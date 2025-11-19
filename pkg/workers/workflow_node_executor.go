@@ -214,7 +214,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		return fmt.Errorf("failed to get execution inputs: %w", err)
 	}
 
-	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, node.WorkflowID)
+	workflow, err := models.FindWorkflowWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 	if err != nil {
 		logger.Errorf("failed to find workflow: %v", err)
 		return fmt.Errorf("failed to find workflow: %v", err)

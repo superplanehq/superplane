@@ -39,6 +39,12 @@ var (
 	nodeRequestWorkerRequestsCountHistogram metric.Int64Histogram
 	nodeRequestWorkerRequestsHistogramReady atomic.Bool
 
+	// Workflow Cleanup Worker Metrics
+	workflowCleanupWorkerTickHistogram           metric.Float64Histogram
+	workflowCleanupWorkerTickHistogramReady      atomic.Bool
+	workflowCleanupWorkerWorkflowsCountHistogram metric.Int64Histogram
+	workflowCleanupWorkerWorkflowsHistogramReady atomic.Bool
+
 	// Database Locks Metrics
 	dbLocksCountHistogram          metric.Int64Histogram
 	dbLocksCountHistogramReady     atomic.Bool
@@ -153,6 +159,28 @@ func InitMetrics(ctx context.Context) error {
 
 	nodeRequestWorkerRequestsHistogramReady.Store(true)
 
+	workflowCleanupWorkerTickHistogram, err = meter.Float64Histogram(
+		"workflow_cleanup_worker.tick.duration.seconds",
+		metric.WithDescription("Duration of each WorkflowCleanupWorker tick"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowCleanupWorkerTickHistogramReady.Store(true)
+
+	workflowCleanupWorkerWorkflowsCountHistogram, err = meter.Int64Histogram(
+		"workflow_cleanup_worker.tick.workflows.deleted",
+		metric.WithDescription("Number of deleted workflows processed each tick"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowCleanupWorkerWorkflowsHistogramReady.Store(true)
+
 	dbLocksCountHistogram, err = meter.Int64Histogram(
 		"db.locks.count",
 		metric.WithDescription("Number of database locks"),
@@ -247,4 +275,20 @@ func RecordNodeRequestWorkerRequestsCount(ctx context.Context, count int) {
 	}
 
 	nodeRequestWorkerRequestsCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordWorkflowCleanupWorkerTickDuration(ctx context.Context, d time.Duration) {
+	if !workflowCleanupWorkerTickHistogramReady.Load() {
+		return
+	}
+
+	workflowCleanupWorkerTickHistogram.Record(ctx, d.Seconds())
+}
+
+func RecordWorkflowCleanupWorkerWorkflowsCount(ctx context.Context, count int) {
+	if !workflowCleanupWorkerWorkflowsHistogramReady.Load() {
+		return
+	}
+
+	workflowCleanupWorkerWorkflowsCountHistogram.Record(ctx, int64(count))
 }

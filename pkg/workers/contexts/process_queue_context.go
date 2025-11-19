@@ -167,7 +167,7 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 			// Fallthrough to workflow-level counting if blueprint id missing
 		}
 
-		wf, err := models.FindUnscopedWorkflowInTransaction(tx, node.WorkflowID)
+		wf, err := models.FindWorkflowWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 		if err != nil {
 			return 0, err
 		}
@@ -213,7 +213,7 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 			}
 		}
 
-		wf, err := models.FindUnscopedWorkflowInTransaction(tx, node.WorkflowID)
+		wf, err := models.FindWorkflowWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 		if err != nil {
 			return 0, err
 		}

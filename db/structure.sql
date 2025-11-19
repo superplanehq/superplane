@@ -392,7 +392,8 @@ CREATE TABLE public.workflows (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
-    created_by uuid
+    created_by uuid,
+    deleted_at timestamp without time zone
 );
 
 
@@ -806,6 +807,13 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 
 
 --
+-- Name: idx_workflows_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflows_deleted_at ON public.workflows USING btree (deleted_at);
+
+
+--
 -- Name: idx_workflows_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1020,7 +1028,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251119113921	f
+20251119161200	f
 \.
 
 
