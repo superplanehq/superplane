@@ -4,49 +4,70 @@ import (
 	"context"
 	"time"
 
-	"gorm.io/gorm"
-
 	"github.com/superplanehq/superplane/pkg/database"
 )
 
-func StartStuckQueueItemsReporter(ctx context.Context) {
-	if !stuckQueueItemsCountHistogramReady.Load() {
-		return
-	}
+//
+// Reports metrics at periodic intervals.
+//
 
-	if !stuckQueueItemsReporterInitializedFlag.CompareAndSwap(false, true) {
-		return
-	}
+type Periodic struct {
+}
 
+func NewPeriodic() *Periodic {
+	return &Periodic{}
+}
+
+func (p *Periodic) Start() {
 	go func() {
 		ticker := time.NewTicker(60 * time.Second)
 		defer ticker.Stop()
 
 		for {
 			select {
-			case <-ctx.Done():
-				return
 			case <-ticker.C:
-				reportStuckQueueItems(ctx, database.Conn())
+				p.report()
 			}
 		}
 	}()
 }
 
-func reportStuckQueueItems(ctx context.Context, db *gorm.DB) {
-	if !stuckQueueItemsCountHistogramReady.Load() {
+func (p *Periodic) report() {
+	p.reportDatabaseLocks()
+	p.reportStuckQueueItems()
+}
+
+func (p *Periodic) reportDatabaseLocks() {
+	if !dbLocksCountHistogramReady.Load() {
 		return
 	}
 
-	count, err := countStuckQueueNodes(db)
+	var count int64
+
+	err := database.Conn().Raw("select count(*) from pg_locks").Scan(&count).Error
 	if err != nil {
 		return
 	}
 
-	queueWorkerStuckItems.Record(ctx, count)
+	dbLocksCountHistogram.Record(context.Background(), count)
 }
 
-func countStuckQueueNodes(db *gorm.DB) (int64, error) {
+func (p *Periodic) reportStuckQueueItems() {
+	if !stuckQueueItemsCountHistogramReady.Load() {
+		return
+	}
+
+	count, err := countStuckQueueNodes()
+	if err != nil {
+		return
+	}
+
+	queueWorkerStuckItems.Record(context.Background(), count)
+}
+
+func countStuckQueueNodes() (int64, error) {
+	db := database.Conn()
+
 	var count int64
 
 	if err := db.

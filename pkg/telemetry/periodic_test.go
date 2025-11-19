@@ -29,7 +29,7 @@ func TestCountStuckQueueNodes_NodeWithQueueAndNoExecutionsIsCounted(t *testing.T
 
 	require.NoError(t, db.Create(queueItem).Error)
 
-	count, err := countStuckQueueNodes(db)
+	count, err := countStuckQueueNodes()
 	require.NoError(t, err)
 	require.Equal(t, int64(1), count)
 }
@@ -63,7 +63,7 @@ func TestCountStuckQueueNodes_NodeWithOnlyFinishedExecutionsIsCounted(t *testing
 
 	require.NoError(t, db.Create(exec).Error)
 
-	count, err := countStuckQueueNodes(db)
+	count, err := countStuckQueueNodes()
 	require.NoError(t, err)
 	require.Equal(t, int64(1), count)
 }
@@ -97,7 +97,7 @@ func TestCountStuckQueueNodes_NodeWithNonFinishedExecutionIsNotCounted(t *testin
 
 	require.NoError(t, db.Create(exec).Error)
 
-	count, err := countStuckQueueNodes(db)
+	count, err := countStuckQueueNodes()
 	require.NoError(t, err)
 	require.Equal(t, int64(0), count)
 }

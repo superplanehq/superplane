@@ -164,8 +164,6 @@ func InitMetrics(ctx context.Context) error {
 
 	dbLocksCountHistogramReady.Store(true)
 
-	StartDatabaseLocksReporter(context.Background())
-
 	queueWorkerStuckItems, err = meter.Int64Histogram(
 		"queue_items.stuck.count",
 		metric.WithDescription("Number of stuck workflow node queue items"),
@@ -177,9 +175,14 @@ func InitMetrics(ctx context.Context) error {
 
 	stuckQueueItemsCountHistogramReady.Store(true)
 
-	StartStuckQueueItemsReporter(context.Background())
+	StartPeriodicMetricsReporter()
 
 	return nil
+}
+
+func StartPeriodicMetricsReporter() {
+	p := NewPeriodic()
+	p.Start()
 }
 
 func RecordQueueWorkerTickDuration(ctx context.Context, d time.Duration) {
