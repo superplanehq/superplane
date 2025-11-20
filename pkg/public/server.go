@@ -22,6 +22,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	nooptrace "go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -328,6 +330,10 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 
 func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	r := mux.NewRouter().StrictSlash(true)
+	r.Use(otelmux.Middleware(
+		"superplane-public-api",
+		otelmux.WithTracerProvider(nooptrace.NewTracerProvider()),
+	))
 	r.Use(middleware.LoggingMiddleware(log.StandardLogger()))
 
 	// Register authentication routes (no auth required)
