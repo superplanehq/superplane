@@ -1,7 +1,5 @@
-import { Field, Label, ErrorMessage } from "../Fieldset/fieldset";
+import { Field, ErrorMessage } from "../Fieldset/fieldset";
 import { Input } from "../Input/input";
-import { Link } from "../Link/link";
-import { Text } from "../Text/text";
 import type { BaseIntegrationFormProps } from "./types";
 
 interface ApiTokenFormProps extends BaseIntegrationFormProps {

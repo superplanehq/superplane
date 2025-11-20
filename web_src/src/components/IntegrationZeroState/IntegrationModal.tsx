@@ -1,9 +1,8 @@
 import { createPortal } from "react-dom";
 import { useState, useEffect, useRef } from "react";
-import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from "../Dialog/dialog";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "../Dialog/dialog";
 import { Button } from "../Button/button";
 import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
-import { Link } from "../Link/link";
 import { useIntegrations, useCreateIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
 import { useSecrets, useCreateSecret, useUpdateSecret } from "@/hooks/useSecrets";
 import {

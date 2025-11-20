@@ -13,7 +13,7 @@ export function GitHubIntegrationForm({
   orgUrlRef,
 }: BaseIntegrationFormProps) {
   const [showGitHubPatInfo, setShowGitHubPatInfo] = useState(false);
-  const [dirtyByUser, setDirtyByUser] = useState(false);
+  const [dirtyByUser] = useState(false);
   const [displayName, setDisplayName] = useState(() => {
     return integrationData.orgUrl ? githubConfig.extractOrgName(integrationData.orgUrl) : "";
   });

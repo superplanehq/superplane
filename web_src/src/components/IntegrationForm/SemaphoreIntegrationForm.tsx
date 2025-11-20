@@ -14,7 +14,7 @@ export function SemaphoreIntegrationForm({
 }: BaseIntegrationFormProps) {
   const [showServiceAccountInfo, setShowServiceAccountInfo] = useState(false);
   const [showSemaphoreTokenInfo, setShowSemaphoreTokenInfo] = useState(false);
-  const [dirtyByUser, setDirtyByUser] = useState(false);
+  const [dirtyByUser] = useState(false);
 
   const handleOrgUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const url = e.target.value;
