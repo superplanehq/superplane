@@ -104,7 +104,7 @@ dev.logs.app:
 	docker compose $(DOCKER_COMPOSE_OPTS) logs -f app
 
 dev.logs.otel:
-	docker compose $(DOCKER_COMPOSE_OPTS) logs -f otel-collector
+	docker compose $(DOCKER_COMPOSE_OPTS) logs -f otel
 
 dev.down:
 	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans

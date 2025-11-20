@@ -60,7 +60,7 @@ services:
       BLOCK_SIGNUP: ${BLOCK_SIGNUP:-no}
       OTEL_ENABLED: "yes"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "otel:4317"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"
       OTEL_SERVICE_NAME: "superplane-dev"
 
     ports:
