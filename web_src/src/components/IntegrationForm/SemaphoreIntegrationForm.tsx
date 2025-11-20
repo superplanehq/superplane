@@ -81,16 +81,7 @@ export function SemaphoreIntegrationForm({
         <div className="mt-3 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
           <ol className="list-decimal ml-5 mt-1 space-y-1">
             <li>
-              Go to your organization's{" "}
-              <a
-                className="text-blue-600 dark:text-blue-400 underline"
-                href="https://org.semaphoreci.com/people"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                People page
-              </a>
-              .
+              Go to your organization's <code className="text-xs bg-zinc-200 dark:bg-zinc-700 px-1 py-0.5 rounded">/people</code> page.
             </li>
             <li>
               Create a new Service Account and give it a clear name (e.g., <strong>superplane</strong>).
