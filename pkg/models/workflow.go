@@ -153,6 +153,21 @@ func FindUnscopedWorkflowInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, er
 	return &workflow, nil
 }
 
+func ListWorkflows(orgID string) ([]Workflow, error) {
+	var workflows []Workflow
+	err := database.Conn().
+		Where("organization_id = ?", orgID).
+		Order("name ASC").
+		Find(&workflows).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return workflows, nil
+}
+
 func ListDeletedWorkflows() ([]Workflow, error) {
 	var workflows []Workflow
 	err := database.Conn().

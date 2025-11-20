@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -74,6 +75,16 @@ func Test__ListWorkflows__ReturnsAllWorkflowsForAnOrganization(t *testing.T) {
 	workflowIDs := []string{response.Workflows[0].Metadata.Id, response.Workflows[1].Metadata.Id}
 	assert.Contains(t, workflowIDs, workflow1.ID.String())
 	assert.Contains(t, workflowIDs, workflow2.ID.String())
+
+	//
+	// List of workflows returned is ordered by name
+	//
+	workflowNames := make([]string, len(response.Workflows))
+	for i, wf := range response.Workflows {
+		workflowNames[i] = wf.Metadata.Name
+	}
+
+	assert.True(t, sort.StringsAreSorted(workflowNames), "workflows should be sorted by name in ascending order")
 }
 
 func Test__ListWorkflows__DoesNotReturnWorkflowsFromOtherOrganizations(t *testing.T) {
