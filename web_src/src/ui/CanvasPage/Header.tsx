@@ -56,7 +56,7 @@ export function Header({
 
   return (
     <>
-      <header className="bg-white border-b border-gray-200">
+      <header className="bg-white border-b border-border">
         <div className="relative flex items-center justify-between h-12 px-6">
           {/* Logo */}
           <div className="flex items-center">
@@ -74,13 +74,13 @@ export function Header({
           </div>
 
           {/* Breadcrumbs - Absolutely centered */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center space-x-2 text-[15px] text-gray-500">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center space-x-1 text-sm text-gray-500">
             {breadcrumbs.map((item, index) => {
               const IconComponent = item.iconSlug ? resolveIcon(item.iconSlug) : null;
 
               return (
                 <div key={index} className="flex items-center">
-                  {index > 0 && <div className="w-2 mx-2">/</div>}
+                  {index > 0 && <div className="w-2 mx-1">/</div>}
                   {item.href || item.onClick ? (
                     <a
                       href={item.href}
