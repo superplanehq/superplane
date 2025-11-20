@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Field, Label, ErrorMessage } from "../Fieldset/fieldset";
 import { Input } from "../Input/input";
-import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
 import { githubConfig } from "./integrationConfigs";
 import type { BaseIntegrationFormProps } from "./types";
+import githubIcon from "@/assets/icons/integrations/github.svg";
 
 export function GitHubIntegrationForm({
   integrationData,
@@ -50,37 +50,16 @@ export function GitHubIntegrationForm({
         />
         {errors.orgUrl && <ErrorMessage>{errors.orgUrl}</ErrorMessage>}
         <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
-          <span className="font-semibold">Note:</span> The organization or user profile you enter here must match the
-          owner of the Personal Access Token (PAT) you provide below.
+          <span className="font-semibold">Note:</span> Enter your GitHub organization or username (e.g.,{" "}
+          <span className="font-mono">superplanehq</span> from{" "}
+          <span className="font-mono">github.com/superplanehq/my_repo</span>).
         </div>
-      </Field>
-
-      <Field>
-        <Label className="text-sm font-medium text-gray-900 dark:text-white">Integration Name</Label>
-        <Input
-          type="text"
-          value={integrationData.name}
-          onChange={(e) => {
-            setIntegrationData((prev) => ({ ...prev, name: e.target.value }));
-            if (errors.name) {
-              setErrors((prev) => ({ ...prev, name: undefined }));
-            }
-
-            if (e.target.value === "") {
-              setDirtyByUser(false);
-            }
-          }}
-          onKeyDown={() => setDirtyByUser(true)}
-          placeholder="Enter integration name"
-          className="w-full"
-        />
-        {errors.name && <ErrorMessage>{errors.name}</ErrorMessage>}
       </Field>
 
       <div className="rounded-md border border-gray-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-4">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 text-zinc-600 dark:text-zinc-300">
-            <MaterialSymbol name="info" size="md" />
+          <div className="mt-0.5 flex-shrink-0">
+            <img src={githubIcon} alt="GitHub" className="w-6 h-6" />
           </div>
           <div className="flex-1">
             <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -112,7 +91,7 @@ export function GitHubIntegrationForm({
                     </a>
                   </li>
                   <li>
-                    Select the <strong>Resource owner</strong>
+                    Select the <strong>Resource owner</strong> (has to match the organization/user you entered above)
                   </li>
                   <li>
                     Choose <strong>All repositories</strong> or pick specific repositories

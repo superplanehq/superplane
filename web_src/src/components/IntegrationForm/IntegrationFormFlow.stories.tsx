@@ -41,10 +41,8 @@ export const GitHubIntegrationFlow: Story = {
     const {
       integrationData,
       setIntegrationData,
-      apiTokenTab,
-      setApiTokenTab,
-      newSecretToken,
-      setNewSecretToken,
+      secretValue,
+      setSecretValue,
       errors,
       setErrors,
       validateForm,
@@ -93,11 +91,8 @@ export const GitHubIntegrationFlow: Story = {
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={mockSecrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           orgUrlRef={orgUrlRef}
         />
 
@@ -106,11 +101,8 @@ export const GitHubIntegrationFlow: Story = {
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={mockSecrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           organizationId={defaultProps.organizationId}
           canvasId={defaultProps.canvasId}
           orgUrlRef={orgUrlRef}
@@ -151,8 +143,7 @@ export const GitHubIntegrationFlow: Story = {
             {JSON.stringify(
               {
                 integrationData,
-                apiTokenTab,
-                newSecretToken: newSecretToken ? "***hidden***" : "",
+                secretValue: secretValue ? "***hidden***" : "",
                 errors,
               },
               null,
@@ -173,10 +164,8 @@ export const SemaphoreIntegrationFlow: Story = {
     const {
       integrationData,
       setIntegrationData,
-      apiTokenTab,
-      setApiTokenTab,
-      newSecretToken,
-      setNewSecretToken,
+      secretValue,
+      setSecretValue,
       errors,
       setErrors,
       validateForm,
@@ -225,11 +214,8 @@ export const SemaphoreIntegrationFlow: Story = {
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={mockSecrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           orgUrlRef={orgUrlRef}
         />
 
@@ -238,11 +224,8 @@ export const SemaphoreIntegrationFlow: Story = {
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={mockSecrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           organizationId={defaultProps.organizationId}
           canvasId={defaultProps.canvasId}
           orgUrlRef={orgUrlRef}
@@ -297,8 +280,7 @@ export const EditIntegrationFlow: Story = {
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("existing");
-    const [newSecretToken, setNewSecretToken] = useState("");
+    const [secretValue, setSecretValue] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitResult, setSubmitResult] = useState<string | null>(null);
 
@@ -333,11 +315,8 @@ export const EditIntegrationFlow: Story = {
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={mockSecrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           orgUrlRef={orgUrlRef}
         />
 
@@ -346,14 +325,12 @@ export const EditIntegrationFlow: Story = {
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={mockSecrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           organizationId={defaultProps.organizationId}
           canvasId={defaultProps.canvasId}
           orgUrlRef={orgUrlRef}
+          isEditMode={true}
         />
 
         <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
