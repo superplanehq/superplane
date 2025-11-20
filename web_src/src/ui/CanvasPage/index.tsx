@@ -1040,7 +1040,7 @@ function CanvasContent({
       {!hideHeader && <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} />}
 
       {/* Toggle button */}
-      <div className={`absolute ${hideHeader ? "top-2" : "top-14"} left-1/2 transform -translate-x-1/2 z-10`}>
+      <div className={`absolute ${hideHeader ? "bottom-3" : "top-14"} left-1/2 transform -translate-x-1/2 z-10`}>
         <ViewToggle isCollapsed={state.isCollapsed} onToggle={handleToggleCollapse} />
       </div>
 
