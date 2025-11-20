@@ -111,7 +111,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                           <img
                             src={integration.spec?.type === "github" ? githubIcon : SemaphoreLogo}
                             alt={integration.spec?.type}
-                            className="w-5 h-5"
+                            className="w-5 "
                           />
                         </div>
                         <div>
