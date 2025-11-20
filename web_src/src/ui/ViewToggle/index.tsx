@@ -14,9 +14,7 @@ function ViewToggle({ isCollapsed, onToggle, className = "" }: ViewToggle.Props)
       <div className="border-r border-border">
         <button
           onClick={onToggle}
-          className={`flex items-center justify-center w-6 h-6 transition-colors ${
-            isCollapsed ? "" : "opacity-30"
-          }`}
+          className={`flex items-center justify-center w-6 h-6 transition-colors ${isCollapsed ? "" : "opacity-30"}`}
           title="Collapsed view"
         >
           <Minimize size={16} strokeWidth={2} />
