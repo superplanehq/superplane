@@ -10,7 +10,6 @@ import "./App.css";
 import AuthGuard from "./components/AuthGuard";
 import Navigation from "./components/Navigation";
 import { AccountProvider } from "./contexts/AccountContext";
-import { useDarkMode } from "./hooks/useDarkMode";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import { CustomComponent } from "./pages/custom-component";
@@ -46,9 +45,6 @@ const withAuthOnly = (Component: React.ComponentType) => (
 
 // Main App component with router
 function App() {
-  // Initialize dark mode handling
-  useDarkMode();
-
   return (
     <QueryClientProvider client={queryClient}>
       <AccountProvider>
