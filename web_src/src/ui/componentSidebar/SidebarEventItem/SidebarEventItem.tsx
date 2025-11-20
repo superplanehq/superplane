@@ -384,7 +384,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       </div>
 
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
-        <div className="rounded-sm bg-white outline outline-black/20 text-gray-500 w-full mb-0.5">
+        <div className="rounded-sm bg-white outline outline-black/15 text-gray-500 w-full mb-0.5">
           {/* Tab Navigation */}
           {tabData && (
             <div className="flex justify-between items-center border-b-1 border-gray-200">
