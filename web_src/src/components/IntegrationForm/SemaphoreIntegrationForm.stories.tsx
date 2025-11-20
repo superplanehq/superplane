@@ -2,7 +2,6 @@ import React, { useState, useRef } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { SemaphoreIntegrationForm } from "./SemaphoreIntegrationForm";
 import type { IntegrationData, FormErrors } from "./types";
-import { createMockSecrets } from "../../../test/__mocks__/secrets";
 
 const meta: Meta<typeof SemaphoreIntegrationForm> = {
   title: "Components/IntegrationForm/SemaphoreIntegrationForm",
@@ -23,8 +22,6 @@ const meta: Meta<typeof SemaphoreIntegrationForm> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const mockSecrets = createMockSecrets();
-
 export const Default: Story = {
   render: (args) => {
     const [integrationData, setIntegrationData] = useState<IntegrationData>({
@@ -37,8 +34,7 @@ export const Default: Story = {
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("new");
-    const [newSecretToken, setNewSecretToken] = useState("");
+    const [secretValue, setSecretValue] = useState("");
     const orgUrlRef = useRef<HTMLInputElement>(null);
 
     return (
@@ -47,11 +43,8 @@ export const Default: Story = {
         setIntegrationData={setIntegrationData}
         errors={errors}
         setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
-        secrets={mockSecrets}
+        secretValue={secretValue}
+        setSecretValue={setSecretValue}
         orgUrlRef={orgUrlRef}
         {...args}
       />
@@ -71,8 +64,7 @@ export const WithExistingData: Story = {
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("new");
-    const [newSecretToken, setNewSecretToken] = useState("");
+    const [secretValue, setSecretValue] = useState("");
     const orgUrlRef = useRef<HTMLInputElement>(null);
 
     return (
@@ -81,11 +73,8 @@ export const WithExistingData: Story = {
         setIntegrationData={setIntegrationData}
         errors={errors}
         setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
-        secrets={mockSecrets}
+        secretValue={secretValue}
+        setSecretValue={setSecretValue}
         orgUrlRef={orgUrlRef}
         {...args}
       />
@@ -108,8 +97,7 @@ export const WithErrors: Story = {
       orgUrl: "URL must be a valid Semaphore organization URL",
       name: "Field cannot be empty",
     });
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("new");
-    const [newSecretToken, setNewSecretToken] = useState("");
+    const [secretValue, setSecretValue] = useState("");
     const orgUrlRef = useRef<HTMLInputElement>(null);
 
     return (
@@ -118,11 +106,8 @@ export const WithErrors: Story = {
         setIntegrationData={setIntegrationData}
         errors={errors}
         setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
-        secrets={mockSecrets}
+        secretValue={secretValue}
+        setSecretValue={setSecretValue}
         orgUrlRef={orgUrlRef}
         {...args}
       />
@@ -142,8 +127,7 @@ export const WithApiEndpoint: Story = {
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("new");
-    const [newSecretToken, setNewSecretToken] = useState("");
+    const [secretValue, setSecretValue] = useState("");
     const orgUrlRef = useRef<HTMLInputElement>(null);
 
     return (
@@ -152,11 +136,8 @@ export const WithApiEndpoint: Story = {
         setIntegrationData={setIntegrationData}
         errors={errors}
         setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
-        secrets={mockSecrets}
+        secretValue={secretValue}
+        setSecretValue={setSecretValue}
         orgUrlRef={orgUrlRef}
         {...args}
       />
@@ -176,8 +157,7 @@ export const EmptyState: Story = {
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("new");
-    const [newSecretToken, setNewSecretToken] = useState("");
+    const [secretValue, setSecretValue] = useState("");
     const orgUrlRef = useRef<HTMLInputElement>(null);
 
     return (
@@ -186,11 +166,8 @@ export const EmptyState: Story = {
         setIntegrationData={setIntegrationData}
         errors={errors}
         setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
-        secrets={[]}
+        secretValue={secretValue}
+        setSecretValue={setSecretValue}
         orgUrlRef={orgUrlRef}
         {...args}
       />
