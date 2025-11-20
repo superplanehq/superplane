@@ -158,7 +158,7 @@ export const Wait: React.FC<WaitProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-1 border-border rounded-md w-[26rem] bg-white">
+      <div className="flex flex-col outline outline-black/15 rounded-md w-[26rem] bg-white">
         <ComponentHeader
           iconSlug="alarm-clock"
           iconBackground={iconBackground || "bg-yellow-100"}

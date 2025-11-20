@@ -44,7 +44,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   return (
     <div className="relative w-20 h-20" onDoubleClick={onDoubleClick}>
       <div
-        className={`canvas-node-drag-handle flex h-20 w-20 items-center justify-center border border-border ${containerClass} ${collapsedBackground || ""}`}
+        className={`canvas-node-drag-handle flex h-20 w-20 items-center justify-center outline outline-black-15 ${containerClass} ${collapsedBackground || ""}`}
       >
         {iconSrc ? (
           <div

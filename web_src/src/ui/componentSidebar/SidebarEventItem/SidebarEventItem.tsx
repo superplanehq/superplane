@@ -362,7 +362,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           >
             <EventIcon size={iconSize} strokeWidth={iconStrokeWidth} className="thick" />
           </div>
-          <span className={`truncate text-sm font-medium ${titleColor}`}>{event.title}</span>
+          <span className={`truncate text-sm ${titleColor}`}>{event.title}</span>
         </div>
         {event.subtitle && (
           <span className="text-xs text-black/50 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
@@ -384,7 +384,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       </div>
 
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
-        <div className="rounded-sm bg-white outline outline-black/20 text-gray-500 w-full mb-0.5">
+        <div className="rounded-sm bg-white outline outline-black/15 text-gray-500 w-full mb-0.5">
           {/* Tab Navigation */}
           {tabData && (
             <div className="flex justify-between items-center border-b-1 border-gray-200">
@@ -440,7 +440,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-l-1 border-gray-200"
                   }`}
                 >
-                  {React.createElement(resolveIcon("code"), { size: 14 })}
+                  {React.createElement(resolveIcon("code"), { size: 16 })}
                   Payload
                 </button>
               )}
@@ -493,7 +493,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       onClick={() => copyPayloadToClipboard(tabData.payload)}
                       className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
                     >
-                      {React.createElement(resolveIcon("copy"), { size: 14 })}
+                      {React.createElement(resolveIcon("copy"), { size: 16 })}
                     </button>
                   </SimpleTooltip>
                   <SimpleTooltip content="Payload">
@@ -504,7 +504,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       }}
                       className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
                     >
-                      {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
+                      {React.createElement(resolveIcon("maximize-2"), { size: 16 })}
                     </button>
                   </SimpleTooltip>
                 </div>
@@ -666,7 +666,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           {!tabData && event.values && Object.entries(event.values).length > 0 && (
             <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
               {Object.entries(event.values || {}).map(([key, value]) => (
-                <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0">
                   <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
                     {key}:
                   </span>
