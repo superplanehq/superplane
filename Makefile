@@ -30,7 +30,6 @@ tidy:
 
 test.setup:
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
-	@if [ ! -f ".env.docker" ]; then cp .env.docker.example .env.docker; fi
 	@mkdir -p tmp/screenshots
 	docker compose $(DOCKER_COMPOSE_OPTS) build
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go get ./...
@@ -85,7 +84,6 @@ format.js.check:
 #
 
 dev.setup:
-	@if [ ! -f ".env.docker" ]; then cp .env.docker.example .env.docker; fi
 	docker compose $(DOCKER_COMPOSE_OPTS) build
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
