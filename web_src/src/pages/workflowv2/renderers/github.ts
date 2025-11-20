@@ -104,7 +104,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
     const props: TriggerProps = {
       title: node.name!,
       iconSrc: githubIcon,
-      iconBackground: "bg-black",
+      iconBackground: "bg-white",
       iconColor: getColorClass(trigger.color),
       headerColor: getBackgroundColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),

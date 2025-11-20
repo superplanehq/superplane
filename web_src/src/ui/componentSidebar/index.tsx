@@ -123,7 +123,7 @@ export const ComponentSidebar = ({
   getLoadingMoreQueue,
   loadExecutionChain,
 }: ComponentSidebarProps) => {
-  const [sidebarWidth, setSidebarWidth] = useState(420);
+  const [sidebarWidth, setSidebarWidth] = useState(450);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   // Keep expanded state stable across parent re-renders
