@@ -56,9 +56,9 @@ services:
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       TEMPLATE_DIR: "/app/templates"
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Superplane}
-      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@superplane.com}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@notifications.superplane.com}
       BLOCK_SIGNUP: ${BLOCK_SIGNUP:-no}
 
     ports:

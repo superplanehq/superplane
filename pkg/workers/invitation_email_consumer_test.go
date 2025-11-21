@@ -17,9 +17,9 @@ type TestEmailService struct {
 
 type SentEmail struct {
 	ToEmail          string
-	ToName           string
 	OrganizationName string
 	InvitationLink   string
+	InviterEmail     string
 }
 
 func NewTestEmailService() *TestEmailService {
@@ -28,12 +28,12 @@ func NewTestEmailService() *TestEmailService {
 	}
 }
 
-func (s *TestEmailService) SendInvitationEmail(toEmail, toName, organizationName, invitationLink string) error {
+func (s *TestEmailService) SendInvitationEmail(toEmail, organizationName, invitationLink, inviterEmail string) error {
 	s.sentEmails = append(s.sentEmails, SentEmail{
 		ToEmail:          toEmail,
-		ToName:           toName,
 		OrganizationName: organizationName,
 		InvitationLink:   invitationLink,
+		InviterEmail:     inviterEmail,
 	})
 	return nil
 }
@@ -84,9 +84,9 @@ func Test__InvitationEmailConsumer(t *testing.T) {
 
 		sentEmail := sentEmails[0]
 		assert.Equal(t, "test@example.com", sentEmail.ToEmail)
-		assert.Equal(t, "test", sentEmail.ToName)
 		assert.Equal(t, r.Organization.Name, sentEmail.OrganizationName)
 		assert.Equal(t, baseURL+"/login", sentEmail.InvitationLink)
+		assert.Equal(t, r.Account.Email, sentEmail.InviterEmail)
 	})
 
 	t.Run("should not send email for accepted invitation", func(t *testing.T) {

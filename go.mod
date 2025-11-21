@@ -22,7 +22,7 @@ require (
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/playwright-community/playwright-go v0.5200.1
 	github.com/renderedtext/go-tackle v0.0.0-20251117195301-3a303949d759
-	github.com/sendgrid/sendgrid-go v3.16.1+incompatible
+	github.com/resend/resend-go/v3 v3.0.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
@@ -89,7 +89,6 @@ require (
 	github.com/rabbitmq/amqp091-go v1.9.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230126093431-47fa9a501578 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
-	github.com/sendgrid/rest v2.6.9+incompatible // indirect
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
