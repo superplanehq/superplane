@@ -44,17 +44,17 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
 		log.Println("Starting Invitation Email Consumer")
-		sendGridAPIKey := os.Getenv("SENDGRID_API_KEY")
+		resendAPIKey := os.Getenv("RESEND_API_KEY")
 		fromName := os.Getenv("EMAIL_FROM_NAME")
 		fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
 		templateDir := os.Getenv("TEMPLATE_DIR")
 
-		if sendGridAPIKey != "" && fromName != "" && fromEmail != "" && templateDir != "" {
-			emailService := services.NewSendGridEmailService(sendGridAPIKey, fromName, fromEmail, templateDir)
+		if resendAPIKey != "" && fromName != "" && fromEmail != "" && templateDir != "" {
+			emailService := services.NewResendEmailService(resendAPIKey, fromName, fromEmail, templateDir)
 			invitationEmailConsumer := workers.NewInvitationEmailConsumer(rabbitMQURL, emailService, baseURL)
 			go invitationEmailConsumer.Start()
 		} else {
-			log.Warn("Invitation Email Consumer not started - missing required environment variables (SENDGRID_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS, TEMPLATE_DIR)")
+			log.Warn("Invitation Email Consumer not started - missing required environment variables (RESEND_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS, TEMPLATE_DIR)")
 		}
 	}
 

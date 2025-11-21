@@ -6,49 +6,45 @@ import (
 	"html/template"
 	"path/filepath"
 
-	"github.com/sendgrid/sendgrid-go"
-	"github.com/sendgrid/sendgrid-go/helpers/mail"
+	"github.com/resend/resend-go/v3"
 	log "github.com/sirupsen/logrus"
 )
 
 type EmailService interface {
-	SendInvitationEmail(toEmail, toName, organizationName, invitationLink string) error
+	SendInvitationEmail(toEmail, organizationName, invitationLink, inviterEmail string) error
 }
 
-type SendGridEmailService struct {
+type InvitationTemplateData struct {
+	ToEmail          string
+	OrganizationName string
+	InvitationLink   string
+	InviterEmail     string
+}
+
+type ResendEmailService struct {
 	apiKey      string
 	fromName    string
 	fromEmail   string
 	templateDir string
-	client      *sendgrid.Client
+	client      *resend.Client
 }
 
-func NewSendGridEmailService(apiKey, fromName, fromEmail, templateDir string) *SendGridEmailService {
-	return &SendGridEmailService{
+func NewResendEmailService(apiKey, fromName, fromEmail, templateDir string) *ResendEmailService {
+	return &ResendEmailService{
 		apiKey:      apiKey,
 		fromName:    fromName,
 		fromEmail:   fromEmail,
 		templateDir: templateDir,
-		client:      sendgrid.NewSendClient(apiKey),
+		client:      resend.NewClient(apiKey),
 	}
 }
 
-type InvitationTemplateData struct {
-	ToName           string
-	OrganizationName string
-	InvitationLink   string
-}
-
-func (s *SendGridEmailService) SendInvitationEmail(toEmail, toName, organizationName, invitationLink string) error {
-	from := mail.NewEmail(s.fromName, s.fromEmail)
-	to := mail.NewEmail(toName, toEmail)
-
-	subject := fmt.Sprintf("You're invited to join %s on Superplane", organizationName)
-
+func (s *ResendEmailService) SendInvitationEmail(toEmail, organizationName, invitationLink, inviterEmail string) error {
 	templateData := InvitationTemplateData{
-		ToName:           toName,
+		ToEmail:          toEmail,
 		OrganizationName: organizationName,
 		InvitationLink:   invitationLink,
+		InviterEmail:     inviterEmail,
 	}
 
 	plainTextContent, err := s.renderTemplate("invitation.txt", templateData)
@@ -63,24 +59,25 @@ func (s *SendGridEmailService) SendInvitationEmail(toEmail, toName, organization
 		return fmt.Errorf("failed to render HTML template: %w", err)
 	}
 
-	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
+	params := &resend.SendEmailRequest{
+		From:    fmt.Sprintf("%s <%s>", s.fromName, s.fromEmail),
+		To:      []string{toEmail},
+		Subject: "You have been invited to join an organization on Superplane",
+		Text:    plainTextContent,
+		Html:    htmlContent,
+	}
 
-	response, err := s.client.Send(message)
+	response, err := s.client.Emails.Send(params)
 	if err != nil {
 		log.Errorf("Error sending invitation email to %s: %v", toEmail, err)
 		return err
 	}
 
-	if response.StatusCode >= 300 {
-		log.Errorf("SendGrid API returned error status %d for email to %s", response.StatusCode, toEmail)
-		return fmt.Errorf("failed to send email: status code %d", response.StatusCode)
-	}
-
-	log.Infof("Invitation email sent successfully to %s", toEmail)
+	log.Infof("Invitation email sent successfully to %s (ID: %s)", toEmail, response.Id)
 	return nil
 }
 
-func (s *SendGridEmailService) renderTemplate(templateName string, data InvitationTemplateData) (string, error) {
+func (s *ResendEmailService) renderTemplate(templateName string, data InvitationTemplateData) (string, error) {
 	templatePath := filepath.Join(s.templateDir, "email", templateName)
 
 	tmpl, err := template.ParseFiles(templatePath)
