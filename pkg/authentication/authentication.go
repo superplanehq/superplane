@@ -268,6 +268,15 @@ func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("account_token")
+	if err == nil {
+		_, err := a.jwtSigner.ValidateAndGetClaims(cookie.Value)
+		if err == nil {
+			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+			return
+		}
+	}
+
 	templatePath := filepath.Join(a.templateDir, "login.html")
 
 	t, err := template.ParseFiles(templatePath)
