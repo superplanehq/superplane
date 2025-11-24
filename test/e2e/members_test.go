@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/utils"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 )
@@ -75,9 +76,10 @@ func (s *membersSteps) submitInvitations() {
 
 func (s *membersSteps) assertInvitationPersistedInDB(email string) {
 	var invitation models.OrganizationInvitation
-	err := database.Conn().Where("email = ? AND organization_id = ?", email, s.session.OrgID.String()).First(&invitation).Error
+	normalizedEmail := utils.NormalizeEmail(email)
+	err := database.Conn().Where("email = ? AND organization_id = ?", normalizedEmail, s.session.OrgID.String()).First(&invitation).Error
 	require.NoError(s.t, err)
-	require.Equal(s.t, email, invitation.Email)
+	require.Equal(s.t, normalizedEmail, invitation.Email)
 	require.Equal(s.t, s.session.OrgID.String(), invitation.OrganizationID.String())
 }
 
