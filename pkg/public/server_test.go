@@ -221,6 +221,55 @@ func (m *mockAuthService) SetupOrganization(tx *gorm.DB, orgID, ownerID string) 
 	return m.AuthService.SetupOrganization(tx, orgID, ownerID)
 }
 
+func Test__LoginPageRedirect(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+
+	signer := jwt.NewSigner("test")
+	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", authService, false)
+	require.NoError(t, err)
+
+	t.Run("unauthenticated user sees login page", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method: "GET",
+			path:   "/login",
+		})
+
+		require.Equal(t, 200, response.Code)
+	})
+
+	t.Run("authenticated user gets redirected from login page", func(t *testing.T) {
+		account, err := models.CreateAccount("test@example.com", "Test User")
+		require.NoError(t, err)
+
+		token, err := signer.Generate(account.ID.String(), time.Hour)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/login",
+			authCookie: token,
+		})
+
+		require.Equal(t, 307, response.Code)
+		require.Equal(t, "/", response.Header().Get("Location"))
+	})
+
+	t.Run("user with invalid token sees login page", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/login",
+			authCookie: "invalid-token",
+		})
+
+		// Should not redirect, should show login page
+		require.Equal(t, 200, response.Code)
+	})
+}
+
 func Test__CreateOrganization(t *testing.T) {
 	t.Run("organization creation fails due to RBAC setup failure", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
