@@ -98,7 +98,7 @@ CREATE TABLE public.blueprints (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100),
+    ptype character varying(100) NOT NULL,
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
