@@ -268,7 +268,9 @@ CREATE TABLE public.webhooks (
     resource jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    deleted_at timestamp without time zone
+    deleted_at timestamp without time zone,
+    retry_count integer DEFAULT 0 NOT NULL,
+    max_retries integer DEFAULT 3 NOT NULL
 );
 
 
@@ -1028,7 +1030,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251119161200	f
+20251124160500	f
 \.
 
 
