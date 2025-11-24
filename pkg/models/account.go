@@ -3,6 +3,7 @@ package models
 import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
 )
 
@@ -17,7 +18,7 @@ func CreateAccount(name, email string) (*Account, error) {
 }
 
 func CreateAccountInTransaction(tx *gorm.DB, name, email string) (*Account, error) {
-	account := &Account{Name: name, Email: email}
+	account := &Account{Name: name, Email: utils.NormalizeEmail(email)}
 	err := tx.Create(account).Error
 	if err != nil {
 		return nil, err
@@ -45,7 +46,7 @@ func FindAccountByEmail(email string) (*Account, error) {
 	var account Account
 
 	err := database.Conn().
-		Where("email = ?", email).
+		Where("email = ?", utils.NormalizeEmail(email)).
 		First(&account).
 		Error
 

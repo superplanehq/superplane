@@ -21,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
 )
 
@@ -339,7 +340,7 @@ func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account,
 	if err == nil {
 		accountProvider.AccessToken = base64.StdEncoding.EncodeToString(accessToken)
 		accountProvider.Username = gothUser.NickName
-		accountProvider.Email = gothUser.Email
+		accountProvider.Email = utils.NormalizeEmail(gothUser.Email)
 		accountProvider.Name = gothUser.Name
 		accountProvider.AvatarURL = gothUser.AvatarURL
 		accountProvider.RefreshToken = gothUser.RefreshToken
@@ -358,7 +359,7 @@ func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account,
 		Provider:       gothUser.Provider,
 		ProviderID:     gothUser.UserID,
 		Username:       gothUser.NickName,
-		Email:          gothUser.Email,
+		Email:          utils.NormalizeEmail(gothUser.Email),
 		Name:           gothUser.Name,
 		AvatarURL:      gothUser.AvatarURL,
 		AccessToken:    base64.StdEncoding.EncodeToString(accessToken),
