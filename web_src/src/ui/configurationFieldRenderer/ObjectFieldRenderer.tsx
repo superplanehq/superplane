@@ -12,16 +12,21 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   hasError,
 }) => {
   const [jsonError, setJsonError] = React.useState<string | null>(null);
+  const [editorValue, setEditorValue] = React.useState<string>(() =>
+    JSON.stringify(value === undefined ? {} : value, null, 2),
+  );
+
   const objectOptions = field.typeOptions?.object;
   const schema = objectOptions?.schema;
   const hasSchema = !!schema && schema.length > 0;
 
   if (!hasSchema) {
     // Fallback to Monaco Editor if no schema defined
-    const handleEditorChange = (value: string | undefined) => {
-      const newValue = value || "{}";
+    const handleEditorChange = (newValue: string | undefined) => {
+      const valueToUse = newValue || "{}";
+      setEditorValue(valueToUse);
       try {
-        const parsed = JSON.parse(newValue);
+        const parsed = JSON.parse(valueToUse);
         onChange(parsed);
         setJsonError(null);
       } catch (error) {
@@ -38,7 +43,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
           <Editor
             height="100%"
             defaultLanguage="json"
-            value={JSON.stringify(value === undefined ? {} : value, null, 2)}
+            value={editorValue}
             onChange={handleEditorChange}
             theme="vs"
             options={{
