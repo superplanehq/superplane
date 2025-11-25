@@ -36,20 +36,17 @@ describe("useWorkflowWebsocket", () => {
   const mockExecution: WorkflowsWorkflowNodeExecution = {
     id: "exec-1",
     nodeId: "node-1",
-    status: "finished",
     rootEvent: { id: "event-1" },
   };
 
   const mockEvent: WorkflowsWorkflowEvent = {
     id: "event-1",
     nodeId: "node-1",
-    type: "webhook",
   };
 
   const mockQueueItem: WorkflowsWorkflowNodeQueueItem = {
     id: "queue-1",
     nodeId: "node-1",
-    status: "pending",
   };
 
   beforeEach(() => {
@@ -73,9 +70,9 @@ describe("useWorkflowWebsocket", () => {
     });
     queryClient.invalidateQueries = vi.fn();
 
-    (useNodeExecutionStore as Mock).mockReturnValue(mockStore);
+    (useNodeExecutionStore as unknown as Mock).mockReturnValue(mockStore);
 
-    mockUseWebSocket.mockImplementation((url, options) => {
+    mockUseWebSocket.mockImplementation((_url, options) => {
       mockOnMessage = options?.onMessage;
       return {};
     });
