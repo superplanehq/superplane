@@ -3,6 +3,7 @@ package authentication
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -129,7 +130,7 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		AccessToken: "dev-token-" + provider,
 	}
 
-	account, err := a.findOrCreateAccount(mockUser.Name, mockUser.Email)
+	account, err := a.FindOrCreateAccountForProvider(mockUser)
 
 	if err != nil {
 		if err.Error() == SignupDisabledError {
@@ -137,6 +138,7 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		log.Errorf("Error finding/creating dev account for %s: %v", mockUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -163,20 +165,27 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account, err := a.findOrCreateAccount(gothUser.Name, gothUser.Email)
+	account, err := a.FindOrCreateAccountForProvider(gothUser)
 	if err != nil {
+		if err.Error() == SignupDisabledError {
+			http.Error(w, SignupDisabledError, http.StatusForbidden)
+			return
+		}
+		log.Errorf("Error finding/creating account for %s: %v", gothUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	err = updateAccountProviders(a.encryptor, account, gothUser)
 	if err != nil {
+		log.Errorf("Error updating account providers for %s: %v", gothUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	err = a.acceptPendingInvitations(account)
 	if err != nil {
+		log.Errorf("Error accepting pending invitations for %s: %v", gothUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -319,6 +328,44 @@ func (a *Handler) findOrCreateAccount(name, email string) (*models.Account, erro
 	}
 
 	account, err = models.CreateAccount(name, email)
+	if err != nil {
+		return nil, err
+	}
+
+	return account, nil
+}
+
+func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {
+	account, err := models.FindAccountByProvider(gothUser.Provider, gothUser.UserID)
+
+	if err == nil {
+		if account.Email != utils.NormalizeEmail(gothUser.Email) {
+			log.Infof("Updating email for account %s from %s to %s", account.ID, account.Email, gothUser.Email)
+			err = account.UpdateEmailForProvider(gothUser.Email, gothUser.Provider, gothUser.UserID)
+
+			if err != nil {
+				log.Errorf("Failed to update account email: %v", err)
+				return nil, fmt.Errorf("failed to update account email: %w", err)
+			}
+		}
+		return account, nil
+	}
+
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	account, err = models.FindAccountByEmail(gothUser.Email)
+	if err == nil {
+		return account, nil
+	}
+
+	if a.blockSignup {
+		log.Warnf("Signup blocked for email: %s", gothUser.Email)
+		return nil, fmt.Errorf(SignupDisabledError)
+	}
+
+	account, err = models.CreateAccount(gothUser.Name, gothUser.Email)
 	if err != nil {
 		return nil, err
 	}
