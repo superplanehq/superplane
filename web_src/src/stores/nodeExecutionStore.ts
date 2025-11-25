@@ -204,7 +204,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
           ? queryClient.fetchQuery(nodeQueueItemsQueryOptions(workflowId, nodeId))
           : Promise.resolve({ items: [] }),
         nodeType === "TYPE_TRIGGER"
-          ? queryClient.fetchQuery(nodeEventsQueryOptions(workflowId, nodeId, { limit: 10 }))
+          ? queryClient.fetchQuery(nodeEventsQueryOptions(workflowId, nodeId))
           : Promise.resolve({ events: [] }),
       ]);
 
@@ -267,7 +267,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
           ? queryClient.fetchQuery(nodeQueueItemsQueryOptions(workflowId, nodeId))
           : Promise.resolve({ items: [] }),
         nodeType === "TYPE_TRIGGER"
-          ? queryClient.fetchQuery(nodeEventsQueryOptions(workflowId, nodeId, { limit: 10 }))
+          ? queryClient.fetchQuery(nodeEventsQueryOptions(workflowId, nodeId))
           : Promise.resolve({ events: [] }),
       ]);
 
