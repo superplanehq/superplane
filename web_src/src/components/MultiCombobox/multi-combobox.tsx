@@ -3,7 +3,7 @@
 import * as Headless from "@headlessui/react";
 import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
-import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
+import { Icon } from "../Icon";
 
 export function MultiCombobox<T extends { id: string }>({
   options,
@@ -221,7 +221,7 @@ export function MultiCombobox<T extends { id: string }>({
                     )}
                   >
                     {children(option, true)}
-                    {!isValid && <MaterialSymbol name="warning" size="sm" className="text-red-500 dark:text-red-400" />}
+                    {!isValid && <Icon name="warning" size="sm" className="text-red-500 dark:text-red-400" />}
                     <button
                       type="button"
                       data-testid={`remove-${option.id}`}
@@ -231,7 +231,7 @@ export function MultiCombobox<T extends { id: string }>({
                       }}
                       className="ml-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 rounded transition-colors"
                     >
-                      <MaterialSymbol name="close" size="sm" />
+                      <Icon name="close" size="sm" />
                     </button>
                   </span>
                 );
@@ -263,7 +263,7 @@ export function MultiCombobox<T extends { id: string }>({
           </div>
           {showButton && (
             <Headless.ComboboxButton className="group absolute inset-y-0 right-0 flex items-center px-2">
-              <MaterialSymbol name="expand_more" size="sm" />
+              <Icon name="expand_more" size="sm" />
             </Headless.ComboboxButton>
           )}
         </span>

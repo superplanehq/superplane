@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Heading } from "../../../components/Heading/heading";
-import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
+import { Icon } from "../../../components/Icon";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Input, InputGroup } from "../../../components/Input/input";
 import { Button } from "../../../components/Button/button";
@@ -351,7 +351,7 @@ export function Members({ organizationId }: MembersProps) {
               onClick={handleEmailsSubmit}
               disabled={!emailsInput.trim() || isInviting}
             >
-              <MaterialSymbol name="add" size="sm" />
+              <Icon name="add" size="sm" />
               {isInviting ? "Sending..." : "Send Invitations"}
             </Button>
           </div>
@@ -426,7 +426,7 @@ export function Members({ organizationId }: MembersProps) {
                   >
                     <div className="flex items-center gap-2">
                       Name
-                      <MaterialSymbol name={getSortIcon("name")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("name")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -435,7 +435,7 @@ export function Members({ organizationId }: MembersProps) {
                   >
                     <div className="flex items-center gap-2">
                       Email
-                      <MaterialSymbol name={getSortIcon("email")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("email")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -444,7 +444,7 @@ export function Members({ organizationId }: MembersProps) {
                   >
                     <div className="flex items-center gap-2">
                       Role
-                      <MaterialSymbol name={getSortIcon("role")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("role")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -453,7 +453,7 @@ export function Members({ organizationId }: MembersProps) {
                   >
                     <div className="flex items-center gap-2">
                       Status
-                      <MaterialSymbol name={getSortIcon("status")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("status")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -485,7 +485,7 @@ export function Members({ organizationId }: MembersProps) {
                         <Dropdown>
                           <DropdownButton outline className="flex items-center gap-2 text-sm">
                             {member.role}
-                            <MaterialSymbol name="keyboard_arrow_down" />
+                            <Icon name="keyboard_arrow_down" />
                           </DropdownButton>
                           <DropdownMenu>
                             {organizationRoles.map((role) => (
@@ -516,11 +516,11 @@ export function Members({ organizationId }: MembersProps) {
                       <div className="flex justify-end">
                         <Dropdown>
                           <DropdownButton plain className="flex items-center gap-2 text-sm">
-                            <MaterialSymbol name="more_vert" size="sm" />
+                            <Icon name="more_vert" size="sm" />
                           </DropdownButton>
                           <DropdownMenu>
                             <DropdownItem onClick={() => handleMemberRemove(member)}>
-                              <MaterialSymbol name="delete" />
+                              <Icon name="delete" />
                               {member.type === "member" ? "Remove" : "Cancel invitation"}
                             </DropdownItem>
                           </DropdownMenu>
@@ -533,7 +533,7 @@ export function Members({ organizationId }: MembersProps) {
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8">
                       <div className="text-zinc-500 dark:text-zinc-400">
-                        <MaterialSymbol name="search" className="h-12 w-12 mx-auto mb-4 text-zinc-300" />
+                        <Icon name="search" className="h-12 w-12 mx-auto mb-4 text-zinc-300" />
                         <p className="text-lg font-medium text-zinc-900 dark:text-white mb-2">
                           {searchTerm ? "No members found" : "No members yet"}
                         </p>
