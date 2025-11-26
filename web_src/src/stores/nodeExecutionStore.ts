@@ -117,24 +117,11 @@ function updateParentExecution(
   }
 
   /*
-   * New parent execution arriving.
-   * Check for orphaned children that belong to it
+   * New execution arriving - just add it to the list
+   * Do NOT adopt other executions as children based on parentExecutionId
+   * as they are likely sibling executions, not true children
    */
-  const orphanedChildren = executions.filter((e) => e.parentExecutionId === parentExecution.id);
-  if (orphanedChildren.length === 0) {
-    return [{ ...parentExecution, childExecutions: parentExecution.childExecutions || [] }, ...executions];
-  }
-
-  /*
-   * Move orphaned children from top-level into parent
-   */
-  const withoutOrphans = executions.filter((e) => e.parentExecutionId !== parentExecution.id);
-  const parentWithChildren = {
-    ...parentExecution,
-    childExecutions: [...(parentExecution.childExecutions || []), ...orphanedChildren],
-  };
-
-  return [parentWithChildren, ...withoutOrphans];
+  return [{ ...parentExecution, childExecutions: parentExecution.childExecutions || [] }, ...executions];
 }
 
 export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
@@ -310,9 +297,29 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
       const newData = new Map(state.data);
       const existing = newData.get(nodeId) || emptyNodeData;
 
+      console.log('Store updateNodeExecution:', {
+        nodeId,
+        executionId: execution.id,
+        state: execution.state,
+        result: execution.result,
+        parentExecutionId: execution.parentExecutionId,
+        existingExecutionsCount: existing.executions.length,
+        existingExecutionIds: existing.executions.map(e => ({ id: e.id, state: e.state }))
+      });
+
       const updatedExecutions = execution.parentExecutionId
         ? updateChildExecution(existing.executions, execution)
         : updateParentExecution(existing.executions, execution);
+
+      console.log('Store after update:', {
+        nodeId,
+        updatedExecutionsCount: updatedExecutions.length,
+        updatedExecutionIds: updatedExecutions.map(e => ({
+          id: e.id,
+          state: e.state,
+          childrenCount: e.childExecutions?.length || 0
+        }))
+      });
 
       newData.set(nodeId, {
         ...existing,
