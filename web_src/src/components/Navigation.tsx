@@ -11,7 +11,7 @@ import {
   DropdownSection,
 } from "./Dropdown/dropdown";
 import { Text } from "./Text/text";
-import { MaterialSymbol } from "./MaterialSymbol/material-symbol";
+import { Icon } from "./Icon";
 import { Link } from "./Link/link";
 import { Button } from "./ui/button";
 import { useOrganization } from "../hooks/useOrganizationData";
@@ -81,7 +81,7 @@ const Navigation: React.FC = () => {
               <DropdownSection>
                 <DropdownItem href={`/${organizationId}/settings/profile`}>
                   <span className="flex items-center gap-x-2">
-                    <MaterialSymbol name="person" data-slot="icon" size="sm" />
+                    <Icon name="person" data-slot="icon" size="sm" />
                     <DropdownLabel>Profile</DropdownLabel>
                   </span>
                 </DropdownItem>
@@ -110,41 +110,41 @@ const Navigation: React.FC = () => {
                 <DropdownSection>
                   <DropdownItem href={`/${organizationId}/settings/general`}>
                     <span className="flex items-center gap-x-2">
-                      <MaterialSymbol name="business" data-slot="icon" size="sm" />
+                      <Icon name="business" data-slot="icon" size="sm" />
                       <DropdownLabel>Organization Settings</DropdownLabel>
                     </span>
                   </DropdownItem>
 
                   <DropdownItem href={`/${organizationId}/settings/members`}>
                     <span className="flex items-center gap-x-2">
-                      <MaterialSymbol name="person" data-slot="icon" size="sm" />
+                      <Icon name="person" data-slot="icon" size="sm" />
                       <DropdownLabel>Members</DropdownLabel>
                     </span>
                   </DropdownItem>
 
                   <DropdownItem href={`/${organizationId}/settings/groups`}>
                     <span className="flex items-center gap-x-2">
-                      <MaterialSymbol name="group" data-slot="icon" size="sm" />
+                      <Icon name="group" data-slot="icon" size="sm" />
                       <DropdownLabel>Groups</DropdownLabel>
                     </span>
                   </DropdownItem>
                   <DropdownItem href={`/${organizationId}/settings/roles`}>
                     <span className="flex items-center gap-x-2">
-                      <MaterialSymbol name="shield" data-slot="icon" size="sm" />
+                      <Icon name="shield" data-slot="icon" size="sm" />
                       <DropdownLabel>Roles</DropdownLabel>
                     </span>
                   </DropdownItem>
 
                   <DropdownItem href={`/${organizationId}/settings/integrations`}>
                     <span className="flex items-center gap-x-2">
-                      <MaterialSymbol name="integration_instructions" data-slot="icon" size="sm" />
+                      <Icon name="integration_instructions" data-slot="icon" size="sm" />
                       <DropdownLabel>Integrations</DropdownLabel>
                     </span>
                   </DropdownItem>
 
                   <DropdownItem href="/">
                     <span className="flex items-center gap-x-2">
-                      <MaterialSymbol name="swap_horiz" data-slot="icon" size="sm" />
+                      <Icon name="swap_horiz" data-slot="icon" size="sm" />
                       <DropdownLabel>Change organization</DropdownLabel>
                     </span>
                   </DropdownItem>
@@ -162,7 +162,7 @@ const Navigation: React.FC = () => {
                   }}
                 >
                   <span className="flex items-center gap-x-2">
-                    <MaterialSymbol name="logout" data-slot="icon" size="sm" />
+                    <Icon name="logout" data-slot="icon" size="sm" />
                     <DropdownLabel>Sign Out</DropdownLabel>
                   </span>
                 </DropdownItem>

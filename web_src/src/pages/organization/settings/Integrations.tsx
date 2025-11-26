@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "../../../components/Button/button";
-import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
+import { Icon } from "../../../components/Icon";
 import { useIntegrations } from "../../../hooks/useIntegrations";
 import { IntegrationModal } from "../../../components/IntegrationZeroState/IntegrationModal";
 import type { IntegrationsIntegration } from "../../../api-client/types.gen";
@@ -79,13 +79,13 @@ export function Integrations({ organizationId }: IntegrationsProps) {
         <div className="p-6">
           {integrations.length === 0 ? (
             <div className="text-center py-12">
-              <MaterialSymbol name="integration_instructions" size="lg" className="text-zinc-400 mx-auto mb-4" />
+              <Icon name="integration_instructions" size="lg" className="text-zinc-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-2">No integrations yet</h3>
               <p className="text-zinc-600 dark:text-zinc-400 mb-6">
                 Connect external services to streamline your workflow
               </p>
               <Button color="blue" onClick={handleAddIntegrationClick} className="flex items-center gap-2">
-                <MaterialSymbol name="add" size="sm" />
+                <Icon name="add" size="sm" />
                 Add Integration
               </Button>
             </div>
@@ -94,7 +94,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium">Organization Integrations</h2>
                 <Button color="blue" onClick={handleAddIntegrationClick} className="flex items-center gap-2">
-                  <MaterialSymbol name="add" size="sm" />
+                  <Icon name="add" size="sm" />
                   Add Integration
                 </Button>
               </div>
@@ -128,7 +128,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                           className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded"
                           title="Edit integration"
                         >
-                          <MaterialSymbol name="edit" size="sm" />
+                          <Icon name="edit" size="sm" />
                         </button>
                       </div>
                     </div>
@@ -151,7 +151,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                   onClick={() => setIsIntegrationSelectorOpen(false)}
                   className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
                 >
-                  <MaterialSymbol name="close" size="sm" />
+                  <Icon name="close" size="sm" />
                 </button>
               </div>
               <div className="space-y-3">

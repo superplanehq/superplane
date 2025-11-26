@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogTitle, DialogBody, DialogActions } from "../Dialog/dialog";
 import { Button } from "../Button/button";
-import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
+import { Icon } from "../Icon";
 import { useIntegrations, useCreateIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
 import { useSecrets, useCreateSecret, useUpdateSecret } from "@/hooks/useSecrets";
 import {
@@ -225,7 +225,7 @@ export function IntegrationModal({
         <Button color="blue" onClick={handleSaveIntegration} disabled={isCreating}>
           {isCreating ? (
             <>
-              <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
+              <Icon name="progress_activity" className="animate-spin" size="sm" />
               {editingIntegration ? "Updating..." : "Creating..."}
             </>
           ) : editingIntegration ? (

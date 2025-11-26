@@ -4,7 +4,7 @@ import { Text } from "../../../components/Text/text";
 import { Heading } from "../../../components/Heading/heading";
 import { Button } from "../../../components/Button/button";
 import { Input } from "../../../components/Input/input";
-import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
+import { Icon } from "../../../components/Icon";
 import { meMe, meRegenerateToken } from "../../../api-client/sdk.gen";
 import type { SuperplaneMeUser } from "../../../api-client/types.gen";
 import { withOrganizationHeader } from "../../../utils/withOrganizationHeader";
@@ -146,7 +146,7 @@ export function Profile() {
             <div className="flex items-center gap-2">
               {!user.hasToken && (
                 <>
-                  <MaterialSymbol name="error" className="text-zinc-500 dark:text-zinc-400 text-lg" />
+                  <Icon name="error" className="text-zinc-500 dark:text-zinc-400 text-lg" />
                   <Text className="text-sm font-medium text-zinc-600 dark:text-zinc-400">No API token generated</Text>
                 </>
               )}
@@ -154,7 +154,7 @@ export function Profile() {
 
             <div className="flex items-center gap-4">
               <Button onClick={handleRegenerateToken} disabled={regeneratingToken} className="flex items-center gap-2">
-                <MaterialSymbol name="refresh" />
+                <Icon name="refresh" />
                 {regeneratingToken ? "Regenerating..." : user.hasToken ? "Regenerate Token" : "Generate Token"}
               </Button>
 
@@ -176,16 +176,16 @@ export function Profile() {
                     className="flex-1 font-mono text-sm bg-zinc-50 dark:bg-zinc-900"
                   />
                   <Button outline onClick={() => setTokenVisible(!tokenVisible)} className="flex items-center gap-1">
-                    <MaterialSymbol name={tokenVisible ? "visibility_off" : "visibility"} />
+                    <Icon name={tokenVisible ? "visibility_off" : "visibility"} />
                   </Button>
                   <Button outline onClick={copyToken} className="flex items-center gap-1">
-                    <MaterialSymbol name="content_copy" />
+                    <Icon name="content_copy" />
                     Copy
                   </Button>
                 </div>
                 <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
                   <div className="flex items-start gap-2">
-                    <MaterialSymbol name="warning" className="text-amber-600 dark:text-amber-400 text-sm mt-0.5" />
+                    <Icon name="warning" className="text-amber-600 dark:text-amber-400 text-sm mt-0.5" />
                     <Text className="text-amber-800 dark:text-amber-200 text-sm">
                       <strong>Important:</strong> This token will only be shown once. Make sure to copy and store it
                       securely. If you lose this token, you'll need to generate a new one.

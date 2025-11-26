@@ -4,7 +4,7 @@ import { Button } from "../Button/button";
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../Dialog/dialog";
 import { Field, Label } from "../Fieldset/fieldset";
 import { Input } from "../Input/input";
-import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
+import { Icon } from "../Icon";
 import { Textarea } from "../Textarea/textarea";
 
 interface CreateCustomComponentModalProps {
@@ -78,7 +78,7 @@ export function CreateCustomComponentModal({
         Create a custom component that can be reused across your canvases and automations.
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
-        <MaterialSymbol name="close" size="sm" />
+        <Icon name="close" size="sm" />
       </button>
 
       <DialogBody>

@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "../Link/link";
-import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
+import { Icon } from "../Icon";
 import clsx from "clsx";
 
 export interface BreadcrumbItem {
@@ -32,9 +32,7 @@ export function Breadcrumbs({ items, className, separator = "/", showDivider = t
             {item.current ? (
               // Current page (not clickable)
               <span className="text-zinc-900 dark:text-zinc-100 font-medium flex items-center" aria-current="page">
-                {item.icon && (
-                  <MaterialSymbol name={item.icon} className="text-zinc-700 dark:text-zinc-300 mr-1" size="sm" />
-                )}
+                {item.icon && <Icon name={item.icon} className="text-zinc-700 dark:text-zinc-300 mr-1" size="sm" />}
                 {item.label}
               </span>
             ) : item.href ? (
@@ -43,9 +41,7 @@ export function Breadcrumbs({ items, className, separator = "/", showDivider = t
                 href={item.href}
                 className="text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-100 transition-colors flex items-center"
               >
-                {item.icon && (
-                  <MaterialSymbol name={item.icon} className="text-blue-700 dark:text-blue-400 mr-1" size="sm" />
-                )}
+                {item.icon && <Icon name={item.icon} className="text-blue-700 dark:text-blue-400 mr-1" size="sm" />}
                 {item.label}
               </Link>
             ) : item.onClick ? (
@@ -54,17 +50,13 @@ export function Breadcrumbs({ items, className, separator = "/", showDivider = t
                 onClick={item.onClick}
                 className="text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-100 transition-colors flex items-center"
               >
-                {item.icon && (
-                  <MaterialSymbol name={item.icon} className="text-blue-700 dark:text-blue-400 mr-1" size="sm" />
-                )}
+                {item.icon && <Icon name={item.icon} className="text-blue-700 dark:text-blue-400 mr-1" size="sm" />}
                 {item.label}
               </button>
             ) : (
               // Non-clickable item
               <span className="text-zinc-600 dark:text-zinc-400 flex items-center">
-                {item.icon && (
-                  <MaterialSymbol name={item.icon} className="text-zinc-600 dark:text-zinc-400 mr-1" size="sm" />
-                )}
+                {item.icon && <Icon name={item.icon} className="text-zinc-600 dark:text-zinc-400 mr-1" size="sm" />}
                 {item.label}
               </span>
             )}
