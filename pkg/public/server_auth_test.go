@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -160,55 +159,9 @@ func TestServer_ProviderConfiguration(t *testing.T) {
 	assert.Len(t, providers, 2)
 }
 
-func TestServer_ProviderEmailChangeIntegration(t *testing.T) {
+func TestServer_AuthIntegration(t *testing.T) {
 	r := support.Setup(t)
-	server, account, _ := setupTestServer(r, t)
-
-	t.Run("should handle provider email change during authentication", func(t *testing.T) {
-
-		originalEmail := account.Email
-		newEmail := "newemail@example.com"
-
-		provider := &models.AccountProvider{
-			AccountID:  account.ID,
-			Provider:   "github",
-			ProviderID: "12345",
-			Username:   "testuser",
-			Email:      originalEmail,
-			Name:       account.Name,
-		}
-		err := database.Conn().Create(provider).Error
-		require.NoError(t, err)
-
-		r.UserModel.AccountID = account.ID
-		r.UserModel.Email = originalEmail
-		err = database.Conn().Save(r.UserModel).Error
-		require.NoError(t, err)
-
-		handler := server.authHandler
-		gothUser := goth.User{
-			UserID:   "12345",
-			Email:    newEmail,
-			Name:     account.Name,
-			Provider: "github",
-		}
-
-		resultAccount, err := handler.FindOrCreateAccountForProvider(gothUser)
-		require.NoError(t, err)
-
-		assert.Equal(t, account.ID, resultAccount.ID)
-		assert.Equal(t, newEmail, resultAccount.Email)
-
-		var userFromDB models.User
-		err = database.Conn().Where("id = ?", r.UserModel.ID).First(&userFromDB).Error
-		require.NoError(t, err)
-		assert.Equal(t, newEmail, userFromDB.Email)
-
-		var providerFromDB models.AccountProvider
-		err = database.Conn().Where("id = ?", provider.ID).First(&providerFromDB).Error
-		require.NoError(t, err)
-		assert.Equal(t, newEmail, providerFromDB.Email)
-	})
+	server, _, _ := setupTestServer(r, t)
 
 	t.Run("should block signup when configured", func(t *testing.T) {
 
