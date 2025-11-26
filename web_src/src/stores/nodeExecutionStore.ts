@@ -297,28 +297,28 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
       const newData = new Map(state.data);
       const existing = newData.get(nodeId) || emptyNodeData;
 
-      console.log('Store updateNodeExecution:', {
+      console.log("Store updateNodeExecution:", {
         nodeId,
         executionId: execution.id,
         state: execution.state,
         result: execution.result,
         parentExecutionId: execution.parentExecutionId,
         existingExecutionsCount: existing.executions.length,
-        existingExecutionIds: existing.executions.map(e => ({ id: e.id, state: e.state }))
+        existingExecutionIds: existing.executions.map((e) => ({ id: e.id, state: e.state })),
       });
 
       const updatedExecutions = execution.parentExecutionId
         ? updateChildExecution(existing.executions, execution)
         : updateParentExecution(existing.executions, execution);
 
-      console.log('Store after update:', {
+      console.log("Store after update:", {
         nodeId,
         updatedExecutionsCount: updatedExecutions.length,
-        updatedExecutionIds: updatedExecutions.map(e => ({
+        updatedExecutionIds: updatedExecutions.map((e) => ({
           id: e.id,
           state: e.state,
-          childrenCount: e.childExecutions?.length || 0
-        }))
+          childrenCount: e.childExecutions?.length || 0,
+        })),
       });
 
       newData.set(nodeId, {
