@@ -316,25 +316,6 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *Handler) findOrCreateAccount(name, email string) (*models.Account, error) {
-	account, err := models.FindAccountByEmail(email)
-	if err == nil {
-		return account, nil
-	}
-
-	if a.blockSignup {
-		log.Warnf("Signup blocked for email: %s", email)
-		return nil, fmt.Errorf(SignupDisabledError)
-	}
-
-	account, err = models.CreateAccount(name, email)
-	if err != nil {
-		return nil, err
-	}
-
-	return account, nil
-}
-
 func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {
 	account, err := models.FindAccountByProvider(gothUser.Provider, gothUser.UserID)
 
