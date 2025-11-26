@@ -137,6 +137,47 @@ function updateParentExecution(
   return [parentWithChildren, ...withoutOrphans];
 }
 
+/**
+ * Invalidates queries for a specific node based on its type
+ */
+async function invalidateNodeQueries(workflowId: string, nodeId: string, nodeType: string, queryClient: QueryClient) {
+  await Promise.all([
+    nodeType !== "TYPE_TRIGGER"
+      ? queryClient.invalidateQueries(nodeExecutionsQueryOptions(workflowId, nodeId))
+      : Promise.resolve(),
+    nodeType !== "TYPE_TRIGGER"
+      ? queryClient.invalidateQueries(nodeQueueItemsQueryOptions(workflowId, nodeId))
+      : Promise.resolve(),
+    nodeType === "TYPE_TRIGGER"
+      ? queryClient.invalidateQueries(nodeEventsQueryOptions(workflowId, nodeId))
+      : Promise.resolve(),
+  ]);
+}
+
+/**
+ * Fetches node data based on its type
+ */
+async function fetchNodeData(
+  workflowId: string,
+  nodeId: string,
+  nodeType: string,
+  queryClient: QueryClient,
+): Promise<
+  [WorkflowsListNodeExecutionsResponse, WorkflowsListNodeQueueItemsResponse, WorkflowsListNodeEventsResponse]
+> {
+  return await Promise.all([
+    nodeType !== "TYPE_TRIGGER"
+      ? queryClient.fetchQuery(nodeExecutionsQueryOptions(workflowId, nodeId))
+      : Promise.resolve({ executions: [] }),
+    nodeType !== "TYPE_TRIGGER"
+      ? queryClient.fetchQuery(nodeQueueItemsQueryOptions(workflowId, nodeId))
+      : Promise.resolve({ items: [] }),
+    nodeType === "TYPE_TRIGGER"
+      ? queryClient.fetchQuery(nodeEventsQueryOptions(workflowId, nodeId))
+      : Promise.resolve({ events: [] }),
+  ]);
+}
+
 export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
   data: new Map(),
   version: 0,
@@ -191,22 +232,16 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
     });
 
     try {
+      // Invalidate queries first to ensure fresh data
+      await invalidateNodeQueries(workflowId, nodeId, nodeType, queryClient);
+
       // Fetch full data in parallel
-      const [executionsResult, queueItemsResult, eventsResult]: [
-        WorkflowsListNodeExecutionsResponse,
-        WorkflowsListNodeQueueItemsResponse,
-        WorkflowsListNodeEventsResponse,
-      ] = await Promise.all([
-        nodeType !== "TYPE_TRIGGER"
-          ? queryClient.fetchQuery(nodeExecutionsQueryOptions(workflowId, nodeId))
-          : Promise.resolve({ executions: [] }),
-        nodeType !== "TYPE_TRIGGER"
-          ? queryClient.fetchQuery(nodeQueueItemsQueryOptions(workflowId, nodeId))
-          : Promise.resolve({ items: [] }),
-        nodeType === "TYPE_TRIGGER"
-          ? queryClient.fetchQuery(nodeEventsQueryOptions(workflowId, nodeId))
-          : Promise.resolve({ events: [] }),
-      ]);
+      const [executionsResult, queueItemsResult, eventsResult] = await fetchNodeData(
+        workflowId,
+        nodeId,
+        nodeType,
+        queryClient,
+      );
 
       // Update with full data
       set((state) => {
@@ -254,6 +289,9 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
     });
 
     try {
+      // Invalidate queries first to ensure fresh data
+      await invalidateNodeQueries(workflowId, nodeId, nodeType, queryClient);
+
       // Fetch fresh data in parallel
       const [executionsResult, queueItemsResult, eventsResult]: [
         WorkflowsListNodeExecutionsResponse,
