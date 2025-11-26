@@ -119,3 +119,81 @@ func (a *Account) FindPendingInvitations() ([]OrganizationInvitation, error) {
 
 	return invitations, nil
 }
+
+func FindAccountByProvider(provider, providerID string) (*Account, error) {
+	var accountProvider AccountProvider
+	err := database.Conn().
+		Where("provider = ?", provider).
+		Where("provider_id = ?", providerID).
+		First(&accountProvider).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return FindAccountByID(accountProvider.AccountID.String())
+}
+
+func (a *Account) UpdateEmail(newEmail string) error {
+	normalizedEmail := utils.NormalizeEmail(newEmail)
+	originalEmail := a.Email
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		err := tx.Model(a).Update("email", normalizedEmail).Error
+		if err != nil {
+			return err
+		}
+
+		err = tx.Model(&User{}).
+			Where("account_id = ?", a.ID).
+			Update("email", normalizedEmail).Error
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err == nil {
+		a.Email = normalizedEmail
+		return nil
+	}
+
+	a.Email = originalEmail
+	return err
+}
+
+func (a *Account) UpdateEmailForProvider(newEmail, provider, providerID string) error {
+	normalizedEmail := utils.NormalizeEmail(newEmail)
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+
+		err := tx.Model(a).Update("email", normalizedEmail).Error
+		if err != nil {
+			return err
+		}
+
+		err = tx.Model(&User{}).
+			Where("account_id = ?", a.ID).
+			Update("email", normalizedEmail).Error
+		if err != nil {
+			return err
+		}
+
+		err = tx.Model(&AccountProvider{}).
+			Where("account_id = ? AND provider = ? AND provider_id = ?", a.ID, provider, providerID).
+			Update("email", normalizedEmail).Error
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err == nil {
+		a.Email = normalizedEmail
+	}
+
+	return err
+}

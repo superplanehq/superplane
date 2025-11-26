@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -156,4 +157,46 @@ func TestServer_ProviderConfiguration(t *testing.T) {
 	assert.Contains(t, providers, "github")
 	assert.Contains(t, providers, "google")
 	assert.Len(t, providers, 2)
+}
+
+func TestServer_AuthIntegration(t *testing.T) {
+	r := support.Setup(t)
+	server, _, _ := setupTestServer(r, t)
+
+	t.Run("should block signup when configured", func(t *testing.T) {
+
+		signer := jwt.NewSigner("test-client-secret")
+		blockedServer, err := NewServer(r.Encryptor, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", r.AuthService, true)
+		require.NoError(t, err)
+
+		handler := blockedServer.authHandler
+		gothUser := goth.User{
+			UserID:   "99999",
+			Email:    "newuser@example.com",
+			Name:     "New User",
+			Provider: "github",
+		}
+
+		resultAccount, err := handler.FindOrCreateAccountForProvider(gothUser)
+		require.Error(t, err)
+		assert.Equal(t, "signup is currently disabled", err.Error())
+		assert.Nil(t, resultAccount)
+	})
+
+	t.Run("should create new account when signup allowed", func(t *testing.T) {
+		handler := server.authHandler
+		gothUser := goth.User{
+			UserID:   "88888",
+			Email:    "brandnew@example.com",
+			Name:     "Brand New User",
+			Provider: "google",
+		}
+
+		resultAccount, err := handler.FindOrCreateAccountForProvider(gothUser)
+		require.NoError(t, err)
+
+		assert.NotNil(t, resultAccount)
+		assert.Equal(t, gothUser.Email, resultAccount.Email)
+		assert.Equal(t, gothUser.Name, resultAccount.Name)
+	})
 }
