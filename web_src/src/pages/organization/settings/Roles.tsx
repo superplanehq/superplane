@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Heading } from "../../../components/Heading/heading";
 import { Button } from "../../../components/Button/button";
 import { Input, InputGroup } from "../../../components/Input/input";
-import { Icon } from "../../../components/Icon";
+import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
 import debounce from "lodash.debounce";
 import { Dropdown, DropdownButton, DropdownMenu, DropdownItem } from "../../../components/Dropdown/dropdown";
 import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "../../../components/Table/table";
@@ -150,7 +150,7 @@ export function Roles({ organizationId }: RolesProps) {
             />
           </InputGroup>
           <Button color="blue" className="flex items-center" onClick={handleCreateRole}>
-            <Icon name="add" />
+            <MaterialSymbol name="add" />
             New Organization Role
           </Button>
         </div>
@@ -169,7 +169,7 @@ export function Roles({ organizationId }: RolesProps) {
                   >
                     <div className="flex items-center gap-2">
                       Role name
-                      <Icon name={getSortIcon("name")} size="sm" className="text-zinc-400" />
+                      <MaterialSymbol name={getSortIcon("name")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -178,7 +178,7 @@ export function Roles({ organizationId }: RolesProps) {
                   >
                     <div className="flex items-center gap-2">
                       Permissions
-                      <Icon name={getSortIcon("permissions")} size="sm" className="text-zinc-400" />
+                      <MaterialSymbol name={getSortIcon("permissions")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -207,18 +207,18 @@ export function Roles({ organizationId }: RolesProps) {
                             ) : (
                               <Dropdown>
                                 <DropdownButton plain disabled={deleteRoleMutation.isPending}>
-                                  <Icon name="more_vert" size="sm" />
+                                  <MaterialSymbol name="more_vert" size="sm" />
                                 </DropdownButton>
                                 <DropdownMenu>
                                   <DropdownItem onClick={() => handleEditRole(role)}>
-                                    <Icon name="edit" />
+                                    <MaterialSymbol name="edit" />
                                     Edit
                                   </DropdownItem>
                                   <DropdownItem
                                     onClick={() => handleDeleteRole(role)}
                                     className="text-red-600 dark:text-red-400"
                                   >
-                                    <Icon name="delete" />
+                                    <MaterialSymbol name="delete" />
                                     {deleteRoleMutation.isPending ? "Deleting..." : "Delete"}
                                   </DropdownItem>
                                 </DropdownMenu>

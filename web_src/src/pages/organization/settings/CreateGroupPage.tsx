@@ -10,7 +10,7 @@ import {
   DropdownLabel,
   DropdownDescription,
 } from "../../../components/Dropdown/dropdown";
-import { Icon } from "../../../components/Icon";
+import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
 import { Text } from "../../../components/Text/text";
 import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
 import { useCreateGroup, useOrganizationRoles } from "../../../hooks/useOrganizationData";
@@ -146,7 +146,10 @@ export function CreateGroupPage() {
                 ) : roles.length === 0 ? (
                   <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                     <div className="flex max-w-lg">
-                      <Icon name="warning" className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5" />
+                      <MaterialSymbol
+                        name="warning"
+                        className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5"
+                      />
                       <div className="text-sm">
                         <p className="text-yellow-800 dark:text-yellow-200 font-medium">No roles available</p>
                         <p className="text-yellow-700 dark:text-yellow-300 mt-1">
@@ -156,7 +159,7 @@ export function CreateGroupPage() {
                           to={`/${orgId}/settings/create-role`}
                           className="inline-flex items-center gap-1 mt-2 text-yellow-800 dark:text-yellow-200 hover:text-yellow-900 dark:hover:text-yellow-100 font-medium"
                         >
-                          <Icon name="add" size="sm" />
+                          <MaterialSymbol name="add" size="sm" />
                           Create Role
                         </Link>
                       </div>
@@ -166,7 +169,7 @@ export function CreateGroupPage() {
                   <Dropdown>
                     <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
                       {roles.find((r) => r.metadata?.name === selectedRole)?.spec?.displayName || "Select Role"}
-                      <Icon name="keyboard_arrow_down" />
+                      <MaterialSymbol name="keyboard_arrow_down" />
                     </DropdownButton>
                     <DropdownMenu>
                       {roles.map((role) => (
@@ -193,7 +196,7 @@ export function CreateGroupPage() {
               disabled={!groupName.trim() || !selectedRole || isCreating || roles.length === 0}
               className="flex items-center gap-2"
             >
-              <Icon name="group_add" size="sm" />
+              <MaterialSymbol name="group_add" size="sm" />
               {isCreating ? "Creating..." : "Create Group"}
             </Button>
 

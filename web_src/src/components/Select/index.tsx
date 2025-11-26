@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useFloating, autoUpdate, offset, flip, shift, size } from "@floating-ui/react";
-import { Icon } from "@/components/Icon";
+import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import { twMerge } from "tailwind-merge";
 
 export interface SelectOption {
@@ -154,14 +154,16 @@ export function Select({
               {selectedOption?.image && (
                 <img src={selectedOption.image} alt="" className="w-4 h-4 dark:bg-white dark:rounded-sm dark:p-0.5" />
               )}
-              {selectedOption?.icon && !selectedOption?.image && <Icon name={selectedOption.icon} size="sm" />}
+              {selectedOption?.icon && !selectedOption?.image && (
+                <MaterialSymbol name={selectedOption.icon} size="sm" />
+              )}
             </div>
           )}
           <span className={twMerge("block truncate", !selectedOption && "text-zinc-500 dark:text-zinc-400")}>
             {selectedOption ? selectedOption.label : placeholder}
           </span>
         </div>
-        <Icon
+        <MaterialSymbol
           name={isOpen ? "expand_less" : "expand_more"}
           size="sm"
           className="ml-2 text-zinc-400 dark:text-zinc-500 flex-shrink-0"
@@ -203,7 +205,7 @@ export function Select({
                                 className="w-4 h-4 dark:bg-white dark:rounded-sm dark:p-0.5"
                               />
                             )}
-                            {option.icon && !option.image && <Icon name={option.icon} size="sm" />}
+                            {option.icon && !option.image && <MaterialSymbol name={option.icon} size="sm" />}
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
@@ -217,7 +219,9 @@ export function Select({
                           )}
                         </div>
                       </div>
-                      {isSelected && <Icon name="check" size="sm" className="text-blue-500 ml-2 flex-shrink-0" />}
+                      {isSelected && (
+                        <MaterialSymbol name="check" size="sm" className="text-blue-500 ml-2 flex-shrink-0" />
+                      )}
                     </div>
                   </div>
                 );

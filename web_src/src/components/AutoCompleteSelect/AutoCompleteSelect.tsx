@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useFloating, autoUpdate, offset, flip, shift, size } from "@floating-ui/react";
-import { Icon } from "@/components/Icon";
+import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import { twMerge } from "tailwind-merge";
 
 export interface AutoCompleteOption {
@@ -172,7 +172,7 @@ export function AutoCompleteSelect({
             setIsOpen(!isOpen);
           }}
         >
-          <Icon
+          <MaterialSymbol
             name={isOpen ? "expand_less" : "expand_more"}
             size="sm"
             className="ml-2 text-zinc-400 dark:text-zinc-500 flex-shrink-0"
@@ -220,7 +220,7 @@ export function AutoCompleteSelect({
                           <span className={twMerge("block truncate", isSelected ? "font-medium" : "font-normal")}>
                             {option.label}
                           </span>
-                          {isSelected && <Icon name="check" size="sm" className="text-blue-500" />}
+                          {isSelected && <MaterialSymbol name="check" size="sm" className="text-blue-500" />}
                         </div>
                       </div>
                     );

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Icon } from "@/components/Icon";
+import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 
 interface CodeBlockProps {
   children: string;
@@ -34,7 +34,7 @@ export function CodeBlock({ children, className = "" }: CodeBlockProps) {
         className="absolute! top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-400"
         title={copied ? "Copied!" : "Copy to clipboard"}
       >
-        <Icon name={copied ? "check" : "content_copy"} size="sm" />
+        <MaterialSymbol name={copied ? "check" : "content_copy"} size="sm" />
       </button>
     </pre>
   );

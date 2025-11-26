@@ -6,7 +6,7 @@ import { SemaphoreIntegrationForm } from "./SemaphoreIntegrationForm";
 import { ApiTokenForm } from "./ApiTokenForm";
 import { useIntegrationForm } from "./useIntegrationForm";
 import { Button } from "../Button/button";
-import { Icon } from "../Icon";
+import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
 import type { IntegrationData, FormErrors } from "./types";
 import { createMockSecrets, createMockIntegrations, defaultProps } from "../../../test/__mocks__/secrets";
 
@@ -116,19 +116,19 @@ export const GitHubIntegrationFlow: Story = {
             }}
             disabled={isSubmitting}
           >
-            <Icon name="refresh" size="sm" />
+            <MaterialSymbol name="refresh" size="sm" />
             Reset Form
           </Button>
 
           <Button color="blue" onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
-                <Icon name="progress_activity" className="animate-spin" size="sm" />
+                <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
                 Creating...
               </>
             ) : (
               <>
-                <Icon name="add" size="sm" />
+                <MaterialSymbol name="add" size="sm" />
                 Create Integration
               </>
             )}
@@ -239,19 +239,19 @@ export const SemaphoreIntegrationFlow: Story = {
             }}
             disabled={isSubmitting}
           >
-            <Icon name="refresh" size="sm" />
+            <MaterialSymbol name="refresh" size="sm" />
             Reset Form
           </Button>
 
           <Button color="blue" onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
-                <Icon name="progress_activity" className="animate-spin" size="sm" />
+                <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
                 Creating...
               </>
             ) : (
               <>
-                <Icon name="add" size="sm" />
+                <MaterialSymbol name="add" size="sm" />
                 Create Integration
               </>
             )}
@@ -335,19 +335,19 @@ export const EditIntegrationFlow: Story = {
 
         <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
           <Button disabled={isSubmitting}>
-            <Icon name="close" size="sm" />
+            <MaterialSymbol name="close" size="sm" />
             Cancel
           </Button>
 
           <Button color="blue" onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
-                <Icon name="progress_activity" className="animate-spin" size="sm" />
+                <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
                 Updating...
               </>
             ) : (
               <>
-                <Icon name="save" size="sm" />
+                <MaterialSymbol name="save" size="sm" />
                 Update Integration
               </>
             )}

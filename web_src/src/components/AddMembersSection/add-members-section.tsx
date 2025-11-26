@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Text } from "../Text/text";
-import { Icon } from "../Icon";
+import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
 import { Avatar } from "../Avatar/avatar";
 import { MultiCombobox, MultiComboboxLabel } from "../MultiCombobox/multi-combobox";
 import { Button } from "../Button/button";
@@ -121,7 +121,7 @@ export function AddMembersSection({
                     </span>
                   ) : (
                     <div className="flex items-center justify-center size-8 bg-zinc-100 dark:bg-zinc-800 rounded-full">
-                      <Icon name="mail" size="md" className="text-zinc-600 dark:text-zinc-400" />
+                      <MaterialSymbol name="mail" size="md" className="text-zinc-600 dark:text-zinc-400" />
                     </div>
                   )
                 ) : (
@@ -155,7 +155,7 @@ export function AddMembersSection({
           }}
         </MultiCombobox>
         <Button type="submit" disabled={selectedUsers.length === 0 || isLoading || disabled} color="blue">
-          <Icon name="add" size="sm" />
+          <MaterialSymbol name="add" size="sm" />
           {isLoading ? "Adding..." : "Add"}
         </Button>
       </form>

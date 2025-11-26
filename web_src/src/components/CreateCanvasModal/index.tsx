@@ -4,7 +4,7 @@ import { Button } from "../Button/button";
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../Dialog/dialog";
 import { Field, Label } from "../Fieldset/fieldset";
 import { Input } from "../Input/input";
-import { Icon } from "../Icon";
+import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
 import { Textarea } from "../Textarea/textarea";
 
 interface CreateCanvasModalProps {
@@ -72,7 +72,7 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
         Create a new canvas to orchestrate your DevOps work. You can tweak the details any time.
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
-        <Icon name="close" size="sm" />
+        <MaterialSymbol name="close" size="sm" />
       </button>
 
       <DialogBody>

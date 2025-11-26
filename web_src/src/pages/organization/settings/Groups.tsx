@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Heading } from "../../../components/Heading/heading";
 import { Button } from "../../../components/Button/button";
 import { Input, InputGroup } from "../../../components/Input/input";
-import { Icon } from "../../../components/Icon";
+import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Link } from "../../../components/Link/link";
 import {
@@ -173,7 +173,7 @@ export function Groups({ organizationId }: GroupsProps) {
             />
           </InputGroup>
           <Button color="blue" className="flex items-center" onClick={handleCreateGroup}>
-            <Icon name="add" />
+            <MaterialSymbol name="add" />
             Create New Group
           </Button>
         </div>
@@ -192,7 +192,7 @@ export function Groups({ organizationId }: GroupsProps) {
                   >
                     <div className="flex items-center gap-2">
                       Team name
-                      <Icon name={getSortIcon("name")} size="sm" className="text-zinc-400" />
+                      <MaterialSymbol name={getSortIcon("name")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -201,7 +201,7 @@ export function Groups({ organizationId }: GroupsProps) {
                   >
                     <div className="flex items-center gap-2">
                       Created
-                      <Icon name={getSortIcon("created")} size="sm" className="text-zinc-400" />
+                      <MaterialSymbol name={getSortIcon("created")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -210,7 +210,7 @@ export function Groups({ organizationId }: GroupsProps) {
                   >
                     <div className="flex items-center gap-2">
                       Members
-                      <Icon name={getSortIcon("members")} size="sm" className="text-zinc-400" />
+                      <MaterialSymbol name={getSortIcon("members")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -219,7 +219,7 @@ export function Groups({ organizationId }: GroupsProps) {
                   >
                     <div className="flex items-center gap-2">
                       Role
-                      <Icon name={getSortIcon("role")} size="sm" className="text-zinc-400" />
+                      <MaterialSymbol name={getSortIcon("role")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -275,7 +275,7 @@ export function Groups({ organizationId }: GroupsProps) {
                               ? "Updating..."
                               : roles.find((r) => r?.metadata?.name === group.spec?.role)?.spec?.displayName ||
                                 "Select Role"}
-                            <Icon name="keyboard_arrow_down" />
+                            <MaterialSymbol name="keyboard_arrow_down" />
                           </DropdownButton>
                           <DropdownMenu>
                             {roles.map((role) => (
@@ -294,18 +294,18 @@ export function Groups({ organizationId }: GroupsProps) {
                         <div className="flex justify-end">
                           <Dropdown>
                             <DropdownButton plain disabled={deleteGroupMutation.isPending}>
-                              <Icon name="more_vert" size="sm" />
+                              <MaterialSymbol name="more_vert" size="sm" />
                             </DropdownButton>
                             <DropdownMenu>
                               <DropdownItem onClick={() => handleViewMembers(group.metadata!.name!)}>
-                                <Icon name="group" />
+                                <MaterialSymbol name="group" />
                                 View Members
                               </DropdownItem>
                               <DropdownItem
                                 onClick={() => handleDeleteGroup(group.metadata!.name!)}
                                 className="text-red-600 dark:text-red-400"
                               >
-                                <Icon name="delete" />
+                                <MaterialSymbol name="delete" />
                                 {deleteGroupMutation.isPending ? "Deleting..." : "Delete Group"}
                               </DropdownItem>
                             </DropdownMenu>
