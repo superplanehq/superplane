@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
+import { Icon } from "../../../components/Icon";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Heading, Subheading } from "../../../components/Heading/heading";
 import { Button } from "../../../components/Button/button";
@@ -311,7 +311,7 @@ export function GroupMembersPage() {
                       disabled={updateGroupMutation.isPending}
                       className="text-green-600 hover:text-green-700"
                     >
-                      <MaterialSymbol name={updateGroupMutation.isPending ? "hourglass_empty" : "check"} size="sm" />
+                      <Icon name={updateGroupMutation.isPending ? "hourglass_empty" : "check"} size="sm" />
                     </Button>
                     <Button
                       plain
@@ -319,7 +319,7 @@ export function GroupMembersPage() {
                       disabled={updateGroupMutation.isPending}
                       className="text-red-600 hover:text-red-700"
                     >
-                      <MaterialSymbol name="close" size="sm" />
+                      <Icon name="close" size="sm" />
                     </Button>
                   </div>
                 ) : (
@@ -332,7 +332,7 @@ export function GroupMembersPage() {
                       onClick={handleEditGroupName}
                       className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
                     >
-                      <MaterialSymbol name="edit" size="sm" />
+                      <Icon name="edit" size="sm" />
                     </Button>
                   </div>
                 )}
@@ -359,7 +359,7 @@ export function GroupMembersPage() {
                       disabled={updateGroupMutation.isPending}
                       className="text-green-600 hover:text-green-700"
                     >
-                      <MaterialSymbol name={updateGroupMutation.isPending ? "hourglass_empty" : "check"} size="sm" />
+                      <Icon name={updateGroupMutation.isPending ? "hourglass_empty" : "check"} size="sm" />
                     </Button>
                     <Button
                       plain
@@ -367,7 +367,7 @@ export function GroupMembersPage() {
                       disabled={updateGroupMutation.isPending}
                       className="text-red-600 hover:text-red-700"
                     >
-                      <MaterialSymbol name="close" size="sm" />
+                      <Icon name="close" size="sm" />
                     </Button>
                   </div>
                 ) : (
@@ -380,7 +380,7 @@ export function GroupMembersPage() {
                       onClick={handleEditGroupDescription}
                       className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
                     >
-                      <MaterialSymbol name="edit" size="sm" />
+                      <Icon name="edit" size="sm" />
                     </Button>
                   </div>
                 )}
@@ -393,7 +393,7 @@ export function GroupMembersPage() {
                 {loadingRoles
                   ? "Loading..."
                   : roles.find((role) => role.metadata?.name === group?.spec?.role)?.spec?.displayName || "Member"}
-                <MaterialSymbol name="keyboard_arrow_down" />
+                <Icon name="keyboard_arrow_down" />
               </DropdownButton>
               <DropdownMenu>
                 {roles.map((role) => (
@@ -406,11 +406,11 @@ export function GroupMembersPage() {
             </Dropdown>
             <Dropdown>
               <DropdownButton plain aria-label="More options" disabled={deleteGroupMutation.isPending}>
-                <MaterialSymbol name="more_vert" size="sm" />
+                <Icon name="more_vert" size="sm" />
               </DropdownButton>
               <DropdownMenu>
                 <DropdownItem onClick={handleDeleteGroup} className="text-red-600 dark:text-red-400">
-                  <MaterialSymbol name="delete" />
+                  <Icon name="delete" />
                   {deleteGroupMutation.isPending ? "Deleting..." : "Delete group"}
                 </DropdownItem>
               </DropdownMenu>
@@ -453,7 +453,7 @@ export function GroupMembersPage() {
                   >
                     <div className="flex items-center gap-2">
                       Name
-                      <MaterialSymbol name={getSortIcon("name")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("name")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -462,7 +462,7 @@ export function GroupMembersPage() {
                   >
                     <div className="flex items-center gap-2">
                       Email
-                      <MaterialSymbol name={getSortIcon("email")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("email")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -493,11 +493,11 @@ export function GroupMembersPage() {
                       <div className="flex justify-end">
                         <Dropdown>
                           <DropdownButton plain className="flex items-center gap-2 text-sm">
-                            <MaterialSymbol name="more_vert" size="sm" />
+                            <Icon name="more_vert" size="sm" />
                           </DropdownButton>
                           <DropdownMenu>
                             <DropdownItem onClick={() => handleRemoveMember(member.metadata!.id!)}>
-                              <MaterialSymbol name="person_remove" />
+                              <Icon name="person_remove" />
                               Remove from Group
                             </DropdownItem>
                           </DropdownMenu>

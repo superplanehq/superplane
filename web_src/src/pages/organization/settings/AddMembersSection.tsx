@@ -3,7 +3,7 @@ import { Button } from "../../../components/Button/button";
 import { Input, InputGroup } from "../../../components/Input/input";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Checkbox } from "../../../components/Checkbox/checkbox";
-import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
+import { Icon } from "../../../components/Icon";
 import { Text } from "../../../components/Text/text";
 import { useOrganizationUsers, useOrganizationGroupUsers, useAddUserToGroup } from "../../../hooks/useOrganizationData";
 
@@ -158,7 +158,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                 onClick={handleSelectAll}
                 disabled={loadingMembers || getFilteredExistingMembers().length === 0}
               >
-                <MaterialSymbol name="select_all" size="sm" />
+                <Icon name="select_all" size="sm" />
                 {selectedMembers.size === getFilteredExistingMembers().length ? "Deselect All" : "Select All"}
               </Button>
               <Button
@@ -167,7 +167,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                 onClick={handleExistingMembersSubmit}
                 disabled={selectedMembers.size === 0 || isInviting}
               >
-                <MaterialSymbol name="add" size="sm" />
+                <Icon name="add" size="sm" />
                 {isInviting
                   ? "Adding..."
                   : `Add ${selectedMembers.size} member${selectedMembers.size === 1 ? "" : "s"}`}
