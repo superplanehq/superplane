@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"sort"
 	"time"
@@ -107,6 +108,18 @@ func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		a.handleSuccessfulAuth(w, r, gothUser)
 		return
+	}
+
+	redirectParam := r.URL.Query().Get("redirect")
+	if redirectParam != "" {
+		r2 := new(http.Request)
+		*r2 = *r
+		r2.URL = new(url.URL)
+		*r2.URL = *r.URL
+		q := r2.URL.Query()
+		q.Set("state", redirectParam)
+		r2.URL.RawQuery = q.Encode()
+		r = r2
 	}
 
 	gothic.BeginAuthHandler(w, r)
@@ -257,7 +270,8 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+	redirectURL := getRedirectURL(r)
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -303,10 +317,14 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(providerNames)
 
+	redirectParam := r.URL.Query().Get("redirect")
+
 	data := struct {
-		Providers []string
+		Providers     []string
+		RedirectParam string
 	}{
-		Providers: providerNames,
+		Providers:     providerNames,
+		RedirectParam: redirectParam,
 	}
 
 	err = t.Execute(w, data)
@@ -396,4 +414,37 @@ func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account,
 	}
 
 	return database.Conn().Create(accountProvider).Error
+}
+
+func getRedirectURL(r *http.Request) string {
+	redirectParam := r.URL.Query().Get("redirect")
+
+	if redirectParam == "" {
+		redirectParam = r.URL.Query().Get("state")
+	}
+
+	if redirectParam == "" {
+		return "/"
+	}
+
+	decodedURL, err := url.QueryUnescape(redirectParam)
+	if err == nil && isValidRedirectURL(decodedURL) {
+		return decodedURL
+	}
+
+	return "/"
+}
+
+// Validates that the redirect URL is a valid internal URL.
+// It rejects external URLs and URLs with multiple slashes.
+func isValidRedirectURL(redirectURL string) bool {
+	if redirectURL == "" || redirectURL[0] != '/' {
+		return false
+	}
+
+	if len(redirectURL) > 1 && redirectURL[1] == '/' {
+		return false
+	}
+
+	return true
 }

@@ -1,6 +1,7 @@
 package authentication
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/markbates/goth"
@@ -153,5 +154,47 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, SignupDisabledError, err.Error())
 		assert.Nil(t, resultAccount)
+	})
+}
+
+func TestGetRedirectURL(t *testing.T) {
+	t.Run("should return home page when no redirect parameter", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/login", nil)
+
+		redirectURL := getRedirectURL(req)
+
+		assert.Equal(t, "/", redirectURL)
+	})
+
+	t.Run("should return redirect URL from redirect parameter", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/login?redirect=%2Fworkflows", nil)
+
+		redirectURL := getRedirectURL(req)
+
+		assert.Equal(t, "/workflows", redirectURL)
+	})
+
+	t.Run("should return redirect URL from state parameter", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/callback?state=%2Fworkflows%2F123", nil)
+
+		redirectURL := getRedirectURL(req)
+
+		assert.Equal(t, "/workflows/123", redirectURL)
+	})
+
+	t.Run("should reject absolute URLs", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/login?redirect=http%3A//evil.com", nil)
+
+		redirectURL := getRedirectURL(req)
+
+		assert.Equal(t, "/", redirectURL)
+	})
+
+	t.Run("should reject protocol-relative URLs", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/login?redirect=%2F%2Fevil.com", nil)
+
+		redirectURL := getRedirectURL(req)
+
+		assert.Equal(t, "/", redirectURL)
 	})
 }
