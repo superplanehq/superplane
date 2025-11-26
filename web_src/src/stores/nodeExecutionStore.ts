@@ -140,12 +140,7 @@ function updateParentExecution(
 /**
  * Invalidates queries for a specific node based on its type
  */
-async function invalidateNodeQueries(
-  workflowId: string,
-  nodeId: string,
-  nodeType: string,
-  queryClient: QueryClient,
-) {
+async function invalidateNodeQueries(workflowId: string, nodeId: string, nodeType: string, queryClient: QueryClient) {
   await Promise.all([
     nodeType !== "TYPE_TRIGGER"
       ? queryClient.invalidateQueries(nodeExecutionsQueryOptions(workflowId, nodeId))
@@ -167,11 +162,9 @@ async function fetchNodeData(
   nodeId: string,
   nodeType: string,
   queryClient: QueryClient,
-): Promise<[
-  WorkflowsListNodeExecutionsResponse,
-  WorkflowsListNodeQueueItemsResponse,
-  WorkflowsListNodeEventsResponse,
-]> {
+): Promise<
+  [WorkflowsListNodeExecutionsResponse, WorkflowsListNodeQueueItemsResponse, WorkflowsListNodeEventsResponse]
+> {
   return await Promise.all([
     nodeType !== "TYPE_TRIGGER"
       ? queryClient.fetchQuery(nodeExecutionsQueryOptions(workflowId, nodeId))

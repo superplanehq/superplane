@@ -22,7 +22,7 @@ export function useWorkflowWebsocket(
 ): void {
   const nodeExecutionStore = useNodeExecutionStore();
   const queryClient = useQueryClient();
-  
+
   // Queue for messages per nodeId
   const messageQueues = useRef<Map<string, QueuedMessage[]>>(new Map());
   const processingNodes = useRef<Set<string>>(new Set());
@@ -108,7 +108,7 @@ export function useWorkflowWebsocket(
         }
       } finally {
         processingNodes.current.delete(nodeId);
-        
+
         // Check if new messages arrived while processing
         const remainingQueue = messageQueues.current.get(nodeId);
         if (remainingQueue && remainingQueue.length > 0) {
@@ -130,7 +130,7 @@ export function useWorkflowWebsocket(
         let nodeId: string | undefined;
         if (payload && "nodeId" in payload && payload.nodeId) {
           nodeId = payload.nodeId as string;
-          
+
           // For child executions, use parent nodeId for queuing
           if (data.event.startsWith("execution_") && "parentExecutionId" in payload && payload.parentExecutionId) {
             if (nodeId.includes(":")) {
