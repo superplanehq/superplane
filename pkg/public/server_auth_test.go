@@ -89,7 +89,7 @@ func Test__GetAccount(t *testing.T) {
 		response := httptest.NewRecorder()
 		server.Router.ServeHTTP(response, req)
 		assert.Equal(t, http.StatusTemporaryRedirect, response.Code)
-		assert.Equal(t, "/login", response.Header().Get("Location"))
+		assert.Equal(t, "/login?redirect=%2Faccount", response.Header().Get("Location"))
 	})
 
 	t.Run("authenticated account -> authorized", func(t *testing.T) {
@@ -110,7 +110,7 @@ func Test__ListAccountOrganizations(t *testing.T) {
 		response := httptest.NewRecorder()
 		server.Router.ServeHTTP(response, req)
 		assert.Equal(t, http.StatusTemporaryRedirect, response.Code)
-		assert.Equal(t, "/login", response.Header().Get("Location"))
+		assert.Equal(t, "/login?redirect=%2Forganizations", response.Header().Get("Location"))
 	})
 
 	t.Run("authenticated account -> authorized", func(t *testing.T) {
