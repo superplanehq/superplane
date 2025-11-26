@@ -12,14 +12,14 @@ interface QueuedMessage {
   timestamp: number;
   sequenceNumber: number;
   event: string;
-  payload: WorkflowsWorkflowNodeExecution | WorkflowsWorkflowEvent | WorkflowsWorkflowNodeQueueItem;
+  payload: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 interface BatchedUpdate {
   nodeId: string;
   operations: Array<{
-    type: "execution" | "event" | "queueItem" | "removeQueueItem";
-    data: WorkflowsWorkflowNodeExecution | WorkflowsWorkflowEvent | WorkflowsWorkflowNodeQueueItem;
+    type: "execution_created" | "execution_started" | "execution_finished" | "event_created" | "queue_item_created" | "queue_item_consumed";
+    data: any; // eslint-disable-line @typescript-eslint/no-explicit-any
     event: string;
   }>;
 }
@@ -44,20 +44,37 @@ export function useWorkflowWebsocket(
   const processBatchedUpdates = useCallback(() => {
     if (batchedUpdates.current.size === 0) return;
 
+    console.log('Processing batched updates at:', new Date().toISOString(), 'Batch size:', batchedUpdates.current.size);
+
     for (const [nodeId, batch] of batchedUpdates.current.entries()) {
+      console.log(`Processing batch for nodeId: ${nodeId}, operations:`, batch.operations.map(op => op.type));
       for (const operation of batch.operations) {
         switch (operation.type) {
-          case "event": {
+          case "event_created": {
             nodeExecutionStore.updateNodeEvent(nodeId, operation.data);
             onNodeEvent?.(nodeId, operation.event);
             break;
           }
-          case "execution": {
+          case "execution_created":
+          case "execution_started":
+          case "execution_finished": {
             const execution = operation.data as WorkflowsWorkflowNodeExecution;
             const storeNodeId =
               execution.parentExecutionId && execution.nodeId?.includes(":")
                 ? execution.nodeId.split(":")[0]
                 : execution.nodeId!;
+
+            console.log('Updating store with execution:', {
+              storeNodeId,
+              executionType: operation.type,
+              execution: {
+                id: execution.id,
+                nodeId: execution.nodeId,
+                state: execution.state,
+                result: execution.result
+              },
+              event: operation.event
+            });
 
             nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
 
@@ -69,12 +86,12 @@ export function useWorkflowWebsocket(
             onNodeEvent?.(execution.nodeId!, operation.event);
             break;
           }
-          case "queueItem": {
+          case "queue_item_created": {
             nodeExecutionStore.addNodeQueueItem(nodeId, operation.data);
             onNodeEvent?.(nodeId, operation.event);
             break;
           }
-          case "removeQueueItem": {
+          case "queue_item_consumed": {
             const queueItem = operation.data as WorkflowsWorkflowNodeQueueItem;
             if (queueItem.id) {
               nodeExecutionStore.removeNodeQueueItem(nodeId, queueItem.id);
@@ -108,12 +125,14 @@ export function useWorkflowWebsocket(
     (message: QueuedMessage) => {
       const { payload, event } = message;
 
+      console.log('Processing websocket message:', { event, payload });
+
       switch (event) {
         case "event_created":
           if (payload && payload.nodeId) {
             const workflowEvent = payload as WorkflowsWorkflowEvent;
             addToBatch(workflowEvent.nodeId!, {
-              type: "event",
+              type: "event_created",
               data: workflowEvent,
               event,
             });
@@ -130,8 +149,21 @@ export function useWorkflowWebsocket(
                   ? execution.nodeId.split(":")[0]
                   : execution.nodeId;
 
+              console.log('Processing execution:', {
+                event,
+                originalNodeId: execution.nodeId,
+                storeNodeId,
+                state: execution.state,
+                result: execution.result,
+                parentExecutionId: execution.parentExecutionId,
+                messageTimestamp: message.timestamp,
+                messageId: message.id,
+                createdAt: execution.createdAt,
+                updatedAt: execution.updatedAt
+              });
+
               addToBatch(storeNodeId, {
-                type: "execution",
+                type: event, // Use actual event type instead of "execution"
                 data: execution,
                 event,
               });
@@ -142,7 +174,7 @@ export function useWorkflowWebsocket(
           if (payload && payload.nodeId) {
             const queueItem = payload as WorkflowsWorkflowNodeQueueItem;
             addToBatch(queueItem.nodeId!, {
-              type: "queueItem",
+              type: "queue_item_created",
               data: queueItem,
               event,
             });
@@ -152,7 +184,7 @@ export function useWorkflowWebsocket(
           if (payload && payload.nodeId && payload.id) {
             const queueItem = payload as WorkflowsWorkflowNodeQueueItem;
             addToBatch(queueItem.nodeId!, {
-              type: "removeQueueItem",
+              type: "queue_item_consumed",
               data: queueItem,
               event,
             });
