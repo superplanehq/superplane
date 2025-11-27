@@ -1100,7 +1100,17 @@ export function WorkflowPageV2() {
   }
 
   if (!workflow) {
-    return null;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <h1 className="text-4xl font-bold text-gray-700">404</h1>
+          <p className="text-lg text-gray-500">Canvas not found</p>
+          <p className="text-sm text-gray-400">
+            This canvas may have been deleted or you may not have permission to view it.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
