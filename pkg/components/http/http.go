@@ -87,35 +87,39 @@ func (e *HTTP) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "payload",
-			Type:     configuration.FieldTypeObject,
-			Label:    "Payload",
-			Required: false,
+			Name:        "payload",
+			Type:        configuration.FieldTypeObject,
+			Label:       "Payload",
+			Description: "JSON payload to send. String values support dynamic interpolation using expr language (e.g., $.ref, $.data.status)",
+			Required:    false,
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "method", Values: []string{"POST", "PUT"}},
+				{Field: "method", Values: []string{"POST", "PUT", "PATCH"}},
 			},
 		},
 		{
-			Name:     "headers",
-			Label:    "Headers",
-			Type:     configuration.FieldTypeList,
-			Required: false,
+			Name:        "headers",
+			Label:       "Headers",
+			Type:        configuration.FieldTypeList,
+			Description: "HTTP headers. Both name and value support dynamic interpolation (e.g., $.ref)",
+			Required:    false,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
 							{
-								Name:     "name",
-								Type:     configuration.FieldTypeString,
-								Label:    "Header Name",
-								Required: true,
+								Name:        "name",
+								Type:        configuration.FieldTypeString,
+								Label:       "Header Name",
+								Description: "Supports dynamic interpolation (e.g., $.headerName)",
+								Required:    true,
 							},
 							{
-								Name:     "value",
-								Type:     configuration.FieldTypeString,
-								Label:    "Header value",
-								Required: true,
+								Name:        "value",
+								Type:        configuration.FieldTypeString,
+								Label:       "Header value",
+								Description: "Supports dynamic interpolation (e.g., $.headerValue)",
+								Required:    true,
 							},
 						},
 					},
@@ -144,7 +148,19 @@ func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 		return err
 	}
 
-	body, err := e.getBody(spec.Method, spec.Payload)
+	// Process payload with dynamic data interpolation
+	processedPayload, err := ProcessPayload(spec.Payload, ctx.Data)
+	if err != nil {
+		return fmt.Errorf("failed to process payload: %w", err)
+	}
+
+	// Process headers with dynamic data interpolation
+	processedHeaders, err := ProcessHeaders(spec.Headers, ctx.Data)
+	if err != nil {
+		return fmt.Errorf("failed to process headers: %w", err)
+	}
+
+	body, err := e.getBody(spec.Method, processedPayload)
 	if err != nil {
 		return err
 	}
@@ -155,7 +171,7 @@ func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	for _, header := range spec.Headers {
+	for _, header := range processedHeaders {
 		req.Header.Set(header.Name, header.Value)
 	}
 
