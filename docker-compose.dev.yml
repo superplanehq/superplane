@@ -8,8 +8,6 @@ services:
     tty: true
 
     command: bash /app/docker-entrypoint.dev.sh
-    env_file:
-      - .env.docker
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"
@@ -60,6 +58,10 @@ services:
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Superplane}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@notifications.superplane.com}
       BLOCK_SIGNUP: ${BLOCK_SIGNUP:-no}
+      OTEL_ENABLED: "yes"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"
+      OTEL_SERVICE_NAME: "superplane-dev"
 
     ports:
       - 5173:5173
@@ -71,6 +73,7 @@ services:
     links:
       - db:db
       - rabbitmq:rabbitmq
+      - otel:otel
 
     depends_on:
       db:
@@ -82,6 +85,15 @@ services:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
+
+  otel:
+    image: otel/opentelemetry-collector-contrib:0.110.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.dev.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - 4317:4317
+      - 4318:4318
 
   db:
     image: postgres:17.5
