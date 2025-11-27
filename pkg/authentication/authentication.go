@@ -277,16 +277,7 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	gothic.Logout(w, r)
 
-	// Clear the account cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "account_token",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	})
+	ClearAccountCookie(w, r)
 
 	http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 }
@@ -296,7 +287,8 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		_, err := a.jwtSigner.ValidateAndGetClaims(cookie.Value)
 		if err == nil {
-			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+			redirectURL := getRedirectURL(r)
+			http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 			return
 		}
 	}
@@ -447,4 +439,16 @@ func isValidRedirectURL(redirectURL string) bool {
 	}
 
 	return true
+}
+
+func ClearAccountCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "account_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
 }

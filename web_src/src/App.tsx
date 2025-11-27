@@ -1,7 +1,7 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./App.css";
@@ -60,10 +60,10 @@ function App() {
                 element={withAuthOnly(NodeRunPage)}
               />
               <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
-
               {/* Organization selection and creation */}
               <Route path="create" element={<OrganizationCreate />} />
               <Route path="" element={<OrganizationSelect />} />
+              <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
