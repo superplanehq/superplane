@@ -454,7 +454,6 @@ const sampleNodes: Node[] = [
             Size: "971.5 MB",
           },
         },
-        startLastValuesOpen: false,
         collapsed: false,
       },
     },
