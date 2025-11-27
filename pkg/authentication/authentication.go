@@ -296,7 +296,8 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		_, err := a.jwtSigner.ValidateAndGetClaims(cookie.Value)
 		if err == nil {
-			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+			redirectURL := getRedirectURL(r)
+			http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 			return
 		}
 	}

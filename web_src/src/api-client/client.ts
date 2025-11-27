@@ -5,7 +5,7 @@ export const setupApiInterceptor = (): void => {
   if (interceptorSetup) return;
 
   // Skip setup in test environments to avoid conflicts
-  if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
+  if (typeof window !== "undefined" && window.location.hostname === "127.0.0.1") {
     interceptorSetup = true;
     return;
   }
@@ -16,12 +16,9 @@ export const setupApiInterceptor = (): void => {
     const response = await originalFetch(input, init);
 
     if (response.status === 401 && isApiRequest(input)) {
-      const currentPath = window.location.pathname + window.location.search;
-      const redirectUrl = encodeURIComponent(currentPath);
+      window.location.href = `/`;
 
-      window.location.href = `/login?redirect=${redirectUrl}`;
-
-      throw new Error('Unauthorized - redirecting to login');
+      throw new Error("Unauthorized");
     }
 
     return response;
@@ -31,7 +28,7 @@ export const setupApiInterceptor = (): void => {
 };
 
 function isApiRequest(input: RequestInfo | URL): boolean {
-  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
 
-  return url.includes('/api/');
+  return url.includes("/api/");
 }
