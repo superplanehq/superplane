@@ -18,11 +18,11 @@ func TestRedirectAfterLogin(t *testing.T) {
 		steps.AssertAuthProvidersHaveRedirectParam()
 	})
 
-	t.Run("after login user should be redirected back to original URL", func(t *testing.T) {
+	t.Run("after login user should be redirected back to root URL because of random protected URL", func(t *testing.T) {
 		steps.StartWithoutLogin()
 		steps.VisitProtectedRandomURL()
 		steps.LoginAndVisitAuthCallback()
-		steps.AssertRedirectedBackToOriginalURL()
+		steps.session.AssertURLIsRoot()
 	})
 }
 
@@ -88,13 +88,4 @@ func (steps *TestRedirectSteps) AssertAuthProvidersHaveRedirectParam() {
 	}
 	assert.Contains(steps.t, pageContent, "/auth/github")
 	assert.Contains(steps.t, pageContent, "redirect=")
-}
-
-func (steps *TestRedirectSteps) AssertRedirectedBackToOriginalURL() {
-
-	steps.session.Sleep(1000)
-
-	steps.session.AssertURLContains(steps.session.OrgID.String())
-	steps.session.AssertURLContains("workflows")
-	steps.session.AssertURLContains(steps.randomUUID)
 }

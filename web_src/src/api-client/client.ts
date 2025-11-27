@@ -4,12 +4,6 @@ let interceptorSetup = false;
 export const setupApiInterceptor = (): void => {
   if (interceptorSetup) return;
 
-  // Skip setup in test environments to avoid conflicts
-  if (typeof window !== "undefined" && window.location.hostname === "127.0.0.1") {
-    interceptorSetup = true;
-    return;
-  }
-
   const originalFetch = globalThis.fetch;
 
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
