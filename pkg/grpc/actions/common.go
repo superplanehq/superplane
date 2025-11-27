@@ -34,15 +34,6 @@ func ValidateUUIDsArray(ids []string) error {
 	return nil
 }
 
-func ProtoToDomainType(domainType pbAuth.DomainType) (string, error) {
-	switch domainType {
-	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		return models.DomainTypeOrganization, nil
-	default:
-		return "", status.Error(codes.InvalidArgument, "invalid domain type")
-	}
-}
-
 func DomainTypeToProto(domainType string) pbAuth.DomainType {
 	switch domainType {
 	case models.DomainTypeOrganization:
