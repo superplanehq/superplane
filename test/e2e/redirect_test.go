@@ -18,11 +18,11 @@ func TestRedirectAfterLogin(t *testing.T) {
 		steps.AssertAuthProvidersHaveRedirectParam()
 	})
 
-	t.Run("after login user should be redirected back to root URL because of random protected URL", func(t *testing.T) {
+	t.Run("after login user should be redirected back original URL", func(t *testing.T) {
 		steps.StartWithoutLogin()
 		steps.VisitProtectedRandomURL()
 		steps.LoginAndVisitAuthCallback()
-		steps.session.AssertURLIsRoot()
+		steps.session.AssertURLContains(steps.protectedURLPath)
 	})
 }
 

@@ -283,14 +283,6 @@ func (s *TestSession) AssertURLContains(part string) {
 	}
 }
 
-func (s *TestSession) AssertURLIsRoot() {
-	s.t.Logf("Asserting URL is root")
-	current := s.page.URL()
-	if current != s.BaseURL+"/" {
-		s.t.Fatalf("expected URL to be %q, got %q", s.BaseURL+"/", current)
-	}
-}
-
 func (s *TestSession) ScrollToTheBottomOfPage() {
 	s.t.Log("Scrolling to the bottom of the page")
 
