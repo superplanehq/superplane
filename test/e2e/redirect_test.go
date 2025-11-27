@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/superplanehq/superplane/test/e2e/session"
 )
 
@@ -15,6 +16,12 @@ func TestRedirectAfterLogin(t *testing.T) {
 		steps.StartWithoutLogin()
 		steps.VisitProtectedRandomURL()
 		steps.AssertRedirectedToLoginWithRedirectParam()
+	})
+
+	t.Run("login page should include redirect URL in auth provider links", func(t *testing.T) {
+		steps.StartWithoutLogin()
+		steps.VisitProtectedRandomURL()
+		steps.AssertAuthProvidersHaveRedirectParam()
 	})
 
 	t.Run("after login user should be redirected back to original URL", func(t *testing.T) {
@@ -81,6 +88,24 @@ func (steps *TestRedirectSteps) LoginAndVisitAuthCallback() {
 	// This should redirect back to the original URL
 	authCallbackURL := "/auth/github?redirect=" + url.QueryEscape(redirectParam)
 	steps.session.Visit(authCallbackURL)
+}
+
+func (steps *TestRedirectSteps) AssertAuthProvidersHaveRedirectParam() {
+	// Wait for the login page to load
+	steps.session.Sleep(500)
+
+	// Verify we're on the login page
+	steps.session.AssertURLContains("/login")
+	steps.session.AssertURLContains("redirect=")
+
+	// Check that the page HTML contains auth provider links with redirect parameter
+	// This tests that the login template includes the redirect parameter in OAuth links
+	pageContent, err := steps.session.Page().Content()
+	if err != nil {
+		steps.t.Fatalf("failed to get page content: %v", err)
+	}
+	assert.Contains(steps.t, pageContent, "/auth/github")
+	assert.Contains(steps.t, pageContent, "redirect=")
 }
 
 func (steps *TestRedirectSteps) AssertRedirectedBackToOriginalURL() {
