@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -23,12 +24,14 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			accountID, err := getAccountFromCookie(r, jwtSigner)
 			if err != nil {
+				authentication.ClearAccountCookie(w, r)
 				redirectToLoginWithOriginalURL(w, r)
 				return
 			}
 
 			account, err := models.FindAccountByID(accountID)
 			if err != nil {
+				authentication.ClearAccountCookie(w, r)
 				redirectToLoginWithOriginalURL(w, r)
 				return
 			}
