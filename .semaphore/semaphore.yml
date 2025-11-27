@@ -4,11 +4,6 @@ agent:
   machine:
     type: f1-standard-2
     os_image: ubuntu2204
-
-auto_cancel:
-  running:
-    when: "branch != 'develop' or branch != 'main'"
-
 blocks:
   - name: "\U0001F9EA QA"
     dependencies: []
@@ -91,19 +86,3 @@ after_pipeline:
       - name: Submit Reports
         commands:
           - test-results gen-pipeline-report
-
-promotions:
-  - name: Build Image
-    pipeline_file: build-image.yml
-    deployment_target: ghcr
-    auto_promote_on:
-      - result: passed
-        branch:
-          - "main"
-
-  - name: Deploy to sxmoon
-    pipeline_file: deploy-to-sxmoon.yml
-    auto_promote_on:
-      - result: passed
-        branch:
-          - "^main$"
