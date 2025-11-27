@@ -31,6 +31,8 @@ export interface WaitProps extends ComponentActionsProps {
   iconColor?: string;
   headerColor?: string;
   hideLastRun?: boolean;
+  runDisabled?: boolean;
+  runDisabledTooltip?: string;
 }
 
 const formatDuration = (value: number, unit: string): string => {
@@ -54,6 +56,8 @@ export const Wait: React.FC<WaitProps> = ({
   iconColor,
   headerColor,
   hideLastRun = false,
+  runDisabled,
+  runDisabledTooltip,
   onToggleCollapse,
   onRun,
   onEdit,
@@ -135,6 +139,8 @@ export const Wait: React.FC<WaitProps> = ({
           shape="rounded"
           onDoubleClick={onToggleCollapse}
           onRun={onRun}
+          runDisabled={runDisabled}
+          runDisabledTooltip={runDisabledTooltip}
           onEdit={onEdit}
           onDuplicate={onDuplicate}
           onDeactivate={onDeactivate}
@@ -168,6 +174,8 @@ export const Wait: React.FC<WaitProps> = ({
           description={description}
           onDoubleClick={onToggleCollapse}
           onRun={onRun}
+          runDisabled={runDisabled}
+          runDisabledTooltip={runDisabledTooltip}
           onEdit={onEdit}
           onDuplicate={onDuplicate}
           onDeactivate={onDeactivate}
