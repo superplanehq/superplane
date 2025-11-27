@@ -114,7 +114,6 @@ const DeployToUS: CompositeProps = createCompositeProps({
     subtitle: "ef758d40",
     receivedAt: new Date(),
   },
-  startLastValuesOpen: true,
   collapsed: false,
 });
 
@@ -137,7 +136,6 @@ const DeployToAsia: CompositeProps = createCompositeProps({
       Size: "971.5 MB",
     },
   },
-  startLastValuesOpen: false,
   collapsed: false,
 });
 

@@ -52,8 +52,6 @@ export interface CompositeProps extends ComponentActionsProps {
   selected?: boolean;
   isMissing?: boolean;
 
-  startLastValuesOpen?: boolean;
-
   onExpandChildEvents?: () => void;
   onReRunChildEvents?: () => void;
   onToggleCollapse?: () => void;
@@ -80,7 +78,6 @@ export const Composite: React.FC<CompositeProps> = ({
   onReRunChildEvents,
   onToggleCollapse,
   onViewMoreEvents,
-  startLastValuesOpen = false,
   selected = false,
   isMissing = false,
   onRun,
@@ -94,11 +91,6 @@ export const Composite: React.FC<CompositeProps> = ({
   onDelete,
   isCompactView,
 }) => {
-  // All hooks must be called before any early returns
-  const [showLastRunValues, setShowLastRunValues] = React.useState<Record<number, boolean>>(
-    startLastValuesOpen ? { 0: true } : {},
-  );
-
   // Use lastRunItems if provided, otherwise fall back to single lastRunItem
   const eventsToDisplay = React.useMemo(() => {
     if (lastRunItems && lastRunItems.length > 0) {
@@ -116,13 +108,6 @@ export const Composite: React.FC<CompositeProps> = ({
   const hiddenEventsCount = React.useMemo(() => {
     return Math.max(0, eventsToDisplay.length - maxVisibleEvents);
   }, [eventsToDisplay.length, maxVisibleEvents]);
-
-  const toggleEventValues = React.useCallback((index: number) => {
-    setShowLastRunValues((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
-  }, []);
 
   const getEventIcon = React.useCallback((state: LastRunState) => {
     if (state === "success") {
@@ -302,35 +287,22 @@ export const Composite: React.FC<CompositeProps> = ({
                 return (
                   <div key={index}>
                     <div
-                      onClick={() => toggleEventValues(index)}
-                      className={`flex flex-col items-center justify-between gap-1 px-2 py-2 rounded-md cursor-pointer ${eventBackground} ${eventColor}`}
+                      className={`flex items-center justify-between gap-1 px-2 py-2 rounded-md ${eventBackground} ${eventColor}`}
                     >
-                      <div className="flex items-center gap-3 rounded-md w-full min-w-0">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <div
-                            className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${eventIconBackground}`}
-                          >
-                            <EventIcon size={event.state === "running" ? 16 : 12} className={`${eventIconColor}`} />
-                          </div>
-                          <span className="truncate text-sm">{event.title}</span>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div
+                          className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${eventIconBackground}`}
+                        >
+                          <EventIcon size={event.state === "running" ? 16 : 12} className={`${eventIconColor}`} />
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {event.subtitle && (
-                            <span className="text-sm text-gray-500 truncate max-w-[100px]">{event.subtitle}</span>
-                          )}
-                          <span className="text-xs text-gray-500">{timeAgo}</span>
-                        </div>
+                        <span className="truncate text-sm">{event.title}</span>
                       </div>
-                      {showLastRunValues[index] && (
-                        <div className="flex flex-col items-center justify-between mt-1 px-2 py-2 rounded-md bg-white text-gray-500 w-full">
-                          {Object.entries(event.values || {}).map(([key, value]) => (
-                            <div key={key} className="flex items-center gap-1 px-2 py-1 rounded-md w-full min-w-0">
-                              <span className="text-sm font-bold flex-shrink-0 text-right">{key}:</span>
-                              <span className="text-sm flex-1 truncate text-left">{value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {event.subtitle && (
+                          <span className="text-sm text-gray-500 truncate max-w-[100px]">{event.subtitle}</span>
+                        )}
+                        <span className="text-xs text-gray-500">{timeAgo}</span>
+                      </div>
                     </div>
                     {event.childEventsInfo && (
                       <ChildEvents
