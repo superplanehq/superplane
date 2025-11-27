@@ -178,7 +178,7 @@ export function NodeConfigurationModal({
                   onChange={(e) => setCurrentNodeName(e.target.value)}
                   placeholder="Enter a name for this node"
                   autoFocus
-                  className={`flex-1 ${
+                  className={`flex-1 shadow-none ${
                     showValidation && validationErrors.has("nodeName") ? "border-red-500 border-2" : ""
                   }`}
                 />

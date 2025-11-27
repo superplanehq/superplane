@@ -158,6 +158,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                 onChange={(e) => setConfigFieldForm({ ...configFieldForm, name: e.target.value })}
                 placeholder="e.g., threshold_expression"
                 autoFocus
+                className="shadow-none"
               />
               <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
                 This is the internal name used in templates (e.g., $config.threshold_expression)
@@ -177,6 +178,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                   })
                 }
                 placeholder="e.g., Threshold Expression"
+                className="shadow-none"
               />
               <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Display name shown in the UI</p>
             </div>
@@ -215,7 +217,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                   });
                 }}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full shadow-none">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
