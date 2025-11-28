@@ -51,13 +51,17 @@ import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
-import { formatTimeAgo } from "@/utils/date";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
-import { mapExecutionsToSidebarEvents, mapQueueItemsToSidebarEvents, mapTriggerEventsToSidebarEvents } from "./utils";
+import {
+  getNextInQueueInfo,
+  mapExecutionsToSidebarEvents,
+  mapQueueItemsToSidebarEvents,
+  mapTriggerEventsToSidebarEvents,
+} from "./utils";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -299,7 +303,7 @@ export function WorkflowPageV2() {
 
       // Build maps with current node data for sidebar
       const executionsMap = nodeData.executions.length > 0 ? { [nodeId]: nodeData.executions } : {};
-      const queueItemsMap = nodeData.queueItems.length > 0 ? { [nodeId]: nodeData.queueItems } : {};
+      const queueItemsMap = nodeData.queueItems.length > 0 ? { [nodeId]: nodeData.queueItems.reverse() } : {};
       const eventsMapForSidebar = nodeData.events.length > 0 ? { [nodeId]: nodeData.events } : nodeEventsMap; // Fall back to existing events map for trigger nodes
       const totalHistoryCount = nodeData.totalInHistoryCount;
       const totalQueueCount = nodeData.totalInQueueCount;
@@ -1376,7 +1380,6 @@ function prepareCompositeNode(
   const isMissing = !blueprintMetadata;
   const color = blueprintMetadata?.color || "gray";
   const executions = nodeExecutionsMap[node.id!] || [];
-  const queueItems = nodeQueueItemsMap[node.id!] || [];
 
   // Use node name if available, otherwise fall back to blueprint name (from metadata)
   const displayLabel = node.name || blueprintMetadata?.name!;
@@ -1446,29 +1449,9 @@ function prepareCompositeNode(
     };
   }
 
-  if (queueItems.length > 0) {
-    const next = queueItems[0] as any;
-    let inferredTitle =
-      next?.name || next?.input?.title || next?.input?.name || next?.input?.eventTitle || next?.id || "Queued";
-
-    // Heuristic: if the workflow has a single trigger and it is a schedule,
-    // show a friendly title consistent with executions.
-    const onlyTrigger = nodes.filter((n) => n.type === "TYPE_TRIGGER");
-    if (inferredTitle === next?.id || inferredTitle === "Queued") {
-      if (onlyTrigger.length === 1 && onlyTrigger[0]?.trigger?.name === "schedule") {
-        inferredTitle = "Event emitted by schedule";
-      }
-    }
-
-    const inferredSubtitle: string =
-      (typeof next?.input?.subtitle === "string" && next?.input?.subtitle) ||
-      (next?.createdAt ? formatTimeAgo(new Date(next.createdAt)).replace(" ago", "") : "");
-
-    (canvasNode.data.composite as CompositeProps).nextInQueue = {
-      title: inferredTitle,
-      subtitle: inferredSubtitle,
-      receivedAt: next?.createdAt ? new Date(next.createdAt) : new Date(),
-    };
+  const nextInQueueInfo = getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes);
+  if (nextInQueueInfo) {
+    (canvasNode.data.composite as CompositeProps).nextInQueue = nextInQueueInfo;
   }
 
   return canvasNode;
@@ -1976,21 +1959,7 @@ function prepareMergeNode(
           eventTitle: "No events received yet",
           eventState: "neutral" as const,
         },
-        nextInQueue:
-          nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
-            ? (() => {
-                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-                const title =
-                  item?.name ||
-                  item?.input?.title ||
-                  item?.input?.name ||
-                  item?.input?.eventTitle ||
-                  item?.id ||
-                  "Queued";
-                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-                return { title, subtitle };
-              })()
-            : undefined,
+        nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },
@@ -2201,21 +2170,7 @@ function prepareSemaphoreNode(
         metadata: metadataItems,
         parameters: configuration?.parameters,
         lastExecution,
-        nextInQueue:
-          nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
-            ? (() => {
-                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-                const title =
-                  item?.name ||
-                  item?.input?.title ||
-                  item?.input?.name ||
-                  item?.input?.eventTitle ||
-                  item?.id ||
-                  "Queued";
-                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-                return { title, subtitle };
-              })()
-            : undefined,
+        nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },
@@ -2280,21 +2235,7 @@ function prepareWaitNode(
         title: displayLabel,
         duration: configuration?.duration,
         lastExecution,
-        nextInQueue:
-          nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
-            ? (() => {
-                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-                const title =
-                  item?.name ||
-                  item?.input?.title ||
-                  item?.input?.name ||
-                  item?.input?.eventTitle ||
-                  item?.id ||
-                  "Queued";
-                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-                return { title, subtitle };
-              })()
-            : undefined,
+        nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
         iconColor: getColorClass(metadata?.color || "yellow"),
         iconBackground: getBackgroundColorClass(metadata?.color || "yellow"),
         headerColor: getBackgroundColorClass(metadata?.color || "yellow"),
@@ -2403,7 +2344,7 @@ function prepareTimeGateNode(
         days: daysDisplay,
         timezone: timezoneDisplay,
         lastExecution,
-        nextInQueue: nodeQueueItemsMap[node.id!]?.[0] ? { title: nodeQueueItemsMap[node.id!]?.[0].id } : undefined,
+        nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
         iconColor: getColorClass(metadata?.color || "blue"),
         iconBackground: getBackgroundColorClass(metadata?.color || "blue"),
         headerColor: getBackgroundColorClass(metadata?.color || "blue"),
