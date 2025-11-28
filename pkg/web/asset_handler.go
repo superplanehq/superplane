@@ -2,12 +2,12 @@ package web
 
 import (
 	"bytes"
+	"html/template"
 	"io"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -23,7 +23,7 @@ type AssetHandler struct {
 
 // NewAssetHandler creates a new AssetHandler with the given file system
 func NewAssetHandler(assets http.FileSystem, basePath string) http.Handler {
-	indexContent, indexModTime := loadIndexHTML(assets)
+	indexContent, indexModTime := loadIndexContent(assets)
 
 	return &AssetHandler{
 		assets:       assets,
@@ -96,7 +96,7 @@ func (h *AssetHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, "index.html", h.indexModTime, reader)
 }
 
-func loadIndexHTML(assets http.FileSystem) ([]byte, time.Time) {
+func loadIndexContent(assets http.FileSystem) ([]byte, time.Time) {
 	indexFile, err := assets.Open("index.html")
 	if err != nil {
 		return nil, time.Time{}
@@ -108,47 +108,27 @@ func loadIndexHTML(assets http.FileSystem) ([]byte, time.Time) {
 		return nil, time.Time{}
 	}
 
+	tmpl, err := template.New("index.html").Parse(string(data))
+	if err != nil {
+		return nil, time.Time{}
+	}
+
+	templateData := struct {
+		SentryDSN         string
+		SentryEnvironment string
+	}{
+		SentryDSN:         os.Getenv("SENTRY_DSN"),
+		SentryEnvironment: os.Getenv("SENTRY_ENVIRONMENT"),
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, templateData); err != nil {
+		return nil, time.Time{}
+	}
+
 	if fi, err := indexFile.Stat(); err == nil {
-		return injectSentryConfig(data), fi.ModTime()
+		return buf.Bytes(), fi.ModTime()
 	}
 
-	return injectSentryConfig(data), time.Now()
-}
-
-func injectSentryConfig(indexHTML []byte) []byte {
-	dsn := os.Getenv("SENTRY_DSN")
-	env := os.Getenv("SENTRY_ENVIRONMENT")
-
-	if dsn == "" && env == "" {
-		return indexHTML
-	}
-
-	var scriptBuilder strings.Builder
-	scriptBuilder.WriteString("<script>")
-
-	if dsn != "" {
-		scriptBuilder.WriteString("window.SUPERPLANE_SENTRY_DSN=")
-		scriptBuilder.WriteString(strconv.Quote(dsn))
-		scriptBuilder.WriteString(";")
-	}
-
-	if env != "" {
-		scriptBuilder.WriteString("window.SUPERPLANE_SENTRY_ENVIRONMENT=")
-		scriptBuilder.WriteString(strconv.Quote(env))
-		scriptBuilder.WriteString(";")
-	}
-
-	scriptBuilder.WriteString("</script>")
-	scriptTag := scriptBuilder.String()
-
-	headClose := []byte("</head>")
-	if idx := bytes.Index(indexHTML, headClose); idx != -1 {
-		var buf bytes.Buffer
-		buf.Write(indexHTML[:idx])
-		buf.WriteString(scriptTag)
-		buf.Write(indexHTML[idx:])
-		return buf.Bytes()
-	}
-
-	return indexHTML
+	return buf.Bytes(), time.Now()
 }
