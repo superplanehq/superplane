@@ -117,7 +117,7 @@ export const EventSource: React.FC<EventSourceProps> = ({
   }
 
   return (
-    <div className={cn("relative w-[26rem]", className)}>
+    <div className={cn("relative w-[23rem]", className)}>
       <div
         className={cn(
           "absolute left-0 top-0 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-white",
