@@ -14,9 +14,9 @@ import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import { CustomComponent } from "./pages/custom-component";
 import HomePage from "./pages/home";
+import NodeRunPage from "./pages/node-run";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
-import NodeRunPage from "./pages/node-run";
 
 // Create a client
 const queryClient = new QueryClient({

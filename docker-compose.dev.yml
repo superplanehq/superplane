@@ -44,6 +44,8 @@ services:
       START_WEBHOOK_CLEANUP_WORKER: "yes"
       START_WORKFLOW_CLEANUP_WORKER: "yes"
       WEB_BASE_PATH: ""
+      SENTRY_DSN: ""
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
       NO_ENCRYPTION: "yes"

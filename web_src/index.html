@@ -11,6 +11,11 @@
 
     <!-- <script src="http://localhost:8097"></script> -->
 
+    <script>
+      window.SUPERPLANE_SENTRY_DSN = "{{ .SentryDSN }}";
+      window.SUPERPLANE_SENTRY_ENVIRONMENT = "{{ .SentryEnvironment }}";
+    </script>
+
     <title>Superplane</title>
   </head>
   <body>

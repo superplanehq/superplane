@@ -1,6 +1,7 @@
 package public
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -690,6 +693,30 @@ func (s *Server) setupDevProxy(webBasePath string) {
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	proxy.ModifyResponse = func(res *http.Response) error {
+		contentType := res.Header.Get("Content-Type")
+		if !strings.HasPrefix(contentType, "text/html") {
+			return nil
+		}
+
+		originalBody, err := io.ReadAll(res.Body)
+		if err != nil {
+			return err
+		}
+		_ = res.Body.Close()
+
+		rendered, err := web.RenderIndexTemplate(originalBody)
+		if err != nil {
+			return err
+		}
+
+		res.Body = io.NopCloser(bytes.NewReader(rendered))
+		res.ContentLength = int64(len(rendered))
+		res.Header.Set("Content-Length", strconv.Itoa(len(rendered)))
+
+		return nil
+	}
 
 	origDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
