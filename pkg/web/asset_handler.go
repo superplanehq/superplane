@@ -1,35 +1,40 @@
 package web
 
 import (
+	"bytes"
+	"io"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // AssetHandler serves static files from the assets filesystem
 // and handles SPA routing by serving index.html for non-asset routes
 type AssetHandler struct {
-	assets    http.FileSystem
-	basePath  string
-	indexFile http.File
+	assets       http.FileSystem
+	basePath     string
+	indexContent []byte
+	indexModTime time.Time
 }
 
 // NewAssetHandler creates a new AssetHandler with the given file system
 func NewAssetHandler(assets http.FileSystem, basePath string) http.Handler {
-	// Load index.html once
-	indexFile, _ := assets.Open("index.html")
+	indexContent, indexModTime := loadIndexHTML(assets)
 
 	return &AssetHandler{
-		assets:    assets,
-		basePath:  basePath,
-		indexFile: indexFile,
+		assets:       assets,
+		basePath:     basePath,
+		indexContent: indexContent,
+		indexModTime: indexModTime,
 	}
 }
 
 // ServeHTTP implements the http.Handler interface
 func (h *AssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
 	// Handle /app/assets/* paths
 	if h.isAssetPath(r.URL.Path) {
 		h.serveAsset(w, r)
@@ -80,16 +85,70 @@ func (h *AssetHandler) serveAsset(w http.ResponseWriter, r *http.Request) {
 
 // serveIndex serves the index.html file for SPA routing
 func (h *AssetHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
-	if h.indexFile == nil {
+	if h.indexContent == nil {
 		http.Error(w, "index.html not found", http.StatusInternalServerError)
 		return
 	}
 
-	// Reset and serve index.html
-	h.indexFile.Seek(0, 0)
-	if fi, _ := h.indexFile.Stat(); fi != nil {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		http.ServeContent(w, r, "index.html", fi.ModTime(), h.indexFile)
+	reader := bytes.NewReader(h.indexContent)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	http.ServeContent(w, r, "index.html", h.indexModTime, reader)
+}
+
+func loadIndexHTML(assets http.FileSystem) ([]byte, time.Time) {
+	indexFile, err := assets.Open("index.html")
+	if err != nil {
+		return nil, time.Time{}
 	}
+	defer indexFile.Close()
+
+	data, err := io.ReadAll(indexFile)
+	if err != nil {
+		return nil, time.Time{}
+	}
+
+	if fi, err := indexFile.Stat(); err == nil {
+		return injectSentryConfig(data), fi.ModTime()
+	}
+
+	return injectSentryConfig(data), time.Now()
+}
+
+func injectSentryConfig(indexHTML []byte) []byte {
+	dsn := os.Getenv("SENTRY_DSN")
+	env := os.Getenv("SENTRY_ENVIRONMENT")
+
+	if dsn == "" && env == "" {
+		return indexHTML
+	}
+
+	var scriptBuilder strings.Builder
+	scriptBuilder.WriteString("<script>")
+
+	if dsn != "" {
+		scriptBuilder.WriteString("window.SUPERPLANE_SENTRY_DSN=")
+		scriptBuilder.WriteString(strconv.Quote(dsn))
+		scriptBuilder.WriteString(";")
+	}
+
+	if env != "" {
+		scriptBuilder.WriteString("window.SUPERPLANE_SENTRY_ENVIRONMENT=")
+		scriptBuilder.WriteString(strconv.Quote(env))
+		scriptBuilder.WriteString(";")
+	}
+
+	scriptBuilder.WriteString("</script>")
+	scriptTag := scriptBuilder.String()
+
+	headClose := []byte("</head>")
+	if idx := bytes.Index(indexHTML, headClose); idx != -1 {
+		var buf bytes.Buffer
+		buf.Write(indexHTML[:idx])
+		buf.WriteString(scriptTag)
+		buf.Write(indexHTML[idx:])
+		return buf.Bytes()
+	}
+
+	return indexHTML
 }

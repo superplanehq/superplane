@@ -19,6 +19,7 @@
     "format:check": "prettier --check '**/*.{ts,tsx}'"
   },
   "dependencies": {
+    "@sentry/react": "^8.40.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@floating-ui/react": "^0.27.12",
