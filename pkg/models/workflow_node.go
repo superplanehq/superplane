@@ -244,6 +244,7 @@ func FindNextQueueItemPerNode(workflowID uuid.UUID) ([]WorkflowNodeQueueItem, er
 func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*WorkflowNodeQueueItem, error) {
 	var queueItem WorkflowNodeQueueItem
 	err := database.Conn().
+		Preload("RootEvent").
 		Where("workflow_id = ? AND id = ?", workflowID, queueItemID).
 		First(&queueItem).
 		Error
