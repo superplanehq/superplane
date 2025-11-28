@@ -9,7 +9,7 @@ class GitLogs
     start_of_year = Date.new(Date.today().year, 1, 1)
     end_of_year = Date.new(Date.today().year, 12, 31)
 
-    log_data = `git log origin/develop --pretty=format:"%H,%an,%at,%s" --since=#{start_of_year.strftime('%Y-%m-%d')} --until=#{end_of_year.strftime('%Y-%m-%d')}`
+    log_data = `git log origin/main --pretty=format:"%H,%an,%at,%s" --since=#{start_of_year.strftime('%Y-%m-%d')} --until=#{end_of_year.strftime('%Y-%m-%d')}`
     logs = log_data.split("\n").map { |line| GitLog.new(line) }
 
     GitLogs.new(logs)

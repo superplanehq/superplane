@@ -2,18 +2,18 @@ package web
 
 import (
 	"bytes"
-	"html/template"
 	"io"
 	"mime"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // AssetHandler serves static files from the assets filesystem
-// and handles SPA routing by serving index.html for non-asset routes
+// and handles SPA routing by serving index.html for non-asset routes.
 type AssetHandler struct {
 	assets       http.FileSystem
 	basePath     string
@@ -21,7 +21,7 @@ type AssetHandler struct {
 	indexModTime time.Time
 }
 
-// NewAssetHandler creates a new AssetHandler with the given file system
+// NewAssetHandler creates a new AssetHandler with the given file system.
 func NewAssetHandler(assets http.FileSystem, basePath string) http.Handler {
 	indexContent, indexModTime := loadIndexContent(assets)
 
@@ -33,9 +33,9 @@ func NewAssetHandler(assets http.FileSystem, basePath string) http.Handler {
 	}
 }
 
-// ServeHTTP implements the http.Handler interface
+// ServeHTTP implements the http.Handler interface.
 func (h *AssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Handle /app/assets/* paths
+	// Handle /assets/* paths
 	if h.isAssetPath(r.URL.Path) {
 		h.serveAsset(w, r)
 		return
@@ -45,7 +45,7 @@ func (h *AssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.serveIndex(w, r)
 }
 
-// isAssetPath checks if the request is for an asset file
+// isAssetPath checks if the request is for an asset file.
 func (h *AssetHandler) isAssetPath(path string) bool {
 	if strings.HasPrefix(path, h.basePath+"/assets") {
 		return true
@@ -61,7 +61,7 @@ func (h *AssetHandler) isAssetPath(path string) bool {
 	return false
 }
 
-// serveAsset serves static files from the assets directory
+// serveAsset serves static files from the assets directory.
 func (h *AssetHandler) serveAsset(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, h.basePath)
 
@@ -83,7 +83,7 @@ func (h *AssetHandler) serveAsset(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// serveIndex serves the index.html file for SPA routing
+// serveIndex serves the index.html file for SPA routing.
 func (h *AssetHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 	if h.indexContent == nil {
 		http.Error(w, "index.html not found", http.StatusInternalServerError)
@@ -96,39 +96,28 @@ func (h *AssetHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, "index.html", h.indexModTime, reader)
 }
 
+// loadIndexContent loads and renders index.html once at startup,
+// applying the shared template rendering logic and caching the result.
 func loadIndexContent(assets http.FileSystem) ([]byte, time.Time) {
 	indexFile, err := assets.Open("index.html")
 	if err != nil {
-		return nil, time.Time{}
+		log.Fatalf("failed to open index.html from assets: %v", err)
 	}
 	defer indexFile.Close()
 
 	data, err := io.ReadAll(indexFile)
 	if err != nil {
-		return nil, time.Time{}
+		log.Fatalf("failed to read index.html from assets: %v", err)
 	}
 
-	tmpl, err := template.New("index.html").Parse(string(data))
+	rendered, err := RenderIndexTemplate(data)
 	if err != nil {
-		return nil, time.Time{}
-	}
-
-	templateData := struct {
-		SentryDSN         string
-		SentryEnvironment string
-	}{
-		SentryDSN:         os.Getenv("SENTRY_DSN"),
-		SentryEnvironment: os.Getenv("SENTRY_ENVIRONMENT"),
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, templateData); err != nil {
-		return nil, time.Time{}
+		log.Fatalf("failed to render index.html template: %v", err)
 	}
 
 	if fi, err := indexFile.Stat(); err == nil {
-		return buf.Bytes(), fi.ModTime()
+		return rendered, fi.ModTime()
 	}
 
-	return buf.Bytes(), time.Now()
+	return rendered, time.Now()
 }

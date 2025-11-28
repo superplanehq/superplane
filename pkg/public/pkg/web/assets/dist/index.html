@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Superplane</title>
+    <script>
+      window.SUPERPLANE_SENTRY_DSN = "{{ .SentryDSN }}";
+      window.SUPERPLANE_SENTRY_ENVIRONMENT = "{{ .SentryEnvironment }}";
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
