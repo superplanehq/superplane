@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   ComponentsNode,
   WorkflowsWorkflowEvent,
@@ -76,6 +75,37 @@ export function mapExecutionsToSidebarEvents(
       nodeId: execution?.nodeId,
     };
   });
+}
+
+export function getNextInQueueInfo(
+  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]> | undefined,
+  nodeId: string,
+  nodes: ComponentsNode[],
+): { title: string; subtitle: string; receivedAt: Date } | undefined {
+  if (!nodeQueueItemsMap || !nodeQueueItemsMap[nodeId] || nodeQueueItemsMap[nodeId].length === 0) {
+    return undefined;
+  }
+
+  const queueItem = nodeQueueItemsMap[nodeId]?.at(-1);
+  if (!queueItem) {
+    return undefined;
+  }
+
+  const rootTriggerNode = nodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+  const { title, subtitle } = queueItem.rootEvent
+    ? rootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent)
+    : {
+        title: queueItem.id || "Execution",
+        subtitle: queueItem.createdAt ? formatTimeAgo(new Date(queueItem.createdAt)).replace(" ago", "") : "",
+      };
+
+  return {
+    title,
+    subtitle: subtitle || (queueItem.createdAt ? formatTimeAgo(new Date(queueItem.createdAt)) : ""),
+    receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : new Date(),
+  };
 }
 
 export function mapQueueItemsToSidebarEvents(
