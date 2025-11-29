@@ -681,6 +681,7 @@ CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (or
 
 CREATE INDEX idx_casbin_rule_ptype ON public.casbin_rule USING btree (ptype);
 
+
 --
 -- Name: idx_casbin_rule_v0; Type: INDEX; Schema: public; Owner: -
 --
