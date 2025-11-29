@@ -82,13 +82,7 @@ func (w *WorkflowCleanupWorker) processWorkflow(tx *gorm.DB, workflow models.Wor
 		return nil
 	}
 
-	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowEvent{}).Error; err != nil {
-		return err
-	}
-	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowNodeExecution{}).Error; err != nil {
-		return err
-	}
-	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
+	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowNodeRequest{}).Error; err != nil {
 		return err
 	}
 
@@ -96,7 +90,15 @@ func (w *WorkflowCleanupWorker) processWorkflow(tx *gorm.DB, workflow models.Wor
 		return err
 	}
 
-	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowNodeRequest{}).Error; err != nil {
+	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowNodeExecution{}).Error; err != nil {
+		return err
+	}
+
+	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
+		return err
+	}
+
+	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowEvent{}).Error; err != nil {
 		return err
 	}
 
