@@ -835,7 +835,7 @@ ALTER TABLE ONLY public.account_providers
 --
 
 ALTER TABLE ONLY public.workflow_node_execution_kvs
-    ADD CONSTRAINT fk_wnek_workflow FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+    ADD CONSTRAINT fk_wnek_workflow FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
 
 
 --
@@ -843,7 +843,7 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 --
 
 ALTER TABLE ONLY public.workflow_node_execution_kvs
-    ADD CONSTRAINT fk_wnek_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+    ADD CONSTRAINT fk_wnek_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
 
 
 --
@@ -891,7 +891,7 @@ ALTER TABLE ONLY public.webhooks
 --
 
 ALTER TABLE ONLY public.workflow_events
-    ADD CONSTRAINT workflow_events_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_events_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
 
 
 --
@@ -899,7 +899,7 @@ ALTER TABLE ONLY public.workflow_events
 --
 
 ALTER TABLE ONLY public.workflow_node_execution_kvs
-    ADD CONSTRAINT workflow_node_execution_kvs_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_execution_kvs_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id);
 
 
 --
@@ -907,7 +907,7 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 --
 
 ALTER TABLE ONLY public.workflow_node_requests
-    ADD CONSTRAINT workflow_node_execution_requests_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_execution_requests_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id);
 
 
 --
@@ -915,7 +915,7 @@ ALTER TABLE ONLY public.workflow_node_requests
 --
 
 ALTER TABLE ONLY public.workflow_node_requests
-    ADD CONSTRAINT workflow_node_execution_requests_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_execution_requests_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
 
 
 --
@@ -923,7 +923,7 @@ ALTER TABLE ONLY public.workflow_node_requests
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_executions_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id);
 
 
 --
@@ -931,7 +931,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_parent_execution_id_fkey FOREIGN KEY (parent_execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_executions_parent_execution_id_fkey FOREIGN KEY (parent_execution_id) REFERENCES public.workflow_node_executions(id);
 
 
 --
@@ -939,7 +939,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_previous_execution_id_fkey FOREIGN KEY (previous_execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_executions_previous_execution_id_fkey FOREIGN KEY (previous_execution_id) REFERENCES public.workflow_node_executions(id);
 
 
 --
@@ -947,7 +947,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_executions_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id);
 
 
 --
@@ -955,7 +955,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_executions_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
 
 
 --
@@ -963,7 +963,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
-    ADD CONSTRAINT workflow_node_queue_items_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_queue_items_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id);
 
 
 --
@@ -971,7 +971,7 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
-    ADD CONSTRAINT workflow_node_queue_items_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_queue_items_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id);
 
 
 --
@@ -979,7 +979,7 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
-    ADD CONSTRAINT workflow_node_queue_items_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_queue_items_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
 
 
 --
@@ -995,7 +995,7 @@ ALTER TABLE ONLY public.workflow_nodes
 --
 
 ALTER TABLE ONLY public.workflow_nodes
-    ADD CONSTRAINT workflow_nodes_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_nodes_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
 
 
 --
@@ -1030,7 +1030,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251124160500	f
+20251128222706	f
 \.
 
 
