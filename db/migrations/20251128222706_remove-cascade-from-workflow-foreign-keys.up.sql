@@ -65,26 +65,8 @@ ALTER TABLE workflow_node_execution_kvs DROP CONSTRAINT fk_wnek_workflow_node;
 ALTER TABLE workflow_node_execution_kvs ADD CONSTRAINT fk_wnek_workflow_node
   FOREIGN KEY (workflow_id, node_id) REFERENCES workflow_nodes(workflow_id, node_id);
 
--- workflow_node_execution_kvs execution_id constraint
 ALTER TABLE workflow_node_execution_kvs DROP CONSTRAINT workflow_node_execution_kvs_execution_id_fkey;
 ALTER TABLE workflow_node_execution_kvs ADD CONSTRAINT workflow_node_execution_kvs_execution_id_fkey
   FOREIGN KEY (execution_id) REFERENCES workflow_node_executions(id);
-
--- Add soft deletion column to workflow_nodes
-ALTER TABLE workflow_nodes ADD COLUMN deleted_at timestamp with time zone;
-CREATE INDEX idx_workflow_nodes_deleted_at ON workflow_nodes (deleted_at);
-
--- Add foreign keys for tables that reference workflow_nodes (workflow_id, node_id)
-ALTER TABLE workflow_events ADD CONSTRAINT fk_workflow_events_workflow_node
-  FOREIGN KEY (workflow_id, node_id) REFERENCES workflow_nodes(workflow_id, node_id);
-
-ALTER TABLE workflow_node_executions ADD CONSTRAINT fk_workflow_node_executions_workflow_node
-  FOREIGN KEY (workflow_id, node_id) REFERENCES workflow_nodes(workflow_id, node_id);
-
-ALTER TABLE workflow_node_queue_items ADD CONSTRAINT fk_workflow_node_queue_items_workflow_node
-  FOREIGN KEY (workflow_id, node_id) REFERENCES workflow_nodes(workflow_id, node_id);
-
-ALTER TABLE workflow_node_requests ADD CONSTRAINT fk_workflow_node_requests_workflow_node
-  FOREIGN KEY (workflow_id, node_id) REFERENCES workflow_nodes(workflow_id, node_id);
 
 COMMIT;
