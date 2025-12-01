@@ -198,7 +198,7 @@ func (g *GitHub) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) 
 
 	eventType := ctx.Headers.Get("X-GitHub-Event")
 	if eventType == "" {
-		return http.StatusOK, nil
+		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
 	config := Configuration{}
