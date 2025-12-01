@@ -6,9 +6,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
@@ -20,33 +22,76 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 			// Use a response writer wrapper to capture status code
 			lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
-			next.ServeHTTP(lrw, r)
+			defer func() {
+				recovered := recover()
+				duration := time.Since(start)
 
-			duration := time.Since(start)
+				if !shouldLogRequest(r.URL.Path) {
+					if recovered != nil {
+						panic(recovered)
+					}
+					return
+				}
 
-			if !shouldLogRequest(r.URL.Path) {
-				return
-			}
+				status := lrw.statusCode
+				if recovered != nil && status < http.StatusInternalServerError {
+					status = http.StatusInternalServerError
+				}
 
-			if ShowFullLogs() {
-				logger.WithFields(log.Fields{
-					"method":     r.Method,
-					"path":       r.URL.Path,
-					"remote":     r.RemoteAddr,
-					"user_agent": r.UserAgent(),
-					"duration":   duration,
-					"status":     lrw.statusCode,
-				}).Info("handled request")
-			} else {
-				logger.WithFields(log.Fields{
+				fields := log.Fields{
 					"method":   r.Method,
 					"path":     r.URL.Path,
 					"duration": duration,
-					"status":   lrw.statusCode,
-				}).Info("handled request")
-			}
+					"status":   status,
+				}
+
+				if ShowFullLogs() {
+					fields["remote"] = r.RemoteAddr
+					fields["user_agent"] = r.UserAgent()
+				}
+
+				logger.WithFields(fields).Info("handled request")
+
+				if recovered != nil {
+					captureHTTPPanic(r, status, recovered)
+					panic(recovered)
+				}
+
+				if status >= http.StatusInternalServerError {
+					captureHTTPError(r, status)
+				}
+			}()
+
+			next.ServeHTTP(lrw, r)
 		})
 	}
+}
+
+func captureHTTPPanic(r *http.Request, status int, recovered any) {
+	hub := sentry.CurrentHub()
+	if hub == nil || hub.Client() == nil {
+		return
+	}
+
+	hub.WithScope(func(scope *sentry.Scope) {
+		scope.SetRequest(r)
+		scope.SetTag("status", strconv.Itoa(status))
+		hub.Recover(recovered)
+		hub.Flush(2 * time.Second)
+	})
+}
+
+func captureHTTPError(r *http.Request, status int) {
+	hub := sentry.CurrentHub()
+	if hub == nil || hub.Client() == nil {
+		return
+	}
+
+	hub.WithScope(func(scope *sentry.Scope) {
+		scope.SetRequest(r)
+		scope.SetTag("status", strconv.Itoa(status))
+		hub.CaptureMessage(fmt.Sprintf("HTTP %d %s", status, r.URL.Path))
+	})
 }
 
 func shouldLogRequest(path string) bool {
