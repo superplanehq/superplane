@@ -86,7 +86,7 @@ services:
     volumes:
       - go-pkg-cache:/go
       - .:/app
-      - /tmp:/tmp
+      - ./tmp:/tmp
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
