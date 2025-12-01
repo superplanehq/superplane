@@ -1,31 +1,31 @@
-import { useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { Icon } from "../../../components/Icon";
+import { SuperplaneUsersUser } from "@/api-client";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import { useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "../../../components/Avatar/avatar";
-import { Heading, Subheading } from "../../../components/Heading/heading";
-import { Button } from "../../../components/Button/button";
-import { Input, InputGroup } from "../../../components/Input/input";
 import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
 import {
   Dropdown,
   DropdownButton,
-  DropdownMenu,
+  DropdownDescription,
   DropdownItem,
   DropdownLabel,
-  DropdownDescription,
+  DropdownMenu,
 } from "../../../components/Dropdown/dropdown";
-import { AddMembersSection, AddMembersSectionRef } from "./AddMembersSection";
-import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "../../../components/Table/table";
+import { Heading, Subheading } from "../../../components/Heading/heading";
+import { Icon } from "../../../components/Icon";
+import { Input, InputGroup } from "../../../components/Input/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import {
+  useDeleteGroup,
   useOrganizationGroup,
   useOrganizationGroupUsers,
   useOrganizationRoles,
-  useUpdateGroup,
-  useDeleteGroup,
   useRemoveUserFromGroup,
+  useUpdateGroup,
 } from "../../../hooks/useOrganizationData";
-import { SuperplaneUsersUser } from "@/api-client";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { Button } from "../../../ui/button";
+import { AddMembersSection, AddMembersSectionRef } from "./AddMembersSection";
 
 export function GroupMembersPage() {
   const { groupName: encodedGroupName } = useParams<{ groupName: string }>();
@@ -306,7 +306,8 @@ export function GroupMembersPage() {
                       autoFocus
                     />
                     <Button
-                      plain
+                      size="sm"
+                      variant="ghost"
                       onClick={handleSaveGroupName}
                       disabled={updateGroupMutation.isPending}
                       className="text-green-600 hover:text-green-700"
@@ -314,7 +315,8 @@ export function GroupMembersPage() {
                       <Icon name={updateGroupMutation.isPending ? "hourglass_empty" : "check"} size="sm" />
                     </Button>
                     <Button
-                      plain
+                      variant="ghost"
+                      size="sm"
                       onClick={handleCancelGroupName}
                       disabled={updateGroupMutation.isPending}
                       className="text-red-600 hover:text-red-700"
@@ -328,7 +330,8 @@ export function GroupMembersPage() {
                       {group?.spec?.displayName}
                     </Heading>
                     <Button
-                      plain
+                      size="sm"
+                      variant="ghost"
                       onClick={handleEditGroupName}
                       className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
                     >
@@ -354,7 +357,8 @@ export function GroupMembersPage() {
                       autoFocus
                     />
                     <Button
-                      plain
+                      variant="ghost"
+                      size="sm"
                       onClick={handleSaveGroupDescription}
                       disabled={updateGroupMutation.isPending}
                       className="text-green-600 hover:text-green-700"
@@ -362,7 +366,8 @@ export function GroupMembersPage() {
                       <Icon name={updateGroupMutation.isPending ? "hourglass_empty" : "check"} size="sm" />
                     </Button>
                     <Button
-                      plain
+                      variant="ghost"
+                      size="sm"
                       onClick={handleCancelGroupDescription}
                       disabled={updateGroupMutation.isPending}
                       className="text-red-600 hover:text-red-700"
@@ -376,7 +381,8 @@ export function GroupMembersPage() {
                       {group?.spec?.description || "No description"}
                     </Subheading>
                     <Button
-                      plain
+                      variant="ghost"
+                      size="sm"
                       onClick={handleEditGroupDescription}
                       className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
                     >

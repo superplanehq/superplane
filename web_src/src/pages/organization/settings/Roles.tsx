@@ -1,14 +1,14 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { Heading } from "../../../components/Heading/heading";
-import { Button } from "../../../components/Button/button";
-import { Input, InputGroup } from "../../../components/Input/input";
-import { Icon } from "../../../components/Icon";
 import debounce from "lodash.debounce";
-import { Dropdown, DropdownButton, DropdownMenu, DropdownItem } from "../../../components/Dropdown/dropdown";
-import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "../../../components/Table/table";
-import { useOrganizationRoles, useDeleteRole } from "../../../hooks/useOrganizationData";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { RolesRole } from "../../../api-client/types.gen";
+import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "../../../components/Dropdown/dropdown";
+import { Heading } from "../../../components/Heading/heading";
+import { Icon } from "../../../components/Icon";
+import { Input, InputGroup } from "../../../components/Input/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
+import { useDeleteRole, useOrganizationRoles } from "../../../hooks/useOrganizationData";
+import { Button } from "../../../ui/button";
 
 interface RolesProps {
   organizationId: string;
@@ -149,7 +149,7 @@ export function Roles({ organizationId }: RolesProps) {
               onChange={(e) => setDebouncedSearch(e.target.value)}
             />
           </InputGroup>
-          <Button color="blue" className="flex items-center" onClick={handleCreateRole}>
+          <Button className="flex items-center" onClick={handleCreateRole}>
             <Icon name="add" />
             New Organization Role
           </Button>

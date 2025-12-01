@@ -1,28 +1,28 @@
-import { useState, useMemo } from "react";
+import { formatRelativeTime } from "@/utils/timezone";
+import debounce from "lodash.debounce";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heading } from "../../../components/Heading/heading";
-import { Button } from "../../../components/Button/button";
-import { Input, InputGroup } from "../../../components/Input/input";
-import { Icon } from "../../../components/Icon";
 import { Avatar } from "../../../components/Avatar/avatar";
-import { Link } from "../../../components/Link/link";
 import {
   Dropdown,
   DropdownButton,
-  DropdownMenu,
+  DropdownDescription,
   DropdownItem,
   DropdownLabel,
-  DropdownDescription,
+  DropdownMenu,
 } from "../../../components/Dropdown/dropdown";
-import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "../../../components/Table/table";
+import { Heading } from "../../../components/Heading/heading";
+import { Icon } from "../../../components/Icon";
+import { Input, InputGroup } from "../../../components/Input/input";
+import { Link } from "../../../components/Link/link";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import {
+  useDeleteGroup,
   useOrganizationGroups,
   useOrganizationRoles,
   useUpdateGroup,
-  useDeleteGroup,
 } from "../../../hooks/useOrganizationData";
-import debounce from "lodash.debounce";
-import { formatRelativeTime } from "@/utils/timezone";
+import { Button } from "../../../ui/button";
 
 interface GroupsProps {
   organizationId: string;
@@ -172,7 +172,7 @@ export function Groups({ organizationId }: GroupsProps) {
               onChange={(e) => setDebouncedSearch(e.target.value)}
             />
           </InputGroup>
-          <Button color="blue" className="flex items-center" onClick={handleCreateGroup}>
+          <Button className="flex items-center" onClick={handleCreateGroup}>
             <Icon name="add" />
             Create New Group
           </Button>

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Text } from "../Text/text";
-import { Icon } from "../Icon";
 import { Avatar } from "../Avatar/avatar";
+import { Icon } from "../Icon";
 import { MultiCombobox, MultiComboboxLabel } from "../MultiCombobox/multi-combobox";
-import { Button } from "../Button/button";
+import { Text } from "../Text/text";
+import { Button } from "../ui/button";
 
 interface User {
   id: string;
@@ -154,7 +154,7 @@ export function AddMembersSection({
             );
           }}
         </MultiCombobox>
-        <Button type="submit" disabled={selectedUsers.length === 0 || isLoading || disabled} color="blue">
+        <Button type="submit" disabled={selectedUsers.length === 0 || isLoading || disabled}>
           <Icon name="add" size="sm" />
           {isLoading ? "Adding..." : "Add"}
         </Button>

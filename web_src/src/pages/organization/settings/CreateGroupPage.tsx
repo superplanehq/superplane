@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from "react";
+import { Heading } from "@/components/Heading/heading";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Button } from "../../../components/Button/button";
-import { Input } from "../../../components/Input/input";
+import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
 import {
   Dropdown,
   DropdownButton,
-  DropdownMenu,
+  DropdownDescription,
   DropdownItem,
   DropdownLabel,
-  DropdownDescription,
+  DropdownMenu,
 } from "../../../components/Dropdown/dropdown";
 import { Icon } from "../../../components/Icon";
+import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
-import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
 import { useCreateGroup, useOrganizationRoles } from "../../../hooks/useOrganizationData";
-import { Heading } from "@/components/Heading/heading";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { Button } from "../../../ui/button";
 
 export function CreateGroupPage() {
   const navigate = useNavigate();
@@ -69,7 +69,7 @@ export function CreateGroupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 pt-20 text-left">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 text-left">
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -188,7 +188,6 @@ export function CreateGroupPage() {
           {/* Action Buttons */}
           <div className="flex items-center gap-3">
             <Button
-              color="blue"
               onClick={handleCreateGroup}
               disabled={!groupName.trim() || !selectedRole || isCreating || roles.length === 0}
               className="flex items-center gap-2"
@@ -198,7 +197,7 @@ export function CreateGroupPage() {
             </Button>
 
             <Link to={`/${orgId}/settings/groups`}>
-              <Button outline>Cancel</Button>
+              <Button variant="secondary">Cancel</Button>
             </Link>
           </div>
         </div>
