@@ -2,6 +2,7 @@ package support
 
 import (
 	"encoding/json"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -546,7 +547,7 @@ func expandBlueprintNodes(t *testing.T, orgID uuid.UUID, nodes []models.Node) ([
 				Type:          bn.Type,
 				Ref:           bn.Ref,
 				Configuration: bn.Configuration,
-				Metadata:      cloneMetadata(bn.Metadata),
+				Metadata:      maps.Clone(bn.Metadata),
 				Position:      bn.Position,
 				IsCollapsed:   bn.IsCollapsed,
 			}
@@ -556,12 +557,4 @@ func expandBlueprintNodes(t *testing.T, orgID uuid.UUID, nodes []models.Node) ([
 	}
 
 	return expanded, nil
-}
-
-func cloneMetadata(md map[string]any) map[string]any {
-	out := map[string]any{}
-	for k, v := range md {
-		out[k] = v
-	}
-	return out
 }

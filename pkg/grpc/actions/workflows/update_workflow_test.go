@@ -1,22 +1,24 @@
 package workflows
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 func TestUpdateWorkflow_NodeRemovalUseSoftDelete(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, nodes := support.CreateWorkflow(
+	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
 		r.User,
@@ -49,13 +51,35 @@ func TestUpdateWorkflow_NodeRemovalUseSoftDelete(t *testing.T) {
 		"test-value",
 	))
 
-	existingNodes := []models.WorkflowNode{nodes[0], nodes[1]}
-	newNodes := []models.Node{{ID: "node-1"}}
+	updatedWorkflowPB := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		return deleteNodes(tx, existingNodes, newNodes, workflow.ID)
-	})
-	require.NoError(t, err, "deleteNodes should succeed when removing nodes with execution KVs")
+	_, err := UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		updatedWorkflowPB,
+	)
+	require.NoError(t, err, "UpdateWorkflow should succeed when removing nodes with execution KVs")
 
 	var normalCount int64
 	database.Conn().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-2").Count(&normalCount)
