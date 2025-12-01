@@ -482,7 +482,7 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell>
                       {member.type === "member" ? (
                         <Dropdown>
-                          <DropdownButton outline className="flex items-center gap-2 text-sm">
+                          <DropdownButton className="flex items-center gap-2 text-sm">
                             {member.role}
                             <Icon name="keyboard_arrow_down" />
                           </DropdownButton>
@@ -514,7 +514,7 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell>
                       <div className="flex justify-end">
                         <Dropdown>
-                          <DropdownButton plain className="flex items-center gap-2 text-sm">
+                          <DropdownButton className="flex items-center gap-2 text-sm">
                             <Icon name="more_vert" size="sm" />
                           </DropdownButton>
                           <DropdownMenu>

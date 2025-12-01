@@ -411,7 +411,7 @@ export function GroupMembersPage() {
               </DropdownMenu>
             </Dropdown>
             <Dropdown>
-              <DropdownButton plain aria-label="More options" disabled={deleteGroupMutation.isPending}>
+              <DropdownButton aria-label="More options" disabled={deleteGroupMutation.isPending}>
                 <Icon name="more_vert" size="sm" />
               </DropdownButton>
               <DropdownMenu>
@@ -498,7 +498,7 @@ export function GroupMembersPage() {
                     <TableCell>
                       <div className="flex justify-end">
                         <Dropdown>
-                          <DropdownButton plain className="flex items-center gap-2 text-sm">
+                          <DropdownButton className="flex items-center gap-2 text-sm">
                             <Icon name="more_vert" size="sm" />
                           </DropdownButton>
                           <DropdownMenu>

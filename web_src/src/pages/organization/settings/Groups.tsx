@@ -267,7 +267,6 @@ export function Groups({ organizationId }: GroupsProps) {
                       <TableCell>
                         <Dropdown>
                           <DropdownButton
-                            outline
                             className="flex items-center gap-2 text-sm justify-between"
                             disabled={updateGroupMutation.isPending}
                           >
@@ -293,7 +292,7 @@ export function Groups({ organizationId }: GroupsProps) {
                       <TableCell>
                         <div className="flex justify-end">
                           <Dropdown>
-                            <DropdownButton plain disabled={deleteGroupMutation.isPending}>
+                            <DropdownButton disabled={deleteGroupMutation.isPending}>
                               <Icon name="more_vert" size="sm" />
                             </DropdownButton>
                             <DropdownMenu>

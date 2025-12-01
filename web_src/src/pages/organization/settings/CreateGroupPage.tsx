@@ -164,7 +164,7 @@ export function CreateGroupPage() {
                   </div>
                 ) : (
                   <Dropdown>
-                    <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
+                    <DropdownButton className="flex items-center gap-2 text-sm justify-between">
                       {roles.find((r) => r.metadata?.name === selectedRole)?.spec?.displayName || "Select Role"}
                       <Icon name="keyboard_arrow_down" />
                     </DropdownButton>

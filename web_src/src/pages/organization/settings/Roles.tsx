@@ -206,7 +206,7 @@ export function Roles({ organizationId }: RolesProps) {
                               </span>
                             ) : (
                               <Dropdown>
-                                <DropdownButton plain disabled={deleteRoleMutation.isPending}>
+                                <DropdownButton disabled={deleteRoleMutation.isPending}>
                                   <Icon name="more_vert" size="sm" />
                                 </DropdownButton>
                                 <DropdownMenu>

@@ -547,7 +547,6 @@ function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuPr
       <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
         <Dropdown>
           <DropdownButton
-            plain
             className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
             aria-label="Canvas actions"
             onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}
@@ -630,7 +629,6 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
       <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
         <Dropdown>
           <DropdownButton
-            plain
             className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
             aria-label="Component actions"
             onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}
