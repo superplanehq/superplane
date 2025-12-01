@@ -2,6 +2,7 @@ package support
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/semaphore"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	// Import components and triggers to register them via init()
@@ -217,6 +219,8 @@ func EmitWorkflowEventForNodeWithData(
 	executionID *uuid.UUID,
 	data map[string]any,
 ) *models.WorkflowEvent {
+	ensureWorkflowNodeExists(t, workflowID, nodeID)
+
 	now := time.Now()
 	event := models.WorkflowEvent{
 		WorkflowID:  workflowID,
@@ -256,6 +260,8 @@ func CreateNodeExecutionWithConfiguration(
 	parentExecutionID *uuid.UUID,
 	configuration map[string]any,
 ) *models.WorkflowNodeExecution {
+	ensureWorkflowNodeExists(t, workflowID, nodeID)
+
 	now := time.Now()
 	execution := models.WorkflowNodeExecution{
 		WorkflowID:        workflowID,
@@ -281,6 +287,8 @@ func CreateWorkflowNodeExecution(
 	eventID uuid.UUID,
 	parentExecutionID *uuid.UUID,
 ) *models.WorkflowNodeExecution {
+	ensureWorkflowNodeExists(t, workflowID, nodeID)
+
 	now := time.Now()
 	execution := models.WorkflowNodeExecution{
 		WorkflowID:        workflowID,
@@ -306,6 +314,8 @@ func CreateNextNodeExecution(
 	eventID uuid.UUID,
 	previous *uuid.UUID,
 ) *models.WorkflowNodeExecution {
+	ensureWorkflowNodeExists(t, workflowID, nodeID)
+
 	now := time.Now()
 	execution := models.WorkflowNodeExecution{
 		WorkflowID:          workflowID,
@@ -343,17 +353,54 @@ func CreateWorkflow(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []mod
 	require.NoError(t, database.Conn().Create(workflow).Error)
 
 	//
-	// Create workflow nodes
+	// Expand blueprint nodes (convert WorkflowNode to Node, expand, then back to WorkflowNode)
 	//
-	for _, node := range nodes {
-		node.WorkflowID = workflow.ID
-		node.State = models.WorkflowNodeStateReady
-		node.CreatedAt = &now
-		node.UpdatedAt = &now
-		require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&node).Error)
+	inputNodes := make([]models.Node, len(nodes))
+	for i, node := range nodes {
+		inputNodes[i] = models.Node{
+			ID:            node.NodeID,
+			Name:          node.Name,
+			Type:          node.Type,
+			Ref:           node.Ref.Data(),
+			Configuration: node.Configuration.Data(),
+			Metadata:      node.Metadata.Data(),
+			Position:      node.Position.Data(),
+			IsCollapsed:   node.IsCollapsed,
+		}
 	}
 
-	return workflow, nodes
+	expandedNodes, err := expandBlueprintNodes(t, orgID, inputNodes)
+	require.NoError(t, err)
+
+	var createdNodes []models.WorkflowNode
+	for _, node := range expandedNodes {
+		var parentNodeID *string
+		if idx := strings.Index(node.ID, ":"); idx != -1 {
+			parent := node.ID[:idx]
+			parentNodeID = &parent
+		}
+
+		workflowNode := models.WorkflowNode{
+			WorkflowID:    workflow.ID,
+			NodeID:        node.ID,
+			ParentNodeID:  parentNodeID,
+			Name:          node.Name,
+			State:         models.WorkflowNodeStateReady,
+			Type:          node.Type,
+			Ref:           datatypes.NewJSONType(node.Ref),
+			Configuration: datatypes.NewJSONType(node.Configuration),
+			Position:      datatypes.NewJSONType(node.Position),
+			Metadata:      datatypes.NewJSONType(node.Metadata),
+			IsCollapsed:   node.IsCollapsed,
+			CreatedAt:     &now,
+			UpdatedAt:     &now,
+		}
+
+		require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&workflowNode).Error)
+		createdNodes = append(createdNodes, workflowNode)
+	}
+
+	return workflow, createdNodes
 }
 
 func CreateBlueprint(t *testing.T, orgID uuid.UUID, nodes []models.Node, edges []models.Edge, outputChannels []models.BlueprintOutputChannel) *models.Blueprint {
@@ -438,4 +485,83 @@ func VerifyWorkflowNodeRequestCount(t *testing.T, workflowID uuid.UUID, expected
 
 	require.NoError(t, err)
 	require.Equal(t, expected, int(actual))
+}
+
+// ensureWorkflowNodeExists creates a minimal workflow node if it doesn't exist
+// This is needed to satisfy FK constraints when creating events/executions
+func ensureWorkflowNodeExists(t *testing.T, workflowID uuid.UUID, nodeID string) {
+	var existingNode models.WorkflowNode
+	err := database.Conn().
+		Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).
+		First(&existingNode).Error
+
+	if err == nil {
+		return
+	}
+
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	now := time.Now()
+	node := models.WorkflowNode{
+		WorkflowID:    workflowID,
+		NodeID:        nodeID,
+		Name:          "Auto-created node for test",
+		State:         models.WorkflowNodeStateReady,
+		Type:          models.NodeTypeComponent,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		Position:      datatypes.NewJSONType(models.Position{}),
+		Metadata:      datatypes.NewJSONType(map[string]any{}),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+
+	require.NoError(t, database.Conn().Create(&node).Error)
+}
+
+func expandBlueprintNodes(t *testing.T, orgID uuid.UUID, nodes []models.Node) ([]models.Node, error) {
+	expanded := make([]models.Node, 0, len(nodes))
+
+	for _, n := range nodes {
+		expanded = append(expanded, n)
+
+		if n.Type != models.NodeTypeBlueprint || n.Ref.Blueprint == nil {
+			continue
+		}
+
+		blueprintID := n.Ref.Blueprint.ID
+		if blueprintID == "" {
+			continue
+		}
+
+		b, err := models.FindBlueprint(orgID.String(), blueprintID)
+		if err != nil {
+			continue
+		}
+
+		for _, bn := range b.Nodes {
+			internal := models.Node{
+				ID:            n.ID + ":" + bn.ID,
+				Name:          bn.Name,
+				Type:          bn.Type,
+				Ref:           bn.Ref,
+				Configuration: bn.Configuration,
+				Metadata:      cloneMetadata(bn.Metadata),
+				Position:      bn.Position,
+				IsCollapsed:   bn.IsCollapsed,
+			}
+
+			expanded = append(expanded, internal)
+		}
+	}
+
+	return expanded, nil
+}
+
+func cloneMetadata(md map[string]any) map[string]any {
+	out := map[string]any{}
+	for k, v := range md {
+		out[k] = v
+	}
+	return out
 }
