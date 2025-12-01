@@ -102,17 +102,8 @@ func (w *WorkflowCleanupWorker) processWorkflow(tx *gorm.DB, workflow models.Wor
 		return err
 	}
 
-	nodes, err := models.FindWorkflowNodesInTransaction(tx, workflow.ID)
-	if err != nil {
+	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowNode{}).Error; err != nil {
 		return err
-	}
-
-	w.logger.Infof("Found %d nodes to delete for workflow %s", len(nodes), workflow.ID)
-
-	for _, node := range nodes {
-		if err := models.DeleteWorkflowNode(tx, node); err != nil {
-			return err
-		}
 	}
 
 	if err := tx.Unscoped().Delete(&workflow).Error; err != nil {
