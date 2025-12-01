@@ -198,7 +198,7 @@ func (g *GitHub) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) 
 
 	eventType := ctx.Headers.Get("X-GitHub-Event")
 	if eventType == "" {
-		return http.StatusOK, nil
+		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
 	config := Configuration{}
@@ -234,10 +234,35 @@ func (g *GitHub) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) 
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
+	//
+	// If the event is a push event for branch deletion, ignore it.
+	//
+	if isBranchDeletionEvent(eventType, data) {
+		return http.StatusOK, nil
+	}
+
 	err = ctx.EventContext.Emit(data)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}
 
 	return http.StatusOK, nil
+}
+
+func isBranchDeletionEvent(eventType string, data map[string]any) bool {
+	if eventType != "push" {
+		return false
+	}
+
+	v, ok := data["deleted"]
+	if !ok {
+		return false
+	}
+
+	deleted, ok := v.(bool)
+	if !ok {
+		return false
+	}
+
+	return deleted
 }
