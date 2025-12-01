@@ -378,7 +378,8 @@ CREATE TABLE public.workflow_nodes (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     "position" jsonb DEFAULT '{}'::jsonb NOT NULL,
     is_collapsed boolean DEFAULT false NOT NULL,
-    parent_node_id character varying(128)
+    parent_node_id character varying(128),
+    deleted_at timestamp with time zone
 );
 
 
@@ -795,6 +796,13 @@ CREATE INDEX idx_workflow_node_executions_workflow_node_id ON public.workflow_no
 
 
 --
+-- Name: idx_workflow_nodes_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_nodes_deleted_at ON public.workflow_nodes USING btree (deleted_at);
+
+
+--
 -- Name: idx_workflow_nodes_parent; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1030,7 +1038,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251128222706	f
+20251201130001	f
 \.
 
 

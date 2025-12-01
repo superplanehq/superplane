@@ -34,6 +34,7 @@ type WorkflowNode struct {
 	WebhookID     *uuid.UUID
 	CreatedAt     *time.Time
 	UpdatedAt     *time.Time
+	DeletedAt     gorm.DeletedAt `gorm:"index"`
 }
 
 func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {
