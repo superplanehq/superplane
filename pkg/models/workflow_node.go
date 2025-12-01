@@ -37,7 +37,13 @@ type WorkflowNode struct {
 }
 
 func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {
-	err := tx.Delete(&node).Error
+	err := tx.Where("workflow_id = ? AND node_id = ?", node.WorkflowID, node.NodeID).
+		Delete(&WorkflowNodeExecutionKV{}).Error
+	if err != nil {
+		return err
+	}
+
+	err = tx.Delete(&node).Error
 	if err != nil {
 		return err
 	}
