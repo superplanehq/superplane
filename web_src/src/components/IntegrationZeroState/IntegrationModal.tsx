@@ -1,19 +1,19 @@
-import { createPortal } from "react-dom";
-import { useState, useEffect, useRef } from "react";
-import { Dialog, DialogTitle, DialogBody, DialogActions } from "../Dialog/dialog";
-import { Button } from "../Button/button";
-import { Icon } from "../Icon";
-import { useIntegrations, useCreateIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
-import { useSecrets, useCreateSecret, useUpdateSecret } from "@/hooks/useSecrets";
-import {
-  GitHubIntegrationForm,
-  SemaphoreIntegrationForm,
-  ApiTokenForm,
-  NEW_SECRET_NAME,
-  useIntegrationForm,
-} from "../IntegrationForm";
 import type { IntegrationsIntegration } from "@/api-client/types.gen";
 import { AuthorizationDomainType } from "@/api-client/types.gen";
+import { useCreateIntegration, useIntegrations, useUpdateIntegration } from "@/hooks/useIntegrations";
+import { useCreateSecret, useSecrets, useUpdateSecret } from "@/hooks/useSecrets";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Dialog, DialogActions, DialogBody, DialogTitle } from "../Dialog/dialog";
+import { Icon } from "../Icon";
+import {
+  ApiTokenForm,
+  GitHubIntegrationForm,
+  NEW_SECRET_NAME,
+  SemaphoreIntegrationForm,
+  useIntegrationForm,
+} from "../IntegrationForm";
+import { Button } from "../ui/button";
 
 interface IntegrationModalProps {
   open: boolean;
@@ -219,10 +219,10 @@ export function IntegrationModal({
       </DialogBody>
 
       <DialogActions>
-        <Button onClick={onClose} disabled={isCreating}>
+        <Button onClick={onClose} disabled={isCreating} variant="secondary">
           Cancel
         </Button>
-        <Button color="blue" onClick={handleSaveIntegration} disabled={isCreating}>
+        <Button onClick={handleSaveIntegration} disabled={isCreating}>
           {isCreating ? (
             <>
               <Icon name="progress_activity" className="animate-spin" size="sm" />

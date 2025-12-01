@@ -1,17 +1,14 @@
-"use client";
-
 import * as Headless from "@headlessui/react";
 import clsx from "clsx";
 import type React from "react";
-import { Button } from "../Button/button";
 import { Link } from "../Link/link";
 
 export function Dropdown(props: Headless.MenuProps) {
   return <Headless.Menu {...props} />;
 }
 
-export function DropdownButton<T extends React.ElementType = typeof Button>({
-  as = Button,
+export function DropdownButton<T extends React.ElementType = typeof Headless.MenuButton>({
+  as = Headless.MenuButton,
   ...props
 }: { className?: string } & Omit<Headless.MenuButtonProps<T>, "className">) {
   return <Headless.MenuButton as={as} {...props} />;

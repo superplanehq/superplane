@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
-import { Avatar } from "../../../components/Avatar/avatar";
-import { Text } from "../../../components/Text/text";
-import { Heading } from "../../../components/Heading/heading";
-import { Button } from "../../../components/Button/button";
-import { Input } from "../../../components/Input/input";
-import { Icon } from "../../../components/Icon";
+import { useEffect, useState } from "react";
 import { meMe, meRegenerateToken } from "../../../api-client/sdk.gen";
 import type { SuperplaneMeUser } from "../../../api-client/types.gen";
+import { Avatar } from "../../../components/Avatar/avatar";
+import { Heading } from "../../../components/Heading/heading";
+import { Icon } from "../../../components/Icon";
+import { Input } from "../../../components/Input/input";
+import { Text } from "../../../components/Text/text";
+import { Button } from "../../../ui/button";
 import { withOrganizationHeader } from "../../../utils/withOrganizationHeader";
 
 export function Profile() {
@@ -175,10 +175,14 @@ export function Profile() {
                     readOnly
                     className="flex-1 font-mono text-sm bg-zinc-50 dark:bg-zinc-900"
                   />
-                  <Button outline onClick={() => setTokenVisible(!tokenVisible)} className="flex items-center gap-1">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setTokenVisible(!tokenVisible)}
+                    className="flex items-center gap-1"
+                  >
                     <Icon name={tokenVisible ? "visibility_off" : "visibility"} />
                   </Button>
-                  <Button outline onClick={copyToken} className="flex items-center gap-1">
+                  <Button variant="secondary" onClick={copyToken} className="flex items-center gap-1">
                     <Icon name="content_copy" />
                     Copy
                   </Button>

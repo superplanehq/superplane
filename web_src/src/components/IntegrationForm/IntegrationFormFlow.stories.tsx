@@ -1,14 +1,14 @@
-import React, { useState, useRef } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
+import { useRef, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
+import { createMockIntegrations, createMockSecrets, defaultProps } from "../../../test/__mocks__/secrets";
+import { Icon } from "../Icon";
+import { Button } from "../ui/button";
+import { ApiTokenForm } from "./ApiTokenForm";
 import { GitHubIntegrationForm } from "./GitHubIntegrationForm";
 import { SemaphoreIntegrationForm } from "./SemaphoreIntegrationForm";
-import { ApiTokenForm } from "./ApiTokenForm";
+import type { FormErrors, IntegrationData } from "./types";
 import { useIntegrationForm } from "./useIntegrationForm";
-import { Button } from "../Button/button";
-import { Icon } from "../Icon";
-import type { IntegrationData, FormErrors } from "./types";
-import { createMockSecrets, createMockIntegrations, defaultProps } from "../../../test/__mocks__/secrets";
 
 const meta: Meta = {
   title: "Components/IntegrationForm/Complete Flow",
