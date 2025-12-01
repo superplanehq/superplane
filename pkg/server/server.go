@@ -232,6 +232,7 @@ func setupOtelMetrics() {
 func Start() {
 	configureLogging()
 	setupOtelMetrics()
+	telemetry.InitSentry()
 
 	encryptionKey := os.Getenv("ENCRYPTION_KEY")
 	if encryptionKey == "" {
