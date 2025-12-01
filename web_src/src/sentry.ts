@@ -18,6 +18,22 @@ if (dsn) {
   Sentry.init({
     dsn,
     environment,
+    integrations: [
+      Sentry.captureConsoleIntegration({
+        levels: ["warn", "error"],
+      }),
+      Sentry.browserApiErrorsIntegration({
+        setTimeout: true,
+        setInterval: true,
+        requestAnimationFrame: true,
+        XMLHttpRequest: true,
+        eventTarget: true,
+      }),
+      Sentry.globalHandlersIntegration({
+        onerror: true,
+        onunhandledrejection: true,
+      }),
+    ],
   });
 }
 
