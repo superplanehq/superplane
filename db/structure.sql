@@ -1003,7 +1003,7 @@ ALTER TABLE ONLY public.workflow_node_requests
 --
 
 ALTER TABLE ONLY public.workflow_nodes
-    ADD CONSTRAINT workflow_nodes_webhook_id_fkey FOREIGN KEY (webhook_id) REFERENCES public.webhooks(id);
+    ADD CONSTRAINT workflow_nodes_webhook_id_fkey FOREIGN KEY (webhook_id) REFERENCES public.webhooks(id) ON DELETE SET NULL;
 
 
 --
@@ -1046,7 +1046,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251202130328	f
+20251202195612	f
 \.
 
 
