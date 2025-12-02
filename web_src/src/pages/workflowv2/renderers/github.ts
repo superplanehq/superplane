@@ -12,8 +12,14 @@ interface GitHubMetadata {
   };
 }
 
+interface RefFilter {
+  type: string;
+  value: string;
+}
+
 interface GithubConfiguration {
   eventType: string;
+  refs?: RefFilter[];
 }
 
 interface GitHubEventData {
@@ -98,6 +104,18 @@ export const githubTriggerRenderer: TriggerRenderer = {
       metadataItems.push({
         icon: "funnel",
         label: configuration.eventType,
+      });
+    }
+
+    // Add ref filters if they exist
+    if (configuration?.refs && configuration.refs.length > 0) {
+      const branchLabels = configuration.refs.map((ref) => {
+        return ref.value;
+      });
+
+      metadataItems.push({
+        icon: "git-branch",
+        label: branchLabels.join(", "),
       });
     }
 

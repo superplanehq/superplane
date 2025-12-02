@@ -20,6 +20,21 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   validationErrors,
   fieldPath = field.name || "",
 }) => {
+  const hasSetDefault = React.useRef(false);
+
+  // Apply default value if value is undefined and a default is provided
+  React.useEffect(() => {
+    if (!hasSetDefault.current && (value === undefined || value === null) && field.defaultValue !== undefined) {
+      const defaultVal = Array.isArray(field.defaultValue)
+        ? field.defaultValue
+        : field.defaultValue
+          ? JSON.parse(field.defaultValue as string)
+          : [];
+      onChange(defaultVal);
+      hasSetDefault.current = true;
+    }
+  }, [value, field.defaultValue, onChange]);
+
   const items = Array.isArray(value) ? value : [];
   const listOptions = field.typeOptions?.list;
   const itemDefinition = listOptions?.itemDefinition;

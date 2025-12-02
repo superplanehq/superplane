@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -16,6 +17,8 @@ import (
 )
 
 const MaxEventSize = 64 * 1024
+const FilterTypeExactMatch = "exact-match"
+const FilterTypeRegex = "regex"
 
 func init() {
 	registry.RegisterTrigger("github", &GitHub{})
@@ -33,10 +36,16 @@ type Repository struct {
 	URL  string `json:"url"`
 }
 
+type RefFilter struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
 type Configuration struct {
-	Integration string `json:"integration"`
-	Repository  string `json:"repository"`
-	EventType   string `json:"eventType"`
+	Integration string       `json:"integration"`
+	Repository  string       `json:"repository"`
+	EventType   string       `json:"eventType"`
+	Refs        []*RefFilter `json:"refs,omitempty"`
 }
 
 func (g *GitHub) Name() string {
@@ -115,6 +124,59 @@ func (g *GitHub) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:     "refs",
+			Label:    "Refs",
+			Type:     configuration.FieldTypeList,
+			Required: false,
+			Default: []map[string]any{
+				{
+					"type":  FilterTypeExactMatch,
+					"value": "refs/heads/main",
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "eventType",
+					Values: []string{"push"},
+				},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:     "type",
+								Label:    "Match Type",
+								Type:     configuration.FieldTypeSelect,
+								Required: true,
+								TypeOptions: &configuration.TypeOptions{
+									Select: &configuration.SelectTypeOptions{
+										Options: []configuration.FieldOption{
+											{
+												Value: FilterTypeExactMatch,
+												Label: "Exact Match",
+											},
+											{
+												Value: FilterTypeRegex,
+												Label: "Regex",
+											},
+										},
+									},
+								},
+							},
+							{
+								Name:     "value",
+								Label:    "Ref Pattern",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -144,6 +206,13 @@ func (g *GitHub) Setup(ctx triggers.TriggerContext) error {
 
 	if config.Repository == "" {
 		return fmt.Errorf("repository is required")
+	}
+
+	//
+	// Validate ref filters
+	//
+	if err := validateRefFilters(config.Refs); err != nil {
+		return err
 	}
 
 	integration, err := ctx.IntegrationContext.GetIntegration(config.Integration)
@@ -208,7 +277,7 @@ func (g *GitHub) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) 
 	}
 
 	//
-	// If event is not in the list of chosen events, ignore it.
+	// If event is not the chosen one, ignore it.
 	//
 	if config.EventType != eventType {
 		return http.StatusOK, nil
@@ -234,10 +303,40 @@ func (g *GitHub) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) 
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
+	switch eventType {
+	case "push":
+		return g.handlePushEvent(ctx, data, config)
+
+	case "pull_request":
+		return g.handlePullRequestEvent(ctx, data)
+
+	default:
+		return http.StatusOK, nil
+	}
+}
+
+func (g *GitHub) handlePushEvent(ctx triggers.WebhookRequestContext, data map[string]any, config Configuration) (int, error) {
 	//
-	// If the event is a push event for branch deletion, ignore it.
+	// If the event is a push event for ref deletion, ignore it.
 	//
-	if isBranchDeletionEvent(eventType, data) {
+	if isRefDeletionEvent(data) {
+		return http.StatusOK, nil
+	}
+
+	//
+	// CHeck if the branch matches the filter.
+	//
+	branch := getRef(data)
+	if branch == "" {
+		return http.StatusBadRequest, fmt.Errorf("failed to extract branch from push event")
+	}
+
+	allowed, err := isRefAllowed(branch, config.Refs)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error checking branch filter: %v", err)
+	}
+
+	if !allowed {
 		return http.StatusOK, nil
 	}
 
@@ -249,11 +348,16 @@ func (g *GitHub) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) 
 	return http.StatusOK, nil
 }
 
-func isBranchDeletionEvent(eventType string, data map[string]any) bool {
-	if eventType != "push" {
-		return false
+func (g *GitHub) handlePullRequestEvent(ctx triggers.WebhookRequestContext, data map[string]any) (int, error) {
+	err := ctx.EventContext.Emit(data)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}
 
+	return http.StatusOK, nil
+}
+
+func isRefDeletionEvent(data map[string]any) bool {
 	v, ok := data["deleted"]
 	if !ok {
 		return false
@@ -265,4 +369,58 @@ func isBranchDeletionEvent(eventType string, data map[string]any) bool {
 	}
 
 	return deleted
+}
+
+func getRef(data map[string]any) string {
+	refValue, ok := data["ref"]
+	if !ok {
+		return ""
+	}
+
+	ref, ok := refValue.(string)
+	if !ok {
+		return ""
+	}
+
+	return ref
+}
+
+func isRefAllowed(ref string, filters []*RefFilter) (bool, error) {
+	//
+	// If no filters configured, allow all refs
+	//
+	if len(filters) == 0 {
+		return true, nil
+	}
+
+	for _, filter := range filters {
+		switch filter.Type {
+		case FilterTypeExactMatch:
+			if ref == filter.Value {
+				return true, nil
+			}
+
+		case FilterTypeRegex:
+			matched, err := regexp.MatchString(filter.Value, ref)
+			if err != nil {
+				return false, fmt.Errorf("invalid regex pattern '%s': %w", filter.Value, err)
+			}
+			if matched {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func validateRefFilters(filters []*RefFilter) error {
+	for _, filter := range filters {
+		if filter.Type == FilterTypeRegex {
+			if _, err := regexp.Compile(filter.Value); err != nil {
+				return fmt.Errorf("invalid regex pattern '%s': %w", filter.Value, err)
+			}
+		}
+	}
+	return nil
 }
