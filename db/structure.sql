@@ -313,8 +313,8 @@ CREATE TABLE public.workflow_node_executions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
     node_id character varying(128) NOT NULL,
-    root_event_id uuid NOT NULL,
-    event_id uuid NOT NULL,
+    root_event_id uuid,
+    event_id uuid,
     previous_execution_id uuid,
     parent_execution_id uuid,
     state character varying(32) NOT NULL,
@@ -336,8 +336,8 @@ CREATE TABLE public.workflow_node_queue_items (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
     node_id character varying(128) NOT NULL,
-    root_event_id uuid NOT NULL,
-    event_id uuid NOT NULL,
+    root_event_id uuid,
+    event_id uuid,
     created_at timestamp without time zone NOT NULL
 );
 
@@ -895,6 +895,14 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_events workflow_events_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_events
+    ADD CONSTRAINT workflow_events_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_events workflow_events_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -907,23 +915,7 @@ ALTER TABLE ONLY public.workflow_events
 --
 
 ALTER TABLE ONLY public.workflow_node_execution_kvs
-    ADD CONSTRAINT workflow_node_execution_kvs_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id);
-
-
---
--- Name: workflow_node_requests workflow_node_execution_requests_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_node_requests
-    ADD CONSTRAINT workflow_node_execution_requests_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id);
-
-
---
--- Name: workflow_node_requests workflow_node_execution_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_node_requests
-    ADD CONSTRAINT workflow_node_execution_requests_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
+    ADD CONSTRAINT workflow_node_execution_kvs_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
 
 
 --
@@ -931,7 +923,7 @@ ALTER TABLE ONLY public.workflow_node_requests
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id);
+    ADD CONSTRAINT workflow_node_executions_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE SET NULL;
 
 
 --
@@ -939,7 +931,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_parent_execution_id_fkey FOREIGN KEY (parent_execution_id) REFERENCES public.workflow_node_executions(id);
+    ADD CONSTRAINT workflow_node_executions_parent_execution_id_fkey FOREIGN KEY (parent_execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
 
 
 --
@@ -947,7 +939,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_previous_execution_id_fkey FOREIGN KEY (previous_execution_id) REFERENCES public.workflow_node_executions(id);
+    ADD CONSTRAINT workflow_node_executions_previous_execution_id_fkey FOREIGN KEY (previous_execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE SET NULL;
 
 
 --
@@ -955,7 +947,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id);
+    ADD CONSTRAINT workflow_node_executions_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE SET NULL;
 
 
 --
@@ -971,7 +963,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
-    ADD CONSTRAINT workflow_node_queue_items_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id);
+    ADD CONSTRAINT workflow_node_queue_items_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE SET NULL;
 
 
 --
@@ -979,7 +971,7 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
-    ADD CONSTRAINT workflow_node_queue_items_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id);
+    ADD CONSTRAINT workflow_node_queue_items_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE SET NULL;
 
 
 --
@@ -988,6 +980,22 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 ALTER TABLE ONLY public.workflow_node_queue_items
     ADD CONSTRAINT workflow_node_queue_items_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
+
+
+--
+-- Name: workflow_node_requests workflow_node_requests_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_requests
+    ADD CONSTRAINT workflow_node_requests_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_requests workflow_node_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_requests
+    ADD CONSTRAINT workflow_node_requests_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
 
 
 --
@@ -1038,7 +1046,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251201130001	f
+20251202130328	f
 \.
 
 
