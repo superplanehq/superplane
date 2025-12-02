@@ -897,6 +897,38 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 
 
 --
+-- Name: workflow_events fk_workflow_events_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_events
+    ADD CONSTRAINT fk_workflow_events_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
+
+
+--
+-- Name: workflow_node_executions fk_workflow_node_executions_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_executions
+    ADD CONSTRAINT fk_workflow_node_executions_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
+
+
+--
+-- Name: workflow_node_queue_items fk_workflow_node_queue_items_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_queue_items
+    ADD CONSTRAINT fk_workflow_node_queue_items_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
+
+
+--
+-- Name: workflow_node_requests fk_workflow_node_requests_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_requests
+    ADD CONSTRAINT fk_workflow_node_requests_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
+
+
+--
 -- Name: workflow_nodes fk_workflow_nodes_parent; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1088,7 +1120,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251202205848	f
+20251202210000	f
 \.
 
 
