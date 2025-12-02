@@ -122,7 +122,7 @@ func Test__HandleWebhook(t *testing.T) {
 		config := Configuration{
 			EventType: "push",
 			Refs: []*RefFilter{
-				{Type: FilterTypeExactMatch, Value: "main"},
+				{Type: FilterTypeExactMatch, Value: "refs/heads/main"},
 			},
 		}
 		ctx := createWebhookRequest(body, "push", "test-secret", config)
@@ -139,7 +139,7 @@ func Test__HandleWebhook(t *testing.T) {
 		config := Configuration{
 			EventType: "push",
 			Refs: []*RefFilter{
-				{Type: FilterTypeExactMatch, Value: "main"},
+				{Type: FilterTypeExactMatch, Value: "refs/heads/main"},
 			},
 		}
 		ctx := createWebhookRequest(body, "push", "test-secret", config)
@@ -156,7 +156,7 @@ func Test__HandleWebhook(t *testing.T) {
 		config := Configuration{
 			EventType: "push",
 			Refs: []*RefFilter{
-				{Type: FilterTypeRegex, Value: "^feature/.*"},
+				{Type: FilterTypeRegex, Value: "^refs/heads/feature/.*"},
 			},
 		}
 		ctx := createWebhookRequest(body, "push", "test-secret", config)
@@ -173,7 +173,7 @@ func Test__HandleWebhook(t *testing.T) {
 		config := Configuration{
 			EventType: "push",
 			Refs: []*RefFilter{
-				{Type: FilterTypeRegex, Value: "^feature/.*"},
+				{Type: FilterTypeRegex, Value: "^refs/heads/feature/.*"},
 			},
 		}
 		ctx := createWebhookRequest(body, "push", "test-secret", config)
@@ -190,9 +190,9 @@ func Test__HandleWebhook(t *testing.T) {
 		config := Configuration{
 			EventType: "push",
 			Refs: []*RefFilter{
-				{Type: FilterTypeExactMatch, Value: "main"},
-				{Type: FilterTypeExactMatch, Value: "develop"},
-				{Type: FilterTypeRegex, Value: "^feature/.*"},
+				{Type: FilterTypeExactMatch, Value: "refs/heads/main"},
+				{Type: FilterTypeExactMatch, Value: "refs/heads/develop"},
+				{Type: FilterTypeRegex, Value: "^refs/heads/feature/.*"},
 			},
 		}
 		ctx := createWebhookRequest(body, "push", "test-secret", config)
@@ -278,10 +278,10 @@ func Test__Setup(t *testing.T) {
 				"integration": uuid.NewString(),
 				"repository":  "test-repo-id",
 				"eventType":   "push",
-				"branches": []map[string]any{
+				"refs": []map[string]any{
 					{
 						"type":  "exact-match",
-						"value": "main",
+						"value": "refs/heads/main",
 					},
 				},
 			},
@@ -300,10 +300,10 @@ func Test__Setup(t *testing.T) {
 				"integration": uuid.NewString(),
 				"repository":  "test-repo-id",
 				"eventType":   "push",
-				"branches": []map[string]any{
+				"refs": []map[string]any{
 					{
 						"type":  "regex",
-						"value": "^feature/.*",
+						"value": "^refs/heads/feature/.*",
 					},
 				},
 			},
@@ -322,7 +322,7 @@ func Test__Setup(t *testing.T) {
 				"integration": uuid.NewString(),
 				"repository":  "test-repo-id",
 				"eventType":   "push",
-				"branches": []map[string]any{
+				"refs": []map[string]any{
 					{
 						"type":  "regex",
 						"value": "[invalid(",
