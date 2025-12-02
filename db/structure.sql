@@ -775,10 +775,38 @@ CREATE INDEX idx_workflow_node_execution_kvs_workflow_node_key_value ON public.w
 
 
 --
+-- Name: idx_workflow_node_executions_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_event_id ON public.workflow_node_executions USING btree (event_id);
+
+
+--
+-- Name: idx_workflow_node_executions_parent_execution_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_parent_execution_id ON public.workflow_node_executions USING btree (parent_execution_id);
+
+
+--
 -- Name: idx_workflow_node_executions_parent_state; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_workflow_node_executions_parent_state ON public.workflow_node_executions USING btree (parent_execution_id, state);
+
+
+--
+-- Name: idx_workflow_node_executions_previous_execution_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_previous_execution_id ON public.workflow_node_executions USING btree (previous_execution_id);
+
+
+--
+-- Name: idx_workflow_node_executions_root_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_root_event_id ON public.workflow_node_executions USING btree (root_event_id);
 
 
 --
@@ -793,6 +821,20 @@ CREATE INDEX idx_workflow_node_executions_state_created_at ON public.workflow_no
 --
 
 CREATE INDEX idx_workflow_node_executions_workflow_node_id ON public.workflow_node_executions USING btree (workflow_id, node_id);
+
+
+--
+-- Name: idx_workflow_node_queue_items_root_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_queue_items_root_event_id ON public.workflow_node_queue_items USING btree (root_event_id);
+
+
+--
+-- Name: idx_workflow_node_requests_execution_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_requests_execution_id ON public.workflow_node_requests USING btree (execution_id);
 
 
 --
@@ -1046,7 +1088,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251202195612	f
+20251202205848	f
 \.
 
 
