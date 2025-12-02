@@ -2,8 +2,10 @@ package workers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
@@ -82,34 +84,50 @@ func (w *WorkflowCleanupWorker) processWorkflow(tx *gorm.DB, workflow models.Wor
 		return nil
 	}
 
-	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowNodeRequest{}).Error; err != nil {
-		return err
+	var nodes []models.WorkflowNode
+	err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Find(&nodes).Error
+	if err != nil {
+		return fmt.Errorf("failed to find workflow nodes: %w", err)
 	}
 
-	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowNodeExecutionKV{}).Error; err != nil {
-		return err
-	}
+	for _, node := range nodes {
+		if err := w.deleteNodeResources(tx, workflow.ID, node.NodeID); err != nil {
+			return fmt.Errorf("failed to delete resources for node %s: %w", node.NodeID, err)
+		}
 
-	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowNodeExecution{}).Error; err != nil {
-		return err
-	}
-
-	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
-		return err
-	}
-
-	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowEvent{}).Error; err != nil {
-		return err
-	}
-
-	if err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Delete(&models.WorkflowNode{}).Error; err != nil {
-		return err
+		if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflow.ID, node.NodeID).Delete(&models.WorkflowNode{}).Error; err != nil {
+			return fmt.Errorf("failed to delete workflow node %s: %w", node.NodeID, err)
+		}
 	}
 
 	if err := tx.Unscoped().Delete(&workflow).Error; err != nil {
-		return err
+		return fmt.Errorf("failed to delete workflow: %w", err)
 	}
 
-	w.logger.Infof("Successfully cleaned up workflow %s", workflow.ID)
+	w.logger.Infof("Successfully cleaned up workflow %s with %d nodes", workflow.ID, len(nodes))
+	return nil
+}
+
+func (w *WorkflowCleanupWorker) deleteNodeResources(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {
+	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Delete(&models.WorkflowNodeRequest{}).Error; err != nil {
+		return fmt.Errorf("failed to delete node requests: %w", err)
+	}
+
+	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Delete(&models.WorkflowNodeExecutionKV{}).Error; err != nil {
+		return fmt.Errorf("failed to delete node execution KVs: %w", err)
+	}
+
+	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Delete(&models.WorkflowNodeExecution{}).Error; err != nil {
+		return fmt.Errorf("failed to delete node executions: %w", err)
+	}
+
+	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
+		return fmt.Errorf("failed to delete node queue items: %w", err)
+	}
+
+	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Delete(&models.WorkflowEvent{}).Error; err != nil {
+		return fmt.Errorf("failed to delete workflow events: %w", err)
+	}
+
 	return nil
 }

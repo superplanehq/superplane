@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { showErrorToast } from "../../utils/toast";
-import { Button } from "../Button/button";
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../Dialog/dialog";
 import { Field, Label } from "../Fieldset/fieldset";
-import { Input } from "../Input/input";
 import { Icon } from "../Icon";
+import { Input } from "../Input/input";
 import { Textarea } from "../Textarea/textarea";
+import { Button } from "../ui/button";
 
 interface CreateCanvasModalProps {
   isOpen: boolean;
@@ -126,7 +126,6 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
 
       <DialogActions>
         <Button
-          color="blue"
           onClick={handleSubmit}
           disabled={!name.trim() || isLoading || !!nameError}
           className="flex items-center gap-2"

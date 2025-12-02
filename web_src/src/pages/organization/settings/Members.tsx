@@ -1,30 +1,30 @@
-import { useState, useMemo } from "react";
-import { Heading } from "../../../components/Heading/heading";
-import { Icon } from "../../../components/Icon";
+import { useMemo, useState } from "react";
 import { Avatar } from "../../../components/Avatar/avatar";
-import { Input, InputGroup } from "../../../components/Input/input";
-import { Button } from "../../../components/Button/button";
-import { Textarea } from "../../../components/Textarea/textarea";
-import { Text } from "../../../components/Text/text";
 import { Badge } from "../../../components/Badge/badge";
 import {
   Dropdown,
   DropdownButton,
-  DropdownMenu,
+  DropdownDescription,
   DropdownItem,
   DropdownLabel,
-  DropdownDescription,
+  DropdownMenu,
 } from "../../../components/Dropdown/dropdown";
-import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "../../../components/Table/table";
+import { Heading } from "../../../components/Heading/heading";
+import { Icon } from "../../../components/Icon";
+import { Input, InputGroup } from "../../../components/Input/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
+import { Text } from "../../../components/Text/text";
+import { Textarea } from "../../../components/Textarea/textarea";
 import {
-  useOrganizationUsers,
-  useOrganizationRoles,
   useAssignRole,
-  useRemoveOrganizationSubject,
-  useOrganizationInvitations,
   useCreateInvitation,
+  useOrganizationInvitations,
+  useOrganizationRoles,
+  useOrganizationUsers,
   useRemoveInvitation,
+  useRemoveOrganizationSubject,
 } from "../../../hooks/useOrganizationData";
+import { Button } from "../../../ui/button";
 
 interface Member {
   id: string;
@@ -346,7 +346,6 @@ export function Members({ organizationId }: MembersProps) {
               onKeyDown={handleKeyDown}
             />
             <Button
-              color="blue"
               className="flex items-center text-sm gap-2"
               onClick={handleEmailsSubmit}
               disabled={!emailsInput.trim() || isInviting}
@@ -483,7 +482,7 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell>
                       {member.type === "member" ? (
                         <Dropdown>
-                          <DropdownButton outline className="flex items-center gap-2 text-sm">
+                          <DropdownButton className="flex items-center gap-2 text-sm">
                             {member.role}
                             <Icon name="keyboard_arrow_down" />
                           </DropdownButton>
@@ -515,7 +514,7 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell>
                       <div className="flex justify-end">
                         <Dropdown>
-                          <DropdownButton plain className="flex items-center gap-2 text-sm">
+                          <DropdownButton className="flex items-center gap-2 text-sm">
                             <Icon name="more_vert" size="sm" />
                           </DropdownButton>
                           <DropdownMenu>

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "../../components/Button/button";
 import { Text } from "../../components/Text/text";
+import { Button } from "../../ui/button";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
@@ -81,11 +81,18 @@ const OrganizationCreate: React.FC = () => {
             />
           </div>
 
-          <div className="flex space-x-4 mt-12">
-            <Button type="button" outline onClick={() => navigate("/")} className="flex-1" disabled={loading}>
+          <div className="flex space-x-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => navigate("/")}
+              className="flex-1"
+              disabled={loading}
+            >
               Cancel
             </Button>
-            <Button type="submit" color="blue" className="flex-1" disabled={loading || !name.trim()}>
+
+            <Button type="submit" className="flex-1" disabled={loading || !name.trim()}>
               {loading ? "Creating..." : "Create Organization"}
             </Button>
           </div>

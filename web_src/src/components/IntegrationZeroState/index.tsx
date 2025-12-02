@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "../Button/button";
+import { Button } from "../ui/button";
 import { IntegrationModal } from "./IntegrationModal";
 
 interface IntegrationZeroStateProps {
@@ -33,9 +33,7 @@ const IntegrationZeroState = ({
         <div className="text-gray-500 dark:text-zinc-400 mb-3 font-[400] max-w-[20rem] mx-auto">
           Looks like you haven't connected any {label} yet
         </div>
-        <Button color="blue" onClick={() => setShowModal(true)}>
-          Create integration
-        </Button>
+        <Button onClick={() => setShowModal(true)}>Create integration</Button>
       </div>
 
       <IntegrationModal

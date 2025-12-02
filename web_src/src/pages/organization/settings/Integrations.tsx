@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { Button } from "../../../components/Button/button";
-import { Icon } from "../../../components/Icon";
-import { useIntegrations } from "../../../hooks/useIntegrations";
-import { IntegrationModal } from "../../../components/IntegrationZeroState/IntegrationModal";
-import type { IntegrationsIntegration } from "../../../api-client/types.gen";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { useState } from "react";
+import type { IntegrationsIntegration } from "../../../api-client/types.gen";
+import { Icon } from "../../../components/Icon";
+import { IntegrationModal } from "../../../components/IntegrationZeroState/IntegrationModal";
+import { useIntegrations } from "../../../hooks/useIntegrations";
+import { Button } from "../../../ui/button";
 
 interface IntegrationsProps {
   organizationId: string;
@@ -84,7 +84,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
               <p className="text-zinc-600 dark:text-zinc-400 mb-6">
                 Connect external services to streamline your workflow
               </p>
-              <Button color="blue" onClick={handleAddIntegrationClick} className="flex items-center gap-2">
+              <Button onClick={handleAddIntegrationClick} className="flex items-center gap-2">
                 <Icon name="add" size="sm" />
                 Add Integration
               </Button>
@@ -93,7 +93,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium">Organization Integrations</h2>
-                <Button color="blue" onClick={handleAddIntegrationClick} className="flex items-center gap-2">
+                <Button onClick={handleAddIntegrationClick} className="flex items-center gap-2">
                   <Icon name="add" size="sm" />
                   Add Integration
                 </Button>
@@ -124,6 +124,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                           {integration.spec?.type}
                         </span>
                         <button
+                          data-testid={`edit-integration-${integration.metadata?.name || ""}`}
                           onClick={() => handleEditIntegration(integration)}
                           className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded"
                           title="Edit integration"

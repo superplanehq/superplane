@@ -2,7 +2,6 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { Box, GitBranch, LayoutGrid, List, MoreVertical, Plus, Search, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button } from "../../components/Button/button";
 import { CreateCanvasModal } from "../../components/CreateCanvasModal";
 import { CreateCustomComponentModal } from "../../components/CreateCustomComponentModal";
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../../components/Dialog/dialog";
@@ -16,6 +15,7 @@ import { cn, resolveIcon } from "../../lib/utils";
 import { getColorClass } from "../../utils/colors";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 
+import { Button } from "../../ui/button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
 import { useCreateCustomComponentModalState } from "./useCreateCustomComponentModalState";
 
@@ -223,16 +223,18 @@ interface ViewModeToggleProps {
 
 function ViewModeToggle({ viewMode, setViewMode }: ViewModeToggleProps) {
   return (
-    <div className="flex items-center">
+    <div className="flex items-center gap-1">
       <Button
-        {...(viewMode === "grid" ? { color: "light" as const } : { plain: true })}
+        variant={viewMode === "grid" ? "default" : "secondary"}
         onClick={() => setViewMode("grid")}
         title="Grid view"
+        size="sm"
       >
         <LayoutGrid size={18} />
       </Button>
       <Button
-        {...(viewMode === "list" ? { color: "light" as const } : { plain: true })}
+        variant={viewMode === "list" ? "default" : "secondary"}
+        size="sm"
         onClick={() => setViewMode("list")}
         title="List view"
       >
@@ -297,7 +299,7 @@ function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
         <Text className="text-zinc-600 dark:text-zinc-400">{description}</Text>
       </div>
 
-      <Button color="blue" className="flex items-center bg-blue-700 text-white hover:bg-blue-600" onClick={onNewClick}>
+      <Button className="flex items-center bg-blue-700 text-white hover:bg-blue-600" onClick={onNewClick}>
         <Plus size={20} />
         {buttonText}
       </Button>
@@ -545,7 +547,6 @@ function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuPr
       <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
         <Dropdown>
           <DropdownButton
-            plain
             className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
             aria-label="Canvas actions"
             onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}
@@ -576,11 +577,11 @@ function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuPr
           </Text>
         </DialogBody>
         <DialogActions>
-          <Button plain onClick={closeDialog}>
+          <Button variant="secondary" onClick={closeDialog}>
             Cancel
           </Button>
           <Button
-            color="red"
+            variant="destructive"
             onClick={handleDelete}
             disabled={deleteWorkflowMutation.isPending}
             className="flex items-center gap-2"
@@ -628,7 +629,6 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
       <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
         <Dropdown>
           <DropdownButton
-            plain
             className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
             aria-label="Component actions"
             onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}
@@ -659,11 +659,11 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
           </Text>
         </DialogBody>
         <DialogActions>
-          <Button plain onClick={closeDialog}>
+          <Button variant="secondary" onClick={closeDialog}>
             Cancel
           </Button>
           <Button
-            color="red"
+            variant="destructive"
             onClick={handleDelete}
             disabled={deleteBlueprintMutation.isPending}
             className="flex items-center gap-2"
