@@ -19,6 +19,12 @@ ALTER TABLE workflow_node_execution_kvs DROP CONSTRAINT fk_wnek_workflow_node;
 ALTER TABLE workflow_node_requests DROP CONSTRAINT workflow_node_execution_requests_execution_id_fkey;
 ALTER TABLE workflow_node_requests DROP CONSTRAINT workflow_node_execution_requests_workflow_id_fkey;
 
+-- Make columns nullable that need ON DELETE SET NULL
+ALTER TABLE workflow_node_queue_items ALTER COLUMN event_id DROP NOT NULL;
+ALTER TABLE workflow_node_queue_items ALTER COLUMN root_event_id DROP NOT NULL;
+ALTER TABLE workflow_node_executions ALTER COLUMN root_event_id DROP NOT NULL;
+ALTER TABLE workflow_node_executions ALTER COLUMN event_id DROP NOT NULL;
+
 -- Re-create constraints with proper cascade operations
 
 -- queue_items
