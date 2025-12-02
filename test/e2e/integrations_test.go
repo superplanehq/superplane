@@ -57,6 +57,27 @@ func TestOrganizationIntegrations(t *testing.T) {
 		steps.assertGithubVisibleInTheList(updatedIntegrationName, updatedOwner)
 		steps.assertGithubPersisted(updatedIntegrationName, updatedOwner)
 	})
+
+	t.Run("editing an existing Semaphore integration", func(t *testing.T) {
+		steps.start()
+		steps.visitIntegrationsSettingsPage()
+
+		const originalOrgURL = "https://e2e-semaphore-org.semaphoreci.com"
+		const originalToken = "test-semaphore-token"
+		const originalIntegrationName = "e2e-semaphore-org-organization"
+
+		steps.createSemaphoreIntegration(originalOrgURL, originalToken)
+		steps.assertSemaphoreVisibleInTheList(originalIntegrationName, originalOrgURL)
+		steps.assertSemaphorePersisted(originalIntegrationName, originalOrgURL)
+
+		const updatedOrgURL = "https://e2e-semaphore-org-updated.semaphoreci.com"
+		const updatedToken = "test-semaphore-token-updated"
+		const updatedIntegrationName = "e2e-semaphore-org-updated-organization"
+
+		steps.editSemaphoreIntegration(originalIntegrationName, updatedOrgURL, updatedToken)
+		steps.assertSemaphoreVisibleInTheList(updatedIntegrationName, updatedOrgURL)
+		steps.assertSemaphorePersisted(updatedIntegrationName, updatedOrgURL)
+	})
 }
 
 type OrganizationIntegrationsSteps struct {
@@ -76,8 +97,8 @@ func (s *OrganizationIntegrationsSteps) visitIntegrationsSettingsPage() {
 }
 
 func (s *OrganizationIntegrationsSteps) createGitHubIntegration(ownerSlug, token string) {
-	ownerInput := q.Locator(`input[placeholder="Johndoe"]`)
-	tokenInput := q.Locator(`input[placeholder="Enter your API token"]`)
+	ownerInput := q.Locator(`input[data-testid="github-owner-input"]`)
+	tokenInput := q.Locator(`input[data-testid="integration-api-token-input"]`)
 
 	s.session.Click(q.Text("Add Integration"))
 	s.session.AssertText("Select Integration Type")
@@ -108,8 +129,8 @@ func (s *OrganizationIntegrationsSteps) assertGithubVisibleInTheList(integration
 }
 
 func (s *OrganizationIntegrationsSteps) createSemaphoreIntegration(orgURL, token string) {
-	orgURLInput := q.Locator(`input[placeholder="https://your-org.semaphoreci.com"]`)
-	tokenInput := q.Locator(`input[placeholder="Enter your API token"]`)
+	orgURLInput := q.Locator(`input[data-testid="semaphore-org-url-input"]`)
+	tokenInput := q.Locator(`input[data-testid="integration-api-token-input"]`)
 
 	s.session.Click(q.Text("Add Integration"))
 	s.session.AssertText("Select Integration Type")
@@ -122,10 +143,23 @@ func (s *OrganizationIntegrationsSteps) createSemaphoreIntegration(orgURL, token
 	s.session.Click(q.TestID("create-integration-button"))
 }
 
+func (s *OrganizationIntegrationsSteps) editSemaphoreIntegration(currentIntegrationName, newOrgURL, newToken string) {
+	editButton := q.TestID("edit-integration-" + currentIntegrationName)
+	orgURLInput := q.Locator(`input[data-testid="semaphore-org-url-input"]`)
+	tokenInput := q.Locator(`input[data-testid="integration-api-token-input"]`)
+
+	s.session.Click(editButton)
+
+	s.session.FillIn(orgURLInput, newOrgURL)
+	s.session.FillIn(tokenInput, newToken)
+
+	s.session.Click(q.TestID("create-integration-button"))
+}
+
 func (s *OrganizationIntegrationsSteps) editGithubIntegration(currentIntegrationName, newOwnerSlug, newToken string) {
 	editButton := q.TestID("edit-integration-" + currentIntegrationName)
-	ownerInput := q.Locator(`input[placeholder="Johndoe"]`)
-	tokenInput := q.Locator(`input[placeholder="Enter new API token value"]`)
+	ownerInput := q.Locator(`input[data-testid="github-owner-input"]`)
+	tokenInput := q.Locator(`input[data-testid="integration-api-token-input"]`)
 
 	s.session.Click(editButton)
 

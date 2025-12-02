@@ -22,6 +22,7 @@ export function ApiTokenForm({
       </div>
       <Field>
         <Input
+          data-testid="integration-api-token-input"
           type="password"
           placeholder={isEditMode ? "Enter new API token value" : "Enter your API token"}
           value={secretValue}
