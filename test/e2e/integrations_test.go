@@ -54,25 +54,18 @@ func (s *OrganizationIntegrationsSteps) visitIntegrationsSettingsPage() {
 }
 
 func (s *OrganizationIntegrationsSteps) createGitHubIntegration(ownerSlug, token string) {
-	addIntegrationButton := q.Text("Add Integration")
-	githubTypeButton := q.Locator(`button:has-text("GitHub")`)
 	ownerInput := q.Locator(`input[placeholder="Johndoe"]`)
 	tokenInput := q.Locator(`input[placeholder="Enter your API token"]`)
-	createButton := q.Locator(`button:has-text("Create")`)
 
-	s.session.Click(addIntegrationButton)
+	s.session.Click(q.Text("Add Integration"))
 	s.session.AssertText("Select Integration Type")
 
-	s.session.Click(githubTypeButton)
+	s.session.Click(q.Locator(`button:has-text("GitHub")`))
 
 	s.session.FillIn(ownerInput, ownerSlug)
 	s.session.FillIn(tokenInput, token)
-	s.session.Sleep(300)
 
-	s.session.Click(createButton) // one click to unblur the input and validate
-	s.session.Sleep(300)
-	s.session.Click(createButton) // second click to actually submit
-	s.session.Sleep(300)
+	s.session.Click(q.TestID("create-integration-button"))
 }
 
 func (s *OrganizationIntegrationsSteps) assertGithubPersisted(integrationName, ownerSlug string) {
@@ -93,25 +86,18 @@ func (s *OrganizationIntegrationsSteps) assertGithubVisibleInTheList(integration
 }
 
 func (s *OrganizationIntegrationsSteps) createSemaphoreIntegration(orgURL, token string) {
-	addIntegrationButton := q.Text("Add Integration")
-	semaphoreTypeButton := q.Locator(`button:has-text("Semaphore")`)
 	orgURLInput := q.Locator(`input[placeholder="https://your-org.semaphoreci.com"]`)
 	tokenInput := q.Locator(`input[placeholder="Enter your API token"]`)
-	createButton := q.Locator(`button:has-text("Create")`)
 
-	s.session.Click(addIntegrationButton)
+	s.session.Click(q.Text("Add Integration"))
 	s.session.AssertText("Select Integration Type")
 
-	s.session.Click(semaphoreTypeButton)
+	s.session.Click(q.Locator(`button:has-text("Semaphore")`))
 
 	s.session.FillIn(orgURLInput, orgURL)
 	s.session.FillIn(tokenInput, token)
-	s.session.Sleep(300)
 
-	s.session.Click(createButton) // one click to unblur the input and validate
-	s.session.Sleep(300)
-	s.session.Click(createButton) // second click to actually submit
-	s.session.Sleep(300)
+	s.session.Click(q.TestID("create-integration-button"))
 }
 
 func (s *OrganizationIntegrationsSteps) assertSemaphorePersisted(integrationName, orgURL string) {
