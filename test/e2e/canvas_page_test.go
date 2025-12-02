@@ -163,24 +163,8 @@ func (s *CanvasPageSteps) assertNodeDeletedInDB(nodeName string) {
 }
 
 func (s *CanvasPageSteps) assertNodeDuplicatedInDB(originalName, duplicateName string) {
-	wf, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
-	require.NoError(s.t, err)
-
-	nodes, err := models.FindWorkflowNodes(wf.ID)
-	require.NoError(s.t, err)
-
-	var originalNode *models.WorkflowNode
-	var duplicateNode *models.WorkflowNode
-
-	for i := range nodes {
-		n := nodes[i]
-		if n.Name == originalName {
-			originalNode = &n
-		}
-		if n.Name == duplicateName {
-			duplicateNode = &n
-		}
-	}
+	originalNode := s.canvas.GetNodeFromDB(originalName)
+	duplicateNode := s.canvas.GetNodeFromDB(duplicateName)
 
 	require.NotNil(s.t, originalNode, "original node %q not found in DB", originalName)
 	require.NotNil(s.t, duplicateNode, "duplicate node %q not found in DB", duplicateName)

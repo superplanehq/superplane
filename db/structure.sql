@@ -313,8 +313,8 @@ CREATE TABLE public.workflow_node_executions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
     node_id character varying(128) NOT NULL,
-    root_event_id uuid NOT NULL,
-    event_id uuid NOT NULL,
+    root_event_id uuid,
+    event_id uuid,
     previous_execution_id uuid,
     parent_execution_id uuid,
     state character varying(32) NOT NULL,
@@ -336,8 +336,8 @@ CREATE TABLE public.workflow_node_queue_items (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
     node_id character varying(128) NOT NULL,
-    root_event_id uuid NOT NULL,
-    event_id uuid NOT NULL,
+    root_event_id uuid,
+    event_id uuid,
     created_at timestamp without time zone NOT NULL
 );
 
@@ -1003,7 +1003,7 @@ ALTER TABLE ONLY public.workflow_node_requests
 --
 
 ALTER TABLE ONLY public.workflow_nodes
-    ADD CONSTRAINT workflow_nodes_webhook_id_fkey FOREIGN KEY (webhook_id) REFERENCES public.webhooks(id);
+    ADD CONSTRAINT workflow_nodes_webhook_id_fkey FOREIGN KEY (webhook_id) REFERENCES public.webhooks(id) ON DELETE SET NULL;
 
 
 --
@@ -1046,7 +1046,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251202130328	f
+20251202195612	f
 \.
 
 
