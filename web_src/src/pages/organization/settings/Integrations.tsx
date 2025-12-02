@@ -124,6 +124,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                           {integration.spec?.type}
                         </span>
                         <button
+                          data-testid={`edit-integration-${integration.metadata?.name || ""}`}
                           onClick={() => handleEditIntegration(integration)}
                           className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded"
                           title="Edit integration"

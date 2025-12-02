@@ -13,15 +13,16 @@ func TestOrganizationIntegrations(t *testing.T) {
 	steps := &OrganizationIntegrationsSteps{t: t}
 
 	t.Run("creating a new GitHub integration", func(t *testing.T) {
-		const githubOwner = "e2e-github-owner"
-		const githubTokenValue = "test-github-token"
-		integrationName := githubOwner + "-account"
-
 		steps.start()
 		steps.visitIntegrationsSettingsPage()
+
+		const githubOwner = "e2e-github-owner"
+		const githubTokenValue = "test-github-token"
+		originalIntegrationName := githubOwner + "-account"
+
 		steps.createGitHubIntegration(githubOwner, githubTokenValue)
-		steps.assertGithubVisibleInTheList(integrationName, githubOwner)
-		steps.assertGithubPersisted(integrationName, githubOwner)
+		steps.assertGithubVisibleInTheList(originalIntegrationName, githubOwner)
+		steps.assertGithubPersisted(originalIntegrationName, githubOwner)
 	})
 
 	t.Run("creating a new Semaphore integration", func(t *testing.T) {
@@ -34,6 +35,27 @@ func TestOrganizationIntegrations(t *testing.T) {
 		steps.createSemaphoreIntegration(semaphoreOrgURL, semaphoreTokenValue)
 		steps.assertSemaphoreVisibleInTheList(integrationName, semaphoreOrgURL)
 		steps.assertSemaphorePersisted(integrationName, semaphoreOrgURL)
+	})
+
+	t.Run("editing an existing GitHub integration", func(t *testing.T) {
+		steps.start()
+		steps.visitIntegrationsSettingsPage()
+
+		const originalOwner = "e2e-github-owner"
+		const originalToken = "test-github-token"
+		originalIntegrationName := originalOwner + "-account"
+
+		steps.createGitHubIntegration(originalOwner, originalToken)
+		steps.assertGithubVisibleInTheList(originalIntegrationName, originalOwner)
+		steps.assertGithubPersisted(originalIntegrationName, originalOwner)
+
+		const updatedOwner = "e2e-github-owner-updated"
+		const updatedToken = "test-github-token-updated"
+		updatedIntegrationName := updatedOwner + "-account"
+
+		steps.editGithubIntegration(originalIntegrationName, updatedOwner, updatedToken)
+		steps.assertGithubVisibleInTheList(updatedIntegrationName, updatedOwner)
+		steps.assertGithubPersisted(updatedIntegrationName, updatedOwner)
 	})
 }
 
@@ -96,6 +118,19 @@ func (s *OrganizationIntegrationsSteps) createSemaphoreIntegration(orgURL, token
 
 	s.session.FillIn(orgURLInput, orgURL)
 	s.session.FillIn(tokenInput, token)
+
+	s.session.Click(q.TestID("create-integration-button"))
+}
+
+func (s *OrganizationIntegrationsSteps) editGithubIntegration(currentIntegrationName, newOwnerSlug, newToken string) {
+	editButton := q.TestID("edit-integration-" + currentIntegrationName)
+	ownerInput := q.Locator(`input[placeholder="Johndoe"]`)
+	tokenInput := q.Locator(`input[placeholder="Enter new API token value"]`)
+
+	s.session.Click(editButton)
+
+	s.session.FillIn(ownerInput, newOwnerSlug)
+	s.session.FillIn(tokenInput, newToken)
 
 	s.session.Click(q.TestID("create-integration-button"))
 }
