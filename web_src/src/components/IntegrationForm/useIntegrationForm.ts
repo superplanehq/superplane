@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from "react";
-import type { FormErrors, IntegrationData } from "./types";
+import { useCallback, useEffect, useState } from "react";
 import { getIntegrationConfig } from "./integrationConfigs";
+import type { FormErrors, IntegrationData } from "./types";
 
 interface UseIntegrationFormProps {
   integrationType: string;
