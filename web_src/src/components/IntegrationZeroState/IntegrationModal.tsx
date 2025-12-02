@@ -222,7 +222,7 @@ export function IntegrationModal({
         <Button onClick={onClose} disabled={isCreating} variant="secondary">
           Cancel
         </Button>
-        <Button onClick={handleSaveIntegration} disabled={isCreating}>
+        <Button data-testid="create-integration-button" onClick={handleSaveIntegration} disabled={isCreating}>
           {isCreating ? (
             <>
               <Icon name="progress_activity" className="animate-spin" size="sm" />
