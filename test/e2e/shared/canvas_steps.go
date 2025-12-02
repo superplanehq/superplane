@@ -57,6 +57,7 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 func (s *CanvasSteps) Save() {
 	s.session.Click(q.TestID("save-canvas-button"))
 	s.session.AssertText("Canvas changes saved")
+	s.session.Sleep(500)
 }
 
 func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
