@@ -31,8 +31,9 @@ func TestCanvasPage(t *testing.T) {
 		steps.saveCanvas()
 		steps.duplicateNodeOnCanvas("Hello")
 		steps.assertUnsavedChangesNoteIsVisible()
+		steps.canvas.RenameNode("Hello", "Hello previous")
 		steps.saveCanvas()
-		steps.assertNodeDuplicatedInDB("Hello", "Hello copy")
+		steps.assertNodeDuplicatedInDB("Hello previous", "Hello")
 	})
 
 	t.Run("run is disabled when you have unsaved changes", func(t *testing.T) {
