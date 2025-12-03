@@ -43,6 +43,7 @@ export function GitHubIntegrationForm({
         <Input
           ref={orgUrlRef}
           type="text"
+          data-testid="github-owner-input"
           value={displayName}
           onChange={handleOrgNameChange}
           placeholder={githubConfig.urlPlaceholder}

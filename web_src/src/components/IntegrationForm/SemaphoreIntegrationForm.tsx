@@ -39,6 +39,7 @@ export function SemaphoreIntegrationForm({
         <Input
           ref={orgUrlRef}
           type="url"
+          data-testid="semaphore-org-url-input"
           value={integrationData.orgUrl}
           onChange={handleOrgUrlChange}
           placeholder={semaphoreConfig.urlPlaceholder}
