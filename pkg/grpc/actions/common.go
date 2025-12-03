@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	uuid "github.com/google/uuid"
@@ -255,9 +254,7 @@ func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
 	}
 
 	if field.Default != nil {
-		defaultBytes, err := json.Marshal(field.Default)
-		if err == nil {
-			defaultStr := string(defaultBytes)
+		if defaultStr, ok := field.Default.(string); ok {
 			pbField.DefaultValue = &defaultStr
 		}
 	}
