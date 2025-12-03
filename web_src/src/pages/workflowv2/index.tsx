@@ -533,27 +533,23 @@ export function WorkflowPageV2() {
       // Extract tab data from execution
       const tabData: TabData = {};
 
-      // Current tab: flatten execution outputs for easy viewing
-      if (execution.outputs) {
-        const flattened = flattenObject(execution.outputs);
-        if (Object.keys(flattened).length > 0) {
-          tabData.current = {
-            ...flattened,
-            "Execution ID": execution.id,
-            "Execution State": execution.state?.replace("STATE_", "").toLowerCase(),
-            "Execution Result": execution.result?.replace("RESULT_", "").toLowerCase(),
-            "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
-          };
-        }
-      } else {
-        // Fallback to basic execution data if no outputs
-        tabData.current = {
-          "Execution ID": execution.id,
-          "Execution State": execution.state,
-          "Execution Result": execution.result,
-          "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
-        };
-      }
+      // Current tab: use outputs if available and non-empty, otherwise use metadata
+      const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
+      const dataSource = hasOutputs ? execution.outputs : (execution.metadata || {});
+      const flattened = flattenObject(dataSource);
+
+      const currentData = {
+        ...flattened,
+        "Execution ID": execution.id,
+        "Execution State": execution.state?.replace("STATE_", "").toLowerCase(),
+        "Execution Result": execution.result?.replace("RESULT_", "").toLowerCase(),
+        "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
+      };
+
+      // Filter out undefined and empty values
+      tabData.current = Object.fromEntries(
+        Object.entries(currentData).filter(([_, value]) => value !== undefined && value !== "" && value !== null)
+      );
 
       // Root tab: root event data
       if (execution.rootEvent) {
