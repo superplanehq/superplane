@@ -381,6 +381,7 @@ func protoToListTypeOptions(pbOpts *configpb.ListTypeOptions) *configuration.Lis
 	}
 
 	opts := &configuration.ListTypeOptions{
+		ItemLabel: pbOpts.ItemLabel,
 		ItemDefinition: &configuration.ListItemDefinition{
 			Type: pbOpts.ItemDefinition.Type,
 		},
