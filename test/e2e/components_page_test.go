@@ -21,6 +21,15 @@ func TestCustomComponents(t *testing.T) {
 		steps.ClickExpand()
 		steps.AssertNavigatedToNodeRunPage()
 	})
+
+	t.Run("setting up outputs", func(t *testing.T) {
+		steps.Start()
+		steps.StartCreatingComponent()
+		steps.AddTwoNodesAndConnect()
+		steps.SetUpOutputs()
+		steps.SaveComponent()
+		steps.AssertComponentHasOutputs()
+	})
 }
 
 type CustomComponentsSteps struct {
@@ -38,6 +47,30 @@ func (s *CustomComponentsSteps) Start() {
 
 	s.session.Start()
 	s.session.Login()
+}
+
+func (s *CustomComponentsSteps) StartCreatingComponent() {
+	s.component.Create()
+}
+
+func (s *CustomComponentsSteps) AddTwoNodesAndConnect() {
+	s.component.AddNoop("First", models.Position{X: 500, Y: 250})
+	s.component.AddNoop("Second", models.Position{X: 900, Y: 250})
+	s.component.Connect("First", "Second")
+}
+
+func (s *CustomComponentsSteps) SetUpOutputs() {
+	s.component.OpenComponentSettings()
+	s.component.ClickOutputChannelsTab()
+	s.component.AddOutputChannel("success", "Second", "default")
+}
+
+func (s *CustomComponentsSteps) SaveComponent() {
+	s.component.Save()
+}
+
+func (s *CustomComponentsSteps) AssertComponentHasOutputs() {
+	s.component.AssertOutputChannelExists("success", "Second", "default")
 }
 
 func (s *CustomComponentsSteps) GivenADeploymentComponentExists() {

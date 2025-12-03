@@ -139,3 +139,45 @@ func (s *ComponentSteps) RunManualTrigger(name string) {
 	s.session.Click(runOption)
 	s.session.Click(q.TestID("emit-event-submit-button"))
 }
+
+func (s *ComponentSteps) OpenComponentSettings() {
+	// Click the settings button to open the component settings sidebar
+	s.session.Click(q.Locator(`button[aria-label="Open settings"]`))
+	s.session.Sleep(300)
+}
+
+func (s *ComponentSteps) ClickOutputChannelsTab() {
+	// Click the "Output Channels" tab
+	s.session.Click(q.Text("Output Channels"))
+	s.session.Sleep(300)
+}
+
+func (s *ComponentSteps) AddOutputChannel(channelName, nodeName, nodeOutputChannel string) {
+	// Click "Add Output Channel" button to open modal
+	s.session.Click(q.Text("Add Output Channel"))
+	s.session.Sleep(300)
+
+	// Fill in the output channel name
+	s.session.FillIn(q.Locator(`label:has-text("Output Channel Name") + div input`), channelName)
+
+	// Select the node from dropdown
+	s.session.Click(q.Locator(`label:has-text("Node") + div button`))
+	s.session.Sleep(200)
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + nodeName + `")`))
+
+	// Select the node output channel from dropdown
+	s.session.Click(q.Locator(`label:has-text("Node Output Channel") + div button`))
+	s.session.Sleep(200)
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + nodeOutputChannel + `")`))
+
+	// Click the save button in the dialog footer
+	s.session.Click(q.Locator(`div[role="dialog"] button:has-text("Add Output Channel")`))
+	s.session.Sleep(300)
+}
+
+func (s *ComponentSteps) AssertOutputChannelExists(channelName, nodeName, nodeOutputChannel string) {
+	// Verify the output channel appears in the list
+	s.session.AssertText(channelName)
+	s.session.AssertText("Node: " + nodeName)
+	s.session.AssertText("Channel: " + nodeOutputChannel)
+}
