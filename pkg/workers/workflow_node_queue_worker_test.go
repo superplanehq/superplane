@@ -563,3 +563,161 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	// Verify execution message was published
 	assert.True(t, executionConsumer.HasReceivedMessage())
 }
+
+func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	logger := log.NewEntry(log.New())
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
+
+	//
+	// Create a blueprint with two nodes - the second one has an invalid configuration.
+	// This way, the first node will process successfully and create the parent execution,
+	// and the second node will fail during configuration build.
+	//
+	blueprint := support.CreateBlueprint(
+		t,
+		r.Organization.ID,
+		[]models.Node{
+			{
+				ID:   "noop1",
+				Type: models.NodeTypeComponent,
+				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
+			},
+			{
+				ID:   "noop2",
+				Type: models.NodeTypeComponent,
+				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
+				// Invalid expression that will fail during Build()
+				Configuration: map[string]any{
+					"field": "{{ chain('nonexistent-node').default[0] }}",
+				},
+			},
+		},
+		[]models.Edge{
+			{SourceID: "noop1", TargetID: "noop2", Channel: "default"},
+		},
+		[]models.BlueprintOutputChannel{
+			{
+				Name:              "default",
+				NodeID:            "noop2",
+				NodeOutputChannel: "default",
+			},
+		},
+	)
+
+	//
+	// Create a workflow with the blueprint node.
+	//
+	triggerNode := "trigger-1"
+	blueprintNode := "blueprint-1"
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: blueprintNode,
+				Type:   models.NodeTypeBlueprint,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: blueprintNode, Channel: "default"},
+		},
+	)
+
+	//
+	// Create a root event and process the blueprint node to create a parent execution.
+	//
+	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
+	support.CreateWorkflowQueueItem(t, workflow.ID, blueprintNode, rootEvent.ID, rootEvent.ID)
+
+	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, blueprintNode)
+	require.NoError(t, err)
+
+	err = worker.LockAndProcessNode(logger, *node)
+	require.NoError(t, err)
+
+	// Get the parent execution that was created
+	parentExecutions, err := models.ListNodeExecutions(workflow.ID, blueprintNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, parentExecutions, 1)
+	parentExecution := parentExecutions[0]
+	assert.Equal(t, models.WorkflowNodeExecutionStatePending, parentExecution.State)
+
+	//
+	// Now we need to simulate the first child node (noop1) executing successfully.
+	// Create and pass the first child execution, which will emit an event.
+	//
+	firstChildExecution, err := models.CreatePendingChildExecution(
+		database.Conn(),
+		&parentExecution,
+		"noop1",
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	// Pass the first child execution to emit an event
+	events, err := firstChildExecution.Pass(map[string][]any{
+		"default": {map[string]any{"data": "test"}},
+	})
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	firstChildEvent := events[0]
+
+	//
+	// Now create a queue item for the second child node (noop2) using the event
+	// emitted by noop1. This node has the invalid configuration and should fail
+	// during configuration build.
+	//
+	secondChildNodeID := blueprintNode + ":noop2"
+	support.CreateWorkflowQueueItem(t, workflow.ID, secondChildNodeID, rootEvent.ID, firstChildEvent.ID)
+
+	childNode, err := models.FindWorkflowNode(database.Conn(), workflow.ID, secondChildNodeID)
+	require.NoError(t, err)
+
+	//
+	// Process the child node - this should:
+	// 1. Create a failed child execution with ParentExecutionID set
+	// 2. Propagate the failure to the parent execution
+	//
+	err = worker.LockAndProcessNode(logger, *childNode)
+	require.NoError(t, err)
+
+	//
+	// Verify the child execution was created with:
+	// - Finished state and failed result
+	// - ParentExecutionID pointing to the parent execution
+	//
+	childExecutions, err := models.ListNodeExecutions(workflow.ID, secondChildNodeID, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, childExecutions, 1)
+	childExecution := childExecutions[0]
+
+	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, childExecution.State)
+	assert.Equal(t, models.WorkflowNodeExecutionResultFailed, childExecution.Result)
+	assert.Equal(t, models.WorkflowNodeExecutionResultReasonError, childExecution.ResultReason)
+	assert.Contains(t, childExecution.ResultMessage, "field")
+	require.NotNil(t, childExecution.ParentExecutionID, "Child execution should have ParentExecutionID set")
+	assert.Equal(t, parentExecution.ID, *childExecution.ParentExecutionID)
+
+	//
+	// Verify the parent execution was also failed (propagated from child).
+	//
+	updatedParent, err := models.FindNodeExecution(workflow.ID, parentExecution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, updatedParent.State)
+	assert.Equal(t, models.WorkflowNodeExecutionResultFailed, updatedParent.Result)
+	assert.Equal(t, models.WorkflowNodeExecutionResultReasonError, updatedParent.ResultReason)
+}
