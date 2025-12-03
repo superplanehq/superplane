@@ -20,6 +20,9 @@ const (
 	ItemTypeUser  = "user"
 	ItemTypeRole  = "role"
 	ItemTypeGroup = "group"
+
+	ChannelApproved = "approved"
+	ChannelRejected = "rejected"
 )
 
 func init() {
@@ -255,7 +258,10 @@ func (a *Approval) Color() string {
 }
 
 func (a *Approval) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{components.DefaultOutputChannel}
+	return []components.OutputChannel{
+		{Name: ChannelApproved, Label: "Approved", Description: "All required actors approved"},
+		{Name: ChannelRejected, Label: "Rejected", Description: "At least one actor rejected (after everyone responded)"},
+	}
 }
 
 func (a *Approval) Configuration() []configuration.Field {
@@ -431,8 +437,15 @@ func (a *Approval) HandleAction(ctx components.ActionContext) error {
 	metadata.UpdateResult()
 	ctx.MetadataContext.Set(metadata)
 
+	var outputChannel string
+	if metadata.Result == StateApproved {
+		outputChannel = ChannelApproved
+	} else if metadata.Result == StateRejected {
+		outputChannel = ChannelRejected
+	}
+
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {metadata},
+		outputChannel: {metadata},
 	})
 }
 
