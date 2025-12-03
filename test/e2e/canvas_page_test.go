@@ -31,8 +31,8 @@ func TestCanvasPage(t *testing.T) {
 		steps.saveCanvas()
 		steps.duplicateNodeOnCanvas("Hello")
 		steps.assertUnsavedChangesNoteIsVisible()
-		steps.canvas.RenameNode("Hello", "Hello previous")
 		steps.saveCanvas()
+		steps.canvas.RenameNode("Hello", "Hello previous")
 		steps.assertNodeDuplicatedInDB("Hello previous", "Hello")
 	})
 
