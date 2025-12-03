@@ -167,6 +167,7 @@ type IntegrationTypeOptions struct {
  */
 type ListTypeOptions struct {
 	ItemDefinition *ListItemDefinition `json:"item_definition"`
+	ItemLabel      string              `json:"item_label,omitempty"`
 }
 
 /*

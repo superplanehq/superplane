@@ -2816,6 +2816,9 @@
       "properties": {
         "itemDefinition": {
           "$ref": "#/definitions/ConfigurationListItemDefinition"
+        },
+        "itemLabel": {
+          "type": "string"
         }
       }
     },

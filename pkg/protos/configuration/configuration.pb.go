@@ -625,6 +625,7 @@ func (x *ResourceTypeOptions) GetType() string {
 type ListTypeOptions struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ItemDefinition *ListItemDefinition    `protobuf:"bytes,1,opt,name=item_definition,json=itemDefinition,proto3" json:"item_definition,omitempty"`
+	ItemLabel      string                 `protobuf:"bytes,2,opt,name=item_label,json=itemLabel,proto3" json:"item_label,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -664,6 +665,13 @@ func (x *ListTypeOptions) GetItemDefinition() *ListItemDefinition {
 		return x.ItemDefinition
 	}
 	return nil
+}
+
+func (x *ListTypeOptions) GetItemLabel() string {
+	if x != nil {
+		return x.ItemLabel
+	}
+	return ""
 }
 
 type ObjectTypeOptions struct {
@@ -1042,9 +1050,11 @@ const file_configuration_proto_rawDesc = "" +
 	"\x16IntegrationTypeOptions\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\")\n" +
 	"\x13ResourceTypeOptions\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\"h\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\"\x87\x01\n" +
 	"\x0fListTypeOptions\x12U\n" +
-	"\x0fitem_definition\x18\x01 \x01(\v2,.Superplane.Configuration.ListItemDefinitionR\x0eitemDefinition\"L\n" +
+	"\x0fitem_definition\x18\x01 \x01(\v2,.Superplane.Configuration.ListItemDefinitionR\x0eitemDefinition\x12\x1d\n" +
+	"\n" +
+	"item_label\x18\x02 \x01(\tR\titemLabel\"L\n" +
 	"\x11ObjectTypeOptions\x127\n" +
 	"\x06schema\x18\x01 \x03(\v2\x1f.Superplane.Configuration.FieldR\x06schema\":\n" +
 	"\fSelectOption\x12\x14\n" +

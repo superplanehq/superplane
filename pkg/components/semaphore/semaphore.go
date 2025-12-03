@@ -135,6 +135,7 @@ func (s *Semaphore) Configuration() []configuration.Field {
 			Type:  configuration.FieldTypeList,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
+					ItemLabel: "Parameter",
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
