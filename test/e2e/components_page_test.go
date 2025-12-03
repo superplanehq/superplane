@@ -30,6 +30,15 @@ func TestCustomComponents(t *testing.T) {
 		steps.SaveComponent()
 		steps.AssertComponentHasOutputs()
 	})
+
+	t.Run("set up configuration options", func(t *testing.T) {
+		steps.Start()
+		steps.StartCreatingComponent()
+		steps.AddTwoNodesAndConnect()
+		steps.SetUpConfigurationOptions()
+		steps.SaveComponent()
+		steps.AssertComponentHasConfiguration()
+	})
 }
 
 type CustomComponentsSteps struct {
@@ -67,6 +76,16 @@ func (s *CustomComponentsSteps) SetUpOutputs() {
 
 func (s *CustomComponentsSteps) SaveComponent() {
 	s.component.Save()
+}
+
+func (s *CustomComponentsSteps) SetUpConfigurationOptions() {
+	s.component.OpenComponentSettings()
+	s.component.ClickConfigurationTab()
+	s.component.AddConfigurationField("environment", "Environment", "select", []string{"staging", "production"})
+}
+
+func (s *CustomComponentsSteps) AssertComponentHasConfiguration() {
+	s.component.AssertConfigurationFieldExists("environment", "Environment", "select")
 }
 
 func (s *CustomComponentsSteps) AssertComponentHasOutputs() {

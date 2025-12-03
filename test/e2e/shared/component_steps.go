@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/models"
 
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -153,6 +154,12 @@ func (s *ComponentSteps) ClickOutputChannelsTab() {
 	s.session.Sleep(300)
 }
 
+func (s *ComponentSteps) ClickConfigurationTab() {
+	// Click the "Configuration" tab (should be already selected by default, but click to be sure)
+	s.session.Click(q.Text("Configuration"))
+	s.session.Sleep(300)
+}
+
 func (s *ComponentSteps) AddOutputChannel(channelName, nodeName, nodeOutputChannel string) {
 	// Click "Add Output Channel" button to open modal
 	s.session.Click(q.Text("Add Output Channel"))
@@ -211,4 +218,87 @@ func (s *ComponentSteps) AssertOutputChannelExists(channelName, nodeName, nodeOu
 	require.NotNil(s.t, foundChannel, "output channel '%s' not found in blueprint", channelName)
 	require.Equal(s.t, targetNode.ID, foundChannel.NodeID, "output channel points to wrong node")
 	require.Equal(s.t, nodeOutputChannel, foundChannel.NodeOutputChannel, "output channel uses wrong node output channel")
+}
+
+func (s *ComponentSteps) AddConfigurationField(fieldName, fieldLabel, fieldType string, options []string) {
+	// Click "Add Configuration Field" button to open modal
+	s.session.Click(q.Text("Add Configuration Field"))
+	s.session.Sleep(500)
+
+	// Fill in the field name
+	nameInput := q.Locator(`input[placeholder*="threshold_expression"]`)
+	s.session.FillIn(nameInput, fieldName)
+
+	// Fill in the field label
+	labelInput := q.Locator(`div[role="dialog"] label:has-text("Label") + div input`)
+	s.session.FillIn(labelInput, fieldLabel)
+
+	// Select the field type
+	typeSelectButton := q.Locator(`div[role="dialog"] div:has(> label:has-text("Type")) button[role="combobox"]`)
+	s.session.Click(typeSelectButton)
+	s.session.Sleep(300)
+
+	// Map type to UI display text
+	typeDisplayText := fieldType
+	if fieldType == "select" {
+		typeDisplayText = "Select"
+	} else if fieldType == "multi_select" {
+		typeDisplayText = "Multi-Select"
+	} else if fieldType == "string" {
+		typeDisplayText = "String"
+	} else if fieldType == "number" {
+		typeDisplayText = "Number"
+	} else if fieldType == "boolean" {
+		typeDisplayText = "Boolean"
+	}
+
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + typeDisplayText + `")`))
+	s.session.Sleep(300)
+
+	// If it's a select or multi_select type, add options
+	if fieldType == "select" || fieldType == "multi_select" {
+		for i, option := range options {
+			// Click "Add Option" button
+			s.session.Click(q.Text("Add Option"))
+			s.session.Sleep(300)
+
+			// Fill the newly added option fields (they appear at the bottom)
+			// Use nth selector to target the specific option row
+			labelSelector := q.Locator(`div[role="dialog"] input[placeholder*="Label"]:nth-of-type(` + strconv.Itoa(i+1) + `)`)
+			valueSelector := q.Locator(`div[role="dialog"] input[placeholder*="Value"]:nth-of-type(` + strconv.Itoa(i+1) + `)`)
+
+			s.session.FillIn(labelSelector, option)
+			s.session.FillIn(valueSelector, option)
+			s.session.Sleep(200)
+		}
+	}
+
+	// Mark as required
+	requiredCheckbox := q.Locator(`div[role="dialog"] input[type="checkbox"]`)
+	s.session.Click(requiredCheckbox)
+	s.session.Sleep(200)
+
+	// Click save button
+	s.session.Click(q.Locator(`div[role="dialog"] button:has-text("Add Configuration Field")`))
+	s.session.Sleep(300)
+}
+
+func (s *ComponentSteps) AssertConfigurationFieldExists(fieldName, fieldLabel, fieldType string) {
+	// Fetch the blueprint from the database
+	blueprint, err := models.FindBlueprintByName(s.ComponentName, s.session.OrgID)
+	require.NoError(s.t, err, "failed to find blueprint in database")
+	require.NotNil(s.t, blueprint, "blueprint not found in database")
+
+	// Find the configuration field with the given name
+	var foundField *configuration.Field
+	for _, field := range blueprint.Configuration {
+		if field.Name == fieldName {
+			foundField = &field
+			break
+		}
+	}
+
+	require.NotNil(s.t, foundField, "configuration field '%s' not found in blueprint", fieldName)
+	require.Equal(s.t, fieldLabel, foundField.Label, "configuration field label mismatch")
+	require.Equal(s.t, fieldType, foundField.Type, "configuration field type mismatch")
 }
