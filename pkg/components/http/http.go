@@ -102,6 +102,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 			Required: false,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
+					ItemLabel: "Header",
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{

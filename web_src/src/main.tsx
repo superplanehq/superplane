@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
-import { setupApiInterceptor } from "./api-client/client.ts";
+import { setupApiInterceptor } from "./lib/api-interceptor.ts";
 import { Sentry } from "./sentry.ts";
 
 function ErrorFallback() {

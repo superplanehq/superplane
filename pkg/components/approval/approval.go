@@ -266,6 +266,7 @@ func (a *Approval) Configuration() []configuration.Field {
 			Type:  configuration.FieldTypeList,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
+					ItemLabel: "Item",
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{

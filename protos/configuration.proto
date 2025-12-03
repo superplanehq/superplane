@@ -67,6 +67,7 @@ message ResourceTypeOptions {
 
 message ListTypeOptions {
   ListItemDefinition item_definition = 1;
+  string item_label = 2;
 }
 
 message ObjectTypeOptions {

@@ -147,6 +147,7 @@ export type ConfigurationListItemDefinition = {
 
 export type ConfigurationListTypeOptions = {
   itemDefinition?: ConfigurationListItemDefinition;
+  itemLabel?: string;
 };
 
 export type ConfigurationMultiSelectTypeOptions = {
