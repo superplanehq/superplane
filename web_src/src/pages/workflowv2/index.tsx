@@ -972,9 +972,6 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(workflow);
 
-      const originalName = nodeToDuplicate.name || "node";
-      const duplicateName = `${originalName} copy`;
-
       let blockName = "node";
       if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
         blockName = nodeToDuplicate.trigger.name;
@@ -986,7 +983,7 @@ export function WorkflowPageV2() {
         blockName = blueprintMetadata?.name || "blueprint";
       }
 
-      const newNodeId = generateNodeId(blockName, duplicateName);
+      const newNodeId = generateNodeId(blockName, nodeToDuplicate.name || "node");
 
       const offsetX = 50;
       const offsetY = 50;
@@ -994,7 +991,7 @@ export function WorkflowPageV2() {
       const duplicateNode: ComponentsNode = {
         ...nodeToDuplicate,
         id: newNodeId,
-        name: duplicateName,
+        name: nodeToDuplicate.name || "node",
         position: {
           x: (nodeToDuplicate.position?.x || 0) + offsetX,
           y: (nodeToDuplicate.position?.y || 0) + offsetY,

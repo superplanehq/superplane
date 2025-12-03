@@ -153,6 +153,19 @@ func (s *CanvasSteps) RunManualTrigger(name string) {
 	s.session.Click(q.TestID("emit-event-submit-button"))
 }
 
+func (s *CanvasSteps) RenameNode(name string, newName string) {
+	node := s.GetNodeFromDB(name)
+
+	query := database.Conn().
+		Model(&models.WorkflowNode{}).
+		Where("workflow_id = ?", s.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		Update("name", newName)
+
+	err := query.Error
+	require.NoError(s.t, err)
+}
+
 func (s *CanvasSteps) GetNodeFromDB(name string) *models.WorkflowNode {
 	canvas, err := models.FindWorkflow(s.session.OrgID, s.WorkflowID)
 	require.NoError(s.t, err)
