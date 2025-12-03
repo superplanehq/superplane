@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -138,4 +139,76 @@ func (s *ComponentSteps) RunManualTrigger(name string) {
 	s.session.Click(dropdown)
 	s.session.Click(runOption)
 	s.session.Click(q.TestID("emit-event-submit-button"))
+}
+
+func (s *ComponentSteps) OpenComponentSettings() {
+	// Click the settings button to open the component settings sidebar
+	s.session.Click(q.Locator(`button[aria-label="Open settings"]`))
+	s.session.Sleep(300)
+}
+
+func (s *ComponentSteps) ClickOutputChannelsTab() {
+	// Click the "Output Channels" tab
+	s.session.Click(q.Text("Output Channels"))
+	s.session.Sleep(300)
+}
+
+func (s *ComponentSteps) AddOutputChannel(channelName, nodeName, nodeOutputChannel string) {
+	// Click "Add Output Channel" button to open modal
+	s.session.Click(q.Text("Add Output Channel"))
+	s.session.Sleep(500)
+
+	// Fill in the output channel name - find input by placeholder
+	nameInput := q.Locator(`input[placeholder*="success"]`)
+	s.session.FillIn(nameInput, channelName)
+
+	// Select the node from dropdown - look within the dialog
+	// The dropdown shows: "NodeName (node-id)"
+	nodeSelectButton := q.Locator(`div[role="dialog"] button[role="combobox"]:has-text("Select a node")`)
+	s.session.Click(nodeSelectButton)
+	s.session.Sleep(300)
+	// Match on option that contains the node name
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + nodeName + `")`))
+	s.session.Sleep(200)
+
+	// Select the node output channel from dropdown
+	channelSelectButton := q.Locator(`div[role="dialog"] div:has(> label:has-text("Node Output Channel")) button[role="combobox"]`)
+	s.session.Click(channelSelectButton)
+	s.session.Sleep(300)
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + nodeOutputChannel + `")`))
+	s.session.Sleep(200)
+
+	// Click the save button in the dialog footer
+	s.session.Click(q.Locator(`div[role="dialog"] button:has-text("Add Output Channel")`))
+	s.session.Sleep(300)
+}
+
+func (s *ComponentSteps) AssertOutputChannelExists(channelName, nodeName, nodeOutputChannel string) {
+	// Fetch the blueprint from the database
+	blueprint, err := models.FindBlueprintByName(s.ComponentName, s.session.OrgID)
+	require.NoError(s.t, err, "failed to find blueprint in database")
+	require.NotNil(s.t, blueprint, "blueprint not found in database")
+
+	// Find the node by name to get its ID
+	var targetNode *models.Node
+	for _, node := range blueprint.Nodes {
+		if node.Name == nodeName {
+			targetNode = &node
+			break
+		}
+	}
+	require.NotNil(s.t, targetNode, "node '%s' not found in blueprint", nodeName)
+
+	// Find the output channel with the given name
+	var foundChannel *models.BlueprintOutputChannel
+	for _, channel := range blueprint.OutputChannels {
+		if channel.Name == channelName {
+			foundChannel = &channel
+			break
+		}
+	}
+
+	require.NotNil(s.t, foundChannel, "output channel '%s' not found in blueprint", channelName)
+	require.Equal(s.t, targetNode.ID, foundChannel.NodeID, "output channel points to wrong node")
+	require.Equal(s.t, nodeOutputChannel, foundChannel.NodeOutputChannel, "output channel uses wrong node output channel")
 }
