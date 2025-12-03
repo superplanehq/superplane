@@ -535,7 +535,7 @@ export function WorkflowPageV2() {
 
       // Current tab: use outputs if available and non-empty, otherwise use metadata
       const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
-      const dataSource = hasOutputs ? execution.outputs : (execution.metadata || {});
+      const dataSource = hasOutputs ? execution.outputs : execution.metadata || {};
       const flattened = flattenObject(dataSource);
 
       const currentData = {
@@ -548,7 +548,7 @@ export function WorkflowPageV2() {
 
       // Filter out undefined and empty values
       tabData.current = Object.fromEntries(
-        Object.entries(currentData).filter(([_, value]) => value !== undefined && value !== "" && value !== null)
+        Object.entries(currentData).filter(([_, value]) => value !== undefined && value !== "" && value !== null),
       );
 
       // Root tab: root event data

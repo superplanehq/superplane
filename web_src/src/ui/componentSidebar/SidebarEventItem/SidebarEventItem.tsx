@@ -467,7 +467,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm flex-1 text-left w-[70%] text-gray-800 cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
-                        style={{ textDecoration: 'underline', textDecorationThickness: '1px' }}
+                        style={{ textDecoration: "underline", textDecorationThickness: "1px" }}
                         title={stringValue}
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -504,7 +504,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm flex-1 text-left w-[70%] text-gray-800 cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
-                        style={{ textDecoration: 'underline', textDecorationThickness: '1px' }}
+                        style={{ textDecoration: "underline", textDecorationThickness: "1px" }}
                         title={stringValue}
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -719,7 +719,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm flex-1 text-left w-[70%] text-gray-800 cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
-                        style={{ textDecoration: 'underline', textDecorationThickness: '1px' }}
+                        style={{ textDecoration: "underline", textDecorationThickness: "1px" }}
                         title={value}
                         onClick={(e) => e.stopPropagation()}
                       >
