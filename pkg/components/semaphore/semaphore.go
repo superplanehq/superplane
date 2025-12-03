@@ -50,6 +50,7 @@ type Spec struct {
 	Project      string      `json:"project"`
 	Ref          string      `json:"ref"`
 	PipelineFile string      `json:"pipelineFile"`
+	CommitSha    string      `json:"commitSha"`
 	Parameters   []Parameter `json:"parameters"`
 }
 
@@ -128,6 +129,11 @@ func (s *Semaphore) Configuration() []configuration.Field {
 			Label:    "Pipeline file location",
 			Type:     configuration.FieldTypeGitRef,
 			Required: true,
+		},
+		{
+			Name:  "commitSha",
+			Label: "Commit SHA",
+			Type:  configuration.FieldTypeString,
 		},
 		{
 			Name:  "parameters",
@@ -231,6 +237,10 @@ func (s *Semaphore) Execute(ctx components.ExecutionContext) error {
 		"reference":     spec.Ref,
 		"pipeline_file": spec.PipelineFile,
 		"parameters":    s.buildParameters(ctx, spec.Parameters),
+	}
+
+	if spec.CommitSha != "" {
+		params["commit_sha"] = spec.CommitSha
 	}
 
 	wf, err := semaphore.RunWorkflow(params)
