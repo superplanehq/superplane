@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	uuid "github.com/google/uuid"
@@ -254,8 +255,18 @@ func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
 	}
 
 	if field.Default != nil {
+		// For simple scalar defaults store the raw string so we don't accumulate
+		// quotes on round-trips.
 		if defaultStr, ok := field.Default.(string); ok {
 			pbField.DefaultValue = &defaultStr
+		} else {
+			// For complex defaults (e.g. slices/objects used by components like timegate),
+			// store JSON so we can reconstruct the original structure.
+			defaultBytes, err := json.Marshal(field.Default)
+			if err == nil {
+				defaultStr := string(defaultBytes)
+				pbField.DefaultValue = &defaultStr
+			}
 		}
 	}
 
@@ -475,7 +486,21 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 	}
 
 	if pbField.DefaultValue != nil {
-		field.Default = *pbField.DefaultValue
+		// Simple scalar types: keep the raw string default as-is.
+		if pbField.Type != configuration.FieldTypeList &&
+			pbField.Type != configuration.FieldTypeObject &&
+			pbField.Type != configuration.FieldTypeMultiSelect {
+			field.Default = *pbField.DefaultValue
+		} else {
+			// Complex types: decode JSON into the original structure.
+			var v any
+			if err := json.Unmarshal([]byte(*pbField.DefaultValue), &v); err == nil {
+				field.Default = v
+			} else {
+				// Fallback to raw string if JSON is invalid
+				field.Default = *pbField.DefaultValue
+			}
+		}
 	}
 
 	if pbField.Placeholder != nil {
