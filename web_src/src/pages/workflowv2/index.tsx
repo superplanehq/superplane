@@ -2149,6 +2149,10 @@ function prepareSemaphoreNode(
     metadataItems.push({ icon: "file-code", label: configuration.pipelineFile });
   }
 
+  if (configuration?.commitSha) {
+    metadataItems.push({ icon: "git-commit", label: configuration.commitSha });
+  }
+
   return {
     id: node.id!,
     position: { x: node.position?.x || 0, y: node.position?.y || 0 },
