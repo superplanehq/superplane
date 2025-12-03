@@ -116,3 +116,17 @@ export function flattenObject(obj: any, maxDepth: number = 5): Record<string, an
 
   return flatten(obj, maxDepth);
 }
+
+/**
+ * Checks if a string is a valid HTTP or HTTPS URL
+ * @param value - The string to check
+ * @returns true if the string is a valid URL, false otherwise
+ */
+export function isUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}

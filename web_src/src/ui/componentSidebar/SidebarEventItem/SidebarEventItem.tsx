@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { resolveIcon } from "@/lib/utils";
+import { resolveIcon, isUrl } from "@/lib/utils";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SidebarEvent } from "../types";
@@ -452,37 +452,75 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           {/* Tab Content */}
           {tabData && activeTab === "current" && tabData.current && (
             <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
-              {Object.entries(tabData.current).map(([key, value]) => (
-                <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                  <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
-                    {key}:
-                  </span>
-                  <span
-                    className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
-                    title={String(value)}
-                  >
-                    {String(value)}
-                  </span>
-                </div>
-              ))}
+              {Object.entries(tabData.current).map(([key, value]) => {
+                const stringValue = String(value);
+                const isUrlValue = isUrl(stringValue);
+
+                return (
+                  <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                      {key}:
+                    </span>
+                    {isUrlValue ? (
+                      <a
+                        href={stringValue}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm flex-1 text-left w-[70%] text-gray-800 cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
+                        style={{ textDecoration: "underline", textDecorationThickness: "1px" }}
+                        title={stringValue}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {stringValue}
+                      </a>
+                    ) : (
+                      <span
+                        className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                        title={stringValue}
+                      >
+                        {stringValue}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
           {tabData && activeTab === "root" && tabData.root && (
             <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
-              {Object.entries(tabData.root).map(([key, value]) => (
-                <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                  <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
-                    {key}:
-                  </span>
-                  <span
-                    className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
-                    title={String(value)}
-                  >
-                    {String(value)}
-                  </span>
-                </div>
-              ))}
+              {Object.entries(tabData.root).map(([key, value]) => {
+                const stringValue = String(value);
+                const isUrlValue = isUrl(stringValue);
+
+                return (
+                  <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                      {key}:
+                    </span>
+                    {isUrlValue ? (
+                      <a
+                        href={stringValue}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm flex-1 text-left w-[70%] text-gray-800 cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
+                        style={{ textDecoration: "underline", textDecorationThickness: "1px" }}
+                        title={stringValue}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {stringValue}
+                      </a>
+                    ) : (
+                      <span
+                        className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                        title={stringValue}
+                      >
+                        {stringValue}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -667,19 +705,37 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           {/* Fallback to original values display if no tabData */}
           {!tabData && event.values && Object.entries(event.values).length > 0 && (
             <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
-              {Object.entries(event.values || {}).map(([key, value]) => (
-                <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0">
-                  <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
-                    {key}:
-                  </span>
-                  <span
-                    className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
-                    title={value}
-                  >
-                    {value}
-                  </span>
-                </div>
-              ))}
+              {Object.entries(event.values || {}).map(([key, value]) => {
+                const isUrlValue = isUrl(value);
+
+                return (
+                  <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0">
+                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                      {key}:
+                    </span>
+                    {isUrlValue ? (
+                      <a
+                        href={value}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm flex-1 text-left w-[70%] text-gray-800 cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
+                        style={{ textDecoration: "underline", textDecorationThickness: "1px" }}
+                        title={value}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {value}
+                      </a>
+                    ) : (
+                      <span
+                        className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                        title={value}
+                      >
+                        {value}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
