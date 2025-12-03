@@ -74,7 +74,7 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 }
 
 func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.WorkflowNode) error {
-	var exec *models.WorkflowNodeExecution
+	var executions []*models.WorkflowNodeExecution
 	var queueItem *models.WorkflowNodeQueueItem
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		n, err := models.LockWorkflowNode(tx, node.WorkflowID, node.NodeID)
@@ -83,17 +83,19 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node mod
 			return nil
 		}
 
-		exec, queueItem, err = w.processNode(tx, logger, n)
+		executions, queueItem, err = w.processNode(tx, logger, n)
 		return err
 	})
 
 	if err == nil {
-		if exec != nil {
-			messages.NewWorkflowExecutionMessage(
-				exec.WorkflowID.String(),
-				exec.ID.String(),
-				exec.NodeID,
-			).Publish()
+		if len(executions) > 0 {
+			for _, execution := range executions {
+				messages.NewWorkflowExecutionMessage(
+					execution.WorkflowID.String(),
+					execution.ID.String(),
+					execution.NodeID,
+				).Publish()
+			}
 		}
 
 		if queueItem != nil {
@@ -108,7 +110,7 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node mod
 	return err
 }
 
-func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.WorkflowNode) (*models.WorkflowNodeExecution, *models.WorkflowNodeQueueItem, error) {
+func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.WorkflowNode) ([]*models.WorkflowNodeExecution, *models.WorkflowNodeQueueItem, error) {
 	queueItem, err := node.FirstQueueItem(tx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -142,12 +144,12 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 		// we create a failed execution and delete the queue item.
 		//
 		logger.Errorf("Error building configuration for node execution: %v", configErr.Error())
-		execution, err := w.handleNodeConfigurationError(tx, logger, configErr)
+		executions, err := w.handleNodeConfigurationError(tx, logger, configErr)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		return execution, queueItem, nil
+		return executions, queueItem, nil
 	}
 
 	var exec *models.WorkflowNodeExecution
@@ -168,7 +170,7 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 		return nil, nil, fmt.Errorf("unsupported node type: %s", node.Type)
 	}
 
-	return exec, queueItem, err
+	return []*models.WorkflowNodeExecution{exec}, queueItem, err
 }
 
 func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *components.ProcessQueueContext, node *models.WorkflowNode) (*models.WorkflowNodeExecution, error) {
@@ -186,7 +188,7 @@ func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *components.ProcessQu
 	return comp.ProcessQueueItem(*ctx)
 }
 
-func (w *WorkflowNodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) (*models.WorkflowNodeExecution, error) {
+func (w *WorkflowNodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) ([]*models.WorkflowNodeExecution, error) {
 	err := configErr.QueueItem.Delete(tx)
 	if err != nil {
 		return nil, err
@@ -224,7 +226,7 @@ func (w *WorkflowNodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logg
 	}
 
 	if parentExecutionID == nil {
-		return &execution, nil
+		return []*models.WorkflowNodeExecution{&execution}, nil
 	}
 
 	//
@@ -241,7 +243,7 @@ func (w *WorkflowNodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logg
 		return nil, err
 	}
 
-	return &execution, nil
+	return []*models.WorkflowNodeExecution{&execution, parent}, nil
 }
 
 func (w *WorkflowNodeQueueWorker) getParentExecutionID(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) (*uuid.UUID, error) {
