@@ -36,8 +36,8 @@ func TestCustomComponents(t *testing.T) {
 		steps.StartCreatingComponent()
 		steps.AddTwoNodesAndConnect()
 		steps.SetUpConfigurationOptions()
-		// steps.SaveComponent()
-		// steps.AssertComponentHasConfiguration()
+		steps.SaveComponent()
+		steps.AssertComponentHasConfiguration()
 	})
 }
 
@@ -81,12 +81,11 @@ func (s *CustomComponentsSteps) SaveComponent() {
 func (s *CustomComponentsSteps) SetUpConfigurationOptions() {
 	s.component.OpenComponentSettings()
 	s.component.ClickAddConfig()
-	s.component.AddConfigurationField("environment", "Environment", "select", []string{"staging", "production"})
-	s.session.TakeScreenshot()
+	s.component.AddConfigurationField("environment", "Environment")
 }
 
 func (s *CustomComponentsSteps) AssertComponentHasConfiguration() {
-	s.component.AssertConfigurationFieldExists("environment", "Environment", "select")
+	s.component.AssertConfigurationFieldExists("environment", "Environment", "string")
 }
 
 func (s *CustomComponentsSteps) AssertComponentHasOutputs() {

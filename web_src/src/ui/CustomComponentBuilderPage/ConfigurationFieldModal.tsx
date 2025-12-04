@@ -153,6 +153,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                 placeholder="e.g., threshold_expression"
                 autoFocus
                 className="shadow-none"
+                data-testid="config-field-name-input"
               />
               <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
                 This is the internal name used in templates (e.g., $config.threshold_expression)
@@ -173,6 +174,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                 }
                 placeholder="e.g., Threshold Expression"
                 className="shadow-none"
+                data-testid="config-field-label-input"
               />
               <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Display name shown in the UI</p>
             </div>
@@ -210,6 +212,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                     typeOptions: newTypeOptions,
                   });
                 }}
+                data-testid="config-field-type-select"
               >
                 <SelectTrigger className="w-full shadow-none">
                   <SelectValue />
@@ -453,6 +456,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                       })
                     }
                     placeholder={`Enter default ${configFieldForm.type} value`}
+                    data-testid="config-field-default-value-input"
                   />
                 )}
                 <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
@@ -486,7 +490,12 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
             <Button variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button variant="default" onClick={handleSave} disabled={isSaveDisabled(configFieldForm)}>
+            <Button
+              variant="default"
+              onClick={handleSave}
+              disabled={isSaveDisabled(configFieldForm)}
+              data-testid="add-config-field-submit-button"
+            >
               {field ? "Save Changes" : "Add Field"}
             </Button>
           </DialogFooter>

@@ -218,60 +218,16 @@ func (s *ComponentSteps) AssertOutputChannelExists(channelName, nodeName, nodeOu
 	require.Equal(s.t, nodeOutputChannel, foundChannel.NodeOutputChannel, "output channel uses wrong node output channel")
 }
 
-func (s *ComponentSteps) AddConfigurationField(fieldName, fieldLabel, fieldType string, options []string) {
+func (s *ComponentSteps) AddConfigurationField(fieldName, fieldLabel string) {
 	nameInput := q.TestID("config-field-name-input")
 	labelInput := q.TestID("config-field-label-input")
-	typeSelectButton := q.TestID("config-field-type-select")
+	defaultValueInput := q.TestID("config-field-default-value-input")
+	saveButton := q.TestID("add-config-field-submit-button")
 
 	s.session.FillIn(nameInput, fieldName)
 	s.session.FillIn(labelInput, fieldLabel)
-	s.session.Click(typeSelectButton)
-
-	s.session.TakeScreenshot()
-
-	// Map type to UI display text
-	typeDisplayText := fieldType
-	if fieldType == "select" {
-		typeDisplayText = "Select"
-	} else if fieldType == "multi_select" {
-		typeDisplayText = "Multi-Select"
-	} else if fieldType == "string" {
-		typeDisplayText = "String"
-	} else if fieldType == "number" {
-		typeDisplayText = "Number"
-	} else if fieldType == "boolean" {
-		typeDisplayText = "Boolean"
-	}
-
-	s.session.Click(q.Locator(`div[role="option"]:has-text("` + typeDisplayText + `")`))
-	s.session.Sleep(300)
-
-	// If it's a select or multi_select type, add options
-	if fieldType == "select" || fieldType == "multi_select" {
-		for i, option := range options {
-			// Click "Add Option" button
-			s.session.Click(q.Text("Add Option"))
-			s.session.Sleep(300)
-
-			// Fill the newly added option fields (they appear at the bottom)
-			// Use nth selector to target the specific option row
-			labelSelector := q.Locator(`div[role="dialog"] input[placeholder*="Label"]:nth-of-type(` + strconv.Itoa(i+1) + `)`)
-			valueSelector := q.Locator(`div[role="dialog"] input[placeholder*="Value"]:nth-of-type(` + strconv.Itoa(i+1) + `)`)
-
-			s.session.FillIn(labelSelector, option)
-			s.session.FillIn(valueSelector, option)
-			s.session.Sleep(200)
-		}
-	}
-
-	// Mark as required
-	requiredCheckbox := q.Locator(`div[role="dialog"] input[type="checkbox"]`)
-	s.session.Click(requiredCheckbox)
-	s.session.Sleep(200)
-
-	// Click save button
-	s.session.Click(q.Locator(`div[role="dialog"] button:has-text("Add Configuration Field")`))
-	s.session.Sleep(300)
+	s.session.FillIn(defaultValueInput, "default")
+	s.session.Click(saveButton)
 }
 
 func (s *ComponentSteps) AssertConfigurationFieldExists(fieldName, fieldLabel, fieldType string) {
