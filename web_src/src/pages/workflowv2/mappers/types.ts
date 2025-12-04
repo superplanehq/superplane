@@ -38,5 +38,9 @@ export interface TriggerRenderer {
 }
 
 export interface ComponentBaseMapper {
-  props(nodes: ComponentsNode[], node: ComponentsNode, lastExecution: WorkflowsWorkflowNodeExecution | null): ComponentBaseProps
+  props(
+    nodes: ComponentsNode[],
+    node: ComponentsNode,
+    lastExecution: WorkflowsWorkflowNodeExecution | null,
+  ): ComponentBaseProps;
 }

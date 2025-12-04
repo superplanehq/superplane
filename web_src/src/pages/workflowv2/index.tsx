@@ -1883,7 +1883,7 @@ function prepareComponentBaseNode(
       type: "component",
       label: displayLabel,
       state: "pending" as const,
-      component: getComponentBaseMapper(node.component?.name!).props(nodes, node, execution)
+      component: getComponentBaseMapper(node.component?.name!).props(nodes, node, execution),
     },
   };
 }

@@ -5,7 +5,11 @@ import { getTriggerRenderer } from ".";
 import { getBackgroundColorClass } from "@/utils/colors";
 
 export const noopMapper: ComponentBaseMapper = {
-  props(nodes: ComponentsNode[], node: ComponentsNode, lastExecution: WorkflowsWorkflowNodeExecution): ComponentBaseProps {
+  props(
+    nodes: ComponentsNode[],
+    node: ComponentsNode,
+    lastExecution: WorkflowsWorkflowNodeExecution,
+  ): ComponentBaseProps {
     return {
       iconSlug: "circle-off",
       headerColor: "bg-gray-50",
@@ -13,9 +17,9 @@ export const noopMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
       eventSections: getEventSections(nodes, lastExecution),
-    }
-  }
-}
+    };
+  },
+};
 
 function getEventSections(nodes: ComponentsNode[], execution: WorkflowsWorkflowNodeExecution): EventSection[] {
   if (!execution) {
@@ -23,9 +27,9 @@ function getEventSections(nodes: ComponentsNode[], execution: WorkflowsWorkflowN
       {
         title: "Last Run",
         eventTitle: "No events received yet",
-        eventState: "neutral" as const
-      }
-    ]
+        eventState: "neutral" as const,
+      },
+    ];
   }
 
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
@@ -38,7 +42,7 @@ function getEventSections(nodes: ComponentsNode[], execution: WorkflowsWorkflowN
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventState: executionToEventSectionState(execution),
-    }
+    },
   ];
 }
 
