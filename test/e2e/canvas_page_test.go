@@ -298,6 +298,7 @@ func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string, execution
 	executions := s.canvas.GetExecutionsForNode(nodeName)
 	require.Greater(s.t, len(executions), 0, "expected at least one execution")
 
+	s.t.Logf("Found %d executions for node %s: %v", len(executions), nodeName, executions)
 	execution := executions[executionIndex]
 	require.Equal(s.t, models.WorkflowNodeExecutionResultCancelled, execution.Result, "expected execution to be cancelled")
 }
