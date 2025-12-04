@@ -56,6 +56,7 @@ import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
+import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import {
   getNextInQueueInfo,
   mapExecutionsToSidebarEvents,
@@ -1084,6 +1085,11 @@ export function WorkflowPageV2() {
     workflow,
   });
 
+  const { onCancelExecution } = useCancelExecutionHandler({
+    workflowId: workflowId!,
+    workflow,
+  });
+
   // Show loading indicator while data is being fetched
   if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
     return (
@@ -1163,6 +1169,7 @@ export function WorkflowPageV2() {
       onCancelQueueItem={onCancelQueueItem}
       onPushThrough={onPushThrough}
       supportsPushThrough={supportsPushThrough}
+      onCancelExecution={onCancelExecution}
       getAllHistoryEvents={getAllHistoryEvents}
       onLoadMoreHistory={handleLoadMoreHistory}
       getHasMoreHistory={getHasMoreHistory}

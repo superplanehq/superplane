@@ -9,6 +9,7 @@ interface SidebarEventActionsMenuProps {
   executionId?: string;
   onCancelQueueItem?: (id: string) => void;
   onPushThrough?: (executionId: string) => void;
+  onCancelExecution?: (executionId: string) => void;
   supportsPushThrough?: boolean;
   eventState: ChildEventsState;
   onReEmit?: () => void;
@@ -20,6 +21,7 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   executionId,
   onCancelQueueItem,
   onPushThrough,
+  onCancelExecution,
   supportsPushThrough,
   eventState,
   onReEmit,
@@ -28,9 +30,10 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   const isProcessed = eventState === "processed";
   const isDiscarded = eventState === "discarded";
   const isWaiting = eventState === "waiting";
+  const isRunning = eventState === "running";
 
   const showPushThrough = supportsPushThrough && !!executionId && !(isProcessed || isDiscarded || isWaiting);
-  const showCancel = isWaiting;
+  const showCancel = (kind === "queue" && isWaiting) || (kind === "execution" && (isRunning || isWaiting));
   const showReEmit = (isProcessed || isDiscarded) && kind === "trigger";
   const showDropdown = showPushThrough || showCancel || showReEmit;
 
@@ -40,6 +43,22 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
       onReEmit?.();
     },
     [onReEmit],
+  );
+
+  const handleCancelExecution = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+
+      if (!executionId) {
+        console.warn("No executionId provided for cancel action");
+        return;
+      }
+
+      if (onCancelExecution) {
+        onCancelExecution(executionId);
+      }
+    },
+    [onCancelExecution, executionId, eventId],
   );
 
   const handlePushThrough = React.useCallback(
@@ -85,7 +104,11 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
 
       <DropdownMenuContent align="end" sideOffset={6} className="min-w-[11rem]">
         {showCancel && (
-          <DropdownMenuItem onClick={handleCancelQueueItem} className="gap-2" data-testid="cancel-queue-item">
+          <DropdownMenuItem
+            onClick={kind === "queue" ? handleCancelQueueItem : handleCancelExecution}
+            className="gap-2"
+            data-testid="cancel-queue-item"
+          >
             {React.createElement(resolveIcon("x-circle"), { size: 16 })}
             Cancel
           </DropdownMenuItem>
