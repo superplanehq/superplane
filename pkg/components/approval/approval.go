@@ -84,6 +84,19 @@ func (m *Metadata) Completed() bool {
 }
 
 func (m *Metadata) UpdateResult() {
+	//
+	// If there is a pending record, the result is pending.
+	//
+	for _, record := range m.Records {
+		if record.State == StatePending {
+			m.Result = StatePending
+			return
+		}
+	}
+
+	//
+	// If there is a rejected record, the result is rejected.
+	//
 	for _, record := range m.Records {
 		if record.State == StateRejected {
 			m.Result = StateRejected
@@ -333,16 +346,6 @@ func (a *Approval) Configuration() []configuration.Field {
 }
 
 func (a *Approval) Setup(ctx components.SetupContext) error {
-	config := Config{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
-		return err
-	}
-
-	if len(config.Items) == 0 {
-		return fmt.Errorf("invalid approval configuration: no user/role/group specified")
-	}
-
 	return nil
 }
 
