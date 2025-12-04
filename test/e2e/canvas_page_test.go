@@ -291,29 +291,7 @@ func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
 }
 
 func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
-	canvas, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
-	require.NoError(s.t, err)
-
-	nodes, err := models.FindWorkflowNodes(canvas.ID)
-	require.NoError(s.t, err)
-
-	var waitNode *models.WorkflowNode
-	for _, n := range nodes {
-		if n.Name == nodeName {
-			waitNode = &n
-			break
-		}
-	}
-	require.NotNil(s.t, waitNode, nodeName+" node not found")
-
-	var executions []models.WorkflowNodeExecution
-	query := database.Conn().
-		Where("workflow_id = ?", waitNode.WorkflowID).
-		Where("node_id = ?", waitNode.NodeID).
-		Order("created_at DESC")
-
-	err = query.Find(&executions).Error
-	require.NoError(s.t, err)
+	executions := s.canvas.GetExecutionsForNode(nodeName)
 	require.Greater(s.t, len(executions), 0, "expected at least one execution")
 
 	execution := executions[0]
