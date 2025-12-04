@@ -192,6 +192,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   pollingRef.current.hasInProgress =
     ["waiting", "running", "pending"].includes(event.state || "") ||
     executionChainData?.some((item) => item.state === ChainExecutionState.RUNNING) ||
+    executionChainData?.some((execution) =>
+      execution.children?.some((children) => children.state === ChainExecutionState.RUNNING),
+    ) ||
     false;
   pollingRef.current.loadData = () => loadExecutionChainData(true);
 
