@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Input } from "../input";
 import { FieldRendererProps } from "./types";
 
@@ -9,6 +9,15 @@ export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({
   hasError,
   allValues = {},
 }) => {
+  useEffect(() => {
+    if ((value === undefined || value === null) && field.defaultValue !== undefined) {
+      const defaultVal = field.defaultValue as string;
+      if (defaultVal && defaultVal !== "") {
+        onChange(defaultVal);
+      }
+    }
+  }, [value, field.defaultValue, onChange]);
+
   // Calculate min/max based on other fields for time gates
   const getTimeConstraints = React.useMemo(() => {
     // For endTime field in time gates, prevent selecting times before startTime

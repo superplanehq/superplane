@@ -1,4 +1,5 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { ComponentBaseProps } from "@/ui/componentBase";
 import { TriggerProps } from "@/ui/trigger";
 
 /**
@@ -34,4 +35,12 @@ export interface TriggerRenderer {
    * @returns The title and subtitle to display
    */
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent) => { title: string; subtitle: string };
+}
+
+export interface ComponentBaseMapper {
+  props(
+    nodes: ComponentsNode[],
+    node: ComponentsNode,
+    lastExecution: WorkflowsWorkflowNodeExecution | null,
+  ): ComponentBaseProps;
 }

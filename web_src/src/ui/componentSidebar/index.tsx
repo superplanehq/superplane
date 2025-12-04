@@ -10,6 +10,7 @@ import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
+import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 
 const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
   { value: "processed", label: "Processed" },
@@ -125,7 +126,10 @@ export const ComponentSidebar = ({
   getLoadingMoreQueue,
   loadExecutionChain,
 }: ComponentSidebarProps) => {
-  const [sidebarWidth, setSidebarWidth] = useState(450);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
+    return saved ? parseInt(saved, 10) : 450;
+  });
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   // Keep expanded state stable across parent re-renders
@@ -172,6 +176,11 @@ export const ComponentSidebar = ({
   const handleMouseUp = useCallback(() => {
     setIsResizing(false);
   }, []);
+
+  // Save sidebar width to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+  }, [sidebarWidth]);
 
   useEffect(() => {
     if (isResizing) {

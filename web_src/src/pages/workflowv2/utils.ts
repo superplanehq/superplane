@@ -6,7 +6,7 @@ import {
 } from "@/api-client";
 import { SidebarEvent } from "@/ui/CanvasPage";
 import { formatTimeAgo } from "@/utils/date";
-import { getTriggerRenderer } from "./renderers";
+import { getTriggerRenderer } from "./mappers";
 
 export function mapTriggerEventsToSidebarEvents(
   events: WorkflowsWorkflowEvent[],

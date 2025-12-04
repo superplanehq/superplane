@@ -9,7 +9,7 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./blueprint-canvas-reset.css";
 
 import { ComponentsComponent, ConfigurationField, SuperplaneBlueprintsOutputChannel } from "@/api-client";
@@ -89,11 +89,36 @@ export interface CustomComponentBuilderPageProps {
   canUndo?: boolean;
 }
 
+/*
+ * nodeTypes must be defined outside of the component to prevent
+ * react-flow from remounting the node types on every render.
+ */
+const nodeTypes = {
+  default: (nodeProps: { data: BlockData & { _callbacksRef?: any }; id: string; selected?: boolean }) => {
+    const { _callbacksRef, ...blockData } = nodeProps.data;
+    const callbacks = _callbacksRef?.current;
+
+    if (!callbacks) {
+      return <Block data={blockData} nodeId={nodeProps.id} selected={nodeProps.selected} />;
+    }
+
+    return (
+      <Block
+        data={blockData}
+        nodeId={nodeProps.id}
+        selected={nodeProps.selected}
+        onEdit={() => callbacks.onEdit?.current?.(nodeProps.id)}
+        onDelete={() => callbacks.onDelete?.current?.(nodeProps.id)}
+        onDuplicate={() => callbacks.onDuplicate?.current?.(nodeProps.id)}
+      />
+    );
+  },
+};
+
 // Canvas content component with ReactFlow hooks - defined outside to prevent re-creation
 function CanvasContent({
   nodes,
   edges,
-  nodeTypes,
   edgeTypes,
   onNodesChange,
   onEdgesChange,
@@ -108,7 +133,6 @@ function CanvasContent({
 }: {
   nodes: Node[];
   edges: Edge[];
-  nodeTypes: any;
   edgeTypes: any;
   onNodesChange: (changes: any) => void;
   onEdgesChange: (changes: any) => void;
@@ -364,21 +388,21 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     [props.onNodeDuplicate],
   );
 
-  const nodeTypes = useMemo(
-    () => ({
-      default: (nodeProps: { data: unknown; id: string; selected?: boolean }) => (
-        <Block
-          data={nodeProps.data as BlockData}
-          nodeId={nodeProps.id}
-          onEdit={() => handleNodeEdit(nodeProps.id)}
-          onDelete={() => handleNodeDelete(nodeProps.id)}
-          onDuplicate={() => handleNodeDuplicate(nodeProps.id)}
-          selected={nodeProps.selected}
-        />
-      ),
-    }),
-    [handleNodeEdit, handleNodeDelete, handleNodeDuplicate],
-  );
+  // Use refs for callbacks to avoid recreating nodeTypes
+  const handleNodeEditRef = useRef(handleNodeEdit);
+  handleNodeEditRef.current = handleNodeEdit;
+
+  const handleNodeDeleteRef = useRef(handleNodeDelete);
+  handleNodeDeleteRef.current = handleNodeDelete;
+
+  const handleNodeDuplicateRef = useRef(handleNodeDuplicate);
+  handleNodeDuplicateRef.current = handleNodeDuplicate;
+
+  const callbacksRef = useRef({
+    onEdit: handleNodeEditRef,
+    onDelete: handleNodeDeleteRef,
+    onDuplicate: handleNodeDuplicateRef,
+  });
 
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
   const [connectingFrom, setConnectingFrom] = useState<{
@@ -446,6 +470,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           _hoveredEdge: hoveredEdge,
           _connectingFrom: connectingFrom,
           _allEdges: props.edges,
+          _callbacksRef: callbacksRef,
         },
       })),
     [props.nodes, hoveredEdge, connectingFrom, props.edges],
@@ -490,7 +515,6 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             <CanvasContent
               nodes={nodesWithHoveredEdge}
               edges={styledEdges}
-              nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               onNodesChange={props.onNodesChange}
               onEdgesChange={props.onEdgesChange}

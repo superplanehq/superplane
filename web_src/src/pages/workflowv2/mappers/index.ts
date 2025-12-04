@@ -1,7 +1,8 @@
-import { TriggerRenderer } from "./types";
+import { ComponentBaseMapper, TriggerRenderer } from "./types";
 import { defaultTriggerRenderer } from "./default";
 import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer } from "./schedule";
+import { noopMapper } from "./noop";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -12,10 +13,22 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
   schedule: scheduleTriggerRenderer,
 };
 
+const componentBaseMappers: Record<string, ComponentBaseMapper> = {
+  noop: noopMapper,
+};
+
 /**
  * Get the appropriate renderer for a trigger type.
  * Falls back to the default renderer if no specific renderer is registered.
  */
 export function getTriggerRenderer(triggerName: string): TriggerRenderer {
   return triggerRenderers[triggerName] || defaultTriggerRenderer;
+}
+
+/**
+ * Get the appropriate renderer for a trigger type.
+ * Falls back to the default renderer if no specific renderer is registered.
+ */
+export function getComponentBaseMapper(componentName: string): ComponentBaseMapper {
+  return componentBaseMappers[componentName];
 }

@@ -52,8 +52,8 @@ import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { getTriggerRenderer } from "./renderers";
-import { TriggerRenderer } from "./renderers/types";
+import { getComponentBaseMapper, getTriggerRenderer } from "./mappers";
+import { TriggerRenderer } from "./mappers/types";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
@@ -1545,7 +1545,7 @@ function prepareComponentNode(
     case "if":
       return prepareIfNode(nodes, node, nodeExecutionsMap);
     case "noop":
-      return prepareNoopNode(nodes, node, components, nodeExecutionsMap);
+      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap);
     case "filter":
       return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
     case "http":
@@ -1872,7 +1872,7 @@ function prepareIfNode(
   };
 }
 
-function prepareNoopNode(
+function prepareComponentBaseNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
@@ -1880,41 +1880,17 @@ function prepareNoopNode(
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
-  const metadata = components.find((c) => c.name === "noop");
-
-  // Get last event data
-  let lastEvent;
-  if (execution) {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    lastEvent = {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: executionToEventSectionState(execution),
-    };
-  }
-
+  const metadata = components.find((c) => c.name === node.component?.name);
   const displayLabel = node.name || metadata?.label!;
 
   return {
     id: node.id!,
     position: { x: node.position?.x || 0, y: node.position?.y || 0 },
     data: {
-      type: "noop",
+      type: "component",
       label: displayLabel,
       state: "pending" as const,
-      noop: {
-        title: displayLabel,
-        lastEvent: lastEvent || {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
+      component: getComponentBaseMapper(node.component?.name!).props(nodes, node, execution),
     },
   };
 }
