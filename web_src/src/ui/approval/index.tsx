@@ -10,6 +10,7 @@ import { resolveIcon } from "@/lib/utils";
 import { ListFilter } from "lucide-react";
 import { SpecsTooltip } from "../componentBase/SpecsTooltip";
 import type { ComponentBaseSpecValue } from "../componentBase";
+import { getEventItemRenderer } from "@/pages/workflowv2/renderers/eventItems";
 
 export interface AwaitingEvent {
   title: string;
@@ -106,36 +107,36 @@ export const Approval: React.FC<ApprovalProps> = ({
     return calcRelativeTimeFromDiff(diff);
   }, [lastRunData]);
 
-  const LastRunIcon = React.useMemo(() => {
+  const eventStyleProps = React.useMemo(() => {
     if (!lastRunData) return null;
-    if (lastRunData.state === "processed") {
-      return resolveIcon("check");
-    } else if (lastRunData.state === "discarded") {
-      return resolveIcon("x");
-    } else {
-      return resolveIcon("loader-2");
-    }
+
+    const renderer = getEventItemRenderer("approval");
+    return renderer.getEventItemStyle(lastRunData.state, "approval");
   }, [lastRunData]);
+
+  const LastRunIcon = React.useMemo(() => {
+    if (!eventStyleProps) return null;
+    return resolveIcon(eventStyleProps.iconName);
+  }, [eventStyleProps]);
 
   const LastRunColor = React.useMemo(() => {
-    if (!lastRunData) return "text-gray-700";
-    if (lastRunData.state === "processed") {
-      return "text-green-700";
-    } else if (lastRunData.state === "discarded") {
-      return "text-red-700";
-    } else {
-      return "text-blue-700";
-    }
-  }, [lastRunData]);
+    if (!eventStyleProps) return "text-gray-700";
+    return eventStyleProps.iconColor;
+  }, [eventStyleProps]);
 
   const LastRunBackground = React.useMemo(() => {
-    if (!lastRunData) return "bg-gray-200";
+    if (!eventStyleProps) return "bg-gray-200";
+    return eventStyleProps.iconBackground;
+  }, [eventStyleProps]);
+
+  const LastRunIconBackground = React.useMemo(() => {
+    if (!lastRunData) return "bg-gray-400";
     if (lastRunData.state === "processed") {
-      return "bg-green-200";
+      return "bg-green-600";
     } else if (lastRunData.state === "discarded") {
-      return "bg-red-200";
+      return "bg-red-600";
     } else {
-      return "bg-blue-200";
+      return "bg-blue-600";
     }
   }, [lastRunData]);
 
@@ -222,7 +223,7 @@ export const Approval: React.FC<ApprovalProps> = ({
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <div
-                    className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${lastRunData.state === "processed" ? "bg-green-600" : lastRunData.state === "discarded" ? "bg-red-600" : "bg-blue-600"}`}
+                    className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${LastRunIconBackground}`}
                   >
                     {LastRunIcon && <LastRunIcon size={12} className="text-white" />}
                   </div>

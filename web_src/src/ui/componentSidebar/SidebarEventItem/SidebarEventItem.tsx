@@ -6,6 +6,7 @@ import { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../SimpleTooltip";
+import { getEventItemRenderer } from "@/pages/workflowv2/renderers/eventItems";
 
 export enum ChainExecutionState {
   COMPLETED = "completed",
@@ -293,57 +294,32 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     }
   }, [tabData, activeTab, getDefaultActiveTab]);
 
-  let EventIcon = resolveIcon("check");
-  let EventColor = "text-green-700";
-  let EventBackground = "bg-green-200";
-  let titleColor = "text-black";
-  let iconSize = 16;
-  let iconContainerSize = 4;
-  let iconStrokeWidth = 2;
-  let animation = "";
+  // Use the event item renderer to get styling
+  const renderer = getEventItemRenderer(event.componentType);
+  let eventStyle = renderer.getEventItemStyle(event.state, event.componentType, event.eventData);
 
-  switch (event.state) {
-    case "processed":
-      EventIcon = resolveIcon("circle-check");
-      EventColor = "text-green-700";
-      EventBackground = "bg-green-200";
-      titleColor = "text-green-800";
-      iconSize = 16;
-      break;
-    case "discarded":
-      EventIcon = resolveIcon("circle-x");
-      EventColor = "text-red-700";
-      EventBackground = "bg-red-200";
-      titleColor = "text-red-800";
-      iconSize = 16;
-      break;
-    case "waiting":
-      if (variant === "queue") {
-        // Match node card styling (neutral grey + dashed icon)
-        EventIcon = resolveIcon("circle-dashed");
-        EventColor = "text-gray-500";
-        EventBackground = "bg-gray-100";
-        titleColor = "text-gray-600";
-        iconSize = 16;
-        animation = "";
-      } else {
-        EventIcon = resolveIcon("refresh-cw");
-        EventColor = "text-blue-700";
-        EventBackground = "bg-blue-100";
-        titleColor = "text-blue-800";
-        iconSize = 16;
-        animation = "animate-spin";
-      }
-      break;
-    case "running":
-      EventIcon = resolveIcon("refresh-cw");
-      EventColor = "text-blue-700";
-      EventBackground = "bg-blue-100";
-      titleColor = "text-blue-800";
-      iconSize = 16;
-      animation = "animate-spin";
-      break;
+  // Special case for queue variant waiting state
+  if (event.state === "waiting" && variant === "queue") {
+    eventStyle = {
+      iconName: "circle-dashed",
+      iconColor: "text-gray-500",
+      iconBackground: "bg-gray-100",
+      titleColor: "text-gray-600",
+      iconSize: 16,
+      iconContainerSize: 4,
+      iconStrokeWidth: 2,
+      animation: "",
+    };
   }
+
+  const EventIcon = resolveIcon(eventStyle.iconName);
+  const EventColor = eventStyle.iconColor;
+  const EventBackground = eventStyle.iconBackground;
+  const titleColor = eventStyle.titleColor;
+  const iconSize = eventStyle.iconSize;
+  const iconContainerSize = eventStyle.iconContainerSize;
+  const iconStrokeWidth = eventStyle.iconStrokeWidth;
+  const animation = eventStyle.animation;
 
   return (
     <div

@@ -2,6 +2,7 @@ import { TriggerRenderer } from "./types";
 import { defaultTriggerRenderer } from "./default";
 import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer } from "./schedule";
+import { approvalTriggerRenderer } from "./approval";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -10,6 +11,7 @@ import { scheduleTriggerRenderer } from "./schedule";
 const triggerRenderers: Record<string, TriggerRenderer> = {
   github: githubTriggerRenderer,
   schedule: scheduleTriggerRenderer,
+  approval: approvalTriggerRenderer,
 };
 
 /**

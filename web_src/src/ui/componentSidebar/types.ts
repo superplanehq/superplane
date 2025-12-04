@@ -18,4 +18,8 @@ export interface SidebarEvent {
   triggerEventId?: string;
   // Optional explicit kind for clarity
   kind?: "execution" | "trigger" | "queue";
+  // Component type for renderer selection
+  componentType?: string;
+  // Event data for component-specific rendering
+  eventData?: Record<string, unknown>;
 }
