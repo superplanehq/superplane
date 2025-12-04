@@ -160,3 +160,17 @@ func (s *WorkflowService) ListChildExecutions(ctx context.Context, req *pb.ListC
 
 	return workflows.ListChildExecutions(ctx, s.registry, workflowID, executionID)
 }
+
+func (s *WorkflowService) CancelExecution(ctx context.Context, req *pb.CancelExecutionRequest) (*pb.CancelExecutionResponse, error) {
+	workflowID, err := uuid.Parse(req.WorkflowId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+	}
+
+	executionID, err := uuid.Parse(req.ExecutionId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid execution_id")
+	}
+
+	return workflows.CancelExecution(ctx, s.registry, workflowID, executionID)
+}
