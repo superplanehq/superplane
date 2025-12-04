@@ -30,6 +30,15 @@ func TestCustomComponents(t *testing.T) {
 		steps.SaveComponent()
 		steps.AssertComponentHasOutputs()
 	})
+
+	t.Run("set up configuration options", func(t *testing.T) {
+		steps.Start()
+		steps.StartCreatingComponent()
+		steps.AddTwoNodesAndConnect()
+		steps.SetUpConfigurationOptions()
+		steps.SaveComponent()
+		steps.AssertComponentHasConfiguration()
+	})
 }
 
 type CustomComponentsSteps struct {
@@ -54,8 +63,8 @@ func (s *CustomComponentsSteps) StartCreatingComponent() {
 }
 
 func (s *CustomComponentsSteps) AddTwoNodesAndConnect() {
-	s.component.AddNoop("First", models.Position{X: 500, Y: 250})
-	s.component.AddNoop("Second", models.Position{X: 900, Y: 250})
+	s.component.AddNoop("First", models.Position{X: 900, Y: 250})
+	s.component.AddNoop("Second", models.Position{X: 1200, Y: 250})
 	s.component.Connect("First", "Second")
 }
 
@@ -67,6 +76,16 @@ func (s *CustomComponentsSteps) SetUpOutputs() {
 
 func (s *CustomComponentsSteps) SaveComponent() {
 	s.component.Save()
+}
+
+func (s *CustomComponentsSteps) SetUpConfigurationOptions() {
+	s.component.OpenComponentSettings()
+	s.component.ClickAddConfig()
+	s.component.AddConfigurationField("environment", "Environment")
+}
+
+func (s *CustomComponentsSteps) AssertComponentHasConfiguration() {
+	s.component.AssertConfigurationFieldExists("environment", "Environment", "string")
 }
 
 func (s *CustomComponentsSteps) AssertComponentHasOutputs() {

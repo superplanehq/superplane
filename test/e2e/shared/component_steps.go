@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/models"
 
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -153,6 +154,10 @@ func (s *ComponentSteps) ClickOutputChannelsTab() {
 	s.session.Sleep(300)
 }
 
+func (s *ComponentSteps) ClickAddConfig() {
+	s.session.Click(q.TestID("add-config-field-btn"))
+}
+
 func (s *ComponentSteps) AddOutputChannel(channelName, nodeName, nodeOutputChannel string) {
 	// Click "Add Output Channel" button to open modal
 	s.session.Click(q.Text("Add Output Channel"))
@@ -211,4 +216,36 @@ func (s *ComponentSteps) AssertOutputChannelExists(channelName, nodeName, nodeOu
 	require.NotNil(s.t, foundChannel, "output channel '%s' not found in blueprint", channelName)
 	require.Equal(s.t, targetNode.ID, foundChannel.NodeID, "output channel points to wrong node")
 	require.Equal(s.t, nodeOutputChannel, foundChannel.NodeOutputChannel, "output channel uses wrong node output channel")
+}
+
+func (s *ComponentSteps) AddConfigurationField(fieldName, fieldLabel string) {
+	nameInput := q.TestID("config-field-name-input")
+	labelInput := q.TestID("config-field-label-input")
+	defaultValueInput := q.TestID("config-field-default-value-input")
+	saveButton := q.TestID("add-config-field-submit-button")
+
+	s.session.FillIn(nameInput, fieldName)
+	s.session.FillIn(labelInput, fieldLabel)
+	s.session.FillIn(defaultValueInput, "default")
+	s.session.Click(saveButton)
+}
+
+func (s *ComponentSteps) AssertConfigurationFieldExists(fieldName, fieldLabel, fieldType string) {
+	// Fetch the blueprint from the database
+	blueprint, err := models.FindBlueprintByName(s.ComponentName, s.session.OrgID)
+	require.NoError(s.t, err, "failed to find blueprint in database")
+	require.NotNil(s.t, blueprint, "blueprint not found in database")
+
+	// Find the configuration field with the given name
+	var foundField *configuration.Field
+	for _, field := range blueprint.Configuration {
+		if field.Name == fieldName {
+			foundField = &field
+			break
+		}
+	}
+
+	require.NotNil(s.t, foundField, "configuration field '%s' not found in blueprint", fieldName)
+	require.Equal(s.t, fieldLabel, foundField.Label, "configuration field label mismatch")
+	require.Equal(s.t, fieldType, foundField.Type, "configuration field type mismatch")
 }
