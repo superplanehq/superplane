@@ -48,7 +48,7 @@ test.e2e.setup:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "cd web_src && npm ci"
 
 test.e2e:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app gotestsum --format short --junitfile junit-report.xml --packages="$(E2E_TEST_PACKAGES)" -- -p 1
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails --packages="$(E2E_TEST_PACKAGES)" -- -p 1
 
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1

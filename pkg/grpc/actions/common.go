@@ -255,17 +255,11 @@ func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
 	}
 
 	if field.Default != nil {
-		defaultBytes, err := json.Marshal(field.Default)
-		if err == nil {
-			defaultStr := string(defaultBytes)
-			pbField.DefaultValue = &defaultStr
-		}
+		pbField.DefaultValue = defaultValueToProto(field.Default)
 	}
 
-	// Map placeholder if provided
 	if field.Placeholder != "" {
-		ph := field.Placeholder
-		pbField.Placeholder = &ph
+		pbField.Placeholder = &field.Placeholder
 	}
 
 	if len(field.VisibilityConditions) > 0 {
@@ -478,7 +472,7 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 	}
 
 	if pbField.DefaultValue != nil {
-		field.Default = *pbField.DefaultValue
+		field.Default = defaultValueFromProto(pbField.Type, *pbField.DefaultValue)
 	}
 
 	if pbField.Placeholder != nil {
@@ -721,4 +715,95 @@ func CheckForCycles(nodes []*componentpb.Node, edges []*componentpb.Edge) error 
 	}
 
 	return nil
+}
+
+func defaultValueToProto(value any) *string {
+	// We are converting the "default value" of a configuration
+	// field to its protobuf representation.
+
+	// The field can have different types, and the default value
+	// can be a simple scalar (string, number, boolean) or a complex
+	// structure (list, object).
+
+	// For simple scalar types, we can directly convert the default
+	// value to a string and return it.
+
+	if str, ok := value.(string); ok {
+		return &str
+	}
+
+	// For complex types, we need to serialize the default value
+	// to JSON so that we can reconstruct the original structure
+	// when deserializing.
+
+	defaultBytes, err := json.Marshal(value)
+	if err == nil {
+		str := string(defaultBytes)
+		return &str
+	}
+
+	// This should never happen, as we should be able to
+	// marshal any value to JSON. Panic in this case.
+	panic("unable to marshal default value to JSON")
+}
+
+func defaultValueFromProto(fieldType, defaultValue string) any {
+	switch fieldType {
+	case configuration.FieldTypeString:
+		fallthrough
+	case configuration.FieldTypeGitRef:
+		fallthrough
+	case configuration.FieldTypeSelect:
+		fallthrough
+	case configuration.FieldTypeIntegration:
+		fallthrough
+	case configuration.FieldTypeIntegrationResource:
+		fallthrough
+	case configuration.FieldTypeTime:
+		fallthrough
+	case configuration.FieldTypeDate:
+		fallthrough
+	case configuration.FieldTypeDateTime:
+		fallthrough
+	case configuration.FieldTypeDayInYear:
+		fallthrough
+	case configuration.FieldTypeUser:
+		fallthrough
+	case configuration.FieldTypeRole:
+		fallthrough
+	case configuration.FieldTypeGroup:
+		// String-like types: preserve the raw string.
+		return defaultValue
+
+	case configuration.FieldTypeMultiSelect:
+		fallthrough
+	case configuration.FieldTypeList:
+		fallthrough
+	case configuration.FieldTypeObject:
+		// Complex/collection types: decode JSON into structured values.
+		var v any
+		if err := json.Unmarshal([]byte(defaultValue), &v); err == nil {
+			return v
+		}
+		return defaultValue
+
+	case configuration.FieldTypeBool:
+		// Boolean: decode JSON into a bool, fall back to raw string.
+		var v bool
+		if err := json.Unmarshal([]byte(defaultValue), &v); err == nil {
+			return v
+		}
+		return defaultValue
+
+	case configuration.FieldTypeNumber:
+		// Number: decode JSON into a float64, fall back to raw string.
+		var v float64
+		if err := json.Unmarshal([]byte(defaultValue), &v); err == nil {
+			return v
+		}
+		return defaultValue
+
+	default:
+		return defaultValue
+	}
 }
