@@ -15,6 +15,7 @@ import type { BreadcrumbItem, NewNodeData } from "../../ui/CustomComponentBuilde
 import { CustomComponentBuilderPage } from "../../ui/CustomComponentBuilderPage";
 import { filterVisibleConfiguration } from "../../utils/components";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
+import { getComponentBaseMapper } from "../workflowv2/mappers";
 
 const elk = new ELK();
 
@@ -61,7 +62,7 @@ const getBlockType = (componentName: string): BlockData["type"] => {
     if: "if",
     filter: "filter",
     approval: "approval",
-    noop: "noop",
+    noop: "component",
     http: "http",
     semaphore: "semaphore",
     wait: "wait",
@@ -180,15 +181,8 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
         hideLastRun: true,
       };
       break;
-    case "noop":
-      baseData.noop = {
-        title: node.name,
-        lastEvent: {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        collapsed: false,
-      };
+    case "component":
+      baseData.component = getComponentBaseMapper(component?.name!).props([], node, null);
       break;
     case "time_gate":
       const mode = node.configuration?.mode || "include_range";
@@ -534,8 +528,8 @@ export const CustomComponent = () => {
               duration: filteredConfiguration.duration,
             };
           }
-          if (nodeData.noop) {
-            updatedData.noop = { ...nodeData.noop, title: nodeName.trim() };
+          if (nodeData.component) {
+            updatedData.component = { ...nodeData.component, title: nodeName.trim() };
           }
           if (nodeData.time_gate) {
             const mode = filteredConfiguration.mode || "include_range";
@@ -695,9 +689,9 @@ export const CustomComponent = () => {
               title: duplicateName,
             },
           }),
-          ...(nodeData.noop && {
-            noop: {
-              ...nodeData.noop,
+          ...(nodeData.component && {
+            component: {
+              ...nodeData.component,
               title: duplicateName,
             },
           }),

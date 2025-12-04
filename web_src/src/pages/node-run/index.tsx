@@ -5,7 +5,7 @@ import { BlueprintsBlueprint, ComponentsComponent, ComponentsEdge, ComponentsNod
 import { useBlueprint, useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useChildExecutions, useWorkflow } from "@/hooks/useWorkflowData";
-import { getTriggerRenderer } from "@/pages/workflowv2/renderers";
+import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
 import { CanvasEdge, CanvasNode, CanvasPage } from "@/ui/CanvasPage";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 

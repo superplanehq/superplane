@@ -11,18 +11,18 @@ import { Semaphore, SemaphoreProps } from "../semaphore";
 import { TimeGate, TimeGateProps } from "../timeGate";
 import { If, IfProps } from "../if";
 import MergeComponent, { type MergeComponentProps } from "../merge";
-import { Noop, NoopProps } from "../noop";
 import { ComponentActionsProps } from "../types/componentActions";
 import { Wait, WaitProps } from "../wait";
+import { ComponentBase, ComponentBaseProps } from "../componentBase";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
 type BlockType =
   | "trigger"
+  | "component"
   | "composite"
   | "approval"
   | "filter"
   | "if"
-  | "noop"
   | "http"
   | "semaphore"
   | "wait"
@@ -52,6 +52,9 @@ export interface BlockData {
   // trigger node specific props
   trigger?: TriggerProps;
 
+  // component base specific props
+  component?: ComponentBaseProps;
+
   // composite node specific props
   composite?: CompositeProps;
 
@@ -63,9 +66,6 @@ export interface BlockData {
 
   // if node specific props
   if?: IfProps;
-
-  // noop node specific props
-  noop?: NoopProps;
 
   // http node specific props
   http?: HttpProps;
@@ -139,7 +139,6 @@ function LeftHandle({ data, nodeId }: BlockProps) {
     (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "filter" && data.filter?.collapsed) ||
     (data.type === "if" && data.if?.collapsed) ||
-    (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "http" && data.http?.collapsed) ||
     (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
@@ -191,7 +190,6 @@ function RightHandle({ data, nodeId }: BlockProps) {
     (data.type === "trigger" && data.trigger?.collapsed) ||
     (data.type === "filter" && data.filter?.collapsed) ||
     (data.type === "if" && data.if?.collapsed) ||
-    (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "http" && data.http?.collapsed) ||
     (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
@@ -419,6 +417,8 @@ function BlockContent({
   switch (data.type) {
     case "trigger":
       return <Trigger {...(data.trigger as TriggerProps)} selected={selected} {...actionProps} />;
+    case "component":
+      return <ComponentBase {...(data.component as ComponentBaseProps)} selected={selected} {...actionProps} />;
     case "composite":
       return (
         <Composite
@@ -434,8 +434,6 @@ function BlockContent({
       return <Filter {...(data.filter as FilterProps)} selected={selected} {...actionProps} />;
     case "if":
       return <If {...(data.if as IfProps)} selected={selected} {...actionProps} />;
-    case "noop":
-      return <Noop {...(data.noop as NoopProps)} selected={selected} {...actionProps} />;
     case "http":
       return <Http {...(data.http as HttpProps)} selected={selected} {...actionProps} />;
     case "semaphore":
