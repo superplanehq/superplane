@@ -17,8 +17,9 @@ const (
 	WorkflowNodeExecutionStateStarted  = "started"
 	WorkflowNodeExecutionStateFinished = "finished"
 
-	WorkflowNodeExecutionResultPassed = "passed"
-	WorkflowNodeExecutionResultFailed = "failed"
+	WorkflowNodeExecutionResultPassed    = "passed"
+	WorkflowNodeExecutionResultFailed    = "failed"
+	WorkflowNodeExecutionResultCancelled = "cancelled"
 
 	WorkflowNodeExecutionResultReasonError = "error"
 )
@@ -415,6 +416,60 @@ func (e *WorkflowNodeExecution) FailInTransaction(tx *gorm.DB, reason, message s
 		}
 
 		return parent.FailInTransaction(tx, reason, message)
+	}
+
+	return nil
+}
+
+func (e *WorkflowNodeExecution) Cancel() error {
+	return e.CancelInTransaction(database.Conn())
+}
+
+func (e *WorkflowNodeExecution) CancelInTransaction(tx *gorm.DB) error {
+	now := time.Now()
+
+	err := tx.Model(e).
+		Updates(map[string]interface{}{
+			"state":      WorkflowNodeExecutionStateFinished,
+			"result":     WorkflowNodeExecutionResultCancelled,
+			"updated_at": &now,
+		}).Error
+
+	if err != nil {
+		return err
+	}
+
+	childExecutions, err := FindChildExecutionsInTransaction(tx, e.ID, []string{WorkflowNodeExecutionStatePending, WorkflowNodeExecutionStateStarted})
+	if err != nil {
+		return err
+	}
+
+	for _, child := range childExecutions {
+		err := child.CancelInTransaction(tx)
+		if err != nil {
+			return err
+		}
+	}
+
+	node, err := FindWorkflowNode(tx, e.WorkflowID, e.NodeID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	if node != nil {
+		err := node.UpdateState(tx, WorkflowNodeStateReady)
+		if err != nil {
+			return err
+		}
+	}
+
+	if e.ParentExecutionID != nil {
+		parent, err := FindNodeExecution(e.WorkflowID, *e.ParentExecutionID)
+		if err != nil {
+			return err
+		}
+
+		return parent.CancelInTransaction(tx)
 	}
 
 	return nil

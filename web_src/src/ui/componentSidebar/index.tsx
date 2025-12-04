@@ -55,8 +55,9 @@ interface ComponentSidebarProps {
   // Tab data function to get tab data for each event
   getTabData?: (event: SidebarEvent) => TabData | undefined;
 
-  // Queue actions
+  // Execution and Queue actions
   onCancelQueueItem?: (id: string) => void;
+  onCancelExecution?: (executionId: string) => void;
   onPushThrough?: (executionId: string) => void;
   supportsPushThrough?: boolean;
 
@@ -112,6 +113,7 @@ export const ComponentSidebar = ({
   isCompactView = false,
   getTabData,
   onCancelQueueItem,
+  onCancelExecution,
   onPushThrough,
   supportsPushThrough,
   onLoadMoreHistory,
@@ -454,6 +456,7 @@ export const ComponentSidebar = ({
                       onEventClick={onEventClick}
                       tabData={getTabData?.(event)}
                       onPushThrough={onPushThrough}
+                      onCancelExecution={onCancelExecution}
                       supportsPushThrough={supportsPushThrough}
                       onReEmit={onReEmit}
                       loadExecutionChain={loadExecutionChain}
@@ -506,6 +509,7 @@ export const ComponentSidebar = ({
                         onEventClick={onEventClick}
                         tabData={getTabData?.(event)}
                         onPushThrough={onPushThrough}
+                        onCancelExecution={onCancelExecution}
                         supportsPushThrough={supportsPushThrough}
                         onReEmit={onReEmit}
                         loadExecutionChain={loadExecutionChain}

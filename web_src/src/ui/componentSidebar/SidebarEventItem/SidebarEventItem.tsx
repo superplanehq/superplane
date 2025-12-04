@@ -38,6 +38,7 @@ interface SidebarEventItemProps {
   onEventClick?: (event: SidebarEvent) => void;
   tabData?: TabData;
   onCancelQueueItem?: (id: string) => void;
+  onCancelExecution?: (executionId: string) => void;
   onPushThrough?: (executionId: string) => void;
   supportsPushThrough?: boolean;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
@@ -58,6 +59,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   onEventClick,
   tabData,
   onCancelQueueItem,
+  onCancelExecution,
   onPushThrough,
   supportsPushThrough,
   onReEmit,
@@ -190,6 +192,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   pollingRef.current.hasInProgress =
     ["waiting", "running", "pending"].includes(event.state || "") ||
     executionChainData?.some((item) => item.state === ChainExecutionState.RUNNING) ||
+    executionChainData?.some((execution) =>
+      execution.children?.some((children) => children.state === ChainExecutionState.RUNNING),
+    ) ||
     false;
   pollingRef.current.loadData = () => loadExecutionChainData(true);
 
@@ -374,6 +379,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           eventId={event.id}
           executionId={event.executionId}
           onCancelQueueItem={onCancelQueueItem}
+          onCancelExecution={onCancelExecution}
           onPushThrough={onPushThrough}
           supportsPushThrough={supportsPushThrough}
           eventState={event.state}

@@ -44,7 +44,8 @@ export function mapExecutionsToSidebarEvents(
     const state =
       execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
         ? ("processed" as const)
-        : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
+        : execution.state === "STATE_FINISHED" &&
+            (execution.result === "RESULT_FAILED" || execution.result === "RESULT_CANCELLED")
           ? ("discarded" as const)
           : execution.state === "STATE_STARTED"
             ? ("running" as const)

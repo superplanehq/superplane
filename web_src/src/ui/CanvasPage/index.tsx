@@ -124,6 +124,7 @@ export interface CanvasPageProps {
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
   onPushThrough?: (nodeId: string, executionId: string) => void;
+  onCancelExecution?: (nodeId: string, executionId: string) => void;
   supportsPushThrough?: (nodeId: string) => boolean;
   onDirty?: () => void;
 
@@ -394,6 +395,12 @@ function CanvasPage(props: CanvasPageProps) {
     }
   };
 
+  const handleCancelExecution = (executionId: string) => {
+    if (state.componentSidebar.selectedNodeId && props.onCancelExecution) {
+      props.onCancelExecution!(state.componentSidebar.selectedNodeId!, executionId);
+    }
+  };
+
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
@@ -458,6 +465,7 @@ function CanvasPage(props: CanvasPageProps) {
             getTabData={props.getTabData}
             onCancelQueueItem={handleCancelQueueItem}
             onPushThrough={handlePushThrough}
+            onCancelExecution={handleCancelExecution}
             supportsPushThrough={props.supportsPushThrough}
             onRun={handleNodeRun}
             onDuplicate={props.onDuplicate}
@@ -537,6 +545,7 @@ function Sidebar({
   getTabData,
   onCancelQueueItem,
   onPushThrough,
+  onCancelExecution,
   supportsPushThrough,
   onRun,
   onDuplicate,
@@ -564,6 +573,7 @@ function Sidebar({
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   onCancelQueueItem?: (id: string) => void;
   onPushThrough?: (executionId: string) => void;
+  onCancelExecution?: (executionId: string) => void;
   supportsPushThrough?: (nodeId: string) => boolean;
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
@@ -658,6 +668,7 @@ function Sidebar({
       }
       onCancelQueueItem={onCancelQueueItem}
       onPushThrough={onPushThrough}
+      onCancelExecution={onCancelExecution}
       supportsPushThrough={supportsPushThrough?.(state.componentSidebar.selectedNodeId!)}
       onRun={onRun ? () => onRun(state.componentSidebar.selectedNodeId!) : undefined}
       runDisabled={runDisabled}

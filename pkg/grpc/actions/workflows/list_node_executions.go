@@ -288,6 +288,8 @@ func NodeExecutionResultToProto(result string) pb.WorkflowNodeExecution_Result {
 		return pb.WorkflowNodeExecution_RESULT_PASSED
 	case models.WorkflowNodeExecutionResultFailed:
 		return pb.WorkflowNodeExecution_RESULT_FAILED
+	case models.WorkflowNodeExecutionResultCancelled:
+		return pb.WorkflowNodeExecution_RESULT_CANCELLED
 	default:
 		return pb.WorkflowNodeExecution_RESULT_UNKNOWN
 	}
