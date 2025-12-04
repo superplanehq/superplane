@@ -82,7 +82,11 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertRunningItemsCount("Wait", 1)
 		steps.assertQueuedItemsCount("Wait", 3)
 		steps.cancelRunningExecutionFromSidebar()
-		steps.assertExecutionWasCancelled("Wait")
+
+		//
+		// Since we have more items in queue, it is expected that the cancelled execution is at index 1
+		//
+		steps.assertExecutionWasCancelled("Wait", 1)
 	})
 }
 
@@ -290,10 +294,10 @@ func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
 	s.session.Sleep(500) // wait for the cancellation to be processed
 }
 
-func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
+func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string, executionIndex int32) {
 	executions := s.canvas.GetExecutionsForNode(nodeName)
 	require.Greater(s.t, len(executions), 0, "expected at least one execution")
 
-	execution := executions[0]
+	execution := executions[executionIndex]
 	require.Equal(s.t, models.WorkflowNodeExecutionResultCancelled, execution.Result, "expected execution to be cancelled")
 }
