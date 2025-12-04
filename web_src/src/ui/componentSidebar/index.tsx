@@ -123,7 +123,10 @@ export const ComponentSidebar = ({
   getLoadingMoreQueue,
   loadExecutionChain,
 }: ComponentSidebarProps) => {
-  const [sidebarWidth, setSidebarWidth] = useState(450);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem("componentSidebarWidth");
+    return saved ? parseInt(saved, 10) : 450;
+  });
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   // Keep expanded state stable across parent re-renders
@@ -170,6 +173,11 @@ export const ComponentSidebar = ({
   const handleMouseUp = useCallback(() => {
     setIsResizing(false);
   }, []);
+
+  // Save sidebar width to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("componentSidebarWidth", String(sidebarWidth));
+  }, [sidebarWidth]);
 
   useEffect(() => {
     if (isResizing) {
