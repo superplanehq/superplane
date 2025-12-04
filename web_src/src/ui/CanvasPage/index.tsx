@@ -175,6 +175,7 @@ export interface CanvasPageProps {
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
+export const COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY = "componentSidebarWidth";
 
 const EDGE_STYLE = {
   type: "custom",
@@ -616,10 +617,13 @@ function Sidebar({
 
   // Show loading state when data is being fetched
   if (sidebarData.isLoading) {
+    const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
+    const sidebarWidth = saved ? parseInt(saved, 10) : 450;
+
     return (
       <div
         className="border-l-1 border-gray-200 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
-        style={{ width: "420px" }}
+        style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
       >
         <div className="flex items-center justify-center h-full">
           <div className="flex flex-col items-center gap-3">
