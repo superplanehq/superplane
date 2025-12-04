@@ -73,6 +73,16 @@ func TestCanvasPage(t *testing.T) {
 		steps.cancelFirstQueueItemFromSidebar()
 		steps.assertQueuedItemsCount("Wait", 2)
 	})
+
+	t.Run("canceling running execution from the sidebar", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasWithManualTriggerAndWaitNodeAndRunningExecution()
+		steps.openSidebarForNode("Wait")
+
+		steps.assertRunningItemsCount("Wait", 1)
+		steps.cancelRunningExecutionFromSidebar()
+		steps.assertExecutionWasCancelled("Wait")
+	})
 }
 
 type CanvasPageSteps struct {
@@ -268,4 +278,65 @@ func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
 	s.session.Click(q.TestID("cancel-queue-item"))
 	s.session.TakeScreenshot()
 	s.session.Sleep(500) // wait for the cancellation to be processed
+}
+
+func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndRunningExecution() {
+	s.canvas = shared.NewCanvasSteps("E2E Canvas With Running Execution", s.t, s.session)
+
+	s.canvas.Create()
+	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
+	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 10, "Seconds")
+	s.canvas.Connect("Start", "Wait")
+	s.canvas.Save()
+
+	dropdown := q.TestID("node", "start", "header-dropdown")
+	runButton := q.Locator("button:has-text('Run')")
+	emitEvent := q.Locator("button:has-text('Emit Event')")
+
+	// Run only one execution to get a running item
+	s.session.Click(dropdown)
+	s.session.Click(runButton)
+	s.session.Click(emitEvent)
+
+	// wait for the execution to start processing
+	s.session.Sleep(500)
+}
+
+func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
+	s.session.Click(q.Locator("h2:has-text('Running') ~ div button[aria-label='Open actions']"))
+	s.session.TakeScreenshot()
+	s.session.Sleep(300)
+	s.session.Click(q.TestID("cancel-queue-item"))
+	s.session.TakeScreenshot()
+	s.session.Sleep(500) // wait for the cancellation to be processed
+}
+
+func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
+	canvas, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
+	require.NoError(s.t, err)
+
+	nodes, err := models.FindWorkflowNodes(canvas.ID)
+	require.NoError(s.t, err)
+
+	var waitNode *models.WorkflowNode
+	for _, n := range nodes {
+		if n.Name == nodeName {
+			waitNode = &n
+			break
+		}
+	}
+	require.NotNil(s.t, waitNode, nodeName+" node not found")
+
+	var executions []models.WorkflowNodeExecution
+	query := database.Conn().
+		Where("workflow_id = ?", waitNode.WorkflowID).
+		Where("node_id = ?", waitNode.NodeID).
+		Order("created_at DESC")
+
+	err = query.Find(&executions).Error
+	require.NoError(s.t, err)
+	require.Greater(s.t, len(executions), 0, "expected at least one execution")
+
+	execution := executions[0]
+	require.Equal(s.t, models.WorkflowNodeExecutionResultCancelled, execution.Result, "expected execution to be cancelled")
 }
