@@ -84,6 +84,19 @@ func (m *Metadata) Completed() bool {
 }
 
 func (m *Metadata) UpdateResult() {
+	//
+	// If there is a pending record, the result is pending.
+	//
+	for _, record := range m.Records {
+		if record.State == StatePending {
+			m.Result = StatePending
+			return
+		}
+	}
+
+	//
+	// If there is a rejected record, the result is rejected.
+	//
 	for _, record := range m.Records {
 		if record.State == StateRejected {
 			m.Result = StateRejected
@@ -352,7 +365,18 @@ func (a *Approval) Execute(ctx components.ExecutionContext) error {
 		return err
 	}
 
+	metadata.UpdateResult()
 	ctx.MetadataContext.Set(metadata)
+
+	//
+	// If no items are specified, just finish the execution.
+	//
+	if metadata.Completed() {
+		return ctx.ExecutionStateContext.Pass(map[string][]any{
+			ChannelApproved: {metadata},
+		})
+	}
+
 	return nil
 }
 
