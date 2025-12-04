@@ -1538,11 +1538,10 @@ function prepareComponentNode(
     case "if":
       return prepareIfNode(nodes, node, nodeExecutionsMap);
     case "noop":
+    case "http":
       return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap);
     case "filter":
       return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
-    case "http":
-      return prepareHttpNode(node, components, nodeExecutionsMap);
     case "semaphore":
       return prepareSemaphoreNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "wait":
@@ -1873,8 +1872,8 @@ function prepareComponentBaseNode(
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
-  const metadata = components.find((c) => c.name === node.component?.name);
-  const displayLabel = node.name || metadata?.label!;
+  const componentDef = components.find((c) => c.name === node.component?.name);
+  const displayLabel = node.name || componentDef?.label!;
 
   return {
     id: node.id!,
@@ -1883,7 +1882,7 @@ function prepareComponentBaseNode(
       type: "component",
       label: displayLabel,
       state: "pending" as const,
-      component: getComponentBaseMapper(node.component?.name!).props(nodes, node, execution),
+      component: getComponentBaseMapper(node.component?.name!).props(nodes, node, componentDef!, execution),
     },
   };
 }
@@ -1980,64 +1979,6 @@ function prepareFilterNode(
           eventTitle: "No events received yet",
           eventState: "neutral" as const,
         },
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-function prepareHttpNode(
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "http");
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  // Configuration always comes from the node, not the execution
-  const configuration = node.configuration as any;
-
-  let lastExecution;
-  if (execution) {
-    const outputs = execution.outputs as any;
-    const response = outputs?.default?.[0];
-
-    lastExecution = {
-      statusCode: response?.status,
-      receivedAt: new Date(execution.createdAt!),
-      state:
-        getRunItemState(execution) === "success"
-          ? ("success" as const)
-          : getRunItemState(execution) === "running"
-            ? ("running" as const)
-            : ("failed" as const),
-    };
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "http",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      http: {
-        iconSlug: metadata?.icon || "globe",
-        iconColor: getColorClass(metadata?.color || "gray"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "gray"),
-        headerColor: getBackgroundColorClass(metadata?.color || "gray"),
-        title: displayLabel,
-        method: configuration?.method,
-        url: configuration?.url,
-        payload: configuration?.payload,
-        headers: configuration?.headers,
-        lastExecution,
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },

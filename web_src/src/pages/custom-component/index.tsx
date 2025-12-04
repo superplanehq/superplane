@@ -63,7 +63,7 @@ const getBlockType = (componentName: string): BlockData["type"] => {
     filter: "filter",
     approval: "approval",
     noop: "component",
-    http: "http",
+    http: "component",
     semaphore: "semaphore",
     wait: "wait",
     time_gate: "time_gate",
@@ -126,22 +126,6 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
         collapsed: false,
       };
       break;
-    case "http":
-      baseData.http = {
-        title: node.name,
-        iconSlug: component?.icon || "globe",
-        iconColor: "text-gray-700",
-        iconBackground: "bg-gray-100",
-        headerColor: "bg-gray-50",
-        collapsedBackground: "bg-gray-100",
-        collapsed: false,
-        hideLastRun: true,
-        method: node.configuration?.method,
-        url: node.configuration?.url,
-        payload: node.configuration?.payload,
-        headers: node.configuration?.headers,
-      };
-      break;
     case "semaphore":
       // Build metadata array
       const metadataItems = [];
@@ -182,7 +166,7 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
       };
       break;
     case "component":
-      baseData.component = getComponentBaseMapper(component?.name!).props([], node, null);
+      baseData.component = getComponentBaseMapper(component?.name!).props([], node, component!, null);
       break;
     case "time_gate":
       const mode = node.configuration?.mode || "include_range";
@@ -498,9 +482,6 @@ export const CustomComponent = () => {
           if (nodeData.approval) {
             updatedData.approval = { ...nodeData.approval, title: nodeName.trim() };
           }
-          if (nodeData.http) {
-            updatedData.http = { ...nodeData.http, title: nodeName.trim() };
-          }
           if (nodeData.semaphore) {
             // Rebuild metadata array from configuration
             const metadataItems = [];
@@ -529,7 +510,16 @@ export const CustomComponent = () => {
             };
           }
           if (nodeData.component) {
-            updatedData.component = { ...nodeData.component, title: nodeName.trim() };
+            const updatedNode: ComponentsNode = {
+              id: node.id,
+              name: nodeName.trim(),
+              type: "TYPE_COMPONENT",
+              configuration: filteredConfiguration,
+              component: {
+                name: component.name,
+              },
+            };
+            updatedData.component = getComponentBaseMapper(component.name!).props([], updatedNode, component, null);
           }
           if (nodeData.time_gate) {
             const mode = filteredConfiguration.mode || "include_range";
@@ -668,12 +658,6 @@ export const CustomComponent = () => {
           ...(nodeData.approval && {
             approval: {
               ...nodeData.approval,
-              title: duplicateName,
-            },
-          }),
-          ...(nodeData.http && {
-            http: {
-              ...nodeData.http,
               title: duplicateName,
             },
           }),

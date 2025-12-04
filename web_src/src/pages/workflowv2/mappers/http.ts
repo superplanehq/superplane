@@ -1,28 +1,39 @@
 import { ComponentsComponent, ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
-import { getTriggerRenderer } from ".";
-import { getBackgroundColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 
-export const noopMapper: ComponentBaseMapper = {
+export const httpMapper: ComponentBaseMapper = {
   props(
-    nodes: ComponentsNode[],
+    _: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
     lastExecution: WorkflowsWorkflowNodeExecution,
   ): ComponentBaseProps {
     return {
-      iconSlug: componentDefinition.icon || "circle-off",
-      headerColor: "bg-gray-50",
+      iconSlug: componentDefinition.icon || "globe",
+      headerColor: getBackgroundColorClass(componentDefinition?.color || "gray"),
+      iconColor: getColorClass(componentDefinition?.color || "gray"),
+      iconBackground: getBackgroundColorClass(componentDefinition?.color || "gray"),
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
-      eventSections: getNoopEventSections(nodes, lastExecution),
+      eventSections: getHTTPEventSections(lastExecution),
+      metadata: [
+        {
+          icon: "link",
+          label: node.configuration?.url as string,
+        },
+        {
+          icon: "globe",
+          label: node.configuration?.method as string,
+        }
+      ]
     };
   },
 };
 
-function getNoopEventSections(nodes: ComponentsNode[], execution: WorkflowsWorkflowNodeExecution): EventSection[] {
+function getHTTPEventSections(execution: WorkflowsWorkflowNodeExecution): EventSection[] {
   if (!execution) {
     return [
       {
@@ -33,15 +44,14 @@ function getNoopEventSections(nodes: ComponentsNode[], execution: WorkflowsWorkf
     ];
   }
 
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const outputs = execution.outputs as any;
+  const response = outputs?.default?.[0];
 
   return [
     {
       title: "Last Run",
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
+      eventTitle: execution.state == "STATE_FINISHED" ? `Status: ${response?.status}` : "Running...",
       eventState: executionToEventSectionState(execution),
     },
   ];
