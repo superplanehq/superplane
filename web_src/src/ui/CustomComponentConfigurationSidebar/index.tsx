@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowUpRight, Settings, PanelLeftClose, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, PanelLeftClose, Plus, Settings, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 export interface BlueprintMetadata {
@@ -212,8 +212,7 @@ export function CustomComponentConfigurationSidebar({
               </div>
             )}
 
-            {/* Add New Configuration Field Button */}
-            <Button variant="outline" onClick={onAddConfigField} className="w-full">
+            <Button variant="outline" onClick={onAddConfigField} className="w-full" data-testid="add-config-field-btn">
               <Plus />
               Add Configuration Field
             </Button>

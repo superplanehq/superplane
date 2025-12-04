@@ -154,10 +154,8 @@ func (s *ComponentSteps) ClickOutputChannelsTab() {
 	s.session.Sleep(300)
 }
 
-func (s *ComponentSteps) ClickConfigurationTab() {
-	// Click the "Configuration" tab (should be already selected by default, but click to be sure)
-	s.session.Click(q.Text("Configuration"))
-	s.session.Sleep(300)
+func (s *ComponentSteps) ClickAddConfig() {
+	s.session.Click(q.TestID("add-config-field-btn"))
 }
 
 func (s *ComponentSteps) AddOutputChannel(channelName, nodeName, nodeOutputChannel string) {
@@ -221,22 +219,15 @@ func (s *ComponentSteps) AssertOutputChannelExists(channelName, nodeName, nodeOu
 }
 
 func (s *ComponentSteps) AddConfigurationField(fieldName, fieldLabel, fieldType string, options []string) {
-	// Click "Add Configuration Field" button to open modal
-	s.session.Click(q.Text("Add Configuration Field"))
-	s.session.Sleep(500)
+	nameInput := q.TestID("config-field-name-input")
+	labelInput := q.TestID("config-field-label-input")
+	typeSelectButton := q.TestID("config-field-type-select")
 
-	// Fill in the field name
-	nameInput := q.Locator(`input[placeholder*="threshold_expression"]`)
 	s.session.FillIn(nameInput, fieldName)
-
-	// Fill in the field label
-	labelInput := q.Locator(`div[role="dialog"] label:has-text("Label") + div input`)
 	s.session.FillIn(labelInput, fieldLabel)
-
-	// Select the field type
-	typeSelectButton := q.Locator(`div[role="dialog"] div:has(> label:has-text("Type")) button[role="combobox"]`)
 	s.session.Click(typeSelectButton)
-	s.session.Sleep(300)
+
+	s.session.TakeScreenshot()
 
 	// Map type to UI display text
 	typeDisplayText := fieldType
