@@ -76,10 +76,11 @@ func TestCanvasPage(t *testing.T) {
 
 	t.Run("canceling running execution from the sidebar", func(t *testing.T) {
 		steps.start()
-		steps.givenACanvasWithManualTriggerAndWaitNodeAndRunningExecution()
+		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems()
 		steps.openSidebarForNode("Wait")
 
 		steps.assertRunningItemsCount("Wait", 1)
+		steps.assertQueuedItemsCount("Wait", 3)
 		steps.cancelRunningExecutionFromSidebar()
 		steps.assertExecutionWasCancelled("Wait")
 	})
@@ -280,30 +281,8 @@ func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
 	s.session.Sleep(500) // wait for the cancellation to be processed
 }
 
-func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndRunningExecution() {
-	s.canvas = shared.NewCanvasSteps("E2E Canvas With Running Execution", s.t, s.session)
-
-	s.canvas.Create()
-	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
-	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 10, "Seconds")
-	s.canvas.Connect("Start", "Wait")
-	s.canvas.Save()
-
-	dropdown := q.TestID("node", "start", "header-dropdown")
-	runButton := q.Locator("button:has-text('Run')")
-	emitEvent := q.Locator("button:has-text('Emit Event')")
-
-	// Run only one execution to get a running item
-	s.session.Click(dropdown)
-	s.session.Click(runButton)
-	s.session.Click(emitEvent)
-
-	// wait for the execution to start processing
-	s.session.Sleep(500)
-}
-
 func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
-	s.session.Click(q.Locator("h2:has-text('Running') ~ div button[aria-label='Open actions']"))
+	s.session.Click(q.Locator("h2:has-text('Latest events') ~ div button[aria-label='Open actions']"))
 	s.session.TakeScreenshot()
 	s.session.Sleep(300)
 	s.session.Click(q.TestID("cancel-queue-item"))
