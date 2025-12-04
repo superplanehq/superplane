@@ -195,7 +195,9 @@ export const Composite: React.FC<CompositeProps> = ({
                     <div key={key} className="flex items-center gap-2">
                       <div className="flex-shrink-0">{React.createElement(resolveIcon(group.icon), { size: 16 })}</div>
                       <span className="text-xs font-medium flex-shrink-0">{key}:</span>
-                      <span className="text-xs truncate">{value}</span>
+                      <span title={value} className="text-xs truncate max-w-[150px]">
+                        {value}
+                      </span>
                     </div>
                   ))}
                 </React.Fragment>
