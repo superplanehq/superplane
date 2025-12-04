@@ -674,6 +674,14 @@ export type WorkflowNodeExecutionResultReason = "RESULT_REASON_OK" | "RESULT_REA
 
 export type WorkflowNodeExecutionState = "STATE_UNKNOWN" | "STATE_PENDING" | "STATE_STARTED" | "STATE_FINISHED";
 
+export type WorkflowsCancelExecutionBody = {
+  [key: string]: unknown;
+};
+
+export type WorkflowsCancelExecutionResponse = {
+  [key: string]: unknown;
+};
+
 export type WorkflowsCreateWorkflowRequest = {
   workflow?: WorkflowsWorkflow;
 };
@@ -2386,6 +2394,35 @@ export type WorkflowsInvokeNodeExecutionActionResponses = {
 
 export type WorkflowsInvokeNodeExecutionActionResponse2 =
   WorkflowsInvokeNodeExecutionActionResponses[keyof WorkflowsInvokeNodeExecutionActionResponses];
+
+export type WorkflowsCancelExecutionData = {
+  body: WorkflowsCancelExecutionBody;
+  path: {
+    workflowId: string;
+    executionId: string;
+  };
+  query?: never;
+  url: "/api/v1/workflows/{workflowId}/executions/{executionId}/cancel";
+};
+
+export type WorkflowsCancelExecutionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type WorkflowsCancelExecutionError = WorkflowsCancelExecutionErrors[keyof WorkflowsCancelExecutionErrors];
+
+export type WorkflowsCancelExecutionResponses = {
+  /**
+   * A successful response.
+   */
+  200: WorkflowsCancelExecutionResponse;
+};
+
+export type WorkflowsCancelExecutionResponse2 =
+  WorkflowsCancelExecutionResponses[keyof WorkflowsCancelExecutionResponses];
 
 export type WorkflowsListChildExecutionsData = {
   body: WorkflowsListChildExecutionsBody;

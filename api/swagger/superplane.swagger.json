@@ -2093,6 +2093,52 @@
         ]
       }
     },
+    "/api/v1/workflows/{workflowId}/executions/{executionId}/cancel": {
+      "patch": {
+        "summary": "Cancel execution",
+        "description": "Cancels a running workflow node execution",
+        "operationId": "Workflows_CancelExecution",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsCancelExecutionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WorkflowsCancelExecutionBody"
+            }
+          }
+        ],
+        "tags": [
+          "WorkflowNodeExecution"
+        ]
+      }
+    },
     "/api/v1/workflows/{workflowId}/executions/{executionId}/children": {
       "post": {
         "summary": "List child executions for an execution",
@@ -4060,6 +4106,12 @@
         "STATE_FINISHED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "WorkflowsCancelExecutionBody": {
+      "type": "object"
+    },
+    "WorkflowsCancelExecutionResponse": {
+      "type": "object"
     },
     "WorkflowsCreateWorkflowRequest": {
       "type": "object",

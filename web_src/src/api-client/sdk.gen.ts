@@ -164,6 +164,9 @@ import type {
   WorkflowsInvokeNodeExecutionActionData,
   WorkflowsInvokeNodeExecutionActionResponse2,
   WorkflowsInvokeNodeExecutionActionError,
+  WorkflowsCancelExecutionData,
+  WorkflowsCancelExecutionResponse2,
+  WorkflowsCancelExecutionError,
   WorkflowsListChildExecutionsData,
   WorkflowsListChildExecutionsResponse2,
   WorkflowsListChildExecutionsError,
@@ -1100,6 +1103,27 @@ export const workflowsInvokeNodeExecutionAction = <ThrowOnError extends boolean 
     ThrowOnError
   >({
     url: "/api/v1/workflows/{workflowId}/executions/{executionId}/actions/{actionName}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * Cancel execution
+ * Cancels a running workflow node execution
+ */
+export const workflowsCancelExecution = <ThrowOnError extends boolean = true>(
+  options: Options<WorkflowsCancelExecutionData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).patch<
+    WorkflowsCancelExecutionResponse2,
+    WorkflowsCancelExecutionError,
+    ThrowOnError
+  >({
+    url: "/api/v1/workflows/{workflowId}/executions/{executionId}/cancel",
     ...options,
     headers: {
       "Content-Type": "application/json",
