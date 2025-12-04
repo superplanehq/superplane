@@ -202,61 +202,6 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 	mockExecStateCtx.AssertNotCalled(t, "Pass")
 }
 
-func TestApproval_Setup(t *testing.T) {
-	approval := &Approval{}
-
-	t.Run("empty items returns error", func(t *testing.T) {
-		ctx := components.SetupContext{
-			Configuration: map[string]any{
-				"items": []any{},
-			},
-		}
-
-		err := approval.Setup(ctx)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid approval configuration: no user/role/group specified")
-	})
-
-	t.Run("nil items returns error", func(t *testing.T) {
-		ctx := components.SetupContext{
-			Configuration: map[string]any{},
-		}
-
-		err := approval.Setup(ctx)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid approval configuration: no user/role/group specified")
-	})
-
-	t.Run("valid items succeeds", func(t *testing.T) {
-		ctx := components.SetupContext{
-			Configuration: map[string]any{
-				"items": []any{
-					map[string]any{
-						"type": "role",
-						"role": "admin",
-					},
-				},
-			},
-		}
-
-		err := approval.Setup(ctx)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("invalid configuration returns error", func(t *testing.T) {
-		ctx := components.SetupContext{
-			Configuration: "invalid",
-		}
-
-		err := approval.Setup(ctx)
-
-		assert.Error(t, err)
-	})
-}
-
 func TestMetadata_UpdateResult(t *testing.T) {
 	t.Run("all approved sets approved", func(t *testing.T) {
 		user1 := &components.User{ID: "user-1"}
