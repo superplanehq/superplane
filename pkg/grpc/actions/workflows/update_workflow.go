@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -195,7 +196,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 	})
 
 	if err != nil {
-		return err
+		return fmt.Errorf("error setting up node %s: %v", node.NodeID, err)
 	}
 
 	return tx.Save(&node).Error
@@ -216,7 +217,7 @@ func setupComponent(tx *gorm.DB, registry *registry.Registry, node models.Workfl
 	})
 
 	if err != nil {
-		return err
+		return fmt.Errorf("error setting up node %s: %v", node.NodeID, err)
 	}
 
 	return tx.Save(&node).Error

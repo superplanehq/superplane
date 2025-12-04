@@ -201,3 +201,221 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 
 	mockExecStateCtx.AssertNotCalled(t, "Pass")
 }
+
+func TestApproval_Setup(t *testing.T) {
+	approval := &Approval{}
+
+	t.Run("empty items returns error", func(t *testing.T) {
+		ctx := components.SetupContext{
+			Configuration: map[string]any{
+				"items": []any{},
+			},
+		}
+
+		err := approval.Setup(ctx)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid approval configuration: no user/role/group specified")
+	})
+
+	t.Run("nil items returns error", func(t *testing.T) {
+		ctx := components.SetupContext{
+			Configuration: map[string]any{},
+		}
+
+		err := approval.Setup(ctx)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid approval configuration: no user/role/group specified")
+	})
+
+	t.Run("valid items succeeds", func(t *testing.T) {
+		ctx := components.SetupContext{
+			Configuration: map[string]any{
+				"items": []any{
+					map[string]any{
+						"type": "role",
+						"role": "admin",
+					},
+				},
+			},
+		}
+
+		err := approval.Setup(ctx)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("invalid configuration returns error", func(t *testing.T) {
+		ctx := components.SetupContext{
+			Configuration: "invalid",
+		}
+
+		err := approval.Setup(ctx)
+
+		assert.Error(t, err)
+	})
+}
+
+func TestMetadata_UpdateResult(t *testing.T) {
+	t.Run("all approved sets approved", func(t *testing.T) {
+		user1 := &components.User{ID: "user-1"}
+		user2 := &components.User{ID: "user-2"}
+
+		metadata := &Metadata{
+			Result: StatePending,
+			Records: []Record{
+				{Index: 0, State: StateApproved, Type: ItemTypeUser, User: user1},
+				{Index: 1, State: StateApproved, Type: ItemTypeUser, User: user2},
+			},
+		}
+
+		metadata.UpdateResult()
+
+		assert.Equal(t, StateApproved, metadata.Result)
+	})
+
+	t.Run("one rejected sets rejected", func(t *testing.T) {
+		user1 := &components.User{ID: "user-1"}
+		user2 := &components.User{ID: "user-2"}
+
+		metadata := &Metadata{
+			Result: StatePending,
+			Records: []Record{
+				{Index: 0, State: StateApproved, Type: ItemTypeUser, User: user1},
+				{Index: 1, State: StateRejected, Type: ItemTypeUser, User: user2},
+			},
+		}
+
+		metadata.UpdateResult()
+
+		assert.Equal(t, StateRejected, metadata.Result)
+	})
+
+	t.Run("first rejected sets rejected", func(t *testing.T) {
+		user1 := &components.User{ID: "user-1"}
+		user2 := &components.User{ID: "user-2"}
+
+		metadata := &Metadata{
+			Result: StatePending,
+			Records: []Record{
+				{Index: 0, State: StateRejected, Type: ItemTypeUser, User: user1},
+				{Index: 1, State: StateApproved, Type: ItemTypeUser, User: user2},
+			},
+		}
+
+		metadata.UpdateResult()
+
+		assert.Equal(t, StateRejected, metadata.Result)
+	})
+}
+
+func TestMetadata_Completed(t *testing.T) {
+	t.Run("all approved returns true", func(t *testing.T) {
+		user1 := &components.User{ID: "user-1"}
+		user2 := &components.User{ID: "user-2"}
+
+		metadata := &Metadata{
+			Result: StatePending,
+			Records: []Record{
+				{Index: 0, State: StateApproved, Type: ItemTypeUser, User: user1},
+				{Index: 1, State: StateApproved, Type: ItemTypeUser, User: user2},
+			},
+		}
+
+		assert.True(t, metadata.Completed())
+	})
+
+	t.Run("one pending returns false", func(t *testing.T) {
+		user1 := &components.User{ID: "user-1"}
+		user2 := &components.User{ID: "user-2"}
+
+		metadata := &Metadata{
+			Result: StatePending,
+			Records: []Record{
+				{Index: 0, State: StateApproved, Type: ItemTypeUser, User: user1},
+				{Index: 1, State: StatePending, Type: ItemTypeUser, User: user2},
+			},
+		}
+
+		assert.False(t, metadata.Completed())
+	})
+
+	t.Run("mixed approved and rejected returns true", func(t *testing.T) {
+		user1 := &components.User{ID: "user-1"}
+		user2 := &components.User{ID: "user-2"}
+
+		metadata := &Metadata{
+			Result: StatePending,
+			Records: []Record{
+				{Index: 0, State: StateApproved, Type: ItemTypeUser, User: user1},
+				{Index: 1, State: StateRejected, Type: ItemTypeUser, User: user2},
+			},
+		}
+
+		assert.True(t, metadata.Completed())
+	})
+}
+
+func TestApproval_Execute(t *testing.T) {
+	approval := &Approval{}
+
+	t.Run("with empty items immediately completes with approved channel", func(t *testing.T) {
+		mockExecStateCtx := &MockExecutionStateContext{}
+		mockMetadataCtx := &MockMetadataContext{}
+		mockAuthCtx := &MockAuthContext{}
+
+		mockMetadataCtx.On("Set", mock.Anything)
+		mockExecStateCtx.On("Pass", mock.MatchedBy(func(outputs map[string][]any) bool {
+			_, hasApproved := outputs[ChannelApproved]
+			return hasApproved
+		})).Return(nil)
+
+		ctx := components.ExecutionContext{
+			Configuration: map[string]any{
+				"items": []any{},
+			},
+			MetadataContext:       mockMetadataCtx,
+			ExecutionStateContext: mockExecStateCtx,
+			AuthContext:           mockAuthCtx,
+		}
+
+		err := approval.Execute(ctx)
+
+		assert.NoError(t, err)
+		mockExecStateCtx.AssertExpectations(t)
+		mockMetadataCtx.AssertCalled(t, "Set", mock.Anything)
+	})
+
+	t.Run("with items does not immediately complete", func(t *testing.T) {
+		mockExecStateCtx := &MockExecutionStateContext{}
+		mockMetadataCtx := &MockMetadataContext{}
+		mockAuthCtx := &MockAuthContext{}
+
+		userID := uuid.New()
+		user := &components.User{ID: userID.String()}
+
+		mockMetadataCtx.On("Set", mock.Anything)
+		mockAuthCtx.On("GetUser", userID).Return(user, nil)
+
+		ctx := components.ExecutionContext{
+			Configuration: map[string]any{
+				"items": []any{
+					map[string]any{
+						"type": "user",
+						"user": userID.String(),
+					},
+				},
+			},
+			MetadataContext:       mockMetadataCtx,
+			ExecutionStateContext: mockExecStateCtx,
+			AuthContext:           mockAuthCtx,
+		}
+
+		err := approval.Execute(ctx)
+
+		assert.NoError(t, err)
+		mockExecStateCtx.AssertNotCalled(t, "Pass")
+		mockMetadataCtx.AssertCalled(t, "Set", mock.Anything)
+	})
+}

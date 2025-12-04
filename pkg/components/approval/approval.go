@@ -333,6 +333,16 @@ func (a *Approval) Configuration() []configuration.Field {
 }
 
 func (a *Approval) Setup(ctx components.SetupContext) error {
+	config := Config{}
+	err := mapstructure.Decode(ctx.Configuration, &config)
+	if err != nil {
+		return err
+	}
+
+	if len(config.Items) == 0 {
+		return fmt.Errorf("invalid approval configuration: no user/role/group specified")
+	}
+
 	return nil
 }
 
@@ -352,7 +362,18 @@ func (a *Approval) Execute(ctx components.ExecutionContext) error {
 		return err
 	}
 
+	metadata.UpdateResult()
 	ctx.MetadataContext.Set(metadata)
+
+	//
+	// If no items are specified, just finish the execution.
+	//
+	if metadata.Completed() {
+		return ctx.ExecutionStateContext.Pass(map[string][]any{
+			ChannelApproved: {metadata},
+		})
+	}
+
 	return nil
 }
 
