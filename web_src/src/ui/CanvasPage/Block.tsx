@@ -6,7 +6,6 @@ import { Handle, Position } from "@xyflow/react";
 import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
 import { Filter, FilterProps } from "../filter";
-import { TimeGate, TimeGateProps } from "../timeGate";
 import { If, IfProps } from "../if";
 import MergeComponent, { type MergeComponentProps } from "../merge";
 import { ComponentActionsProps } from "../types/componentActions";
@@ -14,17 +13,7 @@ import { Wait, WaitProps } from "../wait";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType =
-  | "trigger"
-  | "component"
-  | "composite"
-  | "approval"
-  | "filter"
-  | "if"
-  | "wait"
-  | "merge"
-  | "time_gate"
-  | "switch";
+type BlockType = "trigger" | "component" | "composite" | "approval" | "filter" | "if" | "wait" | "merge" | "switch";
 
 interface BlockAi {
   show: boolean;
@@ -65,9 +54,6 @@ export interface BlockData {
 
   // wait node specific props
   wait?: WaitProps;
-
-  // time_gate node specific props
-  time_gate?: TimeGateProps;
 
   // switch node specific props
   switch?: SwitchComponentProps;
@@ -130,7 +116,6 @@ function LeftHandle({ data, nodeId }: BlockProps) {
     (data.type === "filter" && data.filter?.collapsed) ||
     (data.type === "if" && data.if?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
-    (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
   // Check if this handle is part of the hovered edge (this is the target)
@@ -179,7 +164,6 @@ function RightHandle({ data, nodeId }: BlockProps) {
     (data.type === "filter" && data.filter?.collapsed) ||
     (data.type === "if" && data.if?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
-    (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
   let channels = data.outputChannels || ["default"];
@@ -422,8 +406,6 @@ function BlockContent({
       return <If {...(data.if as IfProps)} selected={selected} {...actionProps} />;
     case "wait":
       return <Wait {...(data.wait as WaitProps)} selected={selected} {...actionProps} />;
-    case "time_gate":
-      return <TimeGate {...(data.time_gate as TimeGateProps)} selected={selected} {...actionProps} />;
     case "switch":
       return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} {...actionProps} />;
     case "merge":

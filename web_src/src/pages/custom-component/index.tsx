@@ -65,7 +65,7 @@ const getBlockType = (componentName: string): BlockData["type"] => {
     http: "component",
     semaphore: "component",
     wait: "wait",
-    time_gate: "time_gate",
+    time_gate: "component",
   };
   return typeMap[componentName] || "noop"; // Default to noop for unknown components
 };
@@ -139,49 +139,6 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
       break;
     case "component":
       baseData.component = getComponentBaseMapper(component?.name!).props([], node, component!, null, undefined);
-      break;
-    case "time_gate":
-      const mode = node.configuration?.mode || "include_range";
-      const days = node.configuration?.days || [];
-      const daysDisplay = days.length > 0 ? days.join(", ") : "";
-
-      // Get timezone information
-      const timezone = node.configuration?.timezone || "0";
-      const getTimezoneDisplay = (timezoneOffset: string) => {
-        const offset = parseFloat(timezoneOffset);
-        if (offset === 0) return "GMT+0 (UTC)";
-        if (offset > 0) return `GMT+${offset}`;
-        return `GMT${offset}`; // Already has the minus sign
-      };
-      const timezoneDisplay = getTimezoneDisplay(timezone);
-
-      let startTime = "00:00";
-      let endTime = "23:59";
-
-      if (mode === "include_specific" || mode === "exclude_specific") {
-        startTime = `${node.configuration.startDayInYear} ${node.configuration.startTime}`;
-        endTime = `${node.configuration.endDayInYear} ${node.configuration.endTime}`;
-      } else {
-        startTime = `${node.configuration.startTime}`;
-        endTime = `${node.configuration.endTime}`;
-      }
-
-      const timeWindow = `${startTime} - ${endTime}`;
-
-      baseData.time_gate = {
-        title: node.name,
-        mode,
-        timeWindow,
-        days: daysDisplay,
-        timezone: timezoneDisplay,
-        lastExecution: undefined,
-        nextInQueue: undefined,
-        iconColor: "text-blue-600",
-        iconBackground: "bg-blue-100",
-        headerColor: "bg-blue-50",
-        collapsedBackground: "bg-white",
-        collapsed: false,
-      };
       break;
   }
 
@@ -479,33 +436,6 @@ export const CustomComponent = () => {
               undefined,
             );
           }
-          if (nodeData.time_gate) {
-            const mode = filteredConfiguration.mode || "include_range";
-            const days = (filteredConfiguration.days as string[]) || [];
-            const daysDisplay = days.length > 0 ? days.join(", ") : "";
-
-            // Handle different time window formats based on mode
-            let startTime = "00:00";
-            let endTime = "23:59";
-
-            if (mode === "include_specific" || mode === "exclude_specific") {
-              startTime = `${filteredConfiguration.startDayInYear} ${filteredConfiguration.startTime}`;
-              endTime = `${filteredConfiguration.endDayInYear} ${filteredConfiguration.endTime}`;
-            } else {
-              startTime = `${filteredConfiguration.startTime}`;
-              endTime = `${filteredConfiguration.endTime}`;
-            }
-
-            const timeWindow = `${startTime} - ${endTime}`;
-
-            updatedData.time_gate = {
-              ...nodeData.time_gate,
-              title: nodeName.trim(),
-              mode,
-              timeWindow,
-              days: daysDisplay,
-            };
-          }
 
           return {
             ...n,
@@ -628,12 +558,6 @@ export const CustomComponent = () => {
           ...(nodeData.component && {
             component: {
               ...nodeData.component,
-              title: duplicateName,
-            },
-          }),
-          ...(nodeData.time_gate && {
-            time_gate: {
-              ...nodeData.time_gate,
               title: duplicateName,
             },
           }),
