@@ -1,6 +1,6 @@
 import { ComponentsComponent, ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
-import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
+import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 
 export const httpMapper: ComponentBaseMapper = {
@@ -10,6 +10,55 @@ export const httpMapper: ComponentBaseMapper = {
     componentDefinition: ComponentsComponent,
     lastExecution: WorkflowsWorkflowNodeExecution,
   ): ComponentBaseProps {
+    const headers = node.configuration?.headers as Array<{ name: string; value: string }> | undefined;
+    const payload = node.configuration?.payload;
+
+    // Build metadata array with method and URL
+    const metadata: Array<{ icon: string; label: string }> = [];
+
+    if (node.configuration?.url && node.configuration.method) {
+      metadata.push({
+        icon: "link",
+        label: `${node.configuration.method} ${node.configuration.url}`,
+      });
+    }
+
+    // Build specs array for headers and payload
+    const specs: ComponentBaseSpec[] = [];
+
+    // Add payload spec
+    if (payload !== undefined && payload !== null) {
+      specs.push({
+        title: "payload",
+        tooltipTitle: "request payload",
+        iconSlug: "file-json",
+        value: payload,
+      });
+    }
+
+    // Add headers spec
+    if (headers && headers.length > 0) {
+      specs.push({
+        title: "header",
+        tooltipTitle: "request headers",
+        iconSlug: "list",
+        values: headers.map((header) => ({
+          badges: [
+            {
+              label: header.name,
+              bgColor: "bg-blue-100",
+              textColor: "text-blue-800",
+            },
+            {
+              label: header.value,
+              bgColor: "bg-gray-100",
+              textColor: "text-gray-800",
+            },
+          ],
+        })),
+      });
+    }
+
     return {
       iconSlug: componentDefinition.icon || "globe",
       headerColor: getBackgroundColorClass(componentDefinition?.color || "gray"),
@@ -19,16 +68,8 @@ export const httpMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
       eventSections: getHTTPEventSections(lastExecution),
-      metadata: [
-        {
-          icon: "link",
-          label: node.configuration?.url as string,
-        },
-        {
-          icon: "globe",
-          label: node.configuration?.method as string,
-        }
-      ]
+      metadata,
+      specs: specs.length > 0 ? specs : undefined,
     };
   },
 };

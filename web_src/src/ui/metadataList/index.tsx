@@ -26,9 +26,9 @@ export const MetadataList: React.FC<MetadataListProps> = ({
       {items.map((item, index) => {
         const Icon = resolveIcon(item.icon);
         return (
-          <div key={index} className="flex items-center gap-2">
-            <Icon size={iconSize} />
-            <span className="text-sm">{item.label}</span>
+          <div key={index} className="flex items-center gap-2 min-w-0">
+            <Icon size={iconSize} className="flex-shrink-0" />
+            <span className="text-sm truncate">{item.label}</span>
           </div>
         );
       })}
