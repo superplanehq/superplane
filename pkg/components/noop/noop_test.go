@@ -124,6 +124,6 @@ func TestNoop_BasicProperties_ShouldReturnCorrectValues(t *testing.T) {
 	assert.Equal(t, "noop", noop.Name())
 	assert.Equal(t, "No Operation", noop.Label())
 	assert.Contains(t, noop.Description(), "pass events through")
-	assert.Equal(t, "check", noop.Icon())
+	assert.Equal(t, "circle-off", noop.Icon())
 	assert.Equal(t, "blue", noop.Color())
 }
