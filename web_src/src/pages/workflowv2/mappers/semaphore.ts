@@ -17,7 +17,7 @@ export const semaphoreMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecution: WorkflowsWorkflowNodeExecution,
+    lastExecutions: WorkflowsWorkflowNodeExecution[],
     nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     return {
@@ -29,7 +29,7 @@ export const semaphoreMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
-      eventSections: getSemaphoreEventSections(nodes, lastExecution, nodeQueueItems),
+      eventSections: getSemaphoreEventSections(nodes, lastExecutions[0], nodeQueueItems),
       metadata: getSemaphoreMetadataList(node),
       specs: getSemaphoreSpecs(node),
     };

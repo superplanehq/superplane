@@ -15,7 +15,7 @@ export const httpMapper: ComponentBaseMapper = {
     _: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecution: WorkflowsWorkflowNodeExecution,
+    lastExecutions: WorkflowsWorkflowNodeExecution[],
     _items?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     return {
@@ -26,7 +26,7 @@ export const httpMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
-      eventSections: getHTTPEventSections(lastExecution),
+      eventSections: getHTTPEventSections(lastExecutions[0]),
       metadata: getHTTPMetadataList(node),
       specs: getHTTPSpecs(node),
     };

@@ -1,4 +1,5 @@
 import type { Node, Edge } from "@xyflow/react";
+import { parseExpression } from "@/lib/expressionParser";
 
 export const mockNodes: Node[] = [
   {
@@ -8,15 +9,29 @@ export const mockNodes: Node[] = [
     data: {
       label: "Check Environment",
       state: "pending",
-      type: "if",
+      type: "component",
       outputChannels: ["true", "false"],
-      if: {
+      component: {
         title: "Check Environment",
-        conditions: [
+        iconSlug: "split",
+        headerColor: "bg-gray-50",
+        specs: [
           {
-            field: "config.environment",
-            operator: "==",
-            value: "prod",
+            title: "condition",
+            tooltipTitle: "conditions applied",
+            values: parseExpression("config.environment == prod"),
+          },
+        ],
+        eventSections: [
+          {
+            title: "TRUE",
+            eventTitle: "No events received yet",
+            eventState: "neutral" as const,
+          },
+          {
+            title: "FALSE",
+            eventTitle: "No events received yet",
+            eventState: "neutral" as const,
           },
         ],
         collapsed: false,
@@ -85,11 +100,20 @@ export const mockNodes: Node[] = [
     data: {
       label: "Skip Approval",
       state: "pending",
-      type: "noop",
+      type: "component",
       outputChannels: ["default"],
-      noop: {
+      component: {
         title: "Skip Approval",
+        iconSlug: "circle-off",
+        headerColor: "bg-gray-50",
         collapsed: false,
+        eventSections: [
+          {
+            title: "Last Run",
+            eventTitle: "No events received yet",
+            eventState: "neutral" as const,
+          },
+        ],
       },
     },
   },

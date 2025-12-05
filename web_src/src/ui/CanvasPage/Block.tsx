@@ -6,14 +6,13 @@ import { Handle, Position } from "@xyflow/react";
 import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
 import { Filter, FilterProps } from "../filter";
-import { If, IfProps } from "../if";
 import MergeComponent, { type MergeComponentProps } from "../merge";
 import { ComponentActionsProps } from "../types/componentActions";
 import { Wait, WaitProps } from "../wait";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType = "trigger" | "component" | "composite" | "approval" | "filter" | "if" | "wait" | "merge" | "switch";
+type BlockType = "trigger" | "component" | "composite" | "approval" | "filter" | "wait" | "merge" | "switch";
 
 interface BlockAi {
   show: boolean;
@@ -48,9 +47,6 @@ export interface BlockData {
 
   // filter node specific props
   filter?: FilterProps;
-
-  // if node specific props
-  if?: IfProps;
 
   // wait node specific props
   wait?: WaitProps;
@@ -114,9 +110,9 @@ function LeftHandle({ data, nodeId }: BlockProps) {
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "filter" && data.filter?.collapsed) ||
-    (data.type === "if" && data.if?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
-    (data.type === "switch" && data.switch?.collapsed);
+    (data.type === "switch" && data.switch?.collapsed) ||
+    (data.type === "component" && data.component?.collapsed);
 
   // Check if this handle is part of the hovered edge (this is the target)
   const hoveredEdge = (data as any)._hoveredEdge;
@@ -162,21 +158,11 @@ function RightHandle({ data, nodeId }: BlockProps) {
     (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "trigger" && data.trigger?.collapsed) ||
     (data.type === "filter" && data.filter?.collapsed) ||
-    (data.type === "if" && data.if?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
-    (data.type === "switch" && data.switch?.collapsed);
+    (data.type === "switch" && data.switch?.collapsed) ||
+    (data.type === "component" && data.component?.collapsed);
 
-  let channels = data.outputChannels || ["default"];
-
-  const isIfOrSwitch = data.type === "if" || data.type === "switch";
-
-  if (isIfOrSwitch && !isCollapsed) {
-    return null;
-  }
-
-  if (data.type === "if") {
-    channels = ["true", "false"];
-  }
+  const channels = data.outputChannels || ["default"];
 
   // Get hovered edge info and connecting state
   const hoveredEdge = (data as any)._hoveredEdge;
@@ -402,8 +388,6 @@ function BlockContent({
       return <Approval {...(data.approval as ApprovalProps)} selected={selected} {...actionProps} />;
     case "filter":
       return <Filter {...(data.filter as FilterProps)} selected={selected} {...actionProps} />;
-    case "if":
-      return <If {...(data.if as IfProps)} selected={selected} {...actionProps} />;
     case "wait":
       return <Wait {...(data.wait as WaitProps)} selected={selected} {...actionProps} />;
     case "switch":

@@ -576,12 +576,7 @@ export function WorkflowPageV2() {
         }) as unknown[];
 
         if (outputData?.length > 0) {
-          const output = outputData?.[0] as Record<string, unknown>;
-          if (output["data"]) {
-            payload = (output["data"] as Record<string, unknown>) || {};
-          } else {
-            payload = output || {};
-          }
+          payload = outputData?.[0] as Record<string, unknown>;
         }
       }
 
@@ -792,6 +787,9 @@ export function WorkflowPageV2() {
     (edgeIds: string[]) => {
       if (!workflow || !organizationId || !workflowId) return;
 
+      // Save snapshot before making changes
+      saveWorkflowSnapshot(workflow);
+
       // Parse edge IDs to extract sourceId, targetId, and channel
       // Edge IDs are formatted as: `${sourceId}--${targetId}--${channel}`
       const edgesToRemove = edgeIds.map((edgeId) => {
@@ -825,7 +823,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
       markUnsavedChange("structural");
     },
-    [workflow, organizationId, workflowId, queryClient, markUnsavedChange],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
   );
 
   /**
@@ -1542,7 +1540,7 @@ function prepareComponentNode(
     case "approval":
       return prepareApprovalNode(nodes, node, components, nodeExecutionsMap, workflowId, queryClient, organizationId);
     case "if":
-      return prepareIfNode(nodes, node, nodeExecutionsMap);
+      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap);
     case "noop":
     case "http":
     case "semaphore":
@@ -1804,70 +1802,6 @@ function prepareApprovalNode(
   };
 }
 
-function prepareIfNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-): CanvasNode {
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const lastTrueExecution = executions.length > 0 ? executions.find((e) => e.outputs?.["true"]) : null;
-  const lastFalseExecution = executions.length > 0 ? executions.find((e) => e.outputs?.["false"]) : null;
-
-  // Parse conditions from node configuration
-  const expression = node.configuration?.expression;
-
-  const processExecutionEventData = (execution: WorkflowsWorkflowNodeExecution) => {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    const eventData = {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: executionToEventSectionState(execution),
-    };
-
-    return eventData;
-  };
-
-  // Get last execution for event data
-  let trueEvent, falseEvent;
-  if (lastTrueExecution) {
-    trueEvent = processExecutionEventData(lastTrueExecution!);
-  }
-
-  if (lastFalseExecution) {
-    falseEvent = processExecutionEventData(lastFalseExecution!);
-  }
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "if",
-      label: node.name!,
-      state: "pending" as const,
-      if: {
-        title: node.name!,
-        expression,
-        trueEvent: trueEvent || {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        falseEvent: falseEvent || {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        trueSectionLabel: "TRUE",
-        falseSectionLabel: "FALSE",
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
 function prepareComponentBaseNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
@@ -1876,9 +1810,9 @@ function prepareComponentBaseNode(
   nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
+  const metadata = components.find((c) => c.name === node.component?.name);
+  const displayLabel = node.name || metadata?.label;
   const componentDef = components.find((c) => c.name === node.component?.name);
-  const displayLabel = node.name || componentDef?.label!;
   const nodeQueueItems = nodeQueueItemsMap?.[node.id!];
 
   return {
@@ -1888,12 +1822,12 @@ function prepareComponentBaseNode(
       type: "component",
       label: displayLabel,
       state: "pending" as const,
-      // outputChannels: componentDef?.outputChannels?.map((c) => c.name!) || ["default"]
-      component: getComponentBaseMapper(node.component?.name!).props(
+      outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
+      component: getComponentBaseMapper(node.component?.name || "").props(
         nodes,
         node,
         componentDef!,
-        execution,
+        executions,
         nodeQueueItems,
       ),
     },
