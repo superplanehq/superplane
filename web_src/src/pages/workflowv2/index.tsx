@@ -575,7 +575,7 @@ export function WorkflowPageV2() {
           return Array.isArray(output) && output?.length > 0;
         }) as unknown[];
 
-        if (outputData?.length == 1) {
+        if (outputData?.length > 0) {
           payload = outputData?.[0] as Record<string, unknown>;
         }
       }
