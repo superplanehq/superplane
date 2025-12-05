@@ -4,6 +4,7 @@ import {
   TriggersTrigger,
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowNodeExecution,
+  WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseProps } from "@/ui/componentBase";
 import { TriggerProps } from "@/ui/trigger";
@@ -49,5 +50,6 @@ export interface ComponentBaseMapper {
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
     lastExecution: WorkflowsWorkflowNodeExecution | null,
+    nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps;
 }

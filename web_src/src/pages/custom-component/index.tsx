@@ -1,4 +1,3 @@
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Connection, Edge, Node, addEdge, applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -64,7 +63,7 @@ const getBlockType = (componentName: string): BlockData["type"] => {
     approval: "approval",
     noop: "component",
     http: "component",
-    semaphore: "semaphore",
+    semaphore: "component",
     wait: "wait",
     time_gate: "time_gate",
   };
@@ -126,33 +125,6 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
         collapsed: false,
       };
       break;
-    case "semaphore":
-      // Build metadata array
-      const metadataItems = [];
-      if (node.configuration?.project) {
-        metadataItems.push({ icon: "folder", label: node.configuration.project });
-      }
-      if (node.configuration?.ref) {
-        metadataItems.push({ icon: "git-branch", label: node.configuration.ref });
-      }
-      if (node.configuration?.pipelineFile) {
-        metadataItems.push({ icon: "file-code", label: node.configuration.pipelineFile });
-      }
-
-      baseData.semaphore = {
-        title: node.name,
-        iconSrc: SemaphoreLogo,
-        iconSlug: component?.icon || "workflow",
-        iconColor: "text-gray-700",
-        iconBackground: "bg-gray-100",
-        headerColor: "bg-gray-50",
-        collapsedBackground: "bg-gray-100",
-        collapsed: false,
-        hideLastRun: true,
-        metadata: metadataItems,
-        parameters: node.configuration?.parameters,
-      };
-      break;
     case "wait":
       baseData.wait = {
         title: node.name,
@@ -166,7 +138,7 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
       };
       break;
     case "component":
-      baseData.component = getComponentBaseMapper(component?.name!).props([], node, component!, null);
+      baseData.component = getComponentBaseMapper(component?.name!).props([], node, component!, null, undefined);
       break;
     case "time_gate":
       const mode = node.configuration?.mode || "include_range";
@@ -482,26 +454,6 @@ export const CustomComponent = () => {
           if (nodeData.approval) {
             updatedData.approval = { ...nodeData.approval, title: nodeName.trim() };
           }
-          if (nodeData.semaphore) {
-            // Rebuild metadata array from configuration
-            const metadataItems = [];
-            if (filteredConfiguration.project) {
-              metadataItems.push({ icon: "folder", label: filteredConfiguration.project });
-            }
-            if (filteredConfiguration.ref) {
-              metadataItems.push({ icon: "git-branch", label: filteredConfiguration.ref });
-            }
-            if (filteredConfiguration.pipelineFile) {
-              metadataItems.push({ icon: "file-code", label: filteredConfiguration.pipelineFile });
-            }
-
-            updatedData.semaphore = {
-              ...nodeData.semaphore,
-              title: nodeName.trim(),
-              metadata: metadataItems,
-              parameters: filteredConfiguration.parameters,
-            };
-          }
           if (nodeData.wait) {
             updatedData.wait = {
               ...nodeData.wait,
@@ -519,7 +471,13 @@ export const CustomComponent = () => {
                 name: component.name,
               },
             };
-            updatedData.component = getComponentBaseMapper(component.name!).props([], updatedNode, component, null);
+            updatedData.component = getComponentBaseMapper(component.name!).props(
+              [],
+              updatedNode,
+              component,
+              null,
+              undefined,
+            );
           }
           if (nodeData.time_gate) {
             const mode = filteredConfiguration.mode || "include_range";
@@ -658,12 +616,6 @@ export const CustomComponent = () => {
           ...(nodeData.approval && {
             approval: {
               ...nodeData.approval,
-              title: duplicateName,
-            },
-          }),
-          ...(nodeData.semaphore && {
-            semaphore: {
-              ...nodeData.semaphore,
               title: duplicateName,
             },
           }),

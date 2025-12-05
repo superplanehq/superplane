@@ -8,6 +8,119 @@ import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
 import { MetadataItem, MetadataList } from "../metadataList";
 
+interface EventSectionDisplayProps {
+  section: EventSection;
+  index: number;
+  totalSections: number;
+}
+
+const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({ section, index, totalSections }) => {
+  // Live timer for running executions
+  const [liveDuration, setLiveDuration] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (section.eventState === "running" && section.receivedAt) {
+      const receivedAt = section.receivedAt;
+
+      // Calculate initial duration
+      setLiveDuration(Date.now() - receivedAt.getTime());
+
+      // Update every second
+      const interval = setInterval(() => {
+        setLiveDuration(Date.now() - receivedAt.getTime());
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      setLiveDuration(null);
+    }
+  }, [section.eventState, section.receivedAt]);
+
+  // Calculate display duration
+  const displayDuration = React.useMemo(() => {
+    if (section.eventState === "running" && liveDuration !== null) {
+      return liveDuration;
+    }
+    return section.duration;
+  }, [section.eventState, section.duration, liveDuration]);
+
+  const now = new Date();
+  const diff = section.receivedAt ? now.getTime() - section.receivedAt.getTime() : 0;
+  const timeAgo = section.receivedAt ? calcRelativeTimeFromDiff(diff) : "";
+  const durationText =
+    displayDuration !== undefined && displayDuration !== null ? calcRelativeTimeFromDiff(displayDuration) : "";
+
+  const LastEventIcon =
+    section.eventState === "success"
+      ? resolveIcon("check")
+      : section.eventState === "neutral"
+        ? resolveIcon("circle")
+        : section.eventState === "next-in-queue"
+          ? resolveIcon("circle-dashed")
+          : section.eventState === "running"
+            ? resolveIcon("refresh-cw")
+            : resolveIcon("x");
+  const LastEventColor =
+    section.eventState === "success"
+      ? "text-green-700"
+      : section.eventState === "neutral"
+        ? "text-gray-500"
+        : section.eventState === "next-in-queue"
+          ? "text-gray-500"
+          : section.eventState === "running"
+            ? "text-blue-800"
+            : "text-red-700";
+  const LastEventBackground =
+    section.eventState === "success"
+      ? "bg-green-200"
+      : section.eventState === "neutral"
+        ? "bg-gray-100"
+        : section.eventState === "next-in-queue"
+          ? "bg-gray-100"
+          : section.eventState === "running"
+            ? "bg-sky-100"
+            : "bg-red-200";
+  const LastEventIconColor =
+    section.eventState === "success"
+      ? "text-green-600 bg-green-600"
+      : section.eventState === "neutral"
+        ? "text-gray-400 bg-gray-400"
+        : section.eventState === "next-in-queue"
+          ? "text-gray-500"
+          : section.eventState === "running"
+            ? "text-blue-800"
+            : "text-red-600 bg-red-600";
+
+  const iconSize = ["next-in-queue", "running"].includes(section.eventState || "") ? 16 : 12;
+  const iconClassName =
+    section.eventState === "running" ? "animate-spin" : section.eventState === "next-in-queue" ? "" : "text-white";
+
+  return (
+    <div key={index} className={"px-4 pt-2 pb-6 relative" + (index < totalSections - 1 ? " border-b" : "")}>
+      <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
+        <span className="uppercase text-xs font-semibold tracking-wide">{section.title}</span>
+        <span className="text-sm">
+          {durationText && section.eventState === "running" ? `Running for: ${durationText}` : timeAgo}
+        </span>
+      </div>
+      <div
+        className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastEventBackground} ${LastEventColor}`}
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${LastEventIconColor}`}>
+            <LastEventIcon size={iconSize} className={iconClassName} />
+          </div>
+          <span className="truncate text-sm min-w-0">{section.eventTitle}</span>
+        </div>
+        {section.eventSubtitle && (
+          <span className="text-sm truncate flex-shrink-0 max-w-[40%] text-gray-500">{section.eventSubtitle}</span>
+        )}
+      </div>
+      {section.handleComponent}
+    </div>
+  );
+};
+
 export interface SpecBadge {
   label: string;
   bgColor: string;
@@ -36,6 +149,7 @@ export interface EventSection {
   eventTitle?: string;
   eventSubtitle?: string;
   handleComponent?: React.ReactNode;
+  duration?: number; // Duration in milliseconds (for finished executions)
 }
 
 export interface ComponentBaseProps extends ComponentActionsProps {
@@ -183,90 +297,9 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           </div>
         )}
 
-        {eventSections?.map((section, index) => {
-          const now = new Date();
-          const diff = section.receivedAt ? now.getTime() - section.receivedAt.getTime() : 0;
-          const timeAgo = section.receivedAt ? calcRelativeTimeFromDiff(diff) : "";
-
-          const LastEventIcon =
-            section.eventState === "success"
-              ? resolveIcon("check")
-              : section.eventState === "neutral"
-                ? resolveIcon("circle")
-                : section.eventState === "next-in-queue"
-                  ? resolveIcon("circle-dashed")
-                  : section.eventState === "running"
-                    ? resolveIcon("refresh-cw")
-                    : resolveIcon("x");
-          const LastEventColor =
-            section.eventState === "success"
-              ? "text-green-700"
-              : section.eventState === "neutral"
-                ? "text-gray-500"
-                : section.eventState === "next-in-queue"
-                  ? "text-gray-500"
-                  : section.eventState === "running"
-                    ? "text-blue-800"
-                    : "text-red-700";
-          const LastEventBackground =
-            section.eventState === "success"
-              ? "bg-green-200"
-              : section.eventState === "neutral"
-                ? "bg-gray-100"
-                : section.eventState === "next-in-queue"
-                  ? "bg-gray-100"
-                  : section.eventState === "running"
-                    ? "bg-sky-100"
-                    : "bg-red-200";
-          const LastEventIconColor =
-            section.eventState === "success"
-              ? "text-green-600 bg-green-600"
-              : section.eventState === "neutral"
-                ? "text-gray-400 bg-gray-400"
-                : section.eventState === "next-in-queue"
-                  ? "text-gray-500"
-                  : section.eventState === "running"
-                    ? "text-blue-800"
-                    : "text-red-600 bg-red-600";
-
-          const iconSize = ["next-in-queue", "running"].includes(section.eventState || "") ? 16 : 12;
-          const iconClassName =
-            section.eventState === "running"
-              ? "animate-spin"
-              : section.eventState === "next-in-queue"
-                ? ""
-                : "text-white";
-
-          return (
-            <div
-              key={index}
-              className={"px-4 pt-2 pb-6 relative" + (index < eventSections.length - 1 ? " border-b" : "")}
-            >
-              <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-                <span className="uppercase text-xs font-semibold tracking-wide">{section.title}</span>
-                <span className="text-sm">{timeAgo}</span>
-              </div>
-              <div
-                className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastEventBackground} ${LastEventColor}`}
-              >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div
-                    className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${LastEventIconColor}`}
-                  >
-                    <LastEventIcon size={iconSize} className={iconClassName} />
-                  </div>
-                  <span className="truncate text-sm min-w-0">{section.eventTitle}</span>
-                </div>
-                {section.eventSubtitle && (
-                  <span className="text-sm truncate flex-shrink-0 max-w-[40%] text-gray-500">
-                    {section.eventSubtitle}
-                  </span>
-                )}
-              </div>
-              {section.handleComponent}
-            </div>
-          );
-        })}
+        {eventSections?.map((section, index) => (
+          <EventSectionDisplay key={index} section={section} index={index} totalSections={eventSections.length} />
+        ))}
       </div>
     </SelectionWrapper>
   );
