@@ -9,7 +9,6 @@ import { Filter, FilterProps } from "../filter";
 import { Http, HttpProps } from "../http";
 import { Semaphore, SemaphoreProps } from "../semaphore";
 import { TimeGate, TimeGateProps } from "../timeGate";
-import { If, IfProps } from "../if";
 import MergeComponent, { type MergeComponentProps } from "../merge";
 import { ComponentActionsProps } from "../types/componentActions";
 import { Wait, WaitProps } from "../wait";
@@ -22,7 +21,6 @@ type BlockType =
   | "composite"
   | "approval"
   | "filter"
-  | "if"
   | "http"
   | "semaphore"
   | "wait"
@@ -63,9 +61,6 @@ export interface BlockData {
 
   // filter node specific props
   filter?: FilterProps;
-
-  // if node specific props
-  if?: IfProps;
 
   // http node specific props
   http?: HttpProps;
@@ -138,12 +133,12 @@ function LeftHandle({ data, nodeId }: BlockProps) {
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "filter" && data.filter?.collapsed) ||
-    (data.type === "if" && data.if?.collapsed) ||
     (data.type === "http" && data.http?.collapsed) ||
     (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "time_gate" && data.time_gate?.collapsed) ||
-    (data.type === "switch" && data.switch?.collapsed);
+    (data.type === "switch" && data.switch?.collapsed) ||
+    (data.type === "component" && data.component?.collapsed);
 
   // Check if this handle is part of the hovered edge (this is the target)
   const hoveredEdge = (data as any)._hoveredEdge;
@@ -189,24 +184,14 @@ function RightHandle({ data, nodeId }: BlockProps) {
     (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "trigger" && data.trigger?.collapsed) ||
     (data.type === "filter" && data.filter?.collapsed) ||
-    (data.type === "if" && data.if?.collapsed) ||
     (data.type === "http" && data.http?.collapsed) ||
     (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "time_gate" && data.time_gate?.collapsed) ||
-    (data.type === "switch" && data.switch?.collapsed);
+    (data.type === "switch" && data.switch?.collapsed) ||
+    (data.type === "component" && data.component?.collapsed);
 
-  let channels = data.outputChannels || ["default"];
-
-  const isIfOrSwitch = data.type === "if" || data.type === "switch";
-
-  if (isIfOrSwitch && !isCollapsed) {
-    return null;
-  }
-
-  if (data.type === "if") {
-    channels = ["true", "false"];
-  }
+  const channels = data.outputChannels || ["default"];
 
   // Get hovered edge info and connecting state
   const hoveredEdge = (data as any)._hoveredEdge;
@@ -432,8 +417,6 @@ function BlockContent({
       return <Approval {...(data.approval as ApprovalProps)} selected={selected} {...actionProps} />;
     case "filter":
       return <Filter {...(data.filter as FilterProps)} selected={selected} {...actionProps} />;
-    case "if":
-      return <If {...(data.if as IfProps)} selected={selected} {...actionProps} />;
     case "http":
       return <Http {...(data.http as HttpProps)} selected={selected} {...actionProps} />;
     case "semaphore":

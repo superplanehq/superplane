@@ -59,7 +59,7 @@ const getLayoutedElements = async (nodes: Node[], edges: Edge[]) => {
 // Helper function to map component type to block type
 const getBlockType = (componentName: string): BlockData["type"] => {
   const typeMap: Record<string, BlockData["type"]> = {
-    if: "if",
+    if: "component",
     filter: "filter",
     approval: "approval",
     noop: "component",
@@ -86,23 +86,6 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
   const expression = node.configuration?.expression;
   // Add type-specific props based on component type
   switch (blockType) {
-    case "if":
-      baseData.if = {
-        title: node.name,
-        expression,
-        trueEvent: {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        falseEvent: {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        trueSectionLabel: "TRUE",
-        falseSectionLabel: "FALSE",
-        collapsed: false,
-      };
-      break;
     case "filter":
       baseData.filter = {
         title: node.name,
@@ -182,7 +165,7 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
       };
       break;
     case "component":
-      baseData.component = getComponentBaseMapper(component?.name!).props([], node, null);
+      baseData.component = getComponentBaseMapper(component?.name!).props([], node, []);
       break;
     case "time_gate":
       const mode = node.configuration?.mode || "include_range";
@@ -480,14 +463,6 @@ export const CustomComponent = () => {
             _originalConfiguration: filteredConfiguration,
           };
 
-          // Update the title and expression in the type-specific props
-          if (nodeData.if) {
-            updatedData.if = {
-              ...nodeData.if,
-              title: nodeName.trim(),
-              expression: filteredConfiguration.expression,
-            };
-          }
           if (nodeData.filter) {
             updatedData.filter = {
               ...nodeData.filter,

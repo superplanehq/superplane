@@ -8,8 +8,9 @@ export const noopMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
-    lastExecution: WorkflowsWorkflowNodeExecution,
+    lastExecutions: WorkflowsWorkflowNodeExecution[],
   ): ComponentBaseProps {
+    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     return {
       iconSlug: "circle-off",
       headerColor: "bg-gray-50",
@@ -21,7 +22,7 @@ export const noopMapper: ComponentBaseMapper = {
   },
 };
 
-function getEventSections(nodes: ComponentsNode[], execution: WorkflowsWorkflowNodeExecution): EventSection[] {
+function getEventSections(nodes: ComponentsNode[], execution: WorkflowsWorkflowNodeExecution | null): EventSection[] {
   if (!execution) {
     return [
       {

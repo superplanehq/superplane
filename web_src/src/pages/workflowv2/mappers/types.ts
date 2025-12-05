@@ -41,6 +41,6 @@ export interface ComponentBaseMapper {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
-    lastExecution: WorkflowsWorkflowNodeExecution | null,
+    lastExecutions: WorkflowsWorkflowNodeExecution[],
   ): ComponentBaseProps;
 }

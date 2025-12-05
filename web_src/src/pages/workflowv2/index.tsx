@@ -1543,7 +1543,7 @@ function prepareComponentNode(
     case "approval":
       return prepareApprovalNode(nodes, node, components, nodeExecutionsMap, workflowId, queryClient, organizationId);
     case "if":
-      return prepareIfNode(nodes, node, nodeExecutionsMap);
+      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap);
     case "noop":
       return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap);
     case "filter":
@@ -1808,70 +1808,6 @@ function prepareApprovalNode(
   };
 }
 
-function prepareIfNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-): CanvasNode {
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const lastTrueExecution = executions.length > 0 ? executions.find((e) => e.outputs?.["true"]) : null;
-  const lastFalseExecution = executions.length > 0 ? executions.find((e) => e.outputs?.["false"]) : null;
-
-  // Parse conditions from node configuration
-  const expression = node.configuration?.expression;
-
-  const processExecutionEventData = (execution: WorkflowsWorkflowNodeExecution) => {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    const eventData = {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: executionToEventSectionState(execution),
-    };
-
-    return eventData;
-  };
-
-  // Get last execution for event data
-  let trueEvent, falseEvent;
-  if (lastTrueExecution) {
-    trueEvent = processExecutionEventData(lastTrueExecution!);
-  }
-
-  if (lastFalseExecution) {
-    falseEvent = processExecutionEventData(lastFalseExecution!);
-  }
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "if",
-      label: node.name!,
-      state: "pending" as const,
-      if: {
-        title: node.name!,
-        expression,
-        trueEvent: trueEvent || {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        falseEvent: falseEvent || {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        trueSectionLabel: "TRUE",
-        falseSectionLabel: "FALSE",
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
 function prepareComponentBaseNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
@@ -1879,9 +1815,8 @@ function prepareComponentBaseNode(
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
   const metadata = components.find((c) => c.name === node.component?.name);
-  const displayLabel = node.name || metadata?.label!;
+  const displayLabel = node.name || metadata?.label;
 
   return {
     id: node.id!,
@@ -1890,7 +1825,8 @@ function prepareComponentBaseNode(
       type: "component",
       label: displayLabel,
       state: "pending" as const,
-      component: getComponentBaseMapper(node.component?.name!).props(nodes, node, execution),
+      outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
+      component: getComponentBaseMapper(node.component?.name || "").props(nodes, node, executions),
     },
   };
 }
