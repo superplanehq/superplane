@@ -111,9 +111,22 @@ func Test__WorkflowCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 
 	//
 	// Process the deleted workflow with cleanup worker
+	// The worker now processes resources in batches, so it might take multiple calls
 	//
-	err = worker.LockAndProcessWorkflow(*deletedWorkflow)
-	require.NoError(t, err)
+
+	// Process until everything is cleaned up (with a reasonable limit)
+	maxAttempts := 10
+	for i := 0; i < maxAttempts; i++ {
+		err = worker.LockAndProcessWorkflow(*deletedWorkflow)
+		require.NoError(t, err)
+
+		// Check if workflow is completely deleted
+		var workflowCount int64
+		database.Conn().Unscoped().Model(&models.Workflow{}).Where("id = ?", workflow.ID).Count(&workflowCount)
+		if workflowCount == 0 {
+			break
+		}
+	}
 
 	//
 	// Verify everything is permanently deleted
@@ -195,9 +208,20 @@ func Test__WorkflowCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 
 	//
 	// Process the deleted workflow with cleanup worker
+	// May take multiple calls due to batched resource deletion
 	//
-	err = worker.LockAndProcessWorkflow(*deletedWorkflow)
-	require.NoError(t, err)
+	maxAttempts := 10
+	for i := 0; i < maxAttempts; i++ {
+		err = worker.LockAndProcessWorkflow(*deletedWorkflow)
+		require.NoError(t, err)
+
+		// Check if workflow is completely deleted
+		var workflowCount int64
+		database.Conn().Unscoped().Model(&models.Workflow{}).Where("id = ?", workflow.ID).Count(&workflowCount)
+		if workflowCount == 0 {
+			break
+		}
+	}
 
 	//
 	// Verify webhook is soft deleted (marked for cleanup by webhook cleanup worker)
@@ -311,8 +335,23 @@ func Test__WorkflowCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	assert.NoError(t, result1)
 	assert.NoError(t, result2)
 
+	// Process remaining work until fully cleaned up
+	maxAttempts := 10
+	for i := 0; i < maxAttempts; i++ {
+		worker := NewWorkflowCleanupWorker()
+		err := worker.LockAndProcessWorkflow(*deletedWorkflow)
+		require.NoError(t, err)
+
+		// Check if workflow is completely deleted
+		var workflowCount int64
+		database.Conn().Unscoped().Model(&models.Workflow{}).Where("id = ?", workflow.ID).Count(&workflowCount)
+		if workflowCount == 0 {
+			break
+		}
+	}
+
 	//
-	// Verify workflow is permanently deleted (only processed once)
+	// Verify workflow is permanently deleted
 	//
 	var workflowCount int64
 	database.Conn().Unscoped().Model(&models.Workflow{}).Where("id = ?", workflow.ID).Count(&workflowCount)
