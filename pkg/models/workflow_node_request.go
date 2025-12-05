@@ -60,8 +60,12 @@ func ListNodeRequests() ([]WorkflowNodeRequest, error) {
 
 	now := time.Now()
 	err := database.Conn().
-		Where("state = ?", NodeExecutionRequestStatePending).
-		Where("run_at <= ?", now).
+		Joins("JOIN workflow_nodes ON workflow_node_requests.workflow_id = workflow_nodes.workflow_id AND workflow_node_requests.node_id = workflow_nodes.node_id").
+		Joins("JOIN workflows ON workflow_node_requests.workflow_id = workflows.id").
+		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
+		Where("workflow_node_requests.run_at <= ?", now).
+		Where("workflow_nodes.deleted_at IS NULL").
+		Where("workflows.deleted_at IS NULL").
 		Find(&requests).
 		Error
 
