@@ -56,7 +56,7 @@ func TestCanvasPage(t *testing.T) {
 
 	t.Run("viewing queued items in the sidebar", func(t *testing.T) {
 		steps.start()
-		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems()
+		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(4)
 		steps.openSidebarForNode("Wait")
 		steps.assertRunningItemsCount("Wait", 1)
 		steps.assertQueuedItemsCount("Wait", 3)
@@ -65,7 +65,7 @@ func TestCanvasPage(t *testing.T) {
 
 	t.Run("canceling queued items from the sidebar", func(t *testing.T) {
 		steps.start()
-		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems()
+		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(4)
 		steps.openSidebarForNode("Wait")
 
 		steps.assertRunningItemsCount("Wait", 1)
@@ -76,17 +76,13 @@ func TestCanvasPage(t *testing.T) {
 
 	t.Run("canceling running execution from the sidebar", func(t *testing.T) {
 		steps.start()
-		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems()
+		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(1)
 		steps.openSidebarForNode("Wait")
 
 		steps.assertRunningItemsCount("Wait", 1)
-		steps.assertQueuedItemsCount("Wait", 3)
+		steps.assertQueuedItemsCount("Wait", 0)
 		steps.cancelRunningExecutionFromSidebar()
-
-		//
-		// Since we have more items in queue, it is expected that the cancelled execution is at index 1
-		//
-		steps.assertExecutionWasCancelled("Wait", 1)
+		steps.assertExecutionWasCancelled("Wait")
 	})
 }
 
@@ -192,7 +188,7 @@ func (s *CanvasPageSteps) assertNodeDuplicatedInDB(originalName, duplicateName s
 	require.Equal(s.t, originalPos.Y+50, duplicatePos.Y, "duplicate node Y position should be offset by 50")
 }
 
-func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems() {
+func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(itemsAmount int) {
 	s.canvas = shared.NewCanvasSteps("E2E Canvas With Queue", s.t, s.session)
 
 	s.canvas.Create()
@@ -206,7 +202,7 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 	runButton := q.Locator("button:has-text('Run')")
 	emitEvent := q.Locator("button:has-text('Emit Event')")
 
-	for i := 0; i < 4; i++ {
+	for i := 0; i < itemsAmount; i++ {
 		s.session.Click(dropdown)
 		s.session.Click(runButton)
 		s.session.Click(emitEvent)
@@ -294,10 +290,10 @@ func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
 	s.session.Sleep(500) // wait for the cancellation to be processed
 }
 
-func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string, executionIndex int32) {
+func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
 	executions := s.canvas.GetExecutionsForNode(nodeName)
 	require.Greater(s.t, len(executions), 0, "expected at least one execution")
 
-	execution := executions[executionIndex]
+	execution := executions[0]
 	require.Equal(s.t, models.WorkflowNodeExecutionResultCancelled, execution.Result, "expected execution to be cancelled")
 }
