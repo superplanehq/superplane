@@ -78,15 +78,24 @@ export const mockNodes: Node[] = [
     data: {
       label: "Filter Services",
       state: "pending",
-      type: "filter",
+      type: "component",
       outputChannels: ["default"],
-      filter: {
+      component: {
         title: "Filter Services",
-        filters: [
+        iconSlug: "filter",
+        headerColor: "bg-gray-50",
+        specs: [
           {
-            field: "service.enabled",
-            operator: "==",
-            value: "true",
+            title: "filter",
+            tooltipTitle: "filters applied",
+            values: parseExpression("service.enabled == true"),
+          },
+        ],
+        eventSections: [
+          {
+            title: "Last Event",
+            eventTitle: "No events received yet",
+            eventState: "neutral" as const,
           },
         ],
         collapsed: false,

@@ -5,14 +5,13 @@ import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
 import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
-import { Filter, FilterProps } from "../filter";
 import MergeComponent, { type MergeComponentProps } from "../merge";
 import { ComponentActionsProps } from "../types/componentActions";
 import { Wait, WaitProps } from "../wait";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType = "trigger" | "component" | "composite" | "approval" | "filter" | "wait" | "merge" | "switch";
+type BlockType = "trigger" | "component" | "composite" | "approval" | "wait" | "merge" | "switch";
 
 interface BlockAi {
   show: boolean;
@@ -44,9 +43,6 @@ export interface BlockData {
 
   // approval node specific props
   approval?: ApprovalProps;
-
-  // filter node specific props
-  filter?: FilterProps;
 
   // wait node specific props
   wait?: WaitProps;
@@ -109,7 +105,6 @@ function LeftHandle({ data, nodeId }: BlockProps) {
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "approval" && data.approval?.collapsed) ||
-    (data.type === "filter" && data.filter?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed) ||
     (data.type === "component" && data.component?.collapsed);
@@ -157,7 +152,6 @@ function RightHandle({ data, nodeId }: BlockProps) {
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "trigger" && data.trigger?.collapsed) ||
-    (data.type === "filter" && data.filter?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed) ||
     (data.type === "component" && data.component?.collapsed);
@@ -386,8 +380,6 @@ function BlockContent({
       );
     case "approval":
       return <Approval {...(data.approval as ApprovalProps)} selected={selected} {...actionProps} />;
-    case "filter":
-      return <Filter {...(data.filter as FilterProps)} selected={selected} {...actionProps} />;
     case "wait":
       return <Wait {...(data.wait as WaitProps)} selected={selected} {...actionProps} />;
     case "switch":
