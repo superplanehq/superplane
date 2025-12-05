@@ -34,23 +34,6 @@ func (i *SemaphoreEventHandler) EventTypes() []string {
 	return []string{PipelineDoneEvent}
 }
 
-func (i *SemaphoreEventHandler) Status(_ string, data []byte) (integrations.StatefulResource, error) {
-	var hook Hook
-	err := json.Unmarshal(data, &hook)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling webhook data: %v", err)
-	}
-
-	return &Workflow{
-		WfID: hook.Workflow.ID,
-		Pipeline: &Pipeline{
-			PipelineID: hook.Pipeline.ID,
-			State:      hook.Pipeline.State,
-			Result:     hook.Pipeline.Result,
-		},
-	}, nil
-}
-
 func (i *SemaphoreEventHandler) Handle(data []byte, header http.Header) (integrations.Event, error) {
 	var hook Hook
 	err := json.Unmarshal(data, &hook)

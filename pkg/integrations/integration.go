@@ -15,13 +15,6 @@ type AuthenticateFn func() (string, error)
 type EventHandler interface {
 
 	//
-	// Convert the webhook data into a stateful resource.
-	// Used by the pending events worker to update execution resources.
-	// Used in conjunction with Status() to update the status of an execution resource.
-	//
-	Status(string, []byte) (StatefulResource, error)
-
-	//
 	// Convert the webhook data into an event.
 	// Used by the HTTP server when receiving events
 	// for a resource from the integration.
@@ -43,13 +36,6 @@ type ResourceManager interface {
 	//
 	Get(resourceType, id string) (Resource, error)
 	List(resourceType string) ([]Resource, error)
-
-	//
-	// Get the status of a resource created by the executor.
-	// Used by the execution resource poller. Ideally, not needed at all, since the status
-	// should be received in a webhook, through WebhookStatus().
-	//
-	Status(resourceType, id string, parentResource Resource) (StatefulResource, error)
 
 	//
 	// Cancel a resource.

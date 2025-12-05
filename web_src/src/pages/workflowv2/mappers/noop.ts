@@ -5,9 +5,10 @@ import {
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
-import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
+import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
 import { getBackgroundColorClass } from "@/utils/colors";
+import { success, failed, neutral, running } from "./eventSectionUtils";
 
 export const noopMapper: ComponentBaseMapper = {
   props(
@@ -31,11 +32,10 @@ export const noopMapper: ComponentBaseMapper = {
 function getNoopEventSections(nodes: ComponentsNode[], execution: WorkflowsWorkflowNodeExecution): EventSection[] {
   if (!execution) {
     return [
-      {
+      neutral({
         title: "Last Run",
         eventTitle: "No events received yet",
-        eventState: "neutral" as const,
-      },
+      }),
     ];
   }
 
@@ -43,24 +43,19 @@ function getNoopEventSections(nodes: ComponentsNode[], execution: WorkflowsWorkf
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
-  return [
-    {
-      title: "Last Run",
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: executionToEventSectionState(execution),
-    },
-  ];
-}
+  const baseProps = {
+    title: "Last Run",
+    receivedAt: new Date(execution.createdAt!),
+    eventTitle: title,
+  };
 
-function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
   if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
+    return [running(baseProps)];
   }
 
   if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
-    return "success";
+    return [success(baseProps)];
   }
 
-  return "failed";
+  return [failed(baseProps)];
 }

@@ -10,6 +10,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from ".";
 import { calcRelativeTimeFromDiff } from "@/lib/utils";
+import { success, failed, neutral, running, inQueue } from "./eventSectionUtils";
 
 export const timeGateMapper: ComponentBaseMapper = {
   props(
@@ -130,18 +131,6 @@ function getTimeGateSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   return specs;
 }
 
-function getRunItemState(execution: WorkflowsWorkflowNodeExecution): "success" | "failed" | "running" {
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
-  }
-
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
-    return "success";
-  }
-
-  return "failed";
-}
-
 function getTimeGateEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution | null,
@@ -151,22 +140,26 @@ function getTimeGateEventSections(
 
   // Add Last Event section
   if (!execution) {
-    sections.push({
-      title: "LAST EVENT",
-      eventTitle: "No events received yet",
-      eventState: "neutral" as const,
-    });
+    sections.push(
+      neutral({
+        title: "LAST EVENT",
+        eventTitle: "No events received yet",
+      }),
+    );
   } else {
-    const executionState = getRunItemState(execution);
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
-    let subtitle: string | undefined;
+    const baseProps = {
+      title: "LAST EVENT",
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+    };
 
-    // If running, show next run time in the subtitle
-    if (executionState === "running") {
+    if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
       const executionMetadata = execution.metadata as { nextValidTime?: string };
+      let subtitle: string | undefined;
       if (executionMetadata?.nextValidTime) {
         const nextRunTime = new Date(executionMetadata.nextValidTime);
         const now = new Date();
@@ -174,15 +167,12 @@ function getTimeGateEventSections(
         const timeLeftText = timeDiff > 0 ? calcRelativeTimeFromDiff(timeDiff) : "Ready to run";
         subtitle = `Runs in ${timeLeftText}`;
       }
+      sections.push(running({ ...baseProps, subtitle }));
+    } else if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
+      sections.push(success(baseProps));
+    } else {
+      sections.push(failed(baseProps));
     }
-
-    sections.push({
-      title: "LAST EVENT",
-      subtitle: subtitle,
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: executionState,
-    });
   }
 
   // Add Next in Queue section if there are queued items
@@ -193,12 +183,13 @@ function getTimeGateEventSections(
 
     if (queueItem.rootEvent) {
       const { title } = rootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent);
-      sections.push({
-        title: "NEXT IN QUEUE",
-        receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
-        eventTitle: title,
-        eventState: "next-in-queue" as const,
-      });
+      sections.push(
+        inQueue({
+          title: "NEXT IN QUEUE",
+          receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
+          eventTitle: title,
+        }),
+      );
     }
   }
 

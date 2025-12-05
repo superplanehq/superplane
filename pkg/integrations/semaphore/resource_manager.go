@@ -19,7 +19,6 @@ const (
 	PipelineResultPassed = "passed"
 	PipelineResultFailed = "failed"
 
-	ResourceTypeTask         = "task"
 	ResourceTypeProject      = "project"
 	ResourceTypeWorkflow     = "workflow"
 	ResourceTypeNotification = "notification"
@@ -42,28 +41,6 @@ func NewSemaphoreResourceManager(ctx context.Context, URL string, authenticate i
 		URL:   URL,
 		Token: token,
 	}, nil
-}
-
-func (i *SemaphoreResourceManager) Status(resourceType, id string, _ integrations.Resource) (integrations.StatefulResource, error) {
-	switch resourceType {
-	case ResourceTypeWorkflow:
-		resource, err := i.getWorkflow(id)
-		if err != nil {
-			return nil, fmt.Errorf("workflow %s not found: %v", id, err)
-		}
-
-		workflow := resource.(*Workflow)
-		resource, err = i.getPipeline(workflow.InitialPplID)
-		if err != nil {
-			return nil, fmt.Errorf("pipeline %s not found: %v", workflow.InitialPplID, err)
-		}
-
-		pipeline := resource.(*Pipeline)
-		return pipeline, nil
-
-	default:
-		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
-	}
 }
 
 func (i *SemaphoreResourceManager) Cancel(resourceType, id string, _ integrations.Resource) error {
@@ -103,6 +80,7 @@ type CreateWorkflowRequest struct {
 
 type CreateWorkflowResponse struct {
 	WorkflowID string `json:"workflow_id"`
+	PipelineID string `json:"pipeline_id"`
 }
 
 func (i *SemaphoreResourceManager) createWebhookSecret(name, key string) (integrations.Resource, error) {
@@ -305,47 +283,7 @@ type NotificationSpec struct {
 	Rules []NotificationRule `json:"rules"`
 }
 
-type RunTaskRequest struct {
-	TaskID       string
-	Branch       string            `json:"branch"`
-	PipelineFile string            `json:"pipeline_file"`
-	Parameters   map[string]string `json:"parameters"`
-}
-
-type RunTaskResponse struct {
-	WorkflowID string `json:"workflow_id"`
-}
-
-func (i *SemaphoreResourceManager) runTask(params any) (integrations.StatefulResource, error) {
-	p, ok := params.(*RunTaskRequest)
-	if !ok {
-		return nil, fmt.Errorf("invalid params type %T", params)
-	}
-
-	URL := fmt.Sprintf("%s/api/v1alpha/tasks/%s/run_now", i.URL, p.TaskID)
-	body, err := json.Marshal(p)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling task trigger: %v", err)
-	}
-
-	responseBody, err := i.execRequest(http.MethodPost, URL, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	var response RunTaskResponse
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
-	}
-
-	return &Workflow{
-		WorkflowURL: fmt.Sprintf("%s/workflows/%s", i.URL, response.WorkflowID),
-		WfID:        response.WorkflowID,
-	}, nil
-}
-
-func (i *SemaphoreResourceManager) RunWorkflow(params any) (integrations.StatefulResource, error) {
+func (i *SemaphoreResourceManager) RunWorkflow(params any) (*Workflow, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows", i.URL)
 
 	body, err := json.Marshal(&params)
@@ -365,35 +303,13 @@ func (i *SemaphoreResourceManager) RunWorkflow(params any) (integrations.Statefu
 	}
 
 	return &Workflow{
-		WfID:        response.WorkflowID,
-		WorkflowURL: fmt.Sprintf("%s/workflows/%s", i.URL, response.WorkflowID),
+		WfID:         response.WorkflowID,
+		InitialPplID: response.PipelineID,
+		WorkflowURL:  fmt.Sprintf("%s/workflows/%s", i.URL, response.WorkflowID),
+		Pipeline: &Pipeline{
+			ID: response.PipelineID,
+		},
 	}, nil
-}
-
-func (i *SemaphoreResourceManager) listTasks(parentIDs ...string) ([]integrations.Resource, error) {
-	if len(parentIDs) != 1 {
-		return nil, fmt.Errorf("expected 1 parent ID, got %d: %v", len(parentIDs), parentIDs)
-	}
-
-	URL := fmt.Sprintf("%s/api/v1alpha/tasks?project_id=%s", i.URL, parentIDs[0])
-	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var tasks []Task
-	err = json.Unmarshal(responseBody, &tasks)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
-	}
-
-	resources := make([]integrations.Resource, len(tasks))
-	for idx, task := range tasks {
-		task.TaskURL = fmt.Sprintf("%s/projects/%s/tasks/%s", i.URL, parentIDs[0], task.ID)
-		resources[idx] = &tasks[idx]
-	}
-
-	return resources, nil
 }
 
 func (i *SemaphoreResourceManager) listProjects() ([]integrations.Resource, error) {
@@ -418,23 +334,6 @@ func (i *SemaphoreResourceManager) listProjects() ([]integrations.Resource, erro
 	return resources, nil
 }
 
-func (i *SemaphoreResourceManager) getWorkflow(id string) (integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows/%s", i.URL, id)
-	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var workflow WorkflowResponse
-	err = json.Unmarshal(responseBody, &workflow)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
-	}
-
-	workflow.Workflow.WorkflowURL = fmt.Sprintf("%s/workflows/%s", i.URL, id)
-	return workflow.Workflow, nil
-}
-
 func (i *SemaphoreResourceManager) stopWorkflow(id string) error {
 	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows/%s/terminate", i.URL, id)
 	_, err := i.execRequest(http.MethodPost, URL, nil)
@@ -445,7 +344,7 @@ func (i *SemaphoreResourceManager) stopWorkflow(id string) error {
 	return nil
 }
 
-func (i *SemaphoreResourceManager) getPipeline(id string) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) GetPipeline(id string) (*Pipeline, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/pipelines/%s", i.URL, id)
 	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
@@ -458,7 +357,6 @@ func (i *SemaphoreResourceManager) getPipeline(id string) (integrations.Resource
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	pipelineResponse.Pipeline.PipelineURL = fmt.Sprintf("%s/workflows/%s?pipeline_id=%s", i.URL, pipelineResponse.Pipeline.WorkflowID, id)
 	return pipelineResponse.Pipeline, nil
 }
 
@@ -499,31 +397,6 @@ func (i *SemaphoreResourceManager) getProjectByName(name string) (integrations.R
 	return &project, nil
 }
 
-func (i *SemaphoreResourceManager) getTask(id string, parentIDs ...string) (integrations.Resource, error) {
-	if len(parentIDs) != 1 {
-		return nil, fmt.Errorf("expected 1 parent ID, got %d: %v", len(parentIDs), parentIDs)
-	}
-
-	URL := fmt.Sprintf("%s/api/v1alpha/tasks/%s?project_id=%s", i.URL, id, parentIDs[0])
-	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	type TaskDescribeResponse struct {
-		Task *Task `json:"schedule"`
-	}
-
-	var task TaskDescribeResponse
-	err = json.Unmarshal(responseBody, &task)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
-	}
-
-	task.Task.TaskURL = fmt.Sprintf("%s/projects/%s/tasks/%s", i.URL, parentIDs[0], id)
-	return task.Task, nil
-}
-
 func (i *SemaphoreResourceManager) execRequest(method string, url string, body io.Reader) ([]byte, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
@@ -554,34 +427,10 @@ type WorkflowResponse struct {
 }
 
 type Workflow struct {
-	WorkflowURL  string    `json:"url"`
-	WfID         string    `json:"wf_id"`
-	InitialPplID string    `json:"initial_ppl_id"`
-	Pipeline     *Pipeline `json:"pipeline"`
-}
-
-func (w *Workflow) Id() string {
-	return w.WfID
-}
-
-func (w *Workflow) Name() string {
-	return ""
-}
-
-func (w *Workflow) Type() string {
-	return ResourceTypeWorkflow
-}
-
-func (w *Workflow) URL() string {
-	return w.WorkflowURL
-}
-
-func (w *Workflow) Finished() bool {
-	return w.Pipeline != nil && w.Pipeline.Finished()
-}
-
-func (w *Workflow) Successful() bool {
-	return w.Pipeline != nil && w.Pipeline.Successful()
+	WorkflowURL  string    `json:"-"`
+	WfID         string    `json:"wf_id" mapstructure:"wf_id"`
+	InitialPplID string    `json:"initial_ppl_id" mapstructure:"initial_ppl_id"`
+	Pipeline     *Pipeline `json:"pipeline" mapstructure:"pipeline"`
 }
 
 type Project struct {
@@ -610,63 +459,25 @@ type ProjectMetadata struct {
 	ProjectID   string `json:"id"`
 }
 
-type Task struct {
-	ID       string `json:"id"`
-	TaskName string `json:"name"`
-	TaskURL  string `json:"-"`
-}
-
-func (t *Task) URL() string {
-	return t.TaskURL
-}
-
-func (t *Task) Id() string {
-	return t.ID
-}
-
-func (t *Task) Name() string {
-	return t.TaskName
-}
-
-func (t *Task) Type() string {
-	return ResourceTypeTask
-}
-
 type PipelineResponse struct {
 	Pipeline *Pipeline `json:"pipeline"`
 }
 
 type Pipeline struct {
-	PipelineURL  string `json:"-"`
-	PipelineName string `json:"name"`
-	PipelineID   string `json:"ppl_id"`
-	WorkflowID   string `json:"wf_id"`
-	State        string `json:"state"`
-	Result       string `json:"result"`
-}
-
-func (p *Pipeline) URL() string {
-	return p.PipelineURL
-}
-
-func (p *Pipeline) Id() string {
-	return p.PipelineID
-}
-
-func (p *Pipeline) Name() string {
-	return p.PipelineName
-}
-
-func (p *Pipeline) Type() string {
-	return ResourceTypePipeline
-}
-
-func (p *Pipeline) Finished() bool {
-	return p.State == PipelineStateDone
-}
-
-func (p *Pipeline) Successful() bool {
-	return p.Result == PipelineResultPassed
+	URL              string `json:"-"`
+	ID               string `json:"ppl_id" mapstructure:"ppl_id"`
+	Name             string `json:"name" mapstructure:"name"`
+	State            string `json:"state" mapstructure:"state"`
+	Result           string `json:"result" mapstructure:"result"`
+	ResultReason     string `json:"result_reason" mapstructure:"result_reason"`
+	CreatedAt        string `json:"created_at" mapstructure:"created_at"`
+	PendingAt        string `json:"pending_at" mapstructure:"pending_at"`
+	QueuingAt        string `json:"queuing_at" mapstructure:"queuing_at"`
+	RunningAt        string `json:"running_at" mapstructure:"running_at"`
+	StoppingAt       string `json:"stopping_at" mapstructure:"stopping_at"`
+	DoneAt           string `json:"done_at" mapstructure:"done_at"`
+	TerminatedBy     string `json:"terminated_by" mapstructure:"terminated_by"`
+	TerminateRequest string `json:"terminate_request" mapstructure:"terminate_request"`
 }
 
 type WebhookMetadata struct {

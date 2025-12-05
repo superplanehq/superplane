@@ -1,5 +1,6 @@
 import { ComponentBase, type EventSection } from "../componentBase";
 import { ComponentActionsProps } from "../types/componentActions";
+import { neutral } from "@/pages/workflowv2/mappers/eventSectionUtils";
 
 export interface MergeComponentProps extends ComponentActionsProps {
   title?: string;
@@ -39,14 +40,15 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
     });
   }
   if (nextInQueue) {
-    eventSections.push({
-      title: "Next In Queue",
-      eventTitle: nextInQueue.title,
-      eventState: "neutral",
-      handleComponent: nextInQueue.subtitle ? (
-        <div className="mt-2 text-right text-xs text-gray-500">{nextInQueue.subtitle}</div>
-      ) : undefined,
-    });
+    eventSections.push(
+      neutral({
+        title: "Next In Queue",
+        eventTitle: nextInQueue.title,
+        handleComponent: nextInQueue.subtitle ? (
+          <div className="mt-2 text-right text-xs text-gray-500">{nextInQueue.subtitle}</div>
+        ) : undefined,
+      }),
+    );
   }
 
   return (

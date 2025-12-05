@@ -1888,6 +1888,7 @@ function prepareComponentBaseNode(
       type: "component",
       label: displayLabel,
       state: "pending" as const,
+      // outputChannels: componentDef?.outputChannels?.map((c) => c.name!) || ["default"]
       component: getComponentBaseMapper(node.component?.name!).props(
         nodes,
         node,

@@ -2,6 +2,7 @@ package semaphore
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,15 +29,9 @@ type NodeMetadata struct {
 }
 
 type ExecutionMetadata struct {
-	Workflow *Workflow      `json:"workflow"`
-	Data     map[string]any `json:"data,omitempty"`
-}
-
-type Workflow struct {
-	ID     string `json:"id"`
-	URL    string `json:"url"`
-	State  string `json:"state"`
-	Result string `json:"result"`
+	URL      string              `json:"url"`
+	Workflow *semaphore.Workflow `json:"workflow"`
+	Data     map[string]any      `json:"data,omitempty"`
 }
 
 type Project struct {
@@ -249,11 +244,8 @@ func (s *Semaphore) Execute(ctx components.ExecutionContext) error {
 	}
 
 	ctx.MetadataContext.Set(ExecutionMetadata{
-		Workflow: &Workflow{
-			ID:    wf.Id(),
-			URL:   wf.URL(),
-			State: "started",
-		},
+		URL:      wf.WorkflowURL,
+		Workflow: wf,
 	})
 
 	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
@@ -266,7 +258,7 @@ func (s *Semaphore) Actions() []components.Action {
 			UserAccessible: false,
 		},
 		{
-			Name:           "finish",
+			Name:           "sendData",
 			UserAccessible: true,
 			Parameters: []configuration.Field{
 				{
@@ -298,16 +290,25 @@ func (s *Semaphore) poll(ctx components.ActionContext) error {
 		return err
 	}
 
+	fmt.Printf("Raw metadata: %v\n", ctx.MetadataContext.Get())
+
 	metadata := ExecutionMetadata{}
 	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
 		return err
 	}
 
+	log.Printf("Workflow: %v", metadata.Workflow)
+	log.Printf("Pipeline: %v", metadata.Workflow.Pipeline)
+
+	if metadata.Workflow.Pipeline == nil {
+		return nil
+	}
+
 	//
-	// If the execution already finished, we don't need to do anything.
+	// If the pipeline is already done, we don't need to do anything.
 	//
-	if metadata.Workflow.State == "finished" {
+	if metadata.Workflow.Pipeline.State == "done" {
 		return nil
 	}
 
@@ -316,42 +317,36 @@ func (s *Semaphore) poll(ctx components.ActionContext) error {
 		return fmt.Errorf("failed to get integration: %w", err)
 	}
 
-	resource, err := integration.Status("workflow", metadata.Workflow.ID, nil)
+	semaphore, ok := integration.(*semaphore.SemaphoreResourceManager)
+	if !ok {
+		return fmt.Errorf("integration is not a semaphore integration")
+	}
+
+	log.Printf("Pipeline ID: %s", metadata.Workflow.Pipeline.ID)
+
+	pipeline, err := semaphore.GetPipeline(metadata.Workflow.Pipeline.ID)
 	if err != nil {
-		return fmt.Errorf("error determing status for workflow %s: %v", resource.Id(), err)
+		return fmt.Errorf("error determing status for pipeline %s: %v", metadata.Workflow.Pipeline.ID, err)
 	}
 
 	//
 	// If not finished, poll again in 1min.
 	//
-	if !resource.Finished() {
+	if pipeline.State != "done" {
 		return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
 	}
 
-	result := "passed"
-	if !resource.Successful() {
-		result = "failed"
-	}
+	metadata.Workflow.Pipeline = pipeline
+	ctx.MetadataContext.Set(metadata)
 
-	newMetadata := &ExecutionMetadata{
-		Workflow: &Workflow{
-			ID:     metadata.Workflow.ID,
-			URL:    metadata.Workflow.URL,
-			State:  "finished",
-			Result: result,
-		},
-	}
-
-	ctx.MetadataContext.Set(newMetadata)
-
-	if result == "passed" {
+	if metadata.Workflow.Pipeline.State == "passed" {
 		return ctx.ExecutionStateContext.Pass(map[string][]any{
-			PassedOutputChannel: {newMetadata},
+			PassedOutputChannel: {metadata},
 		})
 	}
 
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		FailedOutputChannel: {newMetadata},
+		FailedOutputChannel: {metadata},
 	})
 }
 
@@ -362,8 +357,8 @@ func (s *Semaphore) finish(ctx components.ActionContext) error {
 		return err
 	}
 
-	if metadata.Workflow.State == "finished" {
-		return fmt.Errorf("workflow already finished")
+	if metadata.Workflow.Pipeline.State == "done" {
+		return fmt.Errorf("pipeline already done")
 	}
 
 	data, ok := ctx.Parameters["data"]
@@ -376,21 +371,9 @@ func (s *Semaphore) finish(ctx components.ActionContext) error {
 		return fmt.Errorf("data is invalid")
 	}
 
-	newMetadata := &ExecutionMetadata{
-		Data: dataMap,
-		Workflow: &Workflow{
-			ID:     metadata.Workflow.ID,
-			URL:    metadata.Workflow.URL,
-			State:  "finished",
-			Result: "passed",
-		},
-	}
-
-	ctx.MetadataContext.Set(newMetadata)
-
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		PassedOutputChannel: {newMetadata},
-	})
+	metadata.Data = dataMap
+	ctx.MetadataContext.Set(metadata)
+	return nil
 }
 
 func (s *Semaphore) buildParameters(ctx components.ExecutionContext, params []Parameter) map[string]any {

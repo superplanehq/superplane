@@ -5,9 +5,10 @@ import {
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState } from "@/ui/componentBase";
+import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
+import { success, failed, neutral, running } from "./eventSectionUtils";
 
 export const httpMapper: ComponentBaseMapper = {
   props(
@@ -87,35 +88,29 @@ function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 function getHTTPEventSections(execution: WorkflowsWorkflowNodeExecution): EventSection[] {
   if (!execution) {
     return [
-      {
+      neutral({
         title: "Last Run",
         eventTitle: "No events received yet",
-        eventState: "neutral" as const,
-      },
+      }),
     ];
   }
 
   const outputs = execution.outputs as any;
   const response = outputs?.default?.[0];
 
-  return [
-    {
-      title: "Last Run",
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: execution.state == "STATE_FINISHED" ? `Status: ${response?.status}` : "Running...",
-      eventState: executionToEventSectionState(execution),
-    },
-  ];
-}
+  const baseProps = {
+    title: "Last Run",
+    receivedAt: new Date(execution.createdAt!),
+    eventTitle: execution.state == "STATE_FINISHED" ? `Status: ${response?.status}` : "Running...",
+  };
 
-function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
   if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
+    return [running(baseProps)];
   }
 
   if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
-    return "success";
+    return [success(baseProps)];
   }
 
-  return "failed";
+  return [failed(baseProps)];
 }

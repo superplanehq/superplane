@@ -5,11 +5,12 @@ import {
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState } from "@/ui/componentBase";
+import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from ".";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { success, failed, neutral, running, inQueue } from "./eventSectionUtils";
 
 export const semaphoreMapper: ComponentBaseMapper = {
   props(
@@ -92,11 +93,13 @@ function getSemaphoreSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 }
 
 interface ExecutionMetadata {
+  url: string;
   workflow?: {
     id: string;
-    url: string;
-    state: string;
-    result: string;
+    pipeline?: {
+      state: string;
+      result: string;
+    }
   };
 }
 
@@ -109,23 +112,17 @@ function getSemaphoreEventSections(
 
   // Add Last Run section
   if (!execution) {
-    sections.push({
-      title: "Last Run",
-      eventTitle: "No executions received yet",
-      eventState: "neutral" as const,
-    });
+    sections.push(
+      neutral({
+        title: "Last Run",
+        eventTitle: "No executions received yet",
+      }),
+    );
   } else {
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    sections.push({
-      title: "Last Run",
-      showAutomaticTime: true,
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: executionToEventSectionState(execution),
-    });
+    sections.push(lastRunSection(execution, title));
   }
 
   // Add Next in Queue section if there are queued items
@@ -136,27 +133,49 @@ function getSemaphoreEventSections(
 
     if (queueItem.rootEvent) {
       const { title } = rootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent);
-      sections.push({
-        title: "Next in Queue",
-        receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
-        eventTitle: title,
-        eventState: "next-in-queue" as const,
-      });
+      sections.push(
+        inQueue({
+          title: "Next in Queue",
+          receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
+          eventTitle: title,
+        }),
+      );
     }
   }
 
   return sections;
 }
 
-function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
+function lastRunSection(execution: WorkflowsWorkflowNodeExecution, title: string): EventSection {
+  const baseProps = {
+    title: "Last Run",
+    showAutomaticTime: true,
+    receivedAt: new Date(execution.createdAt!),
+    eventTitle: title,
+  };
+
   if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
+    return running(baseProps);
   }
 
-  const metadata = execution.metadata as ExecutionMetadata;
-  if (metadata.workflow?.result === "passed") {
-    return "success";
-  }
+  const metadata = execution.metadata as unknown as ExecutionMetadata;
+  const result = metadata.workflow?.pipeline?.result;
 
-  return "failed";
+  switch (result) {
+    case "passed":
+      return success(baseProps);
+    case "stopped":
+      return {
+        ...baseProps,
+        iconSlug: "circle-stop",
+        textColor: "text-gray-600",
+        backgroundColor: "bg-gray-200",
+        iconColor: "text-gray-500 bg-gray-500",
+        iconSize: 12,
+        iconClassName: "text-white",
+        inProgress: false,
+      };
+    default:
+      return failed(baseProps);
+  }
 }

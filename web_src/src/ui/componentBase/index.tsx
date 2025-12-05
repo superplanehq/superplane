@@ -19,7 +19,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({ section, inde
   const [liveDuration, setLiveDuration] = React.useState<number | null>(null);
 
   React.useEffect(() => {
-    if (section.eventState === "running" && section.receivedAt) {
+    if (section.inProgress && section.receivedAt) {
       const receivedAt = section.receivedAt;
 
       // Calculate initial duration
@@ -34,64 +34,21 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({ section, inde
     } else {
       setLiveDuration(null);
     }
-  }, [section.eventState, section.receivedAt]);
+  }, [section.inProgress, section.receivedAt]);
 
   const now = new Date();
   const diff = section.receivedAt ? now.getTime() - section.receivedAt.getTime() : 0;
   const timeAgo = section.receivedAt ? calcRelativeTimeFromDiff(diff) : "";
   const durationText = liveDuration !== null ? calcRelativeTimeFromDiff(liveDuration) : "";
 
-  const LastEventIcon =
-    section.eventState === "success"
-      ? resolveIcon("check")
-      : section.eventState === "neutral"
-        ? resolveIcon("circle")
-        : section.eventState === "next-in-queue"
-          ? resolveIcon("circle-dashed")
-          : section.eventState === "running"
-            ? resolveIcon("refresh-cw")
-            : resolveIcon("x");
-  const LastEventColor =
-    section.eventState === "success"
-      ? "text-green-700"
-      : section.eventState === "neutral"
-        ? "text-gray-500"
-        : section.eventState === "next-in-queue"
-          ? "text-gray-500"
-          : section.eventState === "running"
-            ? "text-blue-800"
-            : "text-red-700";
-  const LastEventBackground =
-    section.eventState === "success"
-      ? "bg-green-200"
-      : section.eventState === "neutral"
-        ? "bg-gray-100"
-        : section.eventState === "next-in-queue"
-          ? "bg-gray-100"
-          : section.eventState === "running"
-            ? "bg-sky-100"
-            : "bg-red-200";
-  const LastEventIconColor =
-    section.eventState === "success"
-      ? "text-green-600 bg-green-600"
-      : section.eventState === "neutral"
-        ? "text-gray-400 bg-gray-400"
-        : section.eventState === "next-in-queue"
-          ? "text-gray-500"
-          : section.eventState === "running"
-            ? "text-blue-800"
-            : "text-red-600 bg-red-600";
-
-  const iconSize = ["next-in-queue", "running"].includes(section.eventState || "") ? 16 : 12;
-  const iconClassName =
-    section.eventState === "running" ? "animate-spin" : section.eventState === "next-in-queue" ? "" : "text-white";
+  const Icon = resolveIcon(section.iconSlug);
 
   // Determine what to show in the top-right corner
   let topRightText = "";
   if (section.subtitle) {
     topRightText = section.subtitle;
   } else if (section.showAutomaticTime) {
-    topRightText = durationText && section.eventState === "running" ? `Running for: ${durationText}` : timeAgo;
+    topRightText = durationText && section.inProgress ? `Running for: ${durationText}` : timeAgo;
   } else {
     topRightText = timeAgo;
   }
@@ -103,11 +60,11 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({ section, inde
         {topRightText && <span className="text-sm">{topRightText}</span>}
       </div>
       <div
-        className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastEventBackground} ${LastEventColor}`}
+        className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${section.backgroundColor} ${section.textColor}`}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${LastEventIconColor}`}>
-            <LastEventIcon size={iconSize} className={iconClassName} />
+          <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${section.iconColor}`}>
+            <Icon size={section.iconSize} className={section.iconClassName} />
           </div>
           <span className="truncate text-sm min-w-0">{section.eventTitle}</span>
         </div>
@@ -144,17 +101,21 @@ export interface ComponentBaseSpec {
   value?: any;
 }
 
-export type EventState = "success" | "failed" | "neutral" | "next-in-queue" | "running";
-
 export interface EventSection {
   title: string;
   subtitle?: string;
   showAutomaticTime?: boolean;
   receivedAt?: Date;
-  eventState?: EventState;
   eventTitle?: string;
   eventSubtitle?: string;
   handleComponent?: React.ReactNode;
+  iconSlug: string;
+  iconColor: string;
+  iconSize: number;
+  iconClassName: string;
+  backgroundColor: string;
+  textColor: string;
+  inProgress: boolean;
 }
 
 export interface ComponentBaseProps extends ComponentActionsProps {

@@ -1,6 +1,7 @@
 import { Handle, Position } from "@xyflow/react";
 import { ComponentBase, type EventSection } from "../componentBase";
 import { ComponentActionsProps } from "../types/componentActions";
+import { success, failed, neutral, EventState } from "@/pages/workflowv2/mappers/eventSectionUtils";
 
 export interface SwitchStage {
   pathName: string;
@@ -8,7 +9,7 @@ export interface SwitchStage {
   operator: string;
   value: string;
   receivedAt?: Date;
-  eventState?: "success" | "failed";
+  eventState?: EventState;
   eventTitle?: string;
 }
 
@@ -63,12 +64,8 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
         ]
       : undefined;
 
-  const eventSections: EventSection[] = stages.map((stage) => ({
-    title: stage.pathName,
-    receivedAt: stage.receivedAt,
-    eventState: stage.eventState,
-    eventTitle: stage.eventTitle,
-    handleComponent: hideHandle ? undefined : (
+  const eventSections: EventSection[] = stages.map((stage) => {
+    const handleComponent = hideHandle ? undefined : (
       <Handle
         type="source"
         position={Position.Right}
@@ -80,8 +77,25 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
           transform: "translateY(-50%)",
         }}
       />
-    ),
-  }));
+    );
+
+    const baseProps = {
+      title: stage.pathName,
+      receivedAt: stage.receivedAt,
+      eventTitle: stage.eventTitle,
+      handleComponent,
+    };
+
+    const eventState = stage.eventState || "neutral";
+    switch (eventState) {
+      case "success":
+        return success(baseProps);
+      case "failed":
+        return failed(baseProps);
+      default:
+        return neutral(baseProps);
+    }
+  });
 
   return (
     <ComponentBase

@@ -25,7 +25,6 @@ type SemaphoreAPIMock struct {
 	Workflows  map[string]Pipeline
 	Projects   []string
 
-	LastRunTask     *semaphore.RunTaskRequest
 	LastRunWorkflow *semaphore.CreateWorkflowRequest
 }
 
@@ -84,11 +83,6 @@ func (s *SemaphoreAPIMock) Init() error {
 
 		if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/v1alpha/plumber-workflows") {
 			s.RunWorkflow(w, r)
-			return
-		}
-
-		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/run_now") {
-			s.RunTask(w, r)
 			return
 		}
 
@@ -155,14 +149,13 @@ func (s *SemaphoreAPIMock) DescribePipeline(w http.ResponseWriter, r *http.Reque
 
 	log.Infof("Describing pipeline: %s", pipelineID)
 
-	for wfID, p := range s.Workflows {
+	for _, p := range s.Workflows {
 		if p.ID == pipelineID {
 			data, _ := json.Marshal(semaphore.PipelineResponse{
 				Pipeline: &semaphore.Pipeline{
-					PipelineID: p.ID,
-					WorkflowID: wfID,
-					State:      semaphore.PipelineStateDone,
-					Result:     p.Result,
+					ID:     p.ID,
+					State:  semaphore.PipelineStateDone,
+					Result: p.Result,
 				},
 			})
 
@@ -172,31 +165,6 @@ func (s *SemaphoreAPIMock) DescribePipeline(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.WriteHeader(http.StatusNotFound)
-}
-
-func (s *SemaphoreAPIMock) RunTask(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(500)
-		return
-	}
-
-	var runTaskRequest semaphore.RunTaskRequest
-	err = json.Unmarshal(body, &runTaskRequest)
-	if err != nil {
-		w.WriteHeader(500)
-		return
-	}
-
-	response := semaphore.RunTaskResponse{WorkflowID: uuid.New().String()}
-	data, err := json.Marshal(response)
-	if err != nil {
-		w.WriteHeader(500)
-		return
-	}
-
-	s.LastRunTask = &runTaskRequest
-	w.Write(data)
 }
 
 func (s *SemaphoreAPIMock) RunWorkflow(w http.ResponseWriter, r *http.Request) {
