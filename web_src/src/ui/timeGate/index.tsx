@@ -60,29 +60,31 @@ export const TimeGate: React.FC<TimeGateProps> = ({
   onDelete,
   isCompactView,
 }) => {
-  const spec = days
-    ? {
-        title: "day",
-        tooltipTitle: "Days of the week",
-        values: [
-          ...days
-            .split(",")
-            .sort(
-              (a, b) =>
-                daysOfWeekOrder[a.trim() as keyof typeof daysOfWeekOrder] -
-                daysOfWeekOrder[b.trim() as keyof typeof daysOfWeekOrder],
-            )
-            .map((day) => ({
-              badges: [
-                {
-                  label: day.trim(),
-                  bgColor: "bg-gray-100",
-                  textColor: "text-gray-700",
-                },
-              ],
-            })),
-        ],
-      }
+  const specs = days
+    ? [
+        {
+          title: "day",
+          tooltipTitle: "Days of the week",
+          values: [
+            ...days
+              .split(",")
+              .sort(
+                (a, b) =>
+                  daysOfWeekOrder[a.trim() as keyof typeof daysOfWeekOrder] -
+                  daysOfWeekOrder[b.trim() as keyof typeof daysOfWeekOrder],
+              )
+              .map((day) => ({
+                badges: [
+                  {
+                    label: day.trim(),
+                    bgColor: "bg-gray-100",
+                    textColor: "text-gray-700",
+                  },
+                ],
+              })),
+          ],
+        },
+      ]
     : undefined;
 
   const getModeLabel = (mode: string) => {
@@ -178,7 +180,7 @@ export const TimeGate: React.FC<TimeGateProps> = ({
       iconColor={iconColor || "text-blue-600"}
       headerColor={headerColor || "bg-blue-50"}
       title={title}
-      spec={spec}
+      specs={specs}
       eventSections={eventSections}
       collapsed={collapsed}
       selected={selected}

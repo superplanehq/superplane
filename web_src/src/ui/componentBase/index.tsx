@@ -112,15 +112,17 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                 <span className="truncate max-w-[150px]">{item.label}</span>
               </div>
             ))}
-            {specs?.filter(spec => spec.values).map((spec, index) => (
-              <div key={`spec-${index}`} className="flex items-center gap-1 text-xs text-gray-500">
-                {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 12 })}
-                <span>
-                  {!hideCount ? spec.values!.length : ""}{" "}
-                  {spec.title + (spec.values!.length > 1 && !hideCount ? "s" : "")}
-                </span>
-              </div>
-            ))}
+            {specs
+              ?.filter((spec) => spec.values)
+              .map((spec, index) => (
+                <div key={`spec-${index}`} className="flex items-center gap-1 text-xs text-gray-500">
+                  {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 12 })}
+                  <span>
+                    {!hideCount ? spec.values!.length : ""}{" "}
+                    {spec.title + (spec.values!.length > 1 && !hideCount ? "s" : "")}
+                  </span>
+                </div>
+              ))}
           </div>
         </CollapsedComponent>
       </SelectionWrapper>

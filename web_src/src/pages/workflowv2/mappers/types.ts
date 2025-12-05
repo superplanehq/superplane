@@ -1,4 +1,10 @@
-import { ComponentsComponent, ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import {
+  ComponentsComponent,
+  ComponentsNode,
+  TriggersTrigger,
+  WorkflowsWorkflowEvent,
+  WorkflowsWorkflowNodeExecution,
+} from "@/api-client";
 import { ComponentBaseProps } from "@/ui/componentBase";
 import { TriggerProps } from "@/ui/trigger";
 

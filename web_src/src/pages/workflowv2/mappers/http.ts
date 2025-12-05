@@ -2,6 +2,7 @@ import { ComponentsComponent, ComponentsNode, WorkflowsWorkflowNodeExecution } f
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { MetadataItem } from "@/ui/metadataList";
 
 export const httpMapper: ComponentBaseMapper = {
   props(
@@ -10,55 +11,6 @@ export const httpMapper: ComponentBaseMapper = {
     componentDefinition: ComponentsComponent,
     lastExecution: WorkflowsWorkflowNodeExecution,
   ): ComponentBaseProps {
-    const headers = node.configuration?.headers as Array<{ name: string; value: string }> | undefined;
-    const payload = node.configuration?.payload;
-
-    // Build metadata array with method and URL
-    const metadata: Array<{ icon: string; label: string }> = [];
-
-    if (node.configuration?.url && node.configuration.method) {
-      metadata.push({
-        icon: "link",
-        label: `${node.configuration.method} ${node.configuration.url}`,
-      });
-    }
-
-    // Build specs array for headers and payload
-    const specs: ComponentBaseSpec[] = [];
-
-    // Add payload spec
-    if (payload !== undefined && payload !== null) {
-      specs.push({
-        title: "payload",
-        tooltipTitle: "request payload",
-        iconSlug: "file-json",
-        value: payload,
-      });
-    }
-
-    // Add headers spec
-    if (headers && headers.length > 0) {
-      specs.push({
-        title: "header",
-        tooltipTitle: "request headers",
-        iconSlug: "list",
-        values: headers.map((header) => ({
-          badges: [
-            {
-              label: header.name,
-              bgColor: "bg-blue-100",
-              textColor: "text-blue-800",
-            },
-            {
-              label: header.value,
-              bgColor: "bg-gray-100",
-              textColor: "text-gray-800",
-            },
-          ],
-        })),
-      });
-    }
-
     return {
       iconSlug: componentDefinition.icon || "globe",
       headerColor: getBackgroundColorClass(componentDefinition?.color || "gray"),
@@ -68,11 +20,63 @@ export const httpMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
       eventSections: getHTTPEventSections(lastExecution),
-      metadata,
-      specs: specs.length > 0 ? specs : undefined,
+      metadata: getHTTPMetadataList(node),
+      specs: getHTTPSpecs(node),
     };
   },
 };
+
+function getHTTPMetadataList(node: ComponentsNode): MetadataItem[] {
+  const metadata: Array<{ icon: string; label: string }> = [];
+
+  if (node.configuration?.url && node.configuration.method) {
+    metadata.push({
+      icon: "link",
+      label: `${node.configuration.method} ${node.configuration.url}`,
+    });
+  }
+
+  return metadata;
+}
+
+function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
+  const specs: ComponentBaseSpec[] = [];
+
+  const payload = node.configuration?.payload;
+  if (payload && Object.keys(payload).length > 0) {
+    specs.push({
+      title: "payload",
+      tooltipTitle: "request payload",
+      iconSlug: "file-json",
+      value: payload,
+    });
+  }
+
+  const headers = node.configuration?.headers as Array<{ name: string; value: string }> | undefined;
+  if (headers && headers.length > 0) {
+    specs.push({
+      title: "header",
+      tooltipTitle: "request headers",
+      iconSlug: "list",
+      values: headers.map((header) => ({
+        badges: [
+          {
+            label: header.name,
+            bgColor: "bg-blue-100",
+            textColor: "text-blue-800",
+          },
+          {
+            label: header.value,
+            bgColor: "bg-gray-100",
+            textColor: "text-gray-800",
+          },
+        ],
+      })),
+    });
+  }
+
+  return specs;
+}
 
 function getHTTPEventSections(execution: WorkflowsWorkflowNodeExecution): EventSection[] {
   if (!execution) {

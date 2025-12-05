@@ -23,8 +23,7 @@ export function JsonTooltip({ children, title, value }: JsonTooltipProps) {
               value={value}
               style={{
                 fontSize: "12px",
-                fontFamily:
-                  'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
                 backgroundColor: "transparent",
                 textAlign: "left",
                 ...lightTheme,

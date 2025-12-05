@@ -16,7 +16,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
-  http: httpMapper
+  http: httpMapper,
 };
 
 /**
