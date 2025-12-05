@@ -49,7 +49,7 @@ export interface ComponentBaseMapper {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecution: WorkflowsWorkflowNodeExecution | null,
+    lastExecutions: WorkflowsWorkflowNodeExecution[],
     nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps;
 }

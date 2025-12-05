@@ -16,7 +16,7 @@ export const timeGateMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecution: WorkflowsWorkflowNodeExecution | null,
+    lastExecutions: WorkflowsWorkflowNodeExecution[],
     nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     return {
@@ -27,7 +27,7 @@ export const timeGateMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
-      eventSections: getTimeGateEventSections(nodes, lastExecution, nodeQueueItems),
+      eventSections: getTimeGateEventSections(nodes, lastExecutions[0], nodeQueueItems),
       metadata: getTimeGateMetadataList(node),
       specs: getTimeGateSpecs(node),
     };

@@ -3,6 +3,7 @@ import { defaultTriggerRenderer } from "./default";
 import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer } from "./schedule";
 import { noopMapper } from "./noop";
+import { ifMapper } from "./if";
 import { httpMapper } from "./http";
 import { semaphoreMapper } from "./semaphore";
 import { timeGateMapper } from "./timegate";
@@ -18,6 +19,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
+  if: ifMapper,
   http: httpMapper,
   semaphore: semaphoreMapper,
   time_gate: timeGateMapper,
@@ -36,5 +38,6 @@ export function getTriggerRenderer(triggerName: string): TriggerRenderer {
  * Falls back to the default renderer if no specific renderer is registered.
  */
 export function getComponentBaseMapper(componentName: string): ComponentBaseMapper {
-  return componentBaseMappers[componentName];
+  console.log("Getting component base mapper for:", componentName);
+  return componentBaseMappers[componentName] || noopMapper;
 }

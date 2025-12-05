@@ -27,14 +27,14 @@ export const mockComponents: ComponentsComponent[] = [
     ],
   },
   {
-    name: "if",
-    label: "If",
+    name: "condition",
+    label: "Condition",
     description: "Branch execution based on a condition",
-    icon: "braces",
+    icon: "split",
     color: "gray",
     outputChannels: [
-      { name: "then", label: "Then" },
-      { name: "else", label: "Else" },
+      { name: "true", label: "True" },
+      { name: "false", label: "False" },
     ],
     configuration: [
       {
