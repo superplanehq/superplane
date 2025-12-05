@@ -29,7 +29,10 @@ export const noopMapper: ComponentBaseMapper = {
   },
 };
 
-function getNoopEventSections(nodes: ComponentsNode[], execution: WorkflowsWorkflowNodeExecution | null): EventSection[] {
+function getNoopEventSections(
+  nodes: ComponentsNode[],
+  execution: WorkflowsWorkflowNodeExecution | null,
+): EventSection[] {
   if (!execution) {
     return [
       {
