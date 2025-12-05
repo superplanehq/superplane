@@ -1,4 +1,11 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import {
+  ComponentsComponent,
+  ComponentsNode,
+  TriggersTrigger,
+  WorkflowsWorkflowEvent,
+  WorkflowsWorkflowNodeExecution,
+  WorkflowsWorkflowNodeQueueItem,
+} from "@/api-client";
 import { ComponentBaseProps } from "@/ui/componentBase";
 import { TriggerProps } from "@/ui/trigger";
 
@@ -41,6 +48,8 @@ export interface ComponentBaseMapper {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
+    componentDefinition: ComponentsComponent,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
+    nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps;
 }

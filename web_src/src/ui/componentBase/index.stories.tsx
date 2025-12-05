@@ -6,35 +6,37 @@ const FilterComponentProps: ComponentBaseProps = {
   title: "Filter events based on branch",
   iconSlug: "filter",
   headerColor: "bg-gray-50",
-  spec: {
-    title: "filter",
-    tooltipTitle: "filters applied",
-    values: [
-      {
-        badges: [
-          { label: "$.monarch_app.branch", bgColor: "bg-purple-100", textColor: "text-purple-700" },
-          { label: "is", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-          { label: '"main"', bgColor: "bg-green-100", textColor: "text-green-700" },
-          { label: "AND", bgColor: "bg-gray-500", textColor: "text-white" },
-        ],
-      },
-      {
-        badges: [
-          { label: "$.monarch_app.branch", bgColor: "bg-purple-100", textColor: "text-purple-700" },
-          { label: "contains", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-          { label: '"dev"', bgColor: "bg-green-100", textColor: "text-green-700" },
-          { label: "AND", bgColor: "bg-gray-500", textColor: "text-white" },
-        ],
-      },
-      {
-        badges: [
-          { label: "$.monarch_app.branch", bgColor: "bg-purple-100", textColor: "text-purple-700" },
-          { label: "ends with", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-          { label: '"superplane"', bgColor: "bg-green-100", textColor: "text-green-700" },
-        ],
-      },
-    ],
-  },
+  specs: [
+    {
+      title: "filter",
+      tooltipTitle: "filters applied",
+      values: [
+        {
+          badges: [
+            { label: "$.monarch_app.branch", bgColor: "bg-purple-100", textColor: "text-purple-700" },
+            { label: "is", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: '"main"', bgColor: "bg-green-100", textColor: "text-green-700" },
+            { label: "AND", bgColor: "bg-gray-500", textColor: "text-white" },
+          ],
+        },
+        {
+          badges: [
+            { label: "$.monarch_app.branch", bgColor: "bg-purple-100", textColor: "text-purple-700" },
+            { label: "contains", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: '"dev"', bgColor: "bg-green-100", textColor: "text-green-700" },
+            { label: "AND", bgColor: "bg-gray-500", textColor: "text-white" },
+          ],
+        },
+        {
+          badges: [
+            { label: "$.monarch_app.branch", bgColor: "bg-purple-100", textColor: "text-purple-700" },
+            { label: "ends with", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: '"superplane"', bgColor: "bg-green-100", textColor: "text-green-700" },
+          ],
+        },
+      ],
+    },
+  ],
   eventSections: [
     {
       title: "Last Event",
@@ -49,27 +51,29 @@ const IfComponentProps: ComponentBaseProps = {
   title: "If processed events",
   iconSlug: "split",
   headerColor: "bg-gray-50",
-  spec: {
-    title: "condition",
-    tooltipTitle: "conditions applied",
-    values: [
-      {
-        badges: [
-          { label: "$.title", bgColor: "bg-purple-100", textColor: "text-purple-700" },
-          { label: "contains", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-          { label: '"superplane"', bgColor: "bg-green-100", textColor: "text-green-700" },
-          { label: "OR", bgColor: "bg-gray-500", textColor: "text-white" },
-        ],
-      },
-      {
-        badges: [
-          { label: "$.author", bgColor: "bg-purple-100", textColor: "text-purple-700" },
-          { label: "contains", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-          { label: '"pedro"', bgColor: "bg-green-100", textColor: "text-green-700" },
-        ],
-      },
-    ],
-  },
+  specs: [
+    {
+      title: "condition",
+      tooltipTitle: "conditions applied",
+      values: [
+        {
+          badges: [
+            { label: "$.title", bgColor: "bg-purple-100", textColor: "text-purple-700" },
+            { label: "contains", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: '"superplane"', bgColor: "bg-green-100", textColor: "text-green-700" },
+            { label: "OR", bgColor: "bg-gray-500", textColor: "text-white" },
+          ],
+        },
+        {
+          badges: [
+            { label: "$.author", bgColor: "bg-purple-100", textColor: "text-purple-700" },
+            { label: "contains", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: '"pedro"', bgColor: "bg-green-100", textColor: "text-green-700" },
+          ],
+        },
+      ],
+    },
+  ],
   eventSections: [
     {
       title: "TRUE",
@@ -104,36 +108,38 @@ const SwitchComponentProps: ComponentBaseProps = {
   title: "Branch processed events",
   iconSlug: "git-branch",
   headerColor: "bg-gray-50",
-  spec: {
-    title: "path",
-    tooltipTitle: "paths applied",
-    values: [
-      {
-        badges: [
-          { label: "MAIN", bgColor: "bg-gray-500", textColor: "text-white" },
-          { label: "$.title", bgColor: "bg-purple-100", textColor: "text-purple-700" },
-          { label: "contains", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-          { label: '"superplane"', bgColor: "bg-green-100", textColor: "text-green-700" },
-        ],
-      },
-      {
-        badges: [
-          { label: "STAGE", bgColor: "bg-gray-500", textColor: "text-white" },
-          { label: "$.author", bgColor: "bg-purple-100", textColor: "text-purple-700" },
-          { label: "contains", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-          { label: '"pedro"', bgColor: "bg-green-100", textColor: "text-green-700" },
-        ],
-      },
-      {
-        badges: [
-          { label: "DEV", bgColor: "bg-gray-500", textColor: "text-white" },
-          { label: "$.branch", bgColor: "bg-purple-100", textColor: "text-purple-700" },
-          { label: "is", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-          { label: '"dev"', bgColor: "bg-green-100", textColor: "text-green-700" },
-        ],
-      },
-    ],
-  },
+  specs: [
+    {
+      title: "path",
+      tooltipTitle: "paths applied",
+      values: [
+        {
+          badges: [
+            { label: "MAIN", bgColor: "bg-gray-500", textColor: "text-white" },
+            { label: "$.title", bgColor: "bg-purple-100", textColor: "text-purple-700" },
+            { label: "contains", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: '"superplane"', bgColor: "bg-green-100", textColor: "text-green-700" },
+          ],
+        },
+        {
+          badges: [
+            { label: "STAGE", bgColor: "bg-gray-500", textColor: "text-white" },
+            { label: "$.author", bgColor: "bg-purple-100", textColor: "text-purple-700" },
+            { label: "contains", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: '"pedro"', bgColor: "bg-green-100", textColor: "text-green-700" },
+          ],
+        },
+        {
+          badges: [
+            { label: "DEV", bgColor: "bg-gray-500", textColor: "text-white" },
+            { label: "$.branch", bgColor: "bg-purple-100", textColor: "text-purple-700" },
+            { label: "is", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: '"dev"', bgColor: "bg-green-100", textColor: "text-green-700" },
+          ],
+        },
+      ],
+    },
+  ],
   eventSections: [
     {
       title: "MAIN",

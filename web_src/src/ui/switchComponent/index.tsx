@@ -45,20 +45,22 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
   isCompactView,
   hideHandle = false,
 }) => {
-  const spec =
+  const specs =
     stages.length > 0
-      ? {
-          title: "path",
-          tooltipTitle: "paths applied",
-          values: stages.map((stage) => ({
-            badges: [
-              { label: stage.pathName, bgColor: "bg-gray-500", textColor: "text-white" },
-              { label: stage.field, bgColor: "bg-purple-100", textColor: "text-purple-700" },
-              { label: stage.operator, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-              { label: stage.value, bgColor: "bg-green-100", textColor: "text-green-700" },
-            ],
-          })),
-        }
+      ? [
+          {
+            title: "path",
+            tooltipTitle: "paths applied",
+            values: stages.map((stage) => ({
+              badges: [
+                { label: stage.pathName, bgColor: "bg-gray-500", textColor: "text-white" },
+                { label: stage.field, bgColor: "bg-purple-100", textColor: "text-purple-700" },
+                { label: stage.operator, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+                { label: stage.value, bgColor: "bg-green-100", textColor: "text-green-700" },
+              ],
+            })),
+          },
+        ]
       : undefined;
 
   const eventSections: EventSection[] = stages.map((stage) => ({
@@ -86,7 +88,7 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
       title={title}
       iconSlug="git-branch"
       headerColor="bg-gray-50"
-      spec={spec}
+      specs={specs}
       eventSections={eventSections}
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}

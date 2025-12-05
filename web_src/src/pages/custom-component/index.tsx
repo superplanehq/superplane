@@ -1,4 +1,3 @@
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Connection, Edge, Node, addEdge, applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -63,10 +62,10 @@ const getBlockType = (componentName: string): BlockData["type"] => {
     filter: "filter",
     approval: "approval",
     noop: "component",
-    http: "http",
-    semaphore: "semaphore",
+    http: "component",
+    semaphore: "component",
     wait: "wait",
-    time_gate: "time_gate",
+    time_gate: "component",
   };
   return typeMap[componentName] || "noop"; // Default to noop for unknown components
 };
@@ -109,49 +108,6 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
         collapsed: false,
       };
       break;
-    case "http":
-      baseData.http = {
-        title: node.name,
-        iconSlug: component?.icon || "globe",
-        iconColor: "text-gray-700",
-        iconBackground: "bg-gray-100",
-        headerColor: "bg-gray-50",
-        collapsedBackground: "bg-gray-100",
-        collapsed: false,
-        hideLastRun: true,
-        method: node.configuration?.method,
-        url: node.configuration?.url,
-        payload: node.configuration?.payload,
-        headers: node.configuration?.headers,
-      };
-      break;
-    case "semaphore":
-      // Build metadata array
-      const metadataItems = [];
-      if (node.configuration?.project) {
-        metadataItems.push({ icon: "folder", label: node.configuration.project });
-      }
-      if (node.configuration?.ref) {
-        metadataItems.push({ icon: "git-branch", label: node.configuration.ref });
-      }
-      if (node.configuration?.pipelineFile) {
-        metadataItems.push({ icon: "file-code", label: node.configuration.pipelineFile });
-      }
-
-      baseData.semaphore = {
-        title: node.name,
-        iconSrc: SemaphoreLogo,
-        iconSlug: component?.icon || "workflow",
-        iconColor: "text-gray-700",
-        iconBackground: "bg-gray-100",
-        headerColor: "bg-gray-50",
-        collapsedBackground: "bg-gray-100",
-        collapsed: false,
-        hideLastRun: true,
-        metadata: metadataItems,
-        parameters: node.configuration?.parameters,
-      };
-      break;
     case "wait":
       baseData.wait = {
         title: node.name,
@@ -165,50 +121,7 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
       };
       break;
     case "component":
-      baseData.component = getComponentBaseMapper(component?.name!).props([], node, []);
-      break;
-    case "time_gate":
-      const mode = node.configuration?.mode || "include_range";
-      const days = node.configuration?.days || [];
-      const daysDisplay = days.length > 0 ? days.join(", ") : "";
-
-      // Get timezone information
-      const timezone = node.configuration?.timezone || "0";
-      const getTimezoneDisplay = (timezoneOffset: string) => {
-        const offset = parseFloat(timezoneOffset);
-        if (offset === 0) return "GMT+0 (UTC)";
-        if (offset > 0) return `GMT+${offset}`;
-        return `GMT${offset}`; // Already has the minus sign
-      };
-      const timezoneDisplay = getTimezoneDisplay(timezone);
-
-      let startTime = "00:00";
-      let endTime = "23:59";
-
-      if (mode === "include_specific" || mode === "exclude_specific") {
-        startTime = `${node.configuration.startDayInYear} ${node.configuration.startTime}`;
-        endTime = `${node.configuration.endDayInYear} ${node.configuration.endTime}`;
-      } else {
-        startTime = `${node.configuration.startTime}`;
-        endTime = `${node.configuration.endTime}`;
-      }
-
-      const timeWindow = `${startTime} - ${endTime}`;
-
-      baseData.time_gate = {
-        title: node.name,
-        mode,
-        timeWindow,
-        days: daysDisplay,
-        timezone: timezoneDisplay,
-        lastExecution: undefined,
-        nextInQueue: undefined,
-        iconColor: "text-blue-600",
-        iconBackground: "bg-blue-100",
-        headerColor: "bg-blue-50",
-        collapsedBackground: "bg-white",
-        collapsed: false,
-      };
+      baseData.component = getComponentBaseMapper(component?.name!).props([], node, component!, [], undefined);
       break;
   }
 
@@ -473,29 +386,6 @@ export const CustomComponent = () => {
           if (nodeData.approval) {
             updatedData.approval = { ...nodeData.approval, title: nodeName.trim() };
           }
-          if (nodeData.http) {
-            updatedData.http = { ...nodeData.http, title: nodeName.trim() };
-          }
-          if (nodeData.semaphore) {
-            // Rebuild metadata array from configuration
-            const metadataItems = [];
-            if (filteredConfiguration.project) {
-              metadataItems.push({ icon: "folder", label: filteredConfiguration.project });
-            }
-            if (filteredConfiguration.ref) {
-              metadataItems.push({ icon: "git-branch", label: filteredConfiguration.ref });
-            }
-            if (filteredConfiguration.pipelineFile) {
-              metadataItems.push({ icon: "file-code", label: filteredConfiguration.pipelineFile });
-            }
-
-            updatedData.semaphore = {
-              ...nodeData.semaphore,
-              title: nodeName.trim(),
-              metadata: metadataItems,
-              parameters: filteredConfiguration.parameters,
-            };
-          }
           if (nodeData.wait) {
             updatedData.wait = {
               ...nodeData.wait,
@@ -504,34 +394,22 @@ export const CustomComponent = () => {
             };
           }
           if (nodeData.component) {
-            updatedData.component = { ...nodeData.component, title: nodeName.trim() };
-          }
-          if (nodeData.time_gate) {
-            const mode = filteredConfiguration.mode || "include_range";
-            const days = (filteredConfiguration.days as string[]) || [];
-            const daysDisplay = days.length > 0 ? days.join(", ") : "";
-
-            // Handle different time window formats based on mode
-            let startTime = "00:00";
-            let endTime = "23:59";
-
-            if (mode === "include_specific" || mode === "exclude_specific") {
-              startTime = `${filteredConfiguration.startDayInYear} ${filteredConfiguration.startTime}`;
-              endTime = `${filteredConfiguration.endDayInYear} ${filteredConfiguration.endTime}`;
-            } else {
-              startTime = `${filteredConfiguration.startTime}`;
-              endTime = `${filteredConfiguration.endTime}`;
-            }
-
-            const timeWindow = `${startTime} - ${endTime}`;
-
-            updatedData.time_gate = {
-              ...nodeData.time_gate,
-              title: nodeName.trim(),
-              mode,
-              timeWindow,
-              days: daysDisplay,
+            const updatedNode: ComponentsNode = {
+              id: node.id,
+              name: nodeName.trim(),
+              type: "TYPE_COMPONENT",
+              configuration: filteredConfiguration,
+              component: {
+                name: component.name,
+              },
             };
+            updatedData.component = getComponentBaseMapper(component.name!).props(
+              [],
+              updatedNode,
+              component,
+              [],
+              undefined,
+            );
           }
 
           return {
@@ -646,18 +524,6 @@ export const CustomComponent = () => {
               title: duplicateName,
             },
           }),
-          ...(nodeData.http && {
-            http: {
-              ...nodeData.http,
-              title: duplicateName,
-            },
-          }),
-          ...(nodeData.semaphore && {
-            semaphore: {
-              ...nodeData.semaphore,
-              title: duplicateName,
-            },
-          }),
           ...(nodeData.wait && {
             wait: {
               ...nodeData.wait,
@@ -667,12 +533,6 @@ export const CustomComponent = () => {
           ...(nodeData.component && {
             component: {
               ...nodeData.component,
-              title: duplicateName,
-            },
-          }),
-          ...(nodeData.time_gate && {
-            time_gate: {
-              ...nodeData.time_gate,
               title: duplicateName,
             },
           }),

@@ -6,27 +6,13 @@ import { Handle, Position } from "@xyflow/react";
 import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
 import { Filter, FilterProps } from "../filter";
-import { Http, HttpProps } from "../http";
-import { Semaphore, SemaphoreProps } from "../semaphore";
-import { TimeGate, TimeGateProps } from "../timeGate";
 import MergeComponent, { type MergeComponentProps } from "../merge";
 import { ComponentActionsProps } from "../types/componentActions";
 import { Wait, WaitProps } from "../wait";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType =
-  | "trigger"
-  | "component"
-  | "composite"
-  | "approval"
-  | "filter"
-  | "http"
-  | "semaphore"
-  | "wait"
-  | "merge"
-  | "time_gate"
-  | "switch";
+type BlockType = "trigger" | "component" | "composite" | "approval" | "filter" | "wait" | "merge" | "switch";
 
 interface BlockAi {
   show: boolean;
@@ -62,17 +48,8 @@ export interface BlockData {
   // filter node specific props
   filter?: FilterProps;
 
-  // http node specific props
-  http?: HttpProps;
-
-  // semaphore node specific props
-  semaphore?: SemaphoreProps;
-
   // wait node specific props
   wait?: WaitProps;
-
-  // time_gate node specific props
-  time_gate?: TimeGateProps;
 
   // switch node specific props
   switch?: SwitchComponentProps;
@@ -133,10 +110,7 @@ function LeftHandle({ data, nodeId }: BlockProps) {
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "filter" && data.filter?.collapsed) ||
-    (data.type === "http" && data.http?.collapsed) ||
-    (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
-    (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed) ||
     (data.type === "component" && data.component?.collapsed);
 
@@ -184,10 +158,7 @@ function RightHandle({ data, nodeId }: BlockProps) {
     (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "trigger" && data.trigger?.collapsed) ||
     (data.type === "filter" && data.filter?.collapsed) ||
-    (data.type === "http" && data.http?.collapsed) ||
-    (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
-    (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed) ||
     (data.type === "component" && data.component?.collapsed);
 
@@ -417,14 +388,8 @@ function BlockContent({
       return <Approval {...(data.approval as ApprovalProps)} selected={selected} {...actionProps} />;
     case "filter":
       return <Filter {...(data.filter as FilterProps)} selected={selected} {...actionProps} />;
-    case "http":
-      return <Http {...(data.http as HttpProps)} selected={selected} {...actionProps} />;
-    case "semaphore":
-      return <Semaphore {...(data.semaphore as SemaphoreProps)} selected={selected} {...actionProps} />;
     case "wait":
       return <Wait {...(data.wait as WaitProps)} selected={selected} {...actionProps} />;
-    case "time_gate":
-      return <TimeGate {...(data.time_gate as TimeGateProps)} selected={selected} {...actionProps} />;
     case "switch":
       return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} {...actionProps} />;
     case "merge":

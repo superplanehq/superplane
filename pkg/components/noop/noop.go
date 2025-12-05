@@ -30,7 +30,7 @@ func (c *NoOp) Description() string {
 }
 
 func (c *NoOp) Icon() string {
-	return "check"
+	return "circle-off"
 }
 
 func (c *NoOp) Color() string {

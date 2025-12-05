@@ -1,4 +1,3 @@
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
@@ -1545,17 +1544,14 @@ function prepareComponentNode(
     case "if":
       return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap);
     case "noop":
-      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap);
+    case "http":
+    case "semaphore":
+    case "time_gate":
+      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "filter":
       return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
-    case "http":
-      return prepareHttpNode(node, components, nodeExecutionsMap);
-    case "semaphore":
-      return prepareSemaphoreNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "wait":
       return prepareWaitNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
-    case "time_gate":
-      return prepareTimeGateNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "merge":
       return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
   }
@@ -1813,10 +1809,13 @@ function prepareComponentBaseNode(
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const metadata = components.find((c) => c.name === node.component?.name);
   const displayLabel = node.name || metadata?.label;
+  const componentDef = components.find((c) => c.name === node.component?.name);
+  const nodeQueueItems = nodeQueueItemsMap?.[node.id!];
 
   return {
     id: node.id!,
@@ -1826,7 +1825,13 @@ function prepareComponentBaseNode(
       label: displayLabel,
       state: "pending" as const,
       outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
-      component: getComponentBaseMapper(node.component?.name || "").props(nodes, node, executions),
+      component: getComponentBaseMapper(node.component?.name || "").props(
+        nodes,
+        node,
+        componentDef!,
+        executions,
+        nodeQueueItems,
+      ),
     },
   };
 }
@@ -1930,170 +1935,6 @@ function prepareFilterNode(
   };
 }
 
-function prepareHttpNode(
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "http");
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  // Configuration always comes from the node, not the execution
-  const configuration = node.configuration as any;
-
-  let lastExecution;
-  if (execution) {
-    const outputs = execution.outputs as any;
-    const response = outputs?.default?.[0];
-
-    lastExecution = {
-      statusCode: response?.status,
-      receivedAt: new Date(execution.createdAt!),
-      state:
-        getRunItemState(execution) === "success"
-          ? ("success" as const)
-          : getRunItemState(execution) === "running"
-            ? ("running" as const)
-            : ("failed" as const),
-    };
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "http",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      http: {
-        iconSlug: metadata?.icon || "globe",
-        iconColor: getColorClass(metadata?.color || "gray"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "gray"),
-        headerColor: getBackgroundColorClass(metadata?.color || "gray"),
-        title: displayLabel,
-        method: configuration?.method,
-        url: configuration?.url,
-        payload: configuration?.payload,
-        headers: configuration?.headers,
-        lastExecution,
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-interface ExecutionMetadata {
-  workflow?: {
-    id: string;
-    url: string;
-    state: string;
-    result: string;
-  };
-}
-
-function prepareSemaphoreNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "semaphore");
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  // Configuration always comes from the node, not the execution
-  const configuration = node.configuration as any;
-  const nodeMetadata = node.metadata as any;
-
-  let lastExecution;
-  if (execution) {
-    const metadata = execution.metadata as ExecutionMetadata;
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    // Determine state based on workflow result for finished executions
-    let state: "success" | "failed" | "running";
-    if (metadata.workflow?.state === "finished") {
-      // Use workflow result to determine color/icon when finished
-      state = metadata.workflow?.result === "passed" ? "success" : "failed";
-    } else {
-      // Use execution state for running/pending states
-      state = getRunItemState(execution) === "running" ? "running" : "failed";
-    }
-
-    // Calculate duration for finished executions
-    let duration: number | undefined;
-    if (state !== "running" && execution.updatedAt && execution.createdAt) {
-      duration = new Date(execution.updatedAt).getTime() - new Date(execution.createdAt).getTime();
-    }
-
-    lastExecution = {
-      title: title,
-      receivedAt: new Date(execution.createdAt!),
-      completedAt: execution.updatedAt ? new Date(execution.updatedAt) : undefined,
-      state: state,
-      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
-      duration: duration,
-    };
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
-
-  // Build metadata array
-  const metadataItems = [];
-  if (nodeMetadata?.project?.name) {
-    metadataItems.push({ icon: "folder", label: nodeMetadata.project.name });
-  } else if (configuration.project) {
-    metadataItems.push({ icon: "folder", label: configuration.project });
-  }
-
-  if (configuration?.ref) {
-    metadataItems.push({ icon: "git-branch", label: configuration.ref });
-  }
-  if (configuration?.pipelineFile) {
-    metadataItems.push({ icon: "file-code", label: configuration.pipelineFile });
-  }
-
-  if (configuration?.commitSha) {
-    metadataItems.push({ icon: "git-commit", label: configuration.commitSha });
-  }
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "semaphore",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      semaphore: {
-        iconSrc: SemaphoreLogo,
-        iconSlug: metadata?.icon || "workflow",
-        iconColor: getColorClass(metadata?.color || "gray"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "gray"),
-        headerColor: getBackgroundColorClass(metadata?.color || "gray"),
-        title: displayLabel,
-        metadata: metadataItems,
-        parameters: configuration?.parameters,
-        lastExecution,
-        nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
 function prepareWaitNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
@@ -2155,115 +1996,6 @@ function prepareWaitNode(
         iconColor: getColorClass(metadata?.color || "yellow"),
         iconBackground: getBackgroundColorClass(metadata?.color || "yellow"),
         headerColor: getBackgroundColorClass(metadata?.color || "yellow"),
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-function prepareTimeGateNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "time_gate");
-  const configuration = node.configuration as any;
-
-  // Format time gate configuration for display
-  const mode = configuration?.mode || "include_range";
-  const days = configuration?.days || [];
-  const daysDisplay = days.length > 0 ? days.join(", ") : "";
-
-  // Get timezone information
-  const timezone = configuration?.timezone || "0";
-  const getTimezoneDisplay = (timezoneOffset: string) => {
-    const offset = parseFloat(timezoneOffset);
-    if (offset === 0) return "GMT+0 (UTC)";
-    if (offset > 0) return `GMT+${offset}`;
-    return `GMT${offset}`; // Already has the minus sign
-  };
-  const timezoneDisplay = getTimezoneDisplay(timezone);
-
-  // Handle different time window formats based on mode
-  let startTime = "00:00";
-  let endTime = "23:59";
-
-  if (mode === "include_specific" || mode === "exclude_specific") {
-    startTime = `${configuration.startDayInYear} ${configuration.startTime}`;
-    endTime = `${configuration.endDayInYear} ${configuration.endTime}`;
-  } else {
-    startTime = `${configuration.startTime}`;
-    endTime = `${configuration.endTime}`;
-  }
-
-  const timeWindow = `${startTime} - ${endTime}`;
-
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  let lastExecution:
-    | {
-        title: string;
-        receivedAt: Date;
-        state: "success" | "failed" | "running";
-        values?: Record<string, string>;
-        nextRunTime?: Date;
-      }
-    | undefined;
-
-  if (execution) {
-    const executionState = getRunItemState(execution);
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    lastExecution = {
-      title: title,
-      receivedAt: new Date(execution.createdAt!),
-      state:
-        executionState === "success"
-          ? ("success" as const)
-          : executionState === "failed"
-            ? ("failed" as const)
-            : ("running" as const),
-      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
-    };
-
-    if (executionState === "running") {
-      // Get next run time from execution metadata
-      const executionMetadata = execution.metadata as { nextValidTime?: string };
-      if (executionMetadata?.nextValidTime) {
-        lastExecution.nextRunTime = new Date(executionMetadata.nextValidTime);
-      }
-    }
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label || "Time Gate";
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "time_gate",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      time_gate: {
-        title: displayLabel,
-        mode,
-        timeWindow,
-        days: daysDisplay,
-        timezone: timezoneDisplay,
-        lastExecution,
-        nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
-        iconColor: getColorClass(metadata?.color || "blue"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "blue"),
-        headerColor: getBackgroundColorClass(metadata?.color || "blue"),
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },

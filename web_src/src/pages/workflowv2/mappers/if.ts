@@ -1,4 +1,4 @@
-import { ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { ComponentsComponent, ComponentsNode, WorkflowsWorkflowNodeExecution, WorkflowsWorkflowNodeQueueItem } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
@@ -15,16 +15,18 @@ export const ifMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
+    _componentDefinition: ComponentsComponent,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
+    _nodeQueueItems: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     const expression = node.configuration?.expression as string | undefined;
     const conditions = expression ? parseExpression(expression) : [];
-    const spec = expression
-      ? {
+    const specs = expression
+      ? [{
           title: "condition",
           tooltipTitle: "conditions applied",
           values: conditions,
-        }
+        }]
       : undefined;
 
     return {
@@ -34,7 +36,7 @@ export const ifMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
       eventSections: getEventSections(nodes, lastExecutions),
-      spec: spec,
+      specs: specs,
       runDisabled: false,
       runDisabledTooltip: undefined,
     };

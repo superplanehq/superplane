@@ -1,4 +1,9 @@
-import { ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import {
+  ComponentsComponent,
+  ComponentsNode,
+  WorkflowsWorkflowNodeExecution,
+  WorkflowsWorkflowNodeQueueItem,
+} from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
@@ -8,21 +13,23 @@ export const noopMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
+    componentDefinition: ComponentsComponent,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
+    _?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     return {
-      iconSlug: "circle-off",
+      iconSlug: componentDefinition.icon || "circle-off",
       headerColor: "bg-gray-50",
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
-      eventSections: getEventSections(nodes, lastExecution),
+      eventSections: getNoopEventSections(nodes, lastExecution),
     };
   },
 };
 
-function getEventSections(nodes: ComponentsNode[], execution: WorkflowsWorkflowNodeExecution | null): EventSection[] {
+function getNoopEventSections(nodes: ComponentsNode[], execution: WorkflowsWorkflowNodeExecution | null): EventSection[] {
   if (!execution) {
     return [
       {

@@ -4,6 +4,9 @@ import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer } from "./schedule";
 import { noopMapper } from "./noop";
 import { ifMapper } from "./if";
+import { httpMapper } from "./http";
+import { semaphoreMapper } from "./semaphore";
+import { timeGateMapper } from "./timegate";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -17,6 +20,9 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
   if: ifMapper,
+  http: httpMapper,
+  semaphore: semaphoreMapper,
+  time_gate: timeGateMapper,
 };
 
 /**
