@@ -2066,7 +2066,6 @@ function prepareWaitNode(
   };
 }
 
-
 function prepareEdge(edge: ComponentsEdge): CanvasEdge {
   const id = `${edge.sourceId!}--${edge.targetId!}--${edge.channel!}`;
 

@@ -35,32 +35,41 @@ export const timeGateMapper: ComponentBaseMapper = {
 };
 
 function getTimeGateMetadataList(node: ComponentsNode): MetadataItem[] {
-  const metadata: MetadataItem[] = [];
   const configuration = node.configuration as any;
+  const mode = configuration?.mode;
 
-  // Get mode
-  const mode = configuration?.mode || "include_range";
-  const getModeLabel = (mode: string) => {
-    switch (mode) {
-      case "include_range":
-        return "Include Range";
-      case "exclude_range":
-        return "Exclude Range";
-      case "include_specific":
-        return "Include Specific";
-      case "exclude_specific":
-        return "Exclude Specific";
-      default:
-        return mode.charAt(0).toUpperCase() + mode.slice(1).replace(/_/g, " ");
-    }
-  };
+  return [
+    {
+      icon: "settings",
+      label: getTimeGateModeLabel(mode),
+    },
+    {
+      icon: "clock",
+      label: getTimeWindow(mode, configuration),
+    },
+    {
+      icon: "globe",
+      label: `Timezone: ${getTimezoneDisplay(configuration?.timezone || "0")}`,
+    },
+  ];
+}
 
-  metadata.push({
-    icon: "settings",
-    label: getModeLabel(mode),
-  });
+function getTimeGateModeLabel(mode: string): string {
+  switch (mode) {
+    case "include_range":
+      return "Include Range";
+    case "exclude_range":
+      return "Exclude Range";
+    case "include_specific":
+      return "Include Specific";
+    case "exclude_specific":
+      return "Exclude Specific";
+    default:
+      return mode.charAt(0).toUpperCase() + mode.slice(1).replace(/_/g, " ");
+  }
+}
 
-  // Get time window
+function getTimeWindow(mode: string, configuration: any): string {
   let startTime = "00:00";
   let endTime = "23:59";
 
@@ -72,28 +81,18 @@ function getTimeGateMetadataList(node: ComponentsNode): MetadataItem[] {
     endTime = `${configuration.endTime}`;
   }
 
-  const timeWindow = `${startTime} - ${endTime}`;
-  metadata.push({
-    icon: "clock",
-    label: timeWindow,
-  });
+  return `${startTime} - ${endTime}`;
+}
 
-  // Get timezone
-  const timezone = configuration?.timezone || "0";
-  const getTimezoneDisplay = (timezoneOffset: string) => {
-    const offset = parseFloat(timezoneOffset);
-    if (offset === 0) return "GMT+0 (UTC)";
-    if (offset > 0) return `GMT+${offset}`;
-    return `GMT${offset}`; // Already has the minus sign
-  };
-  const timezoneDisplay = getTimezoneDisplay(timezone);
+function getTimezoneDisplay(timezoneOffset: string): string {
+  const offset = parseFloat(timezoneOffset);
+  if (offset === 0) return "GMT+0 (UTC)";
+  if (offset > 0) return `GMT+${offset}`;
 
-  metadata.push({
-    icon: "globe",
-    label: `Timezone: ${timezoneDisplay}`,
-  });
-
-  return metadata;
+  //
+  // Already has the minus sign
+  //
+  return `GMT${offset}`;
 }
 
 const daysOfWeekOrder = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 };

@@ -13,16 +13,7 @@ import { Wait, WaitProps } from "../wait";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType =
-  | "trigger"
-  | "component"
-  | "composite"
-  | "approval"
-  | "filter"
-  | "if"
-  | "wait"
-  | "merge"
-  | "switch";
+type BlockType = "trigger" | "component" | "composite" | "approval" | "filter" | "if" | "wait" | "merge" | "switch";
 
 interface BlockAi {
   show: boolean;

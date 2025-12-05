@@ -134,7 +134,12 @@ export interface ComponentBaseSpec {
   title: string;
   tooltipTitle?: string;
   iconSlug?: string;
-  // Either values for badge-based specs (like headers) or value for JSON specs (like payload)
+
+  //
+  // Either use:
+  // - values for badge-based specs (like headers), or
+  // - value for JSON specs (like payload)
+  //
   values?: ComponentBaseSpecValue[];
   value?: any;
 }
@@ -143,8 +148,8 @@ export type EventState = "success" | "failed" | "neutral" | "next-in-queue" | "r
 
 export interface EventSection {
   title: string;
-  subtitle?: string; // Optional subtitle to display in top-right corner
-  showAutomaticTime?: boolean; // Whether to show automatic time display (running duration or time ago). Defaults to false.
+  subtitle?: string;
+  showAutomaticTime?: boolean;
   receivedAt?: Date;
   eventState?: EventState;
   eventTitle?: string;
