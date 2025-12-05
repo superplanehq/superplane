@@ -576,12 +576,7 @@ export function WorkflowPageV2() {
         }) as unknown[];
 
         if (outputData?.length > 0) {
-          const output = outputData?.[0] as Record<string, unknown>;
-          if (output["data"]) {
-            payload = (output["data"] as Record<string, unknown>) || {};
-          } else {
-            payload = output || {};
-          }
+          payload = outputData?.[0] as Record<string, unknown>;
         }
       }
 
