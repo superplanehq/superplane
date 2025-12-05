@@ -79,6 +79,8 @@ func TestCanvasPage(t *testing.T) {
 		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(1)
 		steps.openSidebarForNode("Wait")
 
+		steps.session.Sleep(1000)
+
 		steps.assertRunningItemsCount("Wait", 1)
 		steps.assertQueuedItemsCount("Wait", 0)
 		steps.cancelRunningExecutionFromSidebar()
