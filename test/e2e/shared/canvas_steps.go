@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -139,6 +140,31 @@ func (s *CanvasSteps) Connect(sourceName, targetName string) {
 	s.session.Sleep(300)
 }
 
+func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {
+	targetHandle := q.Locator(`.react-flow__node:has-text("` + targetName + `") .react-flow__handle-left`)
+
+	loc := targetHandle.Run(s.session)
+	box, err := loc.BoundingBox()
+	if err != nil || box == nil {
+		s.t.Fatalf("getting bounding box for edge %q: %v", loc, err)
+	}
+
+	// This is not very precise, but Playwright does not support clicking on SVG paths directly
+	// so we click a bit left (20px) from the center of the right handle
+
+	centerX := box.X + box.Width/2 - 20
+	centerY := box.Y + box.Height/2
+
+	if err := s.session.Page().Mouse().Click(centerX-20, centerY, pw.MouseClickOptions{}); err != nil {
+		s.t.Fatalf("clicking edge %q at center: %v", loc, err)
+	}
+
+	deleteButton := q.Locator(`button[aria-label="Delete edge"]`)
+	s.session.Click(deleteButton)
+
+	s.session.Sleep(300)
+}
+
 func (s *CanvasSteps) StartEditingNode(name string) {
 	s.session.Click(q.TestID("node", name, "header-dropdown"))
 	s.session.Click(q.TestID("node-action-edit"))
@@ -164,6 +190,13 @@ func (s *CanvasSteps) RenameNode(name string, newName string) {
 
 	err := query.Error
 	require.NoError(s.t, err)
+}
+
+func (s *CanvasSteps) GetWorkflowFromDB() *models.Workflow {
+	workflow, err := models.FindWorkflow(s.session.OrgID, s.WorkflowID)
+	require.NoError(s.t, err)
+
+	return workflow
 }
 
 func (s *CanvasSteps) GetNodeFromDB(name string) *models.WorkflowNode {

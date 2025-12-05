@@ -88,6 +88,15 @@ func TestCanvasPage(t *testing.T) {
 		//
 		steps.assertExecutionWasCancelled("Wait", 1)
 	})
+
+	t.Run("deleting a connection between nodes", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addTwoNodesAndConnect()
+		steps.deleteConnectionBetweenNodes("First", "Second")
+		steps.saveCanvas()
+		steps.assertNodesAreNotConnectedInDB("First", "Second")
+	})
 }
 
 type CanvasPageSteps struct {
@@ -109,6 +118,16 @@ func (s *CanvasPageSteps) givenACanvasExists() {
 
 func (s *CanvasPageSteps) addNoop(name string) {
 	s.canvas.AddNoop(name, models.Position{X: 500, Y: 200})
+}
+
+func (s *CanvasPageSteps) addTwoNodesAndConnect() {
+	s.canvas.AddManualTrigger("First", models.Position{X: 500, Y: 200})
+	s.canvas.AddNoop("Second", models.Position{X: 900, Y: 200})
+	s.canvas.Connect("First", "Second")
+}
+
+func (s *CanvasPageSteps) deleteConnectionBetweenNodes(sourceName, targetName string) {
+	s.canvas.DeleteConnection(sourceName, targetName)
 }
 
 func (s *CanvasPageSteps) assertUnsavedChangesNoteIsVisible() {
@@ -300,4 +319,16 @@ func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string, execution
 
 	execution := executions[executionIndex]
 	require.Equal(s.t, models.WorkflowNodeExecutionResultCancelled, execution.Result, "expected execution to be cancelled")
+}
+
+func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName string) {
+	workflows := s.canvas.GetWorkflowFromDB()
+	sourceNode := s.canvas.GetNodeFromDB(sourceName)
+	targetNode := s.canvas.GetNodeFromDB(targetName)
+
+	for _, conn := range workflows.Edges {
+		if conn.SourceID == sourceNode.NodeID && conn.TargetID == targetNode.NodeID {
+			s.t.Fatalf("expected nodes %q and %q to not be connected, but connection exists in DB", sourceName, targetName)
+		}
+	}
 }
