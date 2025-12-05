@@ -7,6 +7,7 @@ import { ifMapper } from "./if";
 import { httpMapper } from "./http";
 import { semaphoreMapper } from "./semaphore";
 import { timeGateMapper } from "./timegate";
+import { filterMapper } from "./filter";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -23,6 +24,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   http: httpMapper,
   semaphore: semaphoreMapper,
   time_gate: timeGateMapper,
+  filter: filterMapper,
 };
 
 /**

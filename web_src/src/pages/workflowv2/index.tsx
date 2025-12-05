@@ -1539,15 +1539,13 @@ function prepareComponentNode(
   switch (node.component?.name) {
     case "approval":
       return prepareApprovalNode(nodes, node, components, nodeExecutionsMap, workflowId, queryClient, organizationId);
-    case "if":
-      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap);
     case "noop":
     case "http":
     case "semaphore":
     case "time_gate":
-      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "filter":
-      return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
+    case "if":
+      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "wait":
       return prepareWaitNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "merge":
@@ -1875,57 +1873,6 @@ function prepareMergeNode(
           eventState: "neutral" as const,
         },
         nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-function prepareFilterNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-): CanvasNode {
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-  const metadata = components.find((c) => c.name === "filter");
-
-  // Parse filters from node configuration
-  const expression = node.configuration?.expression as string;
-
-  let lastEvent;
-  if (execution) {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    lastEvent = {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: executionToEventSectionState(execution),
-    };
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "filter",
-      label: displayLabel,
-      state: "pending" as const,
-      filter: {
-        title: displayLabel,
-        expression,
-        lastEvent: lastEvent || {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },

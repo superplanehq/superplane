@@ -59,7 +59,7 @@ const getLayoutedElements = async (nodes: Node[], edges: Edge[]) => {
 const getBlockType = (componentName: string): BlockData["type"] => {
   const typeMap: Record<string, BlockData["type"]> = {
     if: "component",
-    filter: "filter",
+    filter: "component",
     approval: "approval",
     noop: "component",
     http: "component",
@@ -82,20 +82,8 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
     type: blockType,
     outputChannels: channels,
   };
-  const expression = node.configuration?.expression;
   // Add type-specific props based on component type
   switch (blockType) {
-    case "filter":
-      baseData.filter = {
-        title: node.name,
-        expression,
-        lastEvent: {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        collapsed: false,
-      };
-      break;
     case "approval":
       baseData.approval = {
         title: node.name,
@@ -376,13 +364,6 @@ export const CustomComponent = () => {
             _originalConfiguration: filteredConfiguration,
           };
 
-          if (nodeData.filter) {
-            updatedData.filter = {
-              ...nodeData.filter,
-              title: nodeName.trim(),
-              expression: filteredConfiguration.expression,
-            };
-          }
           if (nodeData.approval) {
             updatedData.approval = { ...nodeData.approval, title: nodeName.trim() };
           }
