@@ -47,12 +47,14 @@ export const If: React.FC<IfProps> = ({
 }) => {
   const conditions = useMemo(() => parseExpression(expression || ""), [expression]);
 
-  const spec = expression
-    ? {
-        title: "condition",
-        tooltipTitle: "conditions applied",
-        values: conditions,
-      }
+  const specs = expression
+    ? [
+        {
+          title: "condition",
+          tooltipTitle: "conditions applied",
+          values: conditions,
+        },
+      ]
     : undefined;
 
   const eventSections: EventSection[] = [];
@@ -100,7 +102,7 @@ export const If: React.FC<IfProps> = ({
       title={title}
       iconSlug="split"
       headerColor="bg-gray-50"
-      spec={spec}
+      specs={specs}
       eventSections={eventSections}
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}

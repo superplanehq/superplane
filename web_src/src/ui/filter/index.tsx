@@ -31,12 +31,14 @@ export const Filter: React.FC<FilterProps> = ({
 }) => {
   const filters = useMemo(() => parseExpression(expression || ""), [expression]);
 
-  const spec = expression
-    ? {
-        title: "filter",
-        tooltipTitle: "filters applied",
-        values: filters,
-      }
+  const specs = expression
+    ? [
+        {
+          title: "filter",
+          tooltipTitle: "filters applied",
+          values: filters,
+        },
+      ]
     : undefined;
 
   const eventSections: EventSection[] = [];
@@ -52,7 +54,7 @@ export const Filter: React.FC<FilterProps> = ({
       title={title}
       iconSlug="filter"
       headerColor="bg-gray-50"
-      spec={spec}
+      specs={specs}
       eventSections={eventSections}
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}

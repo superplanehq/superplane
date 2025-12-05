@@ -1,8 +1,9 @@
+import React from "react";
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import { CollapsedComponent } from "../collapsedComponent";
 import { ComponentHeader } from "../componentHeader";
-import { ListFilter } from "lucide-react";
 import { SpecsTooltip } from "./SpecsTooltip";
+import { JsonTooltip } from "./JsonTooltip";
 import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
 import { MetadataItem, MetadataList } from "../metadataList";
@@ -15,6 +16,15 @@ export interface SpecBadge {
 
 export interface ComponentBaseSpecValue {
   badges: SpecBadge[];
+}
+
+export interface ComponentBaseSpec {
+  title: string;
+  tooltipTitle?: string;
+  iconSlug?: string;
+  // Either values for badge-based specs (like headers) or value for JSON specs (like payload)
+  values?: ComponentBaseSpecValue[];
+  value?: any;
 }
 
 export type EventState = "success" | "failed" | "neutral" | "next-in-queue" | "running";
@@ -36,11 +46,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   headerColor: string;
   title: string;
   description?: string;
-  spec?: {
-    title: string;
-    tooltipTitle?: string;
-    values: ComponentBaseSpecValue[];
-  };
+  specs?: ComponentBaseSpec[];
   hideCount?: boolean;
   collapsed?: boolean;
   collapsedBackground?: string;
@@ -57,7 +63,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   headerColor,
   title,
   description,
-  spec,
+  specs,
   collapsed = false,
   collapsedBackground,
   eventSections,
@@ -100,15 +106,23 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           isCompactView={isCompactView}
         >
           <div className="flex flex-col items-center gap-1">
-            {spec?.title && spec?.values?.length > 0 && (
-              <div className="flex items-center gap-1 text-xs text-gray-500">
-                <ListFilter size={12} />
-                <span>
-                  {!hideCount ? spec.values.length : ""}{" "}
-                  {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
-                </span>
+            {metadata?.map((item, index) => (
+              <div key={`metadata-${index}`} className="flex items-center gap-1 text-xs text-gray-500">
+                {React.createElement(resolveIcon(item.icon), { size: 12 })}
+                <span className="truncate max-w-[150px]">{item.label}</span>
               </div>
-            )}
+            ))}
+            {specs
+              ?.filter((spec) => spec.values)
+              .map((spec, index) => (
+                <div key={`spec-${index}`} className="flex items-center gap-1 text-xs text-gray-500">
+                  {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 12 })}
+                  <span>
+                    {!hideCount ? spec.values!.length : ""}{" "}
+                    {spec.title + (spec.values!.length > 1 && !hideCount ? "s" : "")}
+                  </span>
+                </div>
+              ))}
           </div>
         </CollapsedComponent>
       </SelectionWrapper>
@@ -139,27 +153,35 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           isCompactView={isCompactView}
         />
 
-        {spec && spec.title && spec.values?.length > 0 && (
+        {metadata && metadata.length > 0 && <MetadataList items={metadata} />}
+
+        {specs && specs.length > 0 && (
           <div className="px-2 py-2 border-b text-gray-500 flex flex-col gap-2">
-            {spec?.title && spec?.values?.length > 0 && (
-              <div className="flex items-center gap-3 text-md text-gray-500">
-                <ListFilter size={18} />
-                <SpecsTooltip
-                  specTitle={spec.tooltipTitle || spec.title}
-                  specValues={spec.values}
-                  hideCount={hideCount}
-                >
-                  <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium">
-                    {hideCount ? "" : spec.values.length}{" "}
-                    {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
-                  </span>
-                </SpecsTooltip>
+            {specs.map((spec, index) => (
+              <div key={index} className="flex items-center gap-2 text-md text-gray-500">
+                {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 18 })}
+                {spec.values ? (
+                  <SpecsTooltip
+                    specTitle={spec.tooltipTitle || spec.title}
+                    specValues={spec.values}
+                    hideCount={hideCount}
+                  >
+                    <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
+                      {hideCount ? "" : spec.values.length}{" "}
+                      {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
+                    </span>
+                  </SpecsTooltip>
+                ) : spec.value !== undefined ? (
+                  <JsonTooltip title={spec.tooltipTitle || spec.title} value={spec.value}>
+                    <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
+                      {spec.title}
+                    </span>
+                  </JsonTooltip>
+                ) : null}
               </div>
-            )}
+            ))}
           </div>
         )}
-
-        {metadata && metadata.length > 0 && <MetadataList items={metadata} />}
 
         {eventSections?.map((section, index) => {
           const now = new Date();

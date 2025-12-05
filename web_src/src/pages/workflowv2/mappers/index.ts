@@ -3,6 +3,7 @@ import { defaultTriggerRenderer } from "./default";
 import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer } from "./schedule";
 import { noopMapper } from "./noop";
+import { httpMapper } from "./http";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -15,6 +16,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
+  http: httpMapper,
 };
 
 /**
