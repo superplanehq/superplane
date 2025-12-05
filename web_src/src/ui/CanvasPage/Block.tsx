@@ -6,7 +6,6 @@ import { Handle, Position } from "@xyflow/react";
 import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
 import { Filter, FilterProps } from "../filter";
-import { Semaphore, SemaphoreProps } from "../semaphore";
 import { TimeGate, TimeGateProps } from "../timeGate";
 import { If, IfProps } from "../if";
 import MergeComponent, { type MergeComponentProps } from "../merge";
@@ -22,7 +21,6 @@ type BlockType =
   | "approval"
   | "filter"
   | "if"
-  | "semaphore"
   | "wait"
   | "merge"
   | "time_gate"
@@ -64,9 +62,6 @@ export interface BlockData {
 
   // if node specific props
   if?: IfProps;
-
-  // semaphore node specific props
-  semaphore?: SemaphoreProps;
 
   // wait node specific props
   wait?: WaitProps;
@@ -134,7 +129,6 @@ function LeftHandle({ data, nodeId }: BlockProps) {
     (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "filter" && data.filter?.collapsed) ||
     (data.type === "if" && data.if?.collapsed) ||
-    (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
@@ -184,7 +178,6 @@ function RightHandle({ data, nodeId }: BlockProps) {
     (data.type === "trigger" && data.trigger?.collapsed) ||
     (data.type === "filter" && data.filter?.collapsed) ||
     (data.type === "if" && data.if?.collapsed) ||
-    (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
@@ -427,8 +420,6 @@ function BlockContent({
       return <Filter {...(data.filter as FilterProps)} selected={selected} {...actionProps} />;
     case "if":
       return <If {...(data.if as IfProps)} selected={selected} {...actionProps} />;
-    case "semaphore":
-      return <Semaphore {...(data.semaphore as SemaphoreProps)} selected={selected} {...actionProps} />;
     case "wait":
       return <Wait {...(data.wait as WaitProps)} selected={selected} {...actionProps} />;
     case "time_gate":

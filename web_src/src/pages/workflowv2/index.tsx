@@ -1,4 +1,3 @@
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
@@ -1546,11 +1545,10 @@ function prepareComponentNode(
       return prepareIfNode(nodes, node, nodeExecutionsMap);
     case "noop":
     case "http":
-      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap);
+    case "semaphore":
+      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "filter":
       return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
-    case "semaphore":
-      return prepareSemaphoreNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "wait":
       return prepareWaitNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "time_gate":
@@ -1876,11 +1874,13 @@ function prepareComponentBaseNode(
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
   const componentDef = components.find((c) => c.name === node.component?.name);
   const displayLabel = node.name || componentDef?.label!;
+  const nodeQueueItems = nodeQueueItemsMap?.[node.id!];
 
   return {
     id: node.id!,
@@ -1889,7 +1889,13 @@ function prepareComponentBaseNode(
       type: "component",
       label: displayLabel,
       state: "pending" as const,
-      component: getComponentBaseMapper(node.component?.name!).props(nodes, node, componentDef!, execution),
+      component: getComponentBaseMapper(node.component?.name!).props(
+        nodes,
+        node,
+        componentDef!,
+        execution,
+        nodeQueueItems,
+      ),
     },
   };
 }
@@ -1986,112 +1992,6 @@ function prepareFilterNode(
           eventTitle: "No events received yet",
           eventState: "neutral" as const,
         },
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-interface ExecutionMetadata {
-  workflow?: {
-    id: string;
-    url: string;
-    state: string;
-    result: string;
-  };
-}
-
-function prepareSemaphoreNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "semaphore");
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  // Configuration always comes from the node, not the execution
-  const configuration = node.configuration as any;
-  const nodeMetadata = node.metadata as any;
-
-  let lastExecution;
-  if (execution) {
-    const metadata = execution.metadata as ExecutionMetadata;
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    // Determine state based on workflow result for finished executions
-    let state: "success" | "failed" | "running";
-    if (metadata.workflow?.state === "finished") {
-      // Use workflow result to determine color/icon when finished
-      state = metadata.workflow?.result === "passed" ? "success" : "failed";
-    } else {
-      // Use execution state for running/pending states
-      state = getRunItemState(execution) === "running" ? "running" : "failed";
-    }
-
-    // Calculate duration for finished executions
-    let duration: number | undefined;
-    if (state !== "running" && execution.updatedAt && execution.createdAt) {
-      duration = new Date(execution.updatedAt).getTime() - new Date(execution.createdAt).getTime();
-    }
-
-    lastExecution = {
-      title: title,
-      receivedAt: new Date(execution.createdAt!),
-      completedAt: execution.updatedAt ? new Date(execution.updatedAt) : undefined,
-      state: state,
-      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
-      duration: duration,
-    };
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
-
-  // Build metadata array
-  const metadataItems = [];
-  if (nodeMetadata?.project?.name) {
-    metadataItems.push({ icon: "folder", label: nodeMetadata.project.name });
-  } else if (configuration.project) {
-    metadataItems.push({ icon: "folder", label: configuration.project });
-  }
-
-  if (configuration?.ref) {
-    metadataItems.push({ icon: "git-branch", label: configuration.ref });
-  }
-  if (configuration?.pipelineFile) {
-    metadataItems.push({ icon: "file-code", label: configuration.pipelineFile });
-  }
-
-  if (configuration?.commitSha) {
-    metadataItems.push({ icon: "git-commit", label: configuration.commitSha });
-  }
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "semaphore",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      semaphore: {
-        iconSrc: SemaphoreLogo,
-        iconSlug: metadata?.icon || "workflow",
-        iconColor: getColorClass(metadata?.color || "gray"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "gray"),
-        headerColor: getBackgroundColorClass(metadata?.color || "gray"),
-        title: displayLabel,
-        metadata: metadataItems,
-        parameters: configuration?.parameters,
-        lastExecution,
-        nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },

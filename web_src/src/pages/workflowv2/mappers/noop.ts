@@ -1,4 +1,9 @@
-import { ComponentsComponent, ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import {
+  ComponentsComponent,
+  ComponentsNode,
+  WorkflowsWorkflowNodeExecution,
+  WorkflowsWorkflowNodeQueueItem,
+} from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
@@ -10,6 +15,7 @@ export const noopMapper: ComponentBaseMapper = {
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
     lastExecution: WorkflowsWorkflowNodeExecution,
+    _?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     return {
       iconSlug: componentDefinition.icon || "circle-off",

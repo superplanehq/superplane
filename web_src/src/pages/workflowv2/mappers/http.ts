@@ -1,4 +1,9 @@
-import { ComponentsComponent, ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import {
+  ComponentsComponent,
+  ComponentsNode,
+  WorkflowsWorkflowNodeExecution,
+  WorkflowsWorkflowNodeQueueItem,
+} from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
@@ -10,6 +15,7 @@ export const httpMapper: ComponentBaseMapper = {
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
     lastExecution: WorkflowsWorkflowNodeExecution,
+    _items?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     return {
       iconSlug: componentDefinition.icon || "globe",
