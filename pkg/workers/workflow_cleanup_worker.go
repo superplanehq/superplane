@@ -16,14 +16,16 @@ import (
 )
 
 type WorkflowCleanupWorker struct {
-	semaphore *semaphore.Weighted
-	logger    *log.Entry
+	semaphore           *semaphore.Weighted
+	logger              *log.Entry
+	maxResourcesPerTick int
 }
 
 func NewWorkflowCleanupWorker() *WorkflowCleanupWorker {
 	return &WorkflowCleanupWorker{
-		semaphore: semaphore.NewWeighted(25),
-		logger:    log.WithFields(log.Fields{"worker": "WorkflowCleanupWorker"}),
+		semaphore:           semaphore.NewWeighted(25),
+		logger:              log.WithFields(log.Fields{"worker": "WorkflowCleanupWorker"}),
+		maxResourcesPerTick: 500,
 	}
 }
 
@@ -90,21 +92,57 @@ func (w *WorkflowCleanupWorker) processWorkflow(tx *gorm.DB, workflow models.Wor
 		return fmt.Errorf("failed to find workflow nodes: %w", err)
 	}
 
+	totalResourcesDeleted := 0
+	nodesProcessed := 0
+
 	for _, node := range nodes {
-		if err := w.deleteNodeResources(tx, workflow.ID, node.NodeID); err != nil {
+		if totalResourcesDeleted >= w.maxResourcesPerTick {
+			w.logger.Infof("Reached max resources per tick (%d), stopping for this cycle", w.maxResourcesPerTick)
+			break
+		}
+
+		resourcesDeleted, allResourcesDeleted, err := w.deleteNodeResourcesBatched(tx, workflow.ID, node.NodeID, w.maxResourcesPerTick-totalResourcesDeleted)
+		if err != nil {
 			return fmt.Errorf("failed to delete resources for node %s: %w", node.NodeID, err)
+		}
+
+		totalResourcesDeleted += resourcesDeleted
+
+		if !allResourcesDeleted {
+			w.logger.Infof("Partially cleaned node %s from workflow %s (deleted %d resources, more remain)", node.NodeID, workflow.ID, resourcesDeleted)
+			nodesProcessed++
+
+			continue
 		}
 
 		if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflow.ID, node.NodeID).Delete(&models.WorkflowNode{}).Error; err != nil {
 			return fmt.Errorf("failed to delete workflow node %s: %w", node.NodeID, err)
 		}
+
+		w.logger.Infof("Deleted node %s from workflow %s (deleted %d resources)", node.NodeID, workflow.ID, resourcesDeleted)
+		nodesProcessed++
 	}
 
+	//
+	// Check if all nodes are gone, then delete the workflow
+	//
+	var remainingNodesCount int64
+	err = tx.Unscoped().Model(&models.WorkflowNode{}).Where("workflow_id = ?", workflow.ID).Count(&remainingNodesCount).Error
+	if err != nil {
+		return fmt.Errorf("failed to check remaining workflow nodes: %w", err)
+	}
+
+	if remainingNodesCount > 0 {
+		w.logger.Infof("Processed %d nodes from workflow %s (deleted %d resources, %d nodes remaining)", nodesProcessed, workflow.ID, totalResourcesDeleted, remainingNodesCount)
+		return nil
+	}
+
+	w.logger.Infof("Processed %d nodes from workflow %s (deleted %d resources, %d nodes remaining)", nodesProcessed, workflow.ID, totalResourcesDeleted, remainingNodesCount)
 	if err := tx.Unscoped().Delete(&workflow).Error; err != nil {
 		return fmt.Errorf("failed to delete workflow: %w", err)
 	}
 
-	w.logger.Infof("Successfully cleaned up workflow %s with %d nodes", workflow.ID, len(nodes))
+	w.logger.Infof("Successfully cleaned up workflow %s (deleted %d resources total)", workflow.ID, totalResourcesDeleted)
 	return nil
 }
 
@@ -130,4 +168,55 @@ func (w *WorkflowCleanupWorker) deleteNodeResources(tx *gorm.DB, workflowID uuid
 	}
 
 	return nil
+}
+
+func (w *WorkflowCleanupWorker) deleteNodeResourcesBatched(tx *gorm.DB, workflowID uuid.UUID, nodeID string, maxResources int) (resourcesDeleted int, allResourcesDeleted bool, err error) {
+	resourceTypes := []struct {
+		model     interface{}
+		tableName string
+	}{
+		{&models.WorkflowNodeRequest{}, "workflow_node_requests"},
+		{&models.WorkflowNodeExecutionKV{}, "workflow_node_execution_kvs"},
+		{&models.WorkflowNodeExecution{}, "workflow_node_executions"},
+		{&models.WorkflowNodeQueueItem{}, "workflow_node_queue_items"},
+		{&models.WorkflowEvent{}, "workflow_events"},
+	}
+
+	totalDeleted := 0
+	allDeleted := true
+
+	for _, resourceType := range resourceTypes {
+		if totalDeleted >= maxResources {
+			allDeleted = false
+			break
+		}
+
+		remaining := maxResources - totalDeleted
+
+		// Delete in batches with LIMIT
+		result := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Limit(remaining).Delete(resourceType.model)
+		if result.Error != nil {
+			return totalDeleted, false, fmt.Errorf("failed to delete %s: %w", resourceType.tableName, result.Error)
+		}
+
+		deleted := int(result.RowsAffected)
+		totalDeleted += deleted
+
+		if deleted != remaining {
+			continue
+		}
+
+		var count int64
+
+		if err := tx.Unscoped().Model(resourceType.model).Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Count(&count).Error; err != nil {
+			return totalDeleted, false, fmt.Errorf("failed to count remaining %s: %w", resourceType.tableName, err)
+		}
+
+		if count > 0 {
+			allDeleted = false
+			break
+		}
+	}
+
+	return totalDeleted, allDeleted, nil
 }
