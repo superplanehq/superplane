@@ -5,6 +5,7 @@ import { scheduleTriggerRenderer } from "./schedule";
 import { noopMapper } from "./noop";
 import { httpMapper } from "./http";
 import { semaphoreMapper } from "./semaphore";
+import { timeGateMapper } from "./timegate";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -19,6 +20,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
   http: httpMapper,
   semaphore: semaphoreMapper,
+  time_gate: timeGateMapper,
 };
 
 /**

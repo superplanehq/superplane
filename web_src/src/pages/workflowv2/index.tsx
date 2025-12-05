@@ -1546,13 +1546,12 @@ function prepareComponentNode(
     case "noop":
     case "http":
     case "semaphore":
+    case "time_gate":
       return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "filter":
       return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
     case "wait":
       return prepareWaitNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
-    case "time_gate":
-      return prepareTimeGateNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "merge":
       return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
   }
@@ -2067,114 +2066,6 @@ function prepareWaitNode(
   };
 }
 
-function prepareTimeGateNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "time_gate");
-  const configuration = node.configuration as any;
-
-  // Format time gate configuration for display
-  const mode = configuration?.mode || "include_range";
-  const days = configuration?.days || [];
-  const daysDisplay = days.length > 0 ? days.join(", ") : "";
-
-  // Get timezone information
-  const timezone = configuration?.timezone || "0";
-  const getTimezoneDisplay = (timezoneOffset: string) => {
-    const offset = parseFloat(timezoneOffset);
-    if (offset === 0) return "GMT+0 (UTC)";
-    if (offset > 0) return `GMT+${offset}`;
-    return `GMT${offset}`; // Already has the minus sign
-  };
-  const timezoneDisplay = getTimezoneDisplay(timezone);
-
-  // Handle different time window formats based on mode
-  let startTime = "00:00";
-  let endTime = "23:59";
-
-  if (mode === "include_specific" || mode === "exclude_specific") {
-    startTime = `${configuration.startDayInYear} ${configuration.startTime}`;
-    endTime = `${configuration.endDayInYear} ${configuration.endTime}`;
-  } else {
-    startTime = `${configuration.startTime}`;
-    endTime = `${configuration.endTime}`;
-  }
-
-  const timeWindow = `${startTime} - ${endTime}`;
-
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  let lastExecution:
-    | {
-        title: string;
-        receivedAt: Date;
-        state: "success" | "failed" | "running";
-        values?: Record<string, string>;
-        nextRunTime?: Date;
-      }
-    | undefined;
-
-  if (execution) {
-    const executionState = getRunItemState(execution);
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    lastExecution = {
-      title: title,
-      receivedAt: new Date(execution.createdAt!),
-      state:
-        executionState === "success"
-          ? ("success" as const)
-          : executionState === "failed"
-            ? ("failed" as const)
-            : ("running" as const),
-      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
-    };
-
-    if (executionState === "running") {
-      // Get next run time from execution metadata
-      const executionMetadata = execution.metadata as { nextValidTime?: string };
-      if (executionMetadata?.nextValidTime) {
-        lastExecution.nextRunTime = new Date(executionMetadata.nextValidTime);
-      }
-    }
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label || "Time Gate";
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "time_gate",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      time_gate: {
-        title: displayLabel,
-        mode,
-        timeWindow,
-        days: daysDisplay,
-        timezone: timezoneDisplay,
-        lastExecution,
-        nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
-        iconColor: getColorClass(metadata?.color || "blue"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "blue"),
-        headerColor: getBackgroundColorClass(metadata?.color || "blue"),
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
 
 function prepareEdge(edge: ComponentsEdge): CanvasEdge {
   const id = `${edge.sourceId!}--${edge.targetId!}--${edge.channel!}`;

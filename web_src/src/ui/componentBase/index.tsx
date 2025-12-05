@@ -36,19 +36,10 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({ section, inde
     }
   }, [section.eventState, section.receivedAt]);
 
-  // Calculate display duration
-  const displayDuration = React.useMemo(() => {
-    if (section.eventState === "running" && liveDuration !== null) {
-      return liveDuration;
-    }
-    return section.duration;
-  }, [section.eventState, section.duration, liveDuration]);
-
   const now = new Date();
   const diff = section.receivedAt ? now.getTime() - section.receivedAt.getTime() : 0;
   const timeAgo = section.receivedAt ? calcRelativeTimeFromDiff(diff) : "";
-  const durationText =
-    displayDuration !== undefined && displayDuration !== null ? calcRelativeTimeFromDiff(displayDuration) : "";
+  const durationText = liveDuration !== null ? calcRelativeTimeFromDiff(liveDuration) : "";
 
   const LastEventIcon =
     section.eventState === "success"
@@ -95,13 +86,21 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({ section, inde
   const iconClassName =
     section.eventState === "running" ? "animate-spin" : section.eventState === "next-in-queue" ? "" : "text-white";
 
+  // Determine what to show in the top-right corner
+  let topRightText = "";
+  if (section.subtitle) {
+    topRightText = section.subtitle;
+  } else if (section.showAutomaticTime) {
+    topRightText = durationText && section.eventState === "running" ? `Running for: ${durationText}` : timeAgo;
+  } else {
+    topRightText = timeAgo;
+  }
+
   return (
     <div key={index} className={"px-4 pt-2 pb-6 relative" + (index < totalSections - 1 ? " border-b" : "")}>
       <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
         <span className="uppercase text-xs font-semibold tracking-wide">{section.title}</span>
-        <span className="text-sm">
-          {durationText && section.eventState === "running" ? `Running for: ${durationText}` : timeAgo}
-        </span>
+        {topRightText && <span className="text-sm">{topRightText}</span>}
       </div>
       <div
         className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastEventBackground} ${LastEventColor}`}
@@ -144,12 +143,13 @@ export type EventState = "success" | "failed" | "neutral" | "next-in-queue" | "r
 
 export interface EventSection {
   title: string;
+  subtitle?: string; // Optional subtitle to display in top-right corner
+  showAutomaticTime?: boolean; // Whether to show automatic time display (running duration or time ago). Defaults to false.
   receivedAt?: Date;
   eventState?: EventState;
   eventTitle?: string;
   eventSubtitle?: string;
   handleComponent?: React.ReactNode;
-  duration?: number; // Duration in milliseconds (for finished executions)
 }
 
 export interface ComponentBaseProps extends ComponentActionsProps {

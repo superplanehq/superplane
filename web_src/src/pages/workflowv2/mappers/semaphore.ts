@@ -121,6 +121,7 @@ function getSemaphoreEventSections(
 
     sections.push({
       title: "Last Run",
+      showAutomaticTime: true,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventState: executionToEventSectionState(execution),
