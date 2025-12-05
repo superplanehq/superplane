@@ -787,6 +787,9 @@ export function WorkflowPageV2() {
     (edgeIds: string[]) => {
       if (!workflow || !organizationId || !workflowId) return;
 
+      // Save snapshot before making changes
+      saveWorkflowSnapshot(workflow);
+
       // Parse edge IDs to extract sourceId, targetId, and channel
       // Edge IDs are formatted as: `${sourceId}--${targetId}--${channel}`
       const edgesToRemove = edgeIds.map((edgeId) => {
@@ -820,7 +823,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
       markUnsavedChange("structural");
     },
-    [workflow, organizationId, workflowId, queryClient, markUnsavedChange],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
   );
 
   /**
