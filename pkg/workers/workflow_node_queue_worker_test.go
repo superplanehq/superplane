@@ -564,6 +564,90 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	assert.True(t, executionConsumer.HasReceivedMessage())
 }
 
+func Test__WorkflowNodeQueueWorker_MergeComponentReturnsNilExecution(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	logger := log.NewEntry(log.New())
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemConsumedRoutingKey)
+	executionConsumer.Start()
+	queueConsumedConsumer.Start()
+	defer executionConsumer.Stop()
+	defer queueConsumedConsumer.Stop()
+
+	//
+	// Create a workflow with two source nodes feeding into a merge node.
+	// This simulates a scenario where merge needs to wait for multiple inputs.
+	//
+	source1Node := "source-1"
+	source2Node := "source-2"
+	mergeNode := "merge-1"
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: source1Node,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: source2Node,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: mergeNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: source1Node, TargetID: mergeNode, Channel: "default"},
+			{SourceID: source2Node, TargetID: mergeNode, Channel: "default"},
+		},
+	)
+
+	//
+	// Create a root event and queue item for the merge node from only one source.
+	// Since merge expects 2 inputs but only gets 1, it should return nil execution.
+	//
+	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, source1Node, "default", nil)
+	support.CreateWorkflowQueueItem(t, workflow.ID, mergeNode, rootEvent.ID, rootEvent.ID)
+
+	//
+	// Verify initial state - node should be ready and queue should have 1 item.
+	//
+	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, mergeNode)
+	require.NoError(t, err)
+	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+
+	queueItems, err := models.ListNodeQueueItems(workflow.ID, mergeNode, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, queueItems, 1)
+
+	//
+	// Process the node - merge should return nil execution because it's waiting for more inputs.
+	//
+	err = worker.LockAndProcessNode(logger, *node)
+	require.NoError(t, err)
+
+	node, err = models.FindWorkflowNode(database.Conn(), workflow.ID, mergeNode)
+	require.NoError(t, err)
+	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+
+	queueItems, err = models.ListNodeQueueItems(workflow.ID, mergeNode, 10, nil)
+	require.NoError(t, err)
+	assert.Len(t, queueItems, 0, "Queue item should be processed even when returning nil execution")
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
+	assert.True(t, queueConsumedConsumer.HasReceivedMessage())
+}
+
 func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

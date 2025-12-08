@@ -90,6 +90,10 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node mod
 	if err == nil {
 		if len(executions) > 0 {
 			for _, execution := range executions {
+				if execution == nil {
+					continue
+				}
+
 				messages.NewWorkflowExecutionMessage(
 					execution.WorkflowID.String(),
 					execution.ID.String(),
