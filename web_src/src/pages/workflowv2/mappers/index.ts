@@ -8,6 +8,7 @@ import { httpMapper } from "./http";
 import { semaphoreMapper } from "./semaphore";
 import { timeGateMapper } from "./timegate";
 import { filterMapper } from "./filter";
+import { waitMapper } from "./wait";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -25,6 +26,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   semaphore: semaphoreMapper,
   time_gate: timeGateMapper,
   filter: filterMapper,
+  wait: waitMapper,
 };
 
 /**

@@ -1545,9 +1545,8 @@ function prepareComponentNode(
     case "time_gate":
     case "filter":
     case "if":
-      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "wait":
-      return prepareWaitNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
+      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "merge":
       return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
   }
@@ -1873,74 +1872,6 @@ function prepareMergeNode(
           eventState: "neutral" as const,
         },
         nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-function prepareWaitNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "wait");
-  const configuration = node.configuration as any;
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  let lastExecution;
-  if (execution) {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    // Calculate expected duration from configuration
-    let expectedDuration: number | undefined;
-    if (configuration?.duration) {
-      const { value, unit } = configuration.duration;
-      const multipliers = { seconds: 1000, minutes: 60000, hours: 3600000 };
-      expectedDuration = value * (multipliers[unit as keyof typeof multipliers] || 1000);
-    }
-
-    lastExecution = {
-      title: title,
-      receivedAt: new Date(execution.createdAt!),
-      completedAt: execution.updatedAt ? new Date(execution.updatedAt) : undefined,
-      state:
-        getRunItemState(execution) === "success"
-          ? ("success" as const)
-          : getRunItemState(execution) === "running"
-            ? ("running" as const)
-            : ("failed" as const),
-      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
-      expectedDuration: expectedDuration,
-    };
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "wait",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      wait: {
-        title: displayLabel,
-        duration: configuration?.duration,
-        lastExecution,
-        nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
-        iconColor: getColorClass(metadata?.color || "yellow"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "yellow"),
-        headerColor: getBackgroundColorClass(metadata?.color || "yellow"),
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },

@@ -64,7 +64,7 @@ const getBlockType = (componentName: string): BlockData["type"] => {
     noop: "component",
     http: "component",
     semaphore: "component",
-    wait: "wait",
+    wait: "component",
     time_gate: "component",
   };
   return typeMap[componentName] || "noop"; // Default to noop for unknown components
@@ -94,18 +94,6 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
         collapsedBackground: "bg-orange-100",
         approvals: [],
         collapsed: false,
-      };
-      break;
-    case "wait":
-      baseData.wait = {
-        title: node.name,
-        duration: node.configuration?.duration,
-        iconColor: "text-yellow-600",
-        iconBackground: "bg-yellow-100",
-        headerColor: "bg-yellow-50",
-        collapsedBackground: "bg-yellow-50",
-        collapsed: false,
-        hideLastRun: true,
       };
       break;
     case "component":
