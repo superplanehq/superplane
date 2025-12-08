@@ -33,8 +33,10 @@ type Field struct {
 	TypeOptions          *TypeOptions           `protobuf:"bytes,8,opt,name=type_options,json=typeOptions,proto3,oneof" json:"type_options,omitempty"`
 	RequiredConditions   []*RequiredCondition   `protobuf:"bytes,9,rep,name=required_conditions,json=requiredConditions,proto3" json:"required_conditions,omitempty"`
 	ValidationRules      []*ValidationRule      `protobuf:"bytes,10,rep,name=validation_rules,json=validationRules,proto3" json:"validation_rules,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Optional placeholder text for UI inputs
+	Placeholder   *string `protobuf:"bytes,11,opt,name=placeholder,proto3,oneof" json:"placeholder,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Field) Reset() {
@@ -135,6 +137,13 @@ func (x *Field) GetValidationRules() []*ValidationRule {
 		return x.ValidationRules
 	}
 	return nil
+}
+
+func (x *Field) GetPlaceholder() string {
+	if x != nil && x.Placeholder != nil {
+		return *x.Placeholder
+	}
+	return ""
 }
 
 type TypeOptions struct {
@@ -616,6 +625,7 @@ func (x *ResourceTypeOptions) GetType() string {
 type ListTypeOptions struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ItemDefinition *ListItemDefinition    `protobuf:"bytes,1,opt,name=item_definition,json=itemDefinition,proto3" json:"item_definition,omitempty"`
+	ItemLabel      string                 `protobuf:"bytes,2,opt,name=item_label,json=itemLabel,proto3" json:"item_label,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -655,6 +665,13 @@ func (x *ListTypeOptions) GetItemDefinition() *ListItemDefinition {
 		return x.ItemDefinition
 	}
 	return nil
+}
+
+func (x *ListTypeOptions) GetItemLabel() string {
+	if x != nil {
+		return x.ItemLabel
+	}
+	return ""
 }
 
 type ObjectTypeOptions struct {
@@ -973,7 +990,7 @@ var File_configuration_proto protoreflect.FileDescriptor
 
 const file_configuration_proto_rawDesc = "" +
 	"\n" +
-	"\x13configuration.proto\x12\x18Superplane.Configuration\"\xb6\x04\n" +
+	"\x13configuration.proto\x12\x18Superplane.Configuration\"\xed\x04\n" +
 	"\x05Field\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12 \n" +
@@ -985,9 +1002,11 @@ const file_configuration_proto_rawDesc = "" +
 	"\ftype_options\x18\b \x01(\v2%.Superplane.Configuration.TypeOptionsH\x01R\vtypeOptions\x88\x01\x01\x12\\\n" +
 	"\x13required_conditions\x18\t \x03(\v2+.Superplane.Configuration.RequiredConditionR\x12requiredConditions\x12S\n" +
 	"\x10validation_rules\x18\n" +
-	" \x03(\v2(.Superplane.Configuration.ValidationRuleR\x0fvalidationRulesB\x10\n" +
+	" \x03(\v2(.Superplane.Configuration.ValidationRuleR\x0fvalidationRules\x12%\n" +
+	"\vplaceholder\x18\v \x01(\tH\x02R\vplaceholder\x88\x01\x01B\x10\n" +
 	"\x0e_default_valueB\x0f\n" +
-	"\r_type_options\"\x81\a\n" +
+	"\r_type_optionsB\x0e\n" +
+	"\f_placeholder\"\x81\a\n" +
 	"\vTypeOptions\x12H\n" +
 	"\x06number\x18\x01 \x01(\v2+.Superplane.Configuration.NumberTypeOptionsH\x00R\x06number\x88\x01\x01\x12H\n" +
 	"\x06select\x18\x02 \x01(\v2+.Superplane.Configuration.SelectTypeOptionsH\x01R\x06select\x88\x01\x01\x12X\n" +
@@ -1031,9 +1050,11 @@ const file_configuration_proto_rawDesc = "" +
 	"\x16IntegrationTypeOptions\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\")\n" +
 	"\x13ResourceTypeOptions\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\"h\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\"\x87\x01\n" +
 	"\x0fListTypeOptions\x12U\n" +
-	"\x0fitem_definition\x18\x01 \x01(\v2,.Superplane.Configuration.ListItemDefinitionR\x0eitemDefinition\"L\n" +
+	"\x0fitem_definition\x18\x01 \x01(\v2,.Superplane.Configuration.ListItemDefinitionR\x0eitemDefinition\x12\x1d\n" +
+	"\n" +
+	"item_label\x18\x02 \x01(\tR\titemLabel\"L\n" +
 	"\x11ObjectTypeOptions\x127\n" +
 	"\x06schema\x18\x01 \x03(\v2\x1f.Superplane.Configuration.FieldR\x06schema\":\n" +
 	"\fSelectOption\x12\x14\n" +

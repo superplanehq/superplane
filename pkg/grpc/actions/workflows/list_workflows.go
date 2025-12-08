@@ -3,17 +3,17 @@ package workflows
 import (
 	"context"
 
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func ListWorkflows(ctx context.Context, registry *registry.Registry, organizationID string) (*pb.ListWorkflowsResponse, error) {
-	var workflows []models.Workflow
-
-	if err := database.Conn().Where("organization_id = ?", organizationID).Find(&workflows).Error; err != nil {
-		return nil, err
+	workflows, err := models.ListWorkflows(organizationID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	protoWorkflows := make([]*pb.Workflow, len(workflows))

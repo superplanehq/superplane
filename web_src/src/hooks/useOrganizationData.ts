@@ -17,21 +17,12 @@ import {
   rolesDescribeRole,
   organizationsDescribeOrganization,
   organizationsUpdateOrganization,
-  superplaneListCanvases,
-  superplaneCreateCanvas,
-  superplaneDeleteCanvas,
   organizationsRemoveUser,
   organizationsListInvitations,
   organizationsCreateInvitation,
-  organizationsUpdateInvitation,
   organizationsRemoveInvitation,
 } from "../api-client/sdk.gen";
-import {
-  RolesCreateRoleRequest,
-  AuthorizationDomainType,
-  OrganizationsRemoveUserData,
-  OrganizationsUpdateInvitationData,
-} from "@/api-client";
+import { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
 import { withOrganizationHeader } from "../utils/withOrganizationHeader";
 
 // Query Keys
@@ -156,10 +147,12 @@ export const useRole = (organizationId: string, roleName: string) => {
     queryFn: async () => {
       const response = await rolesDescribeRole(
         withOrganizationHeader({
+          path: {
+            roleName: roleName,
+          },
           query: {
             domainType: "DOMAIN_TYPE_ORGANIZATION",
             domainId: organizationId,
-            role: roleName,
           },
         }),
       );
@@ -252,37 +245,6 @@ export const useCreateInvitation = (
             email: email,
           },
         }),
-      );
-      return response.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.invitations(organizationId) });
-
-      if (data.invitation?.state === "accepted") {
-        queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) });
-      }
-    },
-    onError: options?.onError,
-  });
-};
-
-export const useUpdateInvitation = (
-  organizationId: string,
-  options?: {
-    onError?: (error: Error) => void;
-  },
-) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ invitationId, canvasIds }: { invitationId: string; canvasIds: string[] }) => {
-      const response = await organizationsUpdateInvitation(
-        withOrganizationHeader({
-          path: { id: organizationId, invitationId },
-          body: {
-            canvasIds: canvasIds,
-          },
-        } as OrganizationsUpdateInvitationData),
       );
       return response.data;
     },
@@ -559,62 +521,6 @@ export const useUpdateOrganization = (organizationId: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.details(organizationId) });
-    },
-  });
-};
-
-export const useOrganizationCanvases = (organizationId: string) => {
-  return useQuery({
-    queryKey: organizationKeys.canvases(organizationId),
-    queryFn: async () => {
-      const response = await superplaneListCanvases(withOrganizationHeader({ query: { organizationId } }));
-      return response.data?.canvases || [];
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!organizationId,
-  });
-};
-
-export const useCreateCanvas = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: {
-      canvas: {
-        metadata: {
-          name: string;
-          description?: string;
-        };
-      };
-      organizationId: string;
-    }) => {
-      return await superplaneCreateCanvas(
-        withOrganizationHeader({
-          body: params,
-        }),
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.canvases(organizationId) });
-    },
-  });
-};
-
-export const useDeleteCanvas = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: { canvasId: string }) => {
-      return await superplaneDeleteCanvas(
-        withOrganizationHeader({
-          path: { idOrName: params.canvasId },
-          query: { organizationId },
-        }),
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.canvases(organizationId) });
     },
   });
 };

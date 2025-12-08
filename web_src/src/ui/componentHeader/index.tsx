@@ -41,8 +41,9 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
 
   return (
     <div
+      data-testid={toTestId(`node-${title}-header`)}
       className={
-        "canvas-node-drag-handle text-left text-lg w-full px-2 flex flex-col border-b p-2 rounded-t items-center relative " +
+        "canvas-node-drag-handle text-left text-lg w-full px-2 flex flex-col border-b p-2 rounded-t-md items-center relative " +
         headerColor
       }
       onDoubleClick={onDoubleClick}

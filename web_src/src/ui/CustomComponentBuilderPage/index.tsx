@@ -9,7 +9,7 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./blueprint-canvas-reset.css";
 
 import { ComponentsComponent, ConfigurationField, SuperplaneBlueprintsOutputChannel } from "@/api-client";
@@ -89,11 +89,36 @@ export interface CustomComponentBuilderPageProps {
   canUndo?: boolean;
 }
 
+/*
+ * nodeTypes must be defined outside of the component to prevent
+ * react-flow from remounting the node types on every render.
+ */
+const nodeTypes = {
+  default: (nodeProps: { data: BlockData & { _callbacksRef?: any }; id: string; selected?: boolean }) => {
+    const { _callbacksRef, ...blockData } = nodeProps.data;
+    const callbacks = _callbacksRef?.current;
+
+    if (!callbacks) {
+      return <Block data={blockData} nodeId={nodeProps.id} selected={nodeProps.selected} />;
+    }
+
+    return (
+      <Block
+        data={blockData}
+        nodeId={nodeProps.id}
+        selected={nodeProps.selected}
+        onEdit={() => callbacks.onEdit?.current?.(nodeProps.id)}
+        onDelete={() => callbacks.onDelete?.current?.(nodeProps.id)}
+        onDuplicate={() => callbacks.onDuplicate?.current?.(nodeProps.id)}
+      />
+    );
+  },
+};
+
 // Canvas content component with ReactFlow hooks - defined outside to prevent re-creation
 function CanvasContent({
   nodes,
   edges,
-  nodeTypes,
   edgeTypes,
   onNodesChange,
   onEdgesChange,
@@ -101,10 +126,13 @@ function CanvasContent({
   onNodeDoubleClick,
   onBuildingBlockDrop,
   onZoomChange,
+  onEdgeMouseEnter,
+  onEdgeMouseLeave,
+  onConnectStart,
+  onConnectEnd,
 }: {
   nodes: Node[];
   edges: Edge[];
-  nodeTypes: any;
   edgeTypes: any;
   onNodesChange: (changes: any) => void;
   onEdgesChange: (changes: any) => void;
@@ -112,6 +140,13 @@ function CanvasContent({
   onNodeDoubleClick?: (event: any, node: Node) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onZoomChange?: (zoom: number) => void;
+  onEdgeMouseEnter?: (event: React.MouseEvent, edge: any) => void;
+  onEdgeMouseLeave?: () => void;
+  onConnectStart?: (
+    event: any,
+    params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
+  ) => void;
+  onConnectEnd?: () => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -180,7 +215,11 @@ function CanvasContent({
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
+      onConnectStart={onConnectStart}
+      onConnectEnd={onConnectEnd}
       onNodeDoubleClick={onNodeDoubleClick}
+      onEdgeMouseEnter={onEdgeMouseEnter}
+      onEdgeMouseLeave={onEdgeMouseLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onMove={handleMove}
@@ -349,21 +388,58 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     [props.onNodeDuplicate],
   );
 
-  const nodeTypes = useMemo(
-    () => ({
-      default: (nodeProps: { data: unknown; id: string; selected?: boolean }) => (
-        <Block
-          data={nodeProps.data as BlockData}
-          nodeId={nodeProps.id}
-          onEdit={() => handleNodeEdit(nodeProps.id)}
-          onDelete={() => handleNodeDelete(nodeProps.id)}
-          onDuplicate={() => handleNodeDuplicate(nodeProps.id)}
-          selected={nodeProps.selected}
-        />
-      ),
-    }),
-    [handleNodeEdit, handleNodeDelete, handleNodeDuplicate],
+  // Use refs for callbacks to avoid recreating nodeTypes
+  const handleNodeEditRef = useRef(handleNodeEdit);
+  handleNodeEditRef.current = handleNodeEdit;
+
+  const handleNodeDeleteRef = useRef(handleNodeDelete);
+  handleNodeDeleteRef.current = handleNodeDelete;
+
+  const handleNodeDuplicateRef = useRef(handleNodeDuplicate);
+  handleNodeDuplicateRef.current = handleNodeDuplicate;
+
+  const callbacksRef = useRef({
+    onEdit: handleNodeEditRef,
+    onDelete: handleNodeDeleteRef,
+    onDuplicate: handleNodeDuplicateRef,
+  });
+
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [connectingFrom, setConnectingFrom] = useState<{
+    nodeId: string;
+    handleId: string | null;
+    handleType: "source" | "target" | null;
+  } | null>(null);
+
+  const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: any) => {
+    setHoveredEdgeId(edge.id);
+  }, []);
+
+  const handleEdgeMouseLeave = useCallback(() => {
+    setHoveredEdgeId(null);
+  }, []);
+
+  const handleConnectStart = useCallback(
+    (
+      _event: any,
+      params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
+    ) => {
+      if (params.nodeId) {
+        setConnectingFrom({ nodeId: params.nodeId, handleId: params.handleId, handleType: params.handleType });
+      }
+    },
+    [],
   );
+
+  const handleConnectEnd = useCallback(() => {
+    setConnectingFrom(null);
+  }, []);
+
+  // Find the hovered edge to get its source and target
+  const hoveredEdge = useMemo(() => {
+    if (!hoveredEdgeId) return null;
+    return props.edges?.find((e) => e.id === hoveredEdgeId);
+  }, [hoveredEdgeId, props.edges]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -372,14 +448,32 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     [],
   );
 
-  // Style edges with custom type
+  // Style edges with custom type and hover state
   const styledEdges = useMemo(
     () =>
       props.edges.map((edge) => ({
         ...edge,
         type: "custom",
+        data: { ...edge.data, isHovered: edge.id === hoveredEdgeId },
+        zIndex: edge.id === hoveredEdgeId ? 1000 : 0,
       })),
-    [props.edges],
+    [props.edges, hoveredEdgeId],
+  );
+
+  // Add hovered edge and connecting state to nodes
+  const nodesWithHoveredEdge = useMemo(
+    () =>
+      props.nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          _hoveredEdge: hoveredEdge,
+          _connectingFrom: connectingFrom,
+          _allEdges: props.edges,
+          _callbacksRef: callbacksRef,
+        },
+      })),
+    [props.nodes, hoveredEdge, connectingFrom, props.edges],
   );
 
   const handleLogoClick = useCallback(() => {
@@ -419,9 +513,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         <div className="flex-1 relative h-full w-full">
           <ReactFlowProvider>
             <CanvasContent
-              nodes={props.nodes}
+              nodes={nodesWithHoveredEdge}
               edges={styledEdges}
-              nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               onNodesChange={props.onNodesChange}
               onEdgesChange={props.onEdgesChange}
@@ -429,6 +522,10 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
               onNodeDoubleClick={props.onNodeDoubleClick}
               onBuildingBlockDrop={handleBuildingBlockDrop}
               onZoomChange={setCanvasZoom}
+              onEdgeMouseEnter={handleEdgeMouseEnter}
+              onEdgeMouseLeave={handleEdgeMouseLeave}
+              onConnectStart={handleConnectStart}
+              onConnectEnd={handleConnectEnd}
             />
           </ReactFlowProvider>
         </div>

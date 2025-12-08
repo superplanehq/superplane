@@ -83,23 +83,23 @@ func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook
 
 	integration, err := models.FindIntegrationByIDInTransaction(tx, *webhook.IntegrationID)
 	if err != nil {
-		return err
+		return w.handleWebhookError(tx, webhook, err)
 	}
 
 	secret, err := w.encryptor.Decrypt(context.Background(), webhook.Secret, []byte(webhook.ID.String()))
 	if err != nil {
-		return err
+		return w.handleWebhookError(tx, webhook, err)
 	}
 
-	resourceManager, err := w.registry.NewResourceManager(context.Background(), integration)
+	resourceManager, err := w.registry.NewResourceManagerInTransaction(context.Background(), tx, integration)
 	if err != nil {
-		return err
+		return w.handleWebhookError(tx, webhook, err)
 	}
 
 	webhookResource := webhook.Resource.Data()
 	resource, err := resourceManager.Get(webhookResource.Type, webhookResource.ID)
 	if err != nil {
-		return err
+		return w.handleWebhookError(tx, webhook, err)
 	}
 
 	webhookMetadata, err := resourceManager.SetupWebhook(integrations.WebhookOptions{
@@ -110,10 +110,29 @@ func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook
 	})
 
 	if err != nil {
-		return err
+		return w.handleWebhookError(tx, webhook, err)
 	}
 
 	return webhook.ReadyWithMetadata(tx, webhookMetadata)
+}
+
+func (w *WebhookProvisioner) handleWebhookError(tx *gorm.DB, webhook *models.Webhook, originalErr error) error {
+	if webhook.HasExceededRetries() {
+		w.log("Webhook %s has exceeded max retries (%d), marking as failed", webhook.ID, webhook.MaxRetries)
+		if err := webhook.MarkFailed(tx); err != nil {
+			w.log("Error marking webhook %s as failed: %v", webhook.ID, err)
+			return err
+		}
+		return nil
+	}
+
+	if err := webhook.IncrementRetry(tx); err != nil {
+		w.log("Error incrementing retry count for webhook %s: %v", webhook.ID, err)
+		return err
+	}
+
+	w.log("Webhook %s provisioning failed (attempt %d/%d): %v", webhook.ID, webhook.RetryCount, webhook.MaxRetries, originalErr)
+	return nil
 }
 
 func (w *WebhookProvisioner) log(format string, v ...any) {

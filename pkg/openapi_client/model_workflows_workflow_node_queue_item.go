@@ -25,6 +25,7 @@ type WorkflowsWorkflowNodeQueueItem struct {
 	WorkflowId *string `json:"workflowId,omitempty"`
 	NodeId *string `json:"nodeId,omitempty"`
 	Input map[string]interface{} `json:"input,omitempty"`
+	RootEvent *WorkflowsWorkflowEvent `json:"rootEvent,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 }
 
@@ -173,6 +174,38 @@ func (o *WorkflowsWorkflowNodeQueueItem) SetInput(v map[string]interface{}) {
 	o.Input = v
 }
 
+// GetRootEvent returns the RootEvent field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowNodeQueueItem) GetRootEvent() WorkflowsWorkflowEvent {
+	if o == nil || IsNil(o.RootEvent) {
+		var ret WorkflowsWorkflowEvent
+		return ret
+	}
+	return *o.RootEvent
+}
+
+// GetRootEventOk returns a tuple with the RootEvent field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowNodeQueueItem) GetRootEventOk() (*WorkflowsWorkflowEvent, bool) {
+	if o == nil || IsNil(o.RootEvent) {
+		return nil, false
+	}
+	return o.RootEvent, true
+}
+
+// HasRootEvent returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowNodeQueueItem) HasRootEvent() bool {
+	if o != nil && !IsNil(o.RootEvent) {
+		return true
+	}
+
+	return false
+}
+
+// SetRootEvent gets a reference to the given WorkflowsWorkflowEvent and assigns it to the RootEvent field.
+func (o *WorkflowsWorkflowNodeQueueItem) SetRootEvent(v WorkflowsWorkflowEvent) {
+	o.RootEvent = &v
+}
+
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
 func (o *WorkflowsWorkflowNodeQueueItem) GetCreatedAt() time.Time {
 	if o == nil || IsNil(o.CreatedAt) {
@@ -226,6 +259,9 @@ func (o WorkflowsWorkflowNodeQueueItem) ToMap() (map[string]interface{}, error) 
 	}
 	if !IsNil(o.Input) {
 		toSerialize["input"] = o.Input
+	}
+	if !IsNil(o.RootEvent) {
+		toSerialize["rootEvent"] = o.RootEvent
 	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["createdAt"] = o.CreatedAt

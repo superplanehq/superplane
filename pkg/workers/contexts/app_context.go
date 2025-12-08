@@ -44,7 +44,16 @@ func (m *AppContext) SetState(value string) {
 }
 
 func (m *AppContext) NewBrowserAction(action applications.BrowserAction) {
-	d := datatypes.NewJSONType(action)
+	//
+	// TODO: we wouldn't need to this unnecessary conversion
+	// if no circular dependency existed between pkg/components, pkg/models, and pkg/applications
+	//
+	d := datatypes.NewJSONType(models.BrowserAction{
+		URL:        action.URL,
+		Method:     action.Method,
+		FormFields: action.FormFields,
+	})
+
 	m.appInstallation.BrowserAction = &d
 }
 

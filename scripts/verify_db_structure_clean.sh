@@ -13,9 +13,18 @@ function red() {
   echo -e "\033[0;31m$1\033[0m"
 }
 
-git diff --exit-code -- db/structure.sql
+function diff() {
+  # Ignore the diff header lines
+  # Ignore the pg_dump version line
+  # Only show actual schema changes
+  git diff --unified=0 -- db/structure.sql | grep -E '^\+|^\-' | grep -v "/db/structure.sql" | grep -v "Dumped by pg_dump version "
+}
 
-if [ $? != 0 ]; then
+lineCount=$(diff | wc -l)
+
+if [[ $lineCount -gt 0 ]]; then
+  diff
+
   red ""
   red "Unexpected changes detected in db/structure.sql!"
   red ""
@@ -28,6 +37,6 @@ if [ $? != 0 ]; then
   red ""
 
   exit 1
-fi
+else
   exit 0
 fi

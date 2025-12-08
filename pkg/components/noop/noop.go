@@ -5,6 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -29,7 +30,7 @@ func (c *NoOp) Description() string {
 }
 
 func (c *NoOp) Icon() string {
-	return "check"
+	return "circle-off"
 }
 
 func (c *NoOp) Color() string {
@@ -50,7 +51,7 @@ func (c *NoOp) Execute(ctx components.ExecutionContext) error {
 	})
 }
 
-func (c *NoOp) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+func (c *NoOp) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 

@@ -2,15 +2,31 @@ package contexts
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+type ConfigurationBuildError struct {
+	Err         error
+	QueueItem   *models.WorkflowNodeQueueItem
+	Node        *models.WorkflowNode
+	Event       *models.WorkflowEvent
+	RootEventID uuid.UUID
+}
+
+func (e *ConfigurationBuildError) Error() string {
+	return fmt.Sprintf("configuration build failed: %v", e.Err)
+}
+
+func (e *ConfigurationBuildError) Unwrap() error {
+	return e.Err
+}
 
 func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem *models.WorkflowNodeQueueItem) (*components.ProcessQueueContext, error) {
 	event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
@@ -34,7 +50,13 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 
 	config, err := configBuilder.Build(node.Configuration.Data())
 	if err != nil {
-		return nil, err
+		return nil, &ConfigurationBuildError{
+			Err:         err,
+			QueueItem:   queueItem,
+			Node:        node,
+			Event:       event,
+			RootEventID: queueItem.RootEventID,
+		}
 	}
 
 	ctx := &components.ProcessQueueContext{
@@ -43,6 +65,7 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		Configuration: config,
 		RootEventID:   queueItem.RootEventID.String(),
 		EventID:       event.ID.String(),
+		SourceNodeID:  event.NodeID,
 		Input:         event.Data.Data(),
 	}
 
@@ -76,7 +99,6 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 			return uuid.Nil, err
 		}
 
-		messages.NewWorkflowExecutionCreatedMessage(execution.WorkflowID.String(), &execution).PublishWithDelay(1 * time.Second)
 		return execution.ID, nil
 	}
 
@@ -88,14 +110,18 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		return node.UpdateState(tx, state)
 	}
 
-	ctx.DefaultProcessing = func() error {
-		if _, err := ctx.CreateExecution(); err != nil {
-			return err
+	ctx.DefaultProcessing = func() (*models.WorkflowNodeExecution, error) {
+		execID, err := ctx.CreateExecution()
+		if err != nil {
+			return nil, err
 		}
 		if err := ctx.DequeueItem(); err != nil {
-			return err
+			return nil, err
 		}
-		return ctx.UpdateNodeState(models.WorkflowNodeStateProcessing)
+		if err := ctx.UpdateNodeState(models.WorkflowNodeStateProcessing); err != nil {
+			return nil, err
+		}
+		return models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
 	}
 
 	ctx.GetExecutionMetadata = func(execID uuid.UUID) (map[string]any, error) {
@@ -164,7 +190,7 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 			// Fallthrough to workflow-level counting if blueprint id missing
 		}
 
-		wf, err := models.FindUnscopedWorkflowInTransaction(tx, node.WorkflowID)
+		wf, err := models.FindWorkflowWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 		if err != nil {
 			return 0, err
 		}
@@ -178,16 +204,74 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		return count, nil
 	}
 
-	ctx.FinishExecution = func(execID uuid.UUID, outputs map[string][]any) error {
+	ctx.CountDistinctIncomingSources = func() (int, error) {
+		// Similar blueprint-aware logic as CountIncomingEdges, but count
+		// distinct source nodes rather than edge count.
+		if node.ParentNodeID != nil && *node.ParentNodeID != "" {
+			parent, err := models.FindWorkflowNode(tx, node.WorkflowID, *node.ParentNodeID)
+			if err != nil {
+				return 0, err
+			}
+
+			blueprintID := parent.Ref.Data().Blueprint.ID
+			if blueprintID != "" {
+				bp, err := models.FindUnscopedBlueprintInTransaction(tx, blueprintID)
+				if err != nil {
+					return 0, err
+				}
+
+				prefix := parent.NodeID + ":"
+				childID := node.NodeID
+				if len(childID) > len(prefix) && childID[:len(prefix)] == prefix {
+					childID = childID[len(prefix):]
+				}
+
+				uniq := map[string]struct{}{}
+				for _, e := range bp.Edges {
+					if e.TargetID == childID {
+						uniq[e.SourceID] = struct{}{}
+					}
+				}
+				return len(uniq), nil
+			}
+		}
+
+		wf, err := models.FindWorkflowWithoutOrgScopeInTransaction(tx, node.WorkflowID)
+		if err != nil {
+			return 0, err
+		}
+
+		uniq := map[string]struct{}{}
+		for _, edge := range wf.Edges {
+			if edge.TargetID == node.NodeID {
+				uniq[edge.SourceID] = struct{}{}
+			}
+		}
+		return len(uniq), nil
+	}
+
+	ctx.PassExecution = func(execID uuid.UUID, outputs map[string][]any) (*models.WorkflowNodeExecution, error) {
 		exec, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		exec.PassInTransaction(tx, outputs)
-		messages.NewWorkflowExecutionFinishedMessage(exec.WorkflowID.String(), exec).PublishWithDelay(1 * time.Second)
 
-		return nil
+		return exec, nil
+	}
+
+	ctx.FailExecution = func(execID uuid.UUID, reason, message string) (*models.WorkflowNodeExecution, error) {
+		exec, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := exec.FailInTransaction(tx, reason, message); err != nil {
+			return nil, err
+		}
+
+		return exec, nil
 	}
 
 	ctx.FindExecutionIDByKV = func(key string, value string) (uuid.UUID, bool, error) {

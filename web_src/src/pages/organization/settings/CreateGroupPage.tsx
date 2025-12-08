@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from "react";
+import { Heading } from "@/components/Heading/heading";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Button } from "../../../components/Button/button";
-import { Input } from "../../../components/Input/input";
+import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
 import {
   Dropdown,
   DropdownButton,
-  DropdownMenu,
+  DropdownDescription,
   DropdownItem,
   DropdownLabel,
-  DropdownDescription,
+  DropdownMenu,
 } from "../../../components/Dropdown/dropdown";
-import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
+import { Icon } from "../../../components/Icon";
+import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
-import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
 import { useCreateGroup, useOrganizationRoles } from "../../../hooks/useOrganizationData";
-import { Heading } from "@/components/Heading/heading";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { Button } from "../../../ui/button";
 
 export function CreateGroupPage() {
   const navigate = useNavigate();
@@ -69,7 +69,7 @@ export function CreateGroupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 pt-20 text-left">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 text-left">
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -146,10 +146,7 @@ export function CreateGroupPage() {
                 ) : roles.length === 0 ? (
                   <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                     <div className="flex max-w-lg">
-                      <MaterialSymbol
-                        name="warning"
-                        className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5"
-                      />
+                      <Icon name="warning" className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5" />
                       <div className="text-sm">
                         <p className="text-yellow-800 dark:text-yellow-200 font-medium">No roles available</p>
                         <p className="text-yellow-700 dark:text-yellow-300 mt-1">
@@ -159,7 +156,7 @@ export function CreateGroupPage() {
                           to={`/${orgId}/settings/create-role`}
                           className="inline-flex items-center gap-1 mt-2 text-yellow-800 dark:text-yellow-200 hover:text-yellow-900 dark:hover:text-yellow-100 font-medium"
                         >
-                          <MaterialSymbol name="add" size="sm" />
+                          <Icon name="add" size="sm" />
                           Create Role
                         </Link>
                       </div>
@@ -167,9 +164,9 @@ export function CreateGroupPage() {
                   </div>
                 ) : (
                   <Dropdown>
-                    <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
+                    <DropdownButton className="flex items-center gap-2 text-sm justify-between">
                       {roles.find((r) => r.metadata?.name === selectedRole)?.spec?.displayName || "Select Role"}
-                      <MaterialSymbol name="keyboard_arrow_down" />
+                      <Icon name="keyboard_arrow_down" />
                     </DropdownButton>
                     <DropdownMenu>
                       {roles.map((role) => (
@@ -191,17 +188,16 @@ export function CreateGroupPage() {
           {/* Action Buttons */}
           <div className="flex items-center gap-3">
             <Button
-              color="blue"
               onClick={handleCreateGroup}
               disabled={!groupName.trim() || !selectedRole || isCreating || roles.length === 0}
               className="flex items-center gap-2"
             >
-              <MaterialSymbol name="group_add" size="sm" />
+              <Icon name="group_add" size="sm" />
               {isCreating ? "Creating..." : "Create Group"}
             </Button>
 
             <Link to={`/${orgId}/settings/groups`}>
-              <Button outline>Cancel</Button>
+              <Button variant="secondary">Cancel</Button>
             </Link>
           </div>
         </div>

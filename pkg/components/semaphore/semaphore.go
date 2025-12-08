@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -28,7 +29,7 @@ type NodeMetadata struct {
 
 type ExecutionMetadata struct {
 	Workflow *Workflow      `json:"workflow"`
-	Data     map[string]any `json:"data"`
+	Data     map[string]any `json:"data,omitempty"`
 }
 
 type Workflow struct {
@@ -49,6 +50,7 @@ type Spec struct {
 	Project      string      `json:"project"`
 	Ref          string      `json:"ref"`
 	PipelineFile string      `json:"pipelineFile"`
+	CommitSha    string      `json:"commitSha"`
 	Parameters   []Parameter `json:"parameters"`
 }
 
@@ -116,16 +118,22 @@ func (s *Semaphore) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "pipelineFile",
+			Label:       "Pipeline file",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "e.g. .semaphore/semaphore.yml",
+		},
+		{
 			Name:     "ref",
-			Label:    "Workflow ref",
-			Type:     configuration.FieldTypeString,
+			Label:    "Pipeline file location",
+			Type:     configuration.FieldTypeGitRef,
 			Required: true,
 		},
 		{
-			Name:     "pipelineFile",
-			Label:    "Pipeline File",
-			Type:     configuration.FieldTypeString,
-			Required: true,
+			Name:  "commitSha",
+			Label: "Commit SHA",
+			Type:  configuration.FieldTypeString,
 		},
 		{
 			Name:  "parameters",
@@ -133,6 +141,7 @@ func (s *Semaphore) Configuration() []configuration.Field {
 			Type:  configuration.FieldTypeList,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
+					ItemLabel: "Parameter",
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
@@ -156,7 +165,7 @@ func (s *Semaphore) Configuration() []configuration.Field {
 	}
 }
 
-func (s *Semaphore) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+func (s *Semaphore) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 
@@ -228,6 +237,10 @@ func (s *Semaphore) Execute(ctx components.ExecutionContext) error {
 		"reference":     spec.Ref,
 		"pipeline_file": spec.PipelineFile,
 		"parameters":    s.buildParameters(ctx, spec.Parameters),
+	}
+
+	if spec.CommitSha != "" {
+		params["commit_sha"] = spec.CommitSha
 	}
 
 	wf, err := semaphore.RunWorkflow(params)

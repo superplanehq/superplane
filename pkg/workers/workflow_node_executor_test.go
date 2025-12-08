@@ -57,12 +57,12 @@ func Test__WorkflowNodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	//
 	go func() {
 		executor1 := NewWorkflowNodeExecutor(r.Registry)
-		results <- executor1.LockAndProcessNodeExecution(*execution)
+		results <- executor1.LockAndProcessNodeExecution(execution.ID)
 	}()
 
 	go func() {
 		executor2 := NewWorkflowNodeExecutor(r.Registry)
-		results <- executor2.LockAndProcessNodeExecution(*execution)
+		results <- executor2.LockAndProcessNodeExecution(execution.ID)
 	}()
 
 	// Collect results - one should succeed (return nil) and one should get ErrRecordLocked
@@ -147,7 +147,7 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecution(t *testing.T) {
 	// and moves the parent execution to started state.
 	//
 	executor := NewWorkflowNodeExecutor(r.Registry)
-	err := executor.LockAndProcessNodeExecution(*execution)
+	err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
 	// Verify parent execution moved to started state
@@ -225,7 +225,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	// The approval component doesn't call Pass() in Execute(), so it should remain in started state.
 	//
 	executor := NewWorkflowNodeExecutor(r.Registry)
-	err = executor.LockAndProcessNodeExecution(*execution)
+	err = executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
 	// Verify execution moved to started state but not finished,
@@ -292,7 +292,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	// The noop component calls Pass() in Execute(), which should finish the execution.
 	//
 	executor := NewWorkflowNodeExecutor(r.Registry)
-	err := executor.LockAndProcessNodeExecution(*execution)
+	err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
 	// Verify execution moved to finished state with passed result
@@ -373,7 +373,7 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecutionFailsWhenConfigurationCann
 	// since this isn't a runtime error, but a configuration error.
 	//
 	executor := NewWorkflowNodeExecutor(r.Registry)
-	err := executor.LockAndProcessNodeExecution(*execution)
+	err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
 	//

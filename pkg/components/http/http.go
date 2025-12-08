@@ -10,6 +10,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -101,6 +102,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 			Required: false,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
+					ItemLabel: "Header",
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
@@ -132,7 +134,7 @@ func (e *HTTP) HandleAction(ctx components.ActionContext) error {
 	return fmt.Errorf("http does not support actions")
 }
 
-func (e *HTTP) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+func (e *HTTP) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 

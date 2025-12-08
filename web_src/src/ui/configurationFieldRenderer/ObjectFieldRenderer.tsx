@@ -11,35 +11,22 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   domainType,
   hasError,
 }) => {
-  const [isDarkMode, setIsDarkMode] = React.useState(false);
   const [jsonError, setJsonError] = React.useState<string | null>(null);
+  const [editorValue, setEditorValue] = React.useState<string>(() =>
+    JSON.stringify(value === undefined ? {} : value, null, 2),
+  );
+
   const objectOptions = field.typeOptions?.object;
   const schema = objectOptions?.schema;
   const hasSchema = !!schema && schema.length > 0;
 
-  // Detect dark mode
-  React.useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    };
-
-    checkDarkMode();
-
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
-    return () => observer.disconnect();
-  }, []);
-
   if (!hasSchema) {
     // Fallback to Monaco Editor if no schema defined
-    const handleEditorChange = (value: string | undefined) => {
-      const newValue = value || "{}";
+    const handleEditorChange = (newValue: string | undefined) => {
+      const valueToUse = newValue || "{}";
+      setEditorValue(valueToUse);
       try {
-        const parsed = JSON.parse(newValue);
+        const parsed = JSON.parse(valueToUse);
         onChange(parsed);
         setJsonError(null);
       } catch (error) {
@@ -56,9 +43,9 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
           <Editor
             height="100%"
             defaultLanguage="json"
-            value={JSON.stringify(value === undefined ? {} : value, null, 2)}
+            value={editorValue}
             onChange={handleEditorChange}
-            theme={isDarkMode ? "vs-dark" : "vs"}
+            theme="vs"
             options={{
               minimap: { enabled: false },
               fontSize: 13,

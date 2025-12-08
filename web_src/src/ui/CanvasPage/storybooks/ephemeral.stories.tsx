@@ -267,7 +267,6 @@ const ephemeralNodes: Node[] = [
           },
         ],
         maxVisibleEvents: 5,
-        startLastValuesOpen: true,
         collapsed: false,
       },
     },

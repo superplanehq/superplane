@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg22.04+1)
+-- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -72,24 +72,6 @@ CREATE TABLE public.accounts (
 
 
 --
--- Name: alerts; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.alerts (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    canvas_id uuid NOT NULL,
-    source_id uuid NOT NULL,
-    source_type character varying(255) NOT NULL,
-    message text NOT NULL,
-    acknowledged boolean DEFAULT false NOT NULL,
-    acknowledged_at timestamp with time zone,
-    type character varying(50) NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    origin_type character varying(255)
-);
-
-
---
 -- Name: app_installations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -129,22 +111,6 @@ CREATE TABLE public.blueprints (
 
 
 --
--- Name: canvases; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.canvases (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    name character varying(128) NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    created_by uuid NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    organization_id uuid NOT NULL,
-    deleted_at timestamp with time zone,
-    description text
-);
-
-
---
 -- Name: casbin_rule; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -178,152 +144,6 @@ CREATE SEQUENCE public.casbin_rule_id_seq
 --
 
 ALTER SEQUENCE public.casbin_rule_id_seq OWNED BY public.casbin_rule.id;
-
-
---
--- Name: connection_group_field_set_events; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.connection_group_field_set_events (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    connection_group_set_id uuid NOT NULL,
-    event_id uuid NOT NULL,
-    source_id uuid NOT NULL,
-    source_name character varying(128) NOT NULL,
-    source_type character varying(64) NOT NULL,
-    received_at timestamp without time zone NOT NULL
-);
-
-
---
--- Name: connection_group_field_sets; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.connection_group_field_sets (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    connection_group_id uuid NOT NULL,
-    field_set jsonb NOT NULL,
-    field_set_hash character(64) NOT NULL,
-    state character varying(64) NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    timeout integer,
-    timeout_behavior character varying(64),
-    state_reason character varying(64)
-);
-
-
---
--- Name: connection_groups; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.connection_groups (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    name character varying(128) NOT NULL,
-    canvas_id uuid NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    created_by uuid NOT NULL,
-    updated_at timestamp without time zone,
-    updated_by uuid,
-    spec jsonb DEFAULT '{}'::jsonb NOT NULL,
-    description text,
-    deleted_at timestamp with time zone
-);
-
-
---
--- Name: connections; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.connections (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    canvas_id uuid NOT NULL,
-    target_id uuid NOT NULL,
-    source_id uuid NOT NULL,
-    source_name character varying(128) NOT NULL,
-    source_type character varying(64) NOT NULL,
-    filter_operator character varying(16) NOT NULL,
-    filters jsonb NOT NULL,
-    target_type character varying(64) DEFAULT 'stage'::character varying NOT NULL
-);
-
-
---
--- Name: event_rejections; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.event_rejections (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    event_id uuid NOT NULL,
-    target_type character varying(64) NOT NULL,
-    target_id uuid NOT NULL,
-    reason character varying(64) NOT NULL,
-    message text,
-    rejected_at timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: event_sources; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.event_sources (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    canvas_id uuid NOT NULL,
-    name character varying(128) NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    key bytea NOT NULL,
-    resource_id uuid,
-    state character varying(64) NOT NULL,
-    scope character varying(64) NOT NULL,
-    description text,
-    event_types jsonb DEFAULT '[]'::jsonb NOT NULL,
-    deleted_at timestamp with time zone,
-    schedule jsonb,
-    last_triggered_at timestamp without time zone,
-    next_trigger_at timestamp without time zone,
-    type character varying(64) DEFAULT 'webhook'::character varying NOT NULL
-);
-
-
---
--- Name: events; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.events (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    source_id uuid NOT NULL,
-    canvas_id uuid NOT NULL,
-    source_name character varying(128) NOT NULL,
-    source_type character varying(64) NOT NULL,
-    received_at timestamp without time zone NOT NULL,
-    raw jsonb NOT NULL,
-    state character varying(64) NOT NULL,
-    headers jsonb DEFAULT '{}'::jsonb NOT NULL,
-    type character varying(128) NOT NULL,
-    state_reason character varying(64),
-    state_message text,
-    created_by uuid
-);
-
-
---
--- Name: execution_resources; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.execution_resources (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    external_id character varying(128) NOT NULL,
-    type character varying(64) NOT NULL,
-    stage_id uuid NOT NULL,
-    execution_id uuid NOT NULL,
-    parent_resource_id uuid NOT NULL,
-    state character varying(64) NOT NULL,
-    result character varying(64) NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    last_polled_at timestamp without time zone
-);
 
 
 --
@@ -393,22 +213,6 @@ CREATE TABLE public.organizations (
 
 
 --
--- Name: resources; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.resources (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    external_id character varying(128) NOT NULL,
-    type character varying(64) NOT NULL,
-    name character varying(128) NOT NULL,
-    integration_id uuid NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone,
-    parent_id uuid
-);
-
-
---
 -- Name: role_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -452,89 +256,6 @@ CREATE TABLE public.secrets (
 
 
 --
--- Name: stage_event_approvals; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.stage_event_approvals (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    stage_event_id uuid NOT NULL,
-    approved_at timestamp without time zone NOT NULL,
-    approved_by uuid NOT NULL
-);
-
-
---
--- Name: stage_events; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.stage_events (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    stage_id uuid NOT NULL,
-    event_id uuid NOT NULL,
-    source_id uuid NOT NULL,
-    source_name character varying(128) NOT NULL,
-    source_type character varying(64) NOT NULL,
-    state character varying(64) NOT NULL,
-    state_reason character varying(64),
-    created_at timestamp without time zone NOT NULL,
-    inputs jsonb DEFAULT '{}'::jsonb NOT NULL,
-    name text,
-    discarded_by uuid,
-    discarded_at timestamp without time zone
-);
-
-
---
--- Name: stage_executions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.stage_executions (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    canvas_id uuid NOT NULL,
-    stage_id uuid NOT NULL,
-    stage_event_id uuid NOT NULL,
-    state character varying(64) NOT NULL,
-    result character varying(64) NOT NULL,
-    outputs jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    started_at timestamp without time zone,
-    finished_at timestamp without time zone,
-    cancelled_at timestamp without time zone,
-    cancelled_by uuid,
-    result_reason character varying(64),
-    result_message text
-);
-
-
---
--- Name: stages; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.stages (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    name character varying(128) NOT NULL,
-    canvas_id uuid NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    created_by uuid NOT NULL,
-    updated_at timestamp without time zone,
-    updated_by uuid,
-    executor_spec jsonb DEFAULT '{}'::jsonb NOT NULL,
-    conditions jsonb,
-    inputs jsonb DEFAULT '[]'::jsonb NOT NULL,
-    outputs jsonb DEFAULT '[]'::jsonb NOT NULL,
-    input_mappings jsonb DEFAULT '[]'::jsonb NOT NULL,
-    secrets jsonb DEFAULT '[]'::jsonb NOT NULL,
-    executor_type character varying(64) NOT NULL,
-    resource_id uuid,
-    description text,
-    executor_name text,
-    deleted_at timestamp with time zone,
-    dry_run boolean DEFAULT false
-);
-
-
---
 -- Name: users; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -565,7 +286,9 @@ CREATE TABLE public.webhooks (
     resource jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    deleted_at timestamp without time zone
+    deleted_at timestamp without time zone,
+    retry_count integer DEFAULT 0 NOT NULL,
+    max_retries integer DEFAULT 3 NOT NULL
 );
 
 
@@ -608,8 +331,8 @@ CREATE TABLE public.workflow_node_executions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
     node_id character varying(128) NOT NULL,
-    root_event_id uuid NOT NULL,
-    event_id uuid NOT NULL,
+    root_event_id uuid,
+    event_id uuid,
     previous_execution_id uuid,
     parent_execution_id uuid,
     state character varying(32) NOT NULL,
@@ -631,8 +354,8 @@ CREATE TABLE public.workflow_node_queue_items (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
     node_id character varying(128) NOT NULL,
-    root_event_id uuid NOT NULL,
-    event_id uuid NOT NULL,
+    root_event_id uuid,
+    event_id uuid,
     created_at timestamp without time zone NOT NULL
 );
 
@@ -673,7 +396,8 @@ CREATE TABLE public.workflow_nodes (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     "position" jsonb DEFAULT '{}'::jsonb NOT NULL,
     is_collapsed boolean DEFAULT false NOT NULL,
-    parent_node_id character varying(128)
+    parent_node_id character varying(128),
+    deleted_at timestamp with time zone
 );
 
 
@@ -689,7 +413,8 @@ CREATE TABLE public.workflows (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
-    created_by uuid
+    created_by uuid,
+    deleted_at timestamp without time zone
 );
 
 
@@ -741,14 +466,6 @@ ALTER TABLE ONLY public.accounts
 
 
 --
--- Name: alerts alerts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.alerts
-    ADD CONSTRAINT alerts_pkey PRIMARY KEY (id);
-
-
---
 -- Name: app_installations app_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -773,107 +490,11 @@ ALTER TABLE ONLY public.blueprints
 
 
 --
--- Name: canvases canvases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvases
-    ADD CONSTRAINT canvases_pkey PRIMARY KEY (id);
-
-
---
 -- Name: casbin_rule casbin_rule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.casbin_rule
     ADD CONSTRAINT casbin_rule_pkey PRIMARY KEY (id);
-
-
---
--- Name: connection_group_field_set_events connection_group_field_set_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connection_group_field_set_events
-    ADD CONSTRAINT connection_group_field_set_events_pkey PRIMARY KEY (id);
-
-
---
--- Name: connection_group_field_sets connection_group_field_sets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connection_group_field_sets
-    ADD CONSTRAINT connection_group_field_sets_pkey PRIMARY KEY (id);
-
-
---
--- Name: connection_groups connection_groups_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connection_groups
-    ADD CONSTRAINT connection_groups_canvas_id_name_key UNIQUE (canvas_id, name);
-
-
---
--- Name: connection_groups connection_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connection_groups
-    ADD CONSTRAINT connection_groups_pkey PRIMARY KEY (id);
-
-
---
--- Name: connections connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connections
-    ADD CONSTRAINT connections_pkey PRIMARY KEY (id);
-
-
---
--- Name: connections connections_target_id_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connections
-    ADD CONSTRAINT connections_target_id_source_id_key UNIQUE (target_id, source_id);
-
-
---
--- Name: event_rejections event_rejections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.event_rejections
-    ADD CONSTRAINT event_rejections_pkey PRIMARY KEY (id);
-
-
---
--- Name: event_sources event_sources_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.event_sources
-    ADD CONSTRAINT event_sources_canvas_id_name_key UNIQUE (canvas_id, name);
-
-
---
--- Name: event_sources event_sources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.event_sources
-    ADD CONSTRAINT event_sources_pkey PRIMARY KEY (id);
-
-
---
--- Name: events events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.events
-    ADD CONSTRAINT events_pkey PRIMARY KEY (id);
-
-
---
--- Name: execution_resources execution_resources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.execution_resources
-    ADD CONSTRAINT execution_resources_pkey PRIMARY KEY (id);
 
 
 --
@@ -925,14 +546,6 @@ ALTER TABLE ONLY public.organizations
 
 
 --
--- Name: resources resources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.resources
-    ADD CONSTRAINT resources_pkey PRIMARY KEY (id);
-
-
---
 -- Name: role_metadata role_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -962,62 +575,6 @@ ALTER TABLE ONLY public.secrets
 
 ALTER TABLE ONLY public.secrets
     ADD CONSTRAINT secrets_pkey PRIMARY KEY (id);
-
-
---
--- Name: stage_event_approvals stage_event_approvals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_event_approvals
-    ADD CONSTRAINT stage_event_approvals_pkey PRIMARY KEY (id);
-
-
---
--- Name: stage_event_approvals stage_event_approvals_stage_event_id_approved_by_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_event_approvals
-    ADD CONSTRAINT stage_event_approvals_stage_event_id_approved_by_key UNIQUE (stage_event_id, approved_by);
-
-
---
--- Name: stage_events stage_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_events
-    ADD CONSTRAINT stage_events_pkey PRIMARY KEY (id);
-
-
---
--- Name: stage_executions stage_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_executions
-    ADD CONSTRAINT stage_executions_pkey PRIMARY KEY (id);
-
-
---
--- Name: stages stages_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stages
-    ADD CONSTRAINT stages_canvas_id_name_key UNIQUE (canvas_id, name);
-
-
---
--- Name: stages stages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stages
-    ADD CONSTRAINT stages_pkey PRIMARY KEY (id);
-
-
---
--- Name: canvases unique_canvas_in_organization; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvases
-    ADD CONSTRAINT unique_canvas_in_organization UNIQUE (organization_id, name);
 
 
 --
@@ -1139,38 +696,10 @@ CREATE INDEX idx_account_providers_provider ON public.account_providers USING bt
 
 
 --
--- Name: idx_alerts_canvas_acknowledged; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_alerts_canvas_acknowledged ON public.alerts USING btree (canvas_id, acknowledged);
-
-
---
--- Name: idx_alerts_canvas_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_alerts_canvas_id ON public.alerts USING btree (canvas_id);
-
-
---
--- Name: idx_alerts_created_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_alerts_created_at ON public.alerts USING btree (created_at DESC);
-
-
---
 -- Name: idx_blueprints_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (organization_id);
-
-
---
--- Name: idx_canvases_deleted_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at);
 
 
 --
@@ -1209,41 +738,6 @@ CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 
 
 --
--- Name: idx_connection_groups_deleted_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_connection_groups_deleted_at ON public.connection_groups USING btree (deleted_at);
-
-
---
--- Name: idx_event_rejections_event_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_event_rejections_event_id ON public.event_rejections USING btree (event_id);
-
-
---
--- Name: idx_event_rejections_target; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_event_rejections_target ON public.event_rejections USING btree (target_type, target_id);
-
-
---
--- Name: idx_event_sources_deleted_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_event_sources_deleted_at ON public.event_sources USING btree (deleted_at);
-
-
---
--- Name: idx_event_sources_next_trigger_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_event_sources_next_trigger_at ON public.event_sources USING btree (next_trigger_at);
-
-
---
 -- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1272,38 +766,24 @@ CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_
 
 
 --
--- Name: idx_stage_events_stage_id_state_created_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_stage_events_stage_id_state_created_at ON public.stage_events USING btree (stage_id, state, created_at);
-
-
---
--- Name: idx_stage_executions_id_stage_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_stage_executions_id_stage_id ON public.stage_executions USING btree (id, stage_id);
-
-
---
--- Name: idx_stage_executions_stage_id_state_created_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_stage_executions_stage_id_state_created_at ON public.stage_executions USING btree (stage_id, state, created_at DESC);
-
-
---
--- Name: idx_stages_deleted_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_stages_deleted_at ON public.stages USING btree (deleted_at);
-
-
---
 -- Name: idx_webhooks_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at);
+
+
+--
+-- Name: idx_workflow_events_execution_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_execution_id ON public.workflow_events USING btree (execution_id);
+
+
+--
+-- Name: idx_workflow_events_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_state ON public.workflow_events USING btree (state);
 
 
 --
@@ -1328,10 +808,73 @@ CREATE INDEX idx_workflow_node_execution_kvs_workflow_node_key_value ON public.w
 
 
 --
+-- Name: idx_workflow_node_executions_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_event_id ON public.workflow_node_executions USING btree (event_id);
+
+
+--
+-- Name: idx_workflow_node_executions_parent_execution_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_parent_execution_id ON public.workflow_node_executions USING btree (parent_execution_id);
+
+
+--
+-- Name: idx_workflow_node_executions_parent_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_parent_state ON public.workflow_node_executions USING btree (parent_execution_id, state);
+
+
+--
+-- Name: idx_workflow_node_executions_previous_execution_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_previous_execution_id ON public.workflow_node_executions USING btree (previous_execution_id);
+
+
+--
+-- Name: idx_workflow_node_executions_root_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_root_event_id ON public.workflow_node_executions USING btree (root_event_id);
+
+
+--
+-- Name: idx_workflow_node_executions_state_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_state_created_at ON public.workflow_node_executions USING btree (state, created_at DESC);
+
+
+--
 -- Name: idx_workflow_node_executions_workflow_node_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_workflow_node_executions_workflow_node_id ON public.workflow_node_executions USING btree (workflow_id, node_id);
+
+
+--
+-- Name: idx_workflow_node_queue_items_root_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_queue_items_root_event_id ON public.workflow_node_queue_items USING btree (root_event_id);
+
+
+--
+-- Name: idx_workflow_node_requests_execution_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_requests_execution_id ON public.workflow_node_requests USING btree (execution_id);
+
+
+--
+-- Name: idx_workflow_nodes_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_nodes_deleted_at ON public.workflow_nodes USING btree (deleted_at);
 
 
 --
@@ -1349,73 +892,17 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 
 
 --
+-- Name: idx_workflows_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflows_deleted_at ON public.workflows USING btree (deleted_at);
+
+
+--
 -- Name: idx_workflows_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (organization_id);
-
-
---
--- Name: uix_event_sources_canvas; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX uix_event_sources_canvas ON public.event_sources USING btree (canvas_id);
-
-
---
--- Name: uix_events_canvas; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX uix_events_canvas ON public.events USING btree (canvas_id);
-
-
---
--- Name: uix_events_source; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX uix_events_source ON public.events USING btree (source_id);
-
-
---
--- Name: uix_stage_event_approvals_events; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX uix_stage_event_approvals_events ON public.stage_event_approvals USING btree (stage_event_id);
-
-
---
--- Name: uix_stage_events_source; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX uix_stage_events_source ON public.stage_events USING btree (source_id);
-
-
---
--- Name: uix_stage_events_stage; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX uix_stage_events_stage ON public.stage_events USING btree (stage_id);
-
-
---
--- Name: uix_stage_executions_events; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX uix_stage_executions_events ON public.stage_executions USING btree (stage_event_id);
-
-
---
--- Name: uix_stage_executions_stage; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX uix_stage_executions_stage ON public.stage_executions USING btree (stage_id);
-
-
---
--- Name: uix_stages_canvas; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX uix_stages_canvas ON public.stages USING btree (canvas_id);
 
 
 --
@@ -1435,83 +922,11 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
--- Name: canvases canvases_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvases
-    ADD CONSTRAINT canvases_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
-
-
---
--- Name: connection_group_field_set_events connection_group_field_set_events_connection_group_set_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connection_group_field_set_events
-    ADD CONSTRAINT connection_group_field_set_events_connection_group_set_id_fkey FOREIGN KEY (connection_group_set_id) REFERENCES public.connection_group_field_sets(id);
-
-
---
--- Name: connection_group_field_sets connection_group_field_sets_connection_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connection_group_field_sets
-    ADD CONSTRAINT connection_group_field_sets_connection_group_id_fkey FOREIGN KEY (connection_group_id) REFERENCES public.connection_groups(id);
-
-
---
--- Name: connection_groups connection_groups_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connection_groups
-    ADD CONSTRAINT connection_groups_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
-
-
---
--- Name: event_rejections event_rejections_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.event_rejections
-    ADD CONSTRAINT event_rejections_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id);
-
-
---
--- Name: event_sources event_sources_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.event_sources
-    ADD CONSTRAINT event_sources_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
-
-
---
--- Name: event_sources event_sources_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.event_sources
-    ADD CONSTRAINT event_sources_resource_id_fkey FOREIGN KEY (resource_id) REFERENCES public.resources(id);
-
-
---
--- Name: execution_resources execution_resources_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.execution_resources
-    ADD CONSTRAINT execution_resources_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.stage_executions(id);
-
-
---
--- Name: execution_resources execution_resources_parent_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.execution_resources
-    ADD CONSTRAINT execution_resources_parent_resource_id_fkey FOREIGN KEY (parent_resource_id) REFERENCES public.resources(id);
-
-
---
 -- Name: workflow_node_execution_kvs fk_wnek_workflow; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_node_execution_kvs
-    ADD CONSTRAINT fk_wnek_workflow FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+    ADD CONSTRAINT fk_wnek_workflow FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
 
 
 --
@@ -1519,7 +934,39 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 --
 
 ALTER TABLE ONLY public.workflow_node_execution_kvs
-    ADD CONSTRAINT fk_wnek_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+    ADD CONSTRAINT fk_wnek_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
+
+
+--
+-- Name: workflow_events fk_workflow_events_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_events
+    ADD CONSTRAINT fk_workflow_events_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
+
+
+--
+-- Name: workflow_node_executions fk_workflow_node_executions_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_executions
+    ADD CONSTRAINT fk_workflow_node_executions_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
+
+
+--
+-- Name: workflow_node_queue_items fk_workflow_node_queue_items_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_queue_items
+    ADD CONSTRAINT fk_workflow_node_queue_items_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
+
+
+--
+-- Name: workflow_node_requests fk_workflow_node_requests_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_requests
+    ADD CONSTRAINT fk_workflow_node_requests_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
 
 
 --
@@ -1536,70 +983,6 @@ ALTER TABLE ONLY public.workflow_nodes
 
 ALTER TABLE ONLY public.organization_invitations
     ADD CONSTRAINT organization_invitations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
-
-
---
--- Name: resources resources_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.resources
-    ADD CONSTRAINT resources_integration_id_fkey FOREIGN KEY (integration_id) REFERENCES public.integrations(id);
-
-
---
--- Name: connections stage_connections_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connections
-    ADD CONSTRAINT stage_connections_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
-
-
---
--- Name: stage_event_approvals stage_event_approvals_stage_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_event_approvals
-    ADD CONSTRAINT stage_event_approvals_stage_event_id_fkey FOREIGN KEY (stage_event_id) REFERENCES public.stage_events(id) ON DELETE CASCADE;
-
-
---
--- Name: stage_events stage_events_stage_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_events
-    ADD CONSTRAINT stage_events_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.stages(id);
-
-
---
--- Name: stage_executions stage_executions_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_executions
-    ADD CONSTRAINT stage_executions_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
-
-
---
--- Name: stage_executions stage_executions_stage_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_executions
-    ADD CONSTRAINT stage_executions_stage_event_id_fkey FOREIGN KEY (stage_event_id) REFERENCES public.stage_events(id);
-
-
---
--- Name: stage_executions stage_executions_stage_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_executions
-    ADD CONSTRAINT stage_executions_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.stages(id);
-
-
---
--- Name: stages stages_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stages
-    ADD CONSTRAINT stages_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
 
 
 --
@@ -1627,11 +1010,19 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_events workflow_events_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_events
+    ADD CONSTRAINT workflow_events_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_events workflow_events_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_events
-    ADD CONSTRAINT workflow_events_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_events_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
 
 
 --
@@ -1643,27 +1034,11 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 
 
 --
--- Name: workflow_node_requests workflow_node_execution_requests_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_node_requests
-    ADD CONSTRAINT workflow_node_execution_requests_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
-
-
---
--- Name: workflow_node_requests workflow_node_execution_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_node_requests
-    ADD CONSTRAINT workflow_node_execution_requests_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
-
-
---
 -- Name: workflow_node_executions workflow_node_executions_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_executions_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE SET NULL;
 
 
 --
@@ -1679,7 +1054,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_previous_execution_id_fkey FOREIGN KEY (previous_execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_executions_previous_execution_id_fkey FOREIGN KEY (previous_execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE SET NULL;
 
 
 --
@@ -1687,7 +1062,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_executions_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE SET NULL;
 
 
 --
@@ -1695,7 +1070,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_executions_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
 
 
 --
@@ -1703,7 +1078,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
-    ADD CONSTRAINT workflow_node_queue_items_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_queue_items_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE SET NULL;
 
 
 --
@@ -1711,7 +1086,7 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
-    ADD CONSTRAINT workflow_node_queue_items_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_queue_items_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE SET NULL;
 
 
 --
@@ -1719,7 +1094,23 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
-    ADD CONSTRAINT workflow_node_queue_items_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_queue_items_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
+
+
+--
+-- Name: workflow_node_requests workflow_node_requests_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_requests
+    ADD CONSTRAINT workflow_node_requests_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_requests workflow_node_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_requests
+    ADD CONSTRAINT workflow_node_requests_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
 
 
 --
@@ -1727,7 +1118,7 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 --
 
 ALTER TABLE ONLY public.workflow_nodes
-    ADD CONSTRAINT workflow_nodes_webhook_id_fkey FOREIGN KEY (webhook_id) REFERENCES public.webhooks(id);
+    ADD CONSTRAINT workflow_nodes_webhook_id_fkey FOREIGN KEY (webhook_id) REFERENCES public.webhooks(id) ON DELETE SET NULL;
 
 
 --
@@ -1735,7 +1126,7 @@ ALTER TABLE ONLY public.workflow_nodes
 --
 
 ALTER TABLE ONLY public.workflow_nodes
-    ADD CONSTRAINT workflow_nodes_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_nodes_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
 
 
 --
@@ -1751,7 +1142,7 @@ ALTER TABLE ONLY public.workflow_nodes
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg22.04+1)
+-- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1770,7 +1161,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251111014202	f
+20251208205307	f
 \.
 
 

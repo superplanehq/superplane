@@ -62,11 +62,6 @@ func (s *OrganizationService) RemoveInvitation(ctx context.Context, req *pb.Remo
 	return organizations.RemoveInvitation(ctx, s.authorizationService, orgID, req.InvitationId)
 }
 
-func (s *OrganizationService) UpdateInvitation(ctx context.Context, req *pb.UpdateInvitationRequest) (*pb.UpdateInvitationResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.UpdateInvitation(ctx, s.authorizationService, orgID, req.InvitationId, req.CanvasIds)
-}
-
 func (s *OrganizationService) ListApplications(ctx context.Context, req *pb.ListApplicationsRequest) (*pb.ListApplicationsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.ListApplications(ctx, orgID)

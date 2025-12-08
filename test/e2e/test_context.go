@@ -11,6 +11,7 @@ import (
 
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/superplanehq/superplane/pkg/server"
+	"github.com/superplanehq/superplane/test/e2e/session"
 )
 
 type TestContext struct {
@@ -31,11 +32,12 @@ func (s *TestContext) Start() {
 	os.Setenv("DB_NAME", "superplane_test")
 	os.Setenv("START_PUBLIC_API", "yes")
 	os.Setenv("START_INTERNAL_API", "yes")
+	os.Setenv("INTERNAL_API_PORT", "50052")
 	os.Setenv("PUBLIC_API_BASE_PATH", "/api/v1")
 	os.Setenv("START_WEB_SERVER", "yes")
 	os.Setenv("WEB_BASE_PATH", "")
 	os.Setenv("START_GRPC_GATEWAY", "yes")
-	os.Setenv("CASBIN_AUTO_RELOAD", "yes")
+	os.Setenv("GRPC_SERVER_ADDR", "127.0.0.1:50052")
 	os.Setenv("START_EVENT_DISTRIBUTER", "yes")
 	os.Setenv("START_CONSUMERS", "yes")
 	os.Setenv("START_WORKFLOW_EVENT_ROUTER", "yes")
@@ -74,7 +76,12 @@ func (s *TestContext) launchBrowser() {
 		panic("browser launch: " + err.Error())
 	}
 
-	c, err := b.NewContext()
+	c, err := b.NewContext(pw.BrowserNewContextOptions{
+		Viewport: &pw.Size{
+			Width:  2560,
+			Height: 1440,
+		},
+	})
 	if err != nil {
 		panic("browser context: " + err.Error())
 	}
@@ -127,70 +134,69 @@ func (s *TestContext) startVite() {
 	}
 }
 
-func (s *TestContext) setUpNavigationLogger() {
-	if err := s.context.AddInitScript(pw.Script{Content: pw.String(`
-        (() => {
-          try {
-            let last = location.href;
-            const notify = () => {
-              const href = location.href;
-              if (href !== last) {
-                last = href;
-                if (window._spNav) {
-                  window._spNav(href);
-                }
-              }
-            };
-            const push = history.pushState;
-            const replace = history.replaceState;
-            history.pushState = function(...args){ const r = push.apply(this, args); notify(); return r; };
-            history.replaceState = function(...args){ const r = replace.apply(this, args); notify(); return r; };
-            window.addEventListener('popstate', notify);
-            window.addEventListener('hashchange', notify);
-            // Initial report
-            if (window._spNav) { window._spNav(location.href); }
-          } catch (_) { /* ignore */ }
-        })();
-    `)}); err != nil {
+const initScript = `
+	(() => {
+		try {
+			let last = location.href;
+			const notify = () => {
+				const href = location.href;
+				if (href !== last) {
+					last = href;
+				if (window._spNav) {
+					window._spNav(href);
+				}
+			}
+		};
+			const push = history.pushState;
+			const replace = history.replaceState;
+			history.pushState = function(...args){ const r = push.apply(this, args); notify(); return r; };
+			history.replaceState = function(...args){ const r = replace.apply(this, args); notify(); return r; };
+			window.addEventListener('popstate', notify);
+			window.addEventListener('hashchange', notify);
 
+			// Auto-accept all confirm dialogs in tests
+			try {
+				const originalConfirm = window.confirm;
+				window.confirm = function(message) {
+					return true;
+				};
+				window._spOriginalConfirm = originalConfirm;
+			} catch (_) {
+				// ignore
+			}
+
+			// Initial report
+			if (window._spNav) { window._spNav(location.href); }
+		} catch (_) { /* ignore */ }
+	})();
+`
+
+func (s *TestContext) setUpNavigationLogger() {
+	if err := s.context.AddInitScript(pw.Script{Content: pw.String(initScript)}); err != nil {
 		panic("init script: " + err.Error())
 	}
 }
 
-func (s *TestContext) NewSession(t *testing.T) *TestSession {
+func (s *TestContext) NewSession(t *testing.T) *session.TestSession {
 	p, err := s.context.NewPage()
 	if err != nil {
 		t.Fatalf("page: %v", err)
 	}
 
-	sess := &TestSession{
-		t:         t,
-		context:   s.context,
-		page:      p,
-		timeoutMs: s.timeoutMs,
-		baseURL:   s.baseURL,
-	}
-
-	// Expose SPA navigation logger and page-level hooks
-	if err := p.ExposeFunction("_spNav", func(args ...interface{}) interface{} {
-		if len(args) > 0 {
-			if url, ok := args[0].(string); ok {
-				t.Logf("[Browser Logs] Navigated to %s", url)
-			}
-		}
-		return nil
-	}); err != nil {
-		t.Fatalf("expose function: %v", err)
-	}
-
-	p.OnFrameNavigated(func(f pw.Frame) {
-		if f.ParentFrame() == nil {
-			t.Logf("[Browser Logs] Navigated to %s", f.URL())
-		}
-	})
+	sess := session.NewTestSession(t, s.context, p, s.timeoutMs, s.baseURL)
 
 	p.OnConsole(func(m pw.ConsoleMessage) {
-		t.Logf("[console.%s] %s", m.Type(), m.Text())
+		text := m.Text()
+
+		// Ignore noisy dev-time logs from Vite and React DevTools suggestions
+		if strings.Contains(text, "[vite] connecting") ||
+			strings.Contains(text, "[vite] connected") ||
+			strings.Contains(text, "React DevTools") ||
+			strings.Contains(text, "Download the React DevTools") {
+			return
+		}
+
+		t.Logf("[console.%s] %s", m.Type(), text)
 	})
 
 	p.OnPageError(func(err error) {
@@ -207,6 +213,7 @@ func (s *TestContext) NewSession(t *testing.T) *TestSession {
 		}
 		t.Logf("[Browser Logs] %s (request failed)", r.URL())
 	})
+
 	p.OnResponse(func(resp pw.Response) {
 		if status := resp.Status(); status >= 400 {
 			t.Logf("[Browser Logs] %d %s", status, resp.URL())

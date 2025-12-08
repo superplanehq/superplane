@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { showErrorToast } from "../../utils/toast";
-import { Button } from "../Button/button";
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../Dialog/dialog";
 import { Field, Label } from "../Fieldset/fieldset";
+import { Icon } from "../Icon";
 import { Input } from "../Input/input";
-import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
 import { Textarea } from "../Textarea/textarea";
+import { Button } from "../ui/button";
 
 interface CreateCustomComponentModalProps {
   isOpen: boolean;
@@ -78,7 +78,7 @@ export function CreateCustomComponentModal({
         Create a custom component that can be reused across your canvases and automations.
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
-        <MaterialSymbol name="close" size="sm" />
+        <Icon name="close" size="sm" />
       </button>
 
       <DialogBody>
@@ -134,7 +134,6 @@ export function CreateCustomComponentModal({
 
       <DialogActions>
         <Button
-          color="blue"
           onClick={handleSubmit}
           disabled={!blueprintName.trim() || isLoading || !!nameError}
           className="flex items-center gap-2"

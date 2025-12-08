@@ -1,7 +1,7 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./App.css";
@@ -10,14 +10,13 @@ import "./App.css";
 import AuthGuard from "./components/AuthGuard";
 import Navigation from "./components/Navigation";
 import { AccountProvider } from "./contexts/AccountContext";
-import { useDarkMode } from "./hooks/useDarkMode";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import { CustomComponent } from "./pages/custom-component";
 import HomePage from "./pages/home";
+import NodeRunPage from "./pages/node-run";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
-import NodeRunPage from "./pages/node-run";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -46,9 +45,6 @@ const withAuthOnly = (Component: React.ComponentType) => (
 
 // Main App component with router
 function App() {
-  // Initialize dark mode handling
-  useDarkMode();
-
   return (
     <QueryClientProvider client={queryClient}>
       <AccountProvider>
@@ -64,10 +60,10 @@ function App() {
                 element={withAuthOnly(NodeRunPage)}
               />
               <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
-
               {/* Organization selection and creation */}
               <Route path="create" element={<OrganizationCreate />} />
               <Route path="" element={<OrganizationSelect />} />
+              <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </BrowserRouter>
         </TooltipProvider>

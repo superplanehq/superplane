@@ -169,7 +169,7 @@ func (r *Registry) getAuthFn(ctx context.Context, tx *gorm.DB, integration *mode
 	switch integration.AuthType {
 	case models.IntegrationAuthTypeToken:
 		secretInfo := integration.Auth.Data().Token.ValueFrom.Secret
-		provider, err := r.secretProvider(tx, secretInfo, integration)
+		provider, err := secrets.NewProvider(tx, r.Encryptor, secretInfo.Name, integration.DomainType, integration.DomainID)
 		if err != nil {
 			return nil, fmt.Errorf("error creating secret provider: %v", err)
 		}
@@ -190,34 +190,6 @@ func (r *Registry) getAuthFn(ctx context.Context, tx *gorm.DB, integration *mode
 	}
 
 	return nil, fmt.Errorf("integration auth type %s not supported", integration.AuthType)
-}
-
-func (r *Registry) secretProvider(tx *gorm.DB, secretDef *models.ValueDefinitionFromSecret, integration *models.Integration) (secrets.Provider, error) {
-	//
-	// If the integration is scoped to an organization, the secret must also be scoped there.
-	//
-	if integration.DomainType == models.DomainTypeOrganization {
-		return secrets.NewProvider(tx, r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
-	}
-
-	//
-	// Here, we know the integration is on the canvas level.
-	// If the secret is also on the canvas level, we use the same domain type and ID.
-	//
-	if secretDef.DomainType == models.DomainTypeCanvas {
-		return secrets.NewProvider(tx, r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
-	}
-
-	//
-	// Otherwise, the integration is on the canvas level, but the secret is on the organization level,
-	// so we need to get the organization ID for the canvas where the integration is.
-	//
-	canvas, err := models.FindUnscopedCanvasByID(integration.DomainID.String())
-	if err != nil {
-		return nil, fmt.Errorf("error finding canvas %s: %v", integration.DomainID, err)
-	}
-
-	return secrets.NewProvider(tx, r.Encryptor, secretDef.Name, secretDef.DomainType, canvas.OrganizationID)
 }
 
 func (r *Registry) ListTriggers() []triggers.Trigger {

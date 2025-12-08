@@ -33,7 +33,7 @@ func Test__DeleteWorkflow(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 	})
 
-	t.Run("workflow is deleted along with nodes, events, and executions", func(t *testing.T) {
+	t.Run("workflow is soft deleted, data remains until cleanup", func(t *testing.T) {
 		//
 		// Create a workflow with nodes, events, and executions
 		//
@@ -78,25 +78,38 @@ func Test__DeleteWorkflow(t *testing.T) {
 		support.VerifyWorkflowNodeQueueCount(t, workflow.ID, 1)
 
 		//
-		// Delete the workflow.
+		// Delete the workflow (soft delete).
 		//
 		_, err = DeleteWorkflow(context.Background(), r.Registry, r.Organization.ID, workflow.ID.String())
 		require.NoError(t, err)
 
 		//
-		// Verify workflow and all associated data is deleted.
+		// Verify workflow is soft deleted but associated data still exists.
+		// The workflow should not be found via regular queries (soft delete).
 		//
 		_, err = models.FindWorkflow(r.Organization.ID, workflow.ID)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+		// But the workflow should still exist when queried with Unscoped
+		var workflowUnscoped models.Workflow
+		err = database.Conn().Unscoped().Where("id = ?", workflow.ID).First(&workflowUnscoped).Error
+		require.NoError(t, err)
+		assert.NotNil(t, workflowUnscoped.DeletedAt)
+
+		// Verify the name has been updated with deleted timestamp suffix
+		assert.Contains(t, workflowUnscoped.Name, "(deleted-")
+		assert.NotEqual(t, workflow.Name, workflowUnscoped.Name)
+
+		// Associated data should still exist (cleanup worker handles this)
 		nodes, err = models.FindWorkflowNodes(workflow.ID)
 		require.NoError(t, err)
-		assert.Len(t, nodes, 0)
-		support.VerifyWorkflowEventsCount(t, workflow.ID, 0)
-		support.VerifyWorkflowNodeExecutionsCount(t, workflow.ID, 0)
-		support.VerifyWorkflowNodeQueueCount(t, workflow.ID, 0)
+		assert.Len(t, nodes, 2)
+		support.VerifyWorkflowEventsCount(t, workflow.ID, 2)
+		support.VerifyWorkflowNodeExecutionsCount(t, workflow.ID, 1)
+		support.VerifyWorkflowNodeQueueCount(t, workflow.ID, 1)
 	})
 
-	t.Run("workflow node webhook is deleted", func(t *testing.T) {
+	t.Run("workflow node webhook remains until cleanup worker processes it", func(t *testing.T) {
 		//
 		// Create webhook
 		//
@@ -130,11 +143,20 @@ func Test__DeleteWorkflow(t *testing.T) {
 		)
 
 		//
-		// Delete the workflow, and verify webhook is deleted too.
+		// Delete the workflow (soft delete).
 		//
 		_, err := DeleteWorkflow(context.Background(), r.Registry, r.Organization.ID, workflow.ID.String())
 		require.NoError(t, err)
-		_, err = models.FindWebhook(webhookID)
+
+		//
+		// Verify workflow is soft deleted but webhook still exists.
+		// The cleanup worker will handle webhook deletion later.
+		//
+		_, err = models.FindWorkflow(r.Organization.ID, workflow.ID)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+		// Webhook should still exist since cleanup worker hasn't run
+		_, err = models.FindWebhook(webhookID)
+		require.NoError(t, err)
 	})
 }

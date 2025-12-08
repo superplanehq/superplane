@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/public"
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/services"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers"
 
 	// Import integrations, components and triggers to register them via init()
@@ -34,7 +35,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 )
 
-func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) {
+func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, authService authorization.Authorization) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -44,17 +45,17 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
 		log.Println("Starting Invitation Email Consumer")
-		sendGridAPIKey := os.Getenv("SENDGRID_API_KEY")
+		resendAPIKey := os.Getenv("RESEND_API_KEY")
 		fromName := os.Getenv("EMAIL_FROM_NAME")
 		fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
 		templateDir := os.Getenv("TEMPLATE_DIR")
 
-		if sendGridAPIKey != "" && fromName != "" && fromEmail != "" && templateDir != "" {
-			emailService := services.NewSendGridEmailService(sendGridAPIKey, fromName, fromEmail, templateDir)
+		if resendAPIKey != "" && fromName != "" && fromEmail != "" && templateDir != "" {
+			emailService := services.NewResendEmailService(resendAPIKey, fromName, fromEmail, templateDir)
 			invitationEmailConsumer := workers.NewInvitationEmailConsumer(rabbitMQURL, emailService, baseURL)
 			go invitationEmailConsumer.Start()
 		} else {
-			log.Warn("Invitation Email Consumer not started - missing required environment variables (SENDGRID_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS, TEMPLATE_DIR)")
+			log.Warn("Invitation Email Consumer not started - missing required environment variables (RESEND_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS, TEMPLATE_DIR)")
 		}
 	}
 
@@ -99,11 +100,18 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		w := workers.NewWebhookCleanupWorker(registry)
 		go w.Start(context.Background())
 	}
+
+	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Workflow Cleanup Worker")
+
+		w := workers.NewWorkflowCleanupWorker()
+		go w.Start(context.Background())
+	}
 }
 
 func startInternalAPI(baseURL string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(baseURL, encryptor, authService, registry, 50051)
+	grpc.RunServer(baseURL, encryptor, authService, registry, lookupInternalAPIPort())
 }
 
 func startPublicAPI(baseURL string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
@@ -177,11 +185,55 @@ func lookupPublicAPIPort() int {
 	return port
 }
 
+func lookupInternalAPIPort() int {
+	port := 50051
+
+	if p := os.Getenv("INTERNAL_API_PORT"); p != "" {
+		if v, errConv := strconv.Atoi(p); errConv == nil && v > 0 {
+			port = v
+		} else {
+			log.Warnf("Invalid INTERNAL_API_PORT %q, falling back to 50051", p)
+		}
+	}
+
+	return port
+}
+
+func configureLogging() {
+	appEnv := os.Getenv("APP_ENV")
+
+	if appEnv == "development" || appEnv == "test" {
+		log.SetFormatter(&log.TextFormatter{
+			FullTimestamp:   false,
+			TimestampFormat: time.Stamp,
+		})
+	} else {
+		log.SetFormatter(&log.TextFormatter{
+			FullTimestamp:   true,
+			TimestampFormat: time.StampMilli,
+		})
+	}
+}
+
+func setupOtelMetrics() {
+	if os.Getenv("OTEL_ENABLED") != "yes" {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := telemetry.InitMetrics(ctx); err != nil {
+		log.Warnf("Failed to initialize OpenTelemetry metrics: %v", err)
+	} else {
+		log.Info("OpenTelemetry metrics initialized")
+	}
+}
+
 func Start() {
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp:   true,
-		TimestampFormat: time.StampMilli,
-	})
+	configureLogging()
+	setupOtelMetrics()
+	telemetry.InitSentry()
 
 	encryptionKey := os.Getenv("ENCRYPTION_KEY")
 	if encryptionKey == "" {
@@ -231,7 +283,7 @@ func Start() {
 		go startInternalAPI(baseURL, encryptorInstance, authService, registry)
 	}
 
-	startWorkers(jwtSigner, encryptorInstance, registry, baseURL)
+	startWorkers(jwtSigner, encryptorInstance, registry, baseURL, authService)
 
 	log.Println("Superplane is UP.")
 

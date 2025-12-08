@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Text } from "../Text/text";
-import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
 import { Avatar } from "../Avatar/avatar";
+import { Icon } from "../Icon";
 import { MultiCombobox, MultiComboboxLabel } from "../MultiCombobox/multi-combobox";
-import { Button } from "../Button/button";
+import { Text } from "../Text/text";
+import { Button } from "../ui/button";
 
 interface User {
   id: string;
@@ -121,7 +121,7 @@ export function AddMembersSection({
                     </span>
                   ) : (
                     <div className="flex items-center justify-center size-8 bg-zinc-100 dark:bg-zinc-800 rounded-full">
-                      <MaterialSymbol name="mail" size="md" className="text-zinc-600 dark:text-zinc-400" />
+                      <Icon name="mail" size="md" className="text-zinc-600 dark:text-zinc-400" />
                     </div>
                   )
                 ) : (
@@ -154,8 +154,8 @@ export function AddMembersSection({
             );
           }}
         </MultiCombobox>
-        <Button type="submit" disabled={selectedUsers.length === 0 || isLoading || disabled} color="blue">
-          <MaterialSymbol name="add" size="sm" />
+        <Button type="submit" disabled={selectedUsers.length === 0 || isLoading || disabled}>
+          <Icon name="add" size="sm" />
           {isLoading ? "Adding..." : "Add"}
         </Button>
       </form>

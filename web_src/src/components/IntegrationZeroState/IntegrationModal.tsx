@@ -1,19 +1,19 @@
+import type { IntegrationsIntegration } from "@/api-client/types.gen";
+import { AuthorizationDomainType } from "@/api-client/types.gen";
+import { useCreateIntegration, useIntegrations, useUpdateIntegration } from "@/hooks/useIntegrations";
+import { useCreateSecret, useSecrets, useUpdateSecret } from "@/hooks/useSecrets";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useState, useEffect, useRef } from "react";
-import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from "../Dialog/dialog";
-import { Button } from "../Button/button";
-import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
-import { Link } from "../Link/link";
-import { useIntegrations, useCreateIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
-import { useSecrets, useCreateSecret } from "@/hooks/useSecrets";
+import { Dialog, DialogActions, DialogBody, DialogTitle } from "../Dialog/dialog";
+import { Icon } from "../Icon";
 import {
-  GitHubIntegrationForm,
-  SemaphoreIntegrationForm,
   ApiTokenForm,
+  GitHubIntegrationForm,
   NEW_SECRET_NAME,
+  SemaphoreIntegrationForm,
   useIntegrationForm,
 } from "../IntegrationForm";
-import type { IntegrationsIntegration } from "@/api-client/types.gen";
+import { Button } from "../ui/button";
 
 interface IntegrationModalProps {
   open: boolean;
@@ -22,7 +22,7 @@ interface IntegrationModalProps {
   canvasId: string;
   organizationId: string;
   onSuccess?: (integrationId: string) => void;
-  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION";
+  domainType?: AuthorizationDomainType;
   editingIntegration?: IntegrationsIntegration;
 }
 
@@ -33,7 +33,7 @@ export function IntegrationModal({
   canvasId,
   organizationId: organizationId,
   onSuccess,
-  domainType = "DOMAIN_TYPE_CANVAS",
+  domainType = "DOMAIN_TYPE_ORGANIZATION",
   editingIntegration,
 }: IntegrationModalProps) {
   const [isCreating, setIsCreating] = useState(false);
@@ -48,14 +48,17 @@ export function IntegrationModal({
     editingIntegration?.metadata?.id || "",
   );
   const createSecretMutation = useCreateSecret(organizationId, domainType);
+  const updateSecretMutation = useUpdateSecret(
+    organizationId,
+    domainType,
+    editingIntegration?.spec?.auth?.token?.valueFrom?.secret?.name || "",
+  );
 
   const {
     integrationData,
     setIntegrationData,
-    apiTokenTab,
-    setApiTokenTab,
-    newSecretToken,
-    setNewSecretToken,
+    secretValue,
+    setSecretValue,
     errors,
     setErrors,
     validateForm,
@@ -75,16 +78,8 @@ export function IntegrationModal({
   useEffect(() => {
     if (!open) {
       resetForm();
-      setErrors({});
     }
-  }, [open, resetForm, setErrors]);
-
-  // Reset form when modal is opened for creating new integration
-  useEffect(() => {
-    if (open && !editingIntegration) {
-      resetForm();
-    }
-  }, [open, editingIntegration, resetForm]);
+  }, [open, resetForm]);
 
   const handleSaveIntegration = async () => {
     if (!validateForm()) {
@@ -98,9 +93,12 @@ export function IntegrationModal({
       let secretName = integrationData.apiToken.secretName;
       let secretKey = integrationData.apiToken.secretKey;
 
-      if (apiTokenTab === "new") {
-        try {
-          let newSecretName = `${integrationData.name.trim()}-api-key`;
+      // Always create or update secret with the provided value
+      try {
+        let newSecretName = `${integrationData.name.trim()}-api-key`;
+
+        // For creating new integration, check for conflicts
+        if (!isEditing) {
           const conflictingSecretsCount = secrets.reduce((acc, secret) => {
             if (secret.metadata?.name === newSecretName) {
               return acc + 1;
@@ -111,24 +109,33 @@ export function IntegrationModal({
           if (conflictingSecretsCount > 0) {
             newSecretName = `${newSecretName}-${conflictingSecretsCount + 1}`;
           }
-
-          const secretData = {
-            name: newSecretName,
-            environmentVariables: [
-              {
-                name: NEW_SECRET_NAME,
-                value: newSecretToken,
-              },
-            ],
-          };
-
-          await createSecretMutation.mutateAsync(secretData);
-          secretName = secretData.name;
-          secretKey = NEW_SECRET_NAME;
-        } catch {
-          setErrors({ apiToken: "Failed to create a secret, please try to create secret manually and import" });
-          return;
+        } else {
+          // For editing, use the existing secret name
+          newSecretName = integrationData.apiToken.secretName;
         }
+
+        const secretData = {
+          name: newSecretName,
+          environmentVariables: [
+            {
+              name: NEW_SECRET_NAME,
+              value: secretValue,
+            },
+          ],
+        };
+
+        // Use update mutation for editing, create mutation for new integrations
+        if (isEditing) {
+          await updateSecretMutation.mutateAsync(secretData);
+        } else {
+          await createSecretMutation.mutateAsync(secretData);
+        }
+
+        secretName = secretData.name;
+        secretKey = NEW_SECRET_NAME;
+      } catch {
+        setErrors({ secretValue: "Failed to create/update secret" });
+        return;
       }
 
       let trimmedUrl = integrationData.orgUrl.trim();
@@ -169,28 +176,10 @@ export function IntegrationModal({
   if (!open) return null;
 
   return createPortal(
-    <Dialog open={open} onClose={() => {}} className="relative z-50" size="md">
+    <Dialog open={open} onClose={() => {}} className="relative z-50" size="xl">
       <DialogTitle>
         {editingIntegration ? "Edit" : "Create"} {config.displayName} Integration
       </DialogTitle>
-      <DialogDescription className="text-sm">
-        {editingIntegration
-          ? "Update your integration settings below."
-          : "New integration will be saved to integrations page."}{" "}
-        Manage integrations{" "}
-        <Link
-          href={
-            domainType === "DOMAIN_TYPE_ORGANIZATION"
-              ? `/${organizationId}/settings/integrations`
-              : `/${organizationId}/canvas/${canvasId}#integrations`
-          }
-          className="text-blue-600 dark:text-blue-400"
-        >
-          {" "}
-          here
-        </Link>
-        .
-      </DialogDescription>
 
       <DialogBody className="space-y-6">
         {integrationType === "github" ? (
@@ -199,11 +188,8 @@ export function IntegrationModal({
             setIntegrationData={setIntegrationData}
             errors={errors}
             setErrors={setErrors}
-            apiTokenTab={apiTokenTab}
-            setApiTokenTab={setApiTokenTab}
-            newSecretToken={newSecretToken}
-            setNewSecretToken={setNewSecretToken}
-            secrets={secrets}
+            secretValue={secretValue}
+            setSecretValue={setSecretValue}
             orgUrlRef={orgUrlRef}
           />
         ) : (
@@ -212,11 +198,8 @@ export function IntegrationModal({
             setIntegrationData={setIntegrationData}
             errors={errors}
             setErrors={setErrors}
-            apiTokenTab={apiTokenTab}
-            setApiTokenTab={setApiTokenTab}
-            newSecretToken={newSecretToken}
-            setNewSecretToken={setNewSecretToken}
-            secrets={secrets}
+            secretValue={secretValue}
+            setSecretValue={setSecretValue}
             orgUrlRef={orgUrlRef}
           />
         )}
@@ -226,25 +209,23 @@ export function IntegrationModal({
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={secrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           orgUrlRef={orgUrlRef}
           organizationId={organizationId}
           canvasId={canvasId}
+          isEditMode={!!editingIntegration}
         />
       </DialogBody>
 
       <DialogActions>
-        <Button onClick={onClose} disabled={isCreating}>
+        <Button onClick={onClose} disabled={isCreating} variant="secondary">
           Cancel
         </Button>
-        <Button color="blue" onClick={handleSaveIntegration} disabled={isCreating}>
+        <Button data-testid="create-integration-button" onClick={handleSaveIntegration} disabled={isCreating}>
           {isCreating ? (
             <>
-              <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
+              <Icon name="progress_activity" className="animate-spin" size="sm" />
               {editingIntegration ? "Updating..." : "Creating..."}
             </>
           ) : editingIntegration ? (

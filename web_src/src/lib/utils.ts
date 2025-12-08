@@ -42,6 +42,19 @@ export const calcRelativeTimeFromDiff = (diff: number) => {
   }
 };
 
+export const formatDuration = (value: number, unit: string): string => {
+  const unitLabels: Record<string, string> = {
+    seconds: value === 1 ? "second" : "seconds",
+    minutes: value === 1 ? "minute" : "minutes",
+    hours: value === 1 ? "hour" : "hours",
+  };
+  return `${value} ${unitLabels[unit] || unit}`;
+};
+
+export const formatTimestamp = (date: Date): string => {
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
+
 export function splitBySpaces(input: string): string[] {
   const regex = /(?:[^\s"']+|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')+/g;
   const matches = input.match(regex);
@@ -115,4 +128,18 @@ export function flattenObject(obj: any, maxDepth: number = 5): Record<string, an
   }
 
   return flatten(obj, maxDepth);
+}
+
+/**
+ * Checks if a string is a valid HTTP or HTTPS URL
+ * @param value - The string to check
+ * @returns true if the string is a valid URL, false otherwise
+ */
+export function isUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }

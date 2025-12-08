@@ -95,19 +95,6 @@ func TestUpdateGroup(t *testing.T) {
 		assert.Len(t, users, 2)
 	})
 
-	t.Run("canvas group update", func(t *testing.T) {
-		require.NoError(t, r.AuthService.CreateGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, "canvas-group", models.RoleCanvasViewer, "Canvas Group", "Canvas Description"))
-
-		groupSpec := &pb.Group_Spec{
-			Role: models.RoleCanvasAdmin,
-		}
-
-		resp, err := UpdateGroup(ctx, models.DomainTypeCanvas, r.Canvas.ID.String(), "canvas-group", groupSpec, r.AuthService)
-		require.NoError(t, err)
-		assert.NotNil(t, resp)
-		assert.Equal(t, models.RoleCanvasAdmin, resp.Group.Spec.Role)
-	})
-
 	t.Run("group not found", func(t *testing.T) {
 		groupSpec := &pb.Group_Spec{
 			Role: models.RoleOrgAdmin,

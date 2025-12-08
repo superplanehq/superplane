@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
 )
 
@@ -31,7 +32,11 @@ func (u *User) Delete() error {
 }
 
 func (u *User) Restore() error {
-	return database.Conn().Unscoped().
+	return u.RestoreInTransaction(database.Conn())
+}
+
+func (u *User) RestoreInTransaction(tx *gorm.DB) error {
+	return tx.Unscoped().
 		Model(u).
 		Update("deleted_at", nil).
 		Error
@@ -51,7 +56,7 @@ func CreateUserInTransaction(tx *gorm.DB, orgID, accountID uuid.UUID, email, nam
 	user := &User{
 		OrganizationID: orgID,
 		AccountID:      accountID,
-		Email:          email,
+		Email:          utils.NormalizeEmail(email),
 		Name:           name,
 	}
 
@@ -110,7 +115,7 @@ func FindActiveUserByEmail(orgID, email string) (*User, error) {
 
 	err := database.Conn().
 		Where("organization_id = ?", orgID).
-		Where("email = ?", email).
+		Where("email = ?", utils.NormalizeEmail(email)).
 		First(&user).
 		Error
 
@@ -122,7 +127,7 @@ func FindMaybeDeletedUserByEmail(orgID, email string) (*User, error) {
 
 	err := database.Conn().Unscoped().
 		Where("organization_id = ?", orgID).
-		Where("email = ?", email).
+		Where("email = ?", utils.NormalizeEmail(email)).
 		First(&user).
 		Error
 
@@ -146,10 +151,21 @@ func FindOrganizationsForAccount(email string) ([]Organization, error) {
 	err := database.Conn().
 		Table("organizations").
 		Joins("JOIN users ON organizations.id = users.organization_id").
-		Where("users.email = ?", email).
+		Where("users.email = ?", utils.NormalizeEmail(email)).
 		Where("users.deleted_at IS NULL").
 		Find(&organizations).
 		Error
 
 	return organizations, err
+}
+
+func FindAnyUserByEmail(email string) (*User, error) {
+	var user User
+
+	err := database.Conn().
+		Where("email = ?", utils.NormalizeEmail(email)).
+		First(&user).
+		Error
+
+	return &user, err
 }

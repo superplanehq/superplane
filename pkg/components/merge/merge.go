@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
@@ -37,6 +38,12 @@ type Spec struct {
 		Value int    `json:"value"`
 		Unit  string `json:"unit"`
 	} `json:"executionTimeout"`
+
+	// Optional expression to short-circuit waiting for all inputs.
+	// The expression is evaluated against the incoming event input using
+	// the Expr language with the input bound to the variable '$'.
+	// If it evaluates to true, the merge finishes immediately.
+	StopIfExpression string `json:"stopIfExpression" mapstructure:"stopIfExpression"`
 }
 
 func (m *Merge) Configuration() []configuration.Field {
@@ -74,6 +81,14 @@ func (m *Merge) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "stopIfExpression",
+			Label:       "Stop if",
+			Type:        configuration.FieldTypeString,
+			Description: "When true, stop waiting and finish immediately.",
+			Placeholder: "e.g. $.result == 'fail'",
+			Required:    false,
+		},
 	}
 }
 
@@ -87,39 +102,71 @@ func (m *Merge) Setup(ctx components.SetupContext) error {
 	return nil
 }
 
-func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	mergeGroup := ctx.RootEventID
 
 	execID, err := m.findOrCreateExecution(ctx, mergeGroup)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := ctx.DequeueItem(); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := ctx.UpdateNodeState(models.WorkflowNodeStateReady); err != nil {
-		return err
+		return nil, err
 	}
 
-	incoming, err := ctx.CountIncomingEdges()
+	incoming, err := ctx.CountDistinctIncomingSources()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	md, err := m.addEventToMetadata(ctx, execID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if len(md.EventIDs) >= incoming {
-		return ctx.FinishExecution(execID, map[string][]any{
+	// Decode config to check for optional stop expression
+	spec := &Spec{}
+	_ = mapstructure.Decode(ctx.Configuration, &spec)
+
+	// If already short-circuited, do not finish again
+	if md.StopEarly {
+		return nil, nil
+	}
+
+	// Evaluate stop expression if provided
+	if spec.StopIfExpression != "" {
+		env := map[string]any{
+			"$": ctx.Input,
+		}
+		vm, err := expr.Compile(spec.StopIfExpression, expr.Env(env), expr.AsBool())
+		if err != nil {
+			return nil, fmt.Errorf("stopIfExpression compilation failed: %w", err)
+		}
+		out, err := expr.Run(vm, env)
+		if err != nil {
+			return nil, fmt.Errorf("stopIfExpression evaluation failed: %w", err)
+		}
+		if b, ok := out.(bool); ok && b {
+			// Mark metadata and fail immediately
+			md.StopEarly = true
+			if err := ctx.SetExecutionMetadata(execID, md); err != nil {
+				return nil, err
+			}
+			return ctx.FailExecution(execID, "stopped", "Stopped by stopIfExpression")
+		}
+	}
+
+	if len(md.Sources) >= incoming {
+		return ctx.PassExecution(execID, map[string][]any{
 			components.DefaultOutputChannel.Name: {md},
 		})
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (m *Merge) findOrCreateExecution(ctx components.ProcessQueueContext, mergeGroup string) (uuid.UUID, error) {
@@ -145,6 +192,7 @@ func (m *Merge) findOrCreateExecution(ctx components.ProcessQueueContext, mergeG
 	md := &ExecutionMetadata{
 		GroupKey: mergeGroup,
 		EventIDs: []string{},
+		Sources:  []string{},
 	}
 
 	err = ctx.SetExecutionMetadata(execID, md)
@@ -169,6 +217,19 @@ func (m *Merge) addEventToMetadata(ctx components.ProcessQueueContext, execID uu
 	}
 
 	md.EventIDs = append(md.EventIDs, ctx.EventID)
+	// Track distinct source nodes that reached this merge
+	if ctx.SourceNodeID != "" {
+		exists := false
+		for _, s := range md.Sources {
+			if s == ctx.SourceNodeID {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			md.Sources = append(md.Sources, ctx.SourceNodeID)
+		}
+	}
 
 	err = ctx.SetExecutionMetadata(execID, md)
 	if err != nil {

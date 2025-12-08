@@ -164,6 +164,18 @@ service Workflows {
     };
   }
 
+  rpc CancelExecution(CancelExecutionRequest) returns (CancelExecutionResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/workflows/{workflow_id}/executions/{execution_id}/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel execution";
+      description: "Cancels a running workflow node execution";
+      tags: "WorkflowNodeExecution";
+    };
+  }
+
   rpc ListWorkflowEvents(ListWorkflowEventsRequest) returns (ListWorkflowEventsResponse) {
     option (google.api.http) = {
       get: "/api/v1/workflows/{workflow_id}/events"
@@ -372,7 +384,8 @@ message WorkflowNodeQueueItem {
   string workflow_id = 2;
   string node_id = 3;
   google.protobuf.Struct input = 4;
-  google.protobuf.Timestamp created_at = 5;
+  WorkflowEvent root_event = 5;
+  google.protobuf.Timestamp created_at = 6;
 }
 
 message InvokeNodeExecutionActionRequest {
@@ -415,32 +428,32 @@ message ListEventExecutionsResponse {
   repeated WorkflowNodeExecution executions = 1;
 }
 
+message CancelExecutionRequest {
+  string workflow_id = 1;
+  string execution_id = 2;
+}
+
+message CancelExecutionResponse {}
+
 //
 // Standalone messages
 //
 
-message EventCreated {
+message WorkflowNodeEventMessage {
   string id = 1;
   string workflow_id = 2;
   string node_id = 3;
   google.protobuf.Timestamp timestamp = 4;
 }
 
-message ExecutionCreated {
+message WorkflowNodeExecutionMessage {
   string id = 1;
   string workflow_id = 2;
   string node_id = 3;
   google.protobuf.Timestamp timestamp = 4;
 }
 
-message ExecutionStarted {
-  string id = 1;
-  string workflow_id = 2;
-  string node_id = 3;
-  google.protobuf.Timestamp timestamp = 4;
-}
-
-message ExecutionFinished {
+message WorkflowNodeQueueItemMessage {
   string id = 1;
   string workflow_id = 2;
   string node_id = 3;

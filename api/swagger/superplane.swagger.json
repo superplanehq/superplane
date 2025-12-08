@@ -14,16 +14,13 @@
       "name": "Organizations"
     },
     {
+      "name": "Applications"
+    },
+    {
       "name": "Secrets"
     },
     {
       "name": "Integrations"
-    },
-    {
-      "name": "Applications"
-    },
-    {
-      "name": "Superplane"
     },
     {
       "name": "Users"
@@ -241,210 +238,6 @@
         ]
       }
     },
-    "/api/v1/canvases": {
-      "get": {
-        "summary": "List canvases",
-        "description": "Returns a list of all canvases",
-        "operationId": "Superplane_ListCanvases",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneListCanvasesResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "tags": [
-          "Canvas"
-        ]
-      },
-      "post": {
-        "summary": "Create a new canvas",
-        "description": "Creates a new canvas with the given name and organization ID",
-        "operationId": "Superplane_CreateCanvas",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneCreateCanvasResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/SuperplaneCreateCanvasRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Canvas"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/users": {
-      "post": {
-        "summary": "Add a user to a canvas",
-        "description": "Add a user to a canvas",
-        "operationId": "Superplane_AddUser",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneAddUserResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/SuperplaneAddUserBody"
-            }
-          }
-        ],
-        "tags": [
-          "Canvas"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/users/{userId}": {
-      "delete": {
-        "summary": "Remove a user from a canvas",
-        "description": "Remove a user from a canvas",
-        "operationId": "Superplane_RemoveUser",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneRemoveUserResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Canvas"
-        ]
-      }
-    },
-    "/api/v1/canvases/{idOrName}": {
-      "delete": {
-        "summary": "Delete a canvas",
-        "description": "Deletes the specified canvas (can be referenced by ID or name)",
-        "operationId": "Superplane_DeleteCanvas",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneDeleteCanvasResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "idOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Canvas"
-        ]
-      }
-    },
-    "/api/v1/canvases/{id}": {
-      "get": {
-        "summary": "Get canvas details",
-        "description": "Returns the details of a specific canvas",
-        "operationId": "Superplane_DescribeCanvas",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneDescribeCanvasResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "name",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Canvas"
-        ]
-      }
-    },
     "/api/v1/components": {
       "get": {
         "summary": "List components",
@@ -560,8 +353,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -642,8 +434,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -690,8 +481,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -778,8 +568,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -900,8 +689,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -982,8 +770,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1070,8 +857,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1417,50 +1203,6 @@
         "tags": [
           "Organization"
         ]
-      },
-      "put": {
-        "summary": "Update an organization invitation",
-        "description": "Updates an organization invitation",
-        "operationId": "Organizations_UpdateInvitation",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/OrganizationsUpdateInvitationResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "invitationId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/OrganizationsUpdateInvitationBody"
-            }
-          }
-        ],
-        "tags": [
-          "Organization"
-        ]
       }
     },
     "/api/v1/organizations/{id}/users/{userId}": {
@@ -1472,7 +1214,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneOrganizationsRemoveUserResponse"
+              "$ref": "#/definitions/OrganizationsRemoveUserResponse"
             }
           },
           "default": {
@@ -1528,8 +1270,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1610,8 +1351,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1658,8 +1398,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1780,8 +1519,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1862,8 +1600,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -1910,8 +1647,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -2048,8 +1784,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -2098,8 +1833,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -2148,8 +1882,7 @@
             "type": "string",
             "enum": [
               "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
+              "DOMAIN_TYPE_ORGANIZATION"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
@@ -2449,6 +2182,52 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/WorkflowsInvokeNodeExecutionActionBody"
+            }
+          }
+        ],
+        "tags": [
+          "WorkflowNodeExecution"
+        ]
+      }
+    },
+    "/api/v1/workflows/{workflowId}/executions/{executionId}/cancel": {
+      "patch": {
+        "summary": "Cancel execution",
+        "description": "Cancels a running workflow node execution",
+        "operationId": "Workflows_CancelExecution",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsCancelExecutionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WorkflowsCancelExecutionBody"
             }
           }
         ],
@@ -2814,7 +2593,7 @@
       "type": "object",
       "properties": {
         "valueFrom": {
-          "$ref": "#/definitions/SuperplaneIntegrationsValueFrom"
+          "$ref": "#/definitions/IntegrationsValueFrom"
         }
       }
     },
@@ -2822,8 +2601,7 @@
       "type": "string",
       "enum": [
         "DOMAIN_TYPE_UNSPECIFIED",
-        "DOMAIN_TYPE_ORGANIZATION",
-        "DOMAIN_TYPE_CANVAS"
+        "DOMAIN_TYPE_ORGANIZATION"
       ],
       "default": "DOMAIN_TYPE_UNSPECIFIED",
       "title": "Enums"
@@ -3175,6 +2953,10 @@
             "type": "object",
             "$ref": "#/definitions/ConfigurationValidationRule"
           }
+        },
+        "placeholder": {
+          "type": "string",
+          "title": "Optional placeholder text for UI inputs"
         }
       }
     },
@@ -3206,6 +2988,9 @@
       "properties": {
         "itemDefinition": {
           "$ref": "#/definitions/ConfigurationListItemDefinition"
+        },
+        "itemLabel": {
+          "type": "string"
         }
       }
     },
@@ -3702,6 +3487,25 @@
         }
       }
     },
+    "IntegrationsValueFrom": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/IntegrationsValueFromSecret"
+        }
+      }
+    },
+    "IntegrationsValueFromSecret": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
+      }
+    },
     "MeRegenerateTokenResponse": {
       "type": "object",
       "properties": {
@@ -3841,12 +3645,6 @@
         "state": {
           "type": "string"
         },
-        "canvasIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
@@ -3898,24 +3696,8 @@
     "OrganizationsRemoveInvitationResponse": {
       "type": "object"
     },
-    "OrganizationsUpdateInvitationBody": {
-      "type": "object",
-      "properties": {
-        "canvasIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "OrganizationsUpdateInvitationResponse": {
-      "type": "object",
-      "properties": {
-        "invitation": {
-          "$ref": "#/definitions/OrganizationsInvitation"
-        }
-      }
+    "OrganizationsRemoveUserResponse": {
+      "type": "object"
     },
     "OrganizationsUpdateOrganizationBody": {
       "type": "object",
@@ -4204,17 +3986,6 @@
         }
       }
     },
-    "SuperplaneAddUserBody": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        }
-      }
-    },
-    "SuperplaneAddUserResponse": {
-      "type": "object"
-    },
     "SuperplaneApplicationsListApplicationsResponse": {
       "type": "object",
       "properties": {
@@ -4252,36 +4023,6 @@
         }
       }
     },
-    "SuperplaneCanvas": {
-      "type": "object",
-      "properties": {
-        "metadata": {
-          "$ref": "#/definitions/SuperplaneCanvasMetadata",
-          "title": "No spec needed for Canvas as per the YAML example"
-        }
-      }
-    },
-    "SuperplaneCanvasMetadata": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "createdBy": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
     "SuperplaneComponentsOutputChannel": {
       "type": "object",
       "properties": {
@@ -4293,67 +4034,6 @@
         },
         "description": {
           "type": "string"
-        }
-      }
-    },
-    "SuperplaneCreateCanvasRequest": {
-      "type": "object",
-      "properties": {
-        "canvas": {
-          "$ref": "#/definitions/SuperplaneCanvas"
-        }
-      }
-    },
-    "SuperplaneCreateCanvasResponse": {
-      "type": "object",
-      "properties": {
-        "canvas": {
-          "$ref": "#/definitions/SuperplaneCanvas"
-        }
-      }
-    },
-    "SuperplaneDeleteCanvasResponse": {
-      "type": "object"
-    },
-    "SuperplaneDescribeCanvasResponse": {
-      "type": "object",
-      "properties": {
-        "canvas": {
-          "$ref": "#/definitions/SuperplaneCanvas"
-        }
-      }
-    },
-    "SuperplaneIntegrationsValueFrom": {
-      "type": "object",
-      "properties": {
-        "secret": {
-          "$ref": "#/definitions/SuperplaneIntegrationsValueFromSecret"
-        }
-      }
-    },
-    "SuperplaneIntegrationsValueFromSecret": {
-      "type": "object",
-      "properties": {
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "name": {
-          "type": "string"
-        },
-        "key": {
-          "type": "string"
-        }
-      }
-    },
-    "SuperplaneListCanvasesResponse": {
-      "type": "object",
-      "properties": {
-        "canvases": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneCanvas"
-          }
         }
       }
     },
@@ -4389,12 +4069,6 @@
           }
         }
       }
-    },
-    "SuperplaneOrganizationsRemoveUserResponse": {
-      "type": "object"
-    },
-    "SuperplaneRemoveUserResponse": {
-      "type": "object"
     },
     "SuperplaneUsersUser": {
       "type": "object",
@@ -4647,6 +4321,12 @@
         "STATE_FINISHED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "WorkflowsCancelExecutionBody": {
+      "type": "object"
+    },
+    "WorkflowsCancelExecutionResponse": {
+      "type": "object"
     },
     "WorkflowsCreateWorkflowRequest": {
       "type": "object",
@@ -4997,6 +4677,9 @@
         },
         "input": {
           "type": "object"
+        },
+        "rootEvent": {
+          "$ref": "#/definitions/WorkflowsWorkflowEvent"
         },
         "createdAt": {
           "type": "string",

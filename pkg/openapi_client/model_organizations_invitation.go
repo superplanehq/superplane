@@ -25,7 +25,6 @@ type OrganizationsInvitation struct {
 	OrganizationId *string `json:"organizationId,omitempty"`
 	Email *string `json:"email,omitempty"`
 	State *string `json:"state,omitempty"`
-	CanvasIds []string `json:"canvasIds,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 }
 
@@ -174,38 +173,6 @@ func (o *OrganizationsInvitation) SetState(v string) {
 	o.State = &v
 }
 
-// GetCanvasIds returns the CanvasIds field value if set, zero value otherwise.
-func (o *OrganizationsInvitation) GetCanvasIds() []string {
-	if o == nil || IsNil(o.CanvasIds) {
-		var ret []string
-		return ret
-	}
-	return o.CanvasIds
-}
-
-// GetCanvasIdsOk returns a tuple with the CanvasIds field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *OrganizationsInvitation) GetCanvasIdsOk() ([]string, bool) {
-	if o == nil || IsNil(o.CanvasIds) {
-		return nil, false
-	}
-	return o.CanvasIds, true
-}
-
-// HasCanvasIds returns a boolean if a field has been set.
-func (o *OrganizationsInvitation) HasCanvasIds() bool {
-	if o != nil && !IsNil(o.CanvasIds) {
-		return true
-	}
-
-	return false
-}
-
-// SetCanvasIds gets a reference to the given []string and assigns it to the CanvasIds field.
-func (o *OrganizationsInvitation) SetCanvasIds(v []string) {
-	o.CanvasIds = v
-}
-
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
 func (o *OrganizationsInvitation) GetCreatedAt() time.Time {
 	if o == nil || IsNil(o.CreatedAt) {
@@ -259,9 +226,6 @@ func (o OrganizationsInvitation) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.State) {
 		toSerialize["state"] = o.State
-	}
-	if !IsNil(o.CanvasIds) {
-		toSerialize["canvasIds"] = o.CanvasIds
 	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["createdAt"] = o.CreatedAt

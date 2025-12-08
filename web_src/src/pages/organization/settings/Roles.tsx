@@ -1,14 +1,14 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { Heading } from "../../../components/Heading/heading";
-import { Button } from "../../../components/Button/button";
-import { Input, InputGroup } from "../../../components/Input/input";
-import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
 import debounce from "lodash.debounce";
-import { Dropdown, DropdownButton, DropdownMenu, DropdownItem } from "../../../components/Dropdown/dropdown";
-import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "../../../components/Table/table";
-import { useOrganizationRoles, useDeleteRole } from "../../../hooks/useOrganizationData";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { RolesRole } from "../../../api-client/types.gen";
+import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "../../../components/Dropdown/dropdown";
+import { Heading } from "../../../components/Heading/heading";
+import { Icon } from "../../../components/Icon";
+import { Input, InputGroup } from "../../../components/Input/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
+import { useDeleteRole, useOrganizationRoles } from "../../../hooks/useOrganizationData";
+import { Button } from "../../../ui/button";
 
 interface RolesProps {
   organizationId: string;
@@ -149,8 +149,8 @@ export function Roles({ organizationId }: RolesProps) {
               onChange={(e) => setDebouncedSearch(e.target.value)}
             />
           </InputGroup>
-          <Button color="blue" className="flex items-center" onClick={handleCreateRole}>
-            <MaterialSymbol name="add" />
+          <Button className="flex items-center" onClick={handleCreateRole}>
+            <Icon name="add" />
             New Organization Role
           </Button>
         </div>
@@ -169,7 +169,7 @@ export function Roles({ organizationId }: RolesProps) {
                   >
                     <div className="flex items-center gap-2">
                       Role name
-                      <MaterialSymbol name={getSortIcon("name")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("name")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -178,7 +178,7 @@ export function Roles({ organizationId }: RolesProps) {
                   >
                     <div className="flex items-center gap-2">
                       Permissions
-                      <MaterialSymbol name={getSortIcon("permissions")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("permissions")} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -206,19 +206,19 @@ export function Roles({ organizationId }: RolesProps) {
                               </span>
                             ) : (
                               <Dropdown>
-                                <DropdownButton plain disabled={deleteRoleMutation.isPending}>
-                                  <MaterialSymbol name="more_vert" size="sm" />
+                                <DropdownButton disabled={deleteRoleMutation.isPending}>
+                                  <Icon name="more_vert" size="sm" />
                                 </DropdownButton>
                                 <DropdownMenu>
                                   <DropdownItem onClick={() => handleEditRole(role)}>
-                                    <MaterialSymbol name="edit" />
+                                    <Icon name="edit" />
                                     Edit
                                   </DropdownItem>
                                   <DropdownItem
                                     onClick={() => handleDeleteRole(role)}
                                     className="text-red-600 dark:text-red-400"
                                   >
-                                    <MaterialSymbol name="delete" />
+                                    <Icon name="delete" />
                                     {deleteRoleMutation.isPending ? "Deleting..." : "Delete"}
                                   </DropdownItem>
                                 </DropdownMenu>

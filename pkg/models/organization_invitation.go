@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/datatypes"
+	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
 )
 
@@ -18,7 +18,6 @@ const (
 type OrganizationInvitation struct {
 	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	OrganizationID uuid.UUID
-	CanvasIDs      datatypes.JSONType[[]string] `gorm:"type:jsonb"`
 	Email          string
 	InvitedBy      uuid.UUID
 	State          string
@@ -34,7 +33,7 @@ func FindPendingInvitationInTransaction(tx *gorm.DB, email, organizationID strin
 	var invitation OrganizationInvitation
 
 	err := tx.
-		Where("email = ?", email).
+		Where("email = ?", utils.NormalizeEmail(email)).
 		Where("organization_id = ?", organizationID).
 		Where("state = ?", InvitationStatePending).
 		First(&invitation).
@@ -84,14 +83,15 @@ func CreateInvitation(organizationID, invitedBy uuid.UUID, email, state string) 
 }
 
 func CreateInvitationInTransaction(tx *gorm.DB, organizationID, invitedBy uuid.UUID, email, state string) (*OrganizationInvitation, error) {
-	_, err := FindPendingInvitationInTransaction(tx, email, organizationID.String())
+	normalizedEmail := utils.NormalizeEmail(email)
+	_, err := FindPendingInvitationInTransaction(tx, normalizedEmail, organizationID.String())
 	if err == nil {
-		return nil, fmt.Errorf("invitation already exists for %s", email)
+		return nil, fmt.Errorf("invitation already exists for %s", normalizedEmail)
 	}
 
 	invitation := &OrganizationInvitation{
 		OrganizationID: organizationID,
-		Email:          email,
+		Email:          normalizedEmail,
 		InvitedBy:      invitedBy,
 		State:          state,
 	}

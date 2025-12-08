@@ -13,7 +13,7 @@ services:
       DB_PORT: "5432"
       DB_NAME: "superplane_dev"
       DB_USERNAME: "postgres"
-      DB_POOL_SIZE: "5"
+      DB_POOL_SIZE: "2"
       POSTGRES_DB_SSL: "false"
       APP_ENV: development
       APPLICATION_NAME: "superplane"
@@ -22,7 +22,13 @@ services:
       SWAGGER_BASE_PATH: "/app/api/swagger"
       RBAC_MODEL_PATH: "/app/rbac/rbac_model.conf"
       RBAC_ORG_POLICY_PATH: "/app/rbac/rbac_org_policy.csv"
-      RBAC_CANVAS_POLICY_PATH: "/app/rbac/rbac_canvas_policy.csv"
+      # Ensure Go build cache initializes in a writable, persisted location
+      # This fixes: "failed to initialize build cache at /.cache/go-build: permission denied"
+      # and keeps the cache across container restarts (since /app is bind-mounted)
+      GOCACHE: "/app/tmp/go-build"
+      XDG_CACHE_HOME: "/app/tmp"
+      # Lock Playwright browsers location so install and runtime match
+      PLAYWRIGHT_BROWSERS_PATH: "/app/tmp/ms-playwright"
       START_PUBLIC_API: "yes"
       START_INTERNAL_API: "yes"
       START_GRPC_GATEWAY: "yes"
@@ -36,7 +42,10 @@ services:
       START_NODE_REQUEST_WORKER: "yes"
       START_WEBHOOK_PROVISIONER: "yes"
       START_WEBHOOK_CLEANUP_WORKER: "yes"
+      START_WORKFLOW_CLEANUP_WORKER: "yes"
       WEB_BASE_PATH: ""
+      SENTRY_DSN: ""
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
       NO_ENCRYPTION: "yes"
@@ -47,10 +56,14 @@ services:
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       TEMPLATE_DIR: "/app/templates"
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Superplane}
-      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@superplane.com}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@notifications.superplane.com}
       BLOCK_SIGNUP: ${BLOCK_SIGNUP:-no}
+      OTEL_ENABLED: "yes"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"
+      OTEL_SERVICE_NAME: "superplane-dev"
 
     ports:
       - 5173:5173
@@ -62,6 +75,7 @@ services:
     links:
       - db:db
       - rabbitmq:rabbitmq
+      - otel:otel
 
     depends_on:
       db:
@@ -73,6 +87,15 @@ services:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
+
+  otel:
+    image: otel/opentelemetry-collector-contrib:0.110.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.dev.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - 4317:4317
+      - 4318:4318
 
   db:
     image: postgres:17.5

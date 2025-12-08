@@ -102,20 +102,15 @@ func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, registry 
 	return record, nil
 }
 
-func validateAuth(ctx context.Context, encryptor crypto.Encryptor, integrationDomainType string, integrationDomainID uuid.UUID, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
+func validateAuth(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID uuid.UUID, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
 	switch auth.Use {
 	case pb.Integration_AUTH_TYPE_TOKEN:
 		if auth.Token == nil || auth.Token.ValueFrom == nil || auth.Token.ValueFrom.Secret == nil {
 			return nil, "", fmt.Errorf("secret is required")
 		}
 
-		domainType, domainID, err := actions.GetDomainForSecret(integrationDomainType, &integrationDomainID, auth.Token.ValueFrom.Secret.DomainType)
-		if err != nil {
-			return nil, "", err
-		}
-
 		name := auth.Token.ValueFrom.Secret.Name
-		provider, err := secrets.NewProvider(database.Conn(), encryptor, name, domainType, *domainID)
+		provider, err := secrets.NewProvider(database.Conn(), encryptor, name, domainType, domainID)
 		if err != nil {
 			return nil, "", err
 		}
@@ -135,9 +130,8 @@ func validateAuth(ctx context.Context, encryptor crypto.Encryptor, integrationDo
 			Token: &models.IntegrationAuthToken{
 				ValueFrom: models.ValueDefinitionFrom{
 					Secret: &models.ValueDefinitionFromSecret{
-						DomainType: domainType,
-						Name:       auth.Token.ValueFrom.Secret.Name,
-						Key:        auth.Token.ValueFrom.Secret.Key,
+						Name: auth.Token.ValueFrom.Secret.Name,
+						Key:  auth.Token.ValueFrom.Secret.Key,
 					},
 				},
 			},
@@ -177,9 +171,8 @@ func serializeIntegrationAuth(authType string, auth models.IntegrationAuth) *pb.
 			Token: &pb.Integration_Auth_Token{
 				ValueFrom: &pb.ValueFrom{
 					Secret: &pb.ValueFromSecret{
-						DomainType: actions.DomainTypeToProto(auth.Token.ValueFrom.Secret.DomainType),
-						Name:       auth.Token.ValueFrom.Secret.Name,
-						Key:        auth.Token.ValueFrom.Secret.Key,
+						Name: auth.Token.ValueFrom.Secret.Name,
+						Key:  auth.Token.ValueFrom.Secret.Key,
 					},
 				},
 			},

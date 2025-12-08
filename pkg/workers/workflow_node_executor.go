@@ -8,7 +8,9 @@ import (
 
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -16,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
@@ -44,10 +47,14 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			tickStart := time.Now()
+
 			executions, err := models.ListPendingNodeExecutions()
 			if err != nil {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
+
+			telemetry.RecordExecutorWorkerNodesCount(context.Background(), len(executions))
 
 			for _, execution := range executions {
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
@@ -55,11 +62,14 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 					continue
 				}
 
+				messages.NewWorkflowExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
+
 				go func(execution models.WorkflowNodeExecution) {
 					defer w.semaphore.Release(1)
 
-					err := w.LockAndProcessNodeExecution(execution)
+					err := w.LockAndProcessNodeExecution(execution.ID)
 					if err == nil {
+						messages.NewWorkflowExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
 						return
 					}
 
@@ -70,19 +80,48 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 					w.logger.Errorf("Error processing node execution - node=%s, execution=%s: %v", execution.NodeID, execution.ID, err)
 				}(execution)
 			}
+
+			telemetry.RecordExecutorWorkerTickDuration(context.Background(), time.Since(tickStart))
 		}
 	}
 }
 
-func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(execution models.WorkflowNodeExecution) error {
+func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		e, err := models.LockWorkflowNodeExecution(tx, execution.ID)
+		var execution models.WorkflowNodeExecution
+
+		//
+		// Try to lock the execution record for update.
+		// If we can't, it means another worker is already processing it.
+		//
+		// We also ensure that the execution is still in pending state,
+		// to avoid processing already started or finished executions.
+		//
+		// Why we need to check the state again:
+		//
+		// Even though we fetch pending executions in the main loop,
+		// there is a race condition where multiple workers might pick the same execution
+		// before any of them has a chance to lock it.
+		//
+		// By checking the state again here, we ensure that only one worker
+		// can start processing a given execution.
+		//
+		// Note: We use SKIP LOCKED to avoid waiting on locked records.
+		//
+
+		err := tx.
+			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+			Where("id = ?", id).
+			Where("state = ?", models.WorkflowNodeExecutionStatePending).
+			First(&execution).
+			Error
+
 		if err != nil {
-			w.logger.Errorf("Execution %s already being processed - skipping", execution.ID)
+			w.logger.Errorf("Execution %s already being processed - skipping", id.String())
 			return ErrRecordLocked
 		}
 
-		return w.processNodeExecution(tx, e)
+		return w.processNodeExecution(tx, &execution)
 	})
 }
 
@@ -136,24 +175,15 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 			fmt.Sprintf("error building configuration for execution of node %s: %v", firstNode.ID, err),
 		)
 
-		messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution).
-			PublishWithDelay(1 * time.Second)
-
 		return nil
 	}
 
-	createdChildExecution, err := models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)
+	_, err = models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)
 	if err != nil {
 		return fmt.Errorf("failed to create child execution: %w", err)
 	}
 
-	messages.NewWorkflowExecutionCreatedMessage(createdChildExecution.WorkflowID.String(), createdChildExecution).PublishWithDelay(1 * time.Second)
-
 	err = execution.StartInTransaction(tx)
-
-	if err == nil {
-		messages.NewWorkflowExecutionStartedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
-	}
 
 	return err
 }
@@ -171,8 +201,6 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		return fmt.Errorf("failed to start execution: %w", err)
 	}
 
-	messages.NewWorkflowExecutionStartedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
-
 	ref := node.Ref.Data()
 	component, err := w.registry.GetComponent(ref.Component.Name)
 	if err != nil {
@@ -186,7 +214,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		return fmt.Errorf("failed to get execution inputs: %w", err)
 	}
 
-	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, node.WorkflowID)
+	workflow, err := models.FindWorkflowWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 	if err != nil {
 		logger.Errorf("failed to find workflow: %v", err)
 		return fmt.Errorf("failed to find workflow: %v", err)
@@ -207,11 +235,8 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 	if err := component.Execute(ctx); err != nil {
 		logger.Errorf("failed to execute component: %v", err)
 		err = execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, err.Error())
-		messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
 		return err
 	}
-
-	messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
 
 	logger.Info("Component executed successfully")
 

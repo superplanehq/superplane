@@ -2,7 +2,6 @@ package workers
 
 import (
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,7 +16,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const InvitationEmailServiceName = "superplane" + "." + messages.DeliveryHubCanvasExchange + "." + messages.InvitationCreatedRoutingKey + ".worker-consumer"
+const InvitationEmailServiceName = "superplane" + "." + messages.WorkflowExchange + "." + messages.InvitationCreatedRoutingKey + ".worker-consumer"
 const InvitationEmailConnectionName = "superplane"
 
 type InvitationEmailConsumer struct {
@@ -48,7 +47,7 @@ func (c *InvitationEmailConsumer) Start() error {
 		URL:            c.RabbitMQURL,
 		ConnectionName: InvitationEmailConnectionName,
 		Service:        InvitationEmailServiceName,
-		RemoteExchange: messages.DeliveryHubCanvasExchange,
+		RemoteExchange: messages.WorkflowExchange,
 		RoutingKey:     messages.InvitationCreatedRoutingKey,
 	}
 
@@ -112,13 +111,17 @@ func (c *InvitationEmailConsumer) Consume(delivery tackle.Delivery) error {
 		return nil
 	}
 
-	toName := strings.Split(invitation.Email, "@")[0]
+	inviter, err := models.FindUnscopedUserByID(invitation.InvitedBy.String())
+	if err != nil {
+		log.Errorf("Error finding inviter %s: %v", invitation.InvitedBy, err)
+		return err
+	}
 
 	err = c.EmailService.SendInvitationEmail(
 		invitation.Email,
-		toName,
 		org.Name,
 		c.BaseURL+"/login",
+		inviter.Email,
 	)
 
 	if err != nil {

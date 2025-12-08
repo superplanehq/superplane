@@ -20,7 +20,7 @@ func Test__ListSecrets(t *testing.T) {
 	encryptor := &crypto.NoOpEncryptor{}
 
 	t.Run("no secrets", func(t *testing.T) {
-		response, err := ListSecrets(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID.String())
+		response, err := ListSecrets(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.Empty(t, response.Secrets)
@@ -30,10 +30,10 @@ func Test__ListSecrets(t *testing.T) {
 		local := map[string]string{"test": "test"}
 		data, _ := json.Marshal(local)
 
-		_, err := models.CreateSecret("test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeCanvas, r.Canvas.ID, data)
+		_, err := models.CreateSecret("test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeOrganization, r.Organization.ID, data)
 		require.NoError(t, err)
 
-		response, err := ListSecrets(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID.String())
+		response, err := ListSecrets(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.Len(t, response.Secrets, 1)

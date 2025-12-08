@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -22,13 +24,15 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			accountID, err := getAccountFromCookie(r, jwtSigner)
 			if err != nil {
-				http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+				authentication.ClearAccountCookie(w, r)
+				redirectToLoginWithOriginalURL(w, r)
 				return
 			}
 
 			account, err := models.FindAccountByID(accountID)
 			if err != nil {
-				http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+				authentication.ClearAccountCookie(w, r)
+				redirectToLoginWithOriginalURL(w, r)
 				return
 			}
 
@@ -157,4 +161,10 @@ func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, error
 func GetUserFromContext(ctx context.Context) (*models.User, bool) {
 	user, ok := ctx.Value(UserContextKey).(*models.User)
 	return user, ok
+}
+
+func redirectToLoginWithOriginalURL(w http.ResponseWriter, r *http.Request) {
+	redirectURL := url.QueryEscape(r.URL.RequestURI())
+	loginURL := fmt.Sprintf("/login?redirect=%s", redirectURL)
+	http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
 }

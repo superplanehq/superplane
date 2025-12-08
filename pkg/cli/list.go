@@ -9,37 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listCanvasesCmd = &cobra.Command{
-	Use:   "canvases",
-	Short: "List all canvases",
-	Long:  `Retrieve a list of all canvases`,
-	Args:  cobra.NoArgs,
-
-	Run: func(cmd *cobra.Command, args []string) {
-		c := DefaultClient()
-		response, _, err := c.CanvasAPI.
-			SuperplaneListCanvases(context.Background()).
-			Execute()
-
-		Check(err)
-
-		if len(response.Canvases) == 0 {
-			fmt.Println("No canvases found.")
-			return
-		}
-
-		for i, canvas := range response.Canvases {
-			fmt.Printf("%d. %s (ID: %s)\n", i+1, *canvas.GetMetadata().Name, *canvas.GetMetadata().Id)
-			fmt.Printf("   Created at: %s\n", *canvas.GetMetadata().CreatedAt)
-			fmt.Printf("   Created by: %s\n", *canvas.GetMetadata().CreatedBy)
-
-			if i < len(response.Canvases)-1 {
-				fmt.Println()
-			}
-		}
-	},
-}
-
 var listSecretsCmd = &cobra.Command{
 	Use:     "secrets",
 	Short:   "List secrets for an organization or canvas",
@@ -144,17 +113,6 @@ var listCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(listCmd)
-
-	// Canvases command
-	listCmd.AddCommand(listCanvasesCmd)
-
-	// Secrets command
 	listCmd.AddCommand(listSecretsCmd)
-	listSecretsCmd.Flags().String("canvas-id", "", "Canvas ID")
-	listSecretsCmd.Flags().String("canvas-name", "", "Canvas name")
-
-	// Integrations command
 	listCmd.AddCommand(listIntegrationsCmd)
-	listIntegrationsCmd.Flags().String("canvas-id", "", "Canvas ID")
-	listIntegrationsCmd.Flags().String("canvas-name", "", "Canvas name")
 }

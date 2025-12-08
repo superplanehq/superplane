@@ -1,11 +1,11 @@
-import { useState, forwardRef, useImperativeHandle, useMemo } from "react";
-import { Button } from "../../../components/Button/button";
-import { Input, InputGroup } from "../../../components/Input/input";
+import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Checkbox } from "../../../components/Checkbox/checkbox";
-import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
+import { Icon } from "../../../components/Icon";
+import { Input, InputGroup } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
-import { useOrganizationUsers, useOrganizationGroupUsers, useAddUserToGroup } from "../../../hooks/useOrganizationData";
+import { useAddUserToGroup, useOrganizationGroupUsers, useOrganizationUsers } from "../../../hooks/useOrganizationData";
+import { Button } from "../../../ui/button";
 
 interface AddMembersSectionProps {
   showRoleSelection?: boolean;
@@ -153,21 +153,20 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
             </InputGroup>
             <div className="flex items-center gap-2">
               <Button
-                outline
+                variant="secondary"
                 className="flex items-center gap-2 text-sm"
                 onClick={handleSelectAll}
                 disabled={loadingMembers || getFilteredExistingMembers().length === 0}
               >
-                <MaterialSymbol name="select_all" size="sm" />
+                <Icon name="select_all" size="sm" />
                 {selectedMembers.size === getFilteredExistingMembers().length ? "Deselect All" : "Select All"}
               </Button>
               <Button
-                color="blue"
                 className="flex items-center gap-2 text-sm"
                 onClick={handleExistingMembersSubmit}
                 disabled={selectedMembers.size === 0 || isInviting}
               >
-                <MaterialSymbol name="add" size="sm" />
+                <Icon name="add" size="sm" />
                 {isInviting
                   ? "Adding..."
                   : `Add ${selectedMembers.size} member${selectedMembers.size === 1 ? "" : "s"}`}

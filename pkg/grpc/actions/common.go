@@ -34,21 +34,8 @@ func ValidateUUIDsArray(ids []string) error {
 	return nil
 }
 
-func ProtoToDomainType(domainType pbAuth.DomainType) (string, error) {
-	switch domainType {
-	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		return models.DomainTypeOrganization, nil
-	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
-		return models.DomainTypeCanvas, nil
-	default:
-		return "", status.Error(codes.InvalidArgument, "invalid domain type")
-	}
-}
-
 func DomainTypeToProto(domainType string) pbAuth.DomainType {
 	switch domainType {
-	case models.DomainTypeCanvas:
-		return pbAuth.DomainType_DOMAIN_TYPE_CANVAS
 	case models.DomainTypeOrganization:
 		return pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION
 	default:
@@ -56,27 +43,12 @@ func DomainTypeToProto(domainType string) pbAuth.DomainType {
 	}
 }
 
-func ValidateIntegration(canvas *models.Canvas, integrationRef *integrationpb.IntegrationRef) (*models.Integration, error) {
+func ValidateIntegration(orgID uuid.UUID, integrationRef *integrationpb.IntegrationRef) (*models.Integration, error) {
 	if integrationRef.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "integration name is required")
 	}
 
-	//
-	// If the integration used is on the organization level, we need to find it there.
-	//
-	if integrationRef.DomainType == pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION {
-		integration, err := models.FindIntegrationByName(models.DomainTypeOrganization, canvas.OrganizationID, integrationRef.Name)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationRef.Name)
-		}
-
-		return integration, nil
-	}
-
-	//
-	// Otherwise, we look for it on the canvas level.
-	//
-	integration, err := models.FindIntegrationByName(models.DomainTypeCanvas, canvas.ID, integrationRef.Name)
+	integration, err := models.FindIntegrationByName(models.DomainTypeOrganization, orgID, integrationRef.Name)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationRef.Name)
 	}
@@ -107,44 +79,6 @@ func ValidateResource(ctx context.Context, registry *registry.Registry, integrat
 	}
 
 	return resource, nil
-}
-
-func GetDomainForSecret(domainTypeForResource string, domainIdForResource *uuid.UUID, domainType pbAuth.DomainType) (string, *uuid.UUID, error) {
-	domainTypeForSecret, err := ProtoToDomainType(domainType)
-	if err != nil {
-		domainTypeForSecret = domainTypeForResource
-	}
-
-	//
-	// If an organization-level resource is being created,
-	// the secret must be on the organization level as well.
-	//
-	if domainTypeForResource == models.DomainTypeOrganization {
-		if domainTypeForSecret != models.DomainTypeOrganization {
-			return "", nil, fmt.Errorf("integration on organization level must use organization-level secret")
-		}
-
-		return domainTypeForSecret, domainIdForResource, nil
-	}
-
-	//
-	// If a canvas-level resource is being created and a canvas-level secret is being used,
-	// we can just re-use the same domain type and ID for the resource.
-	//
-	if domainTypeForSecret == models.DomainTypeCanvas {
-		return domainTypeForSecret, domainIdForResource, nil
-	}
-
-	//
-	// If a canvas-level resource is being created and is using a org-level secret,
-	// we need to find the organization ID for the canvas where the resource is being created.
-	//
-	canvas, err := models.FindUnscopedCanvasByID(domainIdForResource.String())
-	if err != nil {
-		return "", nil, fmt.Errorf("canvas not found")
-	}
-
-	return models.DomainTypeOrganization, &canvas.OrganizationID, nil
 }
 
 func numberTypeOptionsToProto(opts *configuration.NumberTypeOptions) *configpb.NumberTypeOptions {
@@ -224,6 +158,7 @@ func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListT
 	}
 
 	pbOpts := &configpb.ListTypeOptions{
+		ItemLabel: opts.ItemLabel,
 		ItemDefinition: &configpb.ListItemDefinition{
 			Type: opts.ItemDefinition.Type,
 		},
@@ -320,11 +255,11 @@ func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
 	}
 
 	if field.Default != nil {
-		defaultBytes, err := json.Marshal(field.Default)
-		if err == nil {
-			defaultStr := string(defaultBytes)
-			pbField.DefaultValue = &defaultStr
-		}
+		pbField.DefaultValue = defaultValueToProto(field.Default)
+	}
+
+	if field.Placeholder != "" {
+		pbField.Placeholder = &field.Placeholder
 	}
 
 	if len(field.VisibilityConditions) > 0 {
@@ -440,6 +375,7 @@ func protoToListTypeOptions(pbOpts *configpb.ListTypeOptions) *configuration.Lis
 	}
 
 	opts := &configuration.ListTypeOptions{
+		ItemLabel: pbOpts.ItemLabel,
 		ItemDefinition: &configuration.ListItemDefinition{
 			Type: pbOpts.ItemDefinition.Type,
 		},
@@ -536,7 +472,11 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 	}
 
 	if pbField.DefaultValue != nil {
-		field.Default = *pbField.DefaultValue
+		field.Default = defaultValueFromProto(pbField.Type, *pbField.DefaultValue)
+	}
+
+	if pbField.Placeholder != nil {
+		field.Placeholder = *pbField.Placeholder
 	}
 
 	if len(pbField.VisibilityConditions) > 0 {
@@ -775,4 +715,95 @@ func CheckForCycles(nodes []*componentpb.Node, edges []*componentpb.Edge) error 
 	}
 
 	return nil
+}
+
+func defaultValueToProto(value any) *string {
+	// We are converting the "default value" of a configuration
+	// field to its protobuf representation.
+
+	// The field can have different types, and the default value
+	// can be a simple scalar (string, number, boolean) or a complex
+	// structure (list, object).
+
+	// For simple scalar types, we can directly convert the default
+	// value to a string and return it.
+
+	if str, ok := value.(string); ok {
+		return &str
+	}
+
+	// For complex types, we need to serialize the default value
+	// to JSON so that we can reconstruct the original structure
+	// when deserializing.
+
+	defaultBytes, err := json.Marshal(value)
+	if err == nil {
+		str := string(defaultBytes)
+		return &str
+	}
+
+	// This should never happen, as we should be able to
+	// marshal any value to JSON. Panic in this case.
+	panic("unable to marshal default value to JSON")
+}
+
+func defaultValueFromProto(fieldType, defaultValue string) any {
+	switch fieldType {
+	case configuration.FieldTypeString:
+		fallthrough
+	case configuration.FieldTypeGitRef:
+		fallthrough
+	case configuration.FieldTypeSelect:
+		fallthrough
+	case configuration.FieldTypeIntegration:
+		fallthrough
+	case configuration.FieldTypeIntegrationResource:
+		fallthrough
+	case configuration.FieldTypeTime:
+		fallthrough
+	case configuration.FieldTypeDate:
+		fallthrough
+	case configuration.FieldTypeDateTime:
+		fallthrough
+	case configuration.FieldTypeDayInYear:
+		fallthrough
+	case configuration.FieldTypeUser:
+		fallthrough
+	case configuration.FieldTypeRole:
+		fallthrough
+	case configuration.FieldTypeGroup:
+		// String-like types: preserve the raw string.
+		return defaultValue
+
+	case configuration.FieldTypeMultiSelect:
+		fallthrough
+	case configuration.FieldTypeList:
+		fallthrough
+	case configuration.FieldTypeObject:
+		// Complex/collection types: decode JSON into structured values.
+		var v any
+		if err := json.Unmarshal([]byte(defaultValue), &v); err == nil {
+			return v
+		}
+		return defaultValue
+
+	case configuration.FieldTypeBool:
+		// Boolean: decode JSON into a bool, fall back to raw string.
+		var v bool
+		if err := json.Unmarshal([]byte(defaultValue), &v); err == nil {
+			return v
+		}
+		return defaultValue
+
+	case configuration.FieldTypeNumber:
+		// Number: decode JSON into a float64, fall back to raw string.
+		var v float64
+		if err := json.Unmarshal([]byte(defaultValue), &v); err == nil {
+			return v
+		}
+		return defaultValue
+
+	default:
+		return defaultValue
+	}
 }

@@ -74,13 +74,4 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 		assert.Equal(t, "user not found", s.Message())
 	})
-
-	t.Run("remove user from canvas grop", func(t *testing.T) {
-		groupName := support.RandomName("canvas-group")
-		require.NoError(t, r.AuthService.CreateGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, groupName, models.RoleCanvasAdmin, "", ""))
-		require.NoError(t, r.AuthService.AddUserToGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, newUser.ID.String(), groupName))
-
-		_, err := RemoveUserFromGroup(ctx, orgID, models.DomainTypeCanvas, r.Canvas.ID.String(), newUser.ID.String(), "", groupName, r.AuthService)
-		require.NoError(t, err)
-	})
 }

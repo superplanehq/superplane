@@ -3,7 +3,9 @@ package workflows
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,6 +17,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, pbStates []pb.WorkflowNodeExecution_State, pbResults []pb.WorkflowNodeExecution_Result, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeExecutionsResponse, error) {
@@ -25,6 +28,10 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 
 	workflowNode, err := models.FindWorkflowNode(database.Conn(), wfID, nodeID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Error(codes.NotFound, "workflow node not found")
+		}
+
 		return nil, err
 	}
 
@@ -81,28 +88,49 @@ func SerializeNodeExecutionsForSingleNode(node *models.WorkflowNode, executions 
 }
 
 func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExecutions []models.WorkflowNodeExecution) ([]*pb.WorkflowNodeExecution, error) {
-	//
-	// Fetch all input records
-	//
-	rootEvents, err := models.FindWorkflowEvents(rootEventIDs(executions))
-	if err != nil {
-		return nil, fmt.Errorf("error find input events: %v", err)
-	}
+	var rootEvents, inputEvents, outputEvents []models.WorkflowEvent
+	var rootEventsErr, inputEventsErr, outputEventsErr error
+	var wg sync.WaitGroup
 
 	//
-	// Fetch all input records
+	// Fetch all execution resources in parallel
 	//
-	inputEvents, err := models.FindWorkflowEvents(eventIDs(executions))
-	if err != nil {
-		return nil, fmt.Errorf("error find input events: %v", err)
-	}
+	wg.Add(3)
 
 	//
-	// Fetch all output records
+	// Root events
 	//
-	outputEvents, err := models.FindWorkflowEventsForExecutions(executionIDs(executions))
-	if err != nil {
-		return nil, fmt.Errorf("error find output events: %v", err)
+	go func() {
+		defer wg.Done()
+		rootEvents, rootEventsErr = models.FindWorkflowEvents(rootEventIDs(executions))
+	}()
+
+	//
+	// Input events
+	//
+	go func() {
+		defer wg.Done()
+		inputEvents, inputEventsErr = models.FindWorkflowEvents(eventIDs(executions))
+	}()
+
+	//
+	// Output events
+	//
+	go func() {
+		defer wg.Done()
+		outputEvents, outputEventsErr = models.FindWorkflowEventsForExecutions(executionIDs(executions))
+	}()
+
+	wg.Wait()
+
+	if rootEventsErr != nil {
+		return nil, fmt.Errorf("error finding root events: %v", rootEventsErr)
+	}
+	if inputEventsErr != nil {
+		return nil, fmt.Errorf("error finding input events: %v", inputEventsErr)
+	}
+	if outputEventsErr != nil {
+		return nil, fmt.Errorf("error finding output events: %v", outputEventsErr)
 	}
 
 	//
@@ -260,6 +288,8 @@ func NodeExecutionResultToProto(result string) pb.WorkflowNodeExecution_Result {
 		return pb.WorkflowNodeExecution_RESULT_PASSED
 	case models.WorkflowNodeExecutionResultFailed:
 		return pb.WorkflowNodeExecution_RESULT_FAILED
+	case models.WorkflowNodeExecutionResultCancelled:
+		return pb.WorkflowNodeExecution_RESULT_CANCELLED
 	default:
 		return pb.WorkflowNodeExecution_RESULT_UNKNOWN
 	}

@@ -23,14 +23,12 @@ type AuthorizationDomainType string
 const (
 	AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED AuthorizationDomainType = "DOMAIN_TYPE_UNSPECIFIED"
 	AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION AuthorizationDomainType = "DOMAIN_TYPE_ORGANIZATION"
-	AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_CANVAS AuthorizationDomainType = "DOMAIN_TYPE_CANVAS"
 )
 
 // All allowed values of AuthorizationDomainType enum
 var AllowedAuthorizationDomainTypeEnumValues = []AuthorizationDomainType{
 	"DOMAIN_TYPE_UNSPECIFIED",
 	"DOMAIN_TYPE_ORGANIZATION",
-	"DOMAIN_TYPE_CANVAS",
 }
 
 func (v *AuthorizationDomainType) UnmarshalJSON(src []byte) error {

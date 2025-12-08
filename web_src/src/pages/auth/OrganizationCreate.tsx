@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "../../components/Button/button";
 import { Text } from "../../components/Text/text";
+import { Button } from "../../ui/button";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
@@ -31,8 +31,17 @@ const OrganizationCreate: React.FC = () => {
         // Redirect to the new organization
         window.location.href = `/${org.id}`;
       } else {
-        const errorData = await response.json();
-        setError(errorData.message || "Failed to create organization");
+        try {
+          const errorData = await response.json();
+          setError(errorData.message || "Failed to create organization");
+        } catch {
+          // If we can't parse the error response, show a generic message based on status
+          if (response.status === 409) {
+            setError("An organization with this name already exists");
+          } else {
+            setError(`Failed to create organization (${response.status})`);
+          }
+        }
       }
     } catch (err) {
       setError("Network error occurred");
@@ -72,11 +81,18 @@ const OrganizationCreate: React.FC = () => {
             />
           </div>
 
-          <div className="flex space-x-4 mt-12">
-            <Button type="button" outline onClick={() => navigate("/")} className="flex-1" disabled={loading}>
+          <div className="flex space-x-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => navigate("/")}
+              className="flex-1"
+              disabled={loading}
+            >
               Cancel
             </Button>
-            <Button type="submit" color="blue" className="flex-1" disabled={loading || !name.trim()}>
+
+            <Button type="submit" className="flex-1" disabled={loading || !name.trim()}>
               {loading ? "Creating..." : "Create Organization"}
             </Button>
           </div>

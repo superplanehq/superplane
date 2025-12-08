@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiTokenForm } from "./ApiTokenForm";
 import type { IntegrationData, FormErrors } from "./types";
-import { createMockSecrets, defaultProps } from "../../../test/__mocks__/secrets";
+import { defaultProps } from "../../../test/__mocks__/secrets";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,9 +37,7 @@ const meta: Meta<typeof ApiTokenForm> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const mockSecrets = createMockSecrets();
-
-export const NewSecretTab: Story = {
+export const Default: Story = {
   render: () => {
     const [integrationData, setIntegrationData] = useState<IntegrationData>({
       orgUrl: "https://github.com/myorg",
@@ -51,8 +49,7 @@ export const NewSecretTab: Story = {
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("new");
-    const [newSecretToken, setNewSecretToken] = useState("");
+    const [secretValue, setSecretValue] = useState("");
     const orgUrlRef = useRef<HTMLInputElement>(null);
 
     return (
@@ -61,12 +58,9 @@ export const NewSecretTab: Story = {
         setIntegrationData={setIntegrationData}
         errors={errors}
         setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
+        secretValue={secretValue}
+        setSecretValue={setSecretValue}
         orgUrlRef={orgUrlRef}
-        secrets={mockSecrets}
         organizationId={defaultProps.organizationId}
         canvasId={defaultProps.canvasId}
       />
@@ -74,77 +68,7 @@ export const NewSecretTab: Story = {
   },
 };
 
-export const ExistingSecretTab: Story = {
-  render: () => {
-    const [integrationData, setIntegrationData] = useState<IntegrationData>({
-      orgUrl: "https://github.com/myorg",
-      name: "myorg-account",
-      apiToken: {
-        secretName: "",
-        secretKey: "",
-      },
-    });
-
-    const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("existing");
-    const [newSecretToken, setNewSecretToken] = useState("");
-    const orgUrlRef = useRef<HTMLInputElement>(null);
-
-    return (
-      <ApiTokenForm
-        integrationData={integrationData}
-        setIntegrationData={setIntegrationData}
-        errors={errors}
-        setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
-        orgUrlRef={orgUrlRef}
-        secrets={mockSecrets}
-        organizationId={defaultProps.organizationId}
-        canvasId={defaultProps.canvasId}
-      />
-    );
-  },
-};
-
-export const ExistingSecretSelected: Story = {
-  render: () => {
-    const [integrationData, setIntegrationData] = useState<IntegrationData>({
-      orgUrl: "https://github.com/myorg",
-      name: "myorg-account",
-      apiToken: {
-        secretName: "secret-1",
-        secretKey: "api-token",
-      },
-    });
-
-    const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("existing");
-    const [newSecretToken, setNewSecretToken] = useState("");
-    const orgUrlRef = useRef<HTMLInputElement>(null);
-
-    return (
-      <ApiTokenForm
-        integrationData={integrationData}
-        setIntegrationData={setIntegrationData}
-        errors={errors}
-        setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
-        orgUrlRef={orgUrlRef}
-        secrets={mockSecrets}
-        organizationId={defaultProps.organizationId}
-        canvasId={defaultProps.canvasId}
-      />
-    );
-  },
-};
-
-export const WithNewSecretValue: Story = {
+export const WithSecretValue: Story = {
   render: () => {
     const [integrationData, setIntegrationData] = useState<IntegrationData>({
       orgUrl: "https://api.semaphoreci.com",
@@ -156,8 +80,7 @@ export const WithNewSecretValue: Story = {
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("new");
-    const [newSecretToken, setNewSecretToken] = useState("smp_1234567890abcdef1234567890abcdef");
+    const [secretValue, setSecretValue] = useState("smp_1234567890abcdef1234567890abcdef");
     const orgUrlRef = useRef<HTMLInputElement>(null);
 
     return (
@@ -166,12 +89,9 @@ export const WithNewSecretValue: Story = {
         setIntegrationData={setIntegrationData}
         errors={errors}
         setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
+        secretValue={secretValue}
+        setSecretValue={setSecretValue}
         orgUrlRef={orgUrlRef}
-        secrets={mockSecrets}
         organizationId={defaultProps.organizationId}
         canvasId={defaultProps.canvasId}
       />
@@ -191,11 +111,9 @@ export const WithErrors: Story = {
     });
 
     const [errors, setErrors] = useState<FormErrors>({
-      apiToken: "Please select a secret and key",
       secretValue: "Field cannot be empty",
     });
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("new");
-    const [newSecretToken, setNewSecretToken] = useState("");
+    const [secretValue, setSecretValue] = useState("");
     const orgUrlRef = useRef<HTMLInputElement>(null);
 
     return (
@@ -204,82 +122,9 @@ export const WithErrors: Story = {
         setIntegrationData={setIntegrationData}
         errors={errors}
         setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
+        secretValue={secretValue}
+        setSecretValue={setSecretValue}
         orgUrlRef={orgUrlRef}
-        secrets={mockSecrets}
-        organizationId={defaultProps.organizationId}
-        canvasId={defaultProps.canvasId}
-      />
-    );
-  },
-};
-
-export const NoSecretsAvailable: Story = {
-  render: () => {
-    const [integrationData, setIntegrationData] = useState<IntegrationData>({
-      orgUrl: "https://github.com/myorg",
-      name: "myorg-account",
-      apiToken: {
-        secretName: "",
-        secretKey: "",
-      },
-    });
-
-    const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("existing");
-    const [newSecretToken, setNewSecretToken] = useState("");
-    const orgUrlRef = useRef<HTMLInputElement>(null);
-
-    return (
-      <ApiTokenForm
-        integrationData={integrationData}
-        setIntegrationData={setIntegrationData}
-        errors={errors}
-        setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
-        orgUrlRef={orgUrlRef}
-        secrets={[]}
-        organizationId="org-123"
-        canvasId="canvas-456"
-      />
-    );
-  },
-};
-
-export const MultipleKeyOptions: Story = {
-  render: () => {
-    const [integrationData, setIntegrationData] = useState<IntegrationData>({
-      orgUrl: "https://api.example.com",
-      name: "multi-key-integration",
-      apiToken: {
-        secretName: "service-keys",
-        secretKey: "primary",
-      },
-    });
-
-    const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("existing");
-    const [newSecretToken, setNewSecretToken] = useState("");
-    const orgUrlRef = useRef<HTMLInputElement>(null);
-
-    return (
-      <ApiTokenForm
-        integrationData={integrationData}
-        setIntegrationData={setIntegrationData}
-        errors={errors}
-        setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
-        orgUrlRef={orgUrlRef}
-        secrets={mockSecrets}
         organizationId={defaultProps.organizationId}
         canvasId={defaultProps.canvasId}
       />
@@ -299,9 +144,7 @@ export const EditMode: Story = {
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("existing");
-    const [newSecretToken, setNewSecretToken] = useState("");
-    const [newSecretValue, setNewSecretValue] = useState("");
+    const [secretValue, setSecretValue] = useState("");
     const orgUrlRef = useRef<HTMLInputElement>(null);
 
     return (
@@ -310,15 +153,10 @@ export const EditMode: Story = {
         setIntegrationData={setIntegrationData}
         errors={errors}
         setErrors={setErrors}
-        apiTokenTab={apiTokenTab}
-        setApiTokenTab={setApiTokenTab}
-        newSecretToken={newSecretToken}
-        setNewSecretToken={setNewSecretToken}
+        secretValue={secretValue}
+        setSecretValue={setSecretValue}
         orgUrlRef={orgUrlRef}
         isEditMode={true}
-        newSecretValue={newSecretValue}
-        setNewSecretValue={setNewSecretValue}
-        secrets={mockSecrets}
         organizationId={defaultProps.organizationId}
         canvasId={defaultProps.canvasId}
       />

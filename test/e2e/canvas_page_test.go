@@ -1,104 +1,139 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
-	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
+	"github.com/superplanehq/superplane/test/e2e/session"
+	"github.com/superplanehq/superplane/test/e2e/shared"
 )
 
 func TestCanvasPage(t *testing.T) {
 	steps := &CanvasPageSteps{t: t}
 
 	t.Run("adding a node to canvas displays custom node name", func(t *testing.T) {
-		steps.Start()
-		steps.GivenACanvasExists()
-		steps.VisitCanvasPage()
-		steps.AddNoopToCanvas("Hello")
-		steps.SaveCanvas()
-		steps.AssertNodeIsAdded("Hello")
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addNoop("Hello")
+		steps.saveCanvas()
+		steps.assertNodeIsAdded("Hello")
+	})
+
+	t.Run("duplicating a node on canvas", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addNoop("Hello")
+		steps.saveCanvas()
+		steps.duplicateNodeOnCanvas("Hello")
+		steps.assertUnsavedChangesNoteIsVisible()
+		steps.saveCanvas()
+		steps.canvas.RenameNode("Hello", "Hello previous")
+		steps.assertNodeDuplicatedInDB("Hello previous", "Hello")
 	})
 
 	t.Run("run is disabled when you have unsaved changes", func(t *testing.T) {
-		steps.Start()
-		steps.GivenACanvasExists()
-		steps.VisitCanvasPage()
-		steps.AddNoopToCanvas("")
-		steps.AssertUnsavedChangesNoteIsVisible()
-		steps.AssertCantRunNode()
-		steps.AssertExplainationIsShownWhenHoverOverRun()
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addNoop("Hello")
+		steps.assertUnsavedChangesNoteIsVisible()
+		steps.assertCantRunNode("Hello")
+		steps.assertExplainationIsShownWhenHoverOverRun()
 	})
 
-	t.Run("adding an approval component to canvas and testing add item to list 3 times", func(t *testing.T) {
-		steps.Start()
-		steps.GivenACanvasExists()
-		steps.VisitCanvasPage()
-		steps.AddApprovalToCanvas("Test Approval")
-		steps.ClickAddItemButton()
-		steps.ClickAddItemButton()
-		steps.ClickAddItemButton()
+	t.Run("deleting a node from a canvas", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasExistsWithANoopNode()
+		steps.deleteNodeFromCanvas("DeleteMe")
+		steps.assertUnsavedChangesNoteIsVisible()
+		steps.saveCanvas()
+		steps.assertNodeDeletedInDB("DeleteMe")
+	})
+
+	t.Run("viewing queued items in the sidebar", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(4)
+		steps.openSidebarForNode("Wait")
+		steps.assertRunningItemsCount("Wait", 1)
+		steps.assertQueuedItemsCount("Wait", 3)
+		steps.assertQueuedItemsVisibleInSidebar()
+	})
+
+	t.Run("canceling queued items from the sidebar", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(4)
+		steps.openSidebarForNode("Wait")
+
+		steps.assertRunningItemsCount("Wait", 1)
+		steps.assertQueuedItemsCount("Wait", 3)
+		steps.cancelFirstQueueItemFromSidebar()
+		steps.assertQueuedItemsCount("Wait", 2)
+	})
+
+	t.Run("canceling running execution from the sidebar", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(1)
+		steps.openSidebarForNode("Wait")
+
+		steps.session.Sleep(1000)
+
+		steps.assertRunningItemsCount("Wait", 1)
+		steps.assertQueuedItemsCount("Wait", 0)
+		steps.cancelRunningExecutionFromSidebar()
+		steps.assertExecutionWasCancelled("Wait")
+	})
+
+	t.Run("deleting a connection between nodes", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addTwoNodesAndConnect()
+		steps.deleteConnectionBetweenNodes("First", "Second")
+		steps.saveCanvas()
+		steps.assertNodesAreNotConnectedInDB("First", "Second")
 	})
 }
 
 type CanvasPageSteps struct {
-	t          *testing.T
-	session    *TestSession
-	canvasName string
-	workflowID string
+	t       *testing.T
+	session *session.TestSession
+	canvas  *shared.CanvasSteps
 }
 
-func (s *CanvasPageSteps) Start() {
+func (s *CanvasPageSteps) start() {
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
 	s.session.Login()
 }
 
-func (s *CanvasPageSteps) GivenACanvasExists() {
-	s.canvasName = "E2E Canvas"
-
-	s.session.VisitHomePage()
-	s.session.Click(q.Text("New Canvas"))
-	s.session.FillIn(q.TestID("canvas-name-input"), s.canvasName)
-	s.session.Click(q.Text("Create canvas"))
-	s.session.Sleep(300)
-
-	orgUUID := uuid.MustParse(s.session.orgID)
-	wf, err := models.FindWorkflowByName(s.canvasName, orgUUID)
-	require.NoError(s.t, err)
-	s.workflowID = wf.ID.String()
+func (s *CanvasPageSteps) givenACanvasExists() {
+	s.canvas = shared.NewCanvasSteps("E2E Canvas", s.t, s.session)
+	s.canvas.Create()
 }
 
-func (s *CanvasPageSteps) VisitCanvasPage() {
-	s.session.Visit("/" + s.session.orgID + "/workflows/" + s.workflowID)
+func (s *CanvasPageSteps) addNoop(name string) {
+	s.canvas.AddNoop(name, models.Position{X: 500, Y: 200})
 }
 
-func (s *CanvasPageSteps) AddNoopToCanvas(nodeName string) {
-	source := q.TestID("building-block-noop")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, 500, 250)
-	s.session.Sleep(300)
-
-	// Use default name if empty string provided (node name is required)
-	if nodeName == "" {
-		nodeName = "noop"
-	}
-
-	s.session.FillIn(q.TestID("node-name-input"), nodeName)
-	s.session.Click(q.TestID("add-node-button"))
-	s.session.Sleep(300)
+func (s *CanvasPageSteps) addTwoNodesAndConnect() {
+	s.canvas.AddManualTrigger("First", models.Position{X: 500, Y: 200})
+	s.canvas.AddNoop("Second", models.Position{X: 900, Y: 200})
+	s.canvas.Connect("First", "Second")
 }
 
-func (s *CanvasPageSteps) AssertUnsavedChangesNoteIsVisible() {
+func (s *CanvasPageSteps) deleteConnectionBetweenNodes(sourceName, targetName string) {
+	s.canvas.DeleteConnection(sourceName, targetName)
+}
+
+func (s *CanvasPageSteps) assertUnsavedChangesNoteIsVisible() {
 	s.session.AssertText("You have unsaved changes")
 }
 
-func (s *CanvasPageSteps) AssertCantRunNode() {
-	// The dropdown testID is based on the node name
-	// Since we use "noop" as the default name, the testID is "node-noop-header-dropdown"
-	dropdown := q.TestID("node-noop-header-dropdown")
+func (s *CanvasPageSteps) assertCantRunNode(nodeName string) {
+	dropdown := q.TestID("node", nodeName, "header-dropdown")
 	runOption := q.Locator("button:has-text('Run')")
 
 	s.session.Click(dropdown)
@@ -106,42 +141,192 @@ func (s *CanvasPageSteps) AssertCantRunNode() {
 	s.session.AssertDisabled(runOption)
 }
 
-func (s *CanvasPageSteps) AssertExplainationIsShownWhenHoverOverRun() {
+func (s *CanvasPageSteps) assertExplainationIsShownWhenHoverOverRun() {
 	runOption := q.Locator("button:has-text('Run')")
 
 	s.session.HoverOver(runOption)
 	s.session.AssertText("Save canvas changes before running")
 }
 
-func (s *CanvasPageSteps) SaveCanvas() {
-	s.session.Click(q.TestID("save-canvas-button"))
-	s.session.Sleep(500)
-	s.session.AssertText("Canvas changes saved")
+func (s *CanvasPageSteps) saveCanvas() {
+	s.canvas.Save()
 }
 
-func (s *CanvasPageSteps) AddApprovalToCanvas(nodeName string) {
-	source := q.TestID("building-block-approval")
-	target := q.TestID("rf__wrapper")
+func (s *CanvasPageSteps) assertNodeIsAdded(nodeName string) {
+	s.session.AssertText(nodeName)
+}
 
-	s.session.DragAndDrop(source, target, 500, 250)
+func (s *CanvasPageSteps) givenACanvasExistsWithANoopNode() {
+	s.canvas = shared.NewCanvasSteps("E2E Canvas With Noop", s.t, s.session)
+
+	s.canvas.Create()
+	s.canvas.Visit()
+	s.canvas.AddNoop("DeleteMe", models.Position{X: 500, Y: 200})
+	s.canvas.Save()
+}
+
+func (s *CanvasPageSteps) duplicateNodeOnCanvas(nodeName string) {
+	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.Click(q.TestID("node-action-duplicate"))
+}
+
+func (s *CanvasPageSteps) deleteNodeFromCanvas(nodeName string) {
+	safe := strings.ToLower(nodeName)
+	safe = strings.ReplaceAll(safe, " ", "-")
+	dropdown := q.TestID("node-" + safe + "-header-dropdown")
+	deleteButton := q.Locator("button:has-text('Delete')")
+
+	s.session.Click(dropdown)
+	s.session.Click(deleteButton)
 	s.session.Sleep(300)
+}
 
-	// Use default name if empty string provided (node name is required)
-	if nodeName == "" {
-		nodeName = "approval"
+func (s *CanvasPageSteps) assertNodeDeletedInDB(nodeName string) {
+	wf, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
+	require.NoError(s.t, err)
+
+	nodes, err := models.FindWorkflowNodes(wf.ID)
+	require.NoError(s.t, err)
+
+	for _, n := range nodes {
+		if n.Name == nodeName {
+			s.t.Fatalf("expected node %q to be deleted, but it still exists in DB", nodeName)
+		}
+	}
+}
+
+func (s *CanvasPageSteps) assertNodeDuplicatedInDB(originalName, duplicateName string) {
+	originalNode := s.canvas.GetNodeFromDB(originalName)
+	duplicateNode := s.canvas.GetNodeFromDB(duplicateName)
+
+	require.NotNil(s.t, originalNode, "original node %q not found in DB", originalName)
+	require.NotNil(s.t, duplicateNode, "duplicate node %q not found in DB", duplicateName)
+
+	originalPos := originalNode.Position.Data()
+	duplicatePos := duplicateNode.Position.Data()
+
+	require.Equal(s.t, originalPos.X+50, duplicatePos.X, "duplicate node X position should be offset by 50")
+	require.Equal(s.t, originalPos.Y+50, duplicatePos.Y, "duplicate node Y position should be offset by 50")
+}
+
+func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(itemsAmount int) {
+	s.canvas = shared.NewCanvasSteps("E2E Canvas With Queue", s.t, s.session)
+
+	s.canvas.Create()
+	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
+	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 10, "Seconds")
+	s.session.TakeScreenshot()
+	s.canvas.Connect("Start", "Wait")
+	s.canvas.Save()
+
+	dropdown := q.TestID("node", "start", "header-dropdown")
+	runButton := q.Locator("button:has-text('Run')")
+	emitEvent := q.Locator("button:has-text('Emit Event')")
+
+	for i := 0; i < itemsAmount; i++ {
+		s.session.Click(dropdown)
+		s.session.Click(runButton)
+		s.session.Click(emitEvent)
+		s.session.Sleep(100)
 	}
 
-	s.session.FillIn(q.TestID("node-name-input"), nodeName)
-	s.session.Sleep(300)
+	// wait for the first item to start processing
+	s.session.Sleep(500)
 }
 
-func (s *CanvasPageSteps) ClickAddItemButton() {
-	// Click the "Add Item" button to test the list functionality
-	s.session.Click(q.Text("Add Item"))
-	s.session.Sleep(300)
+func (s *CanvasPageSteps) openSidebarForNode(node string) {
+	s.session.Click(q.TestID("node", node, "header"))
+	s.session.TakeScreenshot()
 }
 
-func (s *CanvasPageSteps) AssertNodeIsAdded(nodeName string) {
-	// Verify the node displays the custom name, not the generic component label
-	s.session.AssertText(nodeName)
+func (s *CanvasPageSteps) assertQueuedItemsCount(nodeName string, expected int) {
+	canvas, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
+	require.NoError(s.t, err)
+
+	nodes, err := models.FindWorkflowNodes(canvas.ID)
+	require.NoError(s.t, err)
+
+	var waitNode *models.WorkflowNode
+	for _, n := range nodes {
+		if n.Name == nodeName {
+			waitNode = &n
+			break
+		}
+	}
+	require.NotNil(s.t, waitNode, nodeName+" node not found")
+
+	queueItems, err := models.ListNodeQueueItems(waitNode.WorkflowID, waitNode.NodeID, 100, nil)
+	require.NoError(s.t, err)
+
+	require.Equal(s.t, expected, len(queueItems))
+}
+
+func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int) {
+	canvas, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
+	require.NoError(s.t, err)
+
+	nodes, err := models.FindWorkflowNodes(canvas.ID)
+	require.NoError(s.t, err)
+
+	var waitNode *models.WorkflowNode
+	for _, n := range nodes {
+		if n.Name == nodeName {
+			waitNode = &n
+			break
+		}
+	}
+	require.NotNil(s.t, waitNode, nodeName+" node not found")
+
+	var executions []models.WorkflowNodeExecution
+	query := database.Conn().
+		Where("workflow_id = ?", waitNode.WorkflowID).
+		Where("node_id = ?", waitNode.NodeID).
+		Order("created_at DESC")
+
+	err = query.Find(&executions).Error
+	require.NoError(s.t, err)
+
+	require.Equal(s.t, expected, len(executions))
+}
+
+func (s *CanvasPageSteps) assertQueuedItemsVisibleInSidebar() {
+	s.session.AssertText("Next in queue")
+}
+
+func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
+	s.session.Click(q.Locator("h2:has-text('Next in queue') ~ div button[aria-label='Open actions']"))
+	s.session.TakeScreenshot()
+	s.session.Sleep(300)
+	s.session.Click(q.TestID("cancel-queue-item"))
+	s.session.TakeScreenshot()
+	s.session.Sleep(500) // wait for the cancellation to be processed
+}
+
+func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
+	s.session.Click(q.Locator("h2:has-text('Latest events') ~ div button[aria-label='Open actions']"))
+	s.session.TakeScreenshot()
+	s.session.Sleep(300)
+	s.session.Click(q.TestID("cancel-queue-item"))
+	s.session.TakeScreenshot()
+	s.session.Sleep(500) // wait for the cancellation to be processed
+}
+
+func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
+	executions := s.canvas.GetExecutionsForNode(nodeName)
+	require.Greater(s.t, len(executions), 0, "expected at least one execution")
+
+	execution := executions[0]
+	require.Equal(s.t, models.WorkflowNodeExecutionResultCancelled, execution.Result, "expected execution to be cancelled")
+}
+
+func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName string) {
+	workflows := s.canvas.GetWorkflowFromDB()
+	sourceNode := s.canvas.GetNodeFromDB(sourceName)
+	targetNode := s.canvas.GetNodeFromDB(targetName)
+
+	for _, conn := range workflows.Edges {
+		if conn.SourceID == sourceNode.NodeID && conn.TargetID == targetNode.NodeID {
+			s.t.Fatalf("expected nodes %q and %q to not be connected, but connection exists in DB", sourceName, targetName)
+		}
+	}
 }

@@ -8,7 +8,6 @@ option go_package = "github.com/superplanehq/superplane/pkg/protos/authorization
 enum DomainType {
   DOMAIN_TYPE_UNSPECIFIED = 0;
   DOMAIN_TYPE_ORGANIZATION = 1;
-  DOMAIN_TYPE_CANVAS = 2;
 }
 
 // Common data structures

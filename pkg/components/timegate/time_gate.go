@@ -8,6 +8,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -240,7 +241,7 @@ func (tg *TimeGate) Setup(ctx components.SetupContext) error {
 	return nil
 }
 
-func (tg *TimeGate) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+func (tg *TimeGate) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 
@@ -390,19 +391,45 @@ func (tg *TimeGate) Actions() []components.Action {
 		{
 			Name: "timeReached",
 		},
+		{
+			Name:           "pushThrough",
+			Description:    "Push Through",
+			UserAccessible: true,
+		},
 	}
 }
 
 func (tg *TimeGate) HandleAction(ctx components.ActionContext) error {
 	switch ctx.Name {
 	case "timeReached":
-		return ctx.ExecutionStateContext.Pass(map[string][]any{
-			components.DefaultOutputChannel.Name: {map[string]any{}},
-		})
-
+		return tg.HandleTimeReached(ctx)
+	case "pushThrough":
+		return tg.HandlePushThrough(ctx)
 	default:
 		return fmt.Errorf("unknown action: %s", ctx.Name)
 	}
+}
+
+func (tg *TimeGate) HandleTimeReached(ctx components.ActionContext) error {
+	if ctx.ExecutionStateContext.IsFinished() {
+		// already handled, for example via "pushThrough" action
+		return nil
+	}
+
+	return ctx.ExecutionStateContext.Pass(map[string][]any{
+		components.DefaultOutputChannel.Name: {map[string]any{}},
+	})
+}
+
+func (tg *TimeGate) HandlePushThrough(ctx components.ActionContext) error {
+	if ctx.ExecutionStateContext.IsFinished() {
+		// already handled, for example via "timeReached" action
+		return nil
+	}
+
+	return ctx.ExecutionStateContext.Pass(map[string][]any{
+		components.DefaultOutputChannel.Name: {map[string]any{}},
+	})
 }
 
 func (tg *TimeGate) configEqual(a, b Spec) bool {

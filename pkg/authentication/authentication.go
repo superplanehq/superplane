@@ -3,9 +3,11 @@ package authentication
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"sort"
 	"time"
@@ -21,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
 )
 
@@ -107,6 +110,18 @@ func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	redirectParam := r.URL.Query().Get("redirect")
+	if redirectParam != "" {
+		r2 := new(http.Request)
+		*r2 = *r
+		r2.URL = new(url.URL)
+		*r2.URL = *r.URL
+		q := r2.URL.Query()
+		q.Set("state", redirectParam)
+		r2.URL.RawQuery = q.Encode()
+		r = r2
+	}
+
 	gothic.BeginAuthHandler(w, r)
 }
 
@@ -128,7 +143,7 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		AccessToken: "dev-token-" + provider,
 	}
 
-	account, err := a.findOrCreateAccount(mockUser.Name, mockUser.Email)
+	account, err := a.FindOrCreateAccountForProvider(mockUser)
 
 	if err != nil {
 		if err.Error() == SignupDisabledError {
@@ -136,6 +151,7 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		log.Errorf("Error finding/creating dev account for %s: %v", mockUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -162,20 +178,27 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account, err := a.findOrCreateAccount(gothUser.Name, gothUser.Email)
+	account, err := a.FindOrCreateAccountForProvider(gothUser)
 	if err != nil {
+		if err.Error() == SignupDisabledError {
+			http.Error(w, SignupDisabledError, http.StatusForbidden)
+			return
+		}
+		log.Errorf("Error finding/creating account for %s: %v", gothUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	err = updateAccountProviders(a.encryptor, account, gothUser)
 	if err != nil {
+		log.Errorf("Error updating account providers for %s: %v", gothUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	err = a.acceptPendingInvitations(account)
 	if err != nil {
+		log.Errorf("Error accepting pending invitations for %s: %v", gothUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -215,19 +238,11 @@ func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, acc
 			return err
 		}
 
-		//
-		// TODO: this is not using the transaction properly
-		//
 		err = a.authService.AssignRole(user.ID.String(), models.RoleOrgViewer, invitation.OrganizationID.String(), models.DomainTypeOrganization)
 		if err != nil {
 			return err
 		}
-		for _, canvasID := range invitation.CanvasIDs.Data() {
-			err = a.authService.AssignRole(user.ID.String(), models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
-			if err != nil {
-				return err
-			}
-		}
+
 		return nil
 	})
 }
@@ -255,27 +270,29 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+	redirectURL := getRedirectURL(r)
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	gothic.Logout(w, r)
 
-	// Clear the account cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "account_token",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	})
+	ClearAccountCookie(w, r)
 
 	http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 }
 
 func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("account_token")
+	if err == nil {
+		_, err := a.jwtSigner.ValidateAndGetClaims(cookie.Value)
+		if err == nil {
+			redirectURL := getRedirectURL(r)
+			http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+			return
+		}
+	}
+
 	templatePath := filepath.Join(a.templateDir, "login.html")
 
 	t, err := template.ParseFiles(templatePath)
@@ -292,10 +309,14 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(providerNames)
 
+	redirectParam := r.URL.Query().Get("redirect")
+
 	data := struct {
-		Providers []string
+		Providers     []string
+		RedirectParam string
 	}{
-		Providers: providerNames,
+		Providers:     providerNames,
+		RedirectParam: redirectParam,
 	}
 
 	err = t.Execute(w, data)
@@ -305,18 +326,37 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *Handler) findOrCreateAccount(name, email string) (*models.Account, error) {
-	account, err := models.FindAccountByEmail(email)
+func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {
+	account, err := models.FindAccountByProvider(gothUser.Provider, gothUser.UserID)
+
+	if err == nil {
+		if account.Email != utils.NormalizeEmail(gothUser.Email) {
+			log.Infof("Updating email for account %s from %s to %s", account.ID, account.Email, gothUser.Email)
+			err = account.UpdateEmailForProvider(gothUser.Email, gothUser.Provider, gothUser.UserID)
+
+			if err != nil {
+				log.Errorf("Failed to update account email: %v", err)
+				return nil, fmt.Errorf("failed to update account email: %w", err)
+			}
+		}
+		return account, nil
+	}
+
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	account, err = models.FindAccountByEmail(gothUser.Email)
 	if err == nil {
 		return account, nil
 	}
 
 	if a.blockSignup {
-		log.Warnf("Signup blocked for email: %s", email)
+		log.Warnf("Signup blocked for email: %s", gothUser.Email)
 		return nil, fmt.Errorf(SignupDisabledError)
 	}
 
-	account, err = models.CreateAccount(name, email)
+	account, err = models.CreateAccount(gothUser.Name, gothUser.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +378,7 @@ func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account,
 	if err == nil {
 		accountProvider.AccessToken = base64.StdEncoding.EncodeToString(accessToken)
 		accountProvider.Username = gothUser.NickName
-		accountProvider.Email = gothUser.Email
+		accountProvider.Email = utils.NormalizeEmail(gothUser.Email)
 		accountProvider.Name = gothUser.Name
 		accountProvider.AvatarURL = gothUser.AvatarURL
 		accountProvider.RefreshToken = gothUser.RefreshToken
@@ -357,7 +397,7 @@ func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account,
 		Provider:       gothUser.Provider,
 		ProviderID:     gothUser.UserID,
 		Username:       gothUser.NickName,
-		Email:          gothUser.Email,
+		Email:          utils.NormalizeEmail(gothUser.Email),
 		Name:           gothUser.Name,
 		AvatarURL:      gothUser.AvatarURL,
 		AccessToken:    base64.StdEncoding.EncodeToString(accessToken),
@@ -366,4 +406,49 @@ func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account,
 	}
 
 	return database.Conn().Create(accountProvider).Error
+}
+
+func getRedirectURL(r *http.Request) string {
+	redirectParam := r.URL.Query().Get("redirect")
+
+	if redirectParam == "" {
+		redirectParam = r.URL.Query().Get("state")
+	}
+
+	if redirectParam == "" {
+		return "/"
+	}
+
+	decodedURL, err := url.QueryUnescape(redirectParam)
+	if err == nil && isValidRedirectURL(decodedURL) {
+		return decodedURL
+	}
+
+	return "/"
+}
+
+// Validates that the redirect URL is a valid internal URL.
+// It rejects external URLs and URLs with multiple slashes.
+func isValidRedirectURL(redirectURL string) bool {
+	if redirectURL == "" || redirectURL[0] != '/' {
+		return false
+	}
+
+	if len(redirectURL) > 1 && redirectURL[1] == '/' {
+		return false
+	}
+
+	return true
+}
+
+func ClearAccountCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "account_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
 }

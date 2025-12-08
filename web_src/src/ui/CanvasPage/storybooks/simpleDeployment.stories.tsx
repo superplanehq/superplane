@@ -440,7 +440,6 @@ const sampleNodes: CanvasNode[] = [
             Size: "971.5 MB",
           },
         },
-        startLastValuesOpen: false,
         collapsed: false,
       },
     },

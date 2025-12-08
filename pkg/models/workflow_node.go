@@ -34,6 +34,7 @@ type WorkflowNode struct {
 	WebhookID     *uuid.UUID
 	CreatedAt     *time.Time
 	UpdatedAt     *time.Time
+	DeletedAt     gorm.DeletedAt `gorm:"index"`
 }
 
 func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {
@@ -72,8 +73,12 @@ func FindWorkflowNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*Workfl
 func ListWorkflowNodesReady() ([]WorkflowNode, error) {
 	var nodes []WorkflowNode
 	err := database.Conn().
-		Where("state = ?", WorkflowNodeStateReady).
-		Where("type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
+		Distinct().
+		Joins("JOIN workflow_node_queue_items ON workflow_nodes.workflow_id = workflow_node_queue_items.workflow_id AND workflow_nodes.node_id = workflow_node_queue_items.node_id").
+		Joins("JOIN workflows ON workflow_nodes.workflow_id = workflows.id").
+		Where("workflow_nodes.state = ?", WorkflowNodeStateReady).
+		Where("workflow_nodes.type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
+		Where("workflows.deleted_at IS NULL").
 		Find(&nodes).
 		Error
 
@@ -168,6 +173,7 @@ type WorkflowNodeQueueItem struct {
 	// for that event with a simple query.
 	//
 	RootEventID uuid.UUID
+	RootEvent   *WorkflowEvent `gorm:"foreignKey:RootEventID"`
 
 	//
 	// The reference to a WorkflowEvent record,
@@ -183,6 +189,7 @@ func (i *WorkflowNodeQueueItem) Delete(tx *gorm.DB) error {
 func ListNodeQueueItems(workflowID uuid.UUID, nodeID string, limit int, beforeTime *time.Time) ([]WorkflowNodeQueueItem, error) {
 	var queueItems []WorkflowNodeQueueItem
 	query := database.Conn().
+		Preload("RootEvent").
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
 		Order("created_at DESC").
@@ -233,4 +240,19 @@ func FindNextQueueItemPerNode(workflowID uuid.UUID) ([]WorkflowNodeQueueItem, er
 	}
 
 	return queueItems, nil
+}
+
+func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*WorkflowNodeQueueItem, error) {
+	var queueItem WorkflowNodeQueueItem
+	err := database.Conn().
+		Preload("RootEvent").
+		Where("workflow_id = ? AND id = ?", workflowID, queueItemID).
+		First(&queueItem).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &queueItem, nil
 }

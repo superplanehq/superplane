@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
-import type { FormErrors, IntegrationData } from "./types";
+import { useCallback, useEffect, useState } from "react";
 import { getIntegrationConfig } from "./integrationConfigs";
+import type { FormErrors, IntegrationData } from "./types";
 
 interface UseIntegrationFormProps {
   integrationType: string;
@@ -32,11 +32,36 @@ export function useIntegrationForm({ integrationType, integrations, editingInteg
     };
   });
 
-  const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">(() => {
-    return editingIntegration ? "existing" : "new";
-  });
-  const [newSecretToken, setNewSecretToken] = useState("");
+  const [secretValue, setSecretValue] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
+
+  // Sync form data when editingIntegration changes
+  useEffect(() => {
+    if (editingIntegration) {
+      setIntegrationData({
+        name: editingIntegration.metadata?.name || "",
+        orgUrl: editingIntegration.spec?.url || "",
+        apiToken: {
+          secretName: editingIntegration.spec?.auth?.token?.valueFrom?.secret?.name || "",
+          secretKey: editingIntegration.spec?.auth?.token?.valueFrom?.secret?.key || "",
+        },
+      });
+      setSecretValue("");
+      setErrors({});
+    } else {
+      setIntegrationData({
+        orgUrl: "",
+        name: "",
+        apiToken: {
+          secretName: "",
+          secretKey: "",
+        },
+      });
+      setSecretValue("");
+      setErrors({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingIntegration?.metadata?.id]);
 
   const config = getIntegrationConfig(integrationType);
 
@@ -61,17 +86,8 @@ export function useIntegrationForm({ integrationType, integrations, editingInteg
       }
     }
 
-    if (apiTokenTab === "new") {
-      if (!NEW_SECRET_NAME.trim()) {
-        newErrors.secretName = "Field cannot be empty";
-      }
-      if (!newSecretToken.trim()) {
-        newErrors.secretValue = "Field cannot be empty";
-      }
-    } else {
-      if (!integrationData.apiToken.secretName || !integrationData.apiToken.secretKey) {
-        newErrors.apiToken = "Please select a secret and key";
-      }
+    if (!secretValue.trim()) {
+      newErrors.secretValue = "Field cannot be empty";
     }
 
     setErrors(newErrors);
@@ -84,18 +100,15 @@ export function useIntegrationForm({ integrationType, integrations, editingInteg
       name: "",
       apiToken: { secretName: "", secretKey: "" },
     });
-    setNewSecretToken("");
-    setApiTokenTab("new");
+    setSecretValue("");
     setErrors({});
   }, []);
 
   return {
     integrationData,
     setIntegrationData,
-    apiTokenTab,
-    setApiTokenTab,
-    newSecretToken,
-    setNewSecretToken,
+    secretValue,
+    setSecretValue,
     errors,
     setErrors,
     validateForm,

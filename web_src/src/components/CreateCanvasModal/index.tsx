@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { showErrorToast } from "../../utils/toast";
-import { Button } from "../Button/button";
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../Dialog/dialog";
 import { Field, Label } from "../Fieldset/fieldset";
+import { Icon } from "../Icon";
 import { Input } from "../Input/input";
-import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
 import { Textarea } from "../Textarea/textarea";
+import { Button } from "../ui/button";
 
 interface CreateCanvasModalProps {
   isOpen: boolean;
@@ -72,7 +72,7 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
         Create a new canvas to orchestrate your DevOps work. You can tweak the details any time.
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
-        <MaterialSymbol name="close" size="sm" />
+        <Icon name="close" size="sm" />
       </button>
 
       <DialogBody>
@@ -126,7 +126,6 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
 
       <DialogActions>
         <Button
-          color="blue"
           onClick={handleSubmit}
           disabled={!name.trim() || isLoading || !!nameError}
           className="flex items-center gap-2"

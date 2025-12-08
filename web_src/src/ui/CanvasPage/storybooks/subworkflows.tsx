@@ -1,4 +1,4 @@
-import { NoopProps } from "@/ui/noop";
+import { ComponentBaseProps } from "@/ui/componentBase";
 import { navigateToStory } from "./navigation";
 import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
@@ -650,19 +650,22 @@ export const Provisioner = {
       data: {
         label: `NOOP 1`,
         state: "working",
-        type: "noop",
-        noop: {
+        type: "component",
+        component: {
           title: "NOOP 1",
           description: "NOOP 1",
+          headerColor: "bg-gray-50",
           collapsed: false,
-          lastEvent: {
-            eventState: "success",
-            eventReceivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
-            eventTitle: "FEAT: Add new feature",
-            eventSubtitle: "ef546d40",
-            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
-          },
-        } as NoopProps,
+          eventSections: [
+            {
+              title: "Last Run",
+              eventState: "success",
+              receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
+              eventTitle: "FEAT: Add new feature",
+              eventSubtitle: "ef546d40",
+            },
+          ],
+        } as ComponentBaseProps,
       },
     },
     {
@@ -671,19 +674,22 @@ export const Provisioner = {
       data: {
         label: `NOOP 2`,
         state: "working",
-        type: "noop",
-        noop: {
+        type: "component",
+        component: {
           title: "NOOP 2",
           description: "NOOP 2",
+          headerColor: "bg-gray-50",
           collapsed: false,
-          lastEvent: {
-            eventState: "success",
-            eventReceivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
-            eventTitle: "FEAT: Add new feature",
-            eventSubtitle: "ef546d40",
-            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
-          },
-        } as NoopProps,
+          eventSections: [
+            {
+              title: "Last Run",
+              eventState: "success",
+              receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
+              eventTitle: "FEAT: Add new feature",
+              eventSubtitle: "ef546d40",
+            },
+          ],
+        } as ComponentBaseProps,
       },
     },
   ],
@@ -713,19 +719,22 @@ export const Desprovisioner = {
       data: {
         label: `NOOP 1`,
         state: "working",
-        type: "noop",
-        noop: {
+        type: "component",
+        component: {
           title: "NOOP 1",
           description: "NOOP 1",
+          headerColor: "bg-gray-50",
           collapsed: false,
-          lastEvent: {
-            eventState: "success",
-            eventReceivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
-            eventTitle: "FEAT: Add new feature",
-            eventSubtitle: "ef546d40",
-            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
-          },
-        } as NoopProps,
+          eventSections: [
+            {
+              title: "Last Run",
+              eventState: "success",
+              receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
+              eventTitle: "FEAT: Add new feature",
+              eventSubtitle: "ef546d40",
+            },
+          ],
+        } as ComponentBaseProps,
       },
     },
     {
@@ -734,19 +743,22 @@ export const Desprovisioner = {
       data: {
         label: `NOOP 2`,
         state: "working",
-        type: "noop",
-        noop: {
+        type: "component",
+        component: {
           title: "NOOP 2",
           description: "NOOP 2",
+          headerColor: "bg-gray-50",
           collapsed: false,
-          lastEvent: {
-            eventState: "success",
-            eventReceivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
-            eventTitle: "FEAT: Add new feature",
-            eventSubtitle: "ef546d40",
-            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
-          },
-        } as NoopProps,
+          eventSections: [
+            {
+              title: "Last Run",
+              eventState: "success",
+              receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
+              eventTitle: "FEAT: Add new feature",
+              eventSubtitle: "ef546d40",
+            },
+          ],
+        } as ComponentBaseProps,
       },
     },
   ],

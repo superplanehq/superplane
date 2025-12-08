@@ -30,6 +30,7 @@ type ConfigurationField struct {
 	TypeOptions *ConfigurationTypeOptions `json:"typeOptions,omitempty"`
 	RequiredConditions []ConfigurationRequiredCondition `json:"requiredConditions,omitempty"`
 	ValidationRules []ConfigurationValidationRule `json:"validationRules,omitempty"`
+	Placeholder *string `json:"placeholder,omitempty"`
 }
 
 // NewConfigurationField instantiates a new ConfigurationField object
@@ -369,6 +370,38 @@ func (o *ConfigurationField) SetValidationRules(v []ConfigurationValidationRule)
 	o.ValidationRules = v
 }
 
+// GetPlaceholder returns the Placeholder field value if set, zero value otherwise.
+func (o *ConfigurationField) GetPlaceholder() string {
+	if o == nil || IsNil(o.Placeholder) {
+		var ret string
+		return ret
+	}
+	return *o.Placeholder
+}
+
+// GetPlaceholderOk returns a tuple with the Placeholder field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationField) GetPlaceholderOk() (*string, bool) {
+	if o == nil || IsNil(o.Placeholder) {
+		return nil, false
+	}
+	return o.Placeholder, true
+}
+
+// HasPlaceholder returns a boolean if a field has been set.
+func (o *ConfigurationField) HasPlaceholder() bool {
+	if o != nil && !IsNil(o.Placeholder) {
+		return true
+	}
+
+	return false
+}
+
+// SetPlaceholder gets a reference to the given string and assigns it to the Placeholder field.
+func (o *ConfigurationField) SetPlaceholder(v string) {
+	o.Placeholder = &v
+}
+
 func (o ConfigurationField) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -408,6 +441,9 @@ func (o ConfigurationField) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.ValidationRules) {
 		toSerialize["validationRules"] = o.ValidationRules
+	}
+	if !IsNil(o.Placeholder) {
+		toSerialize["placeholder"] = o.Placeholder
 	}
 	return toSerialize, nil
 }

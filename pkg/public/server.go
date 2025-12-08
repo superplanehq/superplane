@@ -1,6 +1,7 @@
 package public
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,13 +26,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	nooptrace "go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbApplications "github.com/superplanehq/superplane/pkg/protos/applications"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
-	pbSup "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -162,12 +166,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
 
-	err := pbSup.RegisterSuperplaneHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
-	if err != nil {
-		return err
-	}
-
-	err = pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err := pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -345,6 +344,10 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 
 func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	r := mux.NewRouter().StrictSlash(true)
+	r.Use(otelmux.Middleware(
+		"superplane-public-api",
+		otelmux.WithTracerProvider(nooptrace.NewTracerProvider()),
+	))
 	r.Use(middleware.LoggingMiddleware(log.StandardLogger()))
 
 	// Register authentication routes (no auth required)
@@ -469,42 +472,57 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//
-	// TODO: the organization creation should be in a transaction
-	// Create the organization and set up roles for it.
+	// Create the organization
 	//
-	organization, err := models.CreateOrganization(req.Name, "")
-	if err != nil {
-		log.Errorf("Error creating organization: %v", err)
-		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
-		return
-	}
+	tx := database.Conn().Begin()
+	log.Infof("Creating organization %s for account %s", req.Name, account.Email)
+	organization, err := models.CreateOrganizationInTransaction(tx, req.Name, "")
 
-	err = s.authService.SetupOrganizationRoles(organization.ID.String())
 	if err != nil {
-		log.Errorf("Error setting up organization roles for %s: %v", organization.Name, err)
-		models.HardDeleteOrganization(organization.ID.String())
-		http.Error(w, "Failed to set up organization roles", http.StatusInternalServerError)
+		tx.Rollback()
+
+		if err.Error() == "name already used" {
+			http.Error(w, "Organization name already in use", http.StatusConflict)
+			return
+		}
+
+		log.Errorf("Error creating organization %s: %v", req.Name, err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
 		return
 	}
 
 	//
 	// Create the owner user for it
 	//
-	user, err := models.CreateUser(organization.ID, account.ID, account.Email, account.Name)
+	log.Infof("Creating user for new organization %s (%s)", organization.Name, organization.ID)
+	user, err := models.CreateUserInTransaction(tx, organization.ID, account.ID, account.Email, account.Name)
 	if err != nil {
-		log.Errorf("Error creating user for new organization: %v", err)
-		models.HardDeleteOrganization(organization.ID.String())
+		tx.Rollback()
+		log.Errorf("Error creating user for new organization %s (%s): %v", organization.Name, organization.ID, err)
 		http.Error(w, "Failed to create user account", http.StatusInternalServerError)
 		return
 	}
 
-	err = s.authService.CreateOrganizationOwner(user.ID.String(), organization.ID.String())
+	//
+	// Finally, set up RBAC for the new organization.
+	//
+	log.Infof("Setting up RBAC policies for new organization %s (%s)", organization.Name, organization.ID)
+	err = s.authService.SetupOrganization(tx, organization.ID.String(), user.ID.String())
 	if err != nil {
-		log.Errorf("Error creating organization owner for %s: %v", organization.Name, err)
-		models.HardDeleteOrganization(organization.ID.String())
-		http.Error(w, "Failed to create organization owner", http.StatusInternalServerError)
+		tx.Rollback()
+		log.Errorf("Error setting up RBAC policies for %s (%s): %v", organization.Name, organization.ID, err)
+		http.Error(w, "Failed to set up organization roles", http.StatusInternalServerError)
 		return
 	}
+
+	err = tx.Commit().Error
+	if err != nil {
+		log.Errorf("Error committing transaction for organization %s (%s) creation: %v", organization.Name, organization.ID, err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+
+	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
@@ -732,15 +750,34 @@ func (s *Server) setupDevProxy(webBasePath string) {
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
+	proxy.ModifyResponse = func(res *http.Response) error {
+		contentType := res.Header.Get("Content-Type")
+		if !strings.HasPrefix(contentType, "text/html") {
+			return nil
+		}
+
+		originalBody, err := io.ReadAll(res.Body)
+		if err != nil {
+			return err
+		}
+		_ = res.Body.Close()
+
+		rendered, err := web.RenderIndexTemplate(originalBody)
+		if err != nil {
+			return err
+		}
+
+		res.Body = io.NopCloser(bytes.NewReader(rendered))
+		res.ContentLength = int64(len(rendered))
+		res.Header.Set("Content-Length", strconv.Itoa(len(rendered)))
+
+		return nil
+	}
+
 	origDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
-		originalPath := req.URL.Path
-
 		origDirector(req)
-
 		req.Host = target.Host
-
-		log.Infof("Proxying: %s → %s", originalPath, req.URL.Path)
 	}
 
 	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

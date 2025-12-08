@@ -5,30 +5,12 @@ import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
 import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
-import { Filter, FilterProps } from "../filter";
-import { Http, HttpProps } from "../http";
-import { Semaphore, SemaphoreProps } from "../semaphore";
-import { TimeGate, TimeGateProps } from "../timeGate";
-import { If, IfProps } from "../if";
 import MergeComponent, { type MergeComponentProps } from "../merge";
-import { Noop, NoopProps } from "../noop";
 import { ComponentActionsProps } from "../types/componentActions";
-import { Wait, WaitProps } from "../wait";
+import { ComponentBase, ComponentBaseProps } from "../componentBase";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType =
-  | "trigger"
-  | "composite"
-  | "approval"
-  | "filter"
-  | "if"
-  | "noop"
-  | "http"
-  | "semaphore"
-  | "wait"
-  | "merge"
-  | "time_gate"
-  | "switch";
+type BlockType = "trigger" | "component" | "composite" | "approval" | "merge" | "switch";
 
 interface BlockAi {
   show: boolean;
@@ -52,32 +34,14 @@ export interface BlockData {
   // trigger node specific props
   trigger?: TriggerProps;
 
+  // component base specific props
+  component?: ComponentBaseProps;
+
   // composite node specific props
   composite?: CompositeProps;
 
   // approval node specific props
   approval?: ApprovalProps;
-
-  // filter node specific props
-  filter?: FilterProps;
-
-  // if node specific props
-  if?: IfProps;
-
-  // noop node specific props
-  noop?: NoopProps;
-
-  // http node specific props
-  http?: HttpProps;
-
-  // semaphore node specific props
-  semaphore?: SemaphoreProps;
-
-  // wait node specific props
-  wait?: WaitProps;
-
-  // time_gate node specific props
-  time_gate?: TimeGateProps;
 
   // switch node specific props
   switch?: SwitchComponentProps;
@@ -111,9 +75,9 @@ export function Block(props: BlockProps) {
       <AiPopup {...ai} />
 
       <div className="relative w-fit" onClick={props.onClick}>
-        <LeftHandle data={data} />
+        <LeftHandle data={data} nodeId={props.nodeId} />
         <BlockContent {...props} />
-        <RightHandle data={data} />
+        <RightHandle data={data} nodeId={props.nodeId} />
       </div>
     </>
   );
@@ -131,20 +95,37 @@ const HANDLE_STYLE = {
   background: "transparent",
 };
 
-function LeftHandle({ data }: BlockProps) {
+function LeftHandle({ data, nodeId }: BlockProps) {
   if (data.type === "trigger") return null;
 
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "approval" && data.approval?.collapsed) ||
-    (data.type === "filter" && data.filter?.collapsed) ||
-    (data.type === "if" && data.if?.collapsed) ||
-    (data.type === "noop" && data.noop?.collapsed) ||
-    (data.type === "http" && data.http?.collapsed) ||
-    (data.type === "semaphore" && data.semaphore?.collapsed) ||
-    (data.type === "wait" && data.wait?.collapsed) ||
-    (data.type === "time_gate" && data.time_gate?.collapsed) ||
-    (data.type === "switch" && data.switch?.collapsed);
+    (data.type === "switch" && data.switch?.collapsed) ||
+    (data.type === "component" && data.component?.collapsed);
+
+  // Check if this handle is part of the hovered edge (this is the target)
+  const hoveredEdge = (data as any)._hoveredEdge;
+  const connectingFrom = (data as any)._connectingFrom;
+  const allEdges = (data as any)._allEdges || [];
+
+  // Check if already connected to the source being dragged
+  const isAlreadyConnected = connectingFrom
+    ? allEdges.some(
+        (edge: any) =>
+          edge.source === connectingFrom.nodeId &&
+          edge.sourceHandle === connectingFrom.handleId &&
+          edge.target === nodeId,
+      )
+    : false;
+
+  // Highlight if: 1) part of hovered edge, or 2) user is dragging from a source handle on a different node AND not already connected
+  const isHighlighted =
+    (hoveredEdge && hoveredEdge.target === nodeId) ||
+    (connectingFrom &&
+      connectingFrom.nodeId !== nodeId &&
+      connectingFrom.handleType === "source" &&
+      !isAlreadyConnected);
 
   return (
     <Handle
@@ -156,38 +137,44 @@ function LeftHandle({ data }: BlockProps) {
         top: isCollapsed ? "50%" : 30,
         transform: isCollapsed ? "translateY(-50%)" : undefined,
       }}
+      className={isHighlighted ? "highlighted" : undefined}
     />
   );
 }
 
-function RightHandle({ data }: BlockProps) {
+function RightHandle({ data, nodeId }: BlockProps) {
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "trigger" && data.trigger?.collapsed) ||
-    (data.type === "filter" && data.filter?.collapsed) ||
-    (data.type === "if" && data.if?.collapsed) ||
-    (data.type === "noop" && data.noop?.collapsed) ||
-    (data.type === "http" && data.http?.collapsed) ||
-    (data.type === "semaphore" && data.semaphore?.collapsed) ||
-    (data.type === "wait" && data.wait?.collapsed) ||
-    (data.type === "time_gate" && data.time_gate?.collapsed) ||
-    (data.type === "switch" && data.switch?.collapsed);
+    (data.type === "switch" && data.switch?.collapsed) ||
+    (data.type === "component" && data.component?.collapsed);
 
-  let channels = data.outputChannels || ["default"];
+  const channels = data.outputChannels || ["default"];
 
-  const isIfOrSwitch = data.type === "if" || data.type === "switch";
-
-  if (isIfOrSwitch && !isCollapsed) {
-    return null;
-  }
-
-  if (data.type === "if") {
-    channels = ["true", "false"];
-  }
+  // Get hovered edge info and connecting state
+  const hoveredEdge = (data as any)._hoveredEdge;
+  const connectingFrom = (data as any)._connectingFrom;
+  const allEdges = (data as any)._allEdges || [];
 
   // Single channel: render one handle that respects collapsed state
   if (channels.length === 1) {
+    // Check if already connected to the target being dragged
+    const isAlreadyConnected = connectingFrom
+      ? allEdges.some(
+          (edge: any) =>
+            edge.source === nodeId && edge.sourceHandle === channels[0] && edge.target === connectingFrom.nodeId,
+        )
+      : false;
+
+    const isHighlighted =
+      (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channels[0]) ||
+      (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channels[0]) ||
+      (connectingFrom &&
+        connectingFrom.nodeId !== nodeId &&
+        connectingFrom.handleType === "target" &&
+        !isAlreadyConnected);
+
     return (
       <Handle
         type="source"
@@ -199,6 +186,7 @@ function RightHandle({ data }: BlockProps) {
           top: isCollapsed ? "50%" : 30,
           transform: isCollapsed ? "translateY(-50%)" : undefined,
         }}
+        className={isHighlighted ? "highlighted" : undefined}
       />
     );
   }
@@ -208,66 +196,85 @@ function RightHandle({ data }: BlockProps) {
 
   return (
     <>
-      {channels.map((channel, index) => (
-        <div
-          key={channel}
-          className="absolute"
-          style={{
-            left: "100%",
-            top: baseTop + index * spacing,
-            transform: "translateY(-50%)",
-            paddingLeft: 4,
-          }}
-        >
-          <div className="relative flex items-center">
-            {/* Small line from node */}
-            <div
-              style={{
-                width: 20,
-                height: 3,
-                backgroundColor: "#C9D5E1",
-                pointerEvents: "none",
-                marginRight: 4,
-              }}
-            />
-            {/* Label text */}
-            <span
-              className="text-xs font-medium whitespace-nowrap"
-              style={{
-                color: "#8B9AAC",
-                pointerEvents: "none",
-                paddingLeft: 2,
-                paddingRight: 2,
-              }}
-            >
-              {channel}
-            </span>
-            {/* Small line to handle */}
-            <div
-              style={{
-                width: 16,
-                height: 3,
-                backgroundColor: "#C9D5E1",
-                pointerEvents: "none",
-                marginLeft: 4,
-              }}
-            />
-            {/* Handle (connection point) */}
-            <Handle
-              type="source"
-              position={Position.Right}
-              id={channel}
-              style={{
-                ...HANDLE_STYLE,
-                position: "relative",
-                pointerEvents: "auto",
-                marginLeft: -6,
-                top: 5,
-              }}
-            />
+      {channels.map((channel, index) => {
+        // Check if already connected to the target being dragged
+        const isAlreadyConnected = connectingFrom
+          ? allEdges.some(
+              (edge: any) =>
+                edge.source === nodeId && edge.sourceHandle === channel && edge.target === connectingFrom.nodeId,
+            )
+          : false;
+
+        const isHighlighted =
+          (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channel) ||
+          (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channel) ||
+          (connectingFrom &&
+            connectingFrom.nodeId !== nodeId &&
+            connectingFrom.handleType === "target" &&
+            !isAlreadyConnected);
+
+        return (
+          <div
+            key={channel}
+            className="absolute"
+            style={{
+              left: "100%",
+              top: baseTop + index * spacing,
+              transform: "translateY(-50%)",
+              paddingLeft: 4,
+            }}
+          >
+            <div className="relative flex items-center">
+              {/* Small line from node */}
+              <div
+                style={{
+                  width: 20,
+                  height: 3,
+                  backgroundColor: "#C9D5E1",
+                  pointerEvents: "none",
+                  marginRight: 4,
+                }}
+              />
+              {/* Label text */}
+              <span
+                className="text-xs font-medium whitespace-nowrap"
+                style={{
+                  color: "#8B9AAC",
+                  pointerEvents: "none",
+                  paddingLeft: 2,
+                  paddingRight: 2,
+                }}
+              >
+                {channel}
+              </span>
+              {/* Small line to handle */}
+              <div
+                style={{
+                  width: 16,
+                  height: 3,
+                  backgroundColor: "#C9D5E1",
+                  pointerEvents: "none",
+                  marginLeft: 4,
+                }}
+              />
+              {/* Handle (connection point) */}
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={channel}
+                style={{
+                  ...HANDLE_STYLE,
+                  position: "relative",
+                  pointerEvents: "auto",
+                  marginLeft: -6,
+                  top: 5,
+                }}
+                className={isHighlighted ? "highlighted" : undefined}
+              />
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }
@@ -342,18 +349,20 @@ function BlockContent({
     runDisabled,
     runDisabledTooltip,
     onEdit,
-    onConfigure,
     onDuplicate,
     onDeactivate,
     onToggleCollapse,
     onToggleView,
     onDelete,
     isCompactView,
+    onConfigure: data.type === "composite" ? onConfigure : undefined,
   };
 
   switch (data.type) {
     case "trigger":
       return <Trigger {...(data.trigger as TriggerProps)} selected={selected} {...actionProps} />;
+    case "component":
+      return <ComponentBase {...(data.component as ComponentBaseProps)} selected={selected} {...actionProps} />;
     case "composite":
       return (
         <Composite
@@ -365,20 +374,6 @@ function BlockContent({
       );
     case "approval":
       return <Approval {...(data.approval as ApprovalProps)} selected={selected} {...actionProps} />;
-    case "filter":
-      return <Filter {...(data.filter as FilterProps)} selected={selected} {...actionProps} />;
-    case "if":
-      return <If {...(data.if as IfProps)} selected={selected} {...actionProps} />;
-    case "noop":
-      return <Noop {...(data.noop as NoopProps)} selected={selected} {...actionProps} />;
-    case "http":
-      return <Http {...(data.http as HttpProps)} selected={selected} {...actionProps} />;
-    case "semaphore":
-      return <Semaphore {...(data.semaphore as SemaphoreProps)} selected={selected} {...actionProps} />;
-    case "wait":
-      return <Wait {...(data.wait as WaitProps)} selected={selected} {...actionProps} />;
-    case "time_gate":
-      return <TimeGate {...(data.time_gate as TimeGateProps)} selected={selected} {...actionProps} />;
     case "switch":
       return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} {...actionProps} />;
     case "merge":

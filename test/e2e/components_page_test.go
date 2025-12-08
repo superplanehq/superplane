@@ -3,10 +3,11 @@ package e2e
 import (
 	"testing"
 
-	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
+	"github.com/superplanehq/superplane/test/e2e/session"
+	"github.com/superplanehq/superplane/test/e2e/shared"
 )
 
 func TestCustomComponents(t *testing.T) {
@@ -20,83 +21,104 @@ func TestCustomComponents(t *testing.T) {
 		steps.ClickExpand()
 		steps.AssertNavigatedToNodeRunPage()
 	})
+
+	t.Run("setting up outputs", func(t *testing.T) {
+		steps.Start()
+		steps.StartCreatingComponent()
+		steps.AddTwoNodesAndConnect()
+		steps.SetUpOutputs()
+		steps.SaveComponent()
+		steps.AssertComponentHasOutputs()
+	})
+
+	t.Run("set up configuration options", func(t *testing.T) {
+		steps.Start()
+		steps.StartCreatingComponent()
+		steps.AddTwoNodesAndConnect()
+		steps.SetUpConfigurationOptions()
+		steps.SaveComponent()
+		steps.AssertComponentHasConfiguration()
+	})
 }
 
 type CustomComponentsSteps struct {
-	t           *testing.T
-	session     *TestSession
-	canvasName  string
-	workflowID  string
-	componentID string
+	t       *testing.T
+	session *session.TestSession
+
+	canvas    *shared.CanvasSteps
+	component *shared.ComponentSteps
 }
 
 func (s *CustomComponentsSteps) Start() {
 	s.session = ctx.NewSession(s.t)
+	s.canvas = shared.NewCanvasSteps("E2E Components", s.t, s.session)
+	s.component = shared.NewComponentSteps("E2E Deployment Component", s.t, s.session)
+
 	s.session.Start()
 	s.session.Login()
 }
 
+func (s *CustomComponentsSteps) StartCreatingComponent() {
+	s.component.Create()
+}
+
+func (s *CustomComponentsSteps) AddTwoNodesAndConnect() {
+	s.component.AddNoop("First", models.Position{X: 900, Y: 250})
+	s.component.AddNoop("Second", models.Position{X: 1200, Y: 250})
+	s.component.Connect("First", "Second")
+}
+
+func (s *CustomComponentsSteps) SetUpOutputs() {
+	s.component.OpenComponentSettings()
+	s.component.ClickOutputChannelsTab()
+	s.component.AddOutputChannel("success", "Second", "default")
+}
+
+func (s *CustomComponentsSteps) SaveComponent() {
+	s.component.Save()
+}
+
+func (s *CustomComponentsSteps) SetUpConfigurationOptions() {
+	s.component.OpenComponentSettings()
+	s.component.ClickAddConfig()
+	s.component.AddConfigurationField("environment", "Environment")
+}
+
+func (s *CustomComponentsSteps) AssertComponentHasConfiguration() {
+	s.component.AssertConfigurationFieldExists("environment", "Environment", "string")
+}
+
+func (s *CustomComponentsSteps) AssertComponentHasOutputs() {
+	s.component.AssertOutputChannelExists("success", "Second", "default")
+}
+
 func (s *CustomComponentsSteps) GivenADeploymentComponentExists() {
-	s.session.VisitHomePage()
-	s.session.Click(q.Text("Components"))
-	s.session.Click(q.Text("New Component"))
-	s.session.FillIn(q.TestID("component-name-input"), "E2E Deployment Component")
-	s.session.Click(q.Text("Create Component"))
-	s.session.Sleep(300)
-
-	source := q.TestID("building-block-noop")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, 500, 250)
-	s.session.Sleep(300)
-	s.session.Click(q.TestID("add-node-button"))
-	s.session.Click(q.Text("Save"))
-	s.session.Sleep(300)
+	s.component.Create()
+	s.component.AddNoop("Prepare", models.Position{X: 500, Y: 250})
+	s.component.AddNoop("Deploy", models.Position{X: 900, Y: 250})
+	s.component.Connect("Prepare", "Deploy")
+	s.component.Save()
 }
 
 func (s *CustomComponentsSteps) GivenACanvasWithComponentExists() {
-	s.canvasName = "E2E Components"
-
-	s.session.VisitHomePage()
-	s.session.Click(q.Text("New Canvas"))
-	s.session.FillIn(q.TestID("canvas-name-input"), s.canvasName)
-	s.session.Click(q.Text("Create canvas"))
-	s.session.Sleep(300)
-
-	source1 := q.TestID("building-block-start")
-	target1 := q.TestID("rf__wrapper")
-	s.session.DragAndDrop(source1, target1, 500, 250)
-	s.session.Click(q.TestID("add-node-button"))
+	s.canvas.Create()
+	s.canvas.Visit()
+	s.canvas.AddManualTrigger("Start", models.Position{X: 500, Y: 250})
 
 	source2 := q.TestID("building-block-e2e-deployment-component")
 	target2 := q.TestID("rf__wrapper")
 	s.session.DragAndDrop(source2, target2, 900, 250)
 	s.session.Click(q.TestID("add-node-button"))
 
-	// connect: drag from Start node's output handle to the component's input handle
-	sourceHandle := q.Locator(`.react-flow__node:has-text("start") .react-flow__handle-right`)
-	targetHandle := q.Locator(`.react-flow__node:has-text("E2E Deployment Component") .react-flow__handle-left`)
-	s.session.DragAndDrop(sourceHandle, targetHandle, 6, 6)
-	s.session.Sleep(200)
-
-	// save canvas
-	s.session.Click(q.TestID("save-canvas-button"))
-	s.session.Sleep(1000)
+	s.canvas.Connect("Start", "E2E Deployment Component")
+	s.canvas.Save()
 }
 
 func (s *CustomComponentsSteps) GivenNodeHasOneExecution() {
-	// Run the Start node instead of the component
-	dropdown := q.TestID("node-start-header-dropdown")
-	runOption := q.Locator("button:has-text('Run')")
-
-	s.session.Click(dropdown)
-	s.session.Click(runOption)
-	s.session.Click(q.TestID("emit-event-submit-button"))
+	s.canvas.RunManualTrigger("Start")
 	s.session.Sleep(1000)
 
-	// hack to refresh the page
-	s.session.Visit("/" + s.session.orgID + "/")
-	s.session.Click(q.Text(s.canvasName))
+	s.canvas.Visit()
 	s.session.Sleep(500)
 }
 
@@ -105,19 +127,8 @@ func (s *CustomComponentsSteps) ClickExpand() {
 }
 
 func (s *CustomComponentsSteps) AssertNavigatedToNodeRunPage() {
-	orgUUID := uuid.MustParse(s.session.orgID)
-	wf, err := models.FindWorkflowByName(s.canvasName, orgUUID)
-	require.NoError(s.t, err)
-	s.workflowID = wf.ID.String()
+	node := s.canvas.GetNodeFromDB("E2E Deployment Component")
+	require.NotNil(s.t, node, "component node not found in DB")
 
-	nodes, err := models.FindWorkflowNodes(wf.ID)
-	require.NoError(s.t, err)
-	for _, n := range nodes {
-		if n.Name == "E2E Deployment Component" {
-			s.componentID = n.NodeID
-			break
-		}
-	}
-
-	s.session.AssertURLContains("/workflows/" + s.workflowID + "/nodes/" + s.componentID)
+	s.session.AssertURLContains("/workflows/" + s.canvas.WorkflowID.String() + "/nodes/" + node.NodeID)
 }

@@ -19,13 +19,13 @@
     "format:check": "prettier --check '**/*.{ts,tsx}'"
   },
   "dependencies": {
+    "@sentry/react": "^8.40.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@floating-ui/react": "^0.27.12",
     "@headlessui/react": "^2.2.4",
     "@hey-api/client-fetch": "^0.10.1",
     "@monaco-editor/react": "^4.7.0",
-    "@mui/material": "^7.1.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.7",

@@ -43,9 +43,15 @@ Get your first workflow running in 10 minutes:
 # Clone and start Superplane locally
 git clone https://github.com/your-org/superplane
 cd superplane
+# Setup the environment (first time)
 make dev.setup && make dev.start
 
 # Open http://localhost:8000
+
+# Update DB after changes
+
+make db.migrate DB_NAME=superplane_dev
+
 ```
 
 → [Complete Quick Start Guide](docs/getting-started/quick-start.md)

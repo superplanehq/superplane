@@ -1,222 +1,41 @@
-import { Field, Label, ErrorMessage } from "../Fieldset/fieldset";
+import { Field, ErrorMessage } from "../Fieldset/fieldset";
 import { Input } from "../Input/input";
-import { ControlledTabs } from "../Tabs/tabs";
-import { Dropdown, DropdownButton, DropdownMenu, DropdownItem, DropdownLabel } from "../Dropdown/dropdown";
-import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
-import { Link } from "../Link/link";
-import { Text } from "../Text/text";
-import type { Tab } from "../Tabs/tabs";
 import type { BaseIntegrationFormProps } from "./types";
-import { useSecret } from "@/hooks/useSecrets";
 
 interface ApiTokenFormProps extends BaseIntegrationFormProps {
   organizationId: string;
   canvasId: string;
   isEditMode?: boolean;
-  newSecretValue?: string;
-  setNewSecretValue?: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export function ApiTokenForm({
-  integrationData,
-  setIntegrationData,
   errors,
   setErrors,
-  apiTokenTab,
-  setApiTokenTab,
-  newSecretToken,
-  setNewSecretToken,
-  secrets,
-  organizationId,
-  canvasId,
+  secretValue,
+  setSecretValue,
   isEditMode = false,
-  newSecretValue = "",
-  setNewSecretValue,
 }: ApiTokenFormProps) {
-  const { data: selectedSecret } = useSecret(canvasId, "DOMAIN_TYPE_CANVAS", integrationData.apiToken.secretName);
-
-  // In edit mode, show a simplified form that updates the secret value directly
-  if (isEditMode && integrationData.apiToken.secretName) {
-    return (
-      <div className="space-y-4">
-        <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center justify-between">
-          API Token
-        </div>
-        <Field>
-          <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">Update Token Value</Label>
-          <Input
-            type="password"
-            placeholder="Enter new API token value"
-            value={newSecretValue}
-            className="w-full"
-            onChange={(e) => {
-              if (setNewSecretValue) {
-                setNewSecretValue(e.target.value);
-              }
-              if (errors.secretValue) {
-                setErrors((prev) => ({ ...prev, secretValue: undefined }));
-              }
-            }}
-          />
-          <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
-            Updating this value will modify the secret <strong>{integrationData.apiToken.secretName}</strong> in your
-            canvas secrets.
-          </Text>
-          {errors.secretValue && <ErrorMessage>{errors.secretValue}</ErrorMessage>}
-        </Field>
-      </div>
-    );
-  }
-
-  const apiTokenTabs: Tab[] = [
-    {
-      id: "new",
-      label: "Create new secret",
-    },
-    {
-      id: "existing",
-      label: "Import from existing secret",
-      disabled: secrets.length === 0,
-      disabledTooltip: secrets.length === 0 ? "No existing secrets found. Please create new one." : undefined,
-    },
-  ];
-
-  const selectedExistingSecret =
-    selectedSecret || secrets.find((secret) => secret.metadata?.name === integrationData.apiToken.secretName);
-
   return (
     <div className="space-y-4">
       <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center justify-between">
         API Token
       </div>
-
-      <div>
-        <ControlledTabs
-          tabs={apiTokenTabs}
-          activeTab={apiTokenTab}
-          variant="pills"
+      <Field>
+        <Input
+          data-testid="integration-api-token-input"
+          type="password"
+          placeholder={isEditMode ? "Enter new API token value" : "Enter your API token"}
+          value={secretValue}
           className="w-full"
-          buttonClasses="w-full"
-          onTabChange={(tabId) => setApiTokenTab(tabId as "existing" | "new")}
+          onChange={(e) => {
+            setSecretValue(e.target.value);
+            if (errors.secretValue) {
+              setErrors((prev) => ({ ...prev, secretValue: undefined }));
+            }
+          }}
         />
-
-        <div className="pt-4">
-          {apiTokenTab === "existing" ? (
-            <div className="space-y-4">
-              {secrets.length === 0 ? (
-                <div className="text-sm text-gray-500 dark:text-zinc-400">
-                  No existing secrets found. Please create new one.
-                </div>
-              ) : (
-                <>
-                  <Field>
-                    <Dropdown>
-                      <DropdownButton outline className="flex items-center w-full !justify-between">
-                        {integrationData.apiToken.secretName || "Select secret"}
-                        <MaterialSymbol name="keyboard_arrow_down" />
-                      </DropdownButton>
-                      <DropdownMenu anchor="bottom start">
-                        {secrets.map((secret) => (
-                          <DropdownItem
-                            key={secret.metadata?.id}
-                            onClick={() => {
-                              const firstKey = Object.keys(secret.spec?.local?.data || {})[0] || "";
-                              setIntegrationData((prev) => ({
-                                ...prev,
-                                apiToken: {
-                                  secretName: secret.metadata?.name || "",
-                                  secretKey: firstKey,
-                                },
-                              }));
-                              if (errors.apiToken) {
-                                setErrors((prev) => ({ ...prev, apiToken: undefined }));
-                              }
-                            }}
-                          >
-                            <DropdownLabel>{secret.metadata?.name}</DropdownLabel>
-                          </DropdownItem>
-                        ))}
-                      </DropdownMenu>
-                    </Dropdown>
-                  </Field>
-                  {selectedExistingSecret && (
-                    <Field className="flex items-start gap-3 w-full">
-                      <div className="w-50">
-                        <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">Key name</Label>
-                        <Dropdown>
-                          <DropdownButton outline className="flex items-center w-full !justify-between">
-                            {integrationData.apiToken.secretKey || "Select key"}
-                            <MaterialSymbol name="keyboard_arrow_down" />
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom start">
-                            {Object.keys(selectedExistingSecret.spec?.local?.data || {}).map((key) => (
-                              <DropdownItem
-                                key={key}
-                                onClick={() =>
-                                  setIntegrationData((prev) => ({
-                                    ...prev,
-                                    apiToken: { ...prev.apiToken, secretKey: key },
-                                  }))
-                                }
-                              >
-                                <DropdownLabel>{key}</DropdownLabel>
-                              </DropdownItem>
-                            ))}
-                          </DropdownMenu>
-                        </Dropdown>
-                      </div>
-                      <div className="w-50">
-                        <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">Value</Label>
-                        <Input
-                          type="password"
-                          value="••••••••••••••••"
-                          readOnly
-                          disabled
-                          className="w-full bg-gray-50 dark:bg-zinc-800 cursor-not-allowed opacity-75"
-                        />
-                      </div>
-                    </Field>
-                  )}
-                </>
-              )}
-              {errors.apiToken && <ErrorMessage>{errors.apiToken}</ErrorMessage>}
-            </div>
-          ) : (
-            <div className="space-y-4 w-full">
-              <Text className="text-xs text-gray-500 dark:text-zinc-400">
-                New secret will be created in your canvas secrets. You can review and manage your secrets in the secrets
-                tab{" "}
-                <Link
-                  href={`/${organizationId}/canvas/${canvasId}#secrets`}
-                  className="text-blue-600 dark:text-blue-200"
-                >
-                  here
-                </Link>
-              </Text>
-
-              <Field className="flex items-start gap-3 w-full">
-                <div className="w-full">
-                  <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">Secret Value</Label>
-                  <Input
-                    type="password"
-                    value={newSecretToken}
-                    onChange={(e) => {
-                      setNewSecretToken(e.target.value);
-                      if (errors.secretValue) {
-                        setErrors((prev) => ({ ...prev, secretValue: undefined }));
-                      }
-                    }}
-                    placeholder="Enter your API token"
-                    className="w-full"
-                  />
-                  {errors.secretValue && <ErrorMessage>{errors.secretValue}</ErrorMessage>}
-                </div>
-              </Field>
-              {errors.apiToken && <ErrorMessage>{errors.apiToken}</ErrorMessage>}
-            </div>
-          )}
-        </div>
-      </div>
+        {errors.secretValue && <ErrorMessage>{errors.secretValue}</ErrorMessage>}
+      </Field>
     </div>
   );
 }

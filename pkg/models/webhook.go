@@ -13,6 +13,7 @@ import (
 const (
 	WebhookStatePending = "pending"
 	WebhookStateReady   = "ready"
+	WebhookStateFailed  = "failed"
 )
 
 type Webhook struct {
@@ -23,6 +24,8 @@ type Webhook struct {
 	Metadata      datatypes.JSONType[any]
 	IntegrationID *uuid.UUID
 	Resource      datatypes.JSONType[WebhookResource]
+	RetryCount    int `gorm:"default:0"`
+	MaxRetries    int `gorm:"default:3"`
 	CreatedAt     *time.Time
 	UpdatedAt     *time.Time
 	DeletedAt     gorm.DeletedAt `gorm:"index"`
@@ -47,6 +50,25 @@ func (w *Webhook) ReadyWithMetadata(tx *gorm.DB, metadata any) error {
 		Update("metadata", datatypes.NewJSONType(metadata)).
 		Update("updated_at", time.Now()).
 		Error
+}
+
+func (w *Webhook) IncrementRetry(tx *gorm.DB) error {
+	w.RetryCount++
+	return tx.Model(w).
+		Update("retry_count", w.RetryCount).
+		Update("updated_at", time.Now()).
+		Error
+}
+
+func (w *Webhook) MarkFailed(tx *gorm.DB) error {
+	return tx.Model(w).
+		Update("state", WebhookStateFailed).
+		Update("updated_at", time.Now()).
+		Error
+}
+
+func (w *Webhook) HasExceededRetries() bool {
+	return w.RetryCount >= w.MaxRetries
 }
 
 func FindWebhook(id uuid.UUID) (*Webhook, error) {

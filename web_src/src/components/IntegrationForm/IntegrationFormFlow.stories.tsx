@@ -1,14 +1,14 @@
-import React, { useState, useRef } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
+import { useRef, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
+import { createMockIntegrations, createMockSecrets, defaultProps } from "../../../test/__mocks__/secrets";
+import { Icon } from "../Icon";
+import { Button } from "../ui/button";
+import { ApiTokenForm } from "./ApiTokenForm";
 import { GitHubIntegrationForm } from "./GitHubIntegrationForm";
 import { SemaphoreIntegrationForm } from "./SemaphoreIntegrationForm";
-import { ApiTokenForm } from "./ApiTokenForm";
+import type { FormErrors, IntegrationData } from "./types";
 import { useIntegrationForm } from "./useIntegrationForm";
-import { Button } from "../Button/button";
-import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
-import type { IntegrationData, FormErrors } from "./types";
-import { createMockSecrets, createMockIntegrations, defaultProps } from "../../../test/__mocks__/secrets";
 
 const meta: Meta = {
   title: "Components/IntegrationForm/Complete Flow",
@@ -41,10 +41,8 @@ export const GitHubIntegrationFlow: Story = {
     const {
       integrationData,
       setIntegrationData,
-      apiTokenTab,
-      setApiTokenTab,
-      newSecretToken,
-      setNewSecretToken,
+      secretValue,
+      setSecretValue,
       errors,
       setErrors,
       validateForm,
@@ -93,11 +91,8 @@ export const GitHubIntegrationFlow: Story = {
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={mockSecrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           orgUrlRef={orgUrlRef}
         />
 
@@ -106,11 +101,8 @@ export const GitHubIntegrationFlow: Story = {
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={mockSecrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           organizationId={defaultProps.organizationId}
           canvasId={defaultProps.canvasId}
           orgUrlRef={orgUrlRef}
@@ -124,19 +116,19 @@ export const GitHubIntegrationFlow: Story = {
             }}
             disabled={isSubmitting}
           >
-            <MaterialSymbol name="refresh" size="sm" />
+            <Icon name="refresh" size="sm" />
             Reset Form
           </Button>
 
           <Button color="blue" onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
-                <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
+                <Icon name="progress_activity" className="animate-spin" size="sm" />
                 Creating...
               </>
             ) : (
               <>
-                <MaterialSymbol name="add" size="sm" />
+                <Icon name="add" size="sm" />
                 Create Integration
               </>
             )}
@@ -151,8 +143,7 @@ export const GitHubIntegrationFlow: Story = {
             {JSON.stringify(
               {
                 integrationData,
-                apiTokenTab,
-                newSecretToken: newSecretToken ? "***hidden***" : "",
+                secretValue: secretValue ? "***hidden***" : "",
                 errors,
               },
               null,
@@ -173,10 +164,8 @@ export const SemaphoreIntegrationFlow: Story = {
     const {
       integrationData,
       setIntegrationData,
-      apiTokenTab,
-      setApiTokenTab,
-      newSecretToken,
-      setNewSecretToken,
+      secretValue,
+      setSecretValue,
       errors,
       setErrors,
       validateForm,
@@ -225,11 +214,8 @@ export const SemaphoreIntegrationFlow: Story = {
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={mockSecrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           orgUrlRef={orgUrlRef}
         />
 
@@ -238,11 +224,8 @@ export const SemaphoreIntegrationFlow: Story = {
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={mockSecrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           organizationId={defaultProps.organizationId}
           canvasId={defaultProps.canvasId}
           orgUrlRef={orgUrlRef}
@@ -256,19 +239,19 @@ export const SemaphoreIntegrationFlow: Story = {
             }}
             disabled={isSubmitting}
           >
-            <MaterialSymbol name="refresh" size="sm" />
+            <Icon name="refresh" size="sm" />
             Reset Form
           </Button>
 
           <Button color="blue" onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
-                <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
+                <Icon name="progress_activity" className="animate-spin" size="sm" />
                 Creating...
               </>
             ) : (
               <>
-                <MaterialSymbol name="add" size="sm" />
+                <Icon name="add" size="sm" />
                 Create Integration
               </>
             )}
@@ -297,8 +280,7 @@ export const EditIntegrationFlow: Story = {
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
-    const [apiTokenTab, setApiTokenTab] = useState<"existing" | "new">("existing");
-    const [newSecretToken, setNewSecretToken] = useState("");
+    const [secretValue, setSecretValue] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitResult, setSubmitResult] = useState<string | null>(null);
 
@@ -333,11 +315,8 @@ export const EditIntegrationFlow: Story = {
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={mockSecrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           orgUrlRef={orgUrlRef}
         />
 
@@ -346,31 +325,29 @@ export const EditIntegrationFlow: Story = {
           setIntegrationData={setIntegrationData}
           errors={errors}
           setErrors={setErrors}
-          apiTokenTab={apiTokenTab}
-          setApiTokenTab={setApiTokenTab}
-          newSecretToken={newSecretToken}
-          setNewSecretToken={setNewSecretToken}
-          secrets={mockSecrets}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
           organizationId={defaultProps.organizationId}
           canvasId={defaultProps.canvasId}
           orgUrlRef={orgUrlRef}
+          isEditMode={true}
         />
 
         <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
           <Button disabled={isSubmitting}>
-            <MaterialSymbol name="close" size="sm" />
+            <Icon name="close" size="sm" />
             Cancel
           </Button>
 
           <Button color="blue" onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
-                <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
+                <Icon name="progress_activity" className="animate-spin" size="sm" />
                 Updating...
               </>
             ) : (
               <>
-                <MaterialSymbol name="save" size="sm" />
+                <Icon name="save" size="sm" />
                 Update Integration
               </>
             )}

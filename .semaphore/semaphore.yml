@@ -4,11 +4,6 @@ agent:
   machine:
     type: f1-standard-2
     os_image: ubuntu2204
-
-auto_cancel:
-  running:
-    when: "branch != 'develop' or branch != 'main'"
-
 blocks:
   - name: "\U0001F9EA QA"
     dependencies: []
@@ -19,43 +14,34 @@ blocks:
       prologue:
         commands:
           - checkout
+          - make test.setup
+          - make test.start
       jobs:
-        - name: "\U0001F9EA Test"
-          commands:
-            - make test.setup
-            - make check.db.structure
-            - make test
-        - name: "\U0001F9EA Lint"
+        - name: "Lint"
           commands:
             - make lint
-        - name: "Go Format Check"
+
+        - name: "Unit Tests"
           commands:
-            - make test.setup
-            - make test.start
+            - make test
+
+        - name: "E2E Tests"
+          commands:
+            - make setup.playwright
+            - make test.e2e
+
+        - name: "Check: DB structure"
+          commands:
+            - make check.db.structure
+
+        - name: "Check: Go Format"
+          commands:
             - make format.go.check
+
       epilogue:
         always:
           commands:
             - "[ -f junit-report.xml ] && test-results publish junit-report.xml"
-
-  - name: "\U0001F9EA E2E"
-    dependencies: []
-    task:
-      env_vars:
-        - name: DOCKER_BUILDKIT
-          value: "1"
-      prologue:
-        commands:
-          - checkout
-      jobs:
-        - name: "\U0001F9EA E2E Tests"
-          commands:
-            - make test.e2e.setup
-            - make test.e2e
-      epilogue:
-        always:
-          commands:
-            - test-results publish junit-report.xml
 
   - name: "🔨 Frontend Build"
     dependencies: []
@@ -100,19 +86,3 @@ after_pipeline:
       - name: Submit Reports
         commands:
           - test-results gen-pipeline-report
-
-promotions:
-  - name: Build Image
-    pipeline_file: build-image.yml
-    deployment_target: ghcr
-    auto_promote_on:
-      - result: passed
-        branch:
-          - "main"
-
-  - name: Deploy to sxmoon
-    pipeline_file: deploy-to-sxmoon.yml
-    auto_promote_on:
-      - result: passed
-        branch:
-          - "^develop$"

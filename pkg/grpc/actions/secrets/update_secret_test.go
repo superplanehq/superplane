@@ -24,11 +24,11 @@ func Test__UpdateSecret(t *testing.T) {
 	local := map[string]string{"test": "test"}
 	data, _ := json.Marshal(local)
 
-	_, err := models.CreateSecret("test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeCanvas, r.Canvas.ID, data)
+	_, err := models.CreateSecret("test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeOrganization, r.Organization.ID, data)
 	require.NoError(t, err)
 
 	t.Run("secret does not exist -> error", func(t *testing.T) {
-		_, err := UpdateSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), "test2", &protos.Secret{})
+		_, err := UpdateSecret(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), "test2", &protos.Secret{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -51,7 +51,7 @@ func Test__UpdateSecret(t *testing.T) {
 			},
 		}
 
-		response, err := UpdateSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), "test", secret)
+		response, err := UpdateSecret(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), "test", secret)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Secret)

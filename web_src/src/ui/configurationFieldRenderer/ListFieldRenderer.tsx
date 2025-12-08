@@ -23,6 +23,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   const items = Array.isArray(value) ? value : [];
   const listOptions = field.typeOptions?.list;
   const itemDefinition = listOptions?.itemDefinition;
+  const itemLabel = listOptions?.itemLabel || "Item";
 
   const addItem = () => {
     const newItem = itemDefinition?.type === "object" ? {} : itemDefinition?.type === "number" ? 0 : "";
@@ -99,7 +100,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
       ))}
       <Button variant="outline" onClick={addItem} className="w-full mt-3">
         <Plus className="h-4 w-4 mr-2" />
-        Add Item
+        Add {itemLabel}
       </Button>
     </div>
   );

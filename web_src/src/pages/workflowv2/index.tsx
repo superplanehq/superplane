@@ -1,7 +1,6 @@
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -12,6 +11,7 @@ import {
   ComponentsEdge,
   ComponentsNode,
   TriggersTrigger,
+  WorkflowsListEventExecutionsResponse,
   WorkflowsWorkflow,
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowNodeExecution,
@@ -22,7 +22,9 @@ import {
 import { organizationKeys, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
+import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useQueueHistory } from "@/hooks/useQueueHistory";
 import {
   eventExecutionsQueryOptions,
   useTriggers,
@@ -43,14 +45,23 @@ import {
   SidebarData,
   SidebarEvent,
 } from "@/ui/CanvasPage";
-import { ChainExecutionState, TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
+import { EventState } from "@/ui/componentBase";
+import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
-import { formatTimeAgo } from "@/utils/date";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { getTriggerRenderer } from "./renderers";
-import { TriggerRenderer } from "./renderers/types";
+import { getComponentBaseMapper, getTriggerRenderer } from "./mappers";
+import { TriggerRenderer } from "./mappers/types";
+import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
+import { usePushThroughHandler } from "./usePushThroughHandler";
+import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
+import {
+  getNextInQueueInfo,
+  mapExecutionsToSidebarEvents,
+  mapQueueItemsToSidebarEvents,
+  mapTriggerEventsToSidebarEvents,
+} from "./utils";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -170,8 +181,8 @@ export function WorkflowPageV2() {
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
   }, [storeVersion]);
 
-  // Execution chain data based on node executions from store
-  const { executionChainMap } = useExecutionChainData(workflowId!, nodeExecutionsMap);
+  // Execution chain data utilities for lazy loading
+  const { loadExecutionChain } = useExecutionChainData(workflowId!, queryClient, workflow);
 
   const saveWorkflowSnapshot = useCallback(
     (currentWorkflow: WorkflowsWorkflow) => {
@@ -204,7 +215,30 @@ export function WorkflowPageV2() {
     }
   }, [initialWorkflowSnapshot, organizationId, workflowId, queryClient]);
 
-  useWorkflowWebsocket(workflowId!, organizationId!);
+  const handleNodeWebsocketEvent = useCallback(
+    (nodeId: string, event: string) => {
+      if (event.startsWith("event_created")) {
+        queryClient.invalidateQueries({
+          queryKey: workflowKeys.nodeEventHistory(workflowId!, nodeId),
+        });
+      }
+
+      if (event.startsWith("execution")) {
+        queryClient.invalidateQueries({
+          queryKey: workflowKeys.nodeExecutionHistory(workflowId!, nodeId),
+        });
+      }
+
+      if (event.startsWith("queue_item")) {
+        queryClient.invalidateQueries({
+          queryKey: workflowKeys.nodeQueueItemHistory(workflowId!, nodeId),
+        });
+      }
+    },
+    [queryClient, workflowId],
+  );
+
+  useWorkflowWebsocket(workflowId!, organizationId!, handleNodeWebsocketEvent);
 
   // Warn user before leaving page with unsaved changes
   useEffect(() => {
@@ -262,14 +296,17 @@ export function WorkflowPageV2() {
     (nodeId: string): SidebarData | null => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
+      setCurrentHistoryNode({ nodeId, nodeType: node?.type || "TYPE_ACTION" });
 
       // Get current data from store (don't trigger load here - that's done in useEffect)
       const nodeData = getNodeData(nodeId);
 
       // Build maps with current node data for sidebar
       const executionsMap = nodeData.executions.length > 0 ? { [nodeId]: nodeData.executions } : {};
-      const queueItemsMap = nodeData.queueItems.length > 0 ? { [nodeId]: nodeData.queueItems } : {};
+      const queueItemsMap = nodeData.queueItems.length > 0 ? { [nodeId]: nodeData.queueItems.reverse() } : {};
       const eventsMapForSidebar = nodeData.events.length > 0 ? { [nodeId]: nodeData.events } : nodeEventsMap; // Fall back to existing events map for trigger nodes
+      const totalHistoryCount = nodeData.totalInHistoryCount;
+      const totalQueueCount = nodeData.totalInQueueCount;
 
       const sidebarData = prepareSidebarData(
         node,
@@ -280,6 +317,8 @@ export function WorkflowPageV2() {
         executionsMap,
         queueItemsMap,
         eventsMapForSidebar,
+        totalHistoryCount,
+        totalQueueCount,
       );
 
       // Add loading state to sidebar data
@@ -288,7 +327,7 @@ export function WorkflowPageV2() {
         isLoading: nodeData.isLoading,
       };
     },
-    [workflow, blueprints, components, triggers, nodeEventsMap, getNodeData],
+    [workflow, workflowId, blueprints, components, triggers, nodeEventsMap, getNodeData, queryClient],
   );
 
   // Trigger data loading when sidebar opens for a node
@@ -297,55 +336,123 @@ export function WorkflowPageV2() {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return;
 
-      const nodeData = getNodeData(nodeId);
-
-      // Trigger load if not already loaded or loading
-      if (!nodeData.isLoaded && !nodeData.isLoading) {
-        loadNodeDataMethod(workflowId!, nodeId, node.type!, queryClient);
-      }
+      loadNodeDataMethod(workflowId!, nodeId, node.type!, queryClient);
     },
-    [workflow?.spec?.nodes, workflowId, queryClient, getNodeData, loadNodeDataMethod],
+    [workflow, workflowId, queryClient, loadNodeDataMethod],
   );
 
-  const workflowEdges = useMemo(() => workflow?.spec?.edges || [], [workflow?.spec?.edges]);
+  const onCancelQueueItem = useOnCancelQueueItemHandler({
+    workflowId: workflowId!,
+    organizationId,
+    workflow,
+    loadSidebarData,
+  });
+
+  const [currentHistoryNode, setCurrentHistoryNode] = useState<{ nodeId: string; nodeType: string } | null>(null);
+
+  const nodeHistoryQuery = useNodeHistory({
+    workflowId: workflowId || "",
+    nodeId: currentHistoryNode?.nodeId || "",
+    nodeType: currentHistoryNode?.nodeType || "TYPE_ACTION",
+    allNodes: workflow?.spec?.nodes || [],
+    enabled: !!currentHistoryNode && !!workflowId,
+  });
+
+  const queueHistoryQuery = useQueueHistory({
+    workflowId: workflowId || "",
+    nodeId: currentHistoryNode?.nodeId || "",
+    allNodes: workflow?.spec?.nodes || [],
+    enabled: !!currentHistoryNode && !!workflowId,
+  });
+
+  const getAllHistoryEvents = useCallback(
+    (nodeId: string): SidebarEvent[] => {
+      if (currentHistoryNode?.nodeId === nodeId) {
+        return nodeHistoryQuery.getAllHistoryEvents();
+      }
+
+      return [];
+    },
+    [currentHistoryNode, nodeHistoryQuery],
+  );
+  // Load more history for a specific node
+  const handleLoadMoreHistory = useCallback(
+    (nodeId: string) => {
+      if (!currentHistoryNode || currentHistoryNode.nodeId !== nodeId) {
+        setCurrentHistoryNode({ nodeId, nodeType: currentHistoryNode?.nodeType || "TYPE_ACTION" });
+      } else {
+        nodeHistoryQuery.handleLoadMore();
+      }
+    },
+    [currentHistoryNode, nodeHistoryQuery],
+  );
+
+  const getHasMoreHistory = useCallback(
+    (nodeId: string): boolean => {
+      if (currentHistoryNode?.nodeId === nodeId) {
+        return nodeHistoryQuery.hasMoreHistory;
+      }
+      return false;
+    },
+    [currentHistoryNode, nodeHistoryQuery.hasMoreHistory],
+  );
+
+  const getLoadingMoreHistory = useCallback(
+    (nodeId: string): boolean => {
+      if (currentHistoryNode?.nodeId === nodeId) {
+        return nodeHistoryQuery.isLoadingMore;
+      }
+      return false;
+    },
+    [currentHistoryNode, nodeHistoryQuery.isLoadingMore],
+  );
+
+  const onLoadMoreQueue = useCallback(
+    (nodeId: string) => {
+      if (!currentHistoryNode || currentHistoryNode.nodeId !== nodeId) {
+        setCurrentHistoryNode({ nodeId, nodeType: currentHistoryNode?.nodeType || "TYPE_ACTION" });
+      } else {
+        queueHistoryQuery.handleLoadMore();
+      }
+    },
+    [currentHistoryNode, queueHistoryQuery],
+  );
+
+  const getAllQueueEvents = useCallback(
+    (nodeId: string): SidebarEvent[] => {
+      if (currentHistoryNode?.nodeId === nodeId) {
+        return queueHistoryQuery.getAllHistoryEvents();
+      }
+
+      return [];
+    },
+    [currentHistoryNode, queueHistoryQuery],
+  );
+
+  const getHasMoreQueue = useCallback(
+    (nodeId: string): boolean => {
+      if (currentHistoryNode?.nodeId === nodeId) {
+        return queueHistoryQuery.hasMoreHistory;
+      }
+      return false;
+    },
+    [currentHistoryNode, queueHistoryQuery.hasMoreHistory],
+  );
+
+  const getLoadingMoreQueue = useCallback(
+    (nodeId: string): boolean => {
+      if (currentHistoryNode?.nodeId === nodeId) {
+        return queueHistoryQuery.isLoadingMore;
+      }
+      return false;
+    },
+    [currentHistoryNode, queueHistoryQuery.isLoadingMore],
+  );
 
   /**
    * Builds a topological path to find all nodes that should execute before the given target node.
    * This follows the directed graph structure of the workflow to determine execution order.
    */
-  const getNodesBeforeTarget = useCallback(
-    (targetNodeId: string): Set<string> => {
-      if (workflowEdges.length === 0) {
-        return new Set();
-      }
-
-      const nodesBefore = new Set<string>();
-
-      const incomingEdges = new Map<string, string[]>();
-      workflowEdges.forEach((edge) => {
-        if (!incomingEdges.has(edge.targetId!)) {
-          incomingEdges.set(edge.targetId!, []);
-        }
-        incomingEdges.get(edge.targetId!)!.push(edge.sourceId!);
-      });
-
-      const visited = new Set<string>();
-      const dfs = (nodeId: string) => {
-        if (visited.has(nodeId)) return;
-        visited.add(nodeId);
-
-        const incomingNodes = incomingEdges.get(nodeId) || [];
-        incomingNodes.forEach((sourceNodeId) => {
-          nodesBefore.add(sourceNodeId);
-          dfs(sourceNodeId);
-        });
-      };
-
-      dfs(targetNodeId);
-      return nodesBefore;
-    },
-    [workflowEdges],
-  );
 
   const getTabData = useCallback(
     (nodeId: string, event: SidebarEvent): TabData | undefined => {
@@ -371,15 +478,48 @@ export function WorkflowPageV2() {
         };
 
         // Payload tab: raw event data
-        const payload: Record<string, unknown> = {};
+        let payload: Record<string, unknown> = {};
 
         if (triggerEvent.data) {
-          payload.data = triggerEvent.data;
+          payload = triggerEvent.data;
         }
 
-        if (Object.keys(payload).length > 0) {
-          tabData.payload = payload;
+        tabData.payload = payload;
+
+        return Object.keys(tabData).length > 0 ? tabData : undefined;
+      }
+
+      if (event.kind === "queue") {
+        // Handle queue items - get the queue item data
+        const queueItems = nodeQueueItemsMap[nodeId] || [];
+        const queueItem = queueItems.find((item: WorkflowsWorkflowNodeQueueItem) => item.id === event.id);
+
+        if (!queueItem) return undefined;
+
+        const tabData: TabData = {};
+
+        if (queueItem.rootEvent) {
+          const rootTriggerNode = workflow?.spec?.nodes?.find((n) => n.id === queueItem.rootEvent?.nodeId);
+          const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+          const rootEventValues = rootTriggerRenderer.getRootEventValues(queueItem.rootEvent);
+
+          tabData.root = {
+            ...rootEventValues,
+            "Event ID": queueItem.rootEvent.id,
+            "Node ID": queueItem.rootEvent.nodeId,
+            "Created At": queueItem.rootEvent.createdAt
+              ? new Date(queueItem.rootEvent.createdAt).toLocaleString()
+              : undefined,
+          };
         }
+
+        tabData.current = {
+          "Queue Item ID": queueItem.id,
+          "Node ID": queueItem.nodeId,
+          "Created At": queueItem.createdAt ? new Date(queueItem.createdAt).toLocaleString() : undefined,
+        };
+
+        tabData.payload = queueItem.input || {};
 
         return Object.keys(tabData).length > 0 ? tabData : undefined;
       }
@@ -393,27 +533,23 @@ export function WorkflowPageV2() {
       // Extract tab data from execution
       const tabData: TabData = {};
 
-      // Current tab: flatten execution outputs for easy viewing
-      if (execution.outputs) {
-        const flattened = flattenObject(execution.outputs);
-        if (Object.keys(flattened).length > 0) {
-          tabData.current = {
-            ...flattened,
-            "Execution ID": execution.id,
-            "Execution State": execution.state?.replace("STATE_", "").toLowerCase(),
-            "Execution Result": execution.result?.replace("RESULT_", "").toLowerCase(),
-            "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
-          };
-        }
-      } else {
-        // Fallback to basic execution data if no outputs
-        tabData.current = {
-          "Execution ID": execution.id,
-          "Execution State": execution.state,
-          "Execution Result": execution.result,
-          "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
-        };
-      }
+      // Current tab: use outputs if available and non-empty, otherwise use metadata
+      const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
+      const dataSource = hasOutputs ? execution.outputs : execution.metadata || {};
+      const flattened = flattenObject(dataSource);
+
+      const currentData = {
+        ...flattened,
+        "Execution ID": execution.id,
+        "Execution State": execution.state?.replace("STATE_", "").toLowerCase(),
+        "Execution Result": execution.result?.replace("RESULT_", "").toLowerCase(),
+        "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
+      };
+
+      // Filter out undefined and empty values
+      tabData.current = Object.fromEntries(
+        Object.entries(currentData).filter(([_, value]) => value !== undefined && value !== "" && value !== null),
+      );
 
       // Root tab: root event data
       if (execution.rootEvent) {
@@ -432,127 +568,25 @@ export function WorkflowPageV2() {
       }
 
       // Payload tab: execution inputs and outputs (raw data)
-      const payload: Record<string, unknown> = {};
-
-      if (execution.input) {
-        payload.input = execution.input;
-      }
+      let payload: Record<string, unknown> = {};
 
       if (execution.outputs) {
-        payload.outputs = execution.outputs;
-      }
+        const outputData: unknown[] = Object.values(execution.outputs)?.find((output) => {
+          return Array.isArray(output) && output?.length > 0;
+        }) as unknown[];
 
-      if (execution.metadata) {
-        payload.metadata = execution.metadata;
-      }
-
-      if (Object.keys(payload).length > 0) {
-        tabData.payload = payload;
-      }
-
-      // Execution Chain tab: get execution chain for the root event
-      if (execution.rootEvent?.id) {
-        const executionChain = executionChainMap[execution.rootEvent.id];
-        if (executionChain && executionChain.length > 0) {
-          const currentExecutionTime = execution.createdAt ? new Date(execution.createdAt).getTime() : Date.now();
-
-          const nodesBefore = getNodesBeforeTarget(nodeId);
-          nodesBefore.add(nodeId);
-
-          const executionsUpToCurrent = executionChain.filter((exec) => {
-            const execTime = exec.createdAt ? new Date(exec.createdAt).getTime() : 0;
-            const isNodeBefore = nodesBefore.has(exec.nodeId || "");
-            const isBeforeCurrentTime = execTime <= currentExecutionTime;
-            return isNodeBefore && isBeforeCurrentTime;
-          });
-
-          // Sort the filtered executions by creation time to get chronological order
-          executionsUpToCurrent.sort((a, b) => {
-            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            return timeA - timeB;
-          });
-
-          // Group executions by node to create hierarchy
-          const nodeExecutions: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
-          executionsUpToCurrent.forEach((exec) => {
-            const execNodeId = exec.nodeId || "unknown";
-            if (!nodeExecutions[execNodeId]) {
-              nodeExecutions[execNodeId] = [];
-            }
-            nodeExecutions[execNodeId].push(exec);
-          });
-
-          const sortedNodeEntries = Object.values(nodeExecutions)
-            .flatMap((execs) => execs)
-            .sort((execsA, execsB) => {
-              const timeA = execsA.createdAt ? new Date(execsA.createdAt).getTime() : 0;
-              const timeB = execsB.createdAt ? new Date(execsB.createdAt).getTime() : 0;
-              return timeA - timeB;
-            });
-
-          const nodesById = workflow?.spec?.nodes?.reduce(
-            (acc, node) => {
-              if (!node?.id) return acc;
-              acc[node.id] = node;
-              return acc;
-            },
-            {} as Record<string, ComponentsNode>,
-          );
-
-          const chainData = sortedNodeEntries.map((exec) => {
-            const nodeInfo = nodesById?.[exec.nodeId || ""];
-
-            const getSidebarEventItemState = (exec: WorkflowsWorkflowNodeExecution) => {
-              if (exec.state === "STATE_FINISHED") {
-                if (exec.result === "RESULT_PASSED") {
-                  return ChainExecutionState.COMPLETED;
-                }
-                return ChainExecutionState.FAILED;
-              }
-
-              if (exec.state === "STATE_STARTED") {
-                return ChainExecutionState.RUNNING;
-              }
-
-              return ChainExecutionState.FAILED;
-            };
-
-            const mainItem = {
-              name: nodeInfo?.name || exec.nodeId || "Unknown",
-              state: getSidebarEventItemState(exec),
-              children:
-                exec?.childExecutions && exec.childExecutions.length > 0
-                  ? exec.childExecutions
-                      .slice()
-                      .sort((a, b) => {
-                        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                        return timeA - timeB;
-                      })
-                      .map((childExec) => {
-                        const childNodeId = childExec?.nodeId?.split(":")?.at(-1);
-
-                        return {
-                          name: childNodeId || "Unknown",
-                          state: getSidebarEventItemState(childExec),
-                        };
-                      })
-                  : undefined,
-            };
-
-            return mainItem;
-          });
-
-          if (chainData.length > 0) {
-            tabData.executionChain = chainData;
-          }
+        if (outputData?.length > 0) {
+          payload = outputData?.[0] as Record<string, unknown>;
         }
       }
 
+      tabData.payload = payload;
+
+      // Execution Chain will be loaded lazily when requested
+
       return Object.keys(tabData).length > 0 ? tabData : undefined;
     },
-    [workflow, nodeExecutionsMap, nodeEventsMap, executionChainMap, getNodesBeforeTarget],
+    [workflow, nodeExecutionsMap, nodeEventsMap, nodeQueueItemsMap],
   );
 
   const getNodeEditData = useCallback(
@@ -753,6 +787,9 @@ export function WorkflowPageV2() {
     (edgeIds: string[]) => {
       if (!workflow || !organizationId || !workflowId) return;
 
+      // Save snapshot before making changes
+      saveWorkflowSnapshot(workflow);
+
       // Parse edge IDs to extract sourceId, targetId, and channel
       // Edge IDs are formatted as: `${sourceId}--${targetId}--${channel}`
       const edgesToRemove = edgeIds.map((edgeId) => {
@@ -786,7 +823,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
       markUnsavedChange("structural");
     },
-    [workflow, organizationId, workflowId, queryClient, markUnsavedChange],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
   );
 
   /**
@@ -909,6 +946,17 @@ export function WorkflowPageV2() {
     [workflowId],
   );
 
+  const handleReEmit = useCallback(
+    async (nodeId: string, eventOrExecutionId: string) => {
+      const nodeEvents = nodeEventsMap[nodeId];
+      if (!nodeEvents) return;
+      const eventToReemit = nodeEvents.find((event) => event.id === eventOrExecutionId);
+      if (!eventToReemit) return;
+      handleRun(nodeId, eventToReemit.channel || "", eventToReemit.data);
+    },
+    [handleRun, nodeEventsMap],
+  );
+
   const handleNodeDuplicate = useCallback(
     (nodeId: string) => {
       if (!workflow || !organizationId || !workflowId) return;
@@ -917,9 +965,6 @@ export function WorkflowPageV2() {
       if (!nodeToDuplicate) return;
 
       saveWorkflowSnapshot(workflow);
-
-      const originalName = nodeToDuplicate.name || "node";
-      const duplicateName = `${originalName} copy`;
 
       let blockName = "node";
       if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
@@ -932,7 +977,7 @@ export function WorkflowPageV2() {
         blockName = blueprintMetadata?.name || "blueprint";
       }
 
-      const newNodeId = generateNodeId(blockName, duplicateName);
+      const newNodeId = generateNodeId(blockName, nodeToDuplicate.name || "node");
 
       const offsetX = 50;
       const offsetY = 50;
@@ -940,7 +985,7 @@ export function WorkflowPageV2() {
       const duplicateNode: ComponentsNode = {
         ...nodeToDuplicate,
         id: newNodeId,
-        name: duplicateName,
+        name: nodeToDuplicate.name || "node",
         position: {
           x: (nodeToDuplicate.position?.x || 0) + offsetX,
           y: (nodeToDuplicate.position?.y || 0) + offsetY,
@@ -1011,6 +1056,37 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, updateWorkflowMutation],
   );
 
+  const handleSidebarChange = useCallback(
+    (open: boolean, nodeId: string | null) => {
+      const next = new URLSearchParams(searchParams);
+      if (open) {
+        next.set("sidebar", "1");
+        if (nodeId) {
+          next.set("node", nodeId);
+        } else {
+          next.delete("node");
+        }
+      } else {
+        next.delete("sidebar");
+        next.delete("node");
+      }
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
+  const { onPushThrough, supportsPushThrough } = usePushThroughHandler({
+    workflowId: workflowId!,
+    organizationId,
+    workflow,
+  });
+
+  const { onCancelExecution } = useCancelExecutionHandler({
+    workflowId: workflowId!,
+    workflow,
+  });
+
   // Show loading indicator while data is being fetched
   if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
     return (
@@ -1024,7 +1100,17 @@ export function WorkflowPageV2() {
   }
 
   if (!workflow) {
-    return null;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <h1 className="text-4xl font-bold text-gray-700">404</h1>
+          <p className="text-lg text-gray-500">Canvas not found</p>
+          <p className="text-sm text-gray-400">
+            This canvas may have been deleted or you may not have permission to view it.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
@@ -1034,23 +1120,9 @@ export function WorkflowPageV2() {
       // Persist right sidebar in query params
       initialSidebar={{
         isOpen: searchParams.get("sidebar") === "1",
-        nodeId: searchParams.get("node") || undefined,
+        nodeId: searchParams.get("node") || null,
       }}
-      onSidebarChange={(open, nodeId) => {
-        const next = new URLSearchParams(searchParams);
-        if (open) {
-          next.set("sidebar", "1");
-          if (nodeId) {
-            next.set("node", nodeId);
-          } else {
-            next.delete("node");
-          }
-        } else {
-          next.delete("sidebar");
-          next.delete("node");
-        }
-        setSearchParams(next, { replace: true });
-      }}
+      onSidebarChange={handleSidebarChange}
       onNodeExpand={(nodeId) => {
         const latestExecution = nodeExecutionsMap[nodeId]?.[0];
         const executionId = latestExecution?.id;
@@ -1091,6 +1163,20 @@ export function WorkflowPageV2() {
       canUndo={initialWorkflowSnapshot !== null}
       runDisabled={hasRunBlockingChanges}
       runDisabledTooltip={hasRunBlockingChanges ? "Save canvas changes before running" : undefined}
+      onCancelQueueItem={onCancelQueueItem}
+      onPushThrough={onPushThrough}
+      supportsPushThrough={supportsPushThrough}
+      onCancelExecution={onCancelExecution}
+      getAllHistoryEvents={getAllHistoryEvents}
+      onLoadMoreHistory={handleLoadMoreHistory}
+      getHasMoreHistory={getHasMoreHistory}
+      getLoadingMoreHistory={getLoadingMoreHistory}
+      onLoadMoreQueue={onLoadMoreQueue}
+      getAllQueueEvents={getAllQueueEvents}
+      getHasMoreQueue={getHasMoreQueue}
+      getLoadingMoreQueue={getLoadingMoreQueue}
+      onReEmit={handleReEmit}
+      loadExecutionChain={loadExecutionChain}
       breadcrumbs={[
         {
           label: "Canvases",
@@ -1104,44 +1190,110 @@ export function WorkflowPageV2() {
   );
 }
 
-function useExecutionChainData(
-  workflowId: string,
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-) {
-  // Get all unique root event IDs from executions
-  const rootEventIds = useMemo(() => {
-    const eventIds = new Set<string>();
-    Object.values(nodeExecutionsMap).forEach((executions) => {
-      executions.forEach((execution) => {
-        if (execution.rootEvent?.id) {
-          eventIds.add(execution.rootEvent.id);
-        }
-      });
-    });
-    return Array.from(eventIds);
-  }, [nodeExecutionsMap]);
+function useExecutionChainData(workflowId: string, queryClient: QueryClient, workflow?: WorkflowsWorkflow) {
+  const loadExecutionChain = useCallback(
+    async (
+      eventId: string,
+      nodeId?: string,
+      currentExecution?: Record<string, unknown>,
+      forceReload = false,
+    ): Promise<WorkflowsWorkflowNodeExecution[]> => {
+      const queryOptions = eventExecutionsQueryOptions(workflowId, eventId);
 
-  // Fetch execution chains for each unique root event
-  const executionChainResults = useQueries({
-    queries: rootEventIds.map((eventId) => eventExecutionsQueryOptions(workflowId, eventId)),
+      let allExecutions: WorkflowsWorkflowNodeExecution[] = [];
+
+      if (!forceReload) {
+        const cachedData = queryClient.getQueryData(queryOptions.queryKey);
+        if (cachedData) {
+          allExecutions = (cachedData as WorkflowsListEventExecutionsResponse)?.executions || [];
+        }
+      }
+
+      if (allExecutions.length === 0) {
+        if (forceReload) {
+          await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+        }
+        const data = await queryClient.fetchQuery(queryOptions);
+        allExecutions = (data as WorkflowsListEventExecutionsResponse)?.executions || [];
+      }
+
+      // Apply topological filtering - the logic you wanted back!
+      if (!allExecutions.length || !workflow || !nodeId) return allExecutions;
+
+      const currentExecutionTime = currentExecution?.createdAt
+        ? new Date(currentExecution.createdAt as string).getTime()
+        : Date.now();
+      const nodesBefore = getNodesBeforeTarget(nodeId, workflow);
+      nodesBefore.add(nodeId); // Include current node
+
+      const executionsUpToCurrent = allExecutions.filter((exec) => {
+        const execTime = exec.createdAt ? new Date(exec.createdAt).getTime() : 0;
+        const isNodeBefore = nodesBefore.has(exec.nodeId || "");
+        const isBeforeCurrentTime = execTime <= currentExecutionTime;
+        return isNodeBefore && isBeforeCurrentTime;
+      });
+
+      // Sort the filtered executions by creation time to get chronological order
+      executionsUpToCurrent.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeA - timeB;
+      });
+
+      return executionsUpToCurrent;
+    },
+    [workflowId, queryClient, workflow],
+  );
+
+  return { loadExecutionChain };
+}
+
+// Helper function to build topological path to find all nodes that should execute before the given target node
+function getNodesBeforeTarget(targetNodeId: string, workflow: WorkflowsWorkflow): Set<string> {
+  const nodesBefore = new Set<string>();
+  if (!workflow?.spec?.edges) return nodesBefore;
+
+  // Build adjacency list for the workflow graph
+  const adjacencyList: Record<string, string[]> = {};
+  workflow.spec.edges.forEach((edge) => {
+    if (!edge.sourceId || !edge.targetId) return;
+    if (!adjacencyList[edge.sourceId]) {
+      adjacencyList[edge.sourceId] = [];
+    }
+    adjacencyList[edge.sourceId].push(edge.targetId);
   });
 
-  // Check if any queries are still loading
-  const isLoading = executionChainResults.some((result) => result.isLoading);
+  // DFS to find all nodes that can reach the target
+  const visited = new Set<string>();
+  const canReachTarget = (nodeId: string): boolean => {
+    if (visited.has(nodeId)) return false; // Avoid cycles
+    if (nodeId === targetNodeId) return true;
 
-  // Build map of eventId -> execution chain
-  const executionChainMap = useMemo(() => {
-    const map: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
-    rootEventIds.forEach((eventId, index) => {
-      const result = executionChainResults[index];
-      if (result.data?.executions && result.data.executions.length > 0) {
-        map[eventId] = result.data.executions;
-      }
-    });
-    return map;
-  }, [executionChainResults, rootEventIds]);
+    visited.add(nodeId);
+    const neighbors = adjacencyList[nodeId] || [];
+    const canReach = neighbors.some((neighbor) => canReachTarget(neighbor));
+    visited.delete(nodeId); // Allow revisiting in different paths
 
-  return { executionChainMap, isLoading };
+    return canReach;
+  };
+
+  // Check all nodes to see which ones can reach the target
+  const allNodeIds = new Set<string>();
+  workflow.spec.edges?.forEach((edge) => {
+    if (edge.sourceId) allNodeIds.add(edge.sourceId);
+    if (edge.targetId) allNodeIds.add(edge.targetId);
+  });
+  workflow.spec.nodes?.forEach((node) => {
+    if (node.id) allNodeIds.add(node.id);
+  });
+
+  allNodeIds.forEach((nodeId) => {
+    if (canReachTarget(nodeId)) {
+      nodesBefore.add(nodeId);
+    }
+  });
+
+  return nodesBefore;
 }
 
 function prepareData(
@@ -1225,7 +1377,6 @@ function prepareCompositeNode(
   const isMissing = !blueprintMetadata;
   const color = blueprintMetadata?.color || "gray";
   const executions = nodeExecutionsMap[node.id!] || [];
-  const queueItems = nodeQueueItemsMap[node.id!] || [];
 
   // Use node name if available, otherwise fall back to blueprint name (from metadata)
   const displayLabel = node.name || blueprintMetadata?.name!;
@@ -1295,35 +1446,27 @@ function prepareCompositeNode(
     };
   }
 
-  if (queueItems.length > 0) {
-    const next = queueItems[0] as any;
-    let inferredTitle =
-      next?.name || next?.input?.title || next?.input?.name || next?.input?.eventTitle || next?.id || "Queued";
-
-    // Heuristic: if the workflow has a single trigger and it is a schedule,
-    // show a friendly title consistent with executions.
-    const onlyTrigger = nodes.filter((n) => n.type === "TYPE_TRIGGER");
-    if (inferredTitle === next?.id || inferredTitle === "Queued") {
-      if (onlyTrigger.length === 1 && onlyTrigger[0]?.trigger?.name === "schedule") {
-        inferredTitle = "Event emitted by schedule";
-      }
-    }
-
-    const inferredSubtitle: string =
-      (typeof next?.input?.subtitle === "string" && next?.input?.subtitle) ||
-      (next?.createdAt ? formatTimeAgo(new Date(next.createdAt)).replace(" ago", "") : "");
-
-    (canvasNode.data.composite as CompositeProps).nextInQueue = {
-      title: inferredTitle,
-      subtitle: inferredSubtitle,
-      receivedAt: next?.createdAt ? new Date(next.createdAt) : new Date(),
-    };
+  const nextInQueueInfo = getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes);
+  if (nextInQueueInfo) {
+    (canvasNode.data.composite as CompositeProps).nextInQueue = nextInQueueInfo;
   }
 
   return canvasNode;
 }
 
 function getRunItemState(execution: WorkflowsWorkflowNodeExecution): LastRunState {
+  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
+    return "running";
+  }
+
+  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
+    return "success";
+  }
+
+  return "failed";
+}
+
+function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
   if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
     return "running";
   }
@@ -1396,20 +1539,14 @@ function prepareComponentNode(
   switch (node.component?.name) {
     case "approval":
       return prepareApprovalNode(nodes, node, components, nodeExecutionsMap, workflowId, queryClient, organizationId);
-    case "if":
-      return prepareIfNode(nodes, node, nodeExecutionsMap);
     case "noop":
-      return prepareNoopNode(nodes, node, components, nodeExecutionsMap);
-    case "filter":
-      return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
     case "http":
-      return prepareHttpNode(node, components, nodeExecutionsMap);
     case "semaphore":
-      return prepareSemaphoreNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
-    case "wait":
-      return prepareWaitNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "time_gate":
-      return prepareTimeGateNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
+    case "filter":
+    case "if":
+    case "wait":
+      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "merge":
       return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
   }
@@ -1662,108 +1799,34 @@ function prepareApprovalNode(
   };
 }
 
-function prepareIfNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-): CanvasNode {
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  // Parse conditions from node configuration
-  const expression = node.configuration?.expression;
-
-  // Get last execution for event data
-  let trueEvent, falseEvent;
-  if (execution) {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    const eventData = {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
-    };
-
-    if (execution.outputs?.["true"]) {
-      trueEvent = eventData;
-    } else if (execution.outputs?.["false"]) {
-      falseEvent = eventData;
-    }
-  }
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "if",
-      label: node.name!,
-      state: "pending" as const,
-      if: {
-        title: node.name!,
-        expression,
-        trueEvent: trueEvent || {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        falseEvent: falseEvent || {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        trueSectionLabel: "TRUE",
-        falseSectionLabel: "FALSE",
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-function prepareNoopNode(
+function prepareComponentBaseNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-  const metadata = components.find((c) => c.name === "noop");
-
-  // Get last event data
-  let lastEvent;
-  if (execution) {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    lastEvent = {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
-    };
-  }
-
-  const displayLabel = node.name || metadata?.label!;
+  const metadata = components.find((c) => c.name === node.component?.name);
+  const displayLabel = node.name || metadata?.label;
+  const componentDef = components.find((c) => c.name === node.component?.name);
+  const nodeQueueItems = nodeQueueItemsMap?.[node.id!];
 
   return {
     id: node.id!,
     position: { x: node.position?.x || 0, y: node.position?.y || 0 },
     data: {
-      type: "noop",
+      type: "component",
       label: displayLabel,
       state: "pending" as const,
-      noop: {
-        title: displayLabel,
-        lastEvent: lastEvent || {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
+      outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
+      component: getComponentBaseMapper(node.component?.name || "").props(
+        nodes,
+        node,
+        componentDef!,
+        executions,
+        nodeQueueItems,
+      ),
     },
   };
 }
@@ -1789,7 +1852,7 @@ function prepareMergeNode(
     lastEvent = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: getRunItemState(execution),
+      eventState: executionToEventSectionState(execution),
     };
   }
 
@@ -1808,437 +1871,7 @@ function prepareMergeNode(
           eventTitle: "No events received yet",
           eventState: "neutral" as const,
         },
-        nextInQueue:
-          nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
-            ? (() => {
-                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-                const title =
-                  item?.name ||
-                  item?.input?.title ||
-                  item?.input?.name ||
-                  item?.input?.eventTitle ||
-                  item?.id ||
-                  "Queued";
-                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-                return { title, subtitle };
-              })()
-            : undefined,
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-function prepareFilterNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-): CanvasNode {
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-  const metadata = components.find((c) => c.name === "filter");
-
-  // Parse filters from node configuration
-  const expression = node.configuration?.expression as string;
-
-  let lastEvent;
-  if (execution) {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    lastEvent = {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
-    };
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "filter",
-      label: displayLabel,
-      state: "pending" as const,
-      filter: {
-        title: displayLabel,
-        expression,
-        lastEvent: lastEvent || {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-function prepareHttpNode(
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "http");
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  // Configuration always comes from the node, not the execution
-  const configuration = node.configuration as any;
-
-  let lastExecution;
-  if (execution) {
-    const outputs = execution.outputs as any;
-    const response = outputs?.default?.[0];
-
-    lastExecution = {
-      statusCode: response?.status,
-      receivedAt: new Date(execution.createdAt!),
-      state:
-        getRunItemState(execution) === "success"
-          ? ("success" as const)
-          : getRunItemState(execution) === "running"
-            ? ("running" as const)
-            : ("failed" as const),
-    };
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "http",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      http: {
-        iconSlug: metadata?.icon || "globe",
-        iconColor: getColorClass(metadata?.color || "gray"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "gray"),
-        headerColor: getBackgroundColorClass(metadata?.color || "gray"),
-        title: displayLabel,
-        method: configuration?.method,
-        url: configuration?.url,
-        payload: configuration?.payload,
-        headers: configuration?.headers,
-        lastExecution,
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-interface ExecutionMetadata {
-  workflow?: {
-    id: string;
-    url: string;
-    state: string;
-    result: string;
-  };
-}
-
-function prepareSemaphoreNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "semaphore");
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  // Configuration always comes from the node, not the execution
-  const configuration = node.configuration as any;
-  const nodeMetadata = node.metadata as any;
-
-  let lastExecution;
-  if (execution) {
-    const metadata = execution.metadata as ExecutionMetadata;
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    // Determine state based on workflow result for finished executions
-    let state: "success" | "failed" | "running";
-    if (metadata.workflow?.state === "finished") {
-      // Use workflow result to determine color/icon when finished
-      state = metadata.workflow?.result === "passed" ? "success" : "failed";
-    } else {
-      // Use execution state for running/pending states
-      state = getRunItemState(execution) === "running" ? "running" : "failed";
-    }
-
-    // Calculate duration for finished executions
-    let duration: number | undefined;
-    if (state !== "running" && execution.updatedAt && execution.createdAt) {
-      duration = new Date(execution.updatedAt).getTime() - new Date(execution.createdAt).getTime();
-    }
-
-    lastExecution = {
-      title: title,
-      receivedAt: new Date(execution.createdAt!),
-      completedAt: execution.updatedAt ? new Date(execution.updatedAt) : undefined,
-      state: state,
-      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
-      duration: duration,
-    };
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
-
-  // Build metadata array
-  const metadataItems = [];
-  if (nodeMetadata?.project?.name) {
-    metadataItems.push({ icon: "folder", label: nodeMetadata.project.name });
-  } else if (configuration.project) {
-    metadataItems.push({ icon: "folder", label: configuration.project });
-  }
-
-  if (configuration?.ref) {
-    metadataItems.push({ icon: "git-branch", label: configuration.ref });
-  }
-  if (configuration?.pipelineFile) {
-    metadataItems.push({ icon: "file-code", label: configuration.pipelineFile });
-  }
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "semaphore",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      semaphore: {
-        iconSrc: SemaphoreLogo,
-        iconSlug: metadata?.icon || "workflow",
-        iconColor: getColorClass(metadata?.color || "gray"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "gray"),
-        headerColor: getBackgroundColorClass(metadata?.color || "gray"),
-        title: displayLabel,
-        metadata: metadataItems,
-        parameters: configuration?.parameters,
-        lastExecution,
-        nextInQueue:
-          nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
-            ? (() => {
-                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-                const title =
-                  item?.name ||
-                  item?.input?.title ||
-                  item?.input?.name ||
-                  item?.input?.eventTitle ||
-                  item?.id ||
-                  "Queued";
-                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-                return { title, subtitle };
-              })()
-            : undefined,
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-function prepareWaitNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "wait");
-  const configuration = node.configuration as any;
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  let lastExecution;
-  if (execution) {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    // Calculate expected duration from configuration
-    let expectedDuration: number | undefined;
-    if (configuration?.duration) {
-      const { value, unit } = configuration.duration;
-      const multipliers = { seconds: 1000, minutes: 60000, hours: 3600000 };
-      expectedDuration = value * (multipliers[unit as keyof typeof multipliers] || 1000);
-    }
-
-    lastExecution = {
-      title: title,
-      receivedAt: new Date(execution.createdAt!),
-      completedAt: execution.updatedAt ? new Date(execution.updatedAt) : undefined,
-      state:
-        getRunItemState(execution) === "success"
-          ? ("success" as const)
-          : getRunItemState(execution) === "running"
-            ? ("running" as const)
-            : ("failed" as const),
-      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
-      expectedDuration: expectedDuration,
-    };
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "wait",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      wait: {
-        title: displayLabel,
-        duration: configuration?.duration,
-        lastExecution,
-        nextInQueue:
-          nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
-            ? (() => {
-                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-                const title =
-                  item?.name ||
-                  item?.input?.title ||
-                  item?.input?.name ||
-                  item?.input?.eventTitle ||
-                  item?.id ||
-                  "Queued";
-                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-                return { title, subtitle };
-              })()
-            : undefined,
-        iconColor: getColorClass(metadata?.color || "yellow"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "yellow"),
-        headerColor: getBackgroundColorClass(metadata?.color || "yellow"),
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-function prepareTimeGateNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "time_gate");
-  const configuration = node.configuration as any;
-
-  // Format time gate configuration for display
-  const mode = configuration?.mode || "include_range";
-  const days = configuration?.days || [];
-  const daysDisplay = days.length > 0 ? days.join(", ") : "";
-
-  // Get timezone information
-  const timezone = configuration?.timezone || "0";
-  const getTimezoneDisplay = (timezoneOffset: string) => {
-    const offset = parseFloat(timezoneOffset);
-    if (offset === 0) return "GMT+0 (UTC)";
-    if (offset > 0) return `GMT+${offset}`;
-    return `GMT${offset}`; // Already has the minus sign
-  };
-  const timezoneDisplay = getTimezoneDisplay(timezone);
-
-  // Handle different time window formats based on mode
-  let startTime = "00:00";
-  let endTime = "23:59";
-
-  if (mode === "include_specific" || mode === "exclude_specific") {
-    startTime = `${configuration.startDayInYear} ${configuration.startTime}`;
-    endTime = `${configuration.endDayInYear} ${configuration.endTime}`;
-  } else {
-    startTime = `${configuration.startTime}`;
-    endTime = `${configuration.endTime}`;
-  }
-
-  const timeWindow = `${startTime} - ${endTime}`;
-
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  let lastExecution:
-    | {
-        title: string;
-        receivedAt: Date;
-        state: "success" | "failed" | "running";
-        values?: Record<string, string>;
-        nextRunTime?: Date;
-      }
-    | undefined;
-
-  if (execution) {
-    const executionState = getRunItemState(execution);
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    lastExecution = {
-      title: title,
-      receivedAt: new Date(execution.createdAt!),
-      state:
-        executionState === "success"
-          ? ("success" as const)
-          : executionState === "failed"
-            ? ("failed" as const)
-            : ("running" as const),
-      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
-    };
-
-    if (executionState === "running") {
-      // Get next run time from execution metadata
-      const executionMetadata = execution.metadata as { nextValidTime?: string };
-      if (executionMetadata?.nextValidTime) {
-        lastExecution.nextRunTime = new Date(executionMetadata.nextValidTime);
-      }
-    }
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label || "Time Gate";
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "time_gate",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      time_gate: {
-        title: displayLabel,
-        mode,
-        timeWindow,
-        days: daysDisplay,
-        timezone: timezoneDisplay,
-        lastExecution,
-        nextInQueue: nodeQueueItemsMap[node.id!]?.[0] ? { title: nodeQueueItemsMap[node.id!]?.[0].id } : undefined,
-        iconColor: getColorClass(metadata?.color || "blue"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "blue"),
-        headerColor: getBackgroundColorClass(metadata?.color || "blue"),
+        nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },
@@ -2257,58 +1890,6 @@ function prepareEdge(edge: ComponentsEdge): CanvasEdge {
   };
 }
 
-function mapTriggerEventsToSidebarEvents(events: WorkflowsWorkflowEvent[], node: ComponentsNode) {
-  return events.slice(0, 5).map((event) => {
-    const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
-    const { title, subtitle } = triggerRenderer.getTitleAndSubtitle(event);
-    const values = triggerRenderer.getRootEventValues(event);
-
-    return {
-      id: event.id!,
-      title,
-      subtitle,
-      state: "processed" as const,
-      isOpen: false,
-      receivedAt: event.createdAt ? new Date(event.createdAt) : undefined,
-      values,
-    };
-  });
-}
-
-function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution[], nodes: ComponentsNode[]) {
-  return executions.slice(0, 5).map((execution) => {
-    const state =
-      execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
-        ? ("processed" as const)
-        : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
-          ? ("discarded" as const)
-          : ("waiting" as const);
-
-    // Get root trigger information for better title/subtitle
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const { title, subtitle } = execution.rootEvent
-      ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
-      : {
-          title: execution.id || "Execution",
-          subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
-        };
-
-    const values = execution.rootEvent ? rootTriggerRenderer.getRootEventValues(execution.rootEvent) : {};
-
-    return {
-      id: execution.id!,
-      title,
-      subtitle,
-      state,
-      isOpen: false,
-      receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      values,
-    };
-  });
-}
-
 function prepareSidebarData(
   node: ComponentsNode,
   nodes: ComponentsNode[],
@@ -2318,6 +1899,8 @@ function prepareSidebarData(
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
+  totalHistoryCount?: number,
+  totalQueueCount?: number,
 ): SidebarData {
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
@@ -2359,37 +1942,11 @@ function prepareSidebarData(
 
   const latestEvents =
     node.type === "TYPE_TRIGGER"
-      ? mapTriggerEventsToSidebarEvents(events, node)
-      : mapExecutionsToSidebarEvents(executions, nodes);
+      ? mapTriggerEventsToSidebarEvents(events, node, 5)
+      : mapExecutionsToSidebarEvents(executions, nodes, 5);
 
   // Convert queue items to sidebar events (next in queue)
-  const nextInQueueEvents = queueItems.slice(0, 5).map((item) => {
-    const anyItem = item as any;
-    let title =
-      anyItem?.name ||
-      anyItem?.input?.title ||
-      anyItem?.input?.name ||
-      anyItem?.input?.eventTitle ||
-      item.id ||
-      "Queued";
-    const onlyTrigger = nodes.filter((n) => n.type === "TYPE_TRIGGER");
-    if (title === item.id || title === "Queued") {
-      if (onlyTrigger.length === 1 && onlyTrigger[0]?.trigger?.name === "schedule") {
-        title = "Event emitted by schedule";
-      }
-    }
-    const timestamp = item.createdAt ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "") : "";
-    const subtitle: string = (typeof anyItem?.input?.subtitle === "string" && anyItem.input.subtitle) || timestamp;
-
-    return {
-      id: item.id!,
-      title,
-      subtitle,
-      state: "waiting" as const,
-      isOpen: false,
-      receivedAt: item.createdAt ? new Date(item.createdAt) : undefined,
-    };
-  });
+  const nextInQueueEvents = mapQueueItemsToSidebarEvents(queueItems, nodes, 5);
 
   // Build metadata from node configuration
   const metadataItems = [
@@ -2427,7 +1984,9 @@ function prepareSidebarData(
     iconSlug,
     iconColor: getColorClass(color),
     iconBackground: getBackgroundColorClass(color),
-    moreInQueueCount: Math.max(0, queueItems.length - 5),
+    totalInHistoryCount: totalHistoryCount ? totalHistoryCount : 0,
+    totalInQueueCount: totalQueueCount ? totalQueueCount : 0,
     hideQueueEvents,
+    isComposite: node.type === "TYPE_BLUEPRINT",
   };
 }

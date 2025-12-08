@@ -8,6 +8,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -19,6 +20,9 @@ const (
 	ItemTypeUser  = "user"
 	ItemTypeRole  = "role"
 	ItemTypeGroup = "group"
+
+	ChannelApproved = "approved"
+	ChannelRejected = "rejected"
 )
 
 func init() {
@@ -80,6 +84,19 @@ func (m *Metadata) Completed() bool {
 }
 
 func (m *Metadata) UpdateResult() {
+	//
+	// If there is a pending record, the result is pending.
+	//
+	for _, record := range m.Records {
+		if record.State == StatePending {
+			m.Result = StatePending
+			return
+		}
+	}
+
+	//
+	// If there is a rejected record, the result is rejected.
+	//
 	for _, record := range m.Records {
 		if record.State == StateRejected {
 			m.Result = StateRejected
@@ -254,7 +271,10 @@ func (a *Approval) Color() string {
 }
 
 func (a *Approval) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{components.DefaultOutputChannel}
+	return []components.OutputChannel{
+		{Name: ChannelApproved, Label: "Approved", Description: "All required actors approved"},
+		{Name: ChannelRejected, Label: "Rejected", Description: "At least one actor rejected (after everyone responded)"},
+	}
 }
 
 func (a *Approval) Configuration() []configuration.Field {
@@ -265,6 +285,7 @@ func (a *Approval) Configuration() []configuration.Field {
 			Type:  configuration.FieldTypeList,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
+					ItemLabel: "Item",
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
@@ -328,7 +349,7 @@ func (a *Approval) Setup(ctx components.SetupContext) error {
 	return nil
 }
 
-func (a *Approval) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+func (a *Approval) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 
@@ -344,7 +365,18 @@ func (a *Approval) Execute(ctx components.ExecutionContext) error {
 		return err
 	}
 
+	metadata.UpdateResult()
 	ctx.MetadataContext.Set(metadata)
+
+	//
+	// If no items are specified, just finish the execution.
+	//
+	if metadata.Completed() {
+		return ctx.ExecutionStateContext.Pass(map[string][]any{
+			ChannelApproved: {metadata},
+		})
+	}
+
 	return nil
 }
 
@@ -429,8 +461,15 @@ func (a *Approval) HandleAction(ctx components.ActionContext) error {
 	metadata.UpdateResult()
 	ctx.MetadataContext.Set(metadata)
 
+	var outputChannel string
+	if metadata.Result == StateApproved {
+		outputChannel = ChannelApproved
+	} else if metadata.Result == StateRejected {
+		outputChannel = ChannelRejected
+	}
+
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {metadata},
+		outputChannel: {metadata},
 	})
 }
 

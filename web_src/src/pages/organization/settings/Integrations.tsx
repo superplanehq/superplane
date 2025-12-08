@@ -1,9 +1,11 @@
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { useState } from "react";
-import { Button } from "../../../components/Button/button";
-import { MaterialSymbol } from "../../../components/MaterialSymbol/material-symbol";
-import { useIntegrations } from "../../../hooks/useIntegrations";
-import { IntegrationModal } from "../../../components/IntegrationZeroState/IntegrationModal";
 import type { IntegrationsIntegration } from "../../../api-client/types.gen";
+import { Icon } from "../../../components/Icon";
+import { IntegrationModal } from "../../../components/IntegrationZeroState/IntegrationModal";
+import { useIntegrations } from "../../../hooks/useIntegrations";
+import { Button } from "../../../ui/button";
 
 interface IntegrationsProps {
   organizationId: string;
@@ -21,8 +23,8 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   );
 
   const integrationTypes = [
-    { id: "github", name: "GitHub", icon: "code" },
-    { id: "semaphore", name: "Semaphore", icon: "build" },
+    { id: "github", name: "GitHub", icon: githubIcon },
+    { id: "semaphore", name: "Semaphore", icon: SemaphoreLogo },
   ];
 
   const handleCreateIntegration = (type: string) => {
@@ -38,6 +40,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const handleModalClose = () => {
     setIsModalOpen(false);
     setSelectedIntegrationType(null);
+    setEditingIntegration(null);
   };
 
   const handleIntegrationSuccess = () => {
@@ -76,13 +79,13 @@ export function Integrations({ organizationId }: IntegrationsProps) {
         <div className="p-6">
           {integrations.length === 0 ? (
             <div className="text-center py-12">
-              <MaterialSymbol name="integration_instructions" size="lg" className="text-zinc-400 mx-auto mb-4" />
+              <Icon name="integration_instructions" size="lg" className="text-zinc-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-2">No integrations yet</h3>
               <p className="text-zinc-600 dark:text-zinc-400 mb-6">
                 Connect external services to streamline your workflow
               </p>
-              <Button color="blue" onClick={handleAddIntegrationClick} className="flex items-center gap-2">
-                <MaterialSymbol name="add" size="sm" />
+              <Button onClick={handleAddIntegrationClick} className="flex items-center gap-2">
+                <Icon name="add" size="sm" />
                 Add Integration
               </Button>
             </div>
@@ -90,8 +93,8 @@ export function Integrations({ organizationId }: IntegrationsProps) {
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium">Organization Integrations</h2>
-                <Button color="blue" onClick={handleAddIntegrationClick} className="flex items-center gap-2">
-                  <MaterialSymbol name="add" size="sm" />
+                <Button onClick={handleAddIntegrationClick} className="flex items-center gap-2">
+                  <Icon name="add" size="sm" />
                   Add Integration
                 </Button>
               </div>
@@ -104,10 +107,13 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <MaterialSymbol
-                          name={integration.spec?.type === "github" ? "code" : "build"}
-                          className="text-zinc-600 dark:text-zinc-400"
-                        />
+                        <div className="flex-shrink-0">
+                          <img
+                            src={integration.spec?.type === "github" ? githubIcon : SemaphoreLogo}
+                            alt={integration.spec?.type}
+                            className="w-5 "
+                          />
+                        </div>
                         <div>
                           <h3 className="font-medium text-zinc-900 dark:text-zinc-100">{integration.metadata?.name}</h3>
                           <p className="text-sm text-zinc-600 dark:text-zinc-400">{integration.spec?.url}</p>
@@ -118,11 +124,12 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                           {integration.spec?.type}
                         </span>
                         <button
+                          data-testid={`edit-integration-${integration.metadata?.name || ""}`}
                           onClick={() => handleEditIntegration(integration)}
                           className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded"
                           title="Edit integration"
                         >
-                          <MaterialSymbol name="edit" size="sm" />
+                          <Icon name="edit" size="sm" />
                         </button>
                       </div>
                     </div>
@@ -145,7 +152,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                   onClick={() => setIsIntegrationSelectorOpen(false)}
                   className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
                 >
-                  <MaterialSymbol name="close" size="sm" />
+                  <Icon name="close" size="sm" />
                 </button>
               </div>
               <div className="space-y-3">
@@ -155,7 +162,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     onClick={() => handleCreateIntegration(type.id)}
                     className="w-full flex items-center gap-3 p-4 text-left border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                   >
-                    <MaterialSymbol name={type.icon} className="text-zinc-600 dark:text-zinc-400" />
+                    <div className="flex-shrink-0">
+                      <img src={type.icon} alt={type.name} className="w-5" />
+                    </div>
                     <div>
                       <h4 className="font-medium text-zinc-900 dark:text-zinc-100">{type.name}</h4>
                       <p className="text-sm text-zinc-600 dark:text-zinc-400">

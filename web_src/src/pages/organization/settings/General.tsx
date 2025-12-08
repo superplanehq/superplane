@@ -1,12 +1,12 @@
+import { Textarea } from "@/components/Textarea/textarea";
+import { useState } from "react";
+import { useParams } from "react-router-dom";
+import type { OrganizationsOrganization } from "../../../api-client/types.gen";
+import { Field, Fieldset, Label } from "../../../components/Fieldset/fieldset";
 import { Heading } from "../../../components/Heading/heading";
 import { Input } from "../../../components/Input/input";
-import { Field, Fieldset, Label } from "../../../components/Fieldset/fieldset";
-import { Button } from "../../../components/Button/button";
-import { useState } from "react";
 import { useUpdateOrganization } from "../../../hooks/useOrganizationData";
-import type { OrganizationsOrganization } from "../../../api-client/types.gen";
-import { useParams } from "react-router-dom";
-import { Textarea } from "@/components/Textarea/textarea";
+import { Button } from "../../../ui/button";
 
 interface GeneralProps {
   organization: OrganizationsOrganization;

@@ -1,5 +1,5 @@
 import React from "react";
-import { MaterialSymbol } from "../MaterialSymbol/material-symbol";
+import { Icon } from "../Icon";
 
 interface BadgeProps {
   children: React.ReactNode;
@@ -26,7 +26,7 @@ export function Badge({ children, color = "gray", className = "", icon, truncate
       title={title}
       className={`inline-flex items-center gap-x-1.5 px-1.5 py-0.5 rounded-md text-sm/5 font-medium sm:text-xs/5 forced-colors:outline ${colorClasses[color]} ${className}`}
     >
-      {icon && <MaterialSymbol name={icon} size="md" className="flex-shrink-0" />}
+      {icon && <Icon name={icon} size="md" className="flex-shrink-0" />}
       <span className={truncate ? "truncate" : ""}>{children}</span>
     </span>
   );

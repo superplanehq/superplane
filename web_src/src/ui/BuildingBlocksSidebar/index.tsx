@@ -38,12 +38,12 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
     return (
       <Button
         variant="outline"
-        size="icon"
         onClick={() => onToggle(true)}
         aria-label="Open sidebar"
-        className="absolute top-4 left-4 z-10 shadow-md"
+        className="absolute top-4 left-4 z-10"
       >
-        <Menu size={24} />
+        <Menu size={16} />
+        Components
       </Button>
     );
   }
@@ -57,7 +57,7 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
     if (storedShowWip !== null) {
       return JSON.parse(storedShowWip);
     }
-    return true; // default value
+    return false; // default value
   });
 
   // Save showWip to localStorage whenever it changes
@@ -153,7 +153,7 @@ interface CategorySectionProps {
   showWip?: boolean;
 }
 
-function CategorySection({ category, canvasZoom, searchTerm = "", showWip = true }: CategorySectionProps) {
+function CategorySection({ category, canvasZoom, searchTerm = "", showWip = false }: CategorySectionProps) {
   const query = searchTerm.trim().toLowerCase();
   const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
 

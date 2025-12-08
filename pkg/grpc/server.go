@@ -3,7 +3,9 @@ package grpc
 import (
 	"fmt"
 	"net"
+	"time"
 
+	"github.com/getsentry/sentry-go"
 	log "github.com/sirupsen/logrus"
 
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
@@ -23,8 +25,10 @@ import (
 	pbWorkflows "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	health "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 //
@@ -32,8 +36,20 @@ import (
 //
 
 var (
-	customFunc recovery.RecoveryHandlerFunc
+	customFunc recovery.RecoveryHandlerFunc = sentryRecoveryHandler
 )
+
+func sentryRecoveryHandler(p any) error {
+	log.Errorf("recovered from panic in gRPC handler: %v", p)
+
+	hub := sentry.CurrentHub()
+	if hub != nil && hub.Client() != nil {
+		hub.Recover(p)
+		hub.Flush(2 * time.Second)
+	}
+
+	return status.Errorf(codes.Internal, "internal server error")
+}
 
 func RunServer(baseURL string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, port int) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)

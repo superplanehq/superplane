@@ -1,14 +1,14 @@
-import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { Button } from "../../../components/Button/button";
-import { Input } from "../../../components/Input/input";
-import { Text } from "../../../components/Text/text";
-import { Checkbox, CheckboxField } from "../../../components/Checkbox/checkbox";
-import { Label, Description } from "../../../components/Fieldset/fieldset";
-import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
-import { useRole, useCreateRole, useUpdateRole } from "../../../hooks/useOrganizationData";
 import { Heading } from "@/components/Heading/heading";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
+import { Checkbox, CheckboxField } from "../../../components/Checkbox/checkbox";
+import { Description, Label } from "../../../components/Fieldset/fieldset";
+import { Input } from "../../../components/Input/input";
+import { Text } from "../../../components/Text/text";
+import { useCreateRole, useRole, useUpdateRole } from "../../../hooks/useOrganizationData";
+import { Button } from "../../../ui/button";
 
 interface Permission {
   id: string;
@@ -481,10 +481,9 @@ export function CreateRolePage() {
           {/* Action Buttons */}
           <div className="flex justify-end gap-3">
             <Link to={`/${orgId}/settings/roles`}>
-              <Button outline>Cancel</Button>
+              <Button variant="secondary">Cancel</Button>
             </Link>
             <Button
-              color="blue"
               onClick={handleSubmitRole}
               disabled={!roleName.trim() || selectedPermissions.size === 0 || isSubmitting || isLoading}
             >

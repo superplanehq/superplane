@@ -21,6 +21,7 @@ var _ MappedNullable = &ConfigurationListTypeOptions{}
 // ConfigurationListTypeOptions struct for ConfigurationListTypeOptions
 type ConfigurationListTypeOptions struct {
 	ItemDefinition *ConfigurationListItemDefinition `json:"itemDefinition,omitempty"`
+	ItemLabel *string `json:"itemLabel,omitempty"`
 }
 
 // NewConfigurationListTypeOptions instantiates a new ConfigurationListTypeOptions object
@@ -72,6 +73,38 @@ func (o *ConfigurationListTypeOptions) SetItemDefinition(v ConfigurationListItem
 	o.ItemDefinition = &v
 }
 
+// GetItemLabel returns the ItemLabel field value if set, zero value otherwise.
+func (o *ConfigurationListTypeOptions) GetItemLabel() string {
+	if o == nil || IsNil(o.ItemLabel) {
+		var ret string
+		return ret
+	}
+	return *o.ItemLabel
+}
+
+// GetItemLabelOk returns a tuple with the ItemLabel field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationListTypeOptions) GetItemLabelOk() (*string, bool) {
+	if o == nil || IsNil(o.ItemLabel) {
+		return nil, false
+	}
+	return o.ItemLabel, true
+}
+
+// HasItemLabel returns a boolean if a field has been set.
+func (o *ConfigurationListTypeOptions) HasItemLabel() bool {
+	if o != nil && !IsNil(o.ItemLabel) {
+		return true
+	}
+
+	return false
+}
+
+// SetItemLabel gets a reference to the given string and assigns it to the ItemLabel field.
+func (o *ConfigurationListTypeOptions) SetItemLabel(v string) {
+	o.ItemLabel = &v
+}
+
 func (o ConfigurationListTypeOptions) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -84,6 +117,9 @@ func (o ConfigurationListTypeOptions) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.ItemDefinition) {
 		toSerialize["itemDefinition"] = o.ItemDefinition
+	}
+	if !IsNil(o.ItemLabel) {
+		toSerialize["itemLabel"] = o.ItemLabel
 	}
 	return toSerialize, nil
 }

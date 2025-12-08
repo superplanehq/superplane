@@ -1,6 +1,5 @@
-import { Heading } from "@/components/Heading/heading";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
@@ -71,12 +70,10 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit }: 
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-w-3xl max-h-[80vh]">
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
+          <DialogTitle className="flex items-center gap-3">
             <Play className="text-blue-600 dark:text-blue-400" size={24} />
-            <Heading level={3} className="!mb-0">
-              Emit Event
-            </Heading>
-          </div>
+            Emit Event
+          </DialogTitle>
 
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
             Manually emit an output event for node: <strong>{nodeName}</strong>

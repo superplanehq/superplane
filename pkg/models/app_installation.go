@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/applications"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 )
@@ -24,9 +23,18 @@ type AppInstallation struct {
 	State            string
 	Configuration    datatypes.JSONType[map[string]any]
 	Metadata         datatypes.JSONType[map[string]any]
-	BrowserAction    *datatypes.JSONType[applications.BrowserAction]
+	BrowserAction    *datatypes.JSONType[BrowserAction]
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
+}
+
+// TODO: this is copied from pkg/applications here,
+// because there is a circular dependency issue that was
+// introduced by having pkg/components require pkg/models.
+type BrowserAction struct {
+	URL        string
+	Method     string
+	FormFields map[string]string
 }
 
 func CreateAppInstallation(orgID uuid.UUID, appName string, installationName string, config map[string]any) (*AppInstallation, error) {

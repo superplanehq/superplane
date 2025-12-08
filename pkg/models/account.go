@@ -3,6 +3,8 @@ package models
 import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/utils"
+	"gorm.io/gorm"
 )
 
 type Account struct {
@@ -12,8 +14,12 @@ type Account struct {
 }
 
 func CreateAccount(name, email string) (*Account, error) {
-	account := &Account{Name: name, Email: email}
-	err := database.Conn().Create(account).Error
+	return CreateAccountInTransaction(database.Conn(), name, email)
+}
+
+func CreateAccountInTransaction(tx *gorm.DB, name, email string) (*Account, error) {
+	account := &Account{Name: name, Email: utils.NormalizeEmail(email)}
+	err := tx.Create(account).Error
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +46,7 @@ func FindAccountByEmail(email string) (*Account, error) {
 	var account Account
 
 	err := database.Conn().
-		Where("email = ?", email).
+		Where("email = ?", utils.NormalizeEmail(email)).
 		First(&account).
 		Error
 
@@ -112,4 +118,82 @@ func (a *Account) FindPendingInvitations() ([]OrganizationInvitation, error) {
 	}
 
 	return invitations, nil
+}
+
+func FindAccountByProvider(provider, providerID string) (*Account, error) {
+	var accountProvider AccountProvider
+	err := database.Conn().
+		Where("provider = ?", provider).
+		Where("provider_id = ?", providerID).
+		First(&accountProvider).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return FindAccountByID(accountProvider.AccountID.String())
+}
+
+func (a *Account) UpdateEmail(newEmail string) error {
+	normalizedEmail := utils.NormalizeEmail(newEmail)
+	originalEmail := a.Email
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		err := tx.Model(a).Update("email", normalizedEmail).Error
+		if err != nil {
+			return err
+		}
+
+		err = tx.Model(&User{}).
+			Where("account_id = ?", a.ID).
+			Update("email", normalizedEmail).Error
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err == nil {
+		a.Email = normalizedEmail
+		return nil
+	}
+
+	a.Email = originalEmail
+	return err
+}
+
+func (a *Account) UpdateEmailForProvider(newEmail, provider, providerID string) error {
+	normalizedEmail := utils.NormalizeEmail(newEmail)
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+
+		err := tx.Model(a).Update("email", normalizedEmail).Error
+		if err != nil {
+			return err
+		}
+
+		err = tx.Model(&User{}).
+			Where("account_id = ?", a.ID).
+			Update("email", normalizedEmail).Error
+		if err != nil {
+			return err
+		}
+
+		err = tx.Model(&AccountProvider{}).
+			Where("account_id = ? AND provider = ? AND provider_id = ?", a.ID, provider, providerID).
+			Update("email", normalizedEmail).Error
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err == nil {
+		a.Email = normalizedEmail
+	}
+
+	return err
 }
