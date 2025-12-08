@@ -42,6 +42,19 @@ export const calcRelativeTimeFromDiff = (diff: number) => {
   }
 };
 
+export const formatDuration = (value: number, unit: string): string => {
+  const unitLabels: Record<string, string> = {
+    seconds: value === 1 ? "second" : "seconds",
+    minutes: value === 1 ? "minute" : "minutes",
+    hours: value === 1 ? "hour" : "hours",
+  };
+  return `${value} ${unitLabels[unit] || unit}`;
+};
+
+export const formatTimestamp = (date: Date): string => {
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
+
 export function splitBySpaces(input: string): string[] {
   const regex = /(?:[^\s"']+|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')+/g;
   const matches = input.match(regex);

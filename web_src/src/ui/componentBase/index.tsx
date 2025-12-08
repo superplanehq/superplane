@@ -153,7 +153,7 @@ export interface EventSection {
   receivedAt?: Date;
   eventState?: EventState;
   eventTitle?: string;
-  eventSubtitle?: string;
+  eventSubtitle?: string | React.ReactNode;
   handleComponent?: React.ReactNode;
 }
 
@@ -167,6 +167,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   description?: string;
   specs?: ComponentBaseSpec[];
   hideCount?: boolean;
+  hideMetadataList?: boolean;
   collapsed?: boolean;
   collapsedBackground?: string;
   eventSections?: EventSection[];
@@ -199,6 +200,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   onDelete,
   isCompactView,
   hideCount,
+  hideMetadataList,
   metadata,
 }) => {
   if (collapsed) {
@@ -272,7 +274,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           isCompactView={isCompactView}
         />
 
-        {metadata && metadata.length > 0 && <MetadataList items={metadata} />}
+        {!hideMetadataList && metadata && metadata.length > 0 && <MetadataList items={metadata} />}
 
         {specs && specs.length > 0 && (
           <div className="px-2 py-2 border-b text-gray-500 flex flex-col gap-2">

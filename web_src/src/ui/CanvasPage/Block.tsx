@@ -7,11 +7,10 @@ import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
 import MergeComponent, { type MergeComponentProps } from "../merge";
 import { ComponentActionsProps } from "../types/componentActions";
-import { Wait, WaitProps } from "../wait";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType = "trigger" | "component" | "composite" | "approval" | "wait" | "merge" | "switch";
+type BlockType = "trigger" | "component" | "composite" | "approval" | "merge" | "switch";
 
 interface BlockAi {
   show: boolean;
@@ -43,9 +42,6 @@ export interface BlockData {
 
   // approval node specific props
   approval?: ApprovalProps;
-
-  // wait node specific props
-  wait?: WaitProps;
 
   // switch node specific props
   switch?: SwitchComponentProps;
@@ -105,7 +101,6 @@ function LeftHandle({ data, nodeId }: BlockProps) {
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "approval" && data.approval?.collapsed) ||
-    (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed) ||
     (data.type === "component" && data.component?.collapsed);
 
@@ -152,7 +147,6 @@ function RightHandle({ data, nodeId }: BlockProps) {
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "trigger" && data.trigger?.collapsed) ||
-    (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed) ||
     (data.type === "component" && data.component?.collapsed);
 
@@ -380,8 +374,6 @@ function BlockContent({
       );
     case "approval":
       return <Approval {...(data.approval as ApprovalProps)} selected={selected} {...actionProps} />;
-    case "wait":
-      return <Wait {...(data.wait as WaitProps)} selected={selected} {...actionProps} />;
     case "switch":
       return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} {...actionProps} />;
     case "merge":
