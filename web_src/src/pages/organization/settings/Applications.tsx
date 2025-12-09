@@ -1,8 +1,8 @@
-import { AppWindow, Puzzle, Zap, Settings, Check, Loader2, X, Edit } from "lucide-react";
+import { AppWindow, Puzzle, Zap, Loader2, X, Edit } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAvailableApplications, useInstalledApplications, useInstallApplication } from "../../../hooks/useApplications";
-import { Button } from "../../../components/Button/button";
+import { Button } from "@/ui/button";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { ApplicationsApplicationDefinition } from "../../../api-client/types.gen";
 
@@ -22,11 +22,6 @@ export function Applications({ organizationId }: ApplicationsProps) {
   const installMutation = useInstallApplication(organizationId);
 
   const isLoading = loadingAvailable || loadingInstalled;
-
-  // Check if an application is already installed
-  const isInstalled = (appName: string) => {
-    return installedApps.some((installed) => installed.appName === appName);
-  };
 
   const handleInstallClick = (app: ApplicationsApplicationDefinition) => {
     setSelectedApplication(app);
@@ -119,21 +114,18 @@ export function Applications({ organizationId }: ApplicationsProps) {
                           {app.state && (
                             <p className="text-sm text-zinc-600 dark:text-zinc-400">Status: {app.state}</p>
                           )}
+                          {app.stateDescription && (
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400">{app.stateDescription}</p>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-3 py-1 text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full flex items-center gap-1">
-                          <Check className="w-3 h-3" />
-                          Installed
-                        </span>
-                        <button
-                          onClick={() => navigate(`/${organizationId}/settings/applications/${app.id}`)}
-                          className="p-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
-                          title="Edit application"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => navigate(`/${organizationId}/settings/applications/${app.id}`)}
+                        className="p-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
+                        title="Edit application"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -157,59 +149,41 @@ export function Applications({ organizationId }: ApplicationsProps) {
                 </p>
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {availableApps.map((app) => {
-                  const installed = isInstalled(app.name || "");
-                  return (
+              <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {availableApps.map((app) => (
                     <div
                       key={app.name}
-                      className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 hover:shadow-md transition-shadow"
+                      className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 hover:shadow-md transition-shadow"
                     >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <AppWindow className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
-                          <h3 className="font-medium text-zinc-900 dark:text-zinc-100">{app.name}</h3>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <AppWindow className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                          <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{app.label || app.name}</h3>
                         </div>
                       </div>
 
-                      <div className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                        {app.components && app.components.length > 0 && (
-                          <div className="flex items-center gap-2">
-                            <Puzzle className="w-4 h-4" />
-                            <span>{app.components.length} component{app.components.length !== 1 ? "s" : ""}</span>
-                          </div>
-                        )}
+                      <div className="space-y-1 text-xs text-zinc-600 dark:text-zinc-400 mb-3">
+                        <div className="flex items-center gap-1.5">
+                          <Puzzle className="w-3 h-3" />
+                          <span>{app.components?.length || 0} component{(app.components?.length || 0) !== 1 ? "s" : ""}</span>
+                        </div>
                         {app.triggers && app.triggers.length > 0 && (
-                          <div className="flex items-center gap-2">
-                            <Zap className="w-4 h-4" />
+                          <div className="flex items-center gap-1.5">
+                            <Zap className="w-3 h-3" />
                             <span>{app.triggers.length} trigger{app.triggers.length !== 1 ? "s" : ""}</span>
                           </div>
                         )}
-                        {app.configuration && app.configuration.length > 0 && (
-                          <div className="flex items-center gap-2">
-                            <Settings className="w-4 h-4" />
-                            <span>{app.configuration.length} configuration field{app.configuration.length !== 1 ? "s" : ""}</span>
-                          </div>
-                        )}
                       </div>
 
-                      {installed ? (
-                        <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
-                          <Check className="w-4 h-4" />
-                          Installed
-                        </div>
-                      ) : (
-                        <Button
-                          color="blue"
-                          onClick={() => handleInstallClick(app)}
-                          className="w-full"
-                        >
-                          Install
-                        </Button>
-                      )}
+                      <Button
+                        color="blue"
+                        onClick={() => handleInstallClick(app)}
+                        className="w-full text-sm py-1.5"
+                      >
+                        Install
+                      </Button>
                     </div>
-                  );
-                })}
+                  ))}
               </div>
             )}
           </div>
@@ -225,7 +199,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                 <div className="flex items-center gap-3">
                   <AppWindow className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
                   <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-                    Install {selectedApplication.name}
+                    Install {selectedApplication.label || selectedApplication.name}
                   </h3>
                 </div>
                 <button

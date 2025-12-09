@@ -2,6 +2,7 @@
 
 export type ApplicationsApplicationDefinition = {
     name?: string;
+    label?: string;
     configuration?: Array<ConfigurationField>;
     components?: Array<ComponentsComponent>;
     triggers?: Array<TriggersTrigger>;
@@ -394,6 +395,7 @@ export type OrganizationsAppInstallation = {
     appName?: string;
     installationName?: string;
     state?: string;
+    stateDescription?: string;
     configuration?: {
         [key: string]: unknown;
     };

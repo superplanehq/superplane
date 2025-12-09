@@ -40,7 +40,7 @@ func RegisterTrigger(name string, t triggers.Trigger) {
 	registeredTriggers[name] = t
 }
 
-func RegisterIntegration(name string, i applications.Application) {
+func RegisterApplication(name string, i applications.Application) {
 	mu.Lock()
 	defer mu.Unlock()
 	registeredApplications[name] = i
@@ -256,4 +256,19 @@ func (r *Registry) ListApplications() []applications.Application {
 	})
 
 	return applications
+}
+
+func (r *Registry) GetApplicationComponent(name string) (components.Component, error) {
+	application, err := r.GetApplication(name)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, component := range application.Components() {
+		if component.Name() == name {
+			return component, nil
+		}
+	}
+
+	return nil, fmt.Errorf("component %s not registered", name)
 }

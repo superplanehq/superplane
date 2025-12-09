@@ -112,6 +112,9 @@ dev.down:
 dev.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app /bin/bash
 
+dev.db:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app sh -c 'PGPASSWORD=$(DB_PASSWORD) psql -h db -p 5432 -U postgres -d superplane_dev'
+
 dev.db.console:
 	$(MAKE) db.console DB_NAME=superplane_dev
 

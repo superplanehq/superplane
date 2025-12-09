@@ -24,6 +24,7 @@ type OrganizationsAppInstallation struct {
 	AppName *string `json:"appName,omitempty"`
 	InstallationName *string `json:"installationName,omitempty"`
 	State *string `json:"state,omitempty"`
+	StateDescription *string `json:"stateDescription,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	BrowserAction *OrganizationsBrowserAction `json:"browserAction,omitempty"`
@@ -174,6 +175,38 @@ func (o *OrganizationsAppInstallation) SetState(v string) {
 	o.State = &v
 }
 
+// GetStateDescription returns the StateDescription field value if set, zero value otherwise.
+func (o *OrganizationsAppInstallation) GetStateDescription() string {
+	if o == nil || IsNil(o.StateDescription) {
+		var ret string
+		return ret
+	}
+	return *o.StateDescription
+}
+
+// GetStateDescriptionOk returns a tuple with the StateDescription field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsAppInstallation) GetStateDescriptionOk() (*string, bool) {
+	if o == nil || IsNil(o.StateDescription) {
+		return nil, false
+	}
+	return o.StateDescription, true
+}
+
+// HasStateDescription returns a boolean if a field has been set.
+func (o *OrganizationsAppInstallation) HasStateDescription() bool {
+	if o != nil && !IsNil(o.StateDescription) {
+		return true
+	}
+
+	return false
+}
+
+// SetStateDescription gets a reference to the given string and assigns it to the StateDescription field.
+func (o *OrganizationsAppInstallation) SetStateDescription(v string) {
+	o.StateDescription = &v
+}
+
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
 func (o *OrganizationsAppInstallation) GetConfiguration() map[string]interface{} {
 	if o == nil || IsNil(o.Configuration) {
@@ -291,6 +324,9 @@ func (o OrganizationsAppInstallation) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.State) {
 		toSerialize["state"] = o.State
+	}
+	if !IsNil(o.StateDescription) {
+		toSerialize["stateDescription"] = o.StateDescription
 	}
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration

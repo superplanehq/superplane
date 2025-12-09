@@ -29,7 +29,9 @@ func serializeApplications(in []applications.Application) []*pb.ApplicationDefin
 
 		out[i] = &pb.ApplicationDefinition{
 			Name:          application.Name(),
+			Label:         application.Label(),
 			Configuration: configuration,
+			Components:    actions.SerializeComponents(application.Components()),
 		}
 	}
 	return out

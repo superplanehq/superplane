@@ -72,6 +72,21 @@ CREATE TABLE public.accounts (
 
 
 --
+-- Name: app_installation_secrets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.app_installation_secrets (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    installation_id uuid NOT NULL,
+    name character varying(64) NOT NULL,
+    value bytea NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: app_installations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -81,6 +96,7 @@ CREATE TABLE public.app_installations (
     app_name character varying(255) NOT NULL,
     installation_name character varying(255) NOT NULL,
     state character varying(32) NOT NULL,
+    state_description character varying(255),
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     browser_action jsonb,
@@ -463,6 +479,14 @@ ALTER TABLE ONLY public.accounts
 
 ALTER TABLE ONLY public.accounts
     ADD CONSTRAINT accounts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: app_installation_secrets app_installation_secrets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_secrets
+    ADD CONSTRAINT app_installation_secrets_pkey PRIMARY KEY (id);
 
 
 --
@@ -911,6 +935,22 @@ CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (orga
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
+
+
+--
+-- Name: app_installation_secrets app_installation_secrets_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_secrets
+    ADD CONSTRAINT app_installation_secrets_installation_id_fkey FOREIGN KEY (installation_id) REFERENCES public.app_installations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: app_installation_secrets app_installation_secrets_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_secrets
+    ADD CONSTRAINT app_installation_secrets_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --

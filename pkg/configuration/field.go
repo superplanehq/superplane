@@ -57,6 +57,11 @@ type Field struct {
 	Default     any    `json:"default"`
 
 	/*
+	 * Whether the field is sensitive (e.g., password, API token)
+	 */
+	Sensitive bool `json:"sensitive"`
+
+	/*
 	 * Type-specific options for fields.
 	 * The structure depends on the field type.
 	 */

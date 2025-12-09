@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -806,4 +807,35 @@ func defaultValueFromProto(fieldType, defaultValue string) any {
 	default:
 		return defaultValue
 	}
+}
+
+func SerializeComponents(in []components.Component) []*componentpb.Component {
+	out := make([]*componentpb.Component, len(in))
+	for i, component := range in {
+		outputChannels := component.OutputChannels(nil)
+		channels := make([]*componentpb.OutputChannel, len(outputChannels))
+		for j, channel := range outputChannels {
+			channels[j] = &componentpb.OutputChannel{
+				Name: channel.Name,
+			}
+		}
+
+		configFields := component.Configuration()
+		configuration := make([]*configpb.Field, len(configFields))
+		for j, field := range configFields {
+			configuration[j] = ConfigurationFieldToProto(field)
+		}
+
+		out[i] = &componentpb.Component{
+			Name:           component.Name(),
+			Label:          component.Label(),
+			Description:    component.Description(),
+			Icon:           component.Icon(),
+			Color:          component.Color(),
+			OutputChannels: channels,
+			Configuration:  configuration,
+		}
+	}
+
+	return out
 }

@@ -9,10 +9,9 @@ import (
 )
 
 const (
-	AppInstallationStatePending    = "pending"
-	AppInstallationStateInProgress = "in-progress"
-	AppInstallationStateReady      = "ready"
-	AppInstallationStateError      = "error"
+	AppInstallationStatePending = "pending"
+	AppInstallationStateReady   = "ready"
+	AppInstallationStateError   = "error"
 )
 
 type AppInstallation struct {
@@ -21,11 +20,22 @@ type AppInstallation struct {
 	AppName          string
 	InstallationName string
 	State            string
+	StateDescription string
 	Configuration    datatypes.JSONType[map[string]any]
 	Metadata         datatypes.JSONType[map[string]any]
 	BrowserAction    *datatypes.JSONType[BrowserAction]
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
+}
+
+type AppInstallationSecret struct {
+	ID             uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	OrganizationID uuid.UUID
+	InstallationID uuid.UUID
+	Name           string
+	Value          []byte
+	CreatedAt      *time.Time
+	UpdatedAt      *time.Time
 }
 
 // TODO: this is copied from pkg/applications here,

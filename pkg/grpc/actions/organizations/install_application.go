@@ -21,22 +21,34 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, baseUR
 		return nil, status.Errorf(codes.InvalidArgument, "application %s not found", appName)
 	}
 
+	//
+	// TODO: do not save sensitive values as plain text here
+	//
 	appInstallation, err := models.CreateAppInstallation(uuid.MustParse(orgID), appName, installationName, appConfig.AsMap())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create application installation: %v", err)
 	}
 
-	app.Sync(applications.SyncContext{
+	syncErr := app.Sync(applications.SyncContext{
 		Configuration:  appInstallation.Configuration.Data(),
 		BaseURL:        baseURL,
 		OrganizationID: orgID,
 		InstallationID: appInstallation.ID.String(),
-		AppContext:     contexts.NewAppContext(appInstallation),
+		AppContext:     contexts.NewAppContext(database.Conn(), appInstallation),
 	})
 
 	err = database.Conn().Save(appInstallation).Error
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to save application installation after sync: %v", err)
+	}
+
+	if syncErr != nil {
+		appInstallation.State = "error"
+		appInstallation.StateDescription = syncErr.Error()
+		err = database.Conn().Save(appInstallation).Error
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to save application installation after sync: %v", err)
+		}
 	}
 
 	proto, err := serializeAppInstallation(appInstallation)

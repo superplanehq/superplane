@@ -25,6 +25,7 @@ import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
+import { useAvailableApplications } from "@/hooks/useApplications";
 import {
   eventExecutionsQueryOptions,
   useTriggers,
@@ -78,6 +79,7 @@ export function WorkflowPageV2() {
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
+  const { data: availableApplications = [], isLoading: applicationsLoading } = useAvailableApplications();
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
 
   usePageTitle([workflow?.metadata?.name || "Canvas"]);
@@ -254,13 +256,13 @@ export function WorkflowPageV2() {
   }, [hasUnsavedChanges]);
 
   const buildingBlocks = useMemo(
-    () => buildBuildingBlockCategories(triggers, components, blueprints),
-    [triggers, components, blueprints],
+    () => buildBuildingBlockCategories(triggers, components, blueprints, availableApplications),
+    [triggers, components, blueprints, availableApplications],
   );
 
   const { nodes, edges } = useMemo(() => {
     // Don't prepare data until everything is loaded
-    if (!workflow || workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
+    if (!workflow || workflowLoading || triggersLoading || blueprintsLoading || componentsLoading || applicationsLoading) {
       return { nodes: [], edges: [] };
     }
     return prepareData(

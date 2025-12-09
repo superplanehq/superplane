@@ -153,9 +153,10 @@ message AppInstallation {
   string app_name = 2;
   string installation_name = 3;
   string state = 4;
-  google.protobuf.Struct configuration = 5;
-  google.protobuf.Struct metadata = 6;
-  BrowserAction browser_action = 7;
+  string state_description = 5;
+  google.protobuf.Struct configuration = 6;
+  google.protobuf.Struct metadata = 7;
+  BrowserAction browser_action = 8;
 }
 
 message BrowserAction {

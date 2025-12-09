@@ -15,6 +15,11 @@ type Application interface {
 	Name() string
 
 	/*
+	 * Display name for the application.
+	 */
+	Label() string
+
+	/*
 	 * The configuration fields of the application.
 	 */
 	Configuration() []configuration.Field
@@ -32,7 +37,7 @@ type Application interface {
 	/*
 	 * Called when configuration changes.
 	 */
-	Sync(ctx SyncContext) SyncResponse
+	Sync(ctx SyncContext) error
 
 	/*
 	 * HTTP request handler
@@ -55,24 +60,19 @@ type AppContext interface {
 	SetState(string)
 	NewBrowserAction(action BrowserAction)
 	RemoveBrowserAction()
+	SetSecret(name string, value []byte) error
+	GetSecrets() ([]InstallationSecret, error)
+}
+
+type InstallationSecret struct {
+	Name  string
+	Value []byte
 }
 
 type BrowserAction struct {
 	URL        string
 	Method     string
 	FormFields map[string]string
-}
-
-type SyncResponse struct {
-	NewState         string
-	StateDescription string
-	Signals          []Signal
-}
-
-type Signal struct {
-	Name      string
-	Data      any
-	Sensitive bool
 }
 
 type HttpRequestContext struct {

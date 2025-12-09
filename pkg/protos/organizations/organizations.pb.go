@@ -231,9 +231,10 @@ type AppInstallation struct {
 	AppName          string                 `protobuf:"bytes,2,opt,name=app_name,json=appName,proto3" json:"app_name,omitempty"`
 	InstallationName string                 `protobuf:"bytes,3,opt,name=installation_name,json=installationName,proto3" json:"installation_name,omitempty"`
 	State            string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
-	Configuration    *_struct.Struct        `protobuf:"bytes,5,opt,name=configuration,proto3" json:"configuration,omitempty"`
-	Metadata         *_struct.Struct        `protobuf:"bytes,6,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	BrowserAction    *BrowserAction         `protobuf:"bytes,7,opt,name=browser_action,json=browserAction,proto3" json:"browser_action,omitempty"`
+	StateDescription string                 `protobuf:"bytes,5,opt,name=state_description,json=stateDescription,proto3" json:"state_description,omitempty"`
+	Configuration    *_struct.Struct        `protobuf:"bytes,6,opt,name=configuration,proto3" json:"configuration,omitempty"`
+	Metadata         *_struct.Struct        `protobuf:"bytes,7,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	BrowserAction    *BrowserAction         `protobuf:"bytes,8,opt,name=browser_action,json=browserAction,proto3" json:"browser_action,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -292,6 +293,13 @@ func (x *AppInstallation) GetInstallationName() string {
 func (x *AppInstallation) GetState() string {
 	if x != nil {
 		return x.State
+	}
+	return ""
+}
+
+func (x *AppInstallation) GetStateDescription() string {
+	if x != nil {
+		return x.StateDescription
 	}
 	return ""
 }
@@ -1421,15 +1429,16 @@ const file_organizations_proto_rawDesc = "" +
 	"\x11installation_name\x18\x03 \x01(\tR\x10installationName\x12=\n" +
 	"\rconfiguration\x18\x04 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\"k\n" +
 	"\x1aInstallApplicationResponse\x12M\n" +
-	"\finstallation\x18\x01 \x01(\v2).Superplane.Organizations.AppInstallationR\finstallation\"\xc3\x02\n" +
+	"\finstallation\x18\x01 \x01(\v2).Superplane.Organizations.AppInstallationR\finstallation\"\xf0\x02\n" +
 	"\x0fAppInstallation\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\bapp_name\x18\x02 \x01(\tR\aappName\x12+\n" +
 	"\x11installation_name\x18\x03 \x01(\tR\x10installationName\x12\x14\n" +
-	"\x05state\x18\x04 \x01(\tR\x05state\x12=\n" +
-	"\rconfiguration\x18\x05 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x123\n" +
-	"\bmetadata\x18\x06 \x01(\v2\x17.google.protobuf.StructR\bmetadata\x12N\n" +
-	"\x0ebrowser_action\x18\a \x01(\v2'.Superplane.Organizations.BrowserActionR\rbrowserAction\"\xd2\x01\n" +
+	"\x05state\x18\x04 \x01(\tR\x05state\x12+\n" +
+	"\x11state_description\x18\x05 \x01(\tR\x10stateDescription\x12=\n" +
+	"\rconfiguration\x18\x06 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x123\n" +
+	"\bmetadata\x18\a \x01(\v2\x17.google.protobuf.StructR\bmetadata\x12N\n" +
+	"\x0ebrowser_action\x18\b \x01(\v2'.Superplane.Organizations.BrowserActionR\rbrowserAction\"\xd2\x01\n" +
 	"\rBrowserAction\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x16\n" +
 	"\x06method\x18\x02 \x01(\tR\x06method\x12X\n" +

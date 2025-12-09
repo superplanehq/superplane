@@ -22,8 +22,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/triggers"
 )
 
+const (
+	GitHubAppPEM           = "pem"
+	GitHubAppClientSecret  = "clientSecret"
+	GitHubAppWebhookSecret = "webhookSecret"
+)
+
 func init() {
-	registry.RegisterIntegration("github", &GitHub{})
+	registry.RegisterApplication("github", &GitHub{})
 }
 
 type GitHub struct {
@@ -34,22 +40,34 @@ type Configuration struct {
 }
 
 type Metadata struct {
-	InstallationID string        `json:"installationId"`
-	State          string        `json:"state"`
-	Organization   string        `json:"organization"`
-	Repositories   []string      `json:"repositories"`
-	AppData        GitHubAppData `json:"appData"`
+	InstallationID string            `json:"installationId"`
+	State          string            `json:"state"`
+	Organization   string            `json:"organization"`
+	Repositories   []string          `json:"repositories"`
+	GitHubApp      GitHubAppMetadata `json:"githubApp"`
+}
+
+type GitHubAppMetadata struct {
+	ID       int64  `mapstructure:"id" json:"id"`
+	Slug     string `mapstructure:"slug" json:"slug"`
+	ClientID string `mapstructure:"clientId" json:"clientId"`
 }
 
 func (g *GitHub) Name() string {
 	return "github"
 }
 
+func (g *GitHub) Label() string {
+	return "GitHub"
+}
+
 func (g *GitHub) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name: "organization",
-			Type: configuration.FieldTypeString,
+			Name:        "organization",
+			Label:       "Organization",
+			Type:        configuration.FieldTypeString,
+			Description: "Organization to install the app into. If not specified, the app will be installed into the user's account.",
 		},
 	}
 }
@@ -62,40 +80,29 @@ func (g *GitHub) Triggers() []triggers.Trigger {
 	return []triggers.Trigger{}
 }
 
-func (g *GitHub) Sync(ctx applications.SyncContext) applications.SyncResponse {
+func (g *GitHub) Sync(ctx applications.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return applications.SyncResponse{
-			NewState:         "error",
-			StateDescription: fmt.Sprintf("Failed to decode configuration: %v", err),
-		}
+		return fmt.Errorf("Failed to decode configuration: %v", err)
 	}
 
 	metadata := Metadata{}
 	err = mapstructure.Decode(ctx.AppContext.GetMetadata(), &metadata)
 	if err != nil {
-		return applications.SyncResponse{
-			NewState:         "error",
-			StateDescription: fmt.Sprintf("Failed to decode metadata: %v", err),
-		}
+		return fmt.Errorf("Failed to decode metadata: %v", err)
 	}
 
+	//
+	// App is already installed - do not do anything.
+	//
 	if metadata.InstallationID != "" {
-		return applications.SyncResponse{
-			NewState: "ready",
-			Signals: []applications.Signal{
-				{Name: "repositories", Data: metadata.Repositories},
-			},
-		}
+		return nil
 	}
 
 	state, err := crypto.Base64String(32)
 	if err != nil {
-		return applications.SyncResponse{
-			NewState:         "error",
-			StateDescription: fmt.Sprintf("Failed to generate state: %v", err),
-		}
+		return fmt.Errorf("Failed to generate GitHub App state: %v", err)
 	}
 
 	ctx.AppContext.NewBrowserAction(applications.BrowserAction{
@@ -112,9 +119,7 @@ func (g *GitHub) Sync(ctx applications.SyncContext) applications.SyncResponse {
 		State:        state,
 	})
 
-	return applications.SyncResponse{
-		NewState: "in_progress",
-	}
+	return nil
 }
 
 func (g *GitHub) HandleRequest(ctx applications.HttpRequestContext) {
@@ -152,8 +157,6 @@ func afterAppCreation(ctx applications.HttpRequestContext, metadata Metadata) {
 	code := ctx.Request.URL.Query().Get("code")
 	state := ctx.Request.URL.Query().Get("state")
 
-	logrus.Infof("after app creation - code: %s, state: %s", code, state)
-
 	if code == "" || state == "" {
 		return
 	}
@@ -164,17 +167,47 @@ func afterAppCreation(ctx applications.HttpRequestContext, metadata Metadata) {
 		return
 	}
 
-	logrus.Infof("after app creation - appData: %v", appData)
+	//
+	// Save installation metadata
+	//
+	metadata.GitHubApp = GitHubAppMetadata{
+		ID:       appData.ID,
+		Slug:     appData.Slug,
+		ClientID: appData.ClientID,
+	}
 
-	metadata.AppData = *appData
 	ctx.AppContext.SetMetadata(metadata)
 
+	//
+	// Save installation secrets
+	//
+	err = ctx.AppContext.SetSecret(GitHubAppClientSecret, []byte(appData.ClientSecret))
+	if err != nil {
+		logrus.Errorf("failed to save client secret: %v", err)
+		return
+	}
+
+	err = ctx.AppContext.SetSecret(GitHubAppWebhookSecret, []byte(appData.WebhookSecret))
+	if err != nil {
+		logrus.Errorf("failed to save webhook secret: %v", err)
+		return
+	}
+
+	err = ctx.AppContext.SetSecret(GitHubAppPEM, []byte(appData.PEM))
+	if err != nil {
+		logrus.Errorf("failed to save PEM: %v", err)
+		return
+	}
+
+	//
+	// Redirect to app installation page
+	//
 	http.Redirect(
 		*ctx.Response,
 		ctx.Request,
 		fmt.Sprintf(
 			"https://github.com/apps/%s/installations/new?state=%s",
-			metadata.AppData.Slug,
+			metadata.GitHubApp.Slug,
 			state,
 		),
 		http.StatusSeeOther,
@@ -185,8 +218,6 @@ func afterAppInstallation(ctx applications.HttpRequestContext, metadata Metadata
 	installationID := ctx.Request.URL.Query().Get("installation_id")
 	setupAction := ctx.Request.URL.Query().Get("setup_action")
 	state := ctx.Request.URL.Query().Get("state")
-
-	logrus.Infof("after app installation - installationID: %s, setupAction: %s, state: %s", installationID, setupAction, state)
 
 	if installationID == "" || state != metadata.State {
 		logrus.Errorf("invalid installation ID or state")
@@ -203,12 +234,15 @@ func afterAppInstallation(ctx applications.HttpRequestContext, metadata Metadata
 }
 
 func afterAppInstallationInstall(ctx applications.HttpRequestContext, installationID string, metadata Metadata) {
-	logrus.Infof("after app installation install - installationID: %s", installationID)
-	logrus.Infof("after app installation install - metadata: %v", metadata)
-
 	ID, err := strconv.Atoi(installationID)
 	if err != nil {
 		logrus.Errorf("failed to parse installation ID: %v", err)
+		return
+	}
+
+	pem, err := findSecret(ctx, GitHubAppPEM)
+	if err != nil {
+		logrus.Errorf("failed to find PEM: %v", err)
 		return
 	}
 
@@ -221,7 +255,7 @@ func afterAppInstallationInstall(ctx applications.HttpRequestContext, installati
 	defer f.Close()
 	defer os.Remove(f.Name())
 
-	_, err = f.Write([]byte(metadata.AppData.PEM))
+	_, err = f.Write([]byte(pem))
 	if err != nil {
 		logrus.Errorf("failed to write temp file: %v", err)
 		return
@@ -229,7 +263,7 @@ func afterAppInstallationInstall(ctx applications.HttpRequestContext, installati
 
 	itr, err := ghinstallation.NewKeyFromFile(
 		http.DefaultTransport,
-		metadata.AppData.ID,
+		metadata.GitHubApp.ID,
 		int64(ID),
 		f.Name(),
 	)
@@ -314,12 +348,17 @@ func getGitHubAppManifest(ctx applications.SyncContext) string {
 	return string(data)
 }
 
+/*
+ * This is the response GitHub sends back after the GitHub app is created.
+ * NOTE: this contains sensitive data, so we should not save this as part
+ * of the installation metadata.
+ */
 type GitHubAppData struct {
+	ID            int64  `mapstructure:"id" json:"id"`
+	Slug          string `mapstructure:"slug" json:"slug"`
 	ClientID      string `mapstructure:"client_id" json:"client_id"`
 	ClientSecret  string `mapstructure:"client_secret" json:"client_secret"`
 	WebhookSecret string `mapstructure:"webhook_secret" json:"webhook_secret"`
-	ID            int64  `mapstructure:"id" json:"id"`
-	Slug          string `mapstructure:"slug" json:"slug"`
 	PEM           string `mapstructure:"pem" json:"pem"`
 }
 
@@ -351,4 +390,19 @@ func createAppFromManifest(code string) (*GitHubAppData, error) {
 	}
 
 	return &appData, nil
+}
+
+func findSecret(ctx applications.HttpRequestContext, secretName string) (string, error) {
+	secrets, err := ctx.AppContext.GetSecrets()
+	if err != nil {
+		return "", err
+	}
+
+	for _, secret := range secrets {
+		if secret.Name == secretName {
+			return string(secret.Value), nil
+		}
+	}
+
+	return "", fmt.Errorf("secret %s not found", secretName)
 }

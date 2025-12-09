@@ -21,6 +21,7 @@ var _ MappedNullable = &ApplicationsApplicationDefinition{}
 // ApplicationsApplicationDefinition struct for ApplicationsApplicationDefinition
 type ApplicationsApplicationDefinition struct {
 	Name *string `json:"name,omitempty"`
+	Label *string `json:"label,omitempty"`
 	Configuration []ConfigurationField `json:"configuration,omitempty"`
 	Components []ComponentsComponent `json:"components,omitempty"`
 	Triggers []TriggersTrigger `json:"triggers,omitempty"`
@@ -73,6 +74,38 @@ func (o *ApplicationsApplicationDefinition) HasName() bool {
 // SetName gets a reference to the given string and assigns it to the Name field.
 func (o *ApplicationsApplicationDefinition) SetName(v string) {
 	o.Name = &v
+}
+
+// GetLabel returns the Label field value if set, zero value otherwise.
+func (o *ApplicationsApplicationDefinition) GetLabel() string {
+	if o == nil || IsNil(o.Label) {
+		var ret string
+		return ret
+	}
+	return *o.Label
+}
+
+// GetLabelOk returns a tuple with the Label field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ApplicationsApplicationDefinition) GetLabelOk() (*string, bool) {
+	if o == nil || IsNil(o.Label) {
+		return nil, false
+	}
+	return o.Label, true
+}
+
+// HasLabel returns a boolean if a field has been set.
+func (o *ApplicationsApplicationDefinition) HasLabel() bool {
+	if o != nil && !IsNil(o.Label) {
+		return true
+	}
+
+	return false
+}
+
+// SetLabel gets a reference to the given string and assigns it to the Label field.
+func (o *ApplicationsApplicationDefinition) SetLabel(v string) {
+	o.Label = &v
 }
 
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
@@ -183,6 +216,9 @@ func (o ApplicationsApplicationDefinition) ToMap() (map[string]interface{}, erro
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
+	}
+	if !IsNil(o.Label) {
+		toSerialize["label"] = o.Label
 	}
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration

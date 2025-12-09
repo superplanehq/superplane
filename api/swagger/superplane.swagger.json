@@ -2566,6 +2566,9 @@
         "name": {
           "type": "string"
         },
+        "label": {
+          "type": "string"
+        },
         "configuration": {
           "type": "array",
           "items": {
@@ -3551,6 +3554,9 @@
           "type": "string"
         },
         "state": {
+          "type": "string"
+        },
+        "stateDescription": {
           "type": "string"
         },
         "configuration": {

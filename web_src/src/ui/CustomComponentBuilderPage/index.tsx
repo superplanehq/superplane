@@ -363,7 +363,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
 
   // Use shared builder (merge mocks + live components)
   const buildingBlockCategories = useMemo<BuildingBlockCategory[]>(
-    () => buildBuildingBlockCategories([], props.components, []),
+    () => buildBuildingBlockCategories([], props.components, [], []),
     [props.components],
   );
 

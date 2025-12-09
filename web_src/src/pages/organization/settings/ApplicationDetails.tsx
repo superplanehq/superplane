@@ -1,7 +1,7 @@
 import { AppWindow, ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useApplicationInstallation } from "../../../hooks/useApplications";
-import { Button } from "../../../components/Button/button";
+import { Button } from "@/ui/button";
 
 interface ApplicationDetailsProps {
   organizationId: string;
@@ -97,9 +97,9 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold">{installation.installationName || installation.appName}</h1>
+          <h1 className="text-2xl font-semibold">{installation.installationName || installation.appLabel || installation.appName}</h1>
           {installation.appName && installation.installationName !== installation.appName && (
-            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">Application: {installation.appName}</p>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">Application: {installation.appLabel || installation.appName}</p>
           )}
         </div>
       </div>
@@ -126,6 +126,9 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
                   >
                     {installation.state || "unknown"}
                   </span>
+                  {installation.stateDescription && (
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">{installation.stateDescription}</p>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-1">Installation ID</h3>
@@ -143,7 +146,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
           <div className="p-6">
             <h2 className="text-lg font-medium mb-4">Complete Setup</h2>
             <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-              Complete the {installation.appName} setup by submitting the registration form.
+              Complete the {installation.appLabel || installation.appName} setup by submitting the registration form.
             </p>
             <Button
               color="blue"
@@ -151,12 +154,12 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
               className="flex items-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
-              Register {installation.appName} App
+              Register {installation.appLabel || installation.appName} App
             </Button>
             <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
               <p className="text-sm text-blue-800 dark:text-blue-200">
                 <strong>Note:</strong> Clicking the button above will open a new window and submit your app registration
-                to {installation.appName}. After completing the setup, you'll be redirected back to continue the installation.
+                to {installation.appLabel || installation.appName}. After completing the setup, you'll be redirected back to continue the installation.
               </p>
             </div>
             {installation.browserAction.method && (
