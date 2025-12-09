@@ -141,7 +141,7 @@ export const approvalMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       title: node.name || componentDefinition?.label || "Approval",
       description: componentDefinition?.description,
-      eventSections: getApprovalEventSections(nodes, lastExecution),
+      eventSections: getApprovalEventSections(nodes, lastExecution, additionalData),
       specs: getApprovalSpecs(items, additionalData),
       customField: getApprovalCustomField(lastExecution, approvals),
       eventStateMap: APPROVAL_STATE_MAP,
@@ -206,6 +206,7 @@ function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): Comp
 function getApprovalEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution | null,
+  additionalData?: unknown,
 ): EventSection[] {
   if (!execution) {
     return [
@@ -226,11 +227,27 @@ function getApprovalEventSections(
     sectionTitle = "Awaiting Approval";
   }
 
+  let eventSubtitle = "";
+
+  if (execution.metadata?.result === "rejected") {
+    eventSubtitle = "Rejected";
+  } else if (execution.metadata?.result === "approved") {
+    eventSubtitle = "Approved";
+  } else if (execution.state === "STATE_STARTED") {
+    const approvals = (additionalData as { approvals?: ApprovalItemProps[] })?.approvals;
+    const approvalsCount = approvals?.length || 0;
+    const approvalsApprovedCount = approvals?.filter((approval) => approval.approved).length || 0;
+    eventSubtitle = `${approvalsApprovedCount}/${approvalsCount}`;
+  } else {
+    eventSubtitle = "Error";
+  }
+
   return [
     {
       title: sectionTitle,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: eventTitle,
+      eventSubtitle: eventSubtitle,
       eventState: approvalStateFunction(execution),
     },
   ];
