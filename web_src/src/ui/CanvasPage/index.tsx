@@ -401,6 +401,18 @@ function CanvasPage(props: CanvasPageProps) {
     }
   };
 
+  const handleSidebarClose = useCallback(() => {
+    state.componentSidebar.close();
+
+    // Clear ReactFlow's selection state
+    state.setNodes((nodes) =>
+      nodes.map((node) => ({
+        ...node,
+        selected: false,
+      }))
+    );
+  }, [state]);
+
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
@@ -485,6 +497,7 @@ function CanvasPage(props: CanvasPageProps) {
             getLoadingMoreQueue={props.getLoadingMoreQueue}
             onReEmit={props.onReEmit}
             loadExecutionChain={props.loadExecutionChain}
+            onSidebarClose={handleSidebarClose}
           />
         </div>
       </div>
@@ -566,6 +579,7 @@ function Sidebar({
   getHasMoreQueue,
   getLoadingMoreQueue,
   loadExecutionChain,
+  onSidebarClose,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -594,6 +608,7 @@ function Sidebar({
   getHasMoreQueue?: (nodeId: string) => boolean;
   getLoadingMoreQueue?: (nodeId: string) => boolean;
   loadExecutionChain?: (eventId: string) => Promise<any[]>;
+  onSidebarClose?: () => void;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -649,7 +664,7 @@ function Sidebar({
     <ComponentSidebar
       key={state.componentSidebar.selectedNodeId}
       isOpen={state.componentSidebar.isOpen}
-      onClose={state.componentSidebar.close}
+      onClose={onSidebarClose || state.componentSidebar.close}
       latestEvents={latestEvents}
       nextInQueueEvents={nextInQueueEvents}
       metadata={sidebarData.metadata}
@@ -812,6 +827,14 @@ function CanvasContent({
 
   const handleNodeClick = useCallback((nodeId: string) => {
     stateRef.current.componentSidebar.open(nodeId);
+
+    // Update ReactFlow's selection state to highlight the clicked node
+    stateRef.current.setNodes((nodes) =>
+      nodes.map((node) => ({
+        ...node,
+        selected: node.id === nodeId,
+      }))
+    );
   }, []);
 
   const onRunRef = useRef(onRun);
@@ -909,6 +932,14 @@ function CanvasContent({
 
   const handlePaneClick = useCallback(() => {
     stateRef.current.componentSidebar.close();
+
+    // Clear ReactFlow's selection state
+    stateRef.current.setNodes((nodes) =>
+      nodes.map((node) => ({
+        ...node,
+        selected: false,
+      }))
+    );
   }, []);
 
   // Handle fit to view on ReactFlow initialization
