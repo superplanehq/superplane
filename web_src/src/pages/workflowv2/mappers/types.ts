@@ -6,7 +6,7 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseProps } from "@/ui/componentBase";
+import { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
 import { TriggerProps } from "@/ui/trigger";
 import { QueryClient } from "@tanstack/react-query";
 
@@ -70,4 +70,17 @@ export interface ComponentAdditionalDataBuilder {
     queryClient: QueryClient,
     organizationId?: string,
   ): unknown;
+}
+
+/**
+ * A state function that determines the current state based on execution data
+ */
+export type StateFunction = (execution: WorkflowsWorkflowNodeExecution) => EventState;
+
+/**
+ * Event state registry for components with custom state logic and styling
+ */
+export interface EventStateRegistry {
+  stateMap: EventStateMap;
+  getState: StateFunction;
 }

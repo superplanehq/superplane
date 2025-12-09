@@ -8,8 +8,15 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { ComponentAdditionalDataBuilder, ComponentBaseMapper } from "./types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState } from "@/ui/componentBase";
+import { ComponentAdditionalDataBuilder, ComponentBaseMapper, EventStateRegistry, StateFunction } from "./types";
+import {
+  ComponentBaseProps,
+  ComponentBaseSpec,
+  EventSection,
+  EventState,
+  EventStateMap,
+  DEFAULT_EVENT_STATE_MAP,
+} from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { ApprovalGroup } from "@/ui/approvalGroup";
@@ -25,6 +32,91 @@ type ApprovalItem = {
   user?: string;
   role?: string;
   group?: string;
+};
+
+export const APPROVAL_STATE_MAP: EventStateMap = {
+  ...DEFAULT_EVENT_STATE_MAP,
+  "next-in-queue": {
+    icon: "clock",
+    textColor: "text-amber-700",
+    backgroundColor: "bg-amber-100",
+    iconColor: "text-amber-600",
+    iconSize: 16,
+    iconClassName: "",
+  },
+  success: {
+    icon: "check",
+    textColor: "text-green-700",
+    backgroundColor: "bg-green-200",
+    iconColor: "text-green-600 bg-green-600",
+    iconSize: 12,
+    iconClassName: "text-white",
+  },
+  failed: {
+    icon: "x",
+    textColor: "text-red-700",
+    backgroundColor: "bg-red-200",
+    iconColor: "text-red-600 bg-red-600",
+    iconSize: 12,
+    iconClassName: "text-white",
+  },
+  neutral: {
+    icon: "triangle-alert",
+    textColor: "text-red-700",
+    backgroundColor: "bg-red-200",
+    iconColor: "text-red-600",
+    iconSize: 16,
+    iconClassName: "",
+  },
+  running: {
+    icon: "clock",
+    textColor: "text-amber-700",
+    backgroundColor: "bg-amber-100",
+    iconColor: "text-amber-600",
+    iconSize: 16,
+    iconClassName: "",
+  },
+};
+
+/**
+ * Approval-specific state logic function
+ */
+export const approvalStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+  // Error state - component could not evaluate or apply approval logic
+  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED") {
+    return "neutral"; // Using neutral for error state with triangle-alert icon
+  }
+
+  // Waiting state - some or all required actors have not yet responded
+  if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
+    return "next-in-queue"; // Using next-in-queue for waiting state with clock icon
+  }
+
+  // Check execution outputs for approval/rejection decision
+  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
+    const metadata = execution.metadata as Record<string, any> | undefined;
+    if (metadata?.result === "approved") {
+      return "success";
+    }
+
+    if (metadata?.result === "rejected") {
+      return "failed";
+    }
+
+    // Default to success if finished and passed but no specific result
+    return "success";
+  }
+
+  // Default fallback
+  return "failed";
+};
+
+/**
+ * Approval-specific state registry
+ */
+export const APPROVAL_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: APPROVAL_STATE_MAP,
+  getState: approvalStateFunction,
 };
 
 export const approvalMapper: ComponentBaseMapper = {
@@ -52,6 +144,7 @@ export const approvalMapper: ComponentBaseMapper = {
       eventSections: getApprovalEventSections(nodes, lastExecution),
       specs: getApprovalSpecs(items, additionalData),
       customField: getApprovalCustomField(lastExecution, approvals),
+      eventStateMap: APPROVAL_STATE_MAP,
     };
   },
 };
@@ -138,21 +231,9 @@ function getApprovalEventSections(
       title: sectionTitle,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: eventTitle,
-      eventState: executionToEventSectionState(execution),
+      eventState: approvalStateFunction(execution),
     },
   ];
-}
-
-function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
-  }
-
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
-    return "success";
-  }
-
-  return "failed";
 }
 
 // ----------------------- Data Builder -----------------------
