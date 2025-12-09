@@ -16,11 +16,6 @@ const config: StorybookConfig = {
         !(plugin && typeof plugin === "object" && "name" in plugin && plugin.name === "set-hmr-port-from-port"),
     );
 
-    // Add Tailwind CSS plugin
-    config.plugins = config.plugins || [];
-    config.plugins.push(tailwindcss());
-
-    // Configure server settings
     config.server = {
       ...config.server,
       strictPort: false,
