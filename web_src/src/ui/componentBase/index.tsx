@@ -12,9 +12,10 @@ interface EventSectionDisplayProps {
   section: EventSection;
   index: number;
   totalSections: number;
+  className?: string;
 }
 
-const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({ section, index, totalSections }) => {
+const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({ section, index, totalSections, className }) => {
   // Live timer for running executions
   const [liveDuration, setLiveDuration] = React.useState<number | null>(null);
 
@@ -97,7 +98,10 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({ section, inde
   }
 
   return (
-    <div key={index} className={"px-4 pt-2 pb-6 relative" + (index < totalSections - 1 ? " border-b" : "")}>
+    <div
+      key={index}
+      className={"px-4 pt-2 relative" + (index < totalSections - 1 ? " border-b" : "") + ` ${className}`}
+    >
       <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
         <span className="uppercase text-xs font-semibold tracking-wide">{section.title}</span>
         {topRightText && <span className="text-sm">{topRightText}</span>}
@@ -173,6 +177,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   eventSections?: EventSection[];
   selected?: boolean;
   metadata?: MetadataItem[];
+  customField?: React.ReactNode;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -202,6 +207,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   hideCount,
   hideMetadataList,
   metadata,
+  customField,
 }) => {
   if (collapsed) {
     return (
@@ -305,8 +311,16 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         )}
 
         {eventSections?.map((section, index) => (
-          <EventSectionDisplay key={index} section={section} index={index} totalSections={eventSections.length} />
+          <EventSectionDisplay
+            className={customField ? "pb-0" : "pb-6"}
+            key={index}
+            section={section}
+            index={index}
+            totalSections={eventSections.length}
+          />
         ))}
+
+        {customField || null}
       </div>
     </SelectionWrapper>
   );

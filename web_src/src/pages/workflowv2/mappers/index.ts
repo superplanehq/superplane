@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, TriggerRenderer } from "./types";
+import { ComponentBaseMapper, TriggerRenderer, ComponentAdditionalDataBuilder } from "./types";
 import { defaultTriggerRenderer } from "./default";
 import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer } from "./schedule";
@@ -9,6 +9,7 @@ import { semaphoreMapper } from "./semaphore";
 import { timeGateMapper } from "./timegate";
 import { filterMapper } from "./filter";
 import { waitMapper } from "./wait";
+import { approvalMapper, approvalDataBuilder } from "./approval";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -27,6 +28,11 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   time_gate: timeGateMapper,
   filter: filterMapper,
   wait: waitMapper,
+  approval: approvalMapper,
+};
+
+const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
+  approval: approvalDataBuilder,
 };
 
 /**
@@ -42,6 +48,13 @@ export function getTriggerRenderer(triggerName: string): TriggerRenderer {
  * Falls back to the default renderer if no specific renderer is registered.
  */
 export function getComponentBaseMapper(componentName: string): ComponentBaseMapper {
-  console.log("Getting component base mapper for:", componentName);
   return componentBaseMappers[componentName] || noopMapper;
+}
+
+/**
+ * Get the appropriate additional data builder for a component type.
+ * Returns undefined if no specific builder is registered.
+ */
+export function getComponentAdditionalDataBuilder(componentName: string): ComponentAdditionalDataBuilder | undefined {
+  return componentAdditionalDataBuilders[componentName];
 }

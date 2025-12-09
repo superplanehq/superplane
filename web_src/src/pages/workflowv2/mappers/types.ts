@@ -8,6 +8,7 @@ import {
 } from "@/api-client";
 import { ComponentBaseProps } from "@/ui/componentBase";
 import { TriggerProps } from "@/ui/trigger";
+import { QueryClient } from "@tanstack/react-query";
 
 /**
  * A trigger renderer converts backend data into UI props for a specific trigger type.
@@ -51,5 +52,22 @@ export interface ComponentBaseMapper {
     componentDefinition: ComponentsComponent,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+    additionalData?: unknown,
   ): ComponentBaseProps;
+}
+
+/**
+ * A component additional data builder creates component-specific data
+ * that cannot be derived from the standard parameters alone.
+ */
+export interface ComponentAdditionalDataBuilder {
+  buildAdditionalData(
+    nodes: ComponentsNode[],
+    node: ComponentsNode,
+    componentDefinition: ComponentsComponent,
+    lastExecutions: WorkflowsWorkflowNodeExecution[],
+    workflowId: string,
+    queryClient: QueryClient,
+    organizationId?: string,
+  ): unknown;
 }

@@ -21,15 +21,18 @@ export default tseslint.config({ ignores: ['dist'] }, {
   },
   rules: {
     ...reactHooks.configs.recommended.rules,
+    "no-unused-vars": "off",
     'react-refresh/only-export-components': [
       'warn',
       { allowConstantExport: true },
     ],
-    "no-unused-vars": [
-      'error',
+    "@typescript-eslint/no-unused-vars": [
+      "error",
       {
-        "argsIgnorePattern": "^_"
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
       }
-    ],
+    ]
   },
 }, storybook.configs["flat/recommended"]);
