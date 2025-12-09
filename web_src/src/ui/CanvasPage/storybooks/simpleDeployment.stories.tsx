@@ -180,60 +180,50 @@ const sampleNodes: CanvasNode[] = [
     data: {
       label: "Approve release",
       state: "pending",
-      type: "approval",
-      approval: {
+      type: "component",
+      component: {
         title: "Approve Release",
         description: "New releases are deployed to staging for testing and require approvals.",
         iconSlug: "hand",
         iconColor: "text-orange-500",
         headerColor: "bg-orange-100",
         collapsedBackground: "bg-orange-100",
-        approvals: [
+        collapsed: false,
+        specs: [
           {
-            title: "Security",
-            approved: true,
-            requireArtifacts: [
+            title: "Approvers Required",
+            tooltipTitle: "approval configuration",
+            values: [
               {
-                label: "CVE Report",
+                badges: [
+                  {
+                    label: "Security, Compliance, Engineering, Josh Brown",
+                    bgColor: "bg-orange-100",
+                    textColor: "text-orange-800",
+                  },
+                ],
               },
             ],
           },
+        ],
+        eventSections: [
           {
-            title: "Compliance",
-            approved: true,
-            artifactCount: 1,
-            artifacts: {
-              "Security Audit Report": "https://example.com/audit-report.pdf",
-              "Compliance Certificate": "https://example.com/cert.pdf",
-            },
-            href: "#",
-          },
-          {
-            title: "Engineering",
-            approved: true,
-            approverName: "Lucas Pinheiro",
-          },
-          {
-            title: "Josh Brown",
-            approved: true,
+            title: "Last Approval",
+            eventTitle: "All approvals completed",
+            eventState: "success",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 24),
           },
         ],
-        awaitingEvent: null,
-        receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 24),
-        collapsed: false,
       },
     },
     __simulation: {
       onQueueChange: (current, _next, update) => {
         if (current) {
-          update("data.approval.approvals.0.approved", false);
-          update("data.approval.approvals.0.interactive", true);
-          update("data.approval.awaitingEvent", {
-            title: current.title,
-            subtitle: current.subtitle,
-          });
+          update("data.component.eventSections.0.eventTitle", `Awaiting approval: ${current.title}`);
+          update("data.component.eventSections.0.eventState", "running");
         } else {
-          update("data.approval.awaitingEvent", null);
+          update("data.component.eventSections.0.eventTitle", "All approvals completed");
+          update("data.component.eventSections.0.eventState", "success");
         }
       },
       run: async (input, _update, output) => {
@@ -516,11 +506,11 @@ export const SimpleDeployment: Story = {
             };
           }
 
-          if (nodeData.type === "approval" && nodeData.approval) {
-            console.log("Toggling approval from", nodeData.approval.collapsed, "to", !nodeData.approval.collapsed);
-            nodeData.approval = {
-              ...nodeData.approval,
-              collapsed: !nodeData.approval.collapsed,
+          if (nodeData.type === "component" && nodeData.component) {
+            console.log("Toggling component from", nodeData.component.collapsed, "to", !nodeData.component.collapsed);
+            nodeData.component = {
+              ...nodeData.component,
+              collapsed: !nodeData.component.collapsed,
             };
           }
 
@@ -544,29 +534,9 @@ export const SimpleDeployment: Story = {
       });
     }, []);
 
-    // Set up approval handlers for the approval node
     const nodesWithHandlers = useMemo(() => {
-      return nodes.map((node) => {
-        if (node.data.type === "approval" && node.data.approval) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              approval: {
-                ...node.data.approval,
-                approvals: node.data.approval.approvals.map((approval: any) => ({
-                  ...approval,
-                  onApprove: (artifacts?: Record<string, string>) =>
-                    simulation.onApprove(node.id, approval.id || "0", artifacts),
-                  onReject: (comment?: string) => simulation.onReject(node.id, approval.id || "0", comment),
-                })),
-              },
-            },
-          };
-        }
-        return node;
-      });
-    }, [nodes, simulation]);
+      return nodes;
+    }, [nodes]);
 
     const getSidebarData = useMemo(() => createGetSidebarData(nodesWithHandlers), [nodesWithHandlers]);
 

@@ -5,7 +5,7 @@ import {
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
-import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
+import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { parseExpression } from "@/lib/expressionParser";

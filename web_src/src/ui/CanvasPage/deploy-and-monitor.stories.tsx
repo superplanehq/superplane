@@ -252,58 +252,41 @@ const sampleNodes: Node[] = [
     data: {
       label: "Approve release",
       state: "pending",
-      type: "approval",
-      approval: {
+      type: "component",
+      component: {
         title: "Approve Release",
         description: "New releases are deployed to staging for testing and require approvals.",
         iconSlug: "hand",
         iconColor: "text-orange-500",
         headerColor: "bg-orange-100",
         collapsedBackground: "bg-orange-100",
-        approvals: [
+        collapsed: false,
+        specs: [
           {
-            title: "Security",
-            approved: false,
-            interactive: true,
-            requireArtifacts: [
+            title: "Approvers Required",
+            tooltipTitle: "approval configuration",
+            values: [
               {
-                label: "CVE Report",
+                badges: [
+                  {
+                    label: "Security, Compliance, Engineering, Josh Brown, Admin",
+                    bgColor: "bg-orange-100",
+                    textColor: "text-orange-800",
+                  },
+                ],
               },
             ],
-            onApprove: (artifacts) => console.log("Security approved with artifacts:", artifacts),
-            onReject: (comment) => console.log("Security rejected with comment:", comment),
-          },
-          {
-            title: "Compliance",
-            approved: true,
-            artifactCount: 1,
-            artifacts: {
-              "Security Audit Report": "https://example.com/audit-report.pdf",
-              "Compliance Certificate": "https://example.com/cert.pdf",
-            },
-            href: "#",
-          },
-          {
-            title: "Engineering",
-            rejected: true,
-            approverName: "Lucas Pinheiro",
-            rejectionComment: "Security vulnerabilities need to be addressed before approval",
-          },
-          {
-            title: "Josh Brown",
-            approved: true,
-          },
-          {
-            title: "Admin",
-            approved: false,
           },
         ],
-        awaitingEvent: {
-          title: "fix: open rejected events tab",
-          subtitle: "ef758d40",
-        },
-        receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 24),
-        collapsed: false,
+        eventSections: [
+          {
+            title: "Awaiting Approval",
+            eventTitle: "fix: open rejected events tab",
+            eventSubtitle: "ef758d40",
+            eventState: "running",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 24),
+          },
+        ],
       },
     },
   },
@@ -497,11 +480,11 @@ export const DeployAndMonitor: Story = {
             };
           }
 
-          if (nodeData.type === "approval" && nodeData.approval) {
-            console.log("Toggling approval from", nodeData.approval.collapsed, "to", !nodeData.approval.collapsed);
-            nodeData.approval = {
-              ...nodeData.approval,
-              collapsed: !nodeData.approval.collapsed,
+          if (nodeData.type === "component" && nodeData.component) {
+            console.log("Toggling component from", nodeData.component.collapsed, "to", !nodeData.component.collapsed);
+            nodeData.component = {
+              ...nodeData.component,
+              collapsed: !nodeData.component.collapsed,
             };
           }
 
@@ -624,9 +607,6 @@ export const DeployAndMonitor: Story = {
           }}
           onDeactivate={(nodeId) => {
             console.log("Deactivate action for node:", nodeId);
-          }}
-          onDelete={(nodeId) => {
-            console.log("Delete action for node:", nodeId);
           }}
         />
       </div>

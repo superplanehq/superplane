@@ -89,8 +89,9 @@ export class SimulationEngine {
     queue.active.approved = true;
 
     const update = this.updateNodeFn(nodeId);
-    update("data.approval.approvals.0.approved", true);
-    update("data.approval.approvals.0.interactive", false);
+    // Update component-based approval state
+    update("data.component.eventSections.0.eventTitle", "All approvals completed");
+    update("data.component.eventSections.0.eventState", "success");
   }
 
   async onReject(_nodeId: string, _aproveId: string, _comment?: string) {}
@@ -116,7 +117,8 @@ export class SimulationEngine {
 
       await run(event.input, updateNode, (output: any) => (event.output = output));
 
-      if (node.data.approval) {
+      // Handle component-based approvals
+      if (node.data.component && node.id === "approve") {
         while (!event.approved) {
           await sleep(200);
         }

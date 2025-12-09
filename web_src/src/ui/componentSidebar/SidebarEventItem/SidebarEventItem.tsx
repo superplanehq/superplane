@@ -53,7 +53,6 @@ interface SidebarEventItemProps {
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   event,
   index,
-  variant = "latest",
   isOpen,
   onToggleOpen,
   onEventClick,
@@ -85,7 +84,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const [executionChainLoading, setExecutionChainLoading] = useState(false);
 
   const eventStateStyle: EventStateStyle = useMemo(() => {
-    if (!getExecutionState) return {} as EventStateStyle;
+    if (!getExecutionState) return DEFAULT_EVENT_STATE_MAP["neutral"];
 
     if (event.kind === "queue") return DEFAULT_EVENT_STATE_MAP["next-in-queue"];
 

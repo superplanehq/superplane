@@ -1,5 +1,6 @@
 import type { StorybookConfig } from "@storybook/react-vite";
 import * as path from "path";
+import tailwindcss from "@tailwindcss/vite";
 
 const config: StorybookConfig = {
   stories: ["../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
@@ -14,6 +15,10 @@ const config: StorybookConfig = {
       (plugin) =>
         !(plugin && typeof plugin === "object" && "name" in plugin && plugin.name === "set-hmr-port-from-port"),
     );
+
+    // Add Tailwind CSS plugin
+    config.plugins = config.plugins || [];
+    config.plugins.push(tailwindcss());
 
     // Configure server settings
     config.server = {

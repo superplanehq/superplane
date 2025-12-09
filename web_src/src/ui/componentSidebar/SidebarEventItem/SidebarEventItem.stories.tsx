@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { SidebarEventItem, ChainExecutionState } from "./SidebarEventItem";
 import { SidebarEvent } from "../types";
+import { DEFAULT_EVENT_STATE_MAP } from "../../componentBase";
 
 const meta: Meta<typeof SidebarEventItem> = {
   title: "UI/SidebarEventItem",
@@ -36,7 +37,7 @@ const mockEvent: SidebarEvent = {
   id: "event-123",
   title: "Process Payment",
   subtitle: "Stripe API",
-  state: "processed" as const,
+  state: "success" as const,
   values: {
     "Transaction ID": "txn_1234567890",
     Amount: "$99.99",
@@ -68,7 +69,7 @@ const ComponentWrapper = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export const Processed: Story = {
+export const success: Story = {
   render: (args) => (
     <ComponentWrapper>
       <SidebarEventItem {...args} />
@@ -79,6 +80,10 @@ export const Processed: Story = {
     index: 0,
     variant: "latest",
     isOpen: false,
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
   },
 };
 
@@ -98,6 +103,10 @@ export const Discarded: Story = {
     index: 0,
     variant: "latest",
     isOpen: false,
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "failed" as const,
+    }),
   },
 };
 
@@ -117,6 +126,10 @@ export const Running: Story = {
     index: 0,
     variant: "latest",
     isOpen: false,
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "running" as const,
+    }),
   },
 };
 
@@ -136,6 +149,10 @@ export const WaitingLatest: Story = {
     index: 0,
     variant: "latest",
     isOpen: false,
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
   },
 };
 
@@ -155,6 +172,10 @@ export const WaitingQueue: Story = {
     index: 0,
     variant: "queue",
     isOpen: false,
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
   },
 };
 
@@ -289,7 +310,7 @@ export const LargePayload: Story = {
     isOpen: true,
     tabData: {
       current: {
-        "Records Processed": "10,000",
+        "Records success": "10,000",
         "Success Rate": "99.8%",
         Errors: "20",
         Duration: "5m 32s",

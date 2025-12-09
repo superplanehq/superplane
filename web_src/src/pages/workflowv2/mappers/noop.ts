@@ -6,7 +6,7 @@ import {
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
-import { getTriggerRenderer, getState, getStateMap } from ".";
+import { getTriggerRenderer, getStateMap } from ".";
 import { getBackgroundColorClass } from "@/utils/colors";
 
 export const noopMapper: ComponentBaseMapper = {
