@@ -30,6 +30,7 @@ export function mapTriggerEventsToSidebarEvents(
       triggerEventId: event.id!,
       kind: "trigger",
       nodeId: node.id,
+      originalEvent: event,
     };
   });
 }
@@ -74,6 +75,7 @@ export function mapExecutionsToSidebarEvents(
       executionId: execution.id!,
       kind: "execution",
       nodeId: execution?.nodeId,
+      originalExecution: execution,
     };
   });
 }

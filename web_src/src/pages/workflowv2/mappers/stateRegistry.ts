@@ -6,6 +6,8 @@ import { EventStateRegistry, StateFunction } from "./types";
  * Default state logic function used by most components
  */
 export const defaultStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+  if (!execution) return "neutral";
+
   if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
     return "running";
   }

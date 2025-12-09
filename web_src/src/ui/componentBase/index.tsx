@@ -135,28 +135,28 @@ export type EventStateMap = Record<EventState, EventStateStyle>;
 
 export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
   success: {
-    icon: "check",
+    icon: "circle-check",
     textColor: "text-green-700",
     backgroundColor: "bg-green-200",
-    iconColor: "text-green-600 bg-green-600",
-    iconSize: 12,
-    iconClassName: "text-white",
+    iconColor: "text-green-600 ",
+    iconSize: 16,
+    iconClassName: "",
   },
   failed: {
-    icon: "x",
+    icon: "circle-x",
     textColor: "text-red-700",
     backgroundColor: "bg-red-200",
-    iconColor: "text-red-600 bg-red-600",
-    iconSize: 12,
-    iconClassName: "text-white",
+    iconColor: "text-red-600 ",
+    iconSize: 16,
+    iconClassName: "",
   },
   neutral: {
     icon: "circle",
     textColor: "text-gray-500",
     backgroundColor: "bg-gray-100",
-    iconColor: "text-gray-400 bg-gray-400",
+    iconColor: "text-white bg-gray-400",
     iconSize: 12,
-    iconClassName: "text-white",
+    iconClassName: "",
   },
   "next-in-queue": {
     icon: "circle-dashed",

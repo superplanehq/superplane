@@ -111,11 +111,11 @@ export const Composite: React.FC<CompositeProps> = ({
 
   const getEventIcon = React.useCallback((state: LastRunState) => {
     if (state === "success") {
-      return resolveIcon("check");
+      return resolveIcon("circle-check");
     } else if (state === "running") {
       return resolveIcon("refresh-cw");
     } else {
-      return resolveIcon("x");
+      return resolveIcon("circle-x");
     }
   }, []);
 
@@ -141,21 +141,21 @@ export const Composite: React.FC<CompositeProps> = ({
 
   const getEventIconBackground = React.useCallback((state: LastRunState) => {
     if (state === "success") {
-      return "bg-green-600";
+      return "bg-none ";
     } else if (state === "running") {
       return "bg-none animate-spin";
     } else {
-      return "bg-red-600";
+      return "bg-none";
     }
   }, []);
 
   const getEventIconColor = React.useCallback((state: LastRunState) => {
     if (state === "success") {
-      return "text-white";
+      return "text-green-600";
     } else if (state === "running") {
       return "text-blue-800";
     } else {
-      return "text-white";
+      return "text-red-600";
     }
   }, []);
 
@@ -295,7 +295,7 @@ export const Composite: React.FC<CompositeProps> = ({
                         <div
                           className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${eventIconBackground}`}
                         >
-                          <EventIcon size={event.state === "running" ? 16 : 12} className={`${eventIconColor}`} />
+                          <EventIcon size={16} className={`${eventIconColor}`} />
                         </div>
                         <span className="truncate text-sm">{event.title}</span>
                       </div>
