@@ -409,7 +409,7 @@ function CanvasPage(props: CanvasPageProps) {
       nodes.map((node) => ({
         ...node,
         selected: false,
-      }))
+      })),
     );
   }, [state]);
 
@@ -833,7 +833,7 @@ function CanvasContent({
       nodes.map((node) => ({
         ...node,
         selected: node.id === nodeId,
-      }))
+      })),
     );
   }, []);
 
@@ -938,7 +938,7 @@ function CanvasContent({
       nodes.map((node) => ({
         ...node,
         selected: false,
-      }))
+      })),
     );
   }, []);
 
