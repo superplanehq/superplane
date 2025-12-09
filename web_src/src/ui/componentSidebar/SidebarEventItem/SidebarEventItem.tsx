@@ -6,6 +6,8 @@ import { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../SimpleTooltip";
+import { EventState, EventStateMap } from "@/ui/componentBase";
+import { WorkflowsWorkflowNodeExecution } from "@/api-client";
 
 export enum ChainExecutionState {
   COMPLETED = "completed",
@@ -48,6 +50,10 @@ interface SidebarEventItemProps {
     currentExecution?: Record<string, unknown>,
     forceReload?: boolean,
   ) => Promise<any[]>;
+  getExecutionState?: (
+    nodeId: string,
+    execution: WorkflowsWorkflowNodeExecution,
+  ) => { map: EventStateMap; state: EventState };
 }
 
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
@@ -64,6 +70,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   supportsPushThrough,
   onReEmit,
   loadExecutionChain,
+  getExecutionState,
 }) => {
   // Determine default active tab based on available data
   const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" | "executionChain" => {
@@ -104,6 +111,25 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
         const processedChainData = rawExecutionChain.map((exec: any) => {
           const getSidebarEventItemState = (exec: any) => {
+            // Use custom state function if available
+            if (getExecutionState && exec.nodeId) {
+              const eventState = getExecutionState(exec.nodeId, exec).state;
+
+              switch (eventState) {
+                case "success":
+                  return ChainExecutionState.COMPLETED;
+                case "failed":
+                case "neutral":
+                  return ChainExecutionState.FAILED;
+                case "running":
+                case "next-in-queue":
+                  return ChainExecutionState.RUNNING;
+                default:
+                  return ChainExecutionState.FAILED;
+              }
+            }
+
+            // Fallback to default logic
             if (exec.state === "STATE_FINISHED") {
               if (exec.result === "RESULT_PASSED") {
                 return ChainExecutionState.COMPLETED;

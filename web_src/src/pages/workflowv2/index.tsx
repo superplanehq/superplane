@@ -44,13 +44,19 @@ import {
   SidebarData,
   SidebarEvent,
 } from "@/ui/CanvasPage";
-import { EventState } from "@/ui/componentBase";
+import { EventState, EventStateMap } from "@/ui/componentBase";
 import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { getComponentAdditionalDataBuilder, getComponentBaseMapper, getTriggerRenderer } from "./mappers";
+import {
+  getComponentAdditionalDataBuilder,
+  getComponentBaseMapper,
+  getTriggerRenderer,
+  getState,
+  getStateMap,
+} from "./mappers";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
@@ -1085,6 +1091,34 @@ export function WorkflowPageV2() {
     workflow,
   });
 
+  // Provide state function based on component type
+  const getExecutionState = useCallback(
+    (nodeId: string, execution: WorkflowsWorkflowNodeExecution): { map: EventStateMap; state: EventState } => {
+      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+      if (!node) {
+        return {
+          map: getStateMap("default"),
+          state: getState("default")(execution),
+        };
+      }
+
+      let componentName = "default";
+      if (node.type === "TYPE_COMPONENT" && node.component?.name) {
+        componentName = node.component.name;
+      } else if (node.type === "TYPE_TRIGGER" && node.trigger?.name) {
+        componentName = node.trigger.name;
+      } else if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id) {
+        componentName = "default";
+      }
+
+      return {
+        map: getStateMap(componentName),
+        state: getState(componentName)(execution),
+      };
+    },
+    [workflow],
+  );
+
   // Show loading indicator while data is being fetched
   if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
     return (
@@ -1175,6 +1209,7 @@ export function WorkflowPageV2() {
       getLoadingMoreQueue={getLoadingMoreQueue}
       onReEmit={handleReEmit}
       loadExecutionChain={loadExecutionChain}
+      getExecutionState={getExecutionState}
       breadcrumbs={[
         {
           label: "Canvases",

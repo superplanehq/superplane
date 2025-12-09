@@ -7,7 +7,7 @@ import {
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer, getState, getStateMap } from ".";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatDuration, formatTimestamp } from "@/lib/utils";
 import { TimeLeftCountdown } from "@/ui/timeLeftCountdown";
@@ -20,6 +20,7 @@ export const waitMapper: ComponentBaseMapper = {
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
+    const componentName = componentDefinition.name || "wait";
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const duration = node.configuration?.duration as { value: number; unit: "seconds" | "minutes" | "hours" };
 
@@ -44,8 +45,9 @@ export const waitMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
       description,
-      eventSections: getWaitEventSections(nodes, lastExecution, nodeQueueItems, duration),
+      eventSections: getWaitEventSections(nodes, lastExecution, nodeQueueItems, duration, componentName),
       hideMetadataList: true,
+      eventStateMap: getStateMap(componentName),
     };
   },
 };
@@ -55,6 +57,7 @@ function getWaitEventSections(
   execution: WorkflowsWorkflowNodeExecution | null,
   nodeQueueItems: WorkflowsWorkflowNodeQueueItem[] | undefined,
   duration: { value: number; unit: "seconds" | "minutes" | "hours" },
+  componentName: string,
 ): EventSection[] {
   const sections: EventSection[] = [];
 
@@ -66,7 +69,7 @@ function getWaitEventSections(
       eventState: "neutral" as const,
     });
   } else {
-    const executionState = getRunItemState(execution);
+    const executionState = getState(componentName)(execution);
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
@@ -121,16 +124,4 @@ function getWaitEventSections(
   }
 
   return sections;
-}
-
-function getRunItemState(execution: WorkflowsWorkflowNodeExecution): "success" | "failed" | "running" {
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
-  }
-
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
-    return "success";
-  }
-
-  return "failed";
 }

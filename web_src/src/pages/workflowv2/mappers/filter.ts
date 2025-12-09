@@ -6,7 +6,7 @@ import {
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer, getState, getStateMap } from ".";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { parseExpression } from "@/lib/expressionParser";
 
@@ -14,10 +14,11 @@ export const filterMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
-    _componentDefinition: ComponentsComponent,
+    componentDefinition: ComponentsComponent,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     _queueItems: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
+    const componentName = componentDefinition.name || "filter";
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const expression = (node.configuration?.expression as string) || "";
     const filters = parseExpression(expression);
@@ -37,8 +38,9 @@ export const filterMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
-      eventSections: getfilterEventSections(nodes, lastExecution),
+      eventSections: getfilterEventSections(nodes, lastExecution, componentName),
       specs,
+      eventStateMap: getStateMap(componentName),
     };
   },
 };
@@ -46,6 +48,7 @@ export const filterMapper: ComponentBaseMapper = {
 function getfilterEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution | null,
+  componentName: string,
 ): EventSection[] {
   let lastEvent: Omit<EventSection, "title"> = {
     eventTitle: "No events received yet",
@@ -60,7 +63,7 @@ function getfilterEventSections(
     lastEvent = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: executionToEventSectionState(execution),
+      eventState: getState(componentName)(execution),
     };
   }
 
@@ -73,16 +76,4 @@ function getfilterEventSections(
   }
 
   return eventSections;
-}
-
-function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
-  }
-
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
-    return "success";
-  }
-
-  return "failed";
 }

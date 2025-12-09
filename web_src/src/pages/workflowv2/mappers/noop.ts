@@ -6,7 +6,7 @@ import {
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer, getState, getStateMap } from ".";
 import { getBackgroundColorClass } from "@/utils/colors";
 
 export const noopMapper: ComponentBaseMapper = {
@@ -18,13 +18,16 @@ export const noopMapper: ComponentBaseMapper = {
     _?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
+    const componentName = componentDefinition.name || "noop";
+
     return {
       iconSlug: componentDefinition.icon || "circle-off",
       headerColor: "bg-gray-50",
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
-      eventSections: getNoopEventSections(nodes, lastExecution),
+      eventSections: getNoopEventSections(nodes, lastExecution, componentName),
+      eventStateMap: getStateMap(componentName),
     };
   },
 };
@@ -32,6 +35,7 @@ export const noopMapper: ComponentBaseMapper = {
 function getNoopEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution | null,
+  _componentName: string,
 ): EventSection[] {
   if (!execution) {
     return [

@@ -8,7 +8,7 @@ import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer, getState, getStateMap } from ".";
 import { calcRelativeTimeFromDiff } from "@/lib/utils";
 
 export const timeGateMapper: ComponentBaseMapper = {
@@ -19,6 +19,8 @@ export const timeGateMapper: ComponentBaseMapper = {
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
+    const componentName = componentDefinition.name || "timegate";
+
     return {
       iconSlug: "clock",
       headerColor: getBackgroundColorClass(componentDefinition?.color || "blue"),
@@ -27,9 +29,10 @@ export const timeGateMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
-      eventSections: getTimeGateEventSections(nodes, lastExecutions[0], nodeQueueItems),
+      eventSections: getTimeGateEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName),
       metadata: getTimeGateMetadataList(node),
       specs: getTimeGateSpecs(node),
+      eventStateMap: getStateMap(componentName),
     };
   },
 };
@@ -130,22 +133,11 @@ function getTimeGateSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   return specs;
 }
 
-function getRunItemState(execution: WorkflowsWorkflowNodeExecution): "success" | "failed" | "running" {
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
-  }
-
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
-    return "success";
-  }
-
-  return "failed";
-}
-
 function getTimeGateEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution | null,
   nodeQueueItems: WorkflowsWorkflowNodeQueueItem[] | undefined,
+  componentName: string,
 ): EventSection[] {
   const sections: EventSection[] = [];
 
@@ -157,7 +149,7 @@ function getTimeGateEventSections(
       eventState: "neutral" as const,
     });
   } else {
-    const executionState = getRunItemState(execution);
+    const executionState = getState(componentName)(execution);
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
