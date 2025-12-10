@@ -25,8 +25,7 @@ func TestApprovals(t *testing.T) {
 	t.Run("configuring approvals for a user", func(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
-		steps.addApprovalToCanvas("ReleaseApproval")
-		steps.configureApprovalForCurrentUser()
+		steps.addApprovalWithConfigToCanvasNamed("ReleaseApproval")
 		steps.saveCanvas()
 		steps.verifyApprovalConfigurationPersisted()
 	})
@@ -80,6 +79,10 @@ func (s *ApprovalSteps) addApprovalWithConfigToCanvas(nodeName string) {
 
 	s.session.Click(q.TestID("add-node-button"))
 	s.session.Sleep(300)
+}
+
+func (s *ApprovalSteps) addApprovalWithConfigToCanvasNamed(nodeName string) {
+	s.addApprovalWithConfigToCanvas(nodeName)
 }
 
 func (s *ApprovalSteps) saveCanvas() {
