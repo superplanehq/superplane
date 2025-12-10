@@ -280,9 +280,10 @@ func (a *Approval) OutputChannels(configuration any) []components.OutputChannel 
 func (a *Approval) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:  "items",
-			Label: "Items",
-			Type:  configuration.FieldTypeList,
+			Name:     "items",
+			Label:    "Items",
+			Type:     configuration.FieldTypeList,
+			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Item",

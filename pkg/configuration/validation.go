@@ -168,6 +168,10 @@ func validateList(field Field, value any) error {
 		return fmt.Errorf("must be a list of values")
 	}
 
+	if field.Required && len(list) == 0 {
+		return fmt.Errorf("must contain at least one item")
+	}
+
 	if field.TypeOptions.List == nil {
 		return nil
 	}
