@@ -6,9 +6,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-func ListApplications(ctx context.Context, orgID string) (*pb.ListApplicationsResponse, error) {
+func ListApplications(ctx context.Context, registry *registry.Registry, orgID string) (*pb.ListApplicationsResponse, error) {
 	appInstallations, err := models.ListAppInstallations(uuid.MustParse(orgID))
 	if err != nil {
 		return nil, err
@@ -16,7 +17,7 @@ func ListApplications(ctx context.Context, orgID string) (*pb.ListApplicationsRe
 
 	protos := []*pb.AppInstallation{}
 	for _, appInstallation := range appInstallations {
-		proto, err := serializeAppInstallation(&appInstallation)
+		proto, err := serializeAppInstallation(registry, &appInstallation)
 		if err != nil {
 			return nil, err
 		}

@@ -106,6 +106,16 @@ func findNode(nodes []models.WorkflowNode, nodeID string) *models.WorkflowNode {
 func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.Node, workflowID uuid.UUID) (*models.WorkflowNode, error) {
 	now := time.Now()
 
+	// Convert AppInstallationID string to UUID pointer
+	var appInstallationID *uuid.UUID
+	if node.AppInstallationID != nil && *node.AppInstallationID != "" {
+		parsedID, err := uuid.Parse(*node.AppInstallationID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid app installation ID: %v", err)
+		}
+		appInstallationID = &parsedID
+	}
+
 	//
 	// Node exists, just update it
 	//
@@ -118,6 +128,7 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		existingNode.Position = datatypes.NewJSONType(node.Position)
 		existingNode.IsCollapsed = node.IsCollapsed
 		existingNode.Metadata = datatypes.NewJSONType(node.Metadata)
+		existingNode.AppInstallationID = appInstallationID
 		// Set parent if internal namespaced id
 		if idx := strings.Index(node.ID, ":"); idx != -1 {
 			parent := node.ID[:idx]
@@ -145,19 +156,20 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 	}
 
 	workflowNode := models.WorkflowNode{
-		WorkflowID:    workflowID,
-		NodeID:        node.ID,
-		ParentNodeID:  parentNodeID,
-		Name:          node.Name,
-		State:         models.WorkflowNodeStateReady,
-		Type:          node.Type,
-		Ref:           datatypes.NewJSONType(node.Ref),
-		Configuration: datatypes.NewJSONType(node.Configuration),
-		Position:      datatypes.NewJSONType(node.Position),
-		IsCollapsed:   node.IsCollapsed,
-		Metadata:      datatypes.NewJSONType(node.Metadata),
-		CreatedAt:     &now,
-		UpdatedAt:     &now,
+		WorkflowID:        workflowID,
+		NodeID:            node.ID,
+		ParentNodeID:      parentNodeID,
+		Name:              node.Name,
+		State:             models.WorkflowNodeStateReady,
+		Type:              node.Type,
+		Ref:               datatypes.NewJSONType(node.Ref),
+		Configuration:     datatypes.NewJSONType(node.Configuration),
+		Position:          datatypes.NewJSONType(node.Position),
+		IsCollapsed:       node.IsCollapsed,
+		Metadata:          datatypes.NewJSONType(node.Metadata),
+		AppInstallationID: appInstallationID,
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
 	}
 
 	err := tx.Create(&workflowNode).Error
@@ -181,7 +193,7 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 
 func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode) error {
 	ref := node.Ref.Data()
-	trigger, err := registry.GetTrigger(ref.Trigger.Name)
+	trigger, err := findTrigger(registry, ref.Trigger.Name)
 	if err != nil {
 		return err
 	}
@@ -204,7 +216,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 
 func setupComponent(tx *gorm.DB, registry *registry.Registry, node models.WorkflowNode) error {
 	ref := node.Ref.Data()
-	component, err := registry.GetComponent(ref.Component.Name)
+	component, err := findComponent(registry, ref.Component.Name)
 	if err != nil {
 		return err
 	}
@@ -234,4 +246,30 @@ func deleteNodes(tx *gorm.DB, existingNodes []models.WorkflowNode, newNodes []mo
 	}
 
 	return nil
+}
+
+func findTrigger(registry *registry.Registry, triggerName string) (triggers.Trigger, error) {
+	parts := strings.SplitN(triggerName, ".", 2)
+	if len(parts) > 2 {
+		return nil, fmt.Errorf("invalid trigger name: %s", triggerName)
+	}
+
+	if len(parts) == 1 {
+		return registry.GetTrigger(parts[0])
+	}
+
+	return registry.GetApplicationTrigger(parts[0], triggerName)
+}
+
+func findComponent(registry *registry.Registry, componentName string) (components.Component, error) {
+	parts := strings.SplitN(componentName, ".", 2)
+	if len(parts) > 2 {
+		return nil, fmt.Errorf("invalid component name: %s", componentName)
+	}
+
+	if len(parts) == 1 {
+		return registry.GetComponent(parts[0])
+	}
+
+	return registry.GetApplicationComponent(parts[0], componentName)
 }

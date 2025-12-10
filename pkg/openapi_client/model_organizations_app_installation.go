@@ -20,14 +20,14 @@ var _ MappedNullable = &OrganizationsAppInstallation{}
 
 // OrganizationsAppInstallation struct for OrganizationsAppInstallation
 type OrganizationsAppInstallation struct {
-	Id *string `json:"id,omitempty"`
-	AppName *string `json:"appName,omitempty"`
-	InstallationName *string `json:"installationName,omitempty"`
-	State *string `json:"state,omitempty"`
-	StateDescription *string `json:"stateDescription,omitempty"`
-	Configuration map[string]interface{} `json:"configuration,omitempty"`
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
-	BrowserAction *OrganizationsBrowserAction `json:"browserAction,omitempty"`
+	Id               *string                     `json:"id,omitempty"`
+	AppName          *string                     `json:"appName,omitempty"`
+	InstallationName *string                     `json:"installationName,omitempty"`
+	State            *string                     `json:"state,omitempty"`
+	StateDescription *string                     `json:"stateDescription,omitempty"`
+	Configuration    map[string]interface{}      `json:"configuration,omitempty"`
+	Metadata         map[string]interface{}      `json:"metadata,omitempty"`
+	BrowserAction    *OrganizationsBrowserAction `json:"browserAction,omitempty"`
 }
 
 // NewOrganizationsAppInstallation instantiates a new OrganizationsAppInstallation object
@@ -304,7 +304,7 @@ func (o *OrganizationsAppInstallation) SetBrowserAction(v OrganizationsBrowserAc
 }
 
 func (o OrganizationsAppInstallation) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -375,5 +375,3 @@ func (v *NullableOrganizationsAppInstallation) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

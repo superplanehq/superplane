@@ -20,16 +20,17 @@ var _ MappedNullable = &ComponentsNode{}
 
 // ComponentsNode struct for ComponentsNode
 type ComponentsNode struct {
-	Id *string `json:"id,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Type *ComponentsNodeType `json:"type,omitempty"`
-	Configuration map[string]interface{} `json:"configuration,omitempty"`
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
-	Position *ComponentsPosition `json:"position,omitempty"`
-	Component *NodeComponentRef `json:"component,omitempty"`
-	Blueprint *NodeBlueprintRef `json:"blueprint,omitempty"`
-	Trigger *NodeTriggerRef `json:"trigger,omitempty"`
-	IsCollapsed *bool `json:"isCollapsed,omitempty"`
+	Id              *string                       `json:"id,omitempty"`
+	Name            *string                       `json:"name,omitempty"`
+	Type            *ComponentsNodeType           `json:"type,omitempty"`
+	Configuration   map[string]interface{}        `json:"configuration,omitempty"`
+	Metadata        map[string]interface{}        `json:"metadata,omitempty"`
+	Position        *ComponentsPosition           `json:"position,omitempty"`
+	Component       *NodeComponentRef             `json:"component,omitempty"`
+	Blueprint       *NodeBlueprintRef             `json:"blueprint,omitempty"`
+	Trigger         *NodeTriggerRef               `json:"trigger,omitempty"`
+	IsCollapsed     *bool                         `json:"isCollapsed,omitempty"`
+	AppInstallation *ComponentsAppInstallationRef `json:"appInstallation,omitempty"`
 }
 
 // NewComponentsNode instantiates a new ComponentsNode object
@@ -373,8 +374,40 @@ func (o *ComponentsNode) SetIsCollapsed(v bool) {
 	o.IsCollapsed = &v
 }
 
+// GetAppInstallation returns the AppInstallation field value if set, zero value otherwise.
+func (o *ComponentsNode) GetAppInstallation() ComponentsAppInstallationRef {
+	if o == nil || IsNil(o.AppInstallation) {
+		var ret ComponentsAppInstallationRef
+		return ret
+	}
+	return *o.AppInstallation
+}
+
+// GetAppInstallationOk returns a tuple with the AppInstallation field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsNode) GetAppInstallationOk() (*ComponentsAppInstallationRef, bool) {
+	if o == nil || IsNil(o.AppInstallation) {
+		return nil, false
+	}
+	return o.AppInstallation, true
+}
+
+// HasAppInstallation returns a boolean if a field has been set.
+func (o *ComponentsNode) HasAppInstallation() bool {
+	if o != nil && !IsNil(o.AppInstallation) {
+		return true
+	}
+
+	return false
+}
+
+// SetAppInstallation gets a reference to the given ComponentsAppInstallationRef and assigns it to the AppInstallation field.
+func (o *ComponentsNode) SetAppInstallation(v ComponentsAppInstallationRef) {
+	o.AppInstallation = &v
+}
+
 func (o ComponentsNode) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -412,6 +445,9 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.IsCollapsed) {
 		toSerialize["isCollapsed"] = o.IsCollapsed
+	}
+	if !IsNil(o.AppInstallation) {
+		toSerialize["appInstallation"] = o.AppInstallation
 	}
 	return toSerialize, nil
 }
@@ -451,5 +487,3 @@ func (v *NullableComponentsNode) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

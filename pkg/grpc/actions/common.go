@@ -14,7 +14,9 @@ import (
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/triggers"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -519,14 +521,20 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 	result := make([]models.Node, len(nodes))
 	for i, node := range nodes {
+		var appInstallationID *string
+		if node.AppInstallation != nil && node.AppInstallation.Id != "" {
+			appInstallationID = &node.AppInstallation.Id
+		}
+
 		result[i] = models.Node{
-			ID:            node.Id,
-			Name:          node.Name,
-			Type:          ProtoToNodeType(node.Type),
-			Ref:           ProtoToNodeRef(node),
-			Configuration: node.Configuration.AsMap(),
-			Position:      ProtoToPosition(node.Position),
-			IsCollapsed:   node.IsCollapsed,
+			ID:                node.Id,
+			Name:              node.Name,
+			Type:              ProtoToNodeType(node.Type),
+			Ref:               ProtoToNodeRef(node),
+			Configuration:     node.Configuration.AsMap(),
+			Position:          ProtoToPosition(node.Position),
+			IsCollapsed:       node.IsCollapsed,
+			AppInstallationID: appInstallationID,
 		}
 	}
 	return result
@@ -567,6 +575,12 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 
 		if node.Metadata != nil {
 			result[i].Metadata, _ = structpb.NewStruct(node.Metadata)
+		}
+
+		if node.AppInstallationID != nil && *node.AppInstallationID != "" {
+			result[i].AppInstallation = &componentpb.AppInstallationRef{
+				Id: *node.AppInstallationID,
+			}
 		}
 	}
 
@@ -837,5 +851,26 @@ func SerializeComponents(in []components.Component) []*componentpb.Component {
 		}
 	}
 
+	return out
+}
+
+func SerializeTriggers(in []triggers.Trigger) []*triggerpb.Trigger {
+	out := make([]*triggerpb.Trigger, len(in))
+	for i, trigger := range in {
+		configFields := trigger.Configuration()
+		configuration := make([]*configpb.Field, len(configFields))
+		for j, field := range configFields {
+			configuration[j] = ConfigurationFieldToProto(field)
+		}
+
+		out[i] = &triggerpb.Trigger{
+			Name:          trigger.Name(),
+			Label:         trigger.Label(),
+			Description:   trigger.Description(),
+			Icon:          trigger.Icon(),
+			Color:         trigger.Color(),
+			Configuration: configuration,
+		}
+	}
 	return out
 }

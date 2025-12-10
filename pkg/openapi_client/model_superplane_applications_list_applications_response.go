@@ -73,7 +73,7 @@ func (o *SuperplaneApplicationsListApplicationsResponse) SetApplications(v []App
 }
 
 func (o SuperplaneApplicationsListApplicationsResponse) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,5 +123,3 @@ func (v *NullableSuperplaneApplicationsListApplicationsResponse) UnmarshalJSON(s
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

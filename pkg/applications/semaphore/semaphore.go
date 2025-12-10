@@ -11,10 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/triggers"
 )
 
-const (
-	APITokenSecretName = "apiToken"
-)
-
 func init() {
 	registry.RegisterApplication("semaphore", &Semaphore{})
 }
@@ -45,6 +41,7 @@ func (s *Semaphore) Configuration() []configuration.Field {
 			Label:       "Organization URL",
 			Type:        configuration.FieldTypeString,
 			Description: "Semaphore organization URL",
+			Placeholder: "e.g. https://superplane.semaphoreci.com",
 			Required:    true,
 		},
 		{
@@ -72,18 +69,10 @@ func (s *Semaphore) Sync(ctx applications.SyncContext) error {
 	}
 
 	//
+	// TODO: Decrypt the API token to validate it can be decrypted
 	// TODO: list projects to check if credentials are correct.
 	// TODO: save projects in metadata? What if they change?
 	//
-
-	//
-	// TODO: we are saving this into a app installation secret,
-	// but it's still part of the configuration.
-	//
-	err = ctx.AppContext.SetSecret(APITokenSecretName, []byte(config.APIToken))
-	if err != nil {
-		return fmt.Errorf("Failed to save API token: %v", err)
-	}
 
 	ctx.AppContext.SetState("ready")
 	return nil

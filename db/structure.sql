@@ -413,7 +413,8 @@ CREATE TABLE public.workflow_nodes (
     "position" jsonb DEFAULT '{}'::jsonb NOT NULL,
     is_collapsed boolean DEFAULT false NOT NULL,
     parent_node_id character varying(128),
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    app_installation_id uuid
 );
 
 
@@ -881,6 +882,13 @@ CREATE INDEX idx_workflow_node_executions_workflow_node_id ON public.workflow_no
 
 
 --
+-- Name: idx_workflow_node_installation_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_installation_id ON public.workflow_nodes USING btree (app_installation_id);
+
+
+--
 -- Name: idx_workflow_node_queue_items_root_event_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1154,6 +1162,14 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 
 --
+-- Name: workflow_nodes workflow_nodes_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_nodes
+    ADD CONSTRAINT workflow_nodes_app_installation_id_fkey FOREIGN KEY (app_installation_id) REFERENCES public.app_installations(id) ON DELETE SET NULL;
+
+
+--
 -- Name: workflow_nodes workflow_nodes_webhook_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1201,7 +1217,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251208205307	f
+20251210010052	f
 \.
 
 

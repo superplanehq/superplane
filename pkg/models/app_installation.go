@@ -42,9 +42,10 @@ type AppInstallationSecret struct {
 // because there is a circular dependency issue that was
 // introduced by having pkg/components require pkg/models.
 type BrowserAction struct {
-	URL        string
-	Method     string
-	FormFields map[string]string
+	URL         string
+	Method      string
+	FormFields  map[string]string
+	Description string
 }
 
 func CreateAppInstallation(orgID uuid.UUID, appName string, installationName string, config map[string]any) (*AppInstallation, error) {
@@ -76,10 +77,25 @@ func ListAppInstallations(orgID uuid.UUID) ([]AppInstallation, error) {
 	return appInstallations, nil
 }
 
-func FindAppInstallation(installationID uuid.UUID) (*AppInstallation, error) {
+func FindUnscopedAppInstallation(installationID uuid.UUID) (*AppInstallation, error) {
 	var appInstallation AppInstallation
 	err := database.Conn().
 		Where("id = ?", installationID).
+		First(&appInstallation).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &appInstallation, nil
+}
+
+func FindAppInstallation(orgID, installationID uuid.UUID) (*AppInstallation, error) {
+	var appInstallation AppInstallation
+	err := database.Conn().
+		Where("id = ?", installationID).
+		Where("organization_id = ?", orgID).
 		First(&appInstallation).
 		Error
 

@@ -84,6 +84,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbOrganization.Organizations_RemoveUser_FullMethodName:           {Resource: "member", Action: "delete", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_DeleteOrganization_FullMethodName:   {Resource: "org", Action: "delete", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_InstallApplication_FullMethodName:   {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_UpdateApplication_FullMethodName:    {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_ListApplications_FullMethodName:     {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 
 		// Blueprints rules

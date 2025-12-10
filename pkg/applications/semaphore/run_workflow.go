@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -14,10 +13,6 @@ import (
 
 const PassedOutputChannel = "passed"
 const FailedOutputChannel = "failed"
-
-// func init() {
-// 	registry.RegisterComponent("semaphore.runWorkflow", &ListPipelines{})
-// }
 
 type RunWorkflow struct{}
 
@@ -92,29 +87,11 @@ func (r *RunWorkflow) OutputChannels(configuration any) []components.OutputChann
 
 func (r *RunWorkflow) Configuration() []configuration.Field {
 	return []configuration.Field{
-		// TODO: figure out how the component and its application are connected
-		{
-			Name:     "integration",
-			Label:    "Semaphore integration",
-			Type:     configuration.FieldTypeIntegration,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Integration: &configuration.IntegrationTypeOptions{
-					Type: "semaphore",
-				},
-			},
-		},
 		{
 			Name:     "project",
 			Label:    "Project",
 			Type:     configuration.FieldTypeString,
 			Required: true,
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "integration",
-					Values: []string{"*"},
-				},
-			},
 		},
 		{
 			Name:        "pipelineFile",
@@ -175,36 +152,14 @@ func (r *RunWorkflow) Setup(ctx components.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.Integration == "" {
-		return fmt.Errorf("integration is required")
-	}
-
-	_, err = uuid.Parse(config.Integration)
-	if err != nil {
-		return fmt.Errorf("integration ID is invalid: %w", err)
-	}
-
 	if config.Project == "" {
 		return fmt.Errorf("project is required")
 	}
 
-	integration, err := ctx.IntegrationContext.GetIntegration(config.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to get integration: %w", err)
-	}
-
-	resource, err := integration.Get("project", config.Project)
-	if err != nil {
-		return fmt.Errorf("failed to find project %s: %w", config.Project, err)
-	}
-
-	ctx.MetadataContext.Set(RunWorkflowNodeMetadata{
-		Project: &Project{
-			ID:   resource.Id(),
-			Name: resource.Name(),
-			URL:  resource.URL(),
-		},
-	})
+	//
+	// TODO: check if project exists
+	// TODO: set up web hook to receive workflow updates
+	//
 
 	return nil
 }

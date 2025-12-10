@@ -3,6 +3,7 @@ import {
   applicationsListApplications,
   organizationsListApplications,
   organizationsInstallApplication,
+  organizationsUpdateApplication,
 } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import type { OrganizationsInstallApplicationBody } from "@/api-client/types.gen";
@@ -36,7 +37,7 @@ export const useInstalledApplications = (organizationId: string) => {
       const response = await organizationsListApplications(
         withOrganizationHeader({
           path: { id: organizationId },
-        })
+        }),
       );
       return response.data?.applications || [];
     },
@@ -54,7 +55,7 @@ export const useApplicationInstallation = (organizationId: string, installationI
       const response = await organizationsListApplications(
         withOrganizationHeader({
           path: { id: organizationId },
-        })
+        }),
       );
       const installations = response.data?.applications || [];
       return installations.find((app) => app.id === installationId) || null;
@@ -70,7 +71,11 @@ export const useInstallApplication = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { appName: string; installationName: string; configuration?: Record<string, unknown> }) => {
+    mutationFn: async (data: {
+      appName: string;
+      installationName: string;
+      configuration?: Record<string, unknown>;
+    }) => {
       return await organizationsInstallApplication(
         withOrganizationHeader({
           path: { id: organizationId },
@@ -79,12 +84,38 @@ export const useInstallApplication = (organizationId: string) => {
             installationName: data.installationName,
             configuration: data.configuration,
           },
-        })
+        }),
       );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: applicationKeys.installed(organizationId),
+      });
+    },
+  });
+};
+
+// Hook to update an application installation
+export const useUpdateApplication = (organizationId: string, installationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (configuration: Record<string, unknown>) => {
+      return await organizationsUpdateApplication(
+        withOrganizationHeader({
+          path: { id: organizationId, installationId: installationId },
+          body: {
+            configuration,
+          },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: applicationKeys.installed(organizationId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: applicationKeys.installation(organizationId, installationId),
       });
     },
   });

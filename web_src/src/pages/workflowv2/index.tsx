@@ -7,6 +7,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import {
   BlueprintsBlueprint,
+  ComponentsAppInstallationRef,
   ComponentsComponent,
   ComponentsEdge,
   ComponentsNode,
@@ -25,7 +26,7 @@ import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
-import { useAvailableApplications } from "@/hooks/useApplications";
+import { useAvailableApplications, useInstalledApplications } from "@/hooks/useApplications";
 import {
   eventExecutionsQueryOptions,
   useTriggers,
@@ -80,6 +81,7 @@ export function WorkflowPageV2() {
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
   const { data: availableApplications = [], isLoading: applicationsLoading } = useAvailableApplications();
+  const { data: installedApplications = [] } = useInstalledApplications(organizationId!);
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
 
   usePageTitle([workflow?.metadata?.name || "Canvas"]);
@@ -255,6 +257,27 @@ export function WorkflowPageV2() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
+  // Merge triggers and components from applications into the main arrays
+  const allTriggers = useMemo(() => {
+    const merged = [...triggers];
+    availableApplications.forEach((app) => {
+      if (app.triggers) {
+        merged.push(...app.triggers);
+      }
+    });
+    return merged;
+  }, [triggers, availableApplications]);
+
+  const allComponents = useMemo(() => {
+    const merged = [...components];
+    availableApplications.forEach((app) => {
+      if (app.components) {
+        merged.push(...app.components);
+      }
+    });
+    return merged;
+  }, [components, availableApplications]);
+
   const buildingBlocks = useMemo(
     () => buildBuildingBlockCategories(triggers, components, blueprints, availableApplications),
     [triggers, components, blueprints, availableApplications],
@@ -262,14 +285,22 @@ export function WorkflowPageV2() {
 
   const { nodes, edges } = useMemo(() => {
     // Don't prepare data until everything is loaded
-    if (!workflow || workflowLoading || triggersLoading || blueprintsLoading || componentsLoading || applicationsLoading) {
+    if (
+      !workflow ||
+      workflowLoading ||
+      triggersLoading ||
+      blueprintsLoading ||
+      componentsLoading ||
+      applicationsLoading
+    ) {
       return { nodes: [], edges: [] };
     }
+
     return prepareData(
       workflow,
-      triggers,
+      allTriggers,
       blueprints,
-      components,
+      allComponents,
       nodeEventsMap,
       nodeExecutionsMap,
       nodeQueueItemsMap,
@@ -279,9 +310,9 @@ export function WorkflowPageV2() {
     );
   }, [
     workflow,
-    triggers,
+    allTriggers,
     blueprints,
-    components,
+    allComponents,
     nodeEventsMap,
     nodeExecutionsMap,
     nodeQueueItemsMap,
@@ -291,6 +322,7 @@ export function WorkflowPageV2() {
     triggersLoading,
     blueprintsLoading,
     componentsLoading,
+    applicationsLoading,
     organizationId,
   ]);
 
@@ -314,8 +346,8 @@ export function WorkflowPageV2() {
         node,
         workflow?.spec?.nodes || [],
         blueprints,
-        components,
-        triggers,
+        allComponents,
+        allTriggers,
         executionsMap,
         queueItemsMap,
         eventsMapForSidebar,
@@ -329,7 +361,7 @@ export function WorkflowPageV2() {
         isLoading: nodeData.isLoading,
       };
     },
-    [workflow, workflowId, blueprints, components, triggers, nodeEventsMap, getNodeData, queryClient],
+    [workflow, workflowId, blueprints, allComponents, allTriggers, nodeEventsMap, getNodeData, queryClient],
   );
 
   // Trigger data loading when sidebar opens for a node
@@ -599,19 +631,36 @@ export function WorkflowPageV2() {
       // Get configuration fields from metadata based on node type
       let configurationFields: ComponentsComponent["configuration"] = [];
       let displayLabel: string | undefined = node.name || undefined;
+      let appName: string | undefined;
 
       if (node.type === "TYPE_BLUEPRINT") {
         const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
         configurationFields = blueprintMetadata?.configuration || [];
         displayLabel = blueprintMetadata?.name || displayLabel;
       } else if (node.type === "TYPE_COMPONENT") {
-        const componentMetadata = components.find((c) => c.name === node.component?.name);
+        const componentMetadata = allComponents.find((c) => c.name === node.component?.name);
         configurationFields = componentMetadata?.configuration || [];
         displayLabel = componentMetadata?.label || displayLabel;
+
+        // Check if this component is from an application
+        const componentApp = availableApplications.find((app) =>
+          app.components?.some((c) => c.name === node.component?.name)
+        );
+        if (componentApp) {
+          appName = componentApp.name;
+        }
       } else if (node.type === "TYPE_TRIGGER") {
-        const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
+        const triggerMetadata = allTriggers.find((t) => t.name === node.trigger?.name);
         configurationFields = triggerMetadata?.configuration || [];
         displayLabel = triggerMetadata?.label || displayLabel;
+
+        // Check if this trigger is from an application
+        const triggerApp = availableApplications.find((app) =>
+          app.triggers?.some((t) => t.name === node.trigger?.name)
+        );
+        if (triggerApp) {
+          appName = triggerApp.name;
+        }
       }
 
       return {
@@ -620,25 +669,28 @@ export function WorkflowPageV2() {
         displayLabel,
         configuration: node.configuration || {},
         configurationFields,
+        appName,
+        appInstallationRef: node.appInstallation,
       };
     },
-    [workflow, blueprints, components, triggers],
+    [workflow, blueprints, allComponents, allTriggers, availableApplications],
   );
 
   const handleNodeConfigurationSave = useCallback(
-    (nodeId: string, updatedConfiguration: Record<string, any>, updatedNodeName: string) => {
+    (nodeId: string, updatedConfiguration: Record<string, any>, updatedNodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
 
-      // Update the node's configuration and name in local cache only
+      // Update the node's configuration, name, and app installation ref in local cache only
       const updatedNodes = workflow?.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
               ...node,
               configuration: updatedConfiguration,
               name: updatedNodeName,
+              appInstallation: appInstallationRef,
             }
           : node,
       );
@@ -672,7 +724,7 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
 
-      const { buildingBlock, nodeName, configuration, position } = newNodeData;
+      const { buildingBlock, nodeName, configuration, position, appInstallationRef } = newNodeData;
 
       // Filter configuration to only include visible fields
       const filteredConfiguration = filterVisibleConfiguration(configuration, buildingBlock.configuration || []);
@@ -695,6 +747,7 @@ export function WorkflowPageV2() {
           x: (workflow?.spec?.nodes?.length || 0) * 250,
           y: 100,
         },
+        appInstallation: appInstallationRef,
       };
 
       // Add type-specific reference
@@ -1154,6 +1207,7 @@ export function WorkflowPageV2() {
       onConfigure={handleConfigure}
       buildingBlocks={buildingBlocks}
       onNodeAdd={handleNodeAdd}
+      installedApplications={installedApplications}
       hasFitToViewRef={hasFitToViewRef}
       hasUserToggledSidebarRef={hasUserToggledSidebarRef}
       isSidebarOpenRef={isSidebarOpenRef}

@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"sort"
 	"sync"
@@ -258,17 +259,33 @@ func (r *Registry) ListApplications() []applications.Application {
 	return applications
 }
 
-func (r *Registry) GetApplicationComponent(name string) (components.Component, error) {
-	application, err := r.GetApplication(name)
+func (r *Registry) GetApplicationTrigger(appName, triggerName string) (triggers.Trigger, error) {
+	log.Println("GetApplicationTrigger", appName, triggerName)
+	application, err := r.GetApplication(appName)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, trigger := range application.Triggers() {
+		if trigger.Name() == triggerName {
+			return trigger, nil
+		}
+	}
+
+	return nil, fmt.Errorf("trigger %s not found for app %s", triggerName, appName)
+}
+
+func (r *Registry) GetApplicationComponent(appName, componentName string) (components.Component, error) {
+	application, err := r.GetApplication(appName)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, component := range application.Components() {
-		if component.Name() == name {
+		if component.Name() == componentName {
 			return component, nil
 		}
 	}
 
-	return nil, fmt.Errorf("component %s not registered", name)
+	return nil, fmt.Errorf("component %s not found for app %s", componentName, appName)
 }

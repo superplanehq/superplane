@@ -34,6 +34,7 @@ docs/BlueprintsListBlueprintsResponse.md
 docs/BlueprintsUpdateBlueprintBody.md
 docs/BlueprintsUpdateBlueprintResponse.md
 docs/ComponentAPI.md
+docs/ComponentsAppInstallationRef.md
 docs/ComponentsComponent.md
 docs/ComponentsComponentAction.md
 docs/ComponentsDescribeComponentResponse.md
@@ -108,6 +109,8 @@ docs/OrganizationsInvitation.md
 docs/OrganizationsListInvitationsResponse.md
 docs/OrganizationsOrganization.md
 docs/OrganizationsOrganizationMetadata.md
+docs/OrganizationsUpdateApplicationBody.md
+docs/OrganizationsUpdateApplicationResponse.md
 docs/OrganizationsUpdateOrganizationBody.md
 docs/OrganizationsUpdateOrganizationResponse.md
 docs/ProtobufAny.md
@@ -197,6 +200,7 @@ model_blueprints_describe_blueprint_response.go
 model_blueprints_list_blueprints_response.go
 model_blueprints_update_blueprint_body.go
 model_blueprints_update_blueprint_response.go
+model_components_app_installation_ref.go
 model_components_component.go
 model_components_component_action.go
 model_components_describe_component_response.go
@@ -267,6 +271,8 @@ model_organizations_invitation.go
 model_organizations_list_invitations_response.go
 model_organizations_organization.go
 model_organizations_organization_metadata.go
+model_organizations_update_application_body.go
+model_organizations_update_application_response.go
 model_organizations_update_organization_body.go
 model_organizations_update_organization_response.go
 model_protobuf_any.go

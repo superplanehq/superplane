@@ -70,9 +70,10 @@ type InstallationSecret struct {
 }
 
 type BrowserAction struct {
-	URL        string
-	Method     string
-	FormFields map[string]string
+	Description string
+	URL         string
+	Method      string
+	FormFields  map[string]string
 }
 
 type HttpRequestContext struct {

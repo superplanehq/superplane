@@ -1,0 +1,68 @@
+package organizations
+
+import (
+	"context"
+	"fmt"
+	"maps"
+
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/applications"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
+)
+
+func UpdateApplication(ctx context.Context, registry *registry.Registry, baseURL string, orgID string, installationID string, configuration map[string]any) (*pb.UpdateApplicationResponse, error) {
+	appInstallation, err := models.FindUnscopedAppInstallation(uuid.MustParse(installationID))
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "application installation not found: %v", err)
+	}
+
+	app, err := registry.GetApplication(appInstallation.AppName)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "application %s not found", appInstallation.AppName)
+	}
+
+	encryptedConfig, err := encryptSensitiveFields(ctx, registry, app, configuration, orgID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to encrypt sensitive configuration: %v", err)
+	}
+
+	configData := appInstallation.Configuration.Data()
+	maps.Copy(configData, encryptedConfig)
+	appInstallation.Configuration = datatypes.NewJSONType(configData)
+
+	syncErr := app.Sync(applications.SyncContext{
+		Configuration:  appInstallation.Configuration.Data(),
+		BaseURL:        baseURL,
+		OrganizationID: orgID,
+		InstallationID: installationID,
+		AppContext:     contexts.NewAppContext(database.Conn(), appInstallation, registry.Encryptor),
+	})
+
+	if syncErr != nil {
+		appInstallation.State = "error"
+		appInstallation.StateDescription = fmt.Sprintf("Sync failed: %v", syncErr)
+	} else {
+		appInstallation.StateDescription = ""
+	}
+
+	err = database.Conn().Save(appInstallation).Error
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to save application installation: %v", err)
+	}
+
+	proto, err := serializeAppInstallation(registry, appInstallation)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to serialize application installation: %v", err)
+	}
+
+	return &pb.UpdateApplicationResponse{
+		Installation: proto,
+	}, nil
+}

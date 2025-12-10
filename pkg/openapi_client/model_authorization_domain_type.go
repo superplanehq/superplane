@@ -21,7 +21,7 @@ type AuthorizationDomainType string
 
 // List of AuthorizationDomainType
 const (
-	AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED AuthorizationDomainType = "DOMAIN_TYPE_UNSPECIFIED"
+	AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED  AuthorizationDomainType = "DOMAIN_TYPE_UNSPECIFIED"
 	AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION AuthorizationDomainType = "DOMAIN_TYPE_ORGANIZATION"
 )
 
@@ -109,4 +109,3 @@ func (v *NullableAuthorizationDomainType) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-

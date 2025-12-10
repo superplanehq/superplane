@@ -32,6 +32,7 @@ func serializeApplications(in []applications.Application) []*pb.ApplicationDefin
 			Label:         application.Label(),
 			Configuration: configuration,
 			Components:    actions.SerializeComponents(application.Components()),
+			Triggers:      actions.SerializeTriggers(application.Triggers()),
 		}
 	}
 	return out

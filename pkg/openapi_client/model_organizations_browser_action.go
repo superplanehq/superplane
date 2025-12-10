@@ -20,9 +20,10 @@ var _ MappedNullable = &OrganizationsBrowserAction{}
 
 // OrganizationsBrowserAction struct for OrganizationsBrowserAction
 type OrganizationsBrowserAction struct {
-	Url *string `json:"url,omitempty"`
-	Method *string `json:"method,omitempty"`
-	FormFields *map[string]string `json:"formFields,omitempty"`
+	Url         *string            `json:"url,omitempty"`
+	Method      *string            `json:"method,omitempty"`
+	FormFields  *map[string]string `json:"formFields,omitempty"`
+	Description *string            `json:"description,omitempty"`
 }
 
 // NewOrganizationsBrowserAction instantiates a new OrganizationsBrowserAction object
@@ -138,8 +139,40 @@ func (o *OrganizationsBrowserAction) SetFormFields(v map[string]string) {
 	o.FormFields = &v
 }
 
+// GetDescription returns the Description field value if set, zero value otherwise.
+func (o *OrganizationsBrowserAction) GetDescription() string {
+	if o == nil || IsNil(o.Description) {
+		var ret string
+		return ret
+	}
+	return *o.Description
+}
+
+// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsBrowserAction) GetDescriptionOk() (*string, bool) {
+	if o == nil || IsNil(o.Description) {
+		return nil, false
+	}
+	return o.Description, true
+}
+
+// HasDescription returns a boolean if a field has been set.
+func (o *OrganizationsBrowserAction) HasDescription() bool {
+	if o != nil && !IsNil(o.Description) {
+		return true
+	}
+
+	return false
+}
+
+// SetDescription gets a reference to the given string and assigns it to the Description field.
+func (o *OrganizationsBrowserAction) SetDescription(v string) {
+	o.Description = &v
+}
+
 func (o OrganizationsBrowserAction) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -156,6 +189,9 @@ func (o OrganizationsBrowserAction) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.FormFields) {
 		toSerialize["formFields"] = o.FormFields
+	}
+	if !IsNil(o.Description) {
+		toSerialize["description"] = o.Description
 	}
 	return toSerialize, nil
 }
@@ -195,5 +231,3 @@ func (v *NullableOrganizationsBrowserAction) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

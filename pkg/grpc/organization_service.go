@@ -64,7 +64,7 @@ func (s *OrganizationService) RemoveInvitation(ctx context.Context, req *pb.Remo
 
 func (s *OrganizationService) ListApplications(ctx context.Context, req *pb.ListApplicationsRequest) (*pb.ListApplicationsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ListApplications(ctx, orgID)
+	return organizations.ListApplications(ctx, s.registry, orgID)
 }
 
 func (s *OrganizationService) InstallApplication(ctx context.Context, req *pb.InstallApplicationRequest) (*pb.InstallApplicationResponse, error) {
@@ -77,5 +77,17 @@ func (s *OrganizationService) InstallApplication(ctx context.Context, req *pb.In
 		req.AppName,
 		req.InstallationName,
 		req.Configuration,
+	)
+}
+
+func (s *OrganizationService) UpdateApplication(ctx context.Context, req *pb.UpdateApplicationRequest) (*pb.UpdateApplicationResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateApplication(
+		ctx,
+		s.registry,
+		s.baseURL,
+		orgID,
+		req.InstallationId,
+		req.Configuration.AsMap(),
 	)
 }

@@ -73,7 +73,7 @@ func (o *WorkflowsUpdateWorkflowResponse) SetWorkflow(v WorkflowsWorkflow) {
 }
 
 func (o WorkflowsUpdateWorkflowResponse) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,5 +123,3 @@ func (v *NullableWorkflowsUpdateWorkflowResponse) UnmarshalJSON(src []byte) erro
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

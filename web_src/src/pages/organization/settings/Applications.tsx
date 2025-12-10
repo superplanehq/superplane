@@ -1,7 +1,11 @@
 import { AppWindow, Puzzle, Zap, Loader2, X, Edit } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAvailableApplications, useInstalledApplications, useInstallApplication } from "../../../hooks/useApplications";
+import {
+  useAvailableApplications,
+  useInstalledApplications,
+  useInstallApplication,
+} from "../../../hooks/useApplications";
 import { Button } from "@/ui/button";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { ApplicationsApplicationDefinition } from "../../../api-client/types.gen";
@@ -82,62 +86,87 @@ export function Applications({ organizationId }: ApplicationsProps) {
     <div className="pt-6">
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Applications</h1>
-          <p className="text-zinc-600 dark:text-zinc-400 mt-2">
-            Manage installed applications and discover new ones for your organization
-          </p>
+          <h4 className="text-2xl font-semibold">Applications</h4>
         </div>
       </div>
 
       {/* Installed Applications */}
       {installedApps.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-lg font-medium mb-4">Installed Applications</h2>
-          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
-            <div className="p-6">
-              <div className="space-y-4">
-                {installedApps.map((app) => (
-                  <div
-                    key={app.id}
-                    className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <AppWindow className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
-                        <div>
-                          <h3 className="font-medium text-zinc-900 dark:text-zinc-100">
-                            {app.installationName || app.appName}
-                          </h3>
-                          {app.appName && app.installationName !== app.appName && (
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400">App: {app.appName}</p>
-                          )}
-                          {app.state && (
-                            <p className="text-sm text-zinc-600 dark:text-zinc-400">Status: {app.state}</p>
-                          )}
-                          {app.stateDescription && (
-                            <p className="text-sm text-zinc-600 dark:text-zinc-400">{app.stateDescription}</p>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => navigate(`/${organizationId}/settings/applications/${app.id}`)}
-                        className="p-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
-                        title="Edit application"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <h2 className="text-lg font-medium mb-4">Installed</h2>
+          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+            <table className="w-full table-fixed">
+              <thead className="bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
+                <tr>
+                  <th className="px-3 py-2 w-80 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="px-3 py-2 w-24 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                    State
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                    Application
+                  </th>
+                  <th className="px-3 py-2 w-24 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700">
+                {[...installedApps]
+                  .sort((a, b) => (a.appName || "").localeCompare(b.appName || ""))
+                  .map((app) => {
+                    const appDefinition = availableApps.find((a) => a.name === app.appName);
+                    const appLabel = appDefinition?.label || app.appName;
+
+                    return (
+                      <tr key={app.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                        <td className="px-3 py-2 text-sm font-mono text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
+                          {app.id}
+                        </td>
+                        <td className="px-3 py-2 truncate">
+                          <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                            {app.installationName}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              app.state === "ready"
+                                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                : app.state === "error"
+                                  ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                  : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                            }`}
+                          >
+                            {app.state}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 truncate">{appLabel}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-right text-sm">
+                          <button
+                            onClick={() => navigate(`/${organizationId}/settings/applications/${app.id}`)}
+                            className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 transition-colors"
+                          >
+                            <Edit className="w-4 h-4" />
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
       {/* Available Applications */}
       <div>
-        <h2 className="text-lg font-medium mb-4">Available Applications</h2>
+        <h2 className="text-lg font-medium mb-4">Available</h2>
         <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
           <div className="p-6">
             {availableApps.length === 0 ? (
@@ -151,39 +180,39 @@ export function Applications({ organizationId }: ApplicationsProps) {
             ) : (
               <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {availableApps.map((app) => (
-                    <div
-                      key={app.name}
-                      className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <AppWindow className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
-                          <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{app.label || app.name}</h3>
-                        </div>
+                  <div
+                    key={app.name}
+                    className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <AppWindow className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                        <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          {app.label || app.name}
+                        </h3>
                       </div>
-
-                      <div className="space-y-1 text-xs text-zinc-600 dark:text-zinc-400 mb-3">
-                        <div className="flex items-center gap-1.5">
-                          <Puzzle className="w-3 h-3" />
-                          <span>{app.components?.length || 0} component{(app.components?.length || 0) !== 1 ? "s" : ""}</span>
-                        </div>
-                        {app.triggers && app.triggers.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <Zap className="w-3 h-3" />
-                            <span>{app.triggers.length} trigger{app.triggers.length !== 1 ? "s" : ""}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <Button
-                        color="blue"
-                        onClick={() => handleInstallClick(app)}
-                        className="w-full text-sm py-1.5"
-                      >
-                        Install
-                      </Button>
                     </div>
-                  ))}
+
+                    <div className="space-y-1 text-xs text-zinc-600 dark:text-zinc-400 mb-3">
+                      <div className="flex items-center gap-1.5">
+                        <Puzzle className="w-3 h-3" />
+                        <span>
+                          {app.components?.length || 0} component{(app.components?.length || 0) !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Zap className="w-3 h-3" />
+                        <span>
+                          {app.triggers?.length} trigger{app.triggers?.length !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    </div>
+
+                    <Button color="blue" onClick={() => handleInstallClick(app)} className="w-full text-sm py-1.5">
+                      Install
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -218,9 +247,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                     Installation Name
                     <span className="text-red-500 ml-1">*</span>
                   </label>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
-                    A unique name for this installation
-                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">A unique name for this installation</p>
                   <input
                     type="text"
                     value={installationName}
@@ -233,10 +260,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
 
                 {/* Configuration Fields */}
                 {selectedApplication.configuration && selectedApplication.configuration.length > 0 && (
-                  <>
-                    <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                      <h4 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-4">Configuration</h4>
-                    </div>
+                  <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
                     {selectedApplication.configuration.map((field) => {
                       if (!field.name) return null;
                       return (
@@ -251,16 +275,12 @@ export function Applications({ organizationId }: ApplicationsProps) {
                         />
                       );
                     })}
-                  </>
+                  </div>
                 )}
               </div>
 
               <div className="flex justify-end gap-3 mt-6">
-                <Button
-                  color="zinc"
-                  onClick={handleCloseModal}
-                  disabled={installMutation.isPending}
-                >
+                <Button variant="outline" onClick={handleCloseModal} disabled={installMutation.isPending}>
                   Cancel
                 </Button>
                 <Button

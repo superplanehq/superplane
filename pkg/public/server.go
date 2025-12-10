@@ -414,7 +414,7 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	appInstallation, err := models.FindAppInstallation(installationID)
+	appInstallation, err := models.FindUnscopedAppInstallation(installationID)
 	if err != nil {
 		http.Error(w, "installation not found", http.StatusNotFound)
 		return
@@ -429,7 +429,7 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 	app.HandleRequest(applications.HttpRequestContext{
 		Request:        r,
 		Response:       &w,
-		AppContext:     contexts.NewAppContext(database.Conn(), appInstallation),
+		AppContext:     contexts.NewAppContext(database.Conn(), appInstallation, s.encryptor),
 		OrganizationID: appInstallation.OrganizationID.String(),
 		InstallationID: installationID.String(),
 		BaseURL:        s.BaseURL,

@@ -1,5 +1,10 @@
 import { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
-import { TriggersTrigger, ComponentsComponent, BlueprintsBlueprint, ApplicationsApplicationDefinition } from "@/api-client";
+import {
+  TriggersTrigger,
+  ComponentsComponent,
+  BlueprintsBlueprint,
+  ApplicationsApplicationDefinition,
+} from "@/api-client";
 import { mockBuildingBlockCategories } from "@/ui/CanvasPage/storybooks/buildingBlocks";
 
 // Build categories of building blocks from live data and merge with mocks (deduped)
@@ -75,6 +80,7 @@ export function buildBuildingBlockCategories(
           icon: t.icon,
           color: t.color,
           isLive: true,
+          appName: app.name,
         });
       });
     }
@@ -92,6 +98,7 @@ export function buildBuildingBlockCategories(
           icon: c.icon,
           color: c.color,
           isLive: true,
+          appName: app.name,
         });
       });
     }

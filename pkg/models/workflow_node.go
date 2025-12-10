@@ -20,21 +20,22 @@ const (
 )
 
 type WorkflowNode struct {
-	WorkflowID    uuid.UUID `gorm:"primaryKey"`
-	NodeID        string    `gorm:"primaryKey"`
-	ParentNodeID  *string
-	Name          string
-	State         string
-	Type          string
-	Position      datatypes.JSONType[Position]
-	Ref           datatypes.JSONType[NodeRef]
-	Configuration datatypes.JSONType[map[string]any]
-	Metadata      datatypes.JSONType[map[string]any]
-	IsCollapsed   bool
-	WebhookID     *uuid.UUID
-	CreatedAt     *time.Time
-	UpdatedAt     *time.Time
-	DeletedAt     gorm.DeletedAt `gorm:"index"`
+	WorkflowID        uuid.UUID `gorm:"primaryKey"`
+	NodeID            string    `gorm:"primaryKey"`
+	ParentNodeID      *string
+	Name              string
+	State             string
+	Type              string
+	Position          datatypes.JSONType[Position]
+	Ref               datatypes.JSONType[NodeRef]
+	Configuration     datatypes.JSONType[map[string]any]
+	Metadata          datatypes.JSONType[map[string]any]
+	IsCollapsed       bool
+	WebhookID         *uuid.UUID
+	AppInstallationID *uuid.UUID
+	CreatedAt         *time.Time
+	UpdatedAt         *time.Time
+	DeletedAt         gorm.DeletedAt `gorm:"index"`
 }
 
 func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {

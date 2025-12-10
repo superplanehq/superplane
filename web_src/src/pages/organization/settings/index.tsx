@@ -167,7 +167,10 @@ export function OrganizationSettings() {
               <Route path="roles" element={<Roles organizationId={organizationId || ""} />} />
               <Route path="integrations" element={<Integrations organizationId={organizationId || ""} />} />
               <Route path="applications" element={<Applications organizationId={organizationId || ""} />} />
-              <Route path="applications/:installationId" element={<ApplicationDetails organizationId={organizationId || ""} />} />
+              <Route
+                path="applications/:installationId"
+                element={<ApplicationDetails organizationId={organizationId || ""} />}
+              />
               <Route path="groups/:groupName/members" element={<GroupMembersPage />} />
               <Route path="create-group" element={<CreateGroupPage />} />
               <Route path="create-role" element={<CreateRolePage />} />

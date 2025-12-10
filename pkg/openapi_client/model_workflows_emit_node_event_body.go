@@ -20,8 +20,8 @@ var _ MappedNullable = &WorkflowsEmitNodeEventBody{}
 
 // WorkflowsEmitNodeEventBody struct for WorkflowsEmitNodeEventBody
 type WorkflowsEmitNodeEventBody struct {
-	Channel *string `json:"channel,omitempty"`
-	Data map[string]interface{} `json:"data,omitempty"`
+	Channel *string                `json:"channel,omitempty"`
+	Data    map[string]interface{} `json:"data,omitempty"`
 }
 
 // NewWorkflowsEmitNodeEventBody instantiates a new WorkflowsEmitNodeEventBody object
@@ -106,7 +106,7 @@ func (o *WorkflowsEmitNodeEventBody) SetData(v map[string]interface{}) {
 }
 
 func (o WorkflowsEmitNodeEventBody) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,5 +159,3 @@ func (v *NullableWorkflowsEmitNodeEventBody) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

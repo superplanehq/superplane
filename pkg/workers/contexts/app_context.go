@@ -1,11 +1,13 @@
 package contexts
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/applications"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -14,12 +16,14 @@ import (
 type AppContext struct {
 	tx              *gorm.DB
 	appInstallation *models.AppInstallation
+	encryptor       crypto.Encryptor
 }
 
-func NewAppContext(tx *gorm.DB, appInstallation *models.AppInstallation) applications.AppContext {
+func NewAppContext(tx *gorm.DB, appInstallation *models.AppInstallation, encryptor crypto.Encryptor) applications.AppContext {
 	return &AppContext{
 		tx:              tx,
 		appInstallation: appInstallation,
+		encryptor:       encryptor,
 	}
 }
 
@@ -53,8 +57,18 @@ func (m *AppContext) SetState(value string) {
 func (m *AppContext) SetSecret(name string, value []byte) error {
 	now := time.Now()
 
+	// Encrypt the secret value using the installation ID as associated data
+	encryptedValue, err := m.encryptor.Encrypt(
+		context.Background(),
+		value,
+		[]byte(m.appInstallation.ID.String()),
+	)
+	if err != nil {
+		return err
+	}
+
 	var secret models.AppInstallationSecret
-	err := m.tx.
+	err = m.tx.
 		Where("installation_id = ?", m.appInstallation.ID).
 		Where("name = ?", name).
 		First(&secret).
@@ -69,7 +83,7 @@ func (m *AppContext) SetSecret(name string, value []byte) error {
 			OrganizationID: m.appInstallation.OrganizationID,
 			InstallationID: m.appInstallation.ID,
 			Name:           name,
-			Value:          value,
+			Value:          encryptedValue,
 			CreatedAt:      &now,
 			UpdatedAt:      &now,
 		}
@@ -77,7 +91,7 @@ func (m *AppContext) SetSecret(name string, value []byte) error {
 		return m.tx.Create(&secret).Error
 	}
 
-	secret.Value = value
+	secret.Value = encryptedValue
 	secret.UpdatedAt = &now
 
 	return m.tx.Save(&secret).Error
@@ -86,7 +100,7 @@ func (m *AppContext) SetSecret(name string, value []byte) error {
 func (m *AppContext) GetSecrets() ([]applications.InstallationSecret, error) {
 	var fromDB []models.AppInstallationSecret
 	err := m.tx.
-		Where("app_installation_id = ?", m.appInstallation.ID).
+		Where("installation_id = ?", m.appInstallation.ID).
 		Find(&fromDB).
 		Error
 
@@ -96,9 +110,19 @@ func (m *AppContext) GetSecrets() ([]applications.InstallationSecret, error) {
 
 	var secrets []applications.InstallationSecret
 	for _, secret := range fromDB {
+		// Decrypt the secret value using the installation ID as associated data
+		decryptedValue, err := m.encryptor.Decrypt(
+			context.Background(),
+			secret.Value,
+			[]byte(m.appInstallation.ID.String()),
+		)
+		if err != nil {
+			return nil, err
+		}
+
 		secrets = append(secrets, applications.InstallationSecret{
 			Name:  secret.Name,
-			Value: secret.Value,
+			Value: decryptedValue,
 		})
 	}
 
@@ -111,9 +135,10 @@ func (m *AppContext) NewBrowserAction(action applications.BrowserAction) {
 	// if no circular dependency existed between pkg/components, pkg/models, and pkg/applications
 	//
 	d := datatypes.NewJSONType(models.BrowserAction{
-		URL:        action.URL,
-		Method:     action.Method,
-		FormFields: action.FormFields,
+		URL:         action.URL,
+		Method:      action.Method,
+		FormFields:  action.FormFields,
+		Description: action.Description,
 	})
 
 	m.appInstallation.BrowserAction = &d

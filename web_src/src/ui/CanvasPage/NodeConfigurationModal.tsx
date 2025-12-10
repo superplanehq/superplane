@@ -1,4 +1,9 @@
-import { AuthorizationDomainType, ConfigurationField } from "@/api-client";
+import {
+  AuthorizationDomainType,
+  ComponentsAppInstallationRef,
+  ConfigurationField,
+  OrganizationsAppInstallation,
+} from "@/api-client";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCallback, useEffect, useState } from "react";
 
@@ -6,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { isFieldRequired, validateFieldValue } from "@/utils/components";
 
@@ -17,9 +23,16 @@ interface NodeConfigurationModalProps {
   nodeLabel?: string;
   configuration: Record<string, unknown>;
   configurationFields: ConfigurationField[];
-  onSave: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string) => void;
+  onSave: (
+    updatedConfiguration: Record<string, unknown>,
+    updatedNodeName: string,
+    appInstallationRef?: ComponentsAppInstallationRef
+  ) => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
+  installedApplications?: OrganizationsAppInstallation[];
 }
 
 export function NodeConfigurationModal({
@@ -33,9 +46,15 @@ export function NodeConfigurationModal({
   onSave,
   domainId,
   domainType,
+  appName,
+  appInstallationRef,
+  installedApplications = [],
 }: NodeConfigurationModalProps) {
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
+  const [selectedAppInstallationId, setSelectedAppInstallationId] = useState<string | undefined>(
+    appInstallationRef?.id
+  );
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
 
@@ -115,22 +134,42 @@ export function NodeConfigurationModal({
     if (isFieldEmpty(currentNodeName)) {
       errors.add("nodeName");
     }
+
+    // Validate app installation selection for components/triggers from applications
+    if (appName && !selectedAppInstallationId) {
+      errors.add("appInstallation");
+    }
+
     setValidationErrors(errors);
     setShowValidation(true);
     return errors.size === 0;
-  }, [configurationFields, nodeConfiguration, currentNodeName, validateNestedFields]);
+  }, [configurationFields, nodeConfiguration, currentNodeName, validateNestedFields, appName, selectedAppInstallationId]);
 
   // Sync state when props change (e.g., when modal opens for a different node)
   useEffect(() => {
     setNodeConfiguration(configuration || {});
     setCurrentNodeName(nodeName);
+    setSelectedAppInstallationId(appInstallationRef?.id);
     setValidationErrors(new Set());
     setShowValidation(false);
-  }, [configuration, nodeName]);
+  }, [configuration, nodeName, appInstallationRef]);
 
   const handleSave = () => {
     if (validateAllFields()) {
-      onSave(nodeConfiguration, currentNodeName);
+      let appInstallationRefToSave: ComponentsAppInstallationRef | undefined;
+
+      // If this is a component/trigger from an application, include the app installation ref
+      if (appName && selectedAppInstallationId) {
+        const selectedInstallation = installedApplications.find((app) => app.id === selectedAppInstallationId);
+        if (selectedInstallation) {
+          appInstallationRefToSave = {
+            id: selectedInstallation.id,
+            name: selectedInstallation.installationName,
+          };
+        }
+      }
+
+      onSave(nodeConfiguration, currentNodeName, appInstallationRefToSave);
       onClose();
     }
   };
@@ -139,6 +178,7 @@ export function NodeConfigurationModal({
     // Reset to original configuration and name on cancel
     setNodeConfiguration(configuration || {});
     setCurrentNodeName(nodeName);
+    setSelectedAppInstallationId(appInstallationRef?.id);
     onClose();
   };
 
@@ -183,6 +223,41 @@ export function NodeConfigurationModal({
                   }`}
                 />
               </div>
+
+              {/* App Installation selection for components/triggers from applications */}
+              {appName && installedApplications.length > 0 && (
+                <div className="flex flex-col gap-2 h-[60px]">
+                  <Label
+                    className={`min-w-[100px] text-left ${
+                      showValidation && validationErrors.has("appInstallation") ? "text-red-600 dark:text-red-400" : ""
+                    }`}
+                  >
+                    App Installation
+                    <span className="text-red-500 ml-1">*</span>
+                    {showValidation && validationErrors.has("appInstallation") && (
+                      <span className="text-red-500 text-xs ml-2">- required field</span>
+                    )}
+                  </Label>
+                  <Select value={selectedAppInstallationId} onValueChange={setSelectedAppInstallationId}>
+                    <SelectTrigger
+                      className={`${
+                        showValidation && validationErrors.has("appInstallation") ? "border-red-500 border-2" : ""
+                      }`}
+                    >
+                      <SelectValue placeholder="Select an app installation" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {installedApplications
+                        .filter((app) => app.appName === appName)
+                        .map((app) => (
+                          <SelectItem key={app.id} value={app.id!}>
+                            {app.installationName}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Configuration section */}
               {configurationFields && configurationFields.length > 0 && (

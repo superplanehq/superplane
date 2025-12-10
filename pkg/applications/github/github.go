@@ -26,6 +26,14 @@ const (
 	GitHubAppPEM           = "pem"
 	GitHubAppClientSecret  = "clientSecret"
 	GitHubAppWebhookSecret = "webhookSecret"
+
+	appInstallationDescription = `
+To complete the GitHub app setup:
+1. The "Continue" button/link below will take you to GitHub with the app manifest pre-filled.
+2. Give the new app a name, and click "Create".
+3. On the next page, install the new GitHub app in the user/organization.
+4. Once installed into your GitHub user/organization, you will be redirected back here.
+`
 )
 
 func init() {
@@ -77,7 +85,10 @@ func (g *GitHub) Components() []components.Component {
 }
 
 func (g *GitHub) Triggers() []triggers.Trigger {
-	return []triggers.Trigger{}
+	return []triggers.Trigger{
+		&OnPush{},
+		&OnPullRequest{},
+	}
 }
 
 func (g *GitHub) Sync(ctx applications.SyncContext) error {
@@ -106,8 +117,9 @@ func (g *GitHub) Sync(ctx applications.SyncContext) error {
 	}
 
 	ctx.AppContext.NewBrowserAction(applications.BrowserAction{
-		URL:    browserActionURL(config.Organization),
-		Method: "POST",
+		Description: appInstallationDescription,
+		URL:         browserActionURL(config.Organization),
+		Method:      "POST",
 		FormFields: map[string]string{
 			"manifest": getGitHubAppManifest(ctx),
 			"state":    state,
@@ -289,6 +301,7 @@ func afterAppInstallationInstall(ctx applications.HttpRequestContext, installati
 
 	metadata.InstallationID = installationID
 	metadata.Repositories = repos
+	metadata.State = ""
 
 	ctx.AppContext.SetMetadata(metadata)
 	ctx.AppContext.RemoveBrowserAction()

@@ -1097,6 +1097,52 @@
         ]
       }
     },
+    "/api/v1/organizations/{id}/applications/{installationId}": {
+      "patch": {
+        "summary": "Update application installation",
+        "description": "Updates the configuration of an installed application",
+        "operationId": "Organizations_UpdateApplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateApplicationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "installationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateApplicationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
     "/api/v1/organizations/{id}/invitations": {
       "get": {
         "summary": "List organization invitations",
@@ -2741,6 +2787,17 @@
         }
       }
     },
+    "ComponentsAppInstallationRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "ComponentsComponent": {
       "type": "object",
       "properties": {
@@ -2871,6 +2928,9 @@
         },
         "isCollapsed": {
           "type": "boolean"
+        },
+        "appInstallation": {
+          "$ref": "#/definitions/ComponentsAppInstallationRef"
         }
       }
     },
@@ -3584,6 +3644,9 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "description": {
+          "type": "string"
         }
       }
     },
@@ -3704,6 +3767,22 @@
     },
     "OrganizationsRemoveUserResponse": {
       "type": "object"
+    },
+    "OrganizationsUpdateApplicationBody": {
+      "type": "object",
+      "properties": {
+        "configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "OrganizationsUpdateApplicationResponse": {
+      "type": "object",
+      "properties": {
+        "installation": {
+          "$ref": "#/definitions/OrganizationsAppInstallation"
+        }
+      }
     },
     "OrganizationsUpdateOrganizationBody": {
       "type": "object",

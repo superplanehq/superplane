@@ -20,11 +20,11 @@ var _ MappedNullable = &ApplicationsApplicationDefinition{}
 
 // ApplicationsApplicationDefinition struct for ApplicationsApplicationDefinition
 type ApplicationsApplicationDefinition struct {
-	Name *string `json:"name,omitempty"`
-	Label *string `json:"label,omitempty"`
-	Configuration []ConfigurationField `json:"configuration,omitempty"`
-	Components []ComponentsComponent `json:"components,omitempty"`
-	Triggers []TriggersTrigger `json:"triggers,omitempty"`
+	Name          *string               `json:"name,omitempty"`
+	Label         *string               `json:"label,omitempty"`
+	Configuration []ConfigurationField  `json:"configuration,omitempty"`
+	Components    []ComponentsComponent `json:"components,omitempty"`
+	Triggers      []TriggersTrigger     `json:"triggers,omitempty"`
 }
 
 // NewApplicationsApplicationDefinition instantiates a new ApplicationsApplicationDefinition object
@@ -205,7 +205,7 @@ func (o *ApplicationsApplicationDefinition) SetTriggers(v []TriggersTrigger) {
 }
 
 func (o ApplicationsApplicationDefinition) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -267,5 +267,3 @@ func (v *NullableApplicationsApplicationDefinition) UnmarshalJSON(src []byte) er
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

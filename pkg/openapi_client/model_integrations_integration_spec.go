@@ -20,8 +20,8 @@ var _ MappedNullable = &IntegrationsIntegrationSpec{}
 
 // IntegrationsIntegrationSpec struct for IntegrationsIntegrationSpec
 type IntegrationsIntegrationSpec struct {
-	Type *string `json:"type,omitempty"`
-	Url *string `json:"url,omitempty"`
+	Type *string          `json:"type,omitempty"`
+	Url  *string          `json:"url,omitempty"`
 	Auth *IntegrationAuth `json:"auth,omitempty"`
 }
 
@@ -139,7 +139,7 @@ func (o *IntegrationsIntegrationSpec) SetAuth(v IntegrationAuth) {
 }
 
 func (o IntegrationsIntegrationSpec) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,5 +195,3 @@ func (v *NullableIntegrationsIntegrationSpec) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

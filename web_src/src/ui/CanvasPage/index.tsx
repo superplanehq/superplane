@@ -11,7 +11,7 @@ import {
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ConfigurationField } from "@/api-client";
+import { ComponentsAppInstallationRef, ConfigurationField, OrganizationsAppInstallation } from "@/api-client";
 import { AiSidebar } from "../ai";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
@@ -83,6 +83,8 @@ export interface NodeEditData {
   displayLabel?: string;
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
 }
 
 export interface NewNodeData {
@@ -91,6 +93,8 @@ export interface NewNodeData {
   displayLabel?: string;
   configuration: Record<string, any>;
   position?: { x: number; y: number };
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
 }
 
 export interface CanvasPageProps {
@@ -116,8 +120,14 @@ export interface CanvasPageProps {
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
-  onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
+  onNodeConfigurationSave?: (
+    nodeId: string,
+    configuration: Record<string, any>,
+    nodeName: string,
+    appInstallationRef?: ComponentsAppInstallationRef
+  ) => void;
   onSave?: (nodes: CanvasNode[]) => void;
+  installedApplications?: OrganizationsAppInstallation[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
@@ -335,6 +345,7 @@ function CanvasPage(props: CanvasPageProps) {
       displayLabel: block.label || block.name || "",
       configuration: {},
       position,
+      appName: block.appName,
     });
   }, []);
 
@@ -351,9 +362,9 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, any>, nodeName: string) => {
+    (configuration: Record<string, any>, nodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => {
       if (editingNodeData && props.onNodeConfigurationSave) {
-        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName);
+        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
       }
       setEditingNodeData(null);
     },
@@ -361,13 +372,15 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleSaveNewNode = useCallback(
-    (configuration: Record<string, any>, nodeName: string) => {
+    (configuration: Record<string, any>, nodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => {
       if (newNodeData && props.onNodeAdd) {
         props.onNodeAdd({
           buildingBlock: newNodeData.buildingBlock,
           nodeName,
           configuration,
           position: newNodeData.position,
+          appName: newNodeData.appName,
+          appInstallationRef,
         });
       }
       setNewNodeData(null);
@@ -502,6 +515,9 @@ function CanvasPage(props: CanvasPageProps) {
           onSave={handleSaveConfiguration}
           domainId={props.organizationId}
           domainType="DOMAIN_TYPE_ORGANIZATION"
+          appName={editingNodeData.appName}
+          appInstallationRef={editingNodeData.appInstallationRef}
+          installedApplications={props.installedApplications}
         />
       )}
 
@@ -518,6 +534,9 @@ function CanvasPage(props: CanvasPageProps) {
           onSave={handleSaveNewNode}
           domainId={props.organizationId}
           domainType="DOMAIN_TYPE_ORGANIZATION"
+          appName={newNodeData.appName}
+          appInstallationRef={newNodeData.appInstallationRef}
+          installedApplications={props.installedApplications}
         />
       )}
 

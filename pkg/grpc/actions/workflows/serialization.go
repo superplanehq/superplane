@@ -2,13 +2,17 @@ package workflows
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	compb "github.com/superplanehq/superplane/pkg/protos/components"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/triggers"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -26,15 +30,23 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) *pb.Workfl
 		if wn.ParentNodeID != nil {
 			continue
 		}
+
+		var appInstallationID *string
+		if wn.AppInstallationID != nil {
+			idStr := wn.AppInstallationID.String()
+			appInstallationID = &idStr
+		}
+
 		nodes = append(nodes, models.Node{
-			ID:            wn.NodeID,
-			Name:          wn.Name,
-			Type:          wn.Type,
-			Ref:           wn.Ref.Data(),
-			Configuration: wn.Configuration.Data(),
-			Metadata:      wn.Metadata.Data(),
-			Position:      wn.Position.Data(),
-			IsCollapsed:   wn.IsCollapsed,
+			ID:                wn.NodeID,
+			Name:              wn.Name,
+			Type:              wn.Type,
+			Ref:               wn.Ref.Data(),
+			Configuration:     wn.Configuration.Data(),
+			Metadata:          wn.Metadata.Data(),
+			Position:          wn.Position.Data(),
+			IsCollapsed:       wn.IsCollapsed,
+			AppInstallationID: appInstallationID,
 		})
 	}
 
@@ -203,9 +215,9 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 			return fmt.Errorf("component name is required")
 		}
 
-		component, err := registry.GetComponent(node.Component.Name)
+		component, err := findAndValidateComponent(registry, organizationID, node)
 		if err != nil {
-			return fmt.Errorf("component %s not found", node.Component.Name)
+			return err
 		}
 
 		return configuration.ValidateConfiguration(component.Configuration(), node.Configuration.AsMap())
@@ -235,9 +247,9 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 			return fmt.Errorf("trigger name is required")
 		}
 
-		trigger, err := registry.GetTrigger(node.Trigger.Name)
+		trigger, err := findAndValidateTrigger(registry, organizationID, node)
 		if err != nil {
-			return fmt.Errorf("trigger %s not found", node.Trigger.Name)
+			return err
 		}
 
 		return configuration.ValidateConfiguration(trigger.Configuration(), node.Configuration.AsMap())
@@ -245,4 +257,63 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 	default:
 		return fmt.Errorf("invalid node type: %s", node.Type)
 	}
+}
+
+func findAndValidateTrigger(registry *registry.Registry, organizationID string, node *compb.Node) (triggers.Trigger, error) {
+	parts := strings.SplitN(node.Trigger.Name, ".", 2)
+	if len(parts) > 2 {
+		return nil, fmt.Errorf("invalid trigger name: %s", node.Trigger.Name)
+	}
+
+	if len(parts) == 1 {
+		return registry.GetTrigger(parts[0])
+	}
+
+	err := validateAppInstallation(organizationID, node.AppInstallation)
+	if err != nil {
+		return nil, err
+	}
+
+	return registry.GetApplicationTrigger(parts[0], node.Trigger.Name)
+}
+
+func findAndValidateComponent(registry *registry.Registry, organizationID string, node *compb.Node) (components.Component, error) {
+	parts := strings.SplitN(node.Component.Name, ".", 2)
+	if len(parts) > 2 {
+		return nil, fmt.Errorf("invalid component name: %s", node.Component.Name)
+	}
+
+	if len(parts) == 1 {
+		return registry.GetComponent(parts[0])
+	}
+
+	err := validateAppInstallation(organizationID, node.AppInstallation)
+	if err != nil {
+		return nil, err
+	}
+
+	return registry.GetApplicationComponent(parts[0], node.Component.Name)
+}
+
+func validateAppInstallation(organizationID string, ref *compb.AppInstallationRef) error {
+	if ref == nil || ref.Id == "" {
+		return fmt.Errorf("app installation is required")
+	}
+
+	installationID, err := uuid.Parse(ref.Id)
+	if err != nil {
+		return fmt.Errorf("invalid app installation ID: %v", err)
+	}
+
+	orgID, err := uuid.Parse(organizationID)
+	if err != nil {
+		return fmt.Errorf("invalid organization ID: %v", err)
+	}
+
+	_, err = models.FindAppInstallation(orgID, installationID)
+	if err != nil {
+		return fmt.Errorf("app installation not found or does not belong to this organization")
+	}
+
+	return nil
 }
