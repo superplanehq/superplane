@@ -29,10 +29,10 @@ const (
 
 	appInstallationDescription = `
 To complete the GitHub app setup:
-1. The "Continue" button/link below will take you to GitHub with the app manifest pre-filled.
-2. Give the new app a name, and click "Create".
-3. On the next page, install the new GitHub app in the user/organization.
-4. Once installed into your GitHub user/organization, you will be redirected back here.
+
+1. The "**Continue**" button/link will take you to GitHub with the app manifest pre-filled.
+2. **Create GitHub App**: Give the new app a name, and click the "Create" button.
+3. **Install GitHub App**: Install the new GitHub app in the user/organization.
 `
 )
 

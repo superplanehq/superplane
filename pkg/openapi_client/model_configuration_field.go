@@ -31,6 +31,7 @@ type ConfigurationField struct {
 	RequiredConditions   []ConfigurationRequiredCondition   `json:"requiredConditions,omitempty"`
 	ValidationRules      []ConfigurationValidationRule      `json:"validationRules,omitempty"`
 	Placeholder          *string                            `json:"placeholder,omitempty"`
+	Sensitive            *bool                              `json:"sensitive,omitempty"`
 }
 
 // NewConfigurationField instantiates a new ConfigurationField object
@@ -402,6 +403,38 @@ func (o *ConfigurationField) SetPlaceholder(v string) {
 	o.Placeholder = &v
 }
 
+// GetSensitive returns the Sensitive field value if set, zero value otherwise.
+func (o *ConfigurationField) GetSensitive() bool {
+	if o == nil || IsNil(o.Sensitive) {
+		var ret bool
+		return ret
+	}
+	return *o.Sensitive
+}
+
+// GetSensitiveOk returns a tuple with the Sensitive field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationField) GetSensitiveOk() (*bool, bool) {
+	if o == nil || IsNil(o.Sensitive) {
+		return nil, false
+	}
+	return o.Sensitive, true
+}
+
+// HasSensitive returns a boolean if a field has been set.
+func (o *ConfigurationField) HasSensitive() bool {
+	if o != nil && !IsNil(o.Sensitive) {
+		return true
+	}
+
+	return false
+}
+
+// SetSensitive gets a reference to the given bool and assigns it to the Sensitive field.
+func (o *ConfigurationField) SetSensitive(v bool) {
+	o.Sensitive = &v
+}
+
 func (o ConfigurationField) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -444,6 +477,9 @@ func (o ConfigurationField) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Placeholder) {
 		toSerialize["placeholder"] = o.Placeholder
+	}
+	if !IsNil(o.Sensitive) {
+		toSerialize["sensitive"] = o.Sensitive
 	}
 	return toSerialize, nil
 }

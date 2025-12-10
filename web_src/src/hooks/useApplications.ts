@@ -4,6 +4,7 @@ import {
   organizationsListApplications,
   organizationsInstallApplication,
   organizationsUpdateApplication,
+  organizationsUninstallApplication,
 } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import type { OrganizationsInstallApplicationBody } from "@/api-client/types.gen";
@@ -115,6 +116,29 @@ export const useUpdateApplication = (organizationId: string, installationId: str
         queryKey: applicationKeys.installed(organizationId),
       });
       queryClient.invalidateQueries({
+        queryKey: applicationKeys.installation(organizationId, installationId),
+      });
+    },
+  });
+};
+
+// Hook to uninstall an application
+export const useUninstallApplication = (organizationId: string, installationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      return await organizationsUninstallApplication(
+        withOrganizationHeader({
+          path: { id: organizationId, installationId: installationId },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: applicationKeys.installed(organizationId),
+      });
+      queryClient.removeQueries({
         queryKey: applicationKeys.installation(organizationId, installationId),
       });
     },

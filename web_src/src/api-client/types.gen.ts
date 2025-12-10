@@ -148,6 +148,7 @@ export type ConfigurationField = {
   requiredConditions?: Array<ConfigurationRequiredCondition>;
   validationRules?: Array<ConfigurationValidationRule>;
   placeholder?: string;
+  sensitive?: boolean;
 };
 
 export type ConfigurationIntegrationTypeOptions = {
@@ -477,6 +478,10 @@ export type OrganizationsRemoveInvitationResponse = {
 };
 
 export type OrganizationsRemoveUserResponse = {
+  [key: string]: unknown;
+};
+
+export type OrganizationsUninstallApplicationResponse = {
   [key: string]: unknown;
 };
 
@@ -1758,6 +1763,36 @@ export type OrganizationsInstallApplicationResponses = {
 
 export type OrganizationsInstallApplicationResponse2 =
   OrganizationsInstallApplicationResponses[keyof OrganizationsInstallApplicationResponses];
+
+export type OrganizationsUninstallApplicationData = {
+  body?: never;
+  path: {
+    id: string;
+    installationId: string;
+  };
+  query?: never;
+  url: "/api/v1/organizations/{id}/applications/{installationId}";
+};
+
+export type OrganizationsUninstallApplicationErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsUninstallApplicationError =
+  OrganizationsUninstallApplicationErrors[keyof OrganizationsUninstallApplicationErrors];
+
+export type OrganizationsUninstallApplicationResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsUninstallApplicationResponse;
+};
+
+export type OrganizationsUninstallApplicationResponse2 =
+  OrganizationsUninstallApplicationResponses[keyof OrganizationsUninstallApplicationResponses];
 
 export type OrganizationsUpdateApplicationData = {
   body: OrganizationsUpdateApplicationBody;

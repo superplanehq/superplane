@@ -89,6 +89,9 @@ import type {
   OrganizationsInstallApplicationData,
   OrganizationsInstallApplicationResponse2,
   OrganizationsInstallApplicationError,
+  OrganizationsUninstallApplicationData,
+  OrganizationsUninstallApplicationResponse2,
+  OrganizationsUninstallApplicationError,
   OrganizationsUpdateApplicationData,
   OrganizationsUpdateApplicationResponse2,
   OrganizationsUpdateApplicationError,
@@ -711,6 +714,23 @@ export const organizationsInstallApplication = <ThrowOnError extends boolean = t
       "Content-Type": "application/json",
       ...options?.headers,
     },
+  });
+};
+
+/**
+ * Uninstall application
+ * Uninstalls an application from an organization
+ */
+export const organizationsUninstallApplication = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsUninstallApplicationData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).delete<
+    OrganizationsUninstallApplicationResponse2,
+    OrganizationsUninstallApplicationError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/applications/{installationId}",
+    ...options,
   });
 };
 

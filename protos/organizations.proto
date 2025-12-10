@@ -139,6 +139,17 @@ service Organizations {
       tags: "Organization";
     };
   }
+
+  rpc UninstallApplication(UninstallApplicationRequest) returns (UninstallApplicationResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/organizations/{id}/applications/{installation_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Uninstall application";
+      description: "Uninstalls an application from an organization";
+      tags: "Organization";
+    };
+  }
 }
 
 message ListApplicationsRequest {
@@ -169,6 +180,13 @@ message UpdateApplicationRequest {
 message UpdateApplicationResponse {
   AppInstallation installation = 1;
 }
+
+message UninstallApplicationRequest {
+  string id = 1;
+  string installation_id = 2;
+}
+
+message UninstallApplicationResponse {}
 
 message AppInstallation {
   string id = 1;

@@ -124,7 +124,7 @@ export interface CanvasPageProps {
     nodeId: string,
     configuration: Record<string, any>,
     nodeName: string,
-    appInstallationRef?: ComponentsAppInstallationRef
+    appInstallationRef?: ComponentsAppInstallationRef,
   ) => void;
   onSave?: (nodes: CanvasNode[]) => void;
   installedApplications?: OrganizationsAppInstallation[];

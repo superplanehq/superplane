@@ -1,4 +1,4 @@
-import { AppWindow, Puzzle, Zap, Loader2, X, Edit } from "lucide-react";
+import { AppWindow, Puzzle, Zap, Loader2, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -110,9 +110,6 @@ export function Applications({ organizationId }: ApplicationsProps) {
                   <th className="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                     Application
                   </th>
-                  <th className="px-3 py-2 w-24 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                    Actions
-                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700">
@@ -123,8 +120,12 @@ export function Applications({ organizationId }: ApplicationsProps) {
                     const appLabel = appDefinition?.label || app.appName;
 
                     return (
-                      <tr key={app.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                        <td className="px-3 py-2 text-sm font-mono text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
+                      <tr
+                        key={app.id}
+                        onClick={() => navigate(`/${organizationId}/settings/applications/${app.id}`)}
+                        className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer"
+                      >
+                        <td className="px-3 py-2 text-xs font-mono text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
                           {app.id}
                         </td>
                         <td className="px-3 py-2 truncate">
@@ -146,15 +147,6 @@ export function Applications({ organizationId }: ApplicationsProps) {
                           </span>
                         </td>
                         <td className="px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 truncate">{appLabel}</td>
-                        <td className="px-3 py-2 whitespace-nowrap text-right text-sm">
-                          <button
-                            onClick={() => navigate(`/${organizationId}/settings/applications/${app.id}`)}
-                            className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 transition-colors"
-                          >
-                            <Edit className="w-4 h-4" />
-                            Edit
-                          </button>
-                        </td>
                       </tr>
                     );
                   })}

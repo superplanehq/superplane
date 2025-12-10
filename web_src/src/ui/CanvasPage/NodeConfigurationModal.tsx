@@ -26,7 +26,7 @@ interface NodeConfigurationModalProps {
   onSave: (
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
-    appInstallationRef?: ComponentsAppInstallationRef
+    appInstallationRef?: ComponentsAppInstallationRef,
   ) => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
@@ -53,7 +53,7 @@ export function NodeConfigurationModal({
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
   const [selectedAppInstallationId, setSelectedAppInstallationId] = useState<string | undefined>(
-    appInstallationRef?.id
+    appInstallationRef?.id,
   );
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
@@ -143,7 +143,14 @@ export function NodeConfigurationModal({
     setValidationErrors(errors);
     setShowValidation(true);
     return errors.size === 0;
-  }, [configurationFields, nodeConfiguration, currentNodeName, validateNestedFields, appName, selectedAppInstallationId]);
+  }, [
+    configurationFields,
+    nodeConfiguration,
+    currentNodeName,
+    validateNestedFields,
+    appName,
+    selectedAppInstallationId,
+  ]);
 
   // Sync state when props change (e.g., when modal opens for a different node)
   useEffect(() => {
@@ -240,7 +247,7 @@ export function NodeConfigurationModal({
                   </Label>
                   <Select value={selectedAppInstallationId} onValueChange={setSelectedAppInstallationId}>
                     <SelectTrigger
-                      className={`${
+                      className={`w-full ${
                         showValidation && validationErrors.has("appInstallation") ? "border-red-500 border-2" : ""
                       }`}
                     >

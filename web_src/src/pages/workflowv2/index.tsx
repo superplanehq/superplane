@@ -644,7 +644,7 @@ export function WorkflowPageV2() {
 
         // Check if this component is from an application
         const componentApp = availableApplications.find((app) =>
-          app.components?.some((c) => c.name === node.component?.name)
+          app.components?.some((c) => c.name === node.component?.name),
         );
         if (componentApp) {
           appName = componentApp.name;
@@ -656,7 +656,7 @@ export function WorkflowPageV2() {
 
         // Check if this trigger is from an application
         const triggerApp = availableApplications.find((app) =>
-          app.triggers?.some((t) => t.name === node.trigger?.name)
+          app.triggers?.some((t) => t.name === node.trigger?.name),
         );
         if (triggerApp) {
           appName = triggerApp.name;
@@ -677,7 +677,12 @@ export function WorkflowPageV2() {
   );
 
   const handleNodeConfigurationSave = useCallback(
-    (nodeId: string, updatedConfiguration: Record<string, any>, updatedNodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => {
+    (
+      nodeId: string,
+      updatedConfiguration: Record<string, any>,
+      updatedNodeName: string,
+      appInstallationRef?: ComponentsAppInstallationRef,
+    ) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       // Save snapshot before making changes

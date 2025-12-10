@@ -1098,6 +1098,42 @@
       }
     },
     "/api/v1/organizations/{id}/applications/{installationId}": {
+      "delete": {
+        "summary": "Uninstall application",
+        "description": "Uninstalls an application from an organization",
+        "operationId": "Organizations_UninstallApplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUninstallApplicationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "installationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
       "patch": {
         "summary": "Update application installation",
         "description": "Updates the configuration of an installed application",
@@ -3018,8 +3054,10 @@
           }
         },
         "placeholder": {
-          "type": "string",
-          "title": "Optional placeholder text for UI inputs"
+          "type": "string"
+        },
+        "sensitive": {
+          "type": "boolean"
         }
       }
     },
@@ -3766,6 +3804,9 @@
       "type": "object"
     },
     "OrganizationsRemoveUserResponse": {
+      "type": "object"
+    },
+    "OrganizationsUninstallApplicationResponse": {
       "type": "object"
     },
     "OrganizationsUpdateApplicationBody": {

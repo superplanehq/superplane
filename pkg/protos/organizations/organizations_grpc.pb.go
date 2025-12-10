@@ -29,6 +29,7 @@ const (
 	Organizations_ListApplications_FullMethodName     = "/Superplane.Organizations.Organizations/ListApplications"
 	Organizations_InstallApplication_FullMethodName   = "/Superplane.Organizations.Organizations/InstallApplication"
 	Organizations_UpdateApplication_FullMethodName    = "/Superplane.Organizations.Organizations/UpdateApplication"
+	Organizations_UninstallApplication_FullMethodName = "/Superplane.Organizations.Organizations/UninstallApplication"
 )
 
 // OrganizationsClient is the client API for Organizations service.
@@ -45,6 +46,7 @@ type OrganizationsClient interface {
 	ListApplications(ctx context.Context, in *ListApplicationsRequest, opts ...grpc.CallOption) (*ListApplicationsResponse, error)
 	InstallApplication(ctx context.Context, in *InstallApplicationRequest, opts ...grpc.CallOption) (*InstallApplicationResponse, error)
 	UpdateApplication(ctx context.Context, in *UpdateApplicationRequest, opts ...grpc.CallOption) (*UpdateApplicationResponse, error)
+	UninstallApplication(ctx context.Context, in *UninstallApplicationRequest, opts ...grpc.CallOption) (*UninstallApplicationResponse, error)
 }
 
 type organizationsClient struct {
@@ -155,6 +157,16 @@ func (c *organizationsClient) UpdateApplication(ctx context.Context, in *UpdateA
 	return out, nil
 }
 
+func (c *organizationsClient) UninstallApplication(ctx context.Context, in *UninstallApplicationRequest, opts ...grpc.CallOption) (*UninstallApplicationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UninstallApplicationResponse)
+	err := c.cc.Invoke(ctx, Organizations_UninstallApplication_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrganizationsServer is the server API for Organizations service.
 // All implementations should embed UnimplementedOrganizationsServer
 // for forward compatibility.
@@ -169,6 +181,7 @@ type OrganizationsServer interface {
 	ListApplications(context.Context, *ListApplicationsRequest) (*ListApplicationsResponse, error)
 	InstallApplication(context.Context, *InstallApplicationRequest) (*InstallApplicationResponse, error)
 	UpdateApplication(context.Context, *UpdateApplicationRequest) (*UpdateApplicationResponse, error)
+	UninstallApplication(context.Context, *UninstallApplicationRequest) (*UninstallApplicationResponse, error)
 }
 
 // UnimplementedOrganizationsServer should be embedded to have
@@ -207,6 +220,9 @@ func (UnimplementedOrganizationsServer) InstallApplication(context.Context, *Ins
 }
 func (UnimplementedOrganizationsServer) UpdateApplication(context.Context, *UpdateApplicationRequest) (*UpdateApplicationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateApplication not implemented")
+}
+func (UnimplementedOrganizationsServer) UninstallApplication(context.Context, *UninstallApplicationRequest) (*UninstallApplicationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UninstallApplication not implemented")
 }
 func (UnimplementedOrganizationsServer) testEmbeddedByValue() {}
 
@@ -408,6 +424,24 @@ func _Organizations_UpdateApplication_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_UninstallApplication_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UninstallApplicationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).UninstallApplication(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_UninstallApplication_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).UninstallApplication(ctx, req.(*UninstallApplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Organizations_ServiceDesc is the grpc.ServiceDesc for Organizations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -454,6 +488,10 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateApplication",
 			Handler:    _Organizations_UpdateApplication_Handler,
+		},
+		{
+			MethodName: "UninstallApplication",
+			Handler:    _Organizations_UninstallApplication_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

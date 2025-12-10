@@ -1,21 +1,27 @@
-import { ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { useApplicationInstallation, useAvailableApplications, useUpdateApplication } from "@/hooks/useApplications";
+import ReactMarkdown from "react-markdown";
+import {
+  useApplicationInstallation,
+  useAvailableApplications,
+  useUpdateApplication,
+  useUninstallApplication,
+} from "@/hooks/useApplications";
 import { Button } from "@/ui/button";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
+import { Alert, AlertDescription } from "@/ui/alert";
 
 interface ApplicationDetailsProps {
   organizationId: string;
 }
 
-type Tab = "overview" | "configuration";
-
 export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) {
   const navigate = useNavigate();
   const { installationId } = useParams<{ installationId: string }>();
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [configValues, setConfigValues] = useState<Record<string, unknown>>({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: installation, isLoading, error } = useApplicationInstallation(organizationId, installationId || "");
 
@@ -23,6 +29,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
   const appDefinition = installation ? availableApps.find((app) => app.name === installation.appName) : undefined;
 
   const updateMutation = useUpdateApplication(organizationId, installationId || "");
+  const uninstallMutation = useUninstallApplication(organizationId, installationId || "");
 
   // Initialize config values when installation loads
   useEffect(() => {
@@ -35,6 +42,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
     e.preventDefault();
     try {
       await updateMutation.mutateAsync(configValues);
+      navigate(`/${organizationId}/settings/applications`);
     } catch (error) {
       console.error("Failed to update configuration:", error);
     }
@@ -70,6 +78,15 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
       if (url) {
         window.open(url, "_blank");
       }
+    }
+  };
+
+  const handleUninstall = async () => {
+    try {
+      await uninstallMutation.mutateAsync();
+      navigate(`/${organizationId}/settings/applications`);
+    } catch (error) {
+      console.error("Failed to uninstall application:", error);
     }
   };
 
@@ -111,11 +128,6 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
     );
   }
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "overview", label: "Overview" },
-    { id: "configuration", label: "Configuration" },
-  ];
-
   return (
     <div className="pt-6">
       <div className="flex items-center gap-4 mb-6">
@@ -133,28 +145,13 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-zinc-200 dark:border-zinc-800 mb-6">
-        <nav className="flex gap-8">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab.id
-                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:border-zinc-300 dark:hover:border-zinc-700"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="configuration">Configuration</TabsTrigger>
+        </TabsList>
 
-      {/* Tab Content */}
-      {activeTab === "overview" && (
-        <div className="space-y-6">
+        <TabsContent value="overview" className="space-y-6">
           <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
             <div className="p-6">
               <h2 className="text-lg font-medium mb-4">Installation Details</h2>
@@ -184,102 +181,130 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
             </div>
           </div>
 
-          {appDefinition && (
-            <>
-              {appDefinition.components && appDefinition.components.length > 0 && (
-                <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                  <div className="p-6">
-                    <h2 className="text-lg font-medium mb-4">Components</h2>
-                    <ul className="space-y-2">
-                      {appDefinition.components.map((component) => (
-                        <li key={component.name} className="text-sm text-zinc-700 dark:text-zinc-300">
-                          • {component.label || component.name}
-                        </li>
-                      ))}
-                    </ul>
+          {/* Danger Zone */}
+          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-red-200 dark:border-red-800">
+            <div className="p-6">
+              <h2 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">Danger Zone</h2>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                Once you uninstall this application, all its data will be permanently deleted. This action cannot be
+                undone.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Uninstall Application
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="configuration">
+          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+            <div className="p-6">
+              {installation?.browserAction && (
+                <Alert className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+                  <div className="flex items-start justify-between gap-4">
+                    <AlertDescription className="flex-1 text-yellow-800 dark:text-yellow-200 [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:space-y-1">
+                      {installation.browserAction.description && (
+                        <ReactMarkdown>{installation.browserAction.description}</ReactMarkdown>
+                      )}
+                    </AlertDescription>
+                    <Button type="button" variant="outline" onClick={handleBrowserAction} className="shrink-0 px-3 py-1.5">
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Continue
+                    </Button>
                   </div>
-                </div>
+                </Alert>
               )}
 
-              {appDefinition.triggers && appDefinition.triggers.length > 0 && (
-                <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                  <div className="p-6">
-                    <h2 className="text-lg font-medium mb-4">Triggers</h2>
-                    <ul className="space-y-2">
-                      {appDefinition.triggers.map((trigger) => (
-                        <li key={trigger.name} className="text-sm text-zinc-700 dark:text-zinc-300">
-                          • {trigger.label || trigger.name}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+              {appDefinition?.configuration && appDefinition.configuration.length > 0 ? (
+                <form onSubmit={handleConfigSubmit} className="space-y-4">
+                  {appDefinition.configuration.map((field) => (
+                    <ConfigurationFieldRenderer
+                      key={field.name}
+                      field={field}
+                      value={configValues[field.name!]}
+                      onChange={(value) => setConfigValues({ ...configValues, [field.name!]: value })}
+                      allValues={configValues}
+                      domainId={organizationId}
+                      domainType="DOMAIN_TYPE_ORGANIZATION"
+                    />
+                  ))}
 
-      {/* Configuration Tab */}
-      {activeTab === "configuration" && (
-        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <div className="p-6">
-            {installation?.browserAction && (
-              <div className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    {installation.browserAction.description && (
-                      <p className="text-sm text-yellow-800 dark:text-yellow-200 whitespace-pre-wrap">
-                        {installation.browserAction.description}
-                      </p>
+                  <div className="flex items-center gap-3 pt-4">
+                    <Button type="submit" color="blue" disabled={updateMutation.isPending}>
+                      {updateMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Configuration"
+                      )}
+                    </Button>
+                    {updateMutation.isSuccess && (
+                      <span className="text-sm text-green-600 dark:text-green-400">
+                        Configuration updated successfully!
+                      </span>
+                    )}
+                    {updateMutation.isError && (
+                      <span className="text-sm text-red-600 dark:text-red-400">Failed to update configuration</span>
                     )}
                   </div>
-                  <Button type="button" color="blue" onClick={handleBrowserAction} className="shrink-0">
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Continue
-                  </Button>
-                </div>
+                </form>
+              ) : (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">No configuration fields available.</p>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-800 max-w-md w-full mx-4">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Uninstall Application</h3>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
+                Are you sure you want to uninstall <strong>{installation?.installationName}</strong>? This action cannot
+                be undone and all data will be permanently deleted.
+              </p>
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={uninstallMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  color="blue"
+                  onClick={handleUninstall}
+                  disabled={uninstallMutation.isPending}
+                  className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+                >
+                  {uninstallMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Uninstalling...
+                    </>
+                  ) : (
+                    "Uninstall"
+                  )}
+                </Button>
               </div>
-            )}
-
-            {appDefinition?.configuration && appDefinition.configuration.length > 0 ? (
-              <form onSubmit={handleConfigSubmit} className="space-y-4">
-                {appDefinition.configuration.map((field) => (
-                  <ConfigurationFieldRenderer
-                    key={field.name}
-                    field={field}
-                    value={configValues[field.name!]}
-                    onChange={(value) => setConfigValues({ ...configValues, [field.name!]: value })}
-                    allValues={configValues}
-                    domainId={organizationId}
-                    domainType="DOMAIN_TYPE_ORGANIZATION"
-                  />
-                ))}
-
-                <div className="flex items-center gap-3 pt-4">
-                  <Button type="submit" color="blue" disabled={updateMutation.isPending}>
-                    {updateMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      "Save Configuration"
-                    )}
-                  </Button>
-                  {updateMutation.isSuccess && (
-                    <span className="text-sm text-green-600 dark:text-green-400">
-                      Configuration updated successfully!
-                    </span>
-                  )}
-                  {updateMutation.isError && (
-                    <span className="text-sm text-red-600 dark:text-red-400">Failed to update configuration</span>
-                  )}
+              {uninstallMutation.isError && (
+                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    Failed to uninstall application. Please try again.
+                  </p>
                 </div>
-              </form>
-            ) : (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">No configuration fields available.</p>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}

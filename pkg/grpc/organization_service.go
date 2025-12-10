@@ -91,3 +91,8 @@ func (s *OrganizationService) UpdateApplication(ctx context.Context, req *pb.Upd
 		req.Configuration.AsMap(),
 	)
 }
+
+func (s *OrganizationService) UninstallApplication(ctx context.Context, req *pb.UninstallApplicationRequest) (*pb.UninstallApplicationResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UninstallApplication(ctx, orgID, req.InstallationId)
+}
