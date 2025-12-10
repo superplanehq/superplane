@@ -17,7 +17,7 @@ func TestApprovals(t *testing.T) {
 	t.Run("adding an approval component to a canvas", func(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
-		steps.addApprovalWithConfigToCanvas("TestApproval")
+		steps.addApprovalToCanvas("TestApproval")
 		steps.saveCanvas()
 		steps.verifyApprovalSavedToDB("TestApproval")
 	})
@@ -25,7 +25,7 @@ func TestApprovals(t *testing.T) {
 	t.Run("configuring approvals for a user", func(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
-		steps.addApprovalWithConfigToCanvasNamed("ReleaseApproval")
+		steps.addApprovalToCanvas("ReleaseApproval")
 		steps.saveCanvas()
 		steps.verifyApprovalConfigurationPersisted()
 	})
@@ -61,30 +61,6 @@ func (s *ApprovalSteps) addApprovalToCanvas(nodeName string) {
 	s.canvas.AddApproval(nodeName, models.Position{X: 600, Y: 200})
 }
 
-func (s *ApprovalSteps) addApprovalWithConfigToCanvas(nodeName string) {
-	source := q.TestID("building-block-approval")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, 600, 200)
-	s.session.Sleep(300)
-
-	s.session.FillIn(q.TestID("node-name-input"), nodeName)
-
-	s.session.Click(q.Locator(`button:has-text("Add Item")`))
-	s.session.Click(q.Locator(`button:has-text("Select Type")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("User")`))
-
-	s.session.Click(q.Locator(`button:has-text("Select user")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
-
-	s.session.Click(q.TestID("add-node-button"))
-	s.session.Sleep(300)
-}
-
-func (s *ApprovalSteps) addApprovalWithConfigToCanvasNamed(nodeName string) {
-	s.addApprovalWithConfigToCanvas(nodeName)
-}
-
 func (s *ApprovalSteps) saveCanvas() {
 	s.canvas.Save()
 }
@@ -94,8 +70,8 @@ func (s *ApprovalSteps) verifyApprovalSavedToDB(nodeName string) {
 	require.NotNil(s.t, node, "approval node not found in DB")
 }
 
-func (s *ApprovalSteps) configureApprovalForUser(nodeName string) {
-	s.canvas.StartEditingNode(nodeName)
+func (s *ApprovalSteps) configureApprovalForCurrentUser() {
+	s.canvas.StartEditingNode("ReleaseApproval")
 
 	s.session.Click(q.Locator(`button:has-text("Add Item")`))
 	s.session.Click(q.Locator(`button:has-text("Select Type")`))
@@ -106,10 +82,6 @@ func (s *ApprovalSteps) configureApprovalForUser(nodeName string) {
 
 	s.session.Click(q.TestID("add-node-button"))
 	s.session.Sleep(300)
-}
-
-func (s *ApprovalSteps) configureApprovalForCurrentUser() {
-	s.configureApprovalForUser("ReleaseApproval")
 }
 
 func (s *ApprovalSteps) verifyApprovalConfigurationPersisted() {
@@ -137,19 +109,6 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
 
 	s.canvas.Connect("Start", "Approval")
 	s.canvas.Connect("Approval", "Output")
-
-	// set up manual approval configuration
-	s.canvas.StartEditingNode("Approval")
-
-	s.session.Click(q.Locator(`button:has-text("Add Item")`))
-	s.session.Click(q.Locator(`button:has-text("Select Type")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("User")`))
-
-	s.session.Click(q.Locator(`button:has-text("Select user")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
-
-	s.session.Click(q.TestID("add-node-button"))
-	s.session.Sleep(300)
 
 	s.saveCanvas()
 }
