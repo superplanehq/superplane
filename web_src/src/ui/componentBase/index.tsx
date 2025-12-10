@@ -120,7 +120,7 @@ export interface ComponentBaseSpec {
   value?: any;
 }
 
-export type EventState = "success" | "failed" | "neutral" | "next-in-queue" | "running";
+export type EventState = "success" | "failed" | "neutral" | "next-in-queue" | "running" | string;
 
 export interface EventStateStyle {
   icon: string;
