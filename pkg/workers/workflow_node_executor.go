@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -25,13 +26,15 @@ import (
 var ErrRecordLocked = errors.New("record locked")
 
 type WorkflowNodeExecutor struct {
+	encryptor crypto.Encryptor
 	registry  *registry.Registry
 	semaphore *semaphore.Weighted
 	logger    *logrus.Entry
 }
 
-func NewWorkflowNodeExecutor(registry *registry.Registry) *WorkflowNodeExecutor {
+func NewWorkflowNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry) *WorkflowNodeExecutor {
 	return &WorkflowNodeExecutor{
+		encryptor: encryptor,
 		registry:  registry,
 		semaphore: semaphore.NewWeighted(25),
 		logger:    logrus.WithFields(logrus.Fields{"worker": "WorkflowNodeExecutor"}),
@@ -226,10 +229,21 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		Configuration:         execution.Configuration.Data(),
 		Data:                  input,
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
+		NodeMetadataContext:   contexts.NewNodeMetadataContext(node),
 		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
 		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
 		AuthContext:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
 		IntegrationContext:    contexts.NewIntegrationContext(tx, w.registry),
+	}
+
+	if node.AppInstallationID != nil {
+		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			logger.Errorf("failed to find app installation: %v", err)
+			return fmt.Errorf("failed to find app installation: %v", err)
+		}
+
+		ctx.AppInstallationContext = contexts.NewAppInstallationContext(tx, appInstallation, w.encryptor, w.registry)
 	}
 
 	if err := component.Execute(ctx); err != nil {

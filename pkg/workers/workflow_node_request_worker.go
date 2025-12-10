@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -23,10 +24,12 @@ import (
 type NodeRequestWorker struct {
 	semaphore *semaphore.Weighted
 	registry  *registry.Registry
+	encryptor crypto.Encryptor
 }
 
-func NewNodeRequestWorker(registry *registry.Registry) *NodeRequestWorker {
+func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry) *NodeRequestWorker {
 	return &NodeRequestWorker{
+		encryptor: encryptor,
 		registry:  registry,
 		semaphore: semaphore.NewWeighted(25),
 	}
@@ -134,6 +137,15 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Wor
 		RequestContext:  contexts.NewNodeRequestContext(tx, node),
 	}
 
+	if node.AppInstallationID != nil {
+		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			return fmt.Errorf("failed to find app installation: %v", err)
+		}
+
+		actionCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, appInstallation, w.encryptor, w.registry)
+	}
+
 	err = trigger.HandleAction(actionCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)
@@ -190,6 +202,15 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
 		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
 		IntegrationContext:    contexts.NewIntegrationContext(tx, w.registry),
+	}
+
+	if node.AppInstallationID != nil {
+		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			return fmt.Errorf("failed to find app installation: %v", err)
+		}
+
+		actionCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, appInstallation, w.encryptor, w.registry)
 	}
 
 	err = component.HandleAction(actionCtx)

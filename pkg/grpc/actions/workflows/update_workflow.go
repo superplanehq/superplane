@@ -89,8 +89,13 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		return nil, err
 	}
 
+	protoWorkflow, err := SerializeWorkflow(existingWorkflow, true)
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.UpdateWorkflowResponse{
-		Workflow: SerializeWorkflow(existingWorkflow, true),
+		Workflow: protoWorkflow,
 	}, nil
 }
 
@@ -185,7 +190,7 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 	case models.NodeTypeTrigger:
 		return setupTrigger(ctx, tx, encryptor, registry, node)
 	case models.NodeTypeComponent:
-		return setupComponent(tx, registry, node)
+		return setupComponent(tx, encryptor, registry, node)
 	}
 
 	return nil
@@ -193,20 +198,30 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 
 func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode) error {
 	ref := node.Ref.Data()
-	trigger, err := findTrigger(registry, ref.Trigger.Name)
+	trigger, err := registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
 		return err
 	}
 
-	err = trigger.Setup(triggers.TriggerContext{
+	triggerCtx := triggers.TriggerContext{
 		Configuration:      node.Configuration.Data(),
 		MetadataContext:    contexts.NewNodeMetadataContext(&node),
 		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
 		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
 		EventContext:       contexts.NewEventContext(tx, &node),
 		WebhookContext:     contexts.NewWebhookContext(ctx, tx, encryptor, &node),
-	})
+	}
 
+	if node.AppInstallationID != nil {
+		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			return fmt.Errorf("failed to find app installation: %v", err)
+		}
+
+		triggerCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, appInstallation, encryptor, registry)
+	}
+
+	err = trigger.Setup(triggerCtx)
 	if err != nil {
 		return fmt.Errorf("error setting up node %s: %v", node.NodeID, err)
 	}
@@ -214,20 +229,30 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 	return tx.Save(&node).Error
 }
 
-func setupComponent(tx *gorm.DB, registry *registry.Registry, node models.WorkflowNode) error {
+func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode) error {
 	ref := node.Ref.Data()
-	component, err := findComponent(registry, ref.Component.Name)
+	component, err := registry.GetComponent(ref.Component.Name)
 	if err != nil {
 		return err
 	}
 
-	err = component.Setup(components.SetupContext{
+	setupCtx := components.SetupContext{
 		Configuration:      node.Configuration.Data(),
 		MetadataContext:    contexts.NewNodeMetadataContext(&node),
 		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
 		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
-	})
+	}
 
+	if node.AppInstallationID != nil {
+		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			return fmt.Errorf("failed to find app installation: %v", err)
+		}
+
+		setupCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, appInstallation, encryptor, registry)
+	}
+
+	err = component.Setup(setupCtx)
 	if err != nil {
 		return fmt.Errorf("error setting up node %s: %v", node.NodeID, err)
 	}
@@ -246,30 +271,4 @@ func deleteNodes(tx *gorm.DB, existingNodes []models.WorkflowNode, newNodes []mo
 	}
 
 	return nil
-}
-
-func findTrigger(registry *registry.Registry, triggerName string) (triggers.Trigger, error) {
-	parts := strings.SplitN(triggerName, ".", 2)
-	if len(parts) > 2 {
-		return nil, fmt.Errorf("invalid trigger name: %s", triggerName)
-	}
-
-	if len(parts) == 1 {
-		return registry.GetTrigger(parts[0])
-	}
-
-	return registry.GetApplicationTrigger(parts[0], triggerName)
-}
-
-func findComponent(registry *registry.Registry, componentName string) (components.Component, error) {
-	parts := strings.SplitN(componentName, ".", 2)
-	if len(parts) > 2 {
-		return nil, fmt.Errorf("invalid component name: %s", componentName)
-	}
-
-	if len(parts) == 1 {
-		return registry.GetComponent(parts[0])
-	}
-
-	return registry.GetApplicationComponent(parts[0], componentName)
 }

@@ -101,15 +101,17 @@ type OutputChannel struct {
  * to control the state and metadata of each execution of it.
  */
 type ExecutionContext struct {
-	ID                    string
-	WorkflowID            string
-	Data                  any
-	Configuration         any
-	MetadataContext       MetadataContext
-	ExecutionStateContext ExecutionStateContext
-	RequestContext        RequestContext
-	AuthContext           AuthContext
-	IntegrationContext    IntegrationContext
+	ID                     string
+	WorkflowID             string
+	Data                   any
+	Configuration          any
+	MetadataContext        MetadataContext
+	NodeMetadataContext    MetadataContext
+	ExecutionStateContext  ExecutionStateContext
+	RequestContext         RequestContext
+	AuthContext            AuthContext
+	IntegrationContext     IntegrationContext
+	AppInstallationContext AppInstallationContext
 }
 
 /*
@@ -117,11 +119,12 @@ type ExecutionContext struct {
  * to control the state and metadata of each execution of it.
  */
 type SetupContext struct {
-	Configuration      any
-	MetadataContext    MetadataContext
-	RequestContext     RequestContext
-	AuthContext        AuthContext
-	IntegrationContext IntegrationContext
+	Configuration          any
+	MetadataContext        MetadataContext
+	RequestContext         RequestContext
+	AuthContext            AuthContext
+	IntegrationContext     IntegrationContext
+	AppInstallationContext AppInstallationContext
 }
 
 /*
@@ -129,6 +132,18 @@ type SetupContext struct {
  */
 type IntegrationContext interface {
 	GetIntegration(ID string) (integrations.ResourceManager, error)
+}
+
+/*
+ * AppInstallationContext allows components to access app installation information.
+ */
+type AppInstallationContext interface {
+	GetConfig(name string) ([]byte, error)
+}
+
+type InstallationSecret struct {
+	Name  string
+	Value []byte
 }
 
 /*
@@ -176,14 +191,15 @@ type Action struct {
  * and control the state and metadata of each execution of it.
  */
 type ActionContext struct {
-	Name                  string
-	Configuration         any
-	Parameters            map[string]any
-	MetadataContext       MetadataContext
-	ExecutionStateContext ExecutionStateContext
-	AuthContext           AuthContext
-	RequestContext        RequestContext
-	IntegrationContext    IntegrationContext
+	Name                   string
+	Configuration          any
+	Parameters             map[string]any
+	MetadataContext        MetadataContext
+	ExecutionStateContext  ExecutionStateContext
+	AuthContext            AuthContext
+	RequestContext         RequestContext
+	IntegrationContext     IntegrationContext
+	AppInstallationContext AppInstallationContext
 }
 
 /*

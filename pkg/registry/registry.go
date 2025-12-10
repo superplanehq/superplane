@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -207,12 +208,21 @@ func (r *Registry) ListTriggers() []triggers.Trigger {
 }
 
 func (r *Registry) GetTrigger(name string) (triggers.Trigger, error) {
-	trigger, ok := r.Triggers[name]
-	if !ok {
-		return nil, fmt.Errorf("trigger %s not registered", name)
+	parts := strings.SplitN(name, ".", 2)
+	if len(parts) > 2 {
+		return nil, fmt.Errorf("invalid trigger name: %s", name)
 	}
 
-	return trigger, nil
+	if len(parts) == 1 {
+		trigger, ok := r.Triggers[name]
+		if !ok {
+			return nil, fmt.Errorf("trigger %s not registered", name)
+		}
+
+		return trigger, nil
+	}
+
+	return r.GetApplicationTrigger(parts[0], name)
 }
 
 func (r *Registry) ListComponents() []components.Component {
@@ -229,12 +239,21 @@ func (r *Registry) ListComponents() []components.Component {
 }
 
 func (r *Registry) GetComponent(name string) (components.Component, error) {
-	component, ok := r.Components[name]
-	if !ok {
-		return nil, fmt.Errorf("component %s not registered", name)
+	parts := strings.SplitN(name, ".", 2)
+	if len(parts) > 2 {
+		return nil, fmt.Errorf("invalid component name: %s", name)
 	}
 
-	return component, nil
+	if len(parts) == 1 {
+		component, ok := r.Components[name]
+		if !ok {
+			return nil, fmt.Errorf("component %s not registered", name)
+		}
+
+		return component, nil
+	}
+
+	return r.GetApplicationComponent(parts[0], name)
 }
 
 func (r *Registry) GetApplication(name string) (applications.Application, error) {

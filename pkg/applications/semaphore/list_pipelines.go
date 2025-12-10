@@ -12,8 +12,7 @@ import (
 type ListPipelines struct{}
 
 type ListPipelinesSpec struct {
-	Integration string `json:"integration"`
-	Project     string `json:"project"`
+	Project string `json:"project"`
 }
 
 func (l *ListPipelines) Name() string {
@@ -76,11 +75,19 @@ func (l *ListPipelines) Execute(ctx components.ExecutionContext) error {
 		return err
 	}
 
-	//
-	// TODO: list pipelines and emit event
-	//
+	client, err := NewClient(ctx.AppInstallationContext)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	response, err := client.ListPipelines(spec.Project)
+	if err != nil {
+		return err
+	}
+
+	return ctx.ExecutionStateContext.Pass(map[string][]any{
+		components.DefaultOutputChannel.Name: response,
+	})
 }
 
 func (l *ListPipelines) Actions() []components.Action {

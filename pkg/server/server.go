@@ -70,14 +70,14 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" {
 		log.Println("Starting Pending Node Execution Worker")
 
-		w := workers.NewWorkflowNodeExecutor(registry)
+		w := workers.NewWorkflowNodeExecutor(encryptor, registry)
 		go w.Start(context.Background())
 	}
 
 	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
 		log.Println("Starting Node Request Worker")
 
-		w := workers.NewNodeRequestWorker(registry)
+		w := workers.NewNodeRequestWorker(encryptor, registry)
 		go w.Start(context.Background())
 	}
 

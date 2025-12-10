@@ -1,0 +1,131 @@
+package semaphore
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/triggers"
+)
+
+const MaxEventSize = 64 * 1024
+
+type OnPipelineDone struct{}
+
+type OnPipelineDoneMetadata struct {
+	Project *Project `json:"project"`
+}
+
+type OnPipelineDoneConfiguration struct {
+	Project string `json:"project"`
+}
+
+func (p *OnPipelineDone) Name() string {
+	return "semaphore.onPipelineDone"
+}
+
+func (p *OnPipelineDone) Label() string {
+	return "On Push"
+}
+
+func (p *OnPipelineDone) Description() string {
+	return "Listen to Semaphore pipeline done events"
+}
+
+func (p *OnPipelineDone) Icon() string {
+	return "workflow"
+}
+
+func (p *OnPipelineDone) Color() string {
+	return "gray"
+}
+
+func (p *OnPipelineDone) Configuration() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:     "project",
+			Label:    "Project",
+			Type:     configuration.FieldTypeString,
+			Required: true,
+		},
+	}
+}
+
+func (p *OnPipelineDone) Setup(ctx triggers.TriggerContext) error {
+	var metadata OnPipelineDoneMetadata
+	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to parse metadata: %w", err)
+	}
+
+	//
+	// If metadata is set, it means the trigger was already setup
+	//
+	if metadata.Project != nil {
+		return nil
+	}
+
+	config := OnPipelineDoneConfiguration{}
+	err = mapstructure.Decode(ctx.Configuration, &config)
+	if err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if config.Project == "" {
+		return fmt.Errorf("project is required")
+	}
+
+	//
+	// TODO: Check if project exists
+	// TODO: Set up web hook
+	//
+
+	return nil
+}
+
+func (p *OnPipelineDone) Actions() []components.Action {
+	return []components.Action{}
+}
+
+func (p *OnPipelineDone) HandleAction(ctx triggers.TriggerActionContext) error {
+	return nil
+}
+
+func (p *OnPipelineDone) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) {
+	signature := ctx.Headers.Get("X-Semaphore-Signature-256")
+	if signature == "" {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
+	}
+
+	signature = strings.TrimPrefix(signature, "sha256=")
+	if signature == "" {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
+	}
+
+	secret, err := ctx.WebhookContext.GetSecret()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
+	}
+
+	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
+	}
+
+	data := map[string]any{}
+	err = json.Unmarshal(ctx.Body, &data)
+	if err != nil {
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+	}
+
+	err = ctx.EventContext.Emit(data)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+	}
+
+	return http.StatusOK, nil
+}

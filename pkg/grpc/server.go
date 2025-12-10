@@ -3,6 +3,7 @@ package grpc
 import (
 	"fmt"
 	"net"
+	"runtime/debug"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -40,7 +41,7 @@ var (
 )
 
 func sentryRecoveryHandler(p any) error {
-	log.Errorf("recovered from panic in gRPC handler: %v", p)
+	log.Errorf("recovered from panic in gRPC handler: %v. Stack: %s", p, debug.Stack())
 
 	hub := sentry.CurrentHub()
 	if hub != nil && hub.Client() != nil {

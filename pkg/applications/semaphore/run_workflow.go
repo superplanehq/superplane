@@ -7,7 +7,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -17,17 +16,22 @@ const FailedOutputChannel = "failed"
 type RunWorkflow struct{}
 
 type RunWorkflowNodeMetadata struct {
-	Project *Project `json:"project"`
+	Project *Project `json:"project" mapstructure:"project"`
 }
 
 type RunWorkflowExecutionMetadata struct {
-	Workflow *Workflow      `json:"workflow"`
-	Data     map[string]any `json:"data,omitempty"`
+	Workflow *Workflow      `json:"workflow" mapstructure:"workflow"`
+	Pipeline *Pipeline      `json:"pipeline" mapstructure:"pipeline"`
+	Data     map[string]any `json:"data,omitempty" mapstructure:"data,omitempty"`
 }
 
 type Workflow struct {
+	ID  string `json:"id"`
+	URL string `json:"url"`
+}
+
+type Pipeline struct {
 	ID     string `json:"id"`
-	URL    string `json:"url"`
 	State  string `json:"state"`
 	Result string `json:"result"`
 }
@@ -39,7 +43,6 @@ type Project struct {
 }
 
 type RunWorkflowSpec struct {
-	Integration  string      `json:"integration"`
 	Project      string      `json:"project"`
 	Ref          string      `json:"ref"`
 	PipelineFile string      `json:"pipelineFile"`
@@ -156,10 +159,36 @@ func (r *RunWorkflow) Setup(ctx components.SetupContext) error {
 		return fmt.Errorf("project is required")
 	}
 
+	metadata := RunWorkflowNodeMetadata{}
+	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
 	//
-	// TODO: check if project exists
-	// TODO: set up web hook to receive workflow updates
+	// If this is the same project, nothing to do.
 	//
+	if metadata.Project != nil && (config.Project == metadata.Project.ID || config.Project == metadata.Project.Name) {
+		return nil
+	}
+
+	client, err := NewClient(ctx.AppInstallationContext)
+	if err != nil {
+		return err
+	}
+
+	project, err := client.GetProject(config.Project)
+	if err != nil {
+		return fmt.Errorf("error finding project %s: %v", config.Project, err)
+	}
+
+	ctx.MetadataContext.Set(RunWorkflowNodeMetadata{
+		Project: &Project{
+			ID:   project.Metadata.ProjectID,
+			Name: project.Metadata.ProjectName,
+			URL:  fmt.Sprintf("%s/projects/%s", string(client.OrgURL), project.Metadata.ProjectID),
+		},
+	})
 
 	return nil
 }
@@ -171,23 +200,19 @@ func (r *RunWorkflow) Execute(ctx components.ExecutionContext) error {
 		return err
 	}
 
-	integration, err := ctx.IntegrationContext.GetIntegration(spec.Integration)
+	metadata := RunWorkflowNodeMetadata{}
+	err = mapstructure.Decode(ctx.NodeMetadataContext.Get(), &metadata)
 	if err != nil {
-		return fmt.Errorf("failed to get integration: %w", err)
+		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	project, err := integration.Get("project", spec.Project)
+	client, err := NewClient(ctx.AppInstallationContext)
 	if err != nil {
-		return fmt.Errorf("failed to find project %s: %w", spec.Project, err)
-	}
-
-	semaphore, ok := integration.(*semaphore.SemaphoreResourceManager)
-	if !ok {
-		return fmt.Errorf("integration is not a semaphore integration")
+		return err
 	}
 
 	params := map[string]any{
-		"project_id":    project.Id(),
+		"project_id":    metadata.Project.ID,
 		"reference":     spec.Ref,
 		"pipeline_file": spec.PipelineFile,
 		"parameters":    r.buildParameters(ctx, spec.Parameters),
@@ -197,16 +222,18 @@ func (r *RunWorkflow) Execute(ctx components.ExecutionContext) error {
 		params["commit_sha"] = spec.CommitSha
 	}
 
-	wf, err := semaphore.RunWorkflow(params)
+	response, err := client.RunWorkflow(params)
 	if err != nil {
 		return ctx.ExecutionStateContext.Fail("failed to run workflow", err.Error())
 	}
 
 	ctx.MetadataContext.Set(RunWorkflowExecutionMetadata{
 		Workflow: &Workflow{
-			ID:    wf.Id(),
-			URL:   wf.URL(),
-			State: "started",
+			ID:  response.WorkflowID,
+			URL: fmt.Sprintf("%s/workflows/%s", string(client.OrgURL), response.WorkflowID),
+		},
+		Pipeline: &Pipeline{
+			ID: response.PipelineID,
 		},
 	})
 
@@ -259,53 +286,41 @@ func (r *RunWorkflow) poll(ctx components.ActionContext) error {
 	}
 
 	//
-	// If the execution already finished, we don't need to do anything.
+	// If the pipeline already finished, we don't need to do anything.
 	//
-	if metadata.Workflow.State == "finished" {
+	if metadata.Pipeline.State == "done" {
 		return nil
 	}
 
-	integration, err := ctx.IntegrationContext.GetIntegration(spec.Integration)
+	client, err := NewClient(ctx.AppInstallationContext)
 	if err != nil {
-		return fmt.Errorf("failed to get integration: %w", err)
+		return err
 	}
 
-	resource, err := integration.Status("workflow", metadata.Workflow.ID, nil)
+	pipeline, err := client.GetPipeline(metadata.Pipeline.ID)
 	if err != nil {
-		return fmt.Errorf("error determing status for workflow %s: %v", resource.Id(), err)
+		return err
 	}
 
 	//
 	// If not finished, poll again in 1min.
 	//
-	if !resource.Finished() {
+	if pipeline.State != "done" {
 		return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
 	}
 
-	result := "passed"
-	if !resource.Successful() {
-		result = "failed"
-	}
+	metadata.Pipeline.State = pipeline.State
+	metadata.Pipeline.Result = pipeline.Result
+	ctx.MetadataContext.Set(metadata)
 
-	newMetadata := &RunWorkflowExecutionMetadata{
-		Workflow: &Workflow{
-			ID:     metadata.Workflow.ID,
-			URL:    metadata.Workflow.URL,
-			State:  "finished",
-			Result: result,
-		},
-	}
-
-	ctx.MetadataContext.Set(newMetadata)
-
-	if result == "passed" {
+	if pipeline.Result == "passed" {
 		return ctx.ExecutionStateContext.Pass(map[string][]any{
-			PassedOutputChannel: {newMetadata},
+			PassedOutputChannel: {metadata},
 		})
 	}
 
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		FailedOutputChannel: {newMetadata},
+		FailedOutputChannel: {metadata},
 	})
 }
 
@@ -316,8 +331,8 @@ func (r *RunWorkflow) finish(ctx components.ActionContext) error {
 		return err
 	}
 
-	if metadata.Workflow.State == "finished" {
-		return fmt.Errorf("workflow already finished")
+	if metadata.Pipeline.State == "done" {
+		return fmt.Errorf("pipeline already finished")
 	}
 
 	data, ok := ctx.Parameters["data"]
@@ -330,21 +345,9 @@ func (r *RunWorkflow) finish(ctx components.ActionContext) error {
 		return fmt.Errorf("data is invalid")
 	}
 
-	newMetadata := &RunWorkflowExecutionMetadata{
-		Data: dataMap,
-		Workflow: &Workflow{
-			ID:     metadata.Workflow.ID,
-			URL:    metadata.Workflow.URL,
-			State:  "finished",
-			Result: "passed",
-		},
-	}
-
-	ctx.MetadataContext.Set(newMetadata)
-
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		PassedOutputChannel: {newMetadata},
-	})
+	metadata.Data = dataMap
+	ctx.MetadataContext.Set(metadata)
+	return nil
 }
 
 func (r *RunWorkflow) buildParameters(ctx components.ExecutionContext, params []Parameter) map[string]any {

@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 const (
@@ -78,6 +79,10 @@ func ListAppInstallations(orgID uuid.UUID) ([]AppInstallation, error) {
 }
 
 func FindUnscopedAppInstallation(installationID uuid.UUID) (*AppInstallation, error) {
+	return FindUnscopedAppInstallationInTransaction(database.Conn(), installationID)
+}
+
+func FindUnscopedAppInstallationInTransaction(tx *gorm.DB, installationID uuid.UUID) (*AppInstallation, error) {
 	var appInstallation AppInstallation
 	err := database.Conn().
 		Where("id = ?", installationID).

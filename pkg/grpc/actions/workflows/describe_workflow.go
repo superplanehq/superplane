@@ -23,7 +23,12 @@ func DescribeWorkflow(ctx context.Context, registry *registry.Registry, organiza
 		return nil, status.Errorf(codes.NotFound, "workflow not found: %v", err)
 	}
 
+	proto, err := SerializeWorkflow(&workflow, true)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to serialize workflow: %v", err)
+	}
+
 	return &pb.DescribeWorkflowResponse{
-		Workflow: SerializeWorkflow(&workflow, true),
+		Workflow: proto,
 	}, nil
 }

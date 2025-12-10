@@ -90,5 +90,7 @@ func (s *Semaphore) Components() []components.Component {
 }
 
 func (s *Semaphore) Triggers() []triggers.Trigger {
-	return []triggers.Trigger{}
+	return []triggers.Trigger{
+		&OnPipelineDone{},
+	}
 }

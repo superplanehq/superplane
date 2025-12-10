@@ -6,6 +6,7 @@ import {
 } from "@/api-client";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCallback, useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,13 @@ export function NodeConfigurationModal({
   appInstallationRef,
   installedApplications = [],
 }: NodeConfigurationModalProps) {
+  const { organizationId } = useParams<{ organizationId: string }>();
+
+  // Filter installed applications by appName if provided
+  const filteredApplications = appName
+    ? installedApplications.filter((app) => app.appName === appName)
+    : installedApplications;
+
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
   const [selectedAppInstallationId, setSelectedAppInstallationId] = useState<string | undefined>(
@@ -167,7 +175,7 @@ export function NodeConfigurationModal({
 
       // If this is a component/trigger from an application, include the app installation ref
       if (appName && selectedAppInstallationId) {
-        const selectedInstallation = installedApplications.find((app) => app.id === selectedAppInstallationId);
+        const selectedInstallation = filteredApplications.find((app) => app.id === selectedAppInstallationId);
         if (selectedInstallation) {
           appInstallationRefToSave = {
             id: selectedInstallation.id,
@@ -231,8 +239,42 @@ export function NodeConfigurationModal({
                 />
               </div>
 
+              {/* Warning when no app installations are available */}
+              {appName && filteredApplications.length === 0 && (
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+                  <svg
+                    className="w-5 h-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                      No app installations found
+                    </p>
+                    <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                      This component requires an app installation to function. Please{" "}
+                      <a
+                        href={`/${organizationId}/settings/applications`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline font-medium hover:text-yellow-900 dark:hover:text-yellow-100"
+                      >
+                        install the application
+                      </a>{" "}
+                      before configuring this component.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* App Installation selection for components/triggers from applications */}
-              {appName && installedApplications.length > 0 && (
+              {appName && filteredApplications.length > 0 && (
                 <div className="flex flex-col gap-2 h-[60px]">
                   <Label
                     className={`min-w-[100px] text-left ${
@@ -254,13 +296,11 @@ export function NodeConfigurationModal({
                       <SelectValue placeholder="Select an app installation" />
                     </SelectTrigger>
                     <SelectContent>
-                      {installedApplications
-                        .filter((app) => app.appName === appName)
-                        .map((app) => (
-                          <SelectItem key={app.id} value={app.id!}>
-                            {app.installationName}
-                          </SelectItem>
-                        ))}
+                      {filteredApplications.map((app) => (
+                        <SelectItem key={app.id} value={app.id!}>
+                          {app.installationName}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

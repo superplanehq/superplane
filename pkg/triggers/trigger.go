@@ -66,12 +66,13 @@ type Trigger interface {
 }
 
 type TriggerContext struct {
-	Configuration      any
-	MetadataContext    components.MetadataContext
-	RequestContext     components.RequestContext
-	EventContext       EventContext
-	WebhookContext     WebhookContext
-	IntegrationContext IntegrationContext
+	Configuration          any
+	MetadataContext        components.MetadataContext
+	RequestContext         components.RequestContext
+	EventContext           EventContext
+	WebhookContext         WebhookContext
+	IntegrationContext     IntegrationContext
+	AppInstallationContext components.AppInstallationContext
 }
 
 type IntegrationContext interface {
@@ -94,13 +95,14 @@ type EventContext interface {
 }
 
 type TriggerActionContext struct {
-	Name            string
-	Parameters      map[string]any
-	Configuration   any
-	MetadataContext components.MetadataContext
-	RequestContext  components.RequestContext
-	EventContext    EventContext
-	WebhookContext  WebhookContext
+	Name                   string
+	Parameters             map[string]any
+	Configuration          any
+	MetadataContext        components.MetadataContext
+	RequestContext         components.RequestContext
+	EventContext           EventContext
+	WebhookContext         WebhookContext
+	AppInstallationContext components.AppInstallationContext
 }
 
 type WebhookRequestContext struct {

@@ -18,10 +18,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) *pb.Workflow {
+func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workflow, error) {
 	workflowNodes, err := models.FindWorkflowNodes(workflow.ID)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	// Only expose top-level nodes (no parents) to the UI
@@ -76,13 +76,13 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) *pb.Workfl
 				Edges: actions.EdgesToProto(workflow.Edges),
 			},
 			Status: nil,
-		}
+		}, nil
 	}
 
 	// Fetch last executions per node
 	lastExecutions, err := models.FindLastExecutionPerNode(workflow.ID)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	executionIDs := make([]string, len(lastExecutions))
@@ -92,34 +92,34 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) *pb.Workfl
 
 	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	serializedExecutions, err := SerializeNodeExecutions(lastExecutions, childExecutions)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	// Fetch next queue items per node
 	nextQueueItems, err := models.FindNextQueueItemPerNode(workflow.ID)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	serializedQueueItems, err := SerializeNodeQueueItems(nextQueueItems)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	// Fetch last events per node
 	lastEvents, err := models.FindLastEventPerNode(workflow.ID)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	serializedEvents, err := SerializeWorkflowEvents(lastEvents)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	return &pb.Workflow{
@@ -141,7 +141,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) *pb.Workfl
 			NextQueueItems: serializedQueueItems,
 			LastEvents:     serializedEvents,
 		},
-	}
+	}, nil
 }
 
 func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workflow) ([]models.Node, []models.Edge, error) {
