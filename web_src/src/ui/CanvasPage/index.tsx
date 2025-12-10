@@ -31,7 +31,7 @@ import { CanvasPageState, useCanvasState } from "./useCanvasState";
 export interface SidebarEvent {
   id: string;
   title: string;
-  subtitle?: string;
+  subtitle?: string | React.ReactNode;
   state: "processed" | "discarded" | "waiting" | "running";
   isOpen: boolean;
   receivedAt?: Date;

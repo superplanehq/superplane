@@ -1,18 +1,37 @@
 import { useCallback, useMemo } from "react";
 import { useInfiniteNodeEvents, useInfiniteNodeExecutions } from "./useWorkflowData";
 import { SidebarEvent } from "@/ui/CanvasPage";
-import { ComponentsNode, WorkflowsListNodeEventsResponse, WorkflowsListNodeExecutionsResponse } from "@/api-client";
+import {
+  ComponentsComponent,
+  ComponentsNode,
+  WorkflowsListNodeEventsResponse,
+  WorkflowsListNodeExecutionsResponse,
+} from "@/api-client";
 import { mapTriggerEventsToSidebarEvents, mapExecutionsToSidebarEvents } from "@/pages/workflowv2/utils";
+import { QueryClient } from "@tanstack/react-query";
+import { getComponentAdditionalDataBuilder } from "@/pages/workflowv2/mappers";
 
 interface UseNodeHistoryProps {
   workflowId: string;
+  organizationId: string;
+  components: ComponentsComponent[];
   nodeId: string;
   nodeType: string;
   allNodes: ComponentsNode[];
   enabled: boolean;
+  queryClient: QueryClient;
 }
 
-export const useNodeHistory = ({ workflowId, nodeId, nodeType, allNodes, enabled }: UseNodeHistoryProps) => {
+export const useNodeHistory = ({
+  workflowId,
+  nodeId,
+  nodeType,
+  allNodes,
+  enabled,
+  organizationId,
+  queryClient,
+  components,
+}: UseNodeHistoryProps) => {
   // For trigger nodes, use events; for other nodes, use executions
   const isTriggerNode = nodeType === "TYPE_TRIGGER";
 
@@ -34,9 +53,33 @@ export const useNodeHistory = ({ workflowId, nodeId, nodeType, allNodes, enabled
         executionsQuery.data?.pages.flatMap(
           (page) => (page as WorkflowsListNodeExecutionsResponse)?.executions || [],
         ) || [];
-      return mapExecutionsToSidebarEvents(allExecutions, allNodes);
+
+      const componentDef = components.find((c) => c.name === node.component?.name);
+
+      const additionalData = getComponentAdditionalDataBuilder(componentDef?.name || "")?.buildAdditionalData(
+        allNodes,
+        node,
+        componentDef!,
+        allExecutions,
+        workflowId || "",
+        queryClient,
+        organizationId || "",
+      );
+
+      return mapExecutionsToSidebarEvents(allExecutions, allNodes, undefined, additionalData);
     }
-  }, [enabled, allNodes, nodeId, isTriggerNode, eventsQuery.data, executionsQuery.data]);
+  }, [
+    enabled,
+    allNodes,
+    nodeId,
+    isTriggerNode,
+    eventsQuery.data,
+    executionsQuery.data,
+    components,
+    organizationId,
+    queryClient,
+    workflowId,
+  ]);
 
   const handleLoadMore = useCallback(() => {
     if (isTriggerNode) {

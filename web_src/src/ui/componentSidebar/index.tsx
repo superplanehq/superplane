@@ -310,7 +310,7 @@ export const ComponentSidebar = ({
       events = events.filter(
         (event) =>
           event.title.toLowerCase().includes(query) ||
-          event.subtitle?.toLowerCase().includes(query) ||
+          (typeof event.subtitle === "string" && event.subtitle?.toLowerCase().includes(query)) ||
           Object.values(event.values || {}).some((value) => String(value).toLowerCase().includes(query)),
       );
     }

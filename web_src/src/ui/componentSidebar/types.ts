@@ -5,7 +5,7 @@ export interface SidebarEvent {
   // Unique UI identifier for the item (remains stable across types)
   id: string;
   title: string;
-  subtitle?: string;
+  subtitle?: string | React.ReactNode;
   state: ChildEventsState;
   isOpen: boolean;
   receivedAt?: Date;

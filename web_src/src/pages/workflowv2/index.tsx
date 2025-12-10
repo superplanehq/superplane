@@ -323,6 +323,9 @@ export function WorkflowPageV2() {
         eventsMapForSidebar,
         totalHistoryCount,
         totalQueueCount,
+        workflowId,
+        queryClient,
+        organizationId,
       );
 
       // Add loading state to sidebar data
@@ -360,6 +363,9 @@ export function WorkflowPageV2() {
     nodeType: currentHistoryNode?.nodeType || "TYPE_ACTION",
     allNodes: workflow?.spec?.nodes || [],
     enabled: !!currentHistoryNode && !!workflowId,
+    components,
+    organizationId: organizationId || "",
+    queryClient,
   });
 
   const queueHistoryQuery = useQueueHistory({
@@ -1729,6 +1735,9 @@ function prepareSidebarData(
   nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
   totalHistoryCount?: number,
   totalQueueCount?: number,
+  workflowId?: string,
+  queryClient?: QueryClient,
+  organizationId?: string,
 ): SidebarData {
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
@@ -1768,10 +1777,20 @@ function prepareSidebarData(
     color = triggerMetadata.color || color;
   }
 
+  const additionalData = getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData(
+    nodes,
+    node,
+    componentMetadata!,
+    executions,
+    workflowId || "",
+    queryClient as QueryClient,
+    organizationId || "",
+  );
+
   const latestEvents =
     node.type === "TYPE_TRIGGER"
       ? mapTriggerEventsToSidebarEvents(events, node, 5)
-      : mapExecutionsToSidebarEvents(executions, nodes, 5);
+      : mapExecutionsToSidebarEvents(executions, nodes, 5, additionalData);
 
   // Convert queue items to sidebar events (next in queue)
   const nextInQueueEvents = mapQueueItemsToSidebarEvents(queueItems, nodes, 5);

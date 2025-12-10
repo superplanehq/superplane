@@ -147,6 +147,9 @@ export const approvalMapper: ComponentBaseMapper = {
       eventStateMap: APPROVAL_STATE_MAP,
     };
   },
+  subtitle(node, execution, additionalData) {
+    return getComponentSubtitle(node, execution, additionalData);
+  },
 };
 
 function getApprovalCustomField(
@@ -227,21 +230,7 @@ function getApprovalEventSections(
     sectionTitle = "Awaiting Approval";
   }
 
-  let eventSubtitle = "";
-
-  if (execution.metadata?.result === "rejected") {
-    eventSubtitle = "Rejected";
-  } else if (execution.metadata?.result === "approved") {
-    eventSubtitle = "Approved";
-  } else if (execution.state === "STATE_STARTED") {
-    const approvals = (additionalData as { approvals?: ApprovalItemProps[] })?.approvals;
-    const approvalsCount = approvals?.length || 0;
-    const approvalsApprovedCount = approvals?.filter((approval) => approval.approved).length || 0;
-    eventSubtitle = `${approvalsApprovedCount}/${approvalsCount}`;
-  } else {
-    eventSubtitle = "Error";
-  }
-
+  const eventSubtitle = getComponentSubtitle({} as ComponentsNode, execution, additionalData);
   return [
     {
       title: sectionTitle,
@@ -251,6 +240,29 @@ function getApprovalEventSections(
       eventState: approvalStateFunction(execution),
     },
   ];
+}
+
+function getComponentSubtitle(
+  _node: ComponentsNode,
+  execution: WorkflowsWorkflowNodeExecution,
+  additionalData?: unknown,
+): string | React.ReactNode {
+  let subtitle = "";
+
+  if (execution.metadata?.result === "rejected") {
+    subtitle = "Rejected";
+  } else if (execution.metadata?.result === "approved") {
+    subtitle = "Approved";
+  } else if (execution.state === "STATE_STARTED") {
+    const approvals = (additionalData as { approvals?: ApprovalItemProps[] })?.approvals;
+    const approvalsCount = approvals?.length || 0;
+    const approvalsApprovedCount = approvals?.filter((approval) => approval.approved).length || 0;
+    subtitle = `${approvalsApprovedCount}/${approvalsCount}`;
+  } else if (execution.state === "STATE_FINISHED") {
+    subtitle = "Error";
+  }
+
+  return subtitle;
 }
 
 // ----------------------- Data Builder -----------------------

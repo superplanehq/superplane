@@ -54,6 +54,12 @@ export interface ComponentBaseMapper {
     nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
     additionalData?: unknown,
   ): ComponentBaseProps;
+
+  subtitle?(
+    node: ComponentsNode,
+    execution: WorkflowsWorkflowNodeExecution,
+    additionalData?: unknown,
+  ): string | React.ReactNode;
 }
 
 /**
