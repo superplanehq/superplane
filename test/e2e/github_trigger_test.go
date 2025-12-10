@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/e2e/helpers"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
@@ -15,26 +16,29 @@ import (
 )
 
 func TestGithubTrigger(t *testing.T) {
-	steps := &GithubTriggerSteps{t: t}
+	helpers.WithVCR(t, "github_trigger", func(t *testing.T) {
+		steps := &GithubTriggerSteps{t: t}
 
-	t.Run("adding a github trigger node", func(t *testing.T) {
-		steps.start()
-		steps.givenACanvasExists()
-		steps.givenAGithubIntegrationExists()
-		steps.addGithubTriggerNode()
-		steps.saveCanvas()
-		steps.assertGithubTriggerNodeExistsInDB()
-	})
+		t.Run("adding a github trigger node", func(t *testing.T) {
+			steps.start()
+			steps.givenACanvasExists()
+			steps.givenAGithubIntegrationExists()
+			steps.addGithubTriggerNode()
+			steps.saveCanvas()
+			steps.assertGithubTriggerNodeExistsInDB()
+		})
 
-	t.Run("receiving github trigger events", func(t *testing.T) {
-		steps.start()
-		steps.givenACanvasWithGithubTriggerAndNoop()
-		steps.saveCanvas()
-		steps.simulateReceivingGithubEvent()
-		steps.assertGithubTriggerExecutionCreated()
-		steps.assertSecondNodeExecuted()
+		t.Run("receiving github trigger events", func(t *testing.T) {
+			steps.start()
+			steps.givenACanvasWithGithubTriggerAndNoop()
+			steps.saveCanvas()
+			steps.simulateReceivingGithubEvent()
+			steps.assertGithubTriggerExecutionCreated()
+			steps.assertSecondNodeExecuted()
+		})
 	})
 }
+
 
 type GithubTriggerSteps struct {
 	t       *testing.T
