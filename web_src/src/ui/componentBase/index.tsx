@@ -12,9 +12,17 @@ interface EventSectionDisplayProps {
   section: EventSection;
   index: number;
   totalSections: number;
+  className?: string;
+  stateMap?: EventStateMap;
 }
 
-const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({ section, index, totalSections }) => {
+const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
+  section,
+  index,
+  totalSections,
+  className,
+  stateMap = DEFAULT_EVENT_STATE_MAP,
+}) => {
   // Live timer for running executions
   const [liveDuration, setLiveDuration] = React.useState<number | null>(null);
 
@@ -41,50 +49,15 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({ section, inde
   const timeAgo = section.receivedAt ? calcRelativeTimeFromDiff(diff) : "";
   const durationText = liveDuration !== null ? calcRelativeTimeFromDiff(liveDuration) : "";
 
-  const LastEventIcon =
-    section.eventState === "success"
-      ? resolveIcon("check")
-      : section.eventState === "neutral"
-        ? resolveIcon("circle")
-        : section.eventState === "next-in-queue"
-          ? resolveIcon("circle-dashed")
-          : section.eventState === "running"
-            ? resolveIcon("refresh-cw")
-            : resolveIcon("x");
-  const LastEventColor =
-    section.eventState === "success"
-      ? "text-green-700"
-      : section.eventState === "neutral"
-        ? "text-gray-500"
-        : section.eventState === "next-in-queue"
-          ? "text-gray-500"
-          : section.eventState === "running"
-            ? "text-blue-800"
-            : "text-red-700";
-  const LastEventBackground =
-    section.eventState === "success"
-      ? "bg-green-200"
-      : section.eventState === "neutral"
-        ? "bg-gray-100"
-        : section.eventState === "next-in-queue"
-          ? "bg-gray-100"
-          : section.eventState === "running"
-            ? "bg-sky-100"
-            : "bg-red-200";
-  const LastEventIconColor =
-    section.eventState === "success"
-      ? "text-green-600 bg-green-600"
-      : section.eventState === "neutral"
-        ? "text-gray-400 bg-gray-400"
-        : section.eventState === "next-in-queue"
-          ? "text-gray-500"
-          : section.eventState === "running"
-            ? "text-blue-800"
-            : "text-red-600 bg-red-600";
+  const currentState = section.eventState || "neutral";
+  const stateStyle = stateMap[currentState];
 
-  const iconSize = ["next-in-queue", "running"].includes(section.eventState || "") ? 16 : 12;
-  const iconClassName =
-    section.eventState === "running" ? "animate-spin" : section.eventState === "next-in-queue" ? "" : "text-white";
+  const LastEventIcon = resolveIcon(stateStyle.icon);
+  const LastEventColor = stateStyle.textColor;
+  const LastEventBackground = stateStyle.backgroundColor;
+  const LastEventIconColor = stateStyle.iconColor;
+  const iconSize = stateStyle.iconSize;
+  const iconClassName = stateStyle.iconClassName;
 
   // Determine what to show in the top-right corner
   let topRightText = "";
@@ -97,7 +70,10 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({ section, inde
   }
 
   return (
-    <div key={index} className={"px-4 pt-2 pb-6 relative" + (index < totalSections - 1 ? " border-b" : "")}>
+    <div
+      key={index}
+      className={"px-4 pt-2 relative" + (index < totalSections - 1 ? " border-b" : "") + ` ${className}`}
+    >
       <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
         <span className="uppercase text-xs font-semibold tracking-wide">{section.title}</span>
         {topRightText && <span className="text-sm">{topRightText}</span>}
@@ -146,6 +122,60 @@ export interface ComponentBaseSpec {
 
 export type EventState = "success" | "failed" | "neutral" | "next-in-queue" | "running";
 
+export interface EventStateStyle {
+  icon: string;
+  textColor: string;
+  backgroundColor: string;
+  iconColor: string;
+  iconSize: number;
+  iconClassName: string;
+}
+
+export type EventStateMap = Record<EventState, EventStateStyle>;
+
+export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
+  success: {
+    icon: "circle-check",
+    textColor: "text-green-700",
+    backgroundColor: "bg-green-200",
+    iconColor: "text-green-600 ",
+    iconSize: 16,
+    iconClassName: "",
+  },
+  failed: {
+    icon: "circle-x",
+    textColor: "text-red-700",
+    backgroundColor: "bg-red-200",
+    iconColor: "text-red-600 ",
+    iconSize: 16,
+    iconClassName: "",
+  },
+  neutral: {
+    icon: "circle",
+    textColor: "text-gray-500",
+    backgroundColor: "bg-gray-100",
+    iconColor: "text-white bg-gray-400",
+    iconSize: 12,
+    iconClassName: "",
+  },
+  "next-in-queue": {
+    icon: "circle-dashed",
+    textColor: "text-gray-500",
+    backgroundColor: "bg-gray-100",
+    iconColor: "text-gray-500",
+    iconSize: 16,
+    iconClassName: "",
+  },
+  running: {
+    icon: "refresh-cw",
+    textColor: "text-blue-800",
+    backgroundColor: "bg-sky-100",
+    iconColor: "text-blue-800",
+    iconSize: 16,
+    iconClassName: "animate-spin",
+  },
+};
+
 export interface EventSection {
   title: string;
   subtitle?: string;
@@ -173,6 +203,8 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   eventSections?: EventSection[];
   selected?: boolean;
   metadata?: MetadataItem[];
+  customField?: React.ReactNode;
+  eventStateMap?: EventStateMap;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -202,6 +234,8 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   hideCount,
   hideMetadataList,
   metadata,
+  customField,
+  eventStateMap,
 }) => {
   if (collapsed) {
     return (
@@ -305,8 +339,17 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         )}
 
         {eventSections?.map((section, index) => (
-          <EventSectionDisplay key={index} section={section} index={index} totalSections={eventSections.length} />
+          <EventSectionDisplay
+            className={customField ? "pb-0" : "pb-6"}
+            key={index}
+            section={section}
+            index={index}
+            totalSections={eventSections.length}
+            stateMap={eventStateMap}
+          />
         ))}
+
+        {customField || null}
       </div>
     </SelectionWrapper>
   );

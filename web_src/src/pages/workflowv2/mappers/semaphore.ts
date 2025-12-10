@@ -8,7 +8,7 @@ import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer, getState, getStateMap } from ".";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 export const semaphoreMapper: ComponentBaseMapper = {
@@ -19,6 +19,8 @@ export const semaphoreMapper: ComponentBaseMapper = {
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
+    const componentName = componentDefinition.name || "semaphore";
+
     return {
       iconSrc: SemaphoreLogo,
       iconSlug: componentDefinition.icon || "workflow",
@@ -28,9 +30,10 @@ export const semaphoreMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
-      eventSections: getSemaphoreEventSections(nodes, lastExecutions[0], nodeQueueItems),
+      eventSections: getSemaphoreEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName),
       metadata: getSemaphoreMetadataList(node),
       specs: getSemaphoreSpecs(node),
+      eventStateMap: getStateMap(componentName),
     };
   },
 };
@@ -104,6 +107,7 @@ function getSemaphoreEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution,
   nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+  componentName?: string,
 ): EventSection[] {
   const sections: EventSection[] = [];
 
@@ -124,7 +128,7 @@ function getSemaphoreEventSections(
       showAutomaticTime: true,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: executionToEventSectionState(execution),
+      eventState: componentName ? getState(componentName)(execution) : executionToEventSectionState(execution),
     });
   }
 

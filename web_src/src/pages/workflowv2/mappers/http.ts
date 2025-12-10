@@ -5,9 +5,10 @@ import {
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState } from "@/ui/componentBase";
+import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
+import { getState, getStateMap } from ".";
 
 export const httpMapper: ComponentBaseMapper = {
   props(
@@ -17,6 +18,8 @@ export const httpMapper: ComponentBaseMapper = {
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     _items?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
+    const componentName = componentDefinition.name || "http";
+
     return {
       iconSlug: componentDefinition.icon || "globe",
       headerColor: getBackgroundColorClass(componentDefinition?.color || "gray"),
@@ -25,9 +28,10 @@ export const httpMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
-      eventSections: getHTTPEventSections(lastExecutions[0]),
+      eventSections: getHTTPEventSections(lastExecutions[0], componentName),
       metadata: getHTTPMetadataList(node),
       specs: getHTTPSpecs(node),
+      eventStateMap: getStateMap(componentName),
     };
   },
 };
@@ -84,7 +88,7 @@ function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   return specs;
 }
 
-function getHTTPEventSections(execution: WorkflowsWorkflowNodeExecution): EventSection[] {
+function getHTTPEventSections(execution: WorkflowsWorkflowNodeExecution, componentName: string): EventSection[] {
   if (!execution) {
     return [
       {
@@ -103,19 +107,7 @@ function getHTTPEventSections(execution: WorkflowsWorkflowNodeExecution): EventS
       title: "Last Run",
       receivedAt: new Date(execution.createdAt!),
       eventTitle: execution.state == "STATE_FINISHED" ? `Status: ${response?.status}` : "Running...",
-      eventState: executionToEventSectionState(execution),
+      eventState: getState(componentName)(execution),
     },
   ];
-}
-
-function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
-  }
-
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
-    return "success";
-  }
-
-  return "failed";
 }

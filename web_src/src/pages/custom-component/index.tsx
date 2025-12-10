@@ -60,7 +60,7 @@ const getBlockType = (componentName: string): BlockData["type"] => {
   const typeMap: Record<string, BlockData["type"]> = {
     if: "component",
     filter: "component",
-    approval: "approval",
+    approval: "component",
     noop: "component",
     http: "component",
     semaphore: "component",
@@ -81,25 +81,8 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
     state: "pending",
     type: blockType,
     outputChannels: channels,
+    component: getComponentBaseMapper(component?.name!).props([], node, component!, [], undefined),
   };
-  // Add type-specific props based on component type
-  switch (blockType) {
-    case "approval":
-      baseData.approval = {
-        title: node.name,
-        description: component?.description,
-        iconSlug: component?.icon,
-        iconColor: "text-orange-500",
-        headerColor: "bg-orange-100",
-        collapsedBackground: "bg-orange-100",
-        approvals: [],
-        collapsed: false,
-      };
-      break;
-    case "component":
-      baseData.component = getComponentBaseMapper(component?.name!).props([], node, component!, [], undefined);
-      break;
-  }
 
   return baseData;
 };
@@ -352,16 +335,6 @@ export const CustomComponent = () => {
             _originalConfiguration: filteredConfiguration,
           };
 
-          if (nodeData.approval) {
-            updatedData.approval = { ...nodeData.approval, title: nodeName.trim() };
-          }
-          if (nodeData.wait) {
-            updatedData.wait = {
-              ...nodeData.wait,
-              title: nodeName.trim(),
-              duration: filteredConfiguration.duration,
-            };
-          }
           if (nodeData.component) {
             const updatedNode: ComponentsNode = {
               id: node.id,
@@ -474,31 +447,6 @@ export const CustomComponent = () => {
         data: {
           ...nodeData,
           label: duplicateName,
-          // Update type-specific props with new title
-          ...(nodeData.if && {
-            if: {
-              ...nodeData.if,
-              title: duplicateName,
-            },
-          }),
-          ...(nodeData.filter && {
-            filter: {
-              ...nodeData.filter,
-              title: duplicateName,
-            },
-          }),
-          ...(nodeData.approval && {
-            approval: {
-              ...nodeData.approval,
-              title: duplicateName,
-            },
-          }),
-          ...(nodeData.wait && {
-            wait: {
-              ...nodeData.wait,
-              title: duplicateName,
-            },
-          }),
           ...(nodeData.component && {
             component: {
               ...nodeData.component,

@@ -6,7 +6,7 @@ import {
 } from "@/api-client";
 import { SidebarEvent } from "@/ui/CanvasPage";
 import { formatTimeAgo } from "@/utils/date";
-import { getTriggerRenderer } from "./mappers";
+import { getComponentBaseMapper, getTriggerRenderer } from "./mappers";
 
 export function mapTriggerEventsToSidebarEvents(
   events: WorkflowsWorkflowEvent[],
@@ -30,6 +30,7 @@ export function mapTriggerEventsToSidebarEvents(
       triggerEventId: event.id!,
       kind: "trigger",
       nodeId: node.id,
+      originalEvent: event,
     };
   });
 }
@@ -38,6 +39,7 @@ export function mapExecutionsToSidebarEvents(
   executions: WorkflowsWorkflowNodeExecution[],
   nodes: ComponentsNode[],
   limit?: number,
+  additionalData?: unknown,
 ): SidebarEvent[] {
   const executionsToMap = limit ? executions.slice(0, limit) : executions;
   return executionsToMap.map((execution) => {
@@ -53,6 +55,13 @@ export function mapExecutionsToSidebarEvents(
 
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+    const currentComponentNode = nodes.find((n) => n.id === execution.nodeId);
+
+    const componentSubtitle = getComponentBaseMapper(currentComponentNode?.component?.name || "").subtitle?.(
+      currentComponentNode as ComponentsNode,
+      execution,
+      additionalData,
+    );
 
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
@@ -66,7 +75,7 @@ export function mapExecutionsToSidebarEvents(
     return {
       id: execution.id!,
       title,
-      subtitle: subtitle || formatTimeAgo(new Date(execution.createdAt!)),
+      subtitle: componentSubtitle || subtitle || formatTimeAgo(new Date(execution.createdAt!)),
       state,
       isOpen: false,
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
@@ -74,6 +83,7 @@ export function mapExecutionsToSidebarEvents(
       executionId: execution.id!,
       kind: "execution",
       nodeId: execution?.nodeId,
+      originalExecution: execution,
     };
   });
 }

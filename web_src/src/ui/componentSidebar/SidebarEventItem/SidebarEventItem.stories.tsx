@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { SidebarEventItem, ChainExecutionState } from "./SidebarEventItem";
 import { SidebarEvent } from "../types";
+import { DEFAULT_EVENT_STATE_MAP } from "../../componentBase";
 
 const meta: Meta<typeof SidebarEventItem> = {
   title: "UI/SidebarEventItem",
@@ -36,7 +37,7 @@ const mockEvent: SidebarEvent = {
   id: "event-123",
   title: "Process Payment",
   subtitle: "Stripe API",
-  state: "processed" as const,
+  state: "success" as const,
   values: {
     "Transaction ID": "txn_1234567890",
     Amount: "$99.99",
@@ -68,7 +69,7 @@ const ComponentWrapper = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export const Processed: Story = {
+export const success: Story = {
   render: (args) => (
     <ComponentWrapper>
       <SidebarEventItem {...args} />
@@ -79,6 +80,10 @@ export const Processed: Story = {
     index: 0,
     variant: "latest",
     isOpen: false,
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
   },
 };
 
@@ -98,6 +103,10 @@ export const Discarded: Story = {
     index: 0,
     variant: "latest",
     isOpen: false,
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "failed" as const,
+    }),
   },
 };
 
@@ -117,6 +126,10 @@ export const Running: Story = {
     index: 0,
     variant: "latest",
     isOpen: false,
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "running" as const,
+    }),
   },
 };
 
@@ -136,6 +149,10 @@ export const WaitingLatest: Story = {
     index: 0,
     variant: "latest",
     isOpen: false,
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
   },
 };
 
@@ -155,6 +172,10 @@ export const WaitingQueue: Story = {
     index: 0,
     variant: "queue",
     isOpen: false,
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
   },
 };
 
@@ -289,7 +310,7 @@ export const LargePayload: Story = {
     isOpen: true,
     tabData: {
       current: {
-        "Records Processed": "10,000",
+        "Records success": "10,000",
         "Success Rate": "99.8%",
         Errors: "20",
         Duration: "5m 32s",
@@ -364,14 +385,14 @@ export const WithExecutionChain: Story = {
         Environment: "production",
       },
       executionChain: [
-        { name: "Build Docker Image", state: ChainExecutionState.COMPLETED },
-        { name: "Run Unit Tests", state: ChainExecutionState.COMPLETED },
-        { name: "Security Scan", state: ChainExecutionState.COMPLETED },
-        { name: "Deploy to Staging", state: ChainExecutionState.COMPLETED },
-        { name: "Integration Tests", state: ChainExecutionState.RUNNING },
-        { name: "Deploy to Production", state: ChainExecutionState.RUNNING },
-        { name: "Health Checks", state: ChainExecutionState.RUNNING },
-        { name: "Update DNS", state: ChainExecutionState.RUNNING },
+        { name: "Build Docker Image", state: "completed" },
+        { name: "Run Unit Tests", state: "completed" },
+        { name: "Security Scan", state: "completed" },
+        { name: "Deploy to Staging", state: "completed" },
+        { name: "Integration Tests", state: "running" },
+        { name: "Deploy to Production", state: "running" },
+        { name: "Health Checks", state: "running" },
+        { name: "Update DNS", state: "running" },
       ],
     },
   },
@@ -407,12 +428,12 @@ export const WithExecutionChainFailed: Story = {
         Environment: "production",
       },
       executionChain: [
-        { name: "Build Docker Image", state: ChainExecutionState.COMPLETED },
-        { name: "Run Unit Tests", state: ChainExecutionState.COMPLETED },
-        { name: "Security Scan", state: ChainExecutionState.FAILED },
-        { name: "Deploy to Staging", state: ChainExecutionState.RUNNING },
-        { name: "Integration Tests", state: ChainExecutionState.RUNNING },
-        { name: "Deploy to Production", state: ChainExecutionState.RUNNING },
+        { name: "Build Docker Image", state: "completed" },
+        { name: "Run Unit Tests", state: "completed" },
+        { name: "Security Scan", state: "failed" },
+        { name: "Deploy to Staging", state: "running" },
+        { name: "Integration Tests", state: "running" },
+        { name: "Deploy to Production", state: "running" },
       ],
     },
   },
@@ -450,58 +471,58 @@ export const WithNestedExecutionChain: Story = {
       executionChain: [
         {
           name: "Preparation Phase",
-          state: ChainExecutionState.COMPLETED,
+          state: "completed",
           children: [
-            { name: "Validate Configuration", state: ChainExecutionState.COMPLETED },
-            { name: "Check Dependencies", state: ChainExecutionState.COMPLETED },
-            { name: "Reserve Resources", state: ChainExecutionState.COMPLETED },
+            { name: "Validate Configuration", state: "completed" },
+            { name: "Check Dependencies", state: "completed" },
+            { name: "Reserve Resources", state: "completed" },
           ],
         },
         {
           name: "Build Phase",
-          state: ChainExecutionState.COMPLETED,
+          state: "completed",
           children: [
-            { name: "Build API Service", state: ChainExecutionState.COMPLETED },
-            { name: "Build Frontend", state: ChainExecutionState.COMPLETED },
-            { name: "Build Background Jobs", state: ChainExecutionState.COMPLETED },
-            { name: "Build Database Migrations", state: ChainExecutionState.COMPLETED },
+            { name: "Build API Service", state: "completed" },
+            { name: "Build Frontend", state: "completed" },
+            { name: "Build Background Jobs", state: "completed" },
+            { name: "Build Database Migrations", state: "completed" },
           ],
         },
         {
           name: "Test Phase",
-          state: ChainExecutionState.COMPLETED,
+          state: "completed",
           children: [
-            { name: "Unit Tests", state: ChainExecutionState.COMPLETED },
-            { name: "Integration Tests", state: ChainExecutionState.COMPLETED },
-            { name: "Security Scan", state: ChainExecutionState.COMPLETED },
+            { name: "Unit Tests", state: "completed" },
+            { name: "Integration Tests", state: "completed" },
+            { name: "Security Scan", state: "completed" },
           ],
         },
         {
           name: "Deploy to Staging",
-          state: ChainExecutionState.RUNNING,
+          state: "running",
           children: [
-            { name: "Deploy Database", state: ChainExecutionState.COMPLETED },
-            { name: "Deploy API Service", state: ChainExecutionState.COMPLETED },
-            { name: "Deploy Frontend", state: ChainExecutionState.RUNNING },
-            { name: "Deploy Background Jobs", state: ChainExecutionState.RUNNING },
+            { name: "Deploy Database", state: "completed" },
+            { name: "Deploy API Service", state: "completed" },
+            { name: "Deploy Frontend", state: "running" },
+            { name: "Deploy Background Jobs", state: "running" },
           ],
         },
         {
           name: "Staging Tests",
-          state: ChainExecutionState.RUNNING,
+          state: "running",
           children: [
-            { name: "Smoke Tests", state: ChainExecutionState.RUNNING },
-            { name: "Performance Tests", state: ChainExecutionState.RUNNING },
-            { name: "User Acceptance Tests", state: ChainExecutionState.RUNNING },
+            { name: "Smoke Tests", state: "running" },
+            { name: "Performance Tests", state: "running" },
+            { name: "User Acceptance Tests", state: "running" },
           ],
         },
         {
           name: "Production Deployment",
-          state: ChainExecutionState.RUNNING,
+          state: "running",
           children: [
-            { name: "Blue-Green Switch", state: ChainExecutionState.RUNNING },
-            { name: "Health Checks", state: ChainExecutionState.RUNNING },
-            { name: "Monitor Metrics", state: ChainExecutionState.RUNNING },
+            { name: "Blue-Green Switch", state: "running" },
+            { name: "Health Checks", state: "running" },
+            { name: "Monitor Metrics", state: "running" },
           ],
         },
       ],

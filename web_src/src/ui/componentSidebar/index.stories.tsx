@@ -3,6 +3,7 @@ import { ComponentSidebar } from "./";
 import GithubIcon from "@/assets/icons/integrations/github.svg";
 import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
+import { DEFAULT_EVENT_STATE_MAP } from "../componentBase";
 
 const meta: Meta<typeof ComponentSidebar> = {
   title: "ui/ComponentSidebar",
@@ -39,7 +40,7 @@ const mockLatestEvents = [
     id: "event-1",
     title: "New commit",
     subtitle: "4m",
-    state: "processed" as const,
+    state: "success" as const,
     isOpen: false,
     receivedAt: new Date(),
   },
@@ -84,7 +85,7 @@ const mockAllHistoryEvents = [
     id: "history-1",
     title: "Initial commit",
     subtitle: "2d",
-    state: "processed" as const,
+    state: "success" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 48),
     values: {
@@ -99,7 +100,7 @@ const mockAllHistoryEvents = [
     id: "history-2",
     title: "Feature branch created",
     subtitle: "1d",
-    state: "processed" as const,
+    state: "success" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
     values: {
@@ -113,7 +114,7 @@ const mockAllHistoryEvents = [
     id: "history-3",
     title: "Tests passed",
     subtitle: "18h",
-    state: "processed" as const,
+    state: "success" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 18),
     values: {
@@ -141,7 +142,7 @@ const mockAllHistoryEvents = [
     id: "history-5",
     title: "Code review submitted",
     subtitle: "8h",
-    state: "processed" as const,
+    state: "success" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 8),
     values: {
@@ -155,7 +156,7 @@ const mockAllHistoryEvents = [
     id: "history-6",
     title: "Security audit completed",
     subtitle: "6h",
-    state: "processed" as const,
+    state: "success" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 6),
     values: {
@@ -177,7 +178,7 @@ const mockAllHistoryEvents = [
     id: "history-8",
     title: "Merge request created",
     subtitle: "4h",
-    state: "processed" as const,
+    state: "success" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 4),
     values: {
@@ -244,6 +245,10 @@ export const Default: Story = {
     onToggleView: () => console.log("Toggle view action"),
     onDeactivate: () => console.log("Deactivate action"),
     onDelete: () => console.log("Delete action"),
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
   },
 };
 
@@ -299,6 +304,10 @@ export const WithInteractiveEvents: Story = {
     onDuplicate: () => console.log("Duplicate action"),
     onDocs: () => console.log("Documentation action"),
     onToggleView: () => console.log("Toggle view action"),
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
   },
 };
 
@@ -361,6 +370,10 @@ export const WithDifferentIcon: Story = {
     onRun: () => console.log("Run action"),
     onDeactivate: () => console.log("Deactivate action"),
     onDelete: () => console.log("Delete action"),
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
   },
 };
 
@@ -435,6 +448,10 @@ export const ExtendedMetadata: Story = {
     onToggleView: () => console.log("Toggle view action"),
     onDeactivate: () => console.log("Deactivate action"),
     onDelete: () => console.log("Delete action"),
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
   },
 };
 
@@ -462,6 +479,10 @@ export const ZeroState: Story = {
     iconColor: "text-gray-800",
     iconBackground: "bg-gray-200",
     onClose: () => console.log("Close sidebar"),
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
   },
 };
 
@@ -548,7 +569,7 @@ export const WithFullHistory: Story = {
             id: "history-extra-1",
             title: "Database migration completed",
             subtitle: "3d",
-            state: "processed" as const,
+            state: "success" as const,
             isOpen: false,
             receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 72),
           },
@@ -556,7 +577,7 @@ export const WithFullHistory: Story = {
             id: "history-extra-2",
             title: "Backup created",
             subtitle: "4d",
-            state: "processed" as const,
+            state: "success" as const,
             isOpen: false,
             receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 96),
           },
@@ -599,6 +620,10 @@ export const WithFullHistory: Story = {
     onToggleView: () => console.log("Toggle view action"),
     onDeactivate: () => console.log("Deactivate action"),
     onDelete: () => console.log("Delete action"),
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
   },
 };
 

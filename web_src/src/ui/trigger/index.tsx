@@ -66,9 +66,9 @@ export const Trigger: React.FC<TriggerProps> = ({
   const LastEventIcon = React.useMemo(() => {
     if (!lastEventData) return null;
     if (lastEventData.state === "processed") {
-      return resolveIcon("check");
+      return resolveIcon("circle-check");
     } else {
-      return resolveIcon("x");
+      return resolveIcon("circle-x");
     }
   }, [lastEventData]);
 
@@ -155,9 +155,9 @@ export const Trigger: React.FC<TriggerProps> = ({
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <div
-                    className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${lastEventData.state === "processed" ? "bg-green-600" : "bg-red-600"}`}
+                    className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${lastEventData.state === "processed" ? "text-green-600" : "text-red-600"}`}
                   >
-                    {LastEventIcon && <LastEventIcon size={12} className="text-white" />}
+                    {LastEventIcon && <LastEventIcon size={16} />}
                   </div>
                   <span className="truncate text-sm min-w-0">{lastEventData.title}</span>
                 </div>

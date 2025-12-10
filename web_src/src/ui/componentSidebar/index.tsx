@@ -11,6 +11,8 @@ import { SidebarEventItem } from "./SidebarEventItem";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
+import { WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { EventState, EventStateMap } from "../componentBase";
 
 const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
   { value: "processed", label: "Processed" },
@@ -80,6 +82,12 @@ interface ComponentSidebarProps {
     currentExecution?: Record<string, unknown>,
     forceReload?: boolean,
   ) => Promise<any[]>;
+
+  // State registry function for determining execution states
+  getExecutionState?: (
+    nodeId: string,
+    execution: WorkflowsWorkflowNodeExecution,
+  ) => { map: EventStateMap; state: EventState };
 }
 
 export const ComponentSidebar = ({
@@ -125,6 +133,7 @@ export const ComponentSidebar = ({
   getHasMoreQueue,
   getLoadingMoreQueue,
   loadExecutionChain,
+  getExecutionState,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -301,7 +310,7 @@ export const ComponentSidebar = ({
       events = events.filter(
         (event) =>
           event.title.toLowerCase().includes(query) ||
-          event.subtitle?.toLowerCase().includes(query) ||
+          (typeof event.subtitle === "string" && event.subtitle?.toLowerCase().includes(query)) ||
           Object.values(event.values || {}).some((value) => String(value).toLowerCase().includes(query)),
       );
     }
@@ -460,6 +469,7 @@ export const ComponentSidebar = ({
                       supportsPushThrough={supportsPushThrough}
                       onReEmit={onReEmit}
                       loadExecutionChain={loadExecutionChain}
+                      getExecutionState={getExecutionState}
                     />
                   ))}
                   {hasMoreItems && !searchQuery && statusFilter === "all" && (
@@ -513,6 +523,7 @@ export const ComponentSidebar = ({
                         supportsPushThrough={supportsPushThrough}
                         onReEmit={onReEmit}
                         loadExecutionChain={loadExecutionChain}
+                        getExecutionState={getExecutionState}
                       />
                     );
                   })}
@@ -552,6 +563,7 @@ export const ComponentSidebar = ({
                           onPushThrough={onPushThrough}
                           supportsPushThrough={supportsPushThrough}
                           loadExecutionChain={loadExecutionChain}
+                          getExecutionState={getExecutionState}
                         />
                       );
                     })}

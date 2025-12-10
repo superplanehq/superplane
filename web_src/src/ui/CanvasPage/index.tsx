@@ -11,7 +11,7 @@ import {
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ConfigurationField } from "@/api-client";
+import { ConfigurationField, WorkflowsWorkflowNodeExecution } from "@/api-client";
 import { AiSidebar } from "../ai";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
@@ -19,6 +19,7 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import type { MetadataItem } from "../metadataList";
 import { ViewToggle } from "../ViewToggle";
+import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
@@ -30,7 +31,7 @@ import { CanvasPageState, useCanvasState } from "./useCanvasState";
 export interface SidebarEvent {
   id: string;
   title: string;
-  subtitle?: string;
+  subtitle?: string | React.ReactNode;
   state: "processed" | "discarded" | "waiting" | "running";
   isOpen: boolean;
   receivedAt?: Date;
@@ -173,6 +174,12 @@ export interface CanvasPageProps {
     currentExecution?: Record<string, unknown>,
     forceReload?: boolean,
   ) => Promise<any[]>;
+
+  // State registry function for determining execution states
+  getExecutionState?: (
+    nodeId: string,
+    execution: WorkflowsWorkflowNodeExecution,
+  ) => { map: EventStateMap; state: EventState };
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -497,6 +504,7 @@ function CanvasPage(props: CanvasPageProps) {
             getLoadingMoreQueue={props.getLoadingMoreQueue}
             onReEmit={props.onReEmit}
             loadExecutionChain={props.loadExecutionChain}
+            getExecutionState={props.getExecutionState}
             onSidebarClose={handleSidebarClose}
           />
         </div>
@@ -579,6 +587,7 @@ function Sidebar({
   getHasMoreQueue,
   getLoadingMoreQueue,
   loadExecutionChain,
+  getExecutionState,
   onSidebarClose,
 }: {
   state: CanvasPageState;
@@ -608,6 +617,10 @@ function Sidebar({
   getHasMoreQueue?: (nodeId: string) => boolean;
   getLoadingMoreQueue?: (nodeId: string) => boolean;
   loadExecutionChain?: (eventId: string) => Promise<any[]>;
+  getExecutionState?: (
+    nodeId: string,
+    execution: WorkflowsWorkflowNodeExecution,
+  ) => { map: EventStateMap; state: EventState };
   onSidebarClose?: () => void;
 }) {
   const sidebarData = useMemo(() => {
@@ -706,6 +719,9 @@ function Sidebar({
       getLoadingMoreQueue={() => getLoadingMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
       onReEmit={onReEmit}
       loadExecutionChain={loadExecutionChain}
+      getExecutionState={
+        getExecutionState ? (nodeId: string, execution: any) => getExecutionState(nodeId, execution) : undefined
+      }
     />
   );
 }

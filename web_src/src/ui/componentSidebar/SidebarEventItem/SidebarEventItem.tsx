@@ -1,25 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon, isUrl } from "@/lib/utils";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../SimpleTooltip";
+import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
+import { WorkflowsWorkflowNodeExecution } from "@/api-client";
 
-export enum ChainExecutionState {
-  COMPLETED = "completed",
-  FAILED = "failed",
-  RUNNING = "running",
-}
-
-export interface ExecutionChainItem {
+export interface ExecutionChainItem extends EventStateStyle {
   name: string;
   nodeId: string;
   executionId: string;
-  state: ChainExecutionState;
+  state: string;
   payload?: any;
-  children?: Array<{ name: string; state: ChainExecutionState }>;
+  children?: Array<{ name: string; state: string } & EventStateStyle>;
 }
 
 export interface TabData {
@@ -48,12 +44,15 @@ interface SidebarEventItemProps {
     currentExecution?: Record<string, unknown>,
     forceReload?: boolean,
   ) => Promise<any[]>;
+  getExecutionState?: (
+    nodeId: string,
+    execution: WorkflowsWorkflowNodeExecution,
+  ) => { map: EventStateMap; state: EventState };
 }
 
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   event,
   index,
-  variant = "latest",
   isOpen,
   onToggleOpen,
   onEventClick,
@@ -64,6 +63,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   supportsPushThrough,
   onReEmit,
   loadExecutionChain,
+  getExecutionState,
 }) => {
   // Determine default active tab based on available data
   const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" | "executionChain" => {
@@ -82,6 +82,27 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const [payloadCopied, setPayloadCopied] = useState(false);
   const [executionChainData, setExecutionChainData] = useState<ExecutionChainItem[] | null>(null);
   const [executionChainLoading, setExecutionChainLoading] = useState(false);
+
+  const eventStateStyle: EventStateStyle = useMemo(() => {
+    if (!getExecutionState) return DEFAULT_EVENT_STATE_MAP["neutral"];
+
+    if (event.kind === "queue") return DEFAULT_EVENT_STATE_MAP["next-in-queue"];
+
+    if (event.kind === "trigger") {
+      const triggerState = {
+        processed: "success",
+        discarded: "failed",
+      };
+      const state = triggerState[event.state as "processed" | "discarded"];
+      return DEFAULT_EVENT_STATE_MAP[state as EventState];
+    }
+
+    const { map, state } = getExecutionState(
+      event.nodeId || "",
+      event.originalExecution as WorkflowsWorkflowNodeExecution,
+    );
+    return map[state];
+  }, [event.nodeId, event.originalExecution, getExecutionState, event.kind, event.state]);
 
   // Function to load execution chain data lazily
   const loadExecutionChainData = useCallback(
@@ -103,20 +124,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         const rawExecutionChain = await loadExecutionChain(rootEventId, currentNodeId, currentExecution, forceReload);
 
         const processedChainData = rawExecutionChain.map((exec: any) => {
-          const getSidebarEventItemState = (exec: any) => {
-            if (exec.state === "STATE_FINISHED") {
-              if (exec.result === "RESULT_PASSED") {
-                return ChainExecutionState.COMPLETED;
-              }
-              return ChainExecutionState.FAILED;
-            }
+          if (!getExecutionState) return {};
 
-            if (exec.state === "STATE_STARTED" || exec.state === "STATE_PENDING") {
-              return ChainExecutionState.RUNNING;
-            }
-
-            return ChainExecutionState.FAILED;
-          };
+          const { map, state } = getExecutionState(exec.nodeId, exec);
+          const eventStyle = map[state];
 
           let payload: Record<string, unknown> = {};
           if (exec.outputs) {
@@ -135,11 +146,12 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           }
 
           const mainItem: ExecutionChainItem = {
+            ...eventStyle,
             name: exec.nodeId || "Unknown",
             nodeId: exec.nodeId || "",
             executionId: exec.id || "",
             payload,
-            state: getSidebarEventItemState(exec),
+            state: state,
             children:
               exec?.childExecutions && exec.childExecutions.length > 0
                 ? exec.childExecutions
@@ -149,15 +161,21 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
                       return timeA - timeB;
                     })
-                    .map((childExec: any) => ({
-                      name: childExec?.nodeId?.split(":")?.at(-1) || "Unknown",
-                      state: getSidebarEventItemState(childExec),
-                    }))
+                    .map((childExec: any) => {
+                      const nodeId = childExec?.nodeId?.split(":")?.at(-1);
+                      const { map, state } = getExecutionState(exec.nodeId, childExec);
+
+                      return {
+                        name: nodeId || "Unknown",
+                        state: state,
+                        ...map[state],
+                      };
+                    })
                 : undefined,
           };
 
           return mainItem;
-        });
+        }) as ExecutionChainItem[];
 
         setExecutionChainData(processedChainData);
       } catch (error) {
@@ -184,16 +202,16 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     loadData: (() => void) | null;
   }>({
     activeTab,
-    hasInProgress: executionChainData?.some((item) => item.state === ChainExecutionState.RUNNING) || false,
+    hasInProgress: executionChainData?.some((item) => item.state === "running") || false,
     loadData: null,
   });
 
   pollingRef.current.activeTab = activeTab;
   pollingRef.current.hasInProgress =
     ["waiting", "running", "pending"].includes(event.state || "") ||
-    executionChainData?.some((item) => item.state === ChainExecutionState.RUNNING) ||
+    executionChainData?.some((item) => item.state !== "running" && item.state !== "failed") ||
     executionChainData?.some((execution) =>
-      execution.children?.some((children) => children.state === ChainExecutionState.RUNNING),
+      execution.children?.some((children) => children.state !== "success" && children.state !== "failed"),
     ) ||
     false;
   pollingRef.current.loadData = () => loadExecutionChainData(true);
@@ -298,57 +316,14 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     }
   }, [tabData, activeTab, getDefaultActiveTab]);
 
-  let EventIcon = resolveIcon("check");
-  let EventColor = "text-green-700";
-  let EventBackground = "bg-green-200";
-  let titleColor = "text-black";
-  let iconSize = 16;
-  let iconContainerSize = 4;
-  let iconStrokeWidth = 2;
-  let animation = "";
-
-  switch (event.state) {
-    case "processed":
-      EventIcon = resolveIcon("circle-check");
-      EventColor = "text-green-700";
-      EventBackground = "bg-green-200";
-      titleColor = "text-green-800";
-      iconSize = 16;
-      break;
-    case "discarded":
-      EventIcon = resolveIcon("circle-x");
-      EventColor = "text-red-700";
-      EventBackground = "bg-red-200";
-      titleColor = "text-red-800";
-      iconSize = 16;
-      break;
-    case "waiting":
-      if (variant === "queue") {
-        // Match node card styling (neutral grey + dashed icon)
-        EventIcon = resolveIcon("circle-dashed");
-        EventColor = "text-gray-500";
-        EventBackground = "bg-gray-100";
-        titleColor = "text-gray-600";
-        iconSize = 16;
-        animation = "";
-      } else {
-        EventIcon = resolveIcon("refresh-cw");
-        EventColor = "text-blue-700";
-        EventBackground = "bg-blue-100";
-        titleColor = "text-blue-800";
-        iconSize = 16;
-        animation = "animate-spin";
-      }
-      break;
-    case "running":
-      EventIcon = resolveIcon("refresh-cw");
-      EventColor = "text-blue-700";
-      EventBackground = "bg-blue-100";
-      titleColor = "text-blue-800";
-      iconSize = 16;
-      animation = "animate-spin";
-      break;
-  }
+  const EventIcon = resolveIcon(eventStateStyle.icon);
+  const EventColor = eventStateStyle.textColor;
+  const EventBackground = eventStateStyle.backgroundColor;
+  const titleColor = eventStateStyle.textColor;
+  const iconSize = eventStateStyle.iconSize;
+  const iconContainerSize = 4;
+  const iconStrokeWidth = 2;
+  const iconClassName = eventStateStyle.iconClassName;
 
   return (
     <div
@@ -365,7 +340,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           }}
         >
           <div
-            className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center ${EventColor} ${animation}`}
+            className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center ${EventColor} ${iconClassName}`}
           >
             <EventIcon size={iconSize} strokeWidth={iconStrokeWidth} className="thick" />
           </div>
@@ -590,25 +565,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       {/* Main execution */}
                       <div className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0 group hover:bg-gray-100">
                         <div className="flex-shrink-0">
-                          {execution.state === ChainExecutionState.COMPLETED
-                            ? React.createElement(resolveIcon("circle-check"), {
-                                size: 16,
-                                className: "text-green-600",
-                              })
-                            : execution.state === ChainExecutionState.FAILED
-                              ? React.createElement(resolveIcon("x"), {
-                                  size: 16,
-                                  className: "text-red-600",
-                                })
-                              : execution.state === ChainExecutionState.RUNNING
-                                ? React.createElement(resolveIcon("refresh-cw"), {
-                                    size: 16,
-                                    className: "text-blue-600 animate-spin",
-                                  })
-                                : React.createElement(resolveIcon("circle"), {
-                                    size: 16,
-                                    className: "text-gray-400",
-                                  })}
+                          {React.createElement(resolveIcon(execution.icon), {
+                            size: execution.iconSize,
+                            className: `${execution.textColor} ${execution.iconClassName} `,
+                          })}
                         </div>
                         <span className="text-sm text-gray-800 truncate flex-1">{execution.name}</span>
                         {/* Hover Icons */}
@@ -674,17 +634,17 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                               })}
                             </div>
                             <div className="flex-shrink-0">
-                              {child.state === ChainExecutionState.COMPLETED
+                              {child.state === "completed"
                                 ? React.createElement(resolveIcon("circle-check"), {
                                     size: 16,
                                     className: "text-green-600",
                                   })
-                                : child.state === ChainExecutionState.FAILED
+                                : child.state === "failed"
                                   ? React.createElement(resolveIcon("x"), {
                                       size: 16,
                                       className: "text-red-600",
                                     })
-                                  : child.state === ChainExecutionState.RUNNING
+                                  : child.state === "running"
                                     ? React.createElement(resolveIcon("refresh-cw"), {
                                         size: 16,
                                         className: "text-blue-600 animate-spin",

@@ -6,8 +6,9 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseProps } from "@/ui/componentBase";
+import { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
 import { TriggerProps } from "@/ui/trigger";
+import { QueryClient } from "@tanstack/react-query";
 
 /**
  * A trigger renderer converts backend data into UI props for a specific trigger type.
@@ -51,5 +52,41 @@ export interface ComponentBaseMapper {
     componentDefinition: ComponentsComponent,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+    additionalData?: unknown,
   ): ComponentBaseProps;
+
+  subtitle?(
+    node: ComponentsNode,
+    execution: WorkflowsWorkflowNodeExecution,
+    additionalData?: unknown,
+  ): string | React.ReactNode;
+}
+
+/**
+ * A component additional data builder creates component-specific data
+ * that cannot be derived from the standard parameters alone.
+ */
+export interface ComponentAdditionalDataBuilder {
+  buildAdditionalData(
+    nodes: ComponentsNode[],
+    node: ComponentsNode,
+    componentDefinition: ComponentsComponent,
+    lastExecutions: WorkflowsWorkflowNodeExecution[],
+    workflowId: string,
+    queryClient: QueryClient,
+    organizationId?: string,
+  ): unknown;
+}
+
+/**
+ * A state function that determines the current state based on execution data
+ */
+export type StateFunction = (execution: WorkflowsWorkflowNodeExecution) => EventState;
+
+/**
+ * Event state registry for components with custom state logic and styling
+ */
+export interface EventStateRegistry {
+  stateMap: EventStateMap;
+  getState: StateFunction;
 }

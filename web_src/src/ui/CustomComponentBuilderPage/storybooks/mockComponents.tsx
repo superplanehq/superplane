@@ -49,8 +49,8 @@ export const mockComponents: ComponentsComponent[] = [
     name: "approval",
     label: "Approval",
     description: "Pause for manual approval",
-    icon: "check-circle-2",
-    color: "green",
+    icon: "hand",
+    color: "orange",
     outputChannels: [
       { name: "approved", label: "Approved" },
       { name: "rejected", label: "Rejected" },
