@@ -60,7 +60,7 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
     iconSize: 16,
     iconClassName: "",
   },
-  neutral: {
+  error: {
     icon: "triangle-alert",
     textColor: "text-red-700",
     backgroundColor: "bg-red-200",
@@ -84,7 +84,7 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
 export const approvalStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
   // Error state - component could not evaluate or apply approval logic
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED") {
-    return "neutral"; // Using neutral for error state with triangle-alert icon
+    return "error"; // Using neutral for error state with triangle-alert icon
   }
 
   // Waiting state - some or all required actors have not yet responded
