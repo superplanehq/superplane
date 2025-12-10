@@ -20,6 +20,7 @@ func TestGithubTrigger(t *testing.T) {
 	t.Run("adding a github trigger node", func(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
+		steps.givenAGithubIntegrationExists()
 		steps.addGithubTriggerNode()
 		steps.saveCanvas()
 		steps.assertGithubTriggerNodeExistsInDB()
@@ -47,9 +48,38 @@ func (s *GithubTriggerSteps) start() {
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
 	s.session.Login()
+}
 
+func (s *GithubTriggerSteps) givenAGithubIntegrationExists() {
 	s.integrationName = "E2E GitHub Integration"
-	s.ensureGithubIntegrationExists()
+
+	auth := models.IntegrationAuth{
+		Token: &models.IntegrationAuthToken{
+			ValueFrom: models.ValueDefinitionFrom{
+				Secret: &models.ValueDefinitionFromSecret{
+					Name: "github-token",
+					Key:  "value",
+				},
+			},
+		},
+	}
+
+	now := time.Now()
+	integration := &models.Integration{
+		ID:         uuid.New(),
+		Name:       s.integrationName,
+		DomainType: models.DomainTypeOrganization,
+		DomainID:   s.session.OrgID,
+		Type:       models.IntegrationTypeGithub,
+		URL:        "https://github.com/superplane/e2e",
+		AuthType:   models.IntegrationAuthTypeToken,
+		Auth:       datatypes.NewJSONType(auth),
+		CreatedAt:  &now,
+		CreatedBy:  s.session.Account.ID,
+	}
+
+	_, err := models.CreateIntegration(integration)
+	require.NoError(s.t, err)
 }
 
 func (s *GithubTriggerSteps) givenACanvasExists() {
@@ -131,40 +161,4 @@ func (s *GithubTriggerSteps) assertGithubTriggerExecutionCreated() {
 func (s *GithubTriggerSteps) assertSecondNodeExecuted() {
 	executions := s.canvas.GetExecutionsForNode("Second")
 	require.NotEmpty(s.t, executions, "expected at least one execution for second node")
-}
-
-func (s *GithubTriggerSteps) ensureGithubIntegrationExists() {
-	// Check if integration already exists
-	integration, err := models.FindIntegrationByName("organization", s.session.OrgID, s.integrationName)
-	if err == nil && integration != nil {
-		return
-	}
-
-	auth := models.IntegrationAuth{
-		Token: &models.IntegrationAuthToken{
-			ValueFrom: models.ValueDefinitionFrom{
-				Secret: &models.ValueDefinitionFromSecret{
-					Name: "github-token",
-					Key:  "value",
-				},
-			},
-		},
-	}
-
-	now := time.Now()
-	integration = &models.Integration{
-		ID:         uuid.New(),
-		Name:       s.integrationName,
-		DomainType: "organization",
-		DomainID:   s.session.OrgID,
-		Type:       models.IntegrationTypeGithub,
-		URL:        "https://github.com/superplane/e2e",
-		AuthType:   models.IntegrationAuthTypeToken,
-		Auth:       datatypes.NewJSONType(auth),
-		CreatedAt:  &now,
-		CreatedBy:  s.session.Account.ID,
-	}
-
-	_, err = models.CreateIntegration(integration)
-	require.NoError(s.t, err)
 }
