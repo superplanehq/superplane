@@ -18,6 +18,7 @@ func TestApprovals(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addApprovalToCanvas("TestApproval")
+		steps.configureApprovalForUser("TestApproval")
 		steps.saveCanvas()
 		steps.verifyApprovalSavedToDB("TestApproval")
 	})
@@ -71,8 +72,8 @@ func (s *ApprovalSteps) verifyApprovalSavedToDB(nodeName string) {
 	require.NotNil(s.t, node, "approval node not found in DB")
 }
 
-func (s *ApprovalSteps) configureApprovalForCurrentUser() {
-	s.canvas.StartEditingNode("ReleaseApproval")
+func (s *ApprovalSteps) configureApprovalForUser(nodeName string) {
+	s.canvas.StartEditingNode(nodeName)
 
 	s.session.Click(q.Locator(`button:has-text("Add Item")`))
 	s.session.Click(q.Locator(`button:has-text("Select Type")`))
@@ -83,6 +84,10 @@ func (s *ApprovalSteps) configureApprovalForCurrentUser() {
 
 	s.session.Click(q.TestID("add-node-button"))
 	s.session.Sleep(300)
+}
+
+func (s *ApprovalSteps) configureApprovalForCurrentUser() {
+	s.configureApprovalForUser("ReleaseApproval")
 }
 
 func (s *ApprovalSteps) verifyApprovalConfigurationPersisted() {
