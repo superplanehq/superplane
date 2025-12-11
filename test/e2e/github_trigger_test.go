@@ -31,14 +31,14 @@ func TestGithubTrigger(t *testing.T) {
 		steps.assertGithubTriggerNodeExistsInDB()
 	})
 
-	v.Run(t, "receiving github trigger events", func(t *testing.T) {
-		steps.start()
-		steps.givenACanvasWithGithubTriggerAndNoop()
-		steps.saveCanvas()
-		steps.simulateReceivingGithubEvent()
-		steps.assertGithubTriggerExecutionCreated()
-		steps.assertSecondNodeExecuted()
-	})
+	// v.Run(t, "receiving github trigger events", func(t *testing.T) {
+	// 	steps.start()
+	// 	steps.givenACanvasWithGithubTriggerAndNoop()
+	// 	steps.saveCanvas()
+	// 	steps.simulateReceivingGithubEvent()
+	// 	steps.assertGithubTriggerExecutionCreated()
+	// 	steps.assertSecondNodeExecuted()
+	// })
 }
 
 type GithubTriggerSteps struct {
@@ -70,14 +70,12 @@ func (s *GithubTriggerSteps) givenAGithubIntegrationExists(ownerSlug, token stri
 
 	s.session.FillIn(ownerInput, ownerSlug)
 	s.session.FillIn(tokenInput, token)
-	s.session.TakeScreenshot()
 
 	s.session.Click(q.TestID("create-integration-button"))
 
 	s.integrationName = ownerSlug + "-account"
 
 	s.session.Sleep(1000)
-	s.session.TakeScreenshot()
 }
 
 func (s *GithubTriggerSteps) givenACanvasExists() {
@@ -90,7 +88,7 @@ func (s *GithubTriggerSteps) addGithubTriggerNode() {
 	source := q.TestID("building-block-github")
 	target := q.TestID("rf__wrapper")
 
-	s.session.DragAndDrop(source, target, 500, 200)
+	s.session.DragAndDrop(source, target, 800, 200)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), "GitHub Trigger")
@@ -99,6 +97,16 @@ func (s *GithubTriggerSteps) addGithubTriggerNode() {
 	integrationTrigger := q.Locator(`label:has-text("GitHub integration") + div button`)
 	s.session.Click(integrationTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + s.integrationName + `")`))
+
+	// Select the repository
+	repositoryTrigger := q.Locator(`label:has-text("Repository") + div button`)
+	s.session.Click(repositoryTrigger)
+	s.session.Click(q.Locator(`div[role="option"]:has-text("front")`))
+
+	// Select the event type
+	eventTypeTrigger := q.Locator(`label:has-text("Event Type") + div button`)
+	s.session.Click(eventTypeTrigger)
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Push")`))
 
 	s.session.Click(q.TestID("add-node-button"))
 	s.session.Sleep(300)

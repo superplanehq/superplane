@@ -1,0 +1,72 @@
+---
+version: 1
+interactions:
+    - request:
+        body: |
+            {"name":"web","config":{"content_type":"json","url":"http://127.0.0.1:8001/api/v1/webhooks/540abfcb-fbc2-42ee-8961-4072e94c0bff","secret":"od8LLm2w6U0ZTKzuPyXT53k0nLIDl9y7Iyw_1731eQ8="},"events":["push"],"active":true}
+        form: {}
+        headers:
+            Accept:
+                - application/vnd.github.v3+json
+            Authorization:
+                - Bearer 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
+            Content-Type:
+                - application/json
+            User-Agent:
+                - go-github/v74.0.0
+            X-Github-Api-Version:
+                - "2022-11-28"
+        url: https://api.github.com/repos/puppies-inc/front/hooks
+        method: POST
+      response:
+        body: '{"message":"Validation Failed","errors":[{"resource":"Hook","code":"custom","field":"url","message":"url is not supported because it isn''t reachable over the public Internet (127.0.0.1)"}],"documentation_url":"https://docs.github.com/rest/repos/webhooks#create-a-repository-webhook","status":"422"}'
+        headers:
+            Access-Control-Allow-Origin:
+                - '*'
+            Access-Control-Expose-Headers:
+                - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
+            Content-Length:
+                - "298"
+            Content-Security-Policy:
+                - default-src 'none'
+            Content-Type:
+                - application/json; charset=utf-8
+            Date:
+                - Thu, 11 Dec 2025 14:39:19 GMT
+            Github-Authentication-Token-Expiration:
+                - 2026-01-10 11:40:16 +0100
+            Referrer-Policy:
+                - origin-when-cross-origin, strict-origin-when-cross-origin
+            Server:
+                - github.com
+            Strict-Transport-Security:
+                - max-age=31536000; includeSubdomains; preload
+            Vary:
+                - Accept-Encoding, Accept, X-Requested-With
+            X-Accepted-Github-Permissions:
+                - repository_hooks=write
+            X-Content-Type-Options:
+                - nosniff
+            X-Frame-Options:
+                - deny
+            X-Github-Api-Version-Selected:
+                - "2022-11-28"
+            X-Github-Media-Type:
+                - github.v3; format=json
+            X-Github-Request-Id:
+                - 62AA:123889:92C5C31:878C49A:693AD796
+            X-Ratelimit-Limit:
+                - "5000"
+            X-Ratelimit-Remaining:
+                - "4992"
+            X-Ratelimit-Reset:
+                - "1765466198"
+            X-Ratelimit-Resource:
+                - core
+            X-Ratelimit-Used:
+                - "8"
+            X-Xss-Protection:
+                - "0"
+        status: 422 Unprocessable Entity
+        code: 422
+        duration: 431.88925ms

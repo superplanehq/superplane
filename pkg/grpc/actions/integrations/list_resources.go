@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -27,14 +26,10 @@ func ListResources(ctx context.Context, registry *registry.Registry, domainType,
 		return nil, status.Error(codes.NotFound, "integration not found")
 	}
 
-	log.Infof("AAAAAAAAAAAAAAA: Listing resources for integration %s of type %s", integration.Name, integration.Type)
-
 	resourceManager, err := registry.NewResourceManager(ctx, integration)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to create resource manager")
 	}
-
-	log.Infof("AAAAAAAAAAAAAAA: Resource manager created for integration %s of type %s", integration.Name, integration.Type)
 
 	resources, err := resourceManager.List(resourceType)
 	if err != nil {
