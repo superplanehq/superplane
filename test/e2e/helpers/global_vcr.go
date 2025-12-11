@@ -10,38 +10,43 @@ import (
 )
 
 var (
-	globalRecorder    *recorder.Recorder
+	// globalRecorder is the recorder used for the global VCR.
+	globalRecorder *recorder.Recorder
+
+	// Keep the original http transport to restore it back to normal after tests.
 	originalTransport = http.DefaultTransport
 )
 
-// StartGlobalVCR replaces the default HTTP transport with a VCR recorder
-// so that all outbound HTTP calls are recorded/replayed.
-func StartGlobalVCR(cassetteName string) error {
+// WithVCR is the main entry point for using the global VCR in tests.
+//
+// It starts the global VCR with the given cassette name, runs the provided test function,
+// and ensures the VCR is stopped afterwards.
+//
+// It fails the test if starting or stopping the VCR fails.
+//
+// Usage:
+//
+//	helpers.WithVCR(t, "my-test", func(t *testing.T) {
+//	    // Your test code here
+//	})
+func WithVCR(t *testing.T, cassetteName string, testFunc func(t *testing.T)) {
+	err := startGlobalVCR(cassetteName)
+	require.NoError(t, err)
+
+	defer func() {
+		require.NoError(t, stopGlobalVCR())
+	}()
+
+	testFunc(t)
+}
+
+func startGlobalVCR(cassetteName string) error {
 	r, err := recorder.NewAsMode(cassetteName, recorder.ModeReplayingOrRecording, nil)
 	if err != nil {
 		return err
 	}
 
-	// Let local/dev HTTP traffic bypass VCR so we only
-	// record external calls (e.g. GitHub API).
-	r.AddPassthrough(func(req *http.Request) bool {
-		host := req.URL.Host
-		if host == "" {
-			return false
-		}
-
-		// Strip port if present.
-		if idx := strings.Index(host, ":"); idx != -1 {
-			host = host[:idx]
-		}
-
-		switch host {
-		case "localhost", "127.0.0.1":
-			return true
-		default:
-			return false
-		}
-	})
+	r.AddPassthrough(localTraficPassthrough)
 
 	globalRecorder = r
 	http.DefaultTransport = r
@@ -49,8 +54,7 @@ func StartGlobalVCR(cassetteName string) error {
 	return nil
 }
 
-// StopGlobalVCR restores the original HTTP transport and stops the recorder.
-func StopGlobalVCR() error {
+func stopGlobalVCR() error {
 	http.DefaultTransport = originalTransport
 
 	if globalRecorder != nil {
@@ -62,14 +66,24 @@ func StopGlobalVCR() error {
 	return nil
 }
 
-// WithVCR is a test helper that wraps a test in a global VCR cassette.
-func WithVCR(t *testing.T, cassetteName string, testFunc func(t *testing.T)) {
-	err := StartGlobalVCR(cassetteName)
-	require.NoError(t, err)
+// HTTP trafic between the browser and the application server should not be recorded by VCR.
+// This function identifies such trafic and allows it to passthrough the VCR recorder
+// without being recorded or replayed.
+func localTraficPassthrough(req *http.Request) bool {
+	host := req.URL.Host
+	if host == "" {
+		return false
+	}
 
-	defer func() {
-		require.NoError(t, StopGlobalVCR())
-	}()
+	// Strip port if present.
+	if idx := strings.Index(host, ":"); idx != -1 {
+		host = host[:idx]
+	}
 
-	testFunc(t)
+	switch host {
+	case "localhost", "127.0.0.1":
+		return true
+	default:
+		return false
+	}
 }
