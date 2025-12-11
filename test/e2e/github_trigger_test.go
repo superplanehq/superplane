@@ -22,29 +22,31 @@ func TestGithubTrigger(t *testing.T) {
 	const githubOwner = "puppies-inc"
 	const githubTokenValue = "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"
 
-	v.Run(t, "addding a github trigger node", func(t *testing.T) {
+	// v.Run(t, "addding a github trigger node", func(t *testing.T) {
+	// 	steps.start()
+	// 	steps.givenAGithubIntegrationExists(githubOwner, githubTokenValue)
+	// 	steps.givenACanvasExists()
+	// 	steps.addGithubTriggerNode()
+	// 	steps.saveCanvas()
+	// 	steps.assertGithubTriggerNodeExistsInDB()
+	// })
+
+	v.Run(t, "receiving github trigger events", func(t *testing.T) {
 		steps.start()
 		steps.givenAGithubIntegrationExists(githubOwner, githubTokenValue)
-		steps.givenACanvasExists()
-		steps.addGithubTriggerNode()
+		steps.givenACanvasWithGithubTriggerAndNoop()
 		steps.saveCanvas()
-		steps.assertGithubTriggerNodeExistsInDB()
+		steps.simulateReceivingGithubEvent()
+		steps.assertGithubTriggerExecutionCreated()
+		steps.assertSecondNodeExecuted()
 	})
-
-	// v.Run(t, "receiving github trigger events", func(t *testing.T) {
-	// 	steps.start()
-	// 	steps.givenACanvasWithGithubTriggerAndNoop()
-	// 	steps.saveCanvas()
-	// 	steps.simulateReceivingGithubEvent()
-	// 	steps.assertGithubTriggerExecutionCreated()
-	// 	steps.assertSecondNodeExecuted()
-	// })
 }
 
 type GithubTriggerSteps struct {
 	t       *testing.T
 	session *session.TestSession
 	canvas  *shared.CanvasSteps
+
 	// integrationName is the name as shown in the UI dropdown
 	integrationName string
 }
@@ -159,6 +161,8 @@ func (s *GithubTriggerSteps) simulateReceivingGithubEvent() {
 }
 
 func (s *GithubTriggerSteps) assertGithubTriggerExecutionCreated() {
+	s.canvas.WaitForExecution("GitHub Trigger", models.WorkflowNodeExecutionStateFinished, 10*time.Second)
+
 	executions := s.canvas.GetExecutionsForNode("GitHub Trigger")
 	require.NotEmpty(s.t, executions, "expected at least one execution for github trigger node")
 }
