@@ -10,38 +10,32 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
-	"github.com/superplanehq/superplane/test/e2e/helpers"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
+	v "github.com/superplanehq/superplane/test/e2e/vcr"
 	"gorm.io/datatypes"
 )
 
 func TestGithubTrigger(t *testing.T) {
-	helpers.WithVCR(t, "test/e2e/testdata/cassettes/github_trigger.yaml", func(t *testing.T) {
-		steps := &GithubTriggerSteps{
-			t:            t,
-			githubToken:  "addasdas",
-			githubOrgURL: "https://github.com/puppies-inc",
-		}
+	steps := &GithubTriggerSteps{t: t}
 
-		t.Run("adding a github trigger node", func(t *testing.T) {
-			steps.start()
-			steps.givenACanvasExists()
-			steps.givenAGithubIntegrationExists()
-			steps.addGithubTriggerNode()
-			steps.saveCanvas()
-			steps.assertGithubTriggerNodeExistsInDB()
-		})
+	v.Run(t, "addding a github trigger node", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasExists()
+		steps.givenAGithubIntegrationExists("Integration", "https://github.com/puppies-inc", "token")
+		steps.addGithubTriggerNode()
+		steps.saveCanvas()
+		steps.assertGithubTriggerNodeExistsInDB()
+	})
 
-		t.Run("receiving github trigger events", func(t *testing.T) {
-			steps.start()
-			steps.givenACanvasWithGithubTriggerAndNoop()
-			steps.saveCanvas()
-			steps.simulateReceivingGithubEvent()
-			steps.assertGithubTriggerExecutionCreated()
-			steps.assertSecondNodeExecuted()
-		})
+	v.Run(t, "receiving github trigger events", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasWithGithubTriggerAndNoop()
+		steps.saveCanvas()
+		steps.simulateReceivingGithubEvent()
+		steps.assertGithubTriggerExecutionCreated()
+		steps.assertSecondNodeExecuted()
 	})
 }
 
@@ -49,10 +43,6 @@ type GithubTriggerSteps struct {
 	t       *testing.T
 	session *session.TestSession
 	canvas  *shared.CanvasSteps
-
-	integrationName string
-	githubToken     string
-	githubOrgURL    string
 }
 
 func (s *GithubTriggerSteps) start() {
@@ -61,12 +51,8 @@ func (s *GithubTriggerSteps) start() {
 	s.session.Login()
 }
 
-func (s *GithubTriggerSteps) givenAGithubIntegrationExists() {
-	s.integrationName = "E2E GitHub Integration"
-
-	secretValues := map[string]string{
-		"value": s.githubToken,
-	}
+func (s *GithubTriggerSteps) givenAGithubIntegrationExists(name, url, token string) {
+	secretValues := map[string]string{"value": token}
 
 	secretData, err := json.Marshal(secretValues)
 	require.NoError(s.t, err)
@@ -95,11 +81,11 @@ func (s *GithubTriggerSteps) givenAGithubIntegrationExists() {
 	now := time.Now()
 	integration := &models.Integration{
 		ID:         uuid.New(),
-		Name:       s.integrationName,
+		Name:       name,
 		DomainType: models.DomainTypeOrganization,
 		DomainID:   s.session.OrgID,
 		Type:       models.IntegrationTypeGithub,
-		URL:        s.githubOrgURL,
+		URL:        url,
 		AuthType:   models.IntegrationAuthTypeToken,
 		Auth:       datatypes.NewJSONType(auth),
 		CreatedAt:  &now,

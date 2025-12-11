@@ -29,15 +29,19 @@ var (
 //	helpers.WithVCR(t, "my-test", func(t *testing.T) {
 //	    // Your test code here
 //	})
-func WithVCR(t *testing.T, cassetteName string, testFunc func(t *testing.T)) {
-	err := startGlobalVCR(cassetteName)
-	require.NoError(t, err)
+func Run(t *testing.T, testName string, testFunc func(t *testing.T)) {
+	cassetteName := testNameToCassetteName(testName)
 
-	defer func() {
-		require.NoError(t, stopGlobalVCR())
-	}()
+	t.Run(testName, func(t *testing.T) {
+		err := startGlobalVCR(cassetteName)
+		require.NoError(t, err)
 
-	testFunc(t)
+		defer func() {
+			require.NoError(t, stopGlobalVCR())
+		}()
+
+		testFunc(t)
+	})
 }
 
 func startGlobalVCR(cassetteName string) error {
@@ -86,4 +90,13 @@ func localTraficPassthrough(req *http.Request) bool {
 	default:
 		return false
 	}
+}
+
+// testNameToCassetteName converts a test name to a valid cassette file name.
+// e.g. "Test My Feature/Subfeature" -> "Test_My_Feature_Subfeature"
+func testNameToCassetteName(testName string) string {
+	// Replace spaces and slashes with underscores to form a valid file name.
+	cassetteName := strings.ReplaceAll(testName, " ", "_")
+	cassetteName = strings.ReplaceAll(cassetteName, "/", "_")
+	return cassetteName
 }

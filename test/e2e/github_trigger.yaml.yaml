@@ -8,198 +8,6 @@ interactions:
             Accept:
                 - application/vnd.github.surtur-preview+json
             Authorization:
-                - Bearer test-github-token
-            User-Agent:
-                - go-github/v74.0.0
-            X-Github-Api-Version:
-                - "2022-11-28"
-        url: https://api.github.com/orgs/superplane/e2e
-        method: GET
-      response:
-        body: "{\r\n  \"message\": \"Not Found\",\r\n  \"documentation_url\": \"https://docs.github.com/rest\",\r\n  \"status\": \"404\"\r\n}"
-        headers:
-            Access-Control-Allow-Origin:
-                - '*'
-            Access-Control-Expose-Headers:
-                - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
-            Content-Security-Policy:
-                - default-src 'none'
-            Content-Type:
-                - application/json; charset=utf-8
-            Date:
-                - Wed, 10 Dec 2025 13:06:10 GMT
-            Referrer-Policy:
-                - origin-when-cross-origin, strict-origin-when-cross-origin
-            Server:
-                - github.com
-            Strict-Transport-Security:
-                - max-age=31536000; includeSubdomains; preload
-            Vary:
-                - Accept-Encoding, Accept, X-Requested-With
-            X-Content-Type-Options:
-                - nosniff
-            X-Frame-Options:
-                - deny
-            X-Github-Media-Type:
-                - github.v3; format=json
-            X-Github-Request-Id:
-                - 626B:B835C:146BE8C:12D9C47:69397042
-            X-Xss-Protection:
-                - "0"
-        status: 404 Not Found
-        code: 404
-        duration: 273.739792ms
-    - request:
-        body: ""
-        form: {}
-        headers:
-            Accept:
-                - application/vnd.github.v3+json
-            Authorization:
-                - Bearer test-github-token
-            User-Agent:
-                - go-github/v74.0.0
-            X-Github-Api-Version:
-                - "2022-11-28"
-        url: https://api.github.com/users/superplane/e2e/repos
-        method: GET
-      response:
-        body: "{\r\n  \"message\": \"Not Found\",\r\n  \"documentation_url\": \"https://docs.github.com/rest\",\r\n  \"status\": \"404\"\r\n}"
-        headers:
-            Access-Control-Allow-Origin:
-                - '*'
-            Access-Control-Expose-Headers:
-                - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
-            Content-Security-Policy:
-                - default-src 'none'
-            Content-Type:
-                - application/json; charset=utf-8
-            Date:
-                - Wed, 10 Dec 2025 13:06:11 GMT
-            Referrer-Policy:
-                - origin-when-cross-origin, strict-origin-when-cross-origin
-            Server:
-                - github.com
-            Strict-Transport-Security:
-                - max-age=31536000; includeSubdomains; preload
-            Vary:
-                - Accept-Encoding, Accept, X-Requested-With
-            X-Content-Type-Options:
-                - nosniff
-            X-Frame-Options:
-                - deny
-            X-Github-Media-Type:
-                - github.v3; format=json
-            X-Github-Request-Id:
-                - 626B:B835C:146C18B:12D9F26:69397042
-            X-Xss-Protection:
-                - "0"
-        status: 404 Not Found
-        code: 404
-        duration: 125.690959ms
-    - request:
-        body: ""
-        form: {}
-        headers:
-            Accept:
-                - application/vnd.github.surtur-preview+json
-            Authorization:
-                - Bearer test-github-token
-            User-Agent:
-                - go-github/v74.0.0
-            X-Github-Api-Version:
-                - "2022-11-28"
-        url: https://api.github.com/orgs/superplane/e2e
-        method: GET
-      response:
-        body: "{\r\n  \"message\": \"Not Found\",\r\n  \"documentation_url\": \"https://docs.github.com/rest\",\r\n  \"status\": \"404\"\r\n}"
-        headers:
-            Access-Control-Allow-Origin:
-                - '*'
-            Access-Control-Expose-Headers:
-                - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
-            Content-Security-Policy:
-                - default-src 'none'
-            Content-Type:
-                - application/json; charset=utf-8
-            Date:
-                - Wed, 10 Dec 2025 13:06:12 GMT
-            Referrer-Policy:
-                - origin-when-cross-origin, strict-origin-when-cross-origin
-            Server:
-                - github.com
-            Strict-Transport-Security:
-                - max-age=31536000; includeSubdomains; preload
-            Vary:
-                - Accept-Encoding, Accept, X-Requested-With
-            X-Content-Type-Options:
-                - nosniff
-            X-Frame-Options:
-                - deny
-            X-Github-Media-Type:
-                - github.v3; format=json
-            X-Github-Request-Id:
-                - 626B:B835C:146CB58:12DA82E:69397043
-            X-Xss-Protection:
-                - "0"
-        status: 404 Not Found
-        code: 404
-        duration: 125.785458ms
-    - request:
-        body: ""
-        form: {}
-        headers:
-            Accept:
-                - application/vnd.github.v3+json
-            Authorization:
-                - Bearer test-github-token
-            User-Agent:
-                - go-github/v74.0.0
-            X-Github-Api-Version:
-                - "2022-11-28"
-        url: https://api.github.com/users/superplane/e2e/repos
-        method: GET
-      response:
-        body: "{\r\n  \"message\": \"Not Found\",\r\n  \"documentation_url\": \"https://docs.github.com/rest\",\r\n  \"status\": \"404\"\r\n}"
-        headers:
-            Access-Control-Allow-Origin:
-                - '*'
-            Access-Control-Expose-Headers:
-                - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
-            Content-Security-Policy:
-                - default-src 'none'
-            Content-Type:
-                - application/json; charset=utf-8
-            Date:
-                - Wed, 10 Dec 2025 13:06:12 GMT
-            Referrer-Policy:
-                - origin-when-cross-origin, strict-origin-when-cross-origin
-            Server:
-                - github.com
-            Strict-Transport-Security:
-                - max-age=31536000; includeSubdomains; preload
-            Vary:
-                - Accept-Encoding, Accept, X-Requested-With
-            X-Content-Type-Options:
-                - nosniff
-            X-Frame-Options:
-                - deny
-            X-Github-Media-Type:
-                - github.v3; format=json
-            X-Github-Request-Id:
-                - 626B:B835C:146CD38:12DA9EF:69397044
-            X-Xss-Protection:
-                - "0"
-        status: 404 Not Found
-        code: 404
-        duration: 120.250375ms
-    - request:
-        body: ""
-        form: {}
-        headers:
-            Accept:
-                - application/vnd.github.surtur-preview+json
-            Authorization:
                 - Bearer addasdas
             User-Agent:
                 - go-github/v74.0.0
@@ -219,7 +27,7 @@ interactions:
             Content-Type:
                 - application/json; charset=utf-8
             Date:
-                - Wed, 10 Dec 2025 13:57:32 GMT
+                - Thu, 11 Dec 2025 09:57:05 GMT
             Referrer-Policy:
                 - origin-when-cross-origin, strict-origin-when-cross-origin
             Server:
@@ -235,12 +43,12 @@ interactions:
             X-Github-Media-Type:
                 - github.v3; format=json
             X-Github-Request-Id:
-                - 637E:2077A2:1A42C3B:183F34B:69397C4C
+                - 6368:AE4E6:706E073:67808B8:693A9571
             X-Xss-Protection:
                 - "0"
         status: 401 Unauthorized
         code: 401
-        duration: 257.03725ms
+        duration: 260.181626ms
     - request:
         body: ""
         form: {}
@@ -267,7 +75,7 @@ interactions:
             Content-Type:
                 - application/json; charset=utf-8
             Date:
-                - Wed, 10 Dec 2025 13:57:33 GMT
+                - Thu, 11 Dec 2025 09:57:05 GMT
             Referrer-Policy:
                 - origin-when-cross-origin, strict-origin-when-cross-origin
             Server:
@@ -283,9 +91,105 @@ interactions:
             X-Github-Media-Type:
                 - github.v3; format=json
             X-Github-Request-Id:
-                - 637E:2077A2:1A42EAE:183F59F:69397C4C
+                - 6368:AE4E6:706E405:6780BC8:693A9571
             X-Xss-Protection:
                 - "0"
         status: 401 Unauthorized
         code: 401
-        duration: 126.916625ms
+        duration: 111.154792ms
+    - request:
+        body: ""
+        form: {}
+        headers:
+            Accept:
+                - application/vnd.github.surtur-preview+json
+            Authorization:
+                - Bearer addasdas
+            User-Agent:
+                - go-github/v74.0.0
+            X-Github-Api-Version:
+                - "2022-11-28"
+        url: https://api.github.com/orgs/puppies-inc
+        method: GET
+      response:
+        body: "{\r\n  \"message\": \"Bad credentials\",\r\n  \"documentation_url\": \"https://docs.github.com/rest\",\r\n  \"status\": \"401\"\r\n}"
+        headers:
+            Access-Control-Allow-Origin:
+                - '*'
+            Access-Control-Expose-Headers:
+                - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
+            Content-Security-Policy:
+                - default-src 'none'
+            Content-Type:
+                - application/json; charset=utf-8
+            Date:
+                - Thu, 11 Dec 2025 09:57:06 GMT
+            Referrer-Policy:
+                - origin-when-cross-origin, strict-origin-when-cross-origin
+            Server:
+                - github.com
+            Strict-Transport-Security:
+                - max-age=31536000; includeSubdomains; preload
+            Vary:
+                - Accept-Encoding, Accept, X-Requested-With
+            X-Content-Type-Options:
+                - nosniff
+            X-Frame-Options:
+                - deny
+            X-Github-Media-Type:
+                - github.v3; format=json
+            X-Github-Request-Id:
+                - 6368:AE4E6:706ED50:6781414:693A9571
+            X-Xss-Protection:
+                - "0"
+        status: 401 Unauthorized
+        code: 401
+        duration: 127.710583ms
+    - request:
+        body: ""
+        form: {}
+        headers:
+            Accept:
+                - application/vnd.github.v3+json
+            Authorization:
+                - Bearer addasdas
+            User-Agent:
+                - go-github/v74.0.0
+            X-Github-Api-Version:
+                - "2022-11-28"
+        url: https://api.github.com/users/puppies-inc/repos
+        method: GET
+      response:
+        body: "{\r\n  \"message\": \"Bad credentials\",\r\n  \"documentation_url\": \"https://docs.github.com/rest\",\r\n  \"status\": \"401\"\r\n}"
+        headers:
+            Access-Control-Allow-Origin:
+                - '*'
+            Access-Control-Expose-Headers:
+                - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
+            Content-Security-Policy:
+                - default-src 'none'
+            Content-Type:
+                - application/json; charset=utf-8
+            Date:
+                - Thu, 11 Dec 2025 09:57:07 GMT
+            Referrer-Policy:
+                - origin-when-cross-origin, strict-origin-when-cross-origin
+            Server:
+                - github.com
+            Strict-Transport-Security:
+                - max-age=31536000; includeSubdomains; preload
+            Vary:
+                - Accept-Encoding, Accept, X-Requested-With
+            X-Content-Type-Options:
+                - nosniff
+            X-Frame-Options:
+                - deny
+            X-Github-Media-Type:
+                - github.v3; format=json
+            X-Github-Request-Id:
+                - 6368:AE4E6:706EF45:67815BA:693A9572
+            X-Xss-Protection:
+                - "0"
+        status: 401 Unauthorized
+        code: 401
+        duration: 129.119333ms
