@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/e2e/helpers"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -16,8 +18,12 @@ import (
 )
 
 func TestGithubTrigger(t *testing.T) {
-	helpers.WithVCR(t, "github_trigger", func(t *testing.T) {
-		steps := &GithubTriggerSteps{t: t}
+	helpers.WithVCR(t, "test/e2e/testdata/cassettes/github_trigger.yaml", func(t *testing.T) {
+		steps := &GithubTriggerSteps{
+			t:            t,
+			githubToken:  "addasdas",
+			githubOrgURL: "https://github.com/puppies-inc",
+		}
 
 		t.Run("adding a github trigger node", func(t *testing.T) {
 			steps.start()
@@ -39,13 +45,14 @@ func TestGithubTrigger(t *testing.T) {
 	})
 }
 
-
 type GithubTriggerSteps struct {
 	t       *testing.T
 	session *session.TestSession
 	canvas  *shared.CanvasSteps
 
 	integrationName string
+	githubToken     string
+	githubOrgURL    string
 }
 
 func (s *GithubTriggerSteps) start() {
@@ -56,6 +63,23 @@ func (s *GithubTriggerSteps) start() {
 
 func (s *GithubTriggerSteps) givenAGithubIntegrationExists() {
 	s.integrationName = "E2E GitHub Integration"
+
+	secretValues := map[string]string{
+		"value": s.githubToken,
+	}
+
+	secretData, err := json.Marshal(secretValues)
+	require.NoError(s.t, err)
+
+	_, err = models.CreateSecret(
+		"github-token",
+		secrets.ProviderLocal,
+		s.session.Account.ID.String(),
+		models.DomainTypeOrganization,
+		s.session.OrgID,
+		secretData,
+	)
+	require.NoError(s.t, err)
 
 	auth := models.IntegrationAuth{
 		Token: &models.IntegrationAuthToken{
@@ -75,14 +99,14 @@ func (s *GithubTriggerSteps) givenAGithubIntegrationExists() {
 		DomainType: models.DomainTypeOrganization,
 		DomainID:   s.session.OrgID,
 		Type:       models.IntegrationTypeGithub,
-		URL:        "https://github.com/superplane/e2e",
+		URL:        s.githubOrgURL,
 		AuthType:   models.IntegrationAuthTypeToken,
 		Auth:       datatypes.NewJSONType(auth),
 		CreatedAt:  &now,
 		CreatedBy:  s.session.Account.ID,
 	}
 
-	_, err := models.CreateIntegration(integration)
+	_, err = models.CreateIntegration(integration)
 	require.NoError(s.t, err)
 }
 

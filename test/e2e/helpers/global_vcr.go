@@ -1,8 +1,8 @@
 package helpers
 
 import (
-	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -21,6 +21,27 @@ func StartGlobalVCR(cassetteName string) error {
 	if err != nil {
 		return err
 	}
+
+	// Let local/dev HTTP traffic bypass VCR so we only
+	// record external calls (e.g. GitHub API).
+	r.AddPassthrough(func(req *http.Request) bool {
+		host := req.URL.Host
+		if host == "" {
+			return false
+		}
+
+		// Strip port if present.
+		if idx := strings.Index(host, ":"); idx != -1 {
+			host = host[:idx]
+		}
+
+		switch host {
+		case "localhost", "127.0.0.1":
+			return true
+		default:
+			return false
+		}
+	})
 
 	globalRecorder = r
 	http.DefaultTransport = r
@@ -43,7 +64,7 @@ func StopGlobalVCR() error {
 
 // WithVCR is a test helper that wraps a test in a global VCR cassette.
 func WithVCR(t *testing.T, cassetteName string, testFunc func(t *testing.T)) {
-	err := StartGlobalVCR(fmt.Sprintf("testdata/cassettes/%s.yaml", cassetteName))
+	err := StartGlobalVCR(cassetteName)
 	require.NoError(t, err)
 
 	defer func() {
