@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -9,24 +8,24 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/secrets"
-	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
-	v "github.com/superplanehq/superplane/test/e2e/vcr"
 	"gorm.io/datatypes"
+
+	q "github.com/superplanehq/superplane/test/e2e/queries"
+	v "github.com/superplanehq/superplane/test/e2e/vcr"
 )
 
 func TestGithubTrigger(t *testing.T) {
 	steps := &GithubTriggerSteps{t: t}
 
-	org := "https://github.com/puppies-inc"
-	token := "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"
+	const githubOwner = "puppies-inc"
+	const githubTokenValue = "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"
 
 	v.Run(t, "addding a github trigger node", func(t *testing.T) {
 		steps.start()
+		steps.givenAGithubIntegrationExists(githubOwner, githubTokenValue)
 		steps.givenACanvasExists()
-		steps.givenAGithubIntegrationExists("Integration", org, token)
 		steps.addGithubTriggerNode()
 		steps.saveCanvas()
 		steps.assertGithubTriggerNodeExistsInDB()
@@ -46,6 +45,8 @@ type GithubTriggerSteps struct {
 	t       *testing.T
 	session *session.TestSession
 	canvas  *shared.CanvasSteps
+	// integrationName is the name as shown in the UI dropdown
+	integrationName string
 }
 
 func (s *GithubTriggerSteps) start() {
@@ -54,49 +55,29 @@ func (s *GithubTriggerSteps) start() {
 	s.session.Login()
 }
 
-func (s *GithubTriggerSteps) givenAGithubIntegrationExists(name, url, token string) {
-	secretValues := map[string]string{"value": token}
+func (s *GithubTriggerSteps) givenAGithubIntegrationExists(ownerSlug, token string) {
+	// Use the UI flow to create the integration, as in integrations_test.go
+	ownerInput := q.Locator(`input[data-testid="github-owner-input"]`)
+	tokenInput := q.Locator(`input[data-testid="integration-api-token-input"]`)
 
-	secretData, err := json.Marshal(secretValues)
-	require.NoError(s.t, err)
+	s.session.Visit("/" + s.session.OrgID.String() + "/settings/integrations")
+	s.session.AssertText("Integrations")
 
-	_, err = models.CreateSecret(
-		"github-token",
-		secrets.ProviderLocal,
-		s.session.Account.ID.String(),
-		models.DomainTypeOrganization,
-		s.session.OrgID,
-		secretData,
-	)
-	require.NoError(s.t, err)
+	s.session.Click(q.Text("Add Integration"))
+	s.session.AssertText("Select Integration Type")
 
-	auth := models.IntegrationAuth{
-		Token: &models.IntegrationAuthToken{
-			ValueFrom: models.ValueDefinitionFrom{
-				Secret: &models.ValueDefinitionFromSecret{
-					Name: "github-token",
-					Key:  "value",
-				},
-			},
-		},
-	}
+	s.session.Click(q.Locator(`button:has-text("GitHub")`))
 
-	now := time.Now()
-	integration := &models.Integration{
-		ID:         uuid.New(),
-		Name:       name,
-		DomainType: models.DomainTypeOrganization,
-		DomainID:   s.session.OrgID,
-		Type:       models.IntegrationTypeGithub,
-		URL:        url,
-		AuthType:   models.IntegrationAuthTypeToken,
-		Auth:       datatypes.NewJSONType(auth),
-		CreatedAt:  &now,
-		CreatedBy:  s.session.Account.ID,
-	}
+	s.session.FillIn(ownerInput, ownerSlug)
+	s.session.FillIn(tokenInput, token)
+	s.session.TakeScreenshot()
 
-	_, err = models.CreateIntegration(integration)
-	require.NoError(s.t, err)
+	s.session.Click(q.TestID("create-integration-button"))
+
+	s.integrationName = ownerSlug + "-account"
+
+	s.session.Sleep(1000)
+	s.session.TakeScreenshot()
 }
 
 func (s *GithubTriggerSteps) givenACanvasExists() {
@@ -117,7 +98,7 @@ func (s *GithubTriggerSteps) addGithubTriggerNode() {
 	// Select the GitHub integration
 	integrationTrigger := q.Locator(`label:has-text("GitHub integration") + div button`)
 	s.session.Click(integrationTrigger)
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Integration")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + s.integrationName + `")`))
 
 	s.session.Click(q.TestID("add-node-button"))
 	s.session.Sleep(300)
@@ -134,7 +115,6 @@ func (s *GithubTriggerSteps) assertGithubTriggerNodeExistsInDB() {
 
 func (s *GithubTriggerSteps) givenACanvasWithGithubTriggerAndNoop() {
 	s.givenACanvasExists()
-
 	s.addGithubTriggerNode()
 
 	s.canvas.AddNoop("Second", models.Position{X: 900, Y: 200})

@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-github/v74/github"
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"golang.org/x/oauth2"
 )
@@ -131,6 +132,8 @@ func (i *GitHubResourceManager) Get(resourceType, id string) (integrations.Resou
 }
 
 func (i *GitHubResourceManager) List(resourceType string) ([]integrations.Resource, error) {
+	log.Infof("AAAAAAAAAAAAAAAA: Listing resources of type %s", resourceType)
+
 	switch resourceType {
 	case ResourceTypeRepository:
 		return i.listRepositories()
@@ -143,6 +146,10 @@ func (i *GitHubResourceManager) listRepositories() ([]integrations.Resource, err
 	_, _, err := i.client.Organizations.Get(context.Background(), i.Owner)
 	if err == nil {
 		return i.listOrganizationRepositories()
+	}
+
+	if err != nil {
+		log.Infof("AAAAAAAAAAAAAAA: Not an organization: %v", err)
 	}
 
 	opts := &github.RepositoryListByUserOptions{}
