@@ -239,8 +239,8 @@ function CanvasPage(props: CanvasPageProps) {
   const cancelQueueItemRef = useRef<CanvasPageProps["onCancelQueueItem"]>(props.onCancelQueueItem);
   cancelQueueItemRef.current = props.onCancelQueueItem;
   const state = useCanvasState(props);
-  const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(null);
   const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
+  const [currentTab, setCurrentTab] = useState<"latest" | "settings">("latest");
 
   // Use refs from props if provided, otherwise create local ones
   const hasFitToViewRef = props.hasFitToViewRef || useRef(false);
@@ -279,22 +279,30 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleNodeEdit = useCallback(
     (nodeId: string) => {
-      // Try the modal-based edit first (for node configuration)
-      if (props.getNodeEditData) {
-        const editData = props.getNodeEditData(nodeId);
-        if (editData) {
-          setEditingNodeData(editData);
-          return;
-        }
+      // Open the sidebar for this node (data will be automatically available via useMemo)
+      if (!state.componentSidebar.isOpen || state.componentSidebar.selectedNodeId !== nodeId) {
+        state.componentSidebar.open(nodeId);
       }
 
-      // Fall back to the simple onEdit callback
-      if (props.onEdit) {
+      // Switch to settings tab when edit is called
+      setCurrentTab("settings");
+
+      // Fall back to the simple onEdit callback if no getNodeEditData
+      if (!props.getNodeEditData && props.onEdit) {
         props.onEdit(nodeId);
       }
     },
-    [props],
+    [props.getNodeEditData, props.onEdit, state.componentSidebar],
   );
+
+  // Get editing data for the currently selected node
+  const { getNodeEditData } = props;
+  const editingNodeData = useMemo(() => {
+    if (state.componentSidebar.selectedNodeId && state.componentSidebar.isOpen && getNodeEditData) {
+      return getNodeEditData(state.componentSidebar.selectedNodeId);
+    }
+    return null;
+  }, [state.componentSidebar.selectedNodeId, state.componentSidebar.isOpen, getNodeEditData]);
 
   const handleNodeDelete = useCallback(
     (nodeId: string) => {
@@ -362,7 +370,6 @@ function CanvasPage(props: CanvasPageProps) {
       if (editingNodeData && props.onNodeConfigurationSave) {
         props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName);
       }
-      setEditingNodeData(null);
     },
     [editingNodeData, props],
   );
@@ -410,6 +417,8 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleSidebarClose = useCallback(() => {
     state.componentSidebar.close();
+    // Reset to latest tab when sidebar closes
+    setCurrentTab("latest");
 
     // Clear ReactFlow's selection state
     state.setNodes((nodes) =>
@@ -506,27 +515,19 @@ function CanvasPage(props: CanvasPageProps) {
             loadExecutionChain={props.loadExecutionChain}
             getExecutionState={props.getExecutionState}
             onSidebarClose={handleSidebarClose}
+            editingNodeData={editingNodeData}
+            onSaveConfiguration={handleSaveConfiguration}
+            onEdit={handleNodeEdit}
+            currentTab={currentTab}
+            onTabChange={setCurrentTab}
+            organizationId={props.organizationId}
           />
         </div>
       </div>
 
-      {/* Edit existing node modal */}
-      {editingNodeData && (
-        <NodeConfigurationModal
-          mode="edit"
-          isOpen={true}
-          onClose={() => setEditingNodeData(null)}
-          nodeName={editingNodeData.nodeName}
-          nodeLabel={editingNodeData.displayLabel}
-          configuration={editingNodeData.configuration}
-          configurationFields={editingNodeData.configurationFields}
-          onSave={handleSaveConfiguration}
-          domainId={props.organizationId}
-          domainType="DOMAIN_TYPE_ORGANIZATION"
-        />
-      )}
+      {/* Edit existing node modal - now handled by settings sidebar */}
 
-      {/* Add new node modal */}
+      {/* Add new node modal - keeping this as modal for now */}
       {newNodeData && (
         <NodeConfigurationModal
           mode="create"
@@ -589,6 +590,12 @@ function Sidebar({
   loadExecutionChain,
   getExecutionState,
   onSidebarClose,
+  editingNodeData,
+  onSaveConfiguration,
+  onEdit,
+  currentTab,
+  onTabChange,
+  organizationId,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -622,6 +629,12 @@ function Sidebar({
     execution: WorkflowsWorkflowNodeExecution,
   ) => { map: EventStateMap; state: EventState };
   onSidebarClose?: () => void;
+  editingNodeData?: NodeEditData | null;
+  onSaveConfiguration?: (configuration: Record<string, any>, nodeName: string) => void;
+  onEdit?: (nodeId: string) => void;
+  currentTab?: "latest" | "settings";
+  onTabChange?: (tab: "latest" | "settings") => void;
+  organizationId?: string;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -722,6 +735,19 @@ function Sidebar({
       getExecutionState={
         getExecutionState ? (nodeId: string, execution: any) => getExecutionState(nodeId, execution) : undefined
       }
+      showSettingsTab={true}
+      nodeConfigMode="edit"
+      nodeName={editingNodeData?.nodeName || ""}
+      nodeLabel={editingNodeData?.displayLabel}
+      nodeConfiguration={editingNodeData?.configuration || {}}
+      nodeConfigurationFields={editingNodeData?.configurationFields || []}
+      onNodeConfigSave={onSaveConfiguration}
+      onNodeConfigCancel={undefined}
+      onEdit={onEdit ? () => onEdit(state.componentSidebar.selectedNodeId!) : undefined}
+      domainId={organizationId}
+      domainType="DOMAIN_TYPE_ORGANIZATION"
+      currentTab={currentTab}
+      onTabChange={onTabChange}
     />
   );
 }
