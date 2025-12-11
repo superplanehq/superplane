@@ -205,6 +205,6 @@ func (e *HTTP) getBody(method string, payload any) (io.Reader, error) {
 	return bytes.NewReader(bodyData), nil
 }
 
-func (h *HTTP) Cancel(ctx components.ExecutionContext) error {
+func (e *HTTP) Cancel(ctx components.ExecutionContext) error {
 	return nil
 }

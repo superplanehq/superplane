@@ -753,6 +753,6 @@ func (tg *TimeGate) findNextExcludeSpecificEndTime(now time.Time, spec Spec) tim
 	return endDateTime
 }
 
-func (t *TimeGate) Cancel(ctx components.ExecutionContext) error {
+func (tg *TimeGate) Cancel(ctx components.ExecutionContext) error {
 	return nil
 }
