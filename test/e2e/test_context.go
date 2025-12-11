@@ -52,6 +52,7 @@ func (s *TestContext) Start() {
 	os.Setenv("JWT_SECRET", "test-jwt-secret")
 	os.Setenv("PUBLIC_API_PORT", "8001")
 	os.Setenv("BASE_URL", "http://127.0.0.1:8001")
+	os.Setenv("WEBHOOKS_BASE_URL", "https://superplane.sxmoon.com")
 	os.Setenv("APP_ENV", "development")
 
 	s.startVite()

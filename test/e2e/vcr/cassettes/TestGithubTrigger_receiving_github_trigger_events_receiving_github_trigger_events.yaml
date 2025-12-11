@@ -3,7 +3,7 @@ version: 1
 interactions:
     - request:
         body: |
-            {"name":"web","config":{"content_type":"json","url":"http://127.0.0.1:8001/api/v1/webhooks/6a1b2006-dad6-4982-8032-801f0c7ea366","secret":"QgBtuJijEzok9-mJC0vY3VXvib8l1plqsA4aOa4egoc="},"events":["push"],"active":true}
+            {"name":"web","config":{"content_type":"json","url":"https://superplane.sxmoon.com/api/v1/webhooks/25d51628-5912-45f0-996b-67d9cd4e08c3","secret":"N9uCp20mvAUlcT2hZDbB0dnCOI2TWKFKzst8VYJ3m_4="},"events":["push"],"active":true}
         form: {}
         headers:
             Accept:
@@ -19,22 +19,28 @@ interactions:
         url: https://api.github.com/repos/puppies-inc/front/hooks
         method: POST
       response:
-        body: '{"message":"Validation Failed","errors":[{"resource":"Hook","code":"custom","field":"url","message":"url is not supported because it isn''t reachable over the public Internet (127.0.0.1)"}],"documentation_url":"https://docs.github.com/rest/repos/webhooks#create-a-repository-webhook","status":"422"}'
+        body: '{"type":"Repository","id":585776376,"name":"web","active":true,"events":["push"],"config":{"content_type":"json","insecure_ssl":"0","secret":"********","url":"https://superplane.sxmoon.com/api/v1/webhooks/25d51628-5912-45f0-996b-67d9cd4e08c3"},"updated_at":"2025-12-11T15:46:12Z","created_at":"2025-12-11T15:46:12Z","url":"https://api.github.com/repos/puppies-inc/front/hooks/585776376","test_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776376/test","ping_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776376/pings","deliveries_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776376/deliveries","last_response":{"code":null,"status":"unused","message":null}}'
         headers:
             Access-Control-Allow-Origin:
                 - '*'
             Access-Control-Expose-Headers:
                 - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
+            Cache-Control:
+                - private, max-age=60, s-maxage=60
             Content-Length:
-                - "298"
+                - "706"
             Content-Security-Policy:
                 - default-src 'none'
             Content-Type:
                 - application/json; charset=utf-8
             Date:
-                - Thu, 11 Dec 2025 15:11:38 GMT
+                - Thu, 11 Dec 2025 15:46:12 GMT
+            Etag:
+                - '"82aa89b62f019716159c5a8c36fa4cedd2d80cf4f65339b92b36e2e58b073b73"'
             Github-Authentication-Token-Expiration:
                 - 2026-01-10 11:40:16 +0100
+            Location:
+                - https://api.github.com/repos/puppies-inc/front/hooks/585776376
             Referrer-Policy:
                 - origin-when-cross-origin, strict-origin-when-cross-origin
             Server:
@@ -42,7 +48,7 @@ interactions:
             Strict-Transport-Security:
                 - max-age=31536000; includeSubdomains; preload
             Vary:
-                - Accept-Encoding, Accept, X-Requested-With
+                - Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With
             X-Accepted-Github-Permissions:
                 - repository_hooks=write
             X-Content-Type-Options:
@@ -54,22 +60,22 @@ interactions:
             X-Github-Media-Type:
                 - github.v3; format=json
             X-Github-Request-Id:
-                - 627D:1FF6EF:91BDD4B:864CCCE:693ADF29
+                - 62A1:12AEB4:9DBD3A7:9215403:693AE743
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
-                - "4970"
+                - "4947"
             X-Ratelimit-Reset:
-                - "1765466198"
+                - "1765469864"
             X-Ratelimit-Resource:
                 - core
             X-Ratelimit-Used:
-                - "30"
+                - "53"
             X-Xss-Protection:
                 - "0"
-        status: 422 Unprocessable Entity
-        code: 422
-        duration: 496.454125ms
+        status: 201 Created
+        code: 201
+        duration: 386.613417ms
     - request:
         body: ""
         form: {}
@@ -98,7 +104,7 @@ interactions:
             Content-Type:
                 - application/json; charset=utf-8
             Date:
-                - Thu, 11 Dec 2025 15:11:43 GMT
+                - Thu, 11 Dec 2025 15:46:17 GMT
             Etag:
                 - W/"bc86a994e30de3177e08ff93addc8f5a25fafc9a101c5d234da230c629f633e4"
             Github-Authentication-Token-Expiration:
@@ -124,22 +130,22 @@ interactions:
             X-Github-Media-Type:
                 - github.v3; param=surtur-preview; format=json
             X-Github-Request-Id:
-                - 627D:1FF6EF:91C0503:864F192:693ADF2A
+                - 62A1:12AEB4:9DBFB11:921789C:693AE744
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
-                - "4969"
+                - "4946"
             X-Ratelimit-Reset:
-                - "1765466198"
+                - "1765469864"
             X-Ratelimit-Resource:
                 - core
             X-Ratelimit-Used:
-                - "31"
+                - "54"
             X-Xss-Protection:
                 - "0"
         status: 200 OK
         code: 200
-        duration: 268.649167ms
+        duration: 255.545083ms
     - request:
         body: ""
         form: {}
@@ -168,7 +174,7 @@ interactions:
             Content-Type:
                 - application/json; charset=utf-8
             Date:
-                - Thu, 11 Dec 2025 15:11:44 GMT
+                - Thu, 11 Dec 2025 15:46:18 GMT
             Etag:
                 - W/"b9214ad375705a578a2fc8a6813aeb80add91d08ee1308665504fc7bc149c5e0"
             Github-Authentication-Token-Expiration:
@@ -192,22 +198,22 @@ interactions:
             X-Github-Media-Type:
                 - github.mercy-preview; param=nebula-preview; format=json
             X-Github-Request-Id:
-                - 627D:1FF6EF:91C08F1:864F542:693ADF2F
+                - 62A1:12AEB4:9DBFEFA:9217C1D:693AE749
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
-                - "4968"
+                - "4945"
             X-Ratelimit-Reset:
-                - "1765466198"
+                - "1765469864"
             X-Ratelimit-Resource:
                 - core
             X-Ratelimit-Used:
-                - "32"
+                - "55"
             X-Xss-Protection:
                 - "0"
         status: 200 OK
         code: 200
-        duration: 536.797292ms
+        duration: 424.014958ms
     - request:
         body: ""
         form: {}
@@ -236,7 +242,7 @@ interactions:
             Content-Type:
                 - application/json; charset=utf-8
             Date:
-                - Thu, 11 Dec 2025 15:11:48 GMT
+                - Thu, 11 Dec 2025 15:46:21 GMT
             Etag:
                 - W/"fb22fceebb020dcb1f2eed85218bbf867b455a650b79328eb364dd6542b9553f"
             Github-Authentication-Token-Expiration:
@@ -262,22 +268,22 @@ interactions:
             X-Github-Media-Type:
                 - github.v3; format=json
             X-Github-Request-Id:
-                - 627D:1FF6EF:91C2429:8650E47:693ADF30
+                - 62A1:12AEB4:9DC1AA5:921957C:693AE74A
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
-                - "4967"
+                - "4944"
             X-Ratelimit-Reset:
-                - "1765466198"
+                - "1765469864"
             X-Ratelimit-Resource:
                 - core
             X-Ratelimit-Used:
-                - "33"
+                - "56"
             X-Xss-Protection:
                 - "0"
         status: 200 OK
         code: 200
-        duration: 351.862875ms
+        duration: 420.865917ms
     - request:
         body: ""
         form: {}
@@ -306,7 +312,7 @@ interactions:
             Content-Type:
                 - application/json; charset=utf-8
             Date:
-                - Thu, 11 Dec 2025 15:11:49 GMT
+                - Thu, 11 Dec 2025 15:46:23 GMT
             Etag:
                 - W/"fb22fceebb020dcb1f2eed85218bbf867b455a650b79328eb364dd6542b9553f"
             Github-Authentication-Token-Expiration:
@@ -332,25 +338,25 @@ interactions:
             X-Github-Media-Type:
                 - github.v3; format=json
             X-Github-Request-Id:
-                - 627D:1FF6EF:91C2CB4:865161E:693ADF34
+                - 62A1:12AEB4:9DC256C:9219F28:693AE74D
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
-                - "4966"
+                - "4943"
             X-Ratelimit-Reset:
-                - "1765466198"
+                - "1765469864"
             X-Ratelimit-Resource:
                 - core
             X-Ratelimit-Used:
-                - "34"
+                - "57"
             X-Xss-Protection:
                 - "0"
         status: 200 OK
         code: 200
-        duration: 663.666292ms
+        duration: 396.011083ms
     - request:
         body: |
-            {"name":"web","config":{"content_type":"json","url":"http://127.0.0.1:8001/api/v1/webhooks/4e49c070-16c3-415a-8bc9-84bbdd9ebbd9","secret":"HwjR3pb2JXqXtH7PasITj96rcjM2vnxl7Xsqi2uGHFk="},"events":["push"],"active":true}
+            {"name":"web","config":{"content_type":"json","url":"https://superplane.sxmoon.com/api/v1/webhooks/8368f0f0-5f56-430f-a128-a7f907e483b0","secret":"Ljyl9SAQ3sAE1iV2ipggoM8MANa6N2X6c6dvM7l_huw="},"events":["push"],"active":true}
         form: {}
         headers:
             Accept:
@@ -366,73 +372,7 @@ interactions:
         url: https://api.github.com/repos/puppies-inc/front/hooks
         method: POST
       response:
-        body: '{"message":"Validation Failed","errors":[{"resource":"Hook","code":"custom","field":"url","message":"url is not supported because it isn''t reachable over the public Internet (127.0.0.1)"}],"documentation_url":"https://docs.github.com/rest/repos/webhooks#create-a-repository-webhook","status":"422"}'
-        headers:
-            Access-Control-Allow-Origin:
-                - '*'
-            Access-Control-Expose-Headers:
-                - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
-            Content-Length:
-                - "298"
-            Content-Security-Policy:
-                - default-src 'none'
-            Content-Type:
-                - application/json; charset=utf-8
-            Date:
-                - Thu, 11 Dec 2025 15:11:50 GMT
-            Github-Authentication-Token-Expiration:
-                - 2026-01-10 11:40:16 +0100
-            Referrer-Policy:
-                - origin-when-cross-origin, strict-origin-when-cross-origin
-            Server:
-                - github.com
-            Strict-Transport-Security:
-                - max-age=31536000; includeSubdomains; preload
-            Vary:
-                - Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Github-Permissions:
-                - repository_hooks=write
-            X-Content-Type-Options:
-                - nosniff
-            X-Frame-Options:
-                - deny
-            X-Github-Api-Version-Selected:
-                - "2022-11-28"
-            X-Github-Media-Type:
-                - github.v3; format=json
-            X-Github-Request-Id:
-                - 627D:1FF6EF:91C3694:8651F4E:693ADF35
-            X-Ratelimit-Limit:
-                - "5000"
-            X-Ratelimit-Remaining:
-                - "4965"
-            X-Ratelimit-Reset:
-                - "1765466198"
-            X-Ratelimit-Resource:
-                - core
-            X-Ratelimit-Used:
-                - "35"
-            X-Xss-Protection:
-                - "0"
-        status: 422 Unprocessable Entity
-        code: 422
-        duration: 382.747ms
-    - request:
-        body: ""
-        form: {}
-        headers:
-            Accept:
-                - application/vnd.github.v3+json
-            Authorization:
-                - Bearer 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
-            User-Agent:
-                - go-github/v74.0.0
-            X-Github-Api-Version:
-                - "2022-11-28"
-        url: https://api.github.com/repositories/1046187813
-        method: GET
-      response:
-        body: '{"id":1046187813,"node_id":"R_kgDOPluPJQ","name":"front","full_name":"puppies-inc/front","private":true,"owner":{"login":"puppies-inc","id":229106624,"node_id":"O_kgDODafjwA","avatar_url":"https://avatars.githubusercontent.com/u/229106624?v=4","gravatar_id":"","url":"https://api.github.com/users/puppies-inc","html_url":"https://github.com/puppies-inc","followers_url":"https://api.github.com/users/puppies-inc/followers","following_url":"https://api.github.com/users/puppies-inc/following{/other_user}","gists_url":"https://api.github.com/users/puppies-inc/gists{/gist_id}","starred_url":"https://api.github.com/users/puppies-inc/starred{/owner}{/repo}","subscriptions_url":"https://api.github.com/users/puppies-inc/subscriptions","organizations_url":"https://api.github.com/users/puppies-inc/orgs","repos_url":"https://api.github.com/users/puppies-inc/repos","events_url":"https://api.github.com/users/puppies-inc/events{/privacy}","received_events_url":"https://api.github.com/users/puppies-inc/received_events","type":"Organization","user_view_type":"public","site_admin":false},"html_url":"https://github.com/puppies-inc/front","description":null,"fork":false,"url":"https://api.github.com/repos/puppies-inc/front","forks_url":"https://api.github.com/repos/puppies-inc/front/forks","keys_url":"https://api.github.com/repos/puppies-inc/front/keys{/key_id}","collaborators_url":"https://api.github.com/repos/puppies-inc/front/collaborators{/collaborator}","teams_url":"https://api.github.com/repos/puppies-inc/front/teams","hooks_url":"https://api.github.com/repos/puppies-inc/front/hooks","issue_events_url":"https://api.github.com/repos/puppies-inc/front/issues/events{/number}","events_url":"https://api.github.com/repos/puppies-inc/front/events","assignees_url":"https://api.github.com/repos/puppies-inc/front/assignees{/user}","branches_url":"https://api.github.com/repos/puppies-inc/front/branches{/branch}","tags_url":"https://api.github.com/repos/puppies-inc/front/tags","blobs_url":"https://api.github.com/repos/puppies-inc/front/git/blobs{/sha}","git_tags_url":"https://api.github.com/repos/puppies-inc/front/git/tags{/sha}","git_refs_url":"https://api.github.com/repos/puppies-inc/front/git/refs{/sha}","trees_url":"https://api.github.com/repos/puppies-inc/front/git/trees{/sha}","statuses_url":"https://api.github.com/repos/puppies-inc/front/statuses/{sha}","languages_url":"https://api.github.com/repos/puppies-inc/front/languages","stargazers_url":"https://api.github.com/repos/puppies-inc/front/stargazers","contributors_url":"https://api.github.com/repos/puppies-inc/front/contributors","subscribers_url":"https://api.github.com/repos/puppies-inc/front/subscribers","subscription_url":"https://api.github.com/repos/puppies-inc/front/subscription","commits_url":"https://api.github.com/repos/puppies-inc/front/commits{/sha}","git_commits_url":"https://api.github.com/repos/puppies-inc/front/git/commits{/sha}","comments_url":"https://api.github.com/repos/puppies-inc/front/comments{/number}","issue_comment_url":"https://api.github.com/repos/puppies-inc/front/issues/comments{/number}","contents_url":"https://api.github.com/repos/puppies-inc/front/contents/{+path}","compare_url":"https://api.github.com/repos/puppies-inc/front/compare/{base}...{head}","merges_url":"https://api.github.com/repos/puppies-inc/front/merges","archive_url":"https://api.github.com/repos/puppies-inc/front/{archive_format}{/ref}","downloads_url":"https://api.github.com/repos/puppies-inc/front/downloads","issues_url":"https://api.github.com/repos/puppies-inc/front/issues{/number}","pulls_url":"https://api.github.com/repos/puppies-inc/front/pulls{/number}","milestones_url":"https://api.github.com/repos/puppies-inc/front/milestones{/number}","notifications_url":"https://api.github.com/repos/puppies-inc/front/notifications{?since,all,participating}","labels_url":"https://api.github.com/repos/puppies-inc/front/labels{/name}","releases_url":"https://api.github.com/repos/puppies-inc/front/releases{/id}","deployments_url":"https://api.github.com/repos/puppies-inc/front/deployments","created_at":"2025-08-28T10:15:23Z","updated_at":"2025-11-20T16:40:56Z","pushed_at":"2025-12-08T13:40:50Z","git_url":"git://github.com/puppies-inc/front.git","ssh_url":"git@github.com:puppies-inc/front.git","clone_url":"https://github.com/puppies-inc/front.git","svn_url":"https://github.com/puppies-inc/front","homepage":null,"size":194,"stargazers_count":0,"watchers_count":0,"language":null,"has_issues":true,"has_projects":true,"has_downloads":true,"has_wiki":false,"has_pages":false,"has_discussions":false,"forks_count":0,"mirror_url":null,"archived":false,"disabled":false,"open_issues_count":4,"license":null,"allow_forking":false,"is_template":false,"web_commit_signoff_required":false,"topics":[],"visibility":"private","forks":0,"open_issues":4,"watchers":0,"default_branch":"main","permissions":{"admin":true,"maintain":true,"push":true,"triage":true,"pull":true},"custom_properties":{},"organization":{"login":"puppies-inc","id":229106624,"node_id":"O_kgDODafjwA","avatar_url":"https://avatars.githubusercontent.com/u/229106624?v=4","gravatar_id":"","url":"https://api.github.com/users/puppies-inc","html_url":"https://github.com/puppies-inc","followers_url":"https://api.github.com/users/puppies-inc/followers","following_url":"https://api.github.com/users/puppies-inc/following{/other_user}","gists_url":"https://api.github.com/users/puppies-inc/gists{/gist_id}","starred_url":"https://api.github.com/users/puppies-inc/starred{/owner}{/repo}","subscriptions_url":"https://api.github.com/users/puppies-inc/subscriptions","organizations_url":"https://api.github.com/users/puppies-inc/orgs","repos_url":"https://api.github.com/users/puppies-inc/repos","events_url":"https://api.github.com/users/puppies-inc/events{/privacy}","received_events_url":"https://api.github.com/users/puppies-inc/received_events","type":"Organization","user_view_type":"public","site_admin":false},"network_count":0,"subscribers_count":0}'
+        body: '{"type":"Repository","id":585776410,"name":"web","active":true,"events":["push"],"config":{"content_type":"json","insecure_ssl":"0","secret":"********","url":"https://superplane.sxmoon.com/api/v1/webhooks/8368f0f0-5f56-430f-a128-a7f907e483b0"},"updated_at":"2025-12-11T15:46:24Z","created_at":"2025-12-11T15:46:24Z","url":"https://api.github.com/repos/puppies-inc/front/hooks/585776410","test_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776410/test","ping_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776410/pings","deliveries_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776410/deliveries","last_response":{"code":null,"status":"unused","message":null}}'
         headers:
             Access-Control-Allow-Origin:
                 - '*'
@@ -440,18 +380,20 @@ interactions:
                 - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
             Cache-Control:
                 - private, max-age=60, s-maxage=60
+            Content-Length:
+                - "706"
             Content-Security-Policy:
                 - default-src 'none'
             Content-Type:
                 - application/json; charset=utf-8
             Date:
-                - Thu, 11 Dec 2025 15:17:44 GMT
+                - Thu, 11 Dec 2025 15:46:24 GMT
             Etag:
-                - W/"fb22fceebb020dcb1f2eed85218bbf867b455a650b79328eb364dd6542b9553f"
+                - '"5501148df4c845368c0f3cbcb2907a33c5c54395fd2b82cf3a79cb43f91848a2"'
             Github-Authentication-Token-Expiration:
                 - 2026-01-10 11:40:16 +0100
-            Last-Modified:
-                - Thu, 20 Nov 2025 16:40:56 GMT
+            Location:
+                - https://api.github.com/repos/puppies-inc/front/hooks/585776410
             Referrer-Policy:
                 - origin-when-cross-origin, strict-origin-when-cross-origin
             Server:
@@ -461,75 +403,6 @@ interactions:
             Vary:
                 - Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With
             X-Accepted-Github-Permissions:
-                - metadata=read
-            X-Content-Type-Options:
-                - nosniff
-            X-Frame-Options:
-                - deny
-            X-Github-Api-Version-Selected:
-                - "2022-11-28"
-            X-Github-Media-Type:
-                - github.v3; format=json
-            X-Github-Request-Id:
-                - 62F6:9492A:92A6F1A:873F5F6:693AE098
-            X-Ratelimit-Limit:
-                - "5000"
-            X-Ratelimit-Remaining:
-                - "4999"
-            X-Ratelimit-Reset:
-                - "1765469864"
-            X-Ratelimit-Resource:
-                - core
-            X-Ratelimit-Used:
-                - "1"
-            X-Xss-Protection:
-                - "0"
-        status: 200 OK
-        code: 200
-        duration: 512.950959ms
-    - request:
-        body: |
-            {"name":"web","config":{"content_type":"json","url":"http://127.0.0.1:8001/api/v1/webhooks/37058a5f-b996-490f-b46d-c5eddbe0355c","secret":"rXuuxyitvHHNa4pAaO0KNcfqxC_4PNpdxoC3wjHjNy0="},"events":["push"],"active":true}
-        form: {}
-        headers:
-            Accept:
-                - application/vnd.github.v3+json
-            Authorization:
-                - Bearer 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
-            Content-Type:
-                - application/json
-            User-Agent:
-                - go-github/v74.0.0
-            X-Github-Api-Version:
-                - "2022-11-28"
-        url: https://api.github.com/repos/puppies-inc/front/hooks
-        method: POST
-      response:
-        body: '{"message":"Validation Failed","errors":[{"resource":"Hook","code":"custom","field":"url","message":"url is not supported because it isn''t reachable over the public Internet (127.0.0.1)"}],"documentation_url":"https://docs.github.com/rest/repos/webhooks#create-a-repository-webhook","status":"422"}'
-        headers:
-            Access-Control-Allow-Origin:
-                - '*'
-            Access-Control-Expose-Headers:
-                - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
-            Content-Length:
-                - "298"
-            Content-Security-Policy:
-                - default-src 'none'
-            Content-Type:
-                - application/json; charset=utf-8
-            Date:
-                - Thu, 11 Dec 2025 15:17:47 GMT
-            Github-Authentication-Token-Expiration:
-                - 2026-01-10 11:40:16 +0100
-            Referrer-Policy:
-                - origin-when-cross-origin, strict-origin-when-cross-origin
-            Server:
-                - github.com
-            Strict-Transport-Security:
-                - max-age=31536000; includeSubdomains; preload
-            Vary:
-                - Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Github-Permissions:
                 - repository_hooks=write
             X-Content-Type-Options:
                 - nosniff
@@ -540,158 +413,19 @@ interactions:
             X-Github-Media-Type:
                 - github.v3; format=json
             X-Github-Request-Id:
-                - 62F6:9492A:92A7F4E:8740487:693AE098
+                - 62A1:12AEB4:9DC2AB0:921A3ED:693AE74F
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
-                - "4998"
+                - "4942"
             X-Ratelimit-Reset:
                 - "1765469864"
             X-Ratelimit-Resource:
                 - core
             X-Ratelimit-Used:
-                - "2"
+                - "58"
             X-Xss-Protection:
                 - "0"
-        status: 422 Unprocessable Entity
-        code: 422
-        duration: 399.204958ms
-    - request:
-        body: ""
-        form: {}
-        headers:
-            Accept:
-                - application/vnd.github.v3+json
-            Authorization:
-                - Bearer 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
-            User-Agent:
-                - go-github/v74.0.0
-            X-Github-Api-Version:
-                - "2022-11-28"
-        url: https://api.github.com/repositories/1046187813
-        method: GET
-      response:
-        body: '{"id":1046187813,"node_id":"R_kgDOPluPJQ","name":"front","full_name":"puppies-inc/front","private":true,"owner":{"login":"puppies-inc","id":229106624,"node_id":"O_kgDODafjwA","avatar_url":"https://avatars.githubusercontent.com/u/229106624?v=4","gravatar_id":"","url":"https://api.github.com/users/puppies-inc","html_url":"https://github.com/puppies-inc","followers_url":"https://api.github.com/users/puppies-inc/followers","following_url":"https://api.github.com/users/puppies-inc/following{/other_user}","gists_url":"https://api.github.com/users/puppies-inc/gists{/gist_id}","starred_url":"https://api.github.com/users/puppies-inc/starred{/owner}{/repo}","subscriptions_url":"https://api.github.com/users/puppies-inc/subscriptions","organizations_url":"https://api.github.com/users/puppies-inc/orgs","repos_url":"https://api.github.com/users/puppies-inc/repos","events_url":"https://api.github.com/users/puppies-inc/events{/privacy}","received_events_url":"https://api.github.com/users/puppies-inc/received_events","type":"Organization","user_view_type":"public","site_admin":false},"html_url":"https://github.com/puppies-inc/front","description":null,"fork":false,"url":"https://api.github.com/repos/puppies-inc/front","forks_url":"https://api.github.com/repos/puppies-inc/front/forks","keys_url":"https://api.github.com/repos/puppies-inc/front/keys{/key_id}","collaborators_url":"https://api.github.com/repos/puppies-inc/front/collaborators{/collaborator}","teams_url":"https://api.github.com/repos/puppies-inc/front/teams","hooks_url":"https://api.github.com/repos/puppies-inc/front/hooks","issue_events_url":"https://api.github.com/repos/puppies-inc/front/issues/events{/number}","events_url":"https://api.github.com/repos/puppies-inc/front/events","assignees_url":"https://api.github.com/repos/puppies-inc/front/assignees{/user}","branches_url":"https://api.github.com/repos/puppies-inc/front/branches{/branch}","tags_url":"https://api.github.com/repos/puppies-inc/front/tags","blobs_url":"https://api.github.com/repos/puppies-inc/front/git/blobs{/sha}","git_tags_url":"https://api.github.com/repos/puppies-inc/front/git/tags{/sha}","git_refs_url":"https://api.github.com/repos/puppies-inc/front/git/refs{/sha}","trees_url":"https://api.github.com/repos/puppies-inc/front/git/trees{/sha}","statuses_url":"https://api.github.com/repos/puppies-inc/front/statuses/{sha}","languages_url":"https://api.github.com/repos/puppies-inc/front/languages","stargazers_url":"https://api.github.com/repos/puppies-inc/front/stargazers","contributors_url":"https://api.github.com/repos/puppies-inc/front/contributors","subscribers_url":"https://api.github.com/repos/puppies-inc/front/subscribers","subscription_url":"https://api.github.com/repos/puppies-inc/front/subscription","commits_url":"https://api.github.com/repos/puppies-inc/front/commits{/sha}","git_commits_url":"https://api.github.com/repos/puppies-inc/front/git/commits{/sha}","comments_url":"https://api.github.com/repos/puppies-inc/front/comments{/number}","issue_comment_url":"https://api.github.com/repos/puppies-inc/front/issues/comments{/number}","contents_url":"https://api.github.com/repos/puppies-inc/front/contents/{+path}","compare_url":"https://api.github.com/repos/puppies-inc/front/compare/{base}...{head}","merges_url":"https://api.github.com/repos/puppies-inc/front/merges","archive_url":"https://api.github.com/repos/puppies-inc/front/{archive_format}{/ref}","downloads_url":"https://api.github.com/repos/puppies-inc/front/downloads","issues_url":"https://api.github.com/repos/puppies-inc/front/issues{/number}","pulls_url":"https://api.github.com/repos/puppies-inc/front/pulls{/number}","milestones_url":"https://api.github.com/repos/puppies-inc/front/milestones{/number}","notifications_url":"https://api.github.com/repos/puppies-inc/front/notifications{?since,all,participating}","labels_url":"https://api.github.com/repos/puppies-inc/front/labels{/name}","releases_url":"https://api.github.com/repos/puppies-inc/front/releases{/id}","deployments_url":"https://api.github.com/repos/puppies-inc/front/deployments","created_at":"2025-08-28T10:15:23Z","updated_at":"2025-11-20T16:40:56Z","pushed_at":"2025-12-08T13:40:50Z","git_url":"git://github.com/puppies-inc/front.git","ssh_url":"git@github.com:puppies-inc/front.git","clone_url":"https://github.com/puppies-inc/front.git","svn_url":"https://github.com/puppies-inc/front","homepage":null,"size":194,"stargazers_count":0,"watchers_count":0,"language":null,"has_issues":true,"has_projects":true,"has_downloads":true,"has_wiki":false,"has_pages":false,"has_discussions":false,"forks_count":0,"mirror_url":null,"archived":false,"disabled":false,"open_issues_count":4,"license":null,"allow_forking":false,"is_template":false,"web_commit_signoff_required":false,"topics":[],"visibility":"private","forks":0,"open_issues":4,"watchers":0,"default_branch":"main","permissions":{"admin":true,"maintain":true,"push":true,"triage":true,"pull":true},"custom_properties":{},"organization":{"login":"puppies-inc","id":229106624,"node_id":"O_kgDODafjwA","avatar_url":"https://avatars.githubusercontent.com/u/229106624?v=4","gravatar_id":"","url":"https://api.github.com/users/puppies-inc","html_url":"https://github.com/puppies-inc","followers_url":"https://api.github.com/users/puppies-inc/followers","following_url":"https://api.github.com/users/puppies-inc/following{/other_user}","gists_url":"https://api.github.com/users/puppies-inc/gists{/gist_id}","starred_url":"https://api.github.com/users/puppies-inc/starred{/owner}{/repo}","subscriptions_url":"https://api.github.com/users/puppies-inc/subscriptions","organizations_url":"https://api.github.com/users/puppies-inc/orgs","repos_url":"https://api.github.com/users/puppies-inc/repos","events_url":"https://api.github.com/users/puppies-inc/events{/privacy}","received_events_url":"https://api.github.com/users/puppies-inc/received_events","type":"Organization","user_view_type":"public","site_admin":false},"network_count":0,"subscribers_count":0}'
-        headers:
-            Access-Control-Allow-Origin:
-                - '*'
-            Access-Control-Expose-Headers:
-                - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
-            Cache-Control:
-                - private, max-age=60, s-maxage=60
-            Content-Security-Policy:
-                - default-src 'none'
-            Content-Type:
-                - application/json; charset=utf-8
-            Date:
-                - Thu, 11 Dec 2025 15:20:04 GMT
-            Etag:
-                - W/"fb22fceebb020dcb1f2eed85218bbf867b455a650b79328eb364dd6542b9553f"
-            Github-Authentication-Token-Expiration:
-                - 2026-01-10 11:40:16 +0100
-            Last-Modified:
-                - Thu, 20 Nov 2025 16:40:56 GMT
-            Referrer-Policy:
-                - origin-when-cross-origin, strict-origin-when-cross-origin
-            Server:
-                - github.com
-            Strict-Transport-Security:
-                - max-age=31536000; includeSubdomains; preload
-            Vary:
-                - Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Github-Permissions:
-                - metadata=read
-            X-Content-Type-Options:
-                - nosniff
-            X-Frame-Options:
-                - deny
-            X-Github-Api-Version-Selected:
-                - "2022-11-28"
-            X-Github-Media-Type:
-                - github.v3; format=json
-            X-Github-Request-Id:
-                - 6289:AE4E6:926EFEA:86EFDE8:693AE124
-            X-Ratelimit-Limit:
-                - "5000"
-            X-Ratelimit-Remaining:
-                - "4995"
-            X-Ratelimit-Reset:
-                - "1765469864"
-            X-Ratelimit-Resource:
-                - core
-            X-Ratelimit-Used:
-                - "5"
-            X-Xss-Protection:
-                - "0"
-        status: 200 OK
-        code: 200
-        duration: 460.69025ms
-    - request:
-        body: |
-            {"name":"web","config":{"content_type":"json","url":"http://127.0.0.1:8001/api/v1/webhooks/cd3eb96d-8618-412c-aec0-f371b6e47af0","secret":"Hx4ZSRphTbq_vI3CodMFfSNhJQJycMwsABZkyBnu3MU="},"events":["push"],"active":true}
-        form: {}
-        headers:
-            Accept:
-                - application/vnd.github.v3+json
-            Authorization:
-                - Bearer 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
-            Content-Type:
-                - application/json
-            User-Agent:
-                - go-github/v74.0.0
-            X-Github-Api-Version:
-                - "2022-11-28"
-        url: https://api.github.com/repos/puppies-inc/front/hooks
-        method: POST
-      response:
-        body: '{"message":"Validation Failed","errors":[{"resource":"Hook","code":"custom","field":"url","message":"url is not supported because it isn''t reachable over the public Internet (127.0.0.1)"}],"documentation_url":"https://docs.github.com/rest/repos/webhooks#create-a-repository-webhook","status":"422"}'
-        headers:
-            Access-Control-Allow-Origin:
-                - '*'
-            Access-Control-Expose-Headers:
-                - ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
-            Content-Length:
-                - "298"
-            Content-Security-Policy:
-                - default-src 'none'
-            Content-Type:
-                - application/json; charset=utf-8
-            Date:
-                - Thu, 11 Dec 2025 15:20:07 GMT
-            Github-Authentication-Token-Expiration:
-                - 2026-01-10 11:40:16 +0100
-            Referrer-Policy:
-                - origin-when-cross-origin, strict-origin-when-cross-origin
-            Server:
-                - github.com
-            Strict-Transport-Security:
-                - max-age=31536000; includeSubdomains; preload
-            Vary:
-                - Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Github-Permissions:
-                - repository_hooks=write
-            X-Content-Type-Options:
-                - nosniff
-            X-Frame-Options:
-                - deny
-            X-Github-Api-Version-Selected:
-                - "2022-11-28"
-            X-Github-Media-Type:
-                - github.v3; format=json
-            X-Github-Request-Id:
-                - 6289:AE4E6:9270058:86F0D0E:693AE124
-            X-Ratelimit-Limit:
-                - "5000"
-            X-Ratelimit-Remaining:
-                - "4994"
-            X-Ratelimit-Reset:
-                - "1765469864"
-            X-Ratelimit-Resource:
-                - core
-            X-Ratelimit-Used:
-                - "6"
-            X-Xss-Protection:
-                - "0"
-        status: 422 Unprocessable Entity
-        code: 422
-        duration: 510.748292ms
+        status: 201 Created
+        code: 201
+        duration: 593.791125ms

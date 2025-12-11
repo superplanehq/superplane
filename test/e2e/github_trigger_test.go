@@ -1,16 +1,21 @@
 package e2e
 
 import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
-	"gorm.io/datatypes"
 
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	v "github.com/superplanehq/superplane/test/e2e/vcr"
@@ -19,26 +24,30 @@ import (
 func TestGithubTrigger(t *testing.T) {
 	steps := &GithubTriggerSteps{t: t}
 
+	// These credentials are created specifically for E2E.
+	// They are now revoked and have no access to any real repositories.
+	// Used only in the recorded VCR cassettes.
+
 	const githubOwner = "puppies-inc"
 	const githubTokenValue = "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"
 
-	// v.Run(t, "addding a github trigger node", func(t *testing.T) {
-	// 	steps.start()
-	// 	steps.givenAGithubIntegrationExists(githubOwner, githubTokenValue)
-	// 	steps.givenACanvasExists()
-	// 	steps.addGithubTriggerNode()
-	// 	steps.saveCanvas()
-	// 	steps.assertGithubTriggerNodeExistsInDB()
-	// })
+	v.Run(t, "addding a github trigger node", func(t *testing.T) {
+		steps.start()
+		steps.givenAGithubIntegrationExists(githubOwner, githubTokenValue)
+		steps.givenACanvasExists()
+		steps.addGithubTriggerNode()
+		steps.saveCanvas()
+		steps.assertGithubTriggerNodeExistsInDB()
+	})
 
 	v.Run(t, "receiving github trigger events", func(t *testing.T) {
 		steps.start()
 		steps.givenAGithubIntegrationExists(githubOwner, githubTokenValue)
 		steps.givenACanvasWithGithubTriggerAndNoop()
 		steps.saveCanvas()
+		steps.waitForWebhookSetup()
 		steps.simulateReceivingGithubEvent()
-		steps.assertGithubTriggerExecutionCreated()
-		steps.assertSecondNodeExecuted()
+		steps.assertWebhookProcessed()
 	})
 }
 
@@ -127,47 +136,79 @@ func (s *GithubTriggerSteps) givenACanvasWithGithubTriggerAndNoop() {
 	s.givenACanvasExists()
 	s.addGithubTriggerNode()
 
-	s.canvas.AddNoop("Second", models.Position{X: 900, Y: 200})
-	s.canvas.Connect("GitHub Trigger", "Second")
+	s.canvas.AddNoop("Noop", models.Position{X: 1500, Y: 200})
+	s.canvas.Connect("GitHub Trigger", "Noop")
+}
+
+func (s *GithubTriggerSteps) waitForWebhookSetup() {
+	for i := 0; i < 10; i++ {
+		node := s.canvas.GetNodeFromDB("GitHub Trigger")
+		require.NotNil(s.t, node, "github trigger node not found in DB")
+
+		webhook, err := models.FindWebhook(*node.WebhookID)
+		if err == nil && webhook.State == models.WebhookStateReady {
+			return
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	s.t.Fatal("webhook was not set up in time")
 }
 
 func (s *GithubTriggerSteps) simulateReceivingGithubEvent() {
 	node := s.canvas.GetNodeFromDB("GitHub Trigger")
 	require.NotNil(s.t, node, "github trigger node not found in DB")
+	require.NotNil(s.t, node.WebhookID, "github trigger node does not have a webhook")
 
-	// Insert a workflow event that looks like a GitHub webhook payload
-	event := &models.WorkflowEvent{
-		ID:         uuid.New(),
-		WorkflowID: s.canvas.WorkflowID,
-		NodeID:     node.NodeID,
-		Channel:    "github-webhook",
-		Data: datatypes.NewJSONType[any](map[string]any{
-			"head_commit": map[string]any{
-				"message": "Initial commit",
-				"id":      "abc123",
-				"author": map[string]any{
-					"name": "E2E Tester",
-				},
+	webhook, err := models.FindWebhook(*node.WebhookID)
+	require.NoError(s.t, err, "failed to load webhook for github trigger node")
+	require.Equal(s.t, models.WebhookStateReady, webhook.State, "webhook is not in ready state")
+
+	payload := map[string]any{
+		"head_commit": map[string]any{
+			"message": "Initial commit",
+			"id":      "abc123",
+			"author": map[string]any{
+				"name": "E2E Tester",
 			},
-		}),
-		State: models.WorkflowEventStatePending,
+		},
 	}
 
-	err := database.Conn().Create(event).Error
-	require.NoError(s.t, err)
+	body, err := json.Marshal(payload)
+	require.NoError(s.t, err, "failed to marshal github webhook payload")
+
+	// NOTE: In test environments we typically run with NO_ENCRYPTION=yes,
+	// so webhook.Secret contains the raw key used for signing.
+	mac := hmac.New(sha256.New, webhook.Secret)
+	_, err = mac.Write(body)
+	require.NoError(s.t, err, "failed to compute webhook signature")
+
+	signature := hex.EncodeToString(mac.Sum(nil))
+
+	baseURL := os.Getenv("BASE_URL")
+	require.NotEmpty(s.t, baseURL, "BASE_URL must be set for github trigger e2e tests")
+
+	url := fmt.Sprintf("%s/api/v1/webhooks/%s", baseURL, webhook.ID.String())
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	require.NoError(s.t, err, "failed to create github webhook request")
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-GitHub-Event", "push")
+	req.Header.Set("X-Hub-Signature-256", "sha256="+signature)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(s.t, err, "failed to send github webhook request")
+	defer resp.Body.Close()
+
+	require.Equal(s.t, http.StatusOK, resp.StatusCode, "unexpected status code from github webhook endpoint")
 
 	// Give the workflow_event_router and node executor some time to process the event
 	time.Sleep(3 * time.Second)
 }
 
-func (s *GithubTriggerSteps) assertGithubTriggerExecutionCreated() {
-	s.canvas.WaitForExecution("GitHub Trigger", models.WorkflowNodeExecutionStateFinished, 10*time.Second)
-
-	executions := s.canvas.GetExecutionsForNode("GitHub Trigger")
-	require.NotEmpty(s.t, executions, "expected at least one execution for github trigger node")
-}
-
-func (s *GithubTriggerSteps) assertSecondNodeExecuted() {
-	executions := s.canvas.GetExecutionsForNode("Second")
+func (s *GithubTriggerSteps) assertWebhookProcessed() {
+	executions := s.canvas.GetExecutionsForNode("Noop")
 	require.NotEmpty(s.t, executions, "expected at least one execution for second node")
 }

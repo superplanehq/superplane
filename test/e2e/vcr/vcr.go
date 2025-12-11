@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -19,14 +20,24 @@ var (
 
 func Run(t *testing.T, testName string, testFunc func(t *testing.T)) {
 	t.Run(testName, func(t *testing.T) {
-		withVCR(t, testName, testFunc)
+		withVCR(t, testName, recorder.ModeReplaying, testFunc)
 	})
 }
 
-func withVCR(t *testing.T, testName string, testFunc func(t *testing.T)) {
+func Record(t *testing.T, testName string, testFunc func(t *testing.T)) {
+	if os.Getenv("CI") == "true" {
+		t.Fatalf("Recording tests are not allowed to run in CI environment")
+	}
+
+	t.Run(testName, func(t *testing.T) {
+		withVCR(t, testName, recorder.ModeRecording, testFunc)
+	})
+}
+
+func withVCR(t *testing.T, testName string, mode recorder.Mode, testFunc func(t *testing.T)) {
 	cassetteName := testNameToCassetteName(t, testName)
 
-	err := startGlobalVCR(cassetteName)
+	err := startGlobalVCR(cassetteName, mode)
 	require.NoError(t, err)
 
 	defer func() {
@@ -36,8 +47,8 @@ func withVCR(t *testing.T, testName string, testFunc func(t *testing.T)) {
 	testFunc(t)
 }
 
-func startGlobalVCR(cassetteName string) error {
-	r, err := recorder.NewAsMode(cassetteName, recorder.ModeReplayingOrRecording, nil)
+func startGlobalVCR(cassetteName string, mode recorder.Mode) error {
+	r, err := recorder.NewAsMode(cassetteName, mode, nil)
 	if err != nil {
 		return err
 	}
