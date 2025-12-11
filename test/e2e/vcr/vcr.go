@@ -17,31 +17,23 @@ var (
 	originalTransport = http.DefaultTransport
 )
 
-// WithVCR is the main entry point for using the global VCR in tests.
-//
-// It starts the global VCR with the given cassette name, runs the provided test function,
-// and ensures the VCR is stopped afterwards.
-//
-// It fails the test if starting or stopping the VCR fails.
-//
-// Usage:
-//
-//	helpers.WithVCR(t, "my-test", func(t *testing.T) {
-//	    // Your test code here
-//	})
 func Run(t *testing.T, testName string, testFunc func(t *testing.T)) {
-	cassetteName := testNameToCassetteName(testName)
-
 	t.Run(testName, func(t *testing.T) {
-		err := startGlobalVCR(cassetteName)
-		require.NoError(t, err)
-
-		defer func() {
-			require.NoError(t, stopGlobalVCR())
-		}()
-
-		testFunc(t)
+		withVCR(t, testName, testFunc)
 	})
+}
+
+func withVCR(t *testing.T, testName string, testFunc func(t *testing.T)) {
+	cassetteName := testNameToCassetteName(t, testName)
+
+	err := startGlobalVCR(cassetteName)
+	require.NoError(t, err)
+
+	defer func() {
+		require.NoError(t, stopGlobalVCR())
+	}()
+
+	testFunc(t)
 }
 
 func startGlobalVCR(cassetteName string) error {
@@ -92,11 +84,10 @@ func localTraficPassthrough(req *http.Request) bool {
 	}
 }
 
-// testNameToCassetteName converts a test name to a valid cassette file name.
-// e.g. "Test My Feature/Subfeature" -> "Test_My_Feature_Subfeature"
-func testNameToCassetteName(testName string) string {
-	// Replace spaces and slashes with underscores to form a valid file name.
-	cassetteName := strings.ReplaceAll(testName, " ", "_")
+func testNameToCassetteName(t *testing.T, testName string) string {
+	cassetteName := t.Name() + "_" + testName
+	cassetteName = strings.ReplaceAll(cassetteName, " ", "_")
 	cassetteName = strings.ReplaceAll(cassetteName, "/", "_")
-	return cassetteName
+
+	return "vcr/cassettes/" + cassetteName
 }

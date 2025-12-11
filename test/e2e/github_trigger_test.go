@@ -20,10 +20,13 @@ import (
 func TestGithubTrigger(t *testing.T) {
 	steps := &GithubTriggerSteps{t: t}
 
+	org := "https://github.com/puppies-inc"
+	token := "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"
+
 	v.Run(t, "addding a github trigger node", func(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
-		steps.givenAGithubIntegrationExists("Integration", "https://github.com/puppies-inc", "token")
+		steps.givenAGithubIntegrationExists("Integration", org, token)
 		steps.addGithubTriggerNode()
 		steps.saveCanvas()
 		steps.assertGithubTriggerNodeExistsInDB()
@@ -114,7 +117,7 @@ func (s *GithubTriggerSteps) addGithubTriggerNode() {
 	// Select the GitHub integration
 	integrationTrigger := q.Locator(`label:has-text("GitHub integration") + div button`)
 	s.session.Click(integrationTrigger)
-	s.session.Click(q.Locator(`div[role="option"]:has-text("` + s.integrationName + `")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Integration")`))
 
 	s.session.Click(q.TestID("add-node-button"))
 	s.session.Sleep(300)
