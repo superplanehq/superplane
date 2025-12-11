@@ -88,6 +88,13 @@ type Component interface {
 	 * on a specific execution of the component.
 	 */
 	HandleAction(ctx ActionContext) error
+
+	/*
+	 * Cancel allows components to handle cancellation of executions.
+	 * Default behavior does nothing. Components can override to perform
+	 * cleanup or cancel external resources.
+	 */
+	Cancel(ctx ExecutionContext) error
 }
 
 type OutputChannel struct {
