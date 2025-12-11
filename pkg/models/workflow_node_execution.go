@@ -439,18 +439,6 @@ func (e *WorkflowNodeExecution) CancelInTransaction(tx *gorm.DB) error {
 		return err
 	}
 
-	childExecutions, err := FindChildExecutionsInTransaction(tx, e.ID, []string{WorkflowNodeExecutionStatePending, WorkflowNodeExecutionStateStarted})
-	if err != nil {
-		return err
-	}
-
-	for _, child := range childExecutions {
-		err := child.CancelInTransaction(tx)
-		if err != nil {
-			return err
-		}
-	}
-
 	node, err := FindWorkflowNode(tx, e.WorkflowID, e.NodeID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
@@ -461,15 +449,6 @@ func (e *WorkflowNodeExecution) CancelInTransaction(tx *gorm.DB) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	if e.ParentExecutionID != nil {
-		parent, err := FindNodeExecution(e.WorkflowID, *e.ParentExecutionID)
-		if err != nil {
-			return err
-		}
-
-		return parent.CancelInTransaction(tx)
 	}
 
 	return nil

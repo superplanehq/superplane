@@ -66,3 +66,7 @@ func (c *NoOp) HandleAction(ctx components.ActionContext) error {
 func (c *NoOp) Setup(ctx components.SetupContext) error {
 	return nil
 }
+
+func (c *NoOp) Cancel(ctx components.ExecutionContext) error {
+	return nil
+}

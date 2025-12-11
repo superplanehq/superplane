@@ -532,3 +532,7 @@ func (a *Approval) handleReject(ctx components.ActionContext) (*Metadata, error)
 
 	return &metadata, nil
 }
+
+func (a *Approval) Cancel(ctx components.ExecutionContext) error {
+	return nil
+}

@@ -125,3 +125,7 @@ func (f *If) Setup(ctx components.SetupContext) error {
 func (f *If) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (f *If) Cancel(ctx components.ExecutionContext) error {
+	return nil
+}

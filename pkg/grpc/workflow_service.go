@@ -172,5 +172,7 @@ func (s *WorkflowService) CancelExecution(ctx context.Context, req *pb.CancelExe
 		return nil, status.Error(codes.InvalidArgument, "invalid execution_id")
 	}
 
-	return workflows.CancelExecution(ctx, s.registry, workflowID, executionID)
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+
+	return workflows.CancelExecution(ctx, organizationID, s.registry, workflowID, executionID)
 }

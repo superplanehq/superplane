@@ -271,6 +271,10 @@ func (m *Merge) Execute(ctx components.ExecutionContext) error {
 	return nil
 }
 
+func (m *Merge) Cancel(ctx components.ExecutionContext) error {
+	return nil
+}
+
 func durationFrom(value int, unit string) time.Duration {
 	switch unit {
 	case "seconds":

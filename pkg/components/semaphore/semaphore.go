@@ -393,6 +393,49 @@ func (s *Semaphore) finish(ctx components.ActionContext) error {
 	})
 }
 
+func (s *Semaphore) Cancel(ctx components.ExecutionContext) error {
+	metadata := ExecutionMetadata{}
+	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	if metadata.Workflow == nil {
+		return fmt.Errorf("no workflow found in metadata")
+	}
+
+	if ctx.ExecutionStateContext.IsFinished() {
+		return nil
+	}
+
+	spec := Spec{}
+	err = mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	integration, err := ctx.IntegrationContext.GetIntegration(spec.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to get integration: %w", err)
+	}
+
+	semaphore, ok := integration.(*semaphore.SemaphoreResourceManager)
+	if !ok {
+		return fmt.Errorf("integration is not a semaphore integration")
+	}
+
+	err = semaphore.Cancel("workflow", metadata.Workflow.ID, nil)
+	if err != nil {
+		return fmt.Errorf("failed to cancel semaphore workflow: %w", err)
+	}
+
+	metadata.Workflow.State = "finished"
+	metadata.Workflow.Result = "cancelled"
+	ctx.MetadataContext.Set(metadata)
+
+	return nil
+}
+
 func (s *Semaphore) buildParameters(ctx components.ExecutionContext, params []Parameter) map[string]any {
 	parameters := make(map[string]any)
 	for _, param := range params {
