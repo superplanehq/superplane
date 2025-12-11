@@ -16,6 +16,7 @@ import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { AuthorizationDomainType, ConfigurationField, WorkflowsWorkflowNodeExecution } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
+import { NewNodeData } from "../CustomComponentBuilderPage";
 
 const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
   { value: "processed", label: "Processed" },
@@ -96,6 +97,9 @@ interface ComponentSidebarProps {
   showSettingsTab?: boolean;
   currentTab?: "latest" | "settings";
   onTabChange?: (tab: "latest" | "settings") => void;
+  templateNodeId?: string | null;
+  newNodeData: NewNodeData | null;
+  onCancelTemplate?: () => void;
   nodeConfigMode?: "create" | "edit";
   nodeName?: string;
   nodeLabel?: string;
@@ -154,6 +158,9 @@ export const ComponentSidebar = ({
   showSettingsTab = false,
   currentTab = "latest",
   onTabChange,
+  templateNodeId,
+  onCancelTemplate,
+  newNodeData,
   nodeConfigMode = "edit",
   nodeName = "",
   nodeLabel,
@@ -174,7 +181,9 @@ export const ComponentSidebar = ({
   const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
 
   const [page, setPage] = useState<"overview" | "history" | "queue">("overview");
-  const activeTab = currentTab || "latest";
+  // For template nodes, force settings tab and block latest tab
+  const isTemplateNode = !!templateNodeId && !!newNodeData;
+  const activeTab = isTemplateNode ? "settings" : currentTab || "latest";
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
 
@@ -394,19 +403,21 @@ export const ComponentSidebar = ({
           </div>
           <div className="flex justify-between gap-3 w-full">
             <h2 className="text-xl font-semibold">{title}</h2>
-            <SidebarActionsDropdown
-              onRun={onRun}
-              runDisabled={runDisabled}
-              runDisabledTooltip={runDisabledTooltip}
-              onDuplicate={onDuplicate}
-              onDocs={onDocs}
-              onEdit={onEdit}
-              onConfigure={onConfigure}
-              onDeactivate={onDeactivate}
-              onToggleView={onToggleView}
-              onDelete={onDelete}
-              isCompactView={isCompactView}
-            />
+            {!templateNodeId && (
+              <SidebarActionsDropdown
+                onRun={onRun}
+                runDisabled={runDisabled}
+                runDisabledTooltip={runDisabledTooltip}
+                onDuplicate={onDuplicate}
+                onDocs={onDocs}
+                onEdit={onEdit}
+                onConfigure={onConfigure}
+                onDeactivate={onDeactivate}
+                onToggleView={onToggleView}
+                onDelete={onDelete}
+                isCompactView={isCompactView}
+              />
+            )}
           </div>
           <div
             onClick={() => onClose?.()}
@@ -538,11 +549,14 @@ export const ComponentSidebar = ({
               <div className="px-3">
                 <div className="flex border-gray-200 dark:border-zinc-700">
                   <button
-                    onClick={() => onTabChange?.("latest")}
+                    onClick={() => !isTemplateNode && onTabChange?.("latest")}
+                    disabled={isTemplateNode}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === "latest"
-                        ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                      isTemplateNode
+                        ? "border-transparent text-gray-300 cursor-not-allowed dark:text-gray-600"
+                        : activeTab === "latest"
+                          ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                     }`}
                   >
                     Latest
@@ -586,13 +600,17 @@ export const ComponentSidebar = ({
             {showSettingsTab && (
               <TabsContent value="settings" className="mt-0">
                 <SettingsTab
-                  mode={nodeConfigMode}
-                  nodeName={nodeName}
-                  nodeLabel={nodeLabel}
-                  configuration={nodeConfiguration}
-                  configurationFields={nodeConfigurationFields}
+                  mode={isTemplateNode ? "create" : nodeConfigMode}
+                  nodeName={isTemplateNode ? newNodeData.nodeName : nodeName}
+                  nodeLabel={isTemplateNode ? newNodeData.displayLabel : nodeLabel}
+                  configuration={isTemplateNode ? newNodeData.configuration : nodeConfiguration}
+                  configurationFields={
+                    isTemplateNode
+                      ? (newNodeData.buildingBlock.configuration as ConfigurationField[])
+                      : nodeConfigurationFields
+                  }
                   onSave={onNodeConfigSave || (() => {})}
-                  onCancel={onNodeConfigCancel}
+                  onCancel={isTemplateNode ? onCancelTemplate : onNodeConfigCancel}
                   domainId={domainId}
                   domainType={domainType}
                 />
