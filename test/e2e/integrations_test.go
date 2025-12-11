@@ -16,7 +16,7 @@ func TestOrganizationIntegrations(t *testing.T) {
 		steps.start()
 		steps.visitIntegrationsSettingsPage()
 
-		const githubOwner = "e2e-github-owner"
+		const githubOwner = "puppies-inc"
 		const githubTokenValue = "test-github-token"
 		originalIntegrationName := githubOwner + "-account"
 
@@ -41,7 +41,7 @@ func TestOrganizationIntegrations(t *testing.T) {
 		steps.start()
 		steps.visitIntegrationsSettingsPage()
 
-		const originalOwner = "e2e-github-owner"
+		const originalOwner = "puppies-inc"
 		const originalToken = "test-github-token"
 		originalIntegrationName := originalOwner + "-account"
 

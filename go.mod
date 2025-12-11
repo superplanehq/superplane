@@ -36,6 +36,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250414145226-207652e42e2e
 	google.golang.org/grpc v1.71.1
 	google.golang.org/protobuf v1.36.6
+	gopkg.in/dnaeon/go-vcr.v2 v2.3.0
 	gorm.io/datatypes v1.2.5
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.26.0
