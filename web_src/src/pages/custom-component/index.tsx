@@ -361,6 +361,7 @@ export const CustomComponent = () => {
         }),
       );
       setHasUnsavedChanges(true);
+      showSuccessToast("New configuration applied");
     },
     [saveSnapshot],
   );
