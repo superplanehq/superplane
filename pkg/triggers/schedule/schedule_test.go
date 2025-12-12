@@ -11,263 +11,70 @@ func TestNextMinutesTrigger(t *testing.T) {
 		interval      int
 		now           time.Time
 		referenceTime *string
-		expectError   bool
 		expectNext    time.Time
+		expectError   bool
 	}{
 		{
-			name:          "10 minute interval with reference time",
-			interval:      10,
-			now:           mustParseTime("2025-01-01T12:35:00Z"),
-			referenceTime: stringPtr("2025-01-01T12:00:00Z"),
-			expectNext:    mustParseTime("2025-01-01T12:40:00Z"), // 4 intervals of 10 min from 12:00
+			name:       "10 minute interval with reference time",
+			interval:   10,
+			now:        mustParseTime("2025-01-01T12:35:00Z"),
+			expectNext: mustParseTime("2025-01-01T12:45:00Z"),
 		},
 		{
-			name:          "5 minute interval exactly at interval boundary",
-			interval:      5,
-			now:           mustParseTime("2025-01-01T12:20:00Z"),
-			referenceTime: stringPtr("2025-01-01T12:00:00Z"),
-			expectNext:    mustParseTime("2025-01-01T12:25:00Z"), // next interval after 12:20
+			name:       "5 minute interval exactly at interval boundary",
+			interval:   5,
+			now:        mustParseTime("2025-01-01T12:25:00Z"),
+			expectNext: mustParseTime("2025-01-01T12:30:00Z"),
 		},
 		{
 			name:          "15 minute interval with reference time in past",
 			interval:      15,
-			now:           mustParseTime("2025-01-01T12:45:00Z"),
-			referenceTime: stringPtr("2025-01-01T11:30:00Z"),
-			expectNext:    mustParseTime("2025-01-01T13:00:00Z"), // 6 intervals of 15 min from 11:30 (11:30, 11:45, 12:00, 12:15, 12:30, 12:45, 13:00)
-		},
-		{
-			name:          "30 minute interval crossing day boundary",
-			interval:      30,
-			now:           mustParseTime("2025-01-01T23:50:00Z"),
-			referenceTime: stringPtr("2025-01-01T23:00:00Z"),
-			expectNext:    mustParseTime("2025-01-02T00:00:00Z"), // 2 intervals from 23:00 (23:30, 00:00)
-		},
-		{
-			name:          "1 minute interval high frequency",
-			interval:      1,
-			now:           mustParseTime("2025-01-01T12:05:30Z"),
+			now:           mustParseTime("2025-01-01T12:40:00Z"),
 			referenceTime: stringPtr("2025-01-01T12:00:00Z"),
-			expectNext:    mustParseTime("2025-01-01T12:06:00Z"), // next minute after 5:30
+			expectNext:    mustParseTime("2025-01-01T12:45:00Z"),
 		},
 		{
-			name:          "no reference time provided - use current time",
-			interval:      10,
-			now:           mustParseTime("2025-01-01T12:05:00Z"),
-			referenceTime: nil,
-			expectNext:    mustParseTime("2025-01-01T12:15:00Z"), // 10 minutes from now
+			name:       "30 minute interval crossing day boundary",
+			interval:   30,
+			now:        mustParseTime("2025-01-01T23:50:00Z"),
+			expectNext: mustParseTime("2025-01-02T00:20:00Z"),
+		},
+		{
+			name:       "1 minute interval high frequency",
+			interval:   1,
+			now:        mustParseTime("2025-01-01T12:30:30Z"),
+			expectNext: mustParseTime("2025-01-01T12:31:30Z"),
+		},
+		{
+			name:       "no reference time provided - use current time",
+			interval:   20,
+			now:        mustParseTime("2025-01-01T12:30:00Z"),
+			expectNext: mustParseTime("2025-01-01T12:50:00Z"),
 		},
 		{
 			name:          "reference time in future - should handle gracefully",
-			interval:      5,
-			now:           mustParseTime("2025-01-01T12:00:00Z"),
-			referenceTime: stringPtr("2025-01-01T12:10:00Z"),
-			expectNext:    mustParseTime("2025-01-01T12:15:00Z"), // first interval after reference time (since minutesElapsed is 0, next is reference + interval)
+			interval:      10,
+			now:           mustParseTime("2025-01-01T12:30:00Z"),
+			referenceTime: stringPtr("2025-01-01T13:00:00Z"),
+			expectNext:    mustParseTime("2025-01-01T13:10:00Z"),
 		},
 		{
-			name:          "invalid interval - too small",
-			interval:      0,
-			now:           mustParseTime("2025-01-01T12:00:00Z"),
-			referenceTime: stringPtr("2025-01-01T12:00:00Z"),
-			expectError:   true,
+			name:        "invalid interval - too small",
+			interval:    0,
+			now:         mustParseTime("2025-01-01T12:30:00Z"),
+			expectError: true,
 		},
 		{
-			name:          "invalid interval - too large",
-			interval:      1441,
-			now:           mustParseTime("2025-01-01T12:00:00Z"),
-			referenceTime: stringPtr("2025-01-01T12:00:00Z"),
-			expectError:   true,
+			name:        "invalid interval - too large",
+			interval:    60,
+			now:         mustParseTime("2025-01-01T12:30:00Z"),
+			expectError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := nextMinutesTrigger(tt.interval, tt.now, tt.referenceTime)
-
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("expected error but got none")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-
-			if result == nil {
-				t.Error("result is nil")
-				return
-			}
-
-			if !result.Equal(tt.expectNext) {
-				t.Errorf("expected next trigger at %v, got %v", tt.expectNext, *result)
-			}
-
-			// Verify the next trigger is always in the future
-			if !result.After(tt.now) {
-				t.Errorf("next trigger %v should be after now %v", *result, tt.now)
-			}
-		})
-	}
-}
-
-func TestNextHourlyTrigger(t *testing.T) {
-	tests := []struct {
-		name        string
-		minute      int
-		now         time.Time
-		expectNext  time.Time
-		expectError bool
-	}{
-		{
-			name:       "trigger at minute 30",
-			minute:     30,
-			now:        mustParseTime("2025-01-01T12:15:00Z"),
-			expectNext: mustParseTime("2025-01-01T12:30:00Z"),
-		},
-		{
-			name:       "trigger at minute 0, current time past",
-			minute:     0,
-			now:        mustParseTime("2025-01-01T12:15:00Z"),
-			expectNext: mustParseTime("2025-01-01T13:00:00Z"),
-		},
-		{
-			name:        "invalid minute - too large",
-			minute:      60,
-			now:         mustParseTime("2025-01-01T12:15:00Z"),
-			expectError: true,
-		},
-		{
-			name:        "invalid minute - negative",
-			minute:      -1,
-			now:         mustParseTime("2025-01-01T12:15:00Z"),
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := nextHourlyTrigger(tt.minute, tt.now)
-
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("expected error but got none")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-
-			if !result.Equal(tt.expectNext) {
-				t.Errorf("expected next trigger at %v, got %v", tt.expectNext, *result)
-			}
-		})
-	}
-}
-
-func TestNextDailyTrigger(t *testing.T) {
-	tests := []struct {
-		name        string
-		timeValue   string
-		now         time.Time
-		expectNext  time.Time
-		expectError bool
-	}{
-		{
-			name:       "trigger at 14:30 UTC, before time",
-			timeValue:  "14:30",
-			now:        mustParseTime("2025-01-01T10:00:00Z"),
-			expectNext: mustParseTime("2025-01-01T14:30:00Z"),
-		},
-		{
-			name:       "trigger at 14:30 UTC, after time",
-			timeValue:  "14:30",
-			now:        mustParseTime("2025-01-01T16:00:00Z"),
-			expectNext: mustParseTime("2025-01-02T14:30:00Z"),
-		},
-		{
-			name:        "invalid time format",
-			timeValue:   "25:00",
-			now:         mustParseTime("2025-01-01T12:00:00Z"),
-			expectError: true,
-		},
-		{
-			name:        "invalid time format - not HH:MM",
-			timeValue:   "14",
-			now:         mustParseTime("2025-01-01T12:00:00Z"),
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := nextDailyTrigger(tt.timeValue, tt.now)
-
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("expected error but got none")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-
-			if !result.Equal(tt.expectNext) {
-				t.Errorf("expected next trigger at %v, got %v", tt.expectNext, *result)
-			}
-		})
-	}
-}
-
-func TestNextWeeklyTrigger(t *testing.T) {
-	tests := []struct {
-		name        string
-		weekDay     string
-		timeValue   string
-		now         time.Time
-		expectNext  time.Time
-		expectError bool
-	}{
-		{
-			name:       "trigger on Friday 15:30, current day is Monday",
-			weekDay:    "friday",
-			timeValue:  "15:30",
-			now:        mustParseTime("2025-01-06T10:00:00Z"), // Monday
-			expectNext: mustParseTime("2025-01-10T15:30:00Z"), // Friday
-		},
-		{
-			name:       "trigger on Monday 09:00, current day is Monday after time",
-			weekDay:    "monday",
-			timeValue:  "09:00",
-			now:        mustParseTime("2025-01-06T12:00:00Z"), // Monday 12:00
-			expectNext: mustParseTime("2025-01-13T09:00:00Z"), // Next Monday
-		},
-		{
-			name:        "invalid weekday",
-			weekDay:     "funday",
-			timeValue:   "09:00",
-			now:         mustParseTime("2025-01-06T12:00:00Z"),
-			expectError: true,
-		},
-		{
-			name:        "invalid time",
-			weekDay:     "monday",
-			timeValue:   "25:00",
-			now:         mustParseTime("2025-01-06T12:00:00Z"),
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := nextWeeklyTrigger(tt.weekDay, tt.timeValue, tt.now)
 
 			if tt.expectError {
 				if err == nil {
@@ -289,69 +96,139 @@ func TestNextWeeklyTrigger(t *testing.T) {
 }
 
 func TestGetNextTrigger(t *testing.T) {
-	refTime := "2025-01-01T12:00:00Z"
-
+	refTime := "2025-01-01T12:30:00Z"
 	tests := []struct {
-		name          string
-		config        Configuration
-		now           time.Time
-		referenceTime *string
-		expectError   bool
-		expectNext    time.Time
+		name           string
+		config         Configuration
+		now            time.Time
+		referenceTime  *string
+		expectNext     time.Time
+		expectError    bool
+		expectErrorMsg string
 	}{
 		{
 			name: "minutes configuration with reference time",
 			config: Configuration{
 				Type:     TypeMinutes,
-				Interval: intPtr(15),
+				Interval: intPtr(10),
 			},
 			now:           mustParseTime("2025-01-01T12:35:00Z"),
 			referenceTime: &refTime,
-			expectNext:    mustParseTime("2025-01-01T12:45:00Z"),
+			expectNext:    mustParseTime("2025-01-01T12:40:00Z"),
 		},
 		{
-			name: "hourly configuration",
+			name: "hours configuration",
 			config: Configuration{
-				Type:   TypeHourly,
-				Minute: intPtr(30),
+				Type:     TypeHours,
+				Interval: intPtr(1),
+				Minute:   intPtr(30),
 			},
 			now:        mustParseTime("2025-01-01T12:15:00Z"),
-			expectNext: mustParseTime("2025-01-01T12:30:00Z"),
+			expectNext: mustParseTime("2025-01-01T13:30:00Z"),
 		},
 		{
-			name: "daily configuration",
+			name: "days configuration",
 			config: Configuration{
-				Type: TypeDaily,
-				Time: stringPtr("14:30"),
+				Type:     TypeDays,
+				Interval: intPtr(1),
+				Hour:     intPtr(14),
+				Minute:   intPtr(30),
 			},
 			now:        mustParseTime("2025-01-01T10:00:00Z"),
-			expectNext: mustParseTime("2025-01-01T14:30:00Z"),
+			expectNext: mustParseTime("2025-01-02T14:30:00Z"),
 		},
 		{
-			name: "weekly configuration",
+			name: "weeks configuration",
 			config: Configuration{
-				Type:    TypeWeekly,
-				Time:    stringPtr("15:30"),
-				WeekDay: stringPtr("friday"),
+				Type:     TypeWeeks,
+				Interval: intPtr(1),
+				WeekDays: []string{"friday"},
+				Hour:     intPtr(15),
+				Minute:   intPtr(30),
 			},
 			now:        mustParseTime("2025-01-06T10:00:00Z"), // Monday
 			expectNext: mustParseTime("2025-01-10T15:30:00Z"), // Friday
 		},
 		{
+			name: "months configuration",
+			config: Configuration{
+				Type:       TypeMonths,
+				Interval:   intPtr(1),
+				DayOfMonth: intPtr(15),
+				Hour:       intPtr(14),
+				Minute:     intPtr(30),
+			},
+			now:        mustParseTime("2025-01-01T10:00:00Z"),
+			expectNext: mustParseTime("2025-02-15T14:30:00Z"),
+		},
+		{
+			name: "cron configuration",
+			config: Configuration{
+				Type:           TypeCron,
+				CronExpression: stringPtr("0 30 14 * * *"), // Daily at 14:30
+			},
+			now:        mustParseTime("2025-01-01T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-01T14:30:00Z"),
+		},
+		{
 			name: "unsupported type",
 			config: Configuration{
-				Type: "unsupported",
+				Type: "invalid",
 			},
-			now:         mustParseTime("2025-01-01T12:00:00Z"),
-			expectError: true,
+			expectError:    true,
+			expectErrorMsg: "unsupported schedule type",
 		},
 		{
 			name: "minutes without interval",
 			config: Configuration{
 				Type: TypeMinutes,
 			},
-			now:         mustParseTime("2025-01-01T12:00:00Z"),
-			expectError: true,
+			expectError:    true,
+			expectErrorMsg: "interval is required for minutes schedule",
+		},
+		{
+			name: "invalid interval for minutes",
+			config: Configuration{
+				Type:     TypeMinutes,
+				Interval: intPtr(60), // Too high
+			},
+			expectError:    true,
+			expectErrorMsg: "minutes interval must be between 1 and 59",
+		},
+		{
+			name: "invalid interval for hours",
+			config: Configuration{
+				Type:     TypeHours,
+				Interval: intPtr(25), // Too high
+			},
+			expectError:    true,
+			expectErrorMsg: "hours interval must be between 1 and 23",
+		},
+		{
+			name: "weeks without weekDays",
+			config: Configuration{
+				Type:     TypeWeeks,
+				Interval: intPtr(1),
+			},
+			expectError:    true,
+			expectErrorMsg: "weekDays is required for weeks schedule",
+		},
+		{
+			name: "months without dayOfMonth",
+			config: Configuration{
+				Type:     TypeMonths,
+				Interval: intPtr(1),
+			},
+			expectError:    true,
+			expectErrorMsg: "dayOfMonth is required for months schedule",
+		},
+		{
+			name: "cron without expression",
+			config: Configuration{
+				Type: TypeCron,
+			},
+			expectError:    true,
+			expectErrorMsg: "cronExpression is required for cron schedule",
 		},
 	}
 
@@ -362,6 +239,10 @@ func TestGetNextTrigger(t *testing.T) {
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("expected error but got none")
+					return
+				}
+				if tt.expectErrorMsg != "" && !contains(err.Error(), tt.expectErrorMsg) {
+					t.Errorf("expected error message to contain '%s', got: %s", tt.expectErrorMsg, err.Error())
 				}
 				return
 			}
@@ -378,45 +259,127 @@ func TestGetNextTrigger(t *testing.T) {
 	}
 }
 
-func TestMinutesSchedulingConsistency(t *testing.T) {
-	// Test that intervals remain consistent regardless of when the function is called
-	referenceTime := "2025-01-01T12:00:00Z"
-	interval := 10
-
-	// Simulate calls at different times within the same interval
-	testTimes := []time.Time{
-		mustParseTime("2025-01-01T12:15:00Z"), // 15 minutes after reference
-		mustParseTime("2025-01-01T12:18:30Z"), // 18.5 minutes after reference
-		mustParseTime("2025-01-01T12:19:59Z"), // 19:59 after reference
+func TestValidateIntervalForType(t *testing.T) {
+	tests := []struct {
+		name         string
+		scheduleType string
+		interval     int
+		expectError  bool
+	}{
+		{"valid minutes interval", TypeMinutes, 30, false},
+		{"invalid minutes interval - too low", TypeMinutes, 0, true},
+		{"invalid minutes interval - too high", TypeMinutes, 60, true},
+		{"valid hours interval", TypeHours, 12, false},
+		{"invalid hours interval - too high", TypeHours, 24, true},
+		{"valid days interval", TypeDays, 15, false},
+		{"invalid days interval - too high", TypeDays, 32, true},
+		{"valid weeks interval", TypeWeeks, 26, false},
+		{"invalid weeks interval - too high", TypeWeeks, 53, true},
+		{"valid months interval", TypeMonths, 12, false},
+		{"invalid months interval - too high", TypeMonths, 25, true},
 	}
 
-	expectedNext := mustParseTime("2025-01-01T12:20:00Z") // All should return 12:20
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateIntervalForType(tt.scheduleType, tt.interval)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
 
-	for i, now := range testTimes {
-		t.Run("consistency_test_"+string(rune('A'+i)), func(t *testing.T) {
-			result, err := nextMinutesTrigger(interval, now, &referenceTime)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
+func TestMinutesSchedulingConsistency(t *testing.T) {
+	tests := []struct {
+		name     string
+		interval int
+		refTime  string
+		duration time.Duration
+	}{
+		{
+			name:     "consistency test A",
+			interval: 15,
+			refTime:  "2025-01-01T09:00:00Z",
+			duration: 2 * time.Hour,
+		},
+		{
+			name:     "consistency test B",
+			interval: 7,
+			refTime:  "2025-01-01T14:22:00Z",
+			duration: 90 * time.Minute,
+		},
+		{
+			name:     "consistency test C",
+			interval: 23,
+			refTime:  "2025-01-01T08:15:00Z",
+			duration: 4 * time.Hour,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			startTime := mustParseTime(tt.refTime)
+			endTime := startTime.Add(tt.duration)
+
+			var triggers []time.Time
+			currentTime := startTime
+
+			for currentTime.Before(endTime) {
+				next, err := nextMinutesTrigger(tt.interval, currentTime, &tt.refTime)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				triggers = append(triggers, *next)
+				currentTime = *next
 			}
 
-			if !result.Equal(expectedNext) {
-				t.Errorf("inconsistent result for time %v: expected %v, got %v",
-					now, expectedNext, *result)
+			if len(triggers) < 2 {
+				t.Skip("need at least 2 triggers for consistency test")
+			}
+
+			for i := 1; i < len(triggers); i++ {
+				actualInterval := triggers[i].Sub(triggers[i-1])
+				expectedInterval := time.Duration(tt.interval) * time.Minute
+
+				if actualInterval != expectedInterval {
+					t.Errorf("inconsistent interval: expected %v, got %v between triggers %v and %v",
+						expectedInterval, actualInterval, triggers[i-1], triggers[i])
+				}
 			}
 		})
 	}
 }
 
 // Helper functions
-func mustParseTime(timeStr string) time.Time {
-	t, err := time.Parse(time.RFC3339, timeStr)
+func mustParseTime(s string) time.Time {
+	t, err := time.Parse(time.RFC3339, s)
 	if err != nil {
-		panic("failed to parse time: " + err.Error())
+		panic(err)
 	}
 	return t
 }
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && s[:len(substr)] == substr ||
+		   (len(s) > len(substr) && s[len(s)-len(substr):] == substr) ||
+		   (len(substr) < len(s) && findSubstring(s, substr))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

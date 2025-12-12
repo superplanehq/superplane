@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
-import { isFieldRequired, validateFieldValue } from "@/utils/components";
+import { isFieldRequired, validateFieldForSubmission } from "@/utils/components";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -62,7 +62,7 @@ export function SettingsTab({
 
         // Check validation rules (cross-field validation)
         if (value !== undefined && value !== null && value !== "") {
-          const validationErrors = validateFieldValue(field, value, values);
+          const validationErrors = validateFieldForSubmission(field, value, values);
 
           if (validationErrors.length > 0) {
             // Add validation rule errors to the error set

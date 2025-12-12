@@ -17,11 +17,12 @@ import { IntegrationFieldRenderer } from "./IntegrationFieldRenderer";
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
 import { TimeFieldRenderer } from "./TimeFieldRenderer";
 import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
+import { CronFieldRenderer } from "./CronFieldRenderer";
 import { UserFieldRenderer } from "./UserFieldRenderer";
 import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
-import { isFieldVisible, isFieldRequired, validateFieldValue } from "../../utils/components";
+import { isFieldVisible, isFieldRequired, validateFieldForSubmission } from "../../utils/components";
 import { ValidationError } from "./types";
 import { AuthorizationDomainType } from "@/api-client";
 
@@ -58,7 +59,7 @@ export const ConfigurationFieldRenderer = ({
   const fieldValidationErrors = React.useMemo(() => {
     if (!field.name || !validationErrors) return [];
 
-    const errors = validateFieldValue(field, value, allValues);
+    const errors = validateFieldForSubmission(field, value, allValues);
     return errors.map((error) => ({
       field: field.name!,
       message: error,
@@ -145,6 +146,9 @@ export const ConfigurationFieldRenderer = ({
 
       case "day-in-year":
         return <DayInYearFieldRenderer {...commonProps} />;
+
+      case "cron":
+        return <CronFieldRenderer {...commonProps} />;
 
       case "integration":
         return (

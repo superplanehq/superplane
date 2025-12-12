@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/robfig/cron/v3"
 )
 
 func ValidateConfiguration(fields []Field, config map[string]any) error {
@@ -294,6 +296,34 @@ func validateDayInYear(field Field, value any) error {
 	return nil
 }
 
+func validateCron(field Field, value any) error {
+	cronStr, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	if cronStr == "" {
+		return fmt.Errorf("cron expression cannot be empty")
+	}
+
+	// Parse with full cron fields: second, minute, hour, day of month, month, day of week
+	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+	_, err := parser.Parse(cronStr)
+	if err != nil {
+		return fmt.Errorf("invalid cron expression: %w", err)
+	}
+
+	// Validate allowed wildcards: * , - /
+	validChars := "0123456789*,-/ abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	for _, char := range cronStr {
+		if !strings.ContainsRune(validChars, char) {
+			return fmt.Errorf("cron expression contains invalid character '%c'. Valid wildcards are: * , - /", char)
+		}
+	}
+
+	return nil
+}
+
 func validateFieldValue(field Field, value any) error {
 	switch field.Type {
 	case FieldTypeString:
@@ -363,6 +393,9 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeDayInYear:
 		return validateDayInYear(field, value)
+
+	case FieldTypeCron:
+		return validateCron(field, value)
 	}
 
 	return nil

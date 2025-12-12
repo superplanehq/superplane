@@ -464,6 +464,8 @@ github.com/renderedtext/go-tackle v0.0.0-20251117195301-3a303949d759 h1:P69fWmuG
 github.com/renderedtext/go-tackle v0.0.0-20251117195301-3a303949d759/go.mod h1:IfWH6x6erQ2Y4C7+BdP/fzOCN+8Szs2atOc6vUDOnvY=
 github.com/resend/resend-go/v3 v3.0.0 h1:RCZgLuAFMUYH4ZByu+rncNvlOf69DCJwBdOH6q/aZCs=
 github.com/resend/resend-go/v3 v3.0.0/go.mod h1:iI7VA0NoGjWvsNii5iNC5Dy0llsI3HncXPejhniYzwE=
+github.com/robfig/cron/v3 v3.0.1 h1:WdRxkvbJztn8LMz/QEvLN5sBU+xKpSqwwUO1Pjr4qDs=
+github.com/robfig/cron/v3 v3.0.1/go.mod h1:eQICP3HwyT7UooqI/z+Ov+PtYAWygg1TEWWzGIFLtro=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
