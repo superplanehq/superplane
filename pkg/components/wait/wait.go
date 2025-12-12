@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -46,8 +46,8 @@ func (w *Wait) Color() string {
 	return "yellow"
 }
 
-func (w *Wait) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{components.DefaultOutputChannel}
+func (w *Wait) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 func (w *Wait) Configuration() []configuration.Field {
@@ -97,7 +97,7 @@ func (w *Wait) Configuration() []configuration.Field {
 	}
 }
 
-func (w *Wait) Execute(ctx components.ExecutionContext) error {
+func (w *Wait) Execute(ctx core.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
@@ -112,8 +112,8 @@ func (w *Wait) Execute(ctx components.ExecutionContext) error {
 	return ctx.RequestContext.ScheduleActionCall("timeReached", map[string]any{}, interval)
 }
 
-func (w *Wait) Actions() []components.Action {
-	return []components.Action{
+func (w *Wait) Actions() []core.Action {
+	return []core.Action{
 		{
 			Name: "timeReached",
 		},
@@ -125,7 +125,7 @@ func (w *Wait) Actions() []components.Action {
 	}
 }
 
-func (w *Wait) HandleAction(ctx components.ActionContext) error {
+func (w *Wait) HandleAction(ctx core.ActionContext) error {
 	switch ctx.Name {
 	case "timeReached":
 		return w.HandleTimeReached(ctx)
@@ -137,33 +137,33 @@ func (w *Wait) HandleAction(ctx components.ActionContext) error {
 	}
 }
 
-func (w *Wait) HandleTimeReached(ctx components.ActionContext) error {
+func (w *Wait) HandleTimeReached(ctx core.ActionContext) error {
 	if ctx.ExecutionStateContext.IsFinished() {
 		// already handled, for example via "pushThrough" action
 		return nil
 	}
 
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {map[string]any{}},
+		core.DefaultOutputChannel.Name: {map[string]any{}},
 	})
 }
 
-func (w *Wait) HandlePushThrough(ctx components.ActionContext) error {
+func (w *Wait) HandlePushThrough(ctx core.ActionContext) error {
 	if ctx.ExecutionStateContext.IsFinished() {
 		// already handled, for example via "timeReached" action
 		return nil
 	}
 
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {map[string]any{}},
+		core.DefaultOutputChannel.Name: {map[string]any{}},
 	})
 }
 
-func (w *Wait) Setup(ctx components.SetupContext) error {
+func (w *Wait) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (w *Wait) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+func (w *Wait) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 

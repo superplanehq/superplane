@@ -1,7 +1,7 @@
 package contexts
 
 import (
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -11,7 +11,7 @@ type ExecutionStateContext struct {
 	tx        *gorm.DB
 }
 
-func NewExecutionStateContext(tx *gorm.DB, execution *models.WorkflowNodeExecution) components.ExecutionStateContext {
+func NewExecutionStateContext(tx *gorm.DB, execution *models.WorkflowNodeExecution) core.ExecutionStateContext {
 	return &ExecutionStateContext{tx: tx, execution: execution}
 }
 

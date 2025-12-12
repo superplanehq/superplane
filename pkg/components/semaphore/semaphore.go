@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -79,8 +79,8 @@ func (s *Semaphore) Color() string {
 	return "gray"
 }
 
-func (s *Semaphore) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{
+func (s *Semaphore) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{
 		{
 			Name:  PassedOutputChannel,
 			Label: "Passed",
@@ -165,11 +165,11 @@ func (s *Semaphore) Configuration() []configuration.Field {
 	}
 }
 
-func (s *Semaphore) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+func (s *Semaphore) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (s *Semaphore) Setup(ctx components.SetupContext) error {
+func (s *Semaphore) Setup(ctx core.SetupContext) error {
 	config := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
@@ -210,7 +210,7 @@ func (s *Semaphore) Setup(ctx components.SetupContext) error {
 	return nil
 }
 
-func (s *Semaphore) Execute(ctx components.ExecutionContext) error {
+func (s *Semaphore) Execute(ctx core.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
@@ -259,8 +259,8 @@ func (s *Semaphore) Execute(ctx components.ExecutionContext) error {
 	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
 }
 
-func (s *Semaphore) Actions() []components.Action {
-	return []components.Action{
+func (s *Semaphore) Actions() []core.Action {
+	return []core.Action{
 		{
 			Name:           "poll",
 			UserAccessible: false,
@@ -280,7 +280,7 @@ func (s *Semaphore) Actions() []components.Action {
 	}
 }
 
-func (s *Semaphore) HandleAction(ctx components.ActionContext) error {
+func (s *Semaphore) HandleAction(ctx core.ActionContext) error {
 	switch ctx.Name {
 	case "poll":
 		return s.poll(ctx)
@@ -291,7 +291,7 @@ func (s *Semaphore) HandleAction(ctx components.ActionContext) error {
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (s *Semaphore) poll(ctx components.ActionContext) error {
+func (s *Semaphore) poll(ctx core.ActionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
@@ -355,7 +355,7 @@ func (s *Semaphore) poll(ctx components.ActionContext) error {
 	})
 }
 
-func (s *Semaphore) finish(ctx components.ActionContext) error {
+func (s *Semaphore) finish(ctx core.ActionContext) error {
 	metadata := ExecutionMetadata{}
 	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
@@ -393,7 +393,7 @@ func (s *Semaphore) finish(ctx components.ActionContext) error {
 	})
 }
 
-func (s *Semaphore) buildParameters(ctx components.ExecutionContext, params []Parameter) map[string]any {
+func (s *Semaphore) buildParameters(ctx core.ExecutionContext, params []Parameter) map[string]any {
 	parameters := make(map[string]any)
 	for _, param := range params {
 		parameters[param.Name] = param.Value

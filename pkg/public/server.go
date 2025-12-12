@@ -19,12 +19,11 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/applications"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/triggers"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	nooptrace "go.opentelemetry.io/otel/trace/noop"
@@ -426,13 +425,18 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	app.HandleRequest(applications.HttpRequestContext{
+	app.HandleRequest(core.HttpRequestContext{
 		Request:        r,
 		Response:       &w,
-		AppContext:     contexts.NewAppContext(database.Conn(), appInstallation, s.encryptor),
-		OrganizationID: appInstallation.OrganizationID.String(),
-		InstallationID: installationID.String(),
 		BaseURL:        s.BaseURL,
+		OrganizationID: appInstallation.OrganizationID.String(),
+		AppInstallation: contexts.NewAppInstallationContext(
+			database.Conn(),
+			nil,
+			appInstallation,
+			s.encryptor,
+			s.registry,
+		),
 	})
 
 	err = database.Conn().Save(&appInstallation).Error
@@ -685,7 +689,7 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 	}
 
 	tx := database.Conn()
-	return trigger.HandleWebhook(triggers.WebhookRequestContext{
+	return trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:           body,
 		Headers:        headers,
 		Configuration:  node.Configuration.Data(),

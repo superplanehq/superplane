@@ -8,11 +8,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/triggers"
 )
 
 const MaxEventSize = 64 * 1024
@@ -118,7 +117,7 @@ func (g *GitHub) Configuration() []configuration.Field {
 	}
 }
 
-func (g *GitHub) Setup(ctx triggers.TriggerContext) error {
+func (g *GitHub) Setup(ctx core.TriggerContext) error {
 	var metadata Metadata
 	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
@@ -161,7 +160,7 @@ func (g *GitHub) Setup(ctx triggers.TriggerContext) error {
 		return fmt.Errorf("integration ID is invalid: %w", err)
 	}
 
-	err = ctx.WebhookContext.Setup(&triggers.WebhookSetupOptions{
+	err = ctx.WebhookContext.Setup(&core.WebhookSetupOptions{
 		IntegrationID: &integrationID,
 		Resource:      resource,
 		Configuration: config,
@@ -182,15 +181,15 @@ func (g *GitHub) Setup(ctx triggers.TriggerContext) error {
 	return nil
 }
 
-func (g *GitHub) Actions() []components.Action {
-	return []components.Action{}
+func (g *GitHub) Actions() []core.Action {
+	return []core.Action{}
 }
 
-func (g *GitHub) HandleAction(ctx triggers.TriggerActionContext) error {
+func (g *GitHub) HandleAction(ctx core.TriggerActionContext) error {
 	return nil
 }
 
-func (g *GitHub) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) {
+func (g *GitHub) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	signature := ctx.Headers.Get("X-Hub-Signature-256")
 	if signature == "" {
 		return http.StatusForbidden, fmt.Errorf("invalid signature")

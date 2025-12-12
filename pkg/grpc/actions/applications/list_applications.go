@@ -3,7 +3,7 @@ package applications
 import (
 	"context"
 
-	"github.com/superplanehq/superplane/pkg/applications"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/applications"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
@@ -18,7 +18,7 @@ func ListApplications(ctx context.Context, registry *registry.Registry) (*pb.Lis
 	}, nil
 }
 
-func serializeApplications(in []applications.Application) []*pb.ApplicationDefinition {
+func serializeApplications(in []core.Application) []*pb.ApplicationDefinition {
 	out := make([]*pb.ApplicationDefinition, len(in))
 	for i, application := range in {
 		configFields := application.Configuration()

@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -223,7 +223,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
 
-	ctx := components.ExecutionContext{
+	ctx := core.ExecutionContext{
 		ID:                    execution.ID.String(),
 		WorkflowID:            execution.WorkflowID.String(),
 		Configuration:         execution.Configuration.Data(),
@@ -243,7 +243,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 
-		ctx.AppInstallationContext = contexts.NewAppInstallationContext(tx, appInstallation, w.encryptor, w.registry)
+		ctx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
 	}
 
 	if err := component.Execute(ctx); err != nil {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -15,7 +15,7 @@ type NodeRequestContext struct {
 	node *models.WorkflowNode
 }
 
-func NewNodeRequestContext(tx *gorm.DB, node *models.WorkflowNode) components.RequestContext {
+func NewNodeRequestContext(tx *gorm.DB, node *models.WorkflowNode) core.RequestContext {
 	return &NodeRequestContext{tx: tx, node: node}
 }
 

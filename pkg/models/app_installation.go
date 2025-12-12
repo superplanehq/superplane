@@ -78,6 +78,19 @@ func ListAppInstallations(orgID uuid.UUID) ([]AppInstallation, error) {
 	return appInstallations, nil
 }
 
+func ListAppInstallationWebhooks(tx *gorm.DB, installationID uuid.UUID) ([]Webhook, error) {
+	var webhooks []Webhook
+	err := tx.
+		Where("app_installation_id = ?", installationID).
+		Find(&webhooks).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+	return webhooks, nil
+}
+
 func FindUnscopedAppInstallation(installationID uuid.UUID) (*AppInstallation, error) {
 	return FindUnscopedAppInstallationInTransaction(database.Conn(), installationID)
 }

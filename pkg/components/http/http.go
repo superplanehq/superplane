@@ -8,8 +8,8 @@ import (
 	"net/http"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -52,12 +52,12 @@ func (e *HTTP) Color() string {
 	return "blue"
 }
 
-func (e *HTTP) Setup(ctx components.SetupContext) error {
+func (e *HTTP) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (e *HTTP) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{components.DefaultOutputChannel}
+func (e *HTTP) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 func (e *HTTP) Configuration() []configuration.Field {
@@ -126,19 +126,19 @@ func (e *HTTP) Configuration() []configuration.Field {
 	}
 }
 
-func (e *HTTP) Actions() []components.Action {
-	return []components.Action{}
+func (e *HTTP) Actions() []core.Action {
+	return []core.Action{}
 }
 
-func (e *HTTP) HandleAction(ctx components.ActionContext) error {
+func (e *HTTP) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("http does not support actions")
 }
 
-func (e *HTTP) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+func (e *HTTP) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (e *HTTP) Execute(ctx components.ExecutionContext) error {
+func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
@@ -188,7 +188,7 @@ func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 	}
 
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {response},
+		core.DefaultOutputChannel.Name: {response},
 	})
 }
 

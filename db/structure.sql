@@ -304,7 +304,8 @@ CREATE TABLE public.webhooks (
     updated_at timestamp without time zone NOT NULL,
     deleted_at timestamp without time zone,
     retry_count integer DEFAULT 0 NOT NULL,
-    max_retries integer DEFAULT 3 NOT NULL
+    max_retries integer DEFAULT 3 NOT NULL,
+    app_installation_id uuid
 );
 
 
@@ -791,6 +792,13 @@ CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_
 
 
 --
+-- Name: idx_webhooks_app_installation_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_webhooks_app_installation_id ON public.webhooks USING btree (app_installation_id);
+
+
+--
 -- Name: idx_webhooks_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1050,6 +1058,14 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: webhooks webhooks_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhooks
+    ADD CONSTRAINT webhooks_app_installation_id_fkey FOREIGN KEY (app_installation_id) REFERENCES public.app_installations(id);
+
+
+--
 -- Name: webhooks webhooks_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1217,7 +1233,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251210010052	f
+20251212015706	f
 \.
 
 

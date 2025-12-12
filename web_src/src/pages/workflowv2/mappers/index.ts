@@ -42,6 +42,10 @@ export function getTriggerRenderer(triggerName: string): TriggerRenderer {
  * Falls back to the default renderer if no specific renderer is registered.
  */
 export function getComponentBaseMapper(componentName: string): ComponentBaseMapper {
-  console.log("Getting component base mapper for:", componentName);
-  return componentBaseMappers[componentName] || noopMapper;
+  const parts = componentName.split(".")
+  if (parts.length == 1) {
+    return componentBaseMappers[componentName] || noopMapper;
+  }
+
+  return componentBaseMappers[parts[0]] || noopMapper;
 }

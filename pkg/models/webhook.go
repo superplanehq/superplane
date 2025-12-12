@@ -17,18 +17,19 @@ const (
 )
 
 type Webhook struct {
-	ID            uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	State         string
-	Secret        []byte
-	Configuration datatypes.JSONType[any]
-	Metadata      datatypes.JSONType[any]
-	IntegrationID *uuid.UUID
-	Resource      datatypes.JSONType[WebhookResource]
-	RetryCount    int `gorm:"default:0"`
-	MaxRetries    int `gorm:"default:3"`
-	CreatedAt     *time.Time
-	UpdatedAt     *time.Time
-	DeletedAt     gorm.DeletedAt `gorm:"index"`
+	ID                uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	State             string
+	Secret            []byte
+	Configuration     datatypes.JSONType[any]
+	Metadata          datatypes.JSONType[any]
+	IntegrationID     *uuid.UUID
+	AppInstallationID *uuid.UUID
+	Resource          datatypes.JSONType[WebhookResource]
+	RetryCount        int `gorm:"default:0"`
+	MaxRetries        int `gorm:"default:3"`
+	CreatedAt         *time.Time
+	UpdatedAt         *time.Time
+	DeletedAt         gorm.DeletedAt `gorm:"index"`
 }
 
 type WebhookResource struct {
@@ -98,9 +99,14 @@ func FindWebhookInTransaction(tx *gorm.DB, id uuid.UUID) (*Webhook, error) {
 }
 
 func FindWebhookNodes(webhookID uuid.UUID) ([]WorkflowNode, error) {
+	return FindWebhookNodesInTransaction(database.Conn(), webhookID)
+}
+
+func FindWebhookNodesInTransaction(tx *gorm.DB, webhookID uuid.UUID) ([]WorkflowNode, error) {
 	var nodes []WorkflowNode
-	err := database.Conn().
+	err := tx.
 		Where("webhook_id = ?", webhookID).
+		Where("deleted_at IS NULL").
 		Find(&nodes).
 		Error
 

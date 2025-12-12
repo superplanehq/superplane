@@ -8,13 +8,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/triggers"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -203,7 +202,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		return err
 	}
 
-	triggerCtx := triggers.TriggerContext{
+	triggerCtx := core.TriggerContext{
 		Configuration:      node.Configuration.Data(),
 		MetadataContext:    contexts.NewNodeMetadataContext(&node),
 		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
@@ -218,7 +217,13 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 
-		triggerCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, appInstallation, encryptor, registry)
+		triggerCtx.AppInstallationContext = contexts.NewAppInstallationContext(
+			tx,
+			&node,
+			appInstallation,
+			encryptor,
+			registry,
+		)
 	}
 
 	err = trigger.Setup(triggerCtx)
@@ -236,7 +241,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 		return err
 	}
 
-	setupCtx := components.SetupContext{
+	setupCtx := core.SetupContext{
 		Configuration:      node.Configuration.Data(),
 		MetadataContext:    contexts.NewNodeMetadataContext(&node),
 		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
@@ -249,7 +254,13 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 
-		setupCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, appInstallation, encryptor, registry)
+		setupCtx.AppInstallationContext = contexts.NewAppInstallationContext(
+			tx,
+			&node,
+			appInstallation,
+			encryptor,
+			registry,
+		)
 	}
 
 	err = component.Setup(setupCtx)

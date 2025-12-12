@@ -1,16 +1,16 @@
 package github
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/triggers"
 )
 
 type OnPullRequest struct{}
@@ -54,7 +54,7 @@ func (p *OnPullRequest) Configuration() []configuration.Field {
 	}
 }
 
-func (p *OnPullRequest) Setup(ctx triggers.TriggerContext) error {
+func (p *OnPullRequest) Setup(ctx core.TriggerContext) error {
 	var metadata OnPullRequestMetadata
 	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
@@ -78,23 +78,45 @@ func (p *OnPullRequest) Setup(ctx triggers.TriggerContext) error {
 		return fmt.Errorf("repository is required")
 	}
 
-	//
-	// TODO: Check if repository exists
-	// TODO: Set up web hook
-	//
+	appMetadata := Metadata{}
+	err = mapstructure.Decode(ctx.AppInstallationContext.GetMetadata(), &appMetadata)
+	if err != nil {
+		return fmt.Errorf("error decoding app installation metadata: %v", err)
+	}
 
+	client, err := NewClient(ctx.AppInstallationContext, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	repo, _, err := client.Repositories.Get(context.Background(), appMetadata.Owner, config.Repository)
+	if err != nil {
+		return fmt.Errorf("failed to get repository: %w", err)
+	}
+
+	metadata.Repository = &Repository{
+		ID:   repo.GetID(),
+		Name: repo.GetName(),
+		URL:  repo.GetHTMLURL(),
+	}
+
+	ctx.MetadataContext.Set(metadata)
+
+	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+		EventType:  "pull_request",
+		Repository: config.Repository,
+	})
+}
+
+func (p *OnPullRequest) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (p *OnPullRequest) HandleAction(ctx core.TriggerActionContext) error {
 	return nil
 }
 
-func (p *OnPullRequest) Actions() []components.Action {
-	return []components.Action{}
-}
-
-func (p *OnPullRequest) HandleAction(ctx triggers.TriggerActionContext) error {
-	return nil
-}
-
-func (p *OnPullRequest) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) {
+func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	signature := ctx.Headers.Get("X-Hub-Signature-256")
 	if signature == "" {
 		return http.StatusForbidden, fmt.Errorf("invalid signature")

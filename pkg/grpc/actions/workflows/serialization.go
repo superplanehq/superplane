@@ -5,14 +5,13 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	compb "github.com/superplanehq/superplane/pkg/protos/components"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/triggers"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -259,7 +258,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 	}
 }
 
-func findAndValidateTrigger(registry *registry.Registry, organizationID string, node *compb.Node) (triggers.Trigger, error) {
+func findAndValidateTrigger(registry *registry.Registry, organizationID string, node *compb.Node) (core.Trigger, error) {
 	parts := strings.SplitN(node.Trigger.Name, ".", 2)
 	if len(parts) > 2 {
 		return nil, fmt.Errorf("invalid trigger name: %s", node.Trigger.Name)
@@ -277,7 +276,7 @@ func findAndValidateTrigger(registry *registry.Registry, organizationID string, 
 	return registry.GetApplicationTrigger(parts[0], node.Trigger.Name)
 }
 
-func findAndValidateComponent(registry *registry.Registry, organizationID string, node *compb.Node) (components.Component, error) {
+func findAndValidateComponent(registry *registry.Registry, organizationID string, node *compb.Node) (core.Component, error) {
 	parts := strings.SplitN(node.Component.Name, ".", 2)
 	if len(parts) > 2 {
 		return nil, fmt.Errorf("invalid component name: %s", node.Component.Name)

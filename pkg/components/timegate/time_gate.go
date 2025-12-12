@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -59,8 +59,8 @@ func (tg *TimeGate) Color() string {
 	return "blue"
 }
 
-func (tg *TimeGate) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{components.DefaultOutputChannel}
+func (tg *TimeGate) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 func (tg *TimeGate) Configuration() []configuration.Field {
@@ -237,15 +237,15 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 	}
 }
 
-func (tg *TimeGate) Setup(ctx components.SetupContext) error {
+func (tg *TimeGate) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (tg *TimeGate) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+func (tg *TimeGate) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (tg *TimeGate) Execute(ctx components.ExecutionContext) error {
+func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
@@ -296,7 +296,7 @@ func (tg *TimeGate) Execute(ctx components.ExecutionContext) error {
 
 	if interval <= 0 {
 		return ctx.ExecutionStateContext.Pass(map[string][]any{
-			components.DefaultOutputChannel.Name: {ctx.Data},
+			core.DefaultOutputChannel.Name: {ctx.Data},
 		})
 	}
 
@@ -386,8 +386,8 @@ func (tg *TimeGate) validateSpec(spec Spec) error {
 	return nil
 }
 
-func (tg *TimeGate) Actions() []components.Action {
-	return []components.Action{
+func (tg *TimeGate) Actions() []core.Action {
+	return []core.Action{
 		{
 			Name: "timeReached",
 		},
@@ -399,7 +399,7 @@ func (tg *TimeGate) Actions() []components.Action {
 	}
 }
 
-func (tg *TimeGate) HandleAction(ctx components.ActionContext) error {
+func (tg *TimeGate) HandleAction(ctx core.ActionContext) error {
 	switch ctx.Name {
 	case "timeReached":
 		return tg.HandleTimeReached(ctx)
@@ -410,25 +410,25 @@ func (tg *TimeGate) HandleAction(ctx components.ActionContext) error {
 	}
 }
 
-func (tg *TimeGate) HandleTimeReached(ctx components.ActionContext) error {
+func (tg *TimeGate) HandleTimeReached(ctx core.ActionContext) error {
 	if ctx.ExecutionStateContext.IsFinished() {
 		// already handled, for example via "pushThrough" action
 		return nil
 	}
 
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {map[string]any{}},
+		core.DefaultOutputChannel.Name: {map[string]any{}},
 	})
 }
 
-func (tg *TimeGate) HandlePushThrough(ctx components.ActionContext) error {
+func (tg *TimeGate) HandlePushThrough(ctx core.ActionContext) error {
 	if ctx.ExecutionStateContext.IsFinished() {
 		// already handled, for example via "timeReached" action
 		return nil
 	}
 
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {map[string]any{}},
+		core.DefaultOutputChannel.Name: {map[string]any{}},
 	})
 }
 

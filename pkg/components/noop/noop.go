@@ -3,8 +3,8 @@ package noop
 import (
 	"fmt"
 
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -37,32 +37,32 @@ func (c *NoOp) Color() string {
 	return "blue"
 }
 
-func (c *NoOp) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{components.DefaultOutputChannel}
+func (c *NoOp) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 func (c *NoOp) Configuration() []configuration.Field {
 	return []configuration.Field{}
 }
 
-func (c *NoOp) Execute(ctx components.ExecutionContext) error {
+func (c *NoOp) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {make(map[string]any)},
+		core.DefaultOutputChannel.Name: {make(map[string]any)},
 	})
 }
 
-func (c *NoOp) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+func (c *NoOp) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *NoOp) Actions() []components.Action {
-	return []components.Action{}
+func (c *NoOp) Actions() []core.Action {
+	return []core.Action{}
 }
 
-func (c *NoOp) HandleAction(ctx components.ActionContext) error {
+func (c *NoOp) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("noop does not support actions")
 }
 
-func (c *NoOp) Setup(ctx components.SetupContext) error {
+func (c *NoOp) Setup(ctx core.SetupContext) error {
 	return nil
 }

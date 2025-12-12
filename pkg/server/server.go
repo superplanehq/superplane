@@ -98,7 +98,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	if os.Getenv("START_WEBHOOK_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Webhook Cleanup Worker")
 
-		w := workers.NewWebhookCleanupWorker(registry)
+		w := workers.NewWebhookCleanupWorker(encryptor, registry)
 		go w.Start(context.Background())
 	}
 

@@ -6,7 +6,7 @@ import (
 	"maps"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/applications"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -37,12 +37,20 @@ func UpdateApplication(ctx context.Context, registry *registry.Registry, baseURL
 	maps.Copy(configData, encryptedConfig)
 	appInstallation.Configuration = datatypes.NewJSONType(configData)
 
-	syncErr := app.Sync(applications.SyncContext{
-		Configuration:  appInstallation.Configuration.Data(),
-		BaseURL:        baseURL,
-		OrganizationID: orgID,
-		InstallationID: installationID,
-		AppContext:     contexts.NewAppContext(database.Conn(), appInstallation, registry.Encryptor),
+	appCtx := contexts.NewAppInstallationContext(
+		database.Conn(),
+		nil,
+		appInstallation,
+		registry.Encryptor,
+		registry,
+	)
+
+	syncErr := app.Sync(core.SyncContext{
+		Configuration:   appInstallation.Configuration.Data(),
+		BaseURL:         baseURL,
+		OrganizationID:  orgID,
+		InstallationID:  installationID,
+		AppInstallation: appCtx,
 	})
 
 	if syncErr != nil {

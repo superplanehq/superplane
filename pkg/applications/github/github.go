@@ -6,20 +6,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
 
-	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v74/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/applications"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/triggers"
 )
 
 const (
@@ -48,11 +43,11 @@ type Configuration struct {
 }
 
 type Metadata struct {
-	InstallationID string            `json:"installationId"`
-	State          string            `json:"state"`
-	Organization   string            `json:"organization"`
-	Repositories   []string          `json:"repositories"`
-	GitHubApp      GitHubAppMetadata `json:"githubApp"`
+	InstallationID string            `mapstructure:"installationId" json:"installationId"`
+	State          string            `mapstructure:"state" json:"state"`
+	Owner          string            `mapstructure:"owner" json:"owner"`
+	Repositories   []string          `mapstructure:"repositories" json:"repositories"`
+	GitHubApp      GitHubAppMetadata `mapstructure:"githubApp" json:"githubApp"`
 }
 
 type GitHubAppMetadata struct {
@@ -80,18 +75,18 @@ func (g *GitHub) Configuration() []configuration.Field {
 	}
 }
 
-func (g *GitHub) Components() []components.Component {
-	return []components.Component{}
+func (g *GitHub) Components() []core.Component {
+	return []core.Component{}
 }
 
-func (g *GitHub) Triggers() []triggers.Trigger {
-	return []triggers.Trigger{
+func (g *GitHub) Triggers() []core.Trigger {
+	return []core.Trigger{
 		&OnPush{},
 		&OnPullRequest{},
 	}
 }
 
-func (g *GitHub) Sync(ctx applications.SyncContext) error {
+func (g *GitHub) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
@@ -99,7 +94,7 @@ func (g *GitHub) Sync(ctx applications.SyncContext) error {
 	}
 
 	metadata := Metadata{}
-	err = mapstructure.Decode(ctx.AppContext.GetMetadata(), &metadata)
+	err = mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata)
 	if err != nil {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
 	}
@@ -116,7 +111,7 @@ func (g *GitHub) Sync(ctx applications.SyncContext) error {
 		return fmt.Errorf("Failed to generate GitHub App state: %v", err)
 	}
 
-	ctx.AppContext.NewBrowserAction(applications.BrowserAction{
+	ctx.AppInstallation.NewBrowserAction(core.BrowserAction{
 		Description: appInstallationDescription,
 		URL:         browserActionURL(config.Organization),
 		Method:      "POST",
@@ -126,22 +121,20 @@ func (g *GitHub) Sync(ctx applications.SyncContext) error {
 		},
 	})
 
-	ctx.AppContext.SetMetadata(Metadata{
-		Organization: config.Organization,
-		State:        state,
+	ctx.AppInstallation.SetMetadata(Metadata{
+		Owner: config.Organization,
+		State: state,
 	})
 
 	return nil
 }
 
-func (g *GitHub) HandleRequest(ctx applications.HttpRequestContext) {
+func (g *GitHub) HandleRequest(ctx core.HttpRequestContext) {
 	metadata := Metadata{}
-	err := mapstructure.Decode(ctx.AppContext.GetMetadata(), &metadata)
+	err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata)
 	if err != nil {
 		return
 	}
-
-	logrus.Infof("metadata: %v", metadata)
 
 	if strings.HasSuffix(ctx.Request.URL.Path, "/redirect") {
 		afterAppCreation(ctx, metadata)
@@ -153,19 +146,116 @@ func (g *GitHub) HandleRequest(ctx applications.HttpRequestContext) {
 		return
 	}
 
-	if strings.HasSuffix(ctx.Request.URL.Path, "/webhook") {
-		logrus.Infof("webhook")
-		// TODO: verify signature
-		// TODO: decode payload
-		// TODO: find components/triggers using this integration
-		// TODO: call component/trigger
-		return
-	}
-
 	logrus.Infof("unknown path: %s", ctx.Request.URL.Path)
 }
 
-func afterAppCreation(ctx applications.HttpRequestContext, metadata Metadata) {
+type WebhookConfiguration struct {
+	EventType  string `json:"eventType"`
+	Repository string `json:"repository"`
+}
+
+func (g *GitHub) RequestWebhook(ctx core.AppInstallationContext, configuration any) error {
+	config := WebhookConfiguration{}
+	err := mapstructure.Decode(configuration, &config)
+	if err != nil {
+		return fmt.Errorf("Failed to decode configuration: %v", err)
+	}
+
+	hooks, err := ctx.ListWebhooks()
+	if err != nil {
+		return fmt.Errorf("Failed to list webhooks: %v", err)
+	}
+
+	for _, hook := range hooks {
+		c := WebhookConfiguration{}
+		err := mapstructure.Decode(hook.Configuration, &c)
+		if err != nil {
+			return err
+		}
+
+		if c.Repository == config.Repository && c.EventType == config.EventType {
+			ctx.AssociateWebhook(hook.ID)
+			return nil
+		}
+	}
+
+	return ctx.CreateWebhook(configuration)
+}
+
+type Webhook struct {
+	ID          int64  `json:"id"`
+	WebhookName string `json:"name"`
+}
+
+func (g *GitHub) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (any, error) {
+	metadata := Metadata{}
+	err := mapstructure.Decode(ctx.GetMetadata(), &metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := NewClient(ctx, metadata.GitHubApp.ID, metadata.InstallationID)
+	if err != nil {
+		return nil, err
+	}
+
+	config := WebhookConfiguration{}
+	err = mapstructure.Decode(options.Configuration, &config)
+	if err != nil {
+		return nil, err
+	}
+
+	hook := &github.Hook{
+		Active: github.Ptr(true),
+		Events: []string{config.EventType},
+		Config: &github.HookConfig{
+			URL:         &options.URL,
+			Secret:      github.Ptr(string(options.Secret)),
+			ContentType: github.Ptr("json"),
+		},
+	}
+
+	createdHook, _, err := client.Repositories.CreateHook(context.Background(), metadata.Owner, config.Repository, hook)
+	if err != nil {
+		return nil, fmt.Errorf("error creating webhook: %v", err)
+	}
+
+	return &Webhook{ID: createdHook.GetID(), WebhookName: *createdHook.Name}, nil
+}
+
+func (g *GitHub) CleanupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) error {
+	metadata := Metadata{}
+	err := mapstructure.Decode(ctx.GetMetadata(), &metadata)
+	if err != nil {
+		return err
+	}
+
+	client, err := NewClient(ctx, metadata.GitHubApp.ID, metadata.InstallationID)
+	if err != nil {
+		return err
+	}
+
+	webhook := Webhook{}
+	err = mapstructure.Decode(options.Metadata, &webhook)
+	if err != nil {
+		return err
+	}
+
+	configuration := WebhookConfiguration{}
+	err = mapstructure.Decode(options.Configuration, &configuration)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.Repositories.DeleteHook(context.Background(), metadata.Owner, configuration.Repository, webhook.ID)
+	if err != nil {
+		return fmt.Errorf("error deleting webhook: %v", err)
+	}
+
+	return nil
+}
+
+func afterAppCreation(ctx core.HttpRequestContext, metadata Metadata) {
 	code := ctx.Request.URL.Query().Get("code")
 	state := ctx.Request.URL.Query().Get("state")
 
@@ -188,24 +278,24 @@ func afterAppCreation(ctx applications.HttpRequestContext, metadata Metadata) {
 		ClientID: appData.ClientID,
 	}
 
-	ctx.AppContext.SetMetadata(metadata)
+	ctx.AppInstallation.SetMetadata(metadata)
 
 	//
 	// Save installation secrets
 	//
-	err = ctx.AppContext.SetSecret(GitHubAppClientSecret, []byte(appData.ClientSecret))
+	err = ctx.AppInstallation.SetSecret(GitHubAppClientSecret, []byte(appData.ClientSecret))
 	if err != nil {
 		logrus.Errorf("failed to save client secret: %v", err)
 		return
 	}
 
-	err = ctx.AppContext.SetSecret(GitHubAppWebhookSecret, []byte(appData.WebhookSecret))
+	err = ctx.AppInstallation.SetSecret(GitHubAppWebhookSecret, []byte(appData.WebhookSecret))
 	if err != nil {
 		logrus.Errorf("failed to save webhook secret: %v", err)
 		return
 	}
 
-	err = ctx.AppContext.SetSecret(GitHubAppPEM, []byte(appData.PEM))
+	err = ctx.AppInstallation.SetSecret(GitHubAppPEM, []byte(appData.PEM))
 	if err != nil {
 		logrus.Errorf("failed to save PEM: %v", err)
 		return
@@ -226,13 +316,12 @@ func afterAppCreation(ctx applications.HttpRequestContext, metadata Metadata) {
 	)
 }
 
-func afterAppInstallation(ctx applications.HttpRequestContext, metadata Metadata) {
+func afterAppInstallation(ctx core.HttpRequestContext, metadata Metadata) {
 	installationID := ctx.Request.URL.Query().Get("installation_id")
 	setupAction := ctx.Request.URL.Query().Get("setup_action")
 	state := ctx.Request.URL.Query().Get("state")
 
 	if installationID == "" || state != metadata.State {
-		logrus.Errorf("invalid installation ID or state")
 		return
 	}
 
@@ -245,73 +334,47 @@ func afterAppInstallation(ctx applications.HttpRequestContext, metadata Metadata
 	}
 }
 
-func afterAppInstallationInstall(ctx applications.HttpRequestContext, installationID string, metadata Metadata) {
-	ID, err := strconv.Atoi(installationID)
+func afterAppInstallationInstall(ctx core.HttpRequestContext, installationID string, metadata Metadata) {
+	metadata.InstallationID = installationID
+	client, err := NewClient(ctx.AppInstallation, metadata.GitHubApp.ID, installationID)
 	if err != nil {
-		logrus.Errorf("failed to parse installation ID: %v", err)
+		logrus.Errorf("failed to create client: %v", err)
 		return
 	}
 
-	pem, err := findSecret(ctx, GitHubAppPEM)
-	if err != nil {
-		logrus.Errorf("failed to find PEM: %v", err)
-		return
+	if metadata.Owner == "" {
+		ghApp, _, err := client.Apps.Get(context.Background(), metadata.GitHubApp.Slug)
+		if err != nil {
+			logrus.Errorf("failed to get app: %v", err)
+			return
+		}
+
+		metadata.Owner = ghApp.Owner.GetLogin()
 	}
 
-	f, err := os.CreateTemp("", "github-app.pem")
-	if err != nil {
-		logrus.Errorf("failed to create temp file: %v", err)
-		return
-	}
-
-	defer f.Close()
-	defer os.Remove(f.Name())
-
-	_, err = f.Write([]byte(pem))
-	if err != nil {
-		logrus.Errorf("failed to write temp file: %v", err)
-		return
-	}
-
-	itr, err := ghinstallation.NewKeyFromFile(
-		http.DefaultTransport,
-		metadata.GitHubApp.ID,
-		int64(ID),
-		f.Name(),
-	)
-
-	if err != nil {
-		logrus.Errorf("failed to create apps transport: %v", err)
-		return
-	}
-
-	client := github.NewClient(&http.Client{Transport: itr})
 	response, _, err := client.Apps.ListRepos(context.Background(), &github.ListOptions{})
 	if err != nil {
 		logrus.Errorf("failed to list repos: %v", err)
 		return
 	}
 
-	logrus.Infof("after app installation install - response: %v", response)
-
 	repos := []string{}
 	for _, r := range response.Repositories {
 		repos = append(repos, r.GetFullName())
 	}
 
-	metadata.InstallationID = installationID
 	metadata.Repositories = repos
 	metadata.State = ""
 
-	ctx.AppContext.SetMetadata(metadata)
-	ctx.AppContext.RemoveBrowserAction()
-	ctx.AppContext.SetState("ready")
+	ctx.AppInstallation.SetMetadata(metadata)
+	ctx.AppInstallation.RemoveBrowserAction()
+	ctx.AppInstallation.SetState("ready")
 
 	http.Redirect(
 		*ctx.Response,
 		ctx.Request,
 		fmt.Sprintf(
-			"%s/%s/settings/applications/%s", ctx.BaseURL, ctx.OrganizationID, ctx.InstallationID,
+			"%s/%s/settings/applications/%s", ctx.BaseURL, ctx.OrganizationID, ctx.AppInstallation.ID().String(),
 		),
 		http.StatusSeeOther,
 	)
@@ -325,32 +388,23 @@ func browserActionURL(organization string) string {
 	return "https://github.com/settings/apps/new"
 }
 
-func getGitHubAppManifest(ctx applications.SyncContext) string {
+func getGitHubAppManifest(ctx core.SyncContext) string {
 	manifest := map[string]any{
+		"name":   `Superplane GH integration`,
+		"public": false,
+		"url":    "https://superplane.com",
+		"default_permissions": map[string]string{
+			"issues":           "write",
+			"actions":          "write",
+			"contents":         "write",
+			"pull_requests":    "write",
+			"repository_hooks": "write",
+		},
+		"setup_url":    fmt.Sprintf(`%s/api/v1/apps/%s/setup`, ctx.BaseURL, ctx.InstallationID),
+		"redirect_url": fmt.Sprintf(`%s/api/v1/apps/%s/redirect`, ctx.BaseURL, ctx.InstallationID),
 		"callback_urls": []string{
 			fmt.Sprintf("%s/%s/settings/applications/%s", ctx.BaseURL, ctx.OrganizationID, ctx.InstallationID),
 		},
-		"default_events": []string{
-			"issues",
-			"workflow_run",
-			"pull_request",
-			"push",
-			"issue_comment",
-		},
-		"default_permissions": map[string]string{
-			"issues":        "write",
-			"actions":       "write",
-			"contents":      "write",
-			"pull_requests": "write",
-		},
-		"hook_attributes": map[string]string{
-			"url": fmt.Sprintf(`%s/api/v1/apps/%s/webhook`, ctx.BaseURL, ctx.InstallationID),
-		},
-		"setup_url":    fmt.Sprintf(`%s/api/v1/apps/%s/setup`, ctx.BaseURL, ctx.InstallationID),
-		"name":         `Superplane GH integration`,
-		"public":       false,
-		"redirect_url": fmt.Sprintf(`%s/api/v1/apps/%s/redirect`, ctx.BaseURL, ctx.InstallationID),
-		"url":          "https://superplane.com",
 	}
 
 	data, err := json.Marshal(manifest)
@@ -394,8 +448,6 @@ func createAppFromManifest(code string) (*GitHubAppData, error) {
 		return nil, err
 	}
 
-	logrus.Infof("createAppFromManifest - body: %s", string(body))
-
 	var appData GitHubAppData
 	err = json.Unmarshal(body, &appData)
 	if err != nil {
@@ -403,19 +455,4 @@ func createAppFromManifest(code string) (*GitHubAppData, error) {
 	}
 
 	return &appData, nil
-}
-
-func findSecret(ctx applications.HttpRequestContext, secretName string) (string, error) {
-	secrets, err := ctx.AppContext.GetSecrets()
-	if err != nil {
-		return "", err
-	}
-
-	for _, secret := range secrets {
-		if secret.Name == secretName {
-			return string(secret.Value), nil
-		}
-	}
-
-	return "", fmt.Errorf("secret %s not found", secretName)
 }

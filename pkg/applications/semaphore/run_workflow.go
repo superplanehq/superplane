@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -75,8 +75,8 @@ func (r *RunWorkflow) Color() string {
 	return "gray"
 }
 
-func (r *RunWorkflow) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{
+func (r *RunWorkflow) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{
 		{
 			Name:  PassedOutputChannel,
 			Label: "Passed",
@@ -144,11 +144,11 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 	}
 }
 
-func (r *RunWorkflow) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+func (r *RunWorkflow) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (r *RunWorkflow) Setup(ctx components.SetupContext) error {
+func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 	config := RunWorkflowSpec{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
@@ -193,7 +193,7 @@ func (r *RunWorkflow) Setup(ctx components.SetupContext) error {
 	return nil
 }
 
-func (r *RunWorkflow) Execute(ctx components.ExecutionContext) error {
+func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	spec := RunWorkflowSpec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
@@ -240,8 +240,8 @@ func (r *RunWorkflow) Execute(ctx components.ExecutionContext) error {
 	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
 }
 
-func (r *RunWorkflow) Actions() []components.Action {
-	return []components.Action{
+func (r *RunWorkflow) Actions() []core.Action {
+	return []core.Action{
 		{
 			Name:           "poll",
 			UserAccessible: false,
@@ -261,7 +261,7 @@ func (r *RunWorkflow) Actions() []components.Action {
 	}
 }
 
-func (r *RunWorkflow) HandleAction(ctx components.ActionContext) error {
+func (r *RunWorkflow) HandleAction(ctx core.ActionContext) error {
 	switch ctx.Name {
 	case "poll":
 		return r.poll(ctx)
@@ -272,7 +272,7 @@ func (r *RunWorkflow) HandleAction(ctx components.ActionContext) error {
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (r *RunWorkflow) poll(ctx components.ActionContext) error {
+func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 	spec := RunWorkflowSpec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
@@ -324,7 +324,7 @@ func (r *RunWorkflow) poll(ctx components.ActionContext) error {
 	})
 }
 
-func (r *RunWorkflow) finish(ctx components.ActionContext) error {
+func (r *RunWorkflow) finish(ctx core.ActionContext) error {
 	metadata := RunWorkflowExecutionMetadata{}
 	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
@@ -350,7 +350,7 @@ func (r *RunWorkflow) finish(ctx components.ActionContext) error {
 	return nil
 }
 
-func (r *RunWorkflow) buildParameters(ctx components.ExecutionContext, params []Parameter) map[string]any {
+func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, params []Parameter) map[string]any {
 	parameters := make(map[string]any)
 	for _, param := range params {
 		parameters[param.Name] = param.Value

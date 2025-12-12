@@ -1,10 +1,9 @@
-package triggers
+package core
 
 import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations"
 )
@@ -57,7 +56,7 @@ type Trigger interface {
 	/*
 	 * Allows triggers to define custom actions.
 	 */
-	Actions() []components.Action
+	Actions() []Action
 
 	/*
 	 * Execution a custom action - defined in Actions() for a trigger.
@@ -67,27 +66,19 @@ type Trigger interface {
 
 type TriggerContext struct {
 	Configuration          any
-	MetadataContext        components.MetadataContext
-	RequestContext         components.RequestContext
+	MetadataContext        MetadataContext
+	RequestContext         RequestContext
 	EventContext           EventContext
 	WebhookContext         WebhookContext
 	IntegrationContext     IntegrationContext
-	AppInstallationContext components.AppInstallationContext
-}
-
-type IntegrationContext interface {
-	GetIntegration(ID string) (integrations.ResourceManager, error)
-}
-
-type WebhookContext interface {
-	Setup(options *WebhookSetupOptions) error
-	GetSecret() ([]byte, error)
+	AppInstallationContext AppInstallationContext
 }
 
 type WebhookSetupOptions struct {
-	IntegrationID *uuid.UUID
-	Resource      integrations.Resource
-	Configuration any
+	IntegrationID     *uuid.UUID
+	AppInstallationID *uuid.UUID
+	Resource          integrations.Resource
+	Configuration     any
 }
 
 type EventContext interface {
@@ -98,11 +89,11 @@ type TriggerActionContext struct {
 	Name                   string
 	Parameters             map[string]any
 	Configuration          any
-	MetadataContext        components.MetadataContext
-	RequestContext         components.RequestContext
+	MetadataContext        MetadataContext
+	RequestContext         RequestContext
 	EventContext           EventContext
 	WebhookContext         WebhookContext
-	AppInstallationContext components.AppInstallationContext
+	AppInstallationContext AppInstallationContext
 }
 
 type WebhookRequestContext struct {
@@ -111,4 +102,9 @@ type WebhookRequestContext struct {
 	Configuration  any
 	WebhookContext WebhookContext
 	EventContext   EventContext
+}
+
+type WebhookContext interface {
+	Setup(options *WebhookSetupOptions) error
+	GetSecret() ([]byte, error)
 }

@@ -1597,7 +1597,10 @@ function prepareComponentNode(
   queryClient: any,
   organizationId?: string,
 ): CanvasNode {
-  switch (node.component?.name) {
+  const componentNameParts = node.component?.name?.split(".") || [];
+  const componentName = componentNameParts[0];
+
+  switch (componentName) {
     case "approval":
       return prepareApprovalNode(nodes, node, components, nodeExecutionsMap, workflowId, queryClient, organizationId);
     case "noop":

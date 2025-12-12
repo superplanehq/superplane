@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/applications"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -37,12 +37,20 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, baseUR
 		return nil, status.Errorf(codes.Internal, "failed to create application installation: %v", err)
 	}
 
-	syncErr := app.Sync(applications.SyncContext{
-		Configuration:  appInstallation.Configuration.Data(),
-		BaseURL:        baseURL,
-		OrganizationID: orgID,
-		InstallationID: appInstallation.ID.String(),
-		AppContext:     contexts.NewAppContext(database.Conn(), appInstallation, registry.Encryptor),
+	appCtx := contexts.NewAppInstallationContext(
+		database.Conn(),
+		nil,
+		appInstallation,
+		registry.Encryptor,
+		registry,
+	)
+
+	syncErr := app.Sync(core.SyncContext{
+		AppInstallation: appCtx,
+		Configuration:   appInstallation.Configuration.Data(),
+		BaseURL:         baseURL,
+		OrganizationID:  orgID,
+		InstallationID:  appInstallation.ID.String(),
 	})
 
 	err = database.Conn().Save(appInstallation).Error
@@ -113,7 +121,7 @@ func serializeAppInstallation(registry *registry.Registry, appInstallation *mode
 }
 
 // encryptSensitiveFields encrypts all sensitive configuration fields
-func encryptSensitiveFields(ctx context.Context, registry *registry.Registry, app applications.Application, config map[string]any, orgID string) (map[string]any, error) {
+func encryptSensitiveFields(ctx context.Context, registry *registry.Registry, app core.Application, config map[string]any, orgID string) (map[string]any, error) {
 	result := make(map[string]any)
 	for k, v := range config {
 		result[k] = v
@@ -148,7 +156,7 @@ func encryptSensitiveFields(ctx context.Context, registry *registry.Registry, ap
 }
 
 // sanitizeSensitiveFields replaces encrypted sensitive configuration fields with their SHA256 hash
-func sanitizeSensitiveFields(app applications.Application, config map[string]any) map[string]any {
+func sanitizeSensitiveFields(app core.Application, config map[string]any) map[string]any {
 	result := make(map[string]any)
 	for k, v := range config {
 		result[k] = v

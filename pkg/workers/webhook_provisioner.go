@@ -9,11 +9,13 @@ import (
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 type WebhookProvisioner struct {
@@ -77,10 +79,49 @@ func (w *WebhookProvisioner) LockAndProcessWebhook(webhook models.Webhook) error
 }
 
 func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook) error {
-	if webhook.IntegrationID == nil {
-		return webhook.Ready(tx)
+	if webhook.IntegrationID != nil {
+		return w.processIntegrationWebhook(tx, webhook)
 	}
 
+	if webhook.AppInstallationID != nil {
+		return w.processAppInstallationWebhook(tx, webhook)
+	}
+
+	return webhook.Ready(tx)
+}
+
+func (w *WebhookProvisioner) processAppInstallationWebhook(tx *gorm.DB, webhook *models.Webhook) error {
+	appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *webhook.AppInstallationID)
+	if err != nil {
+		return w.handleWebhookError(tx, webhook, err)
+	}
+
+	secret, err := w.encryptor.Decrypt(context.Background(), webhook.Secret, []byte(webhook.ID.String()))
+	if err != nil {
+		return w.handleWebhookError(tx, webhook, err)
+	}
+
+	app, err := w.registry.GetApplication(appInstallation.AppName)
+	if err != nil {
+		return w.handleWebhookError(tx, webhook, err)
+	}
+
+	ctx := contexts.NewAppInstallationContext(tx, nil, appInstallation, w.encryptor, w.registry)
+	webhookMetadata, err := app.SetupWebhook(ctx, core.WebhookOptions{
+		ID:            webhook.ID.String(),
+		Configuration: webhook.Configuration.Data(),
+		URL:           fmt.Sprintf("%s/api/v1/webhooks/%s", w.baseURL, webhook.ID.String()),
+		Secret:        secret,
+	})
+
+	if err != nil {
+		return w.handleWebhookError(tx, webhook, err)
+	}
+
+	return webhook.ReadyWithMetadata(tx, webhookMetadata)
+}
+
+func (w *WebhookProvisioner) processIntegrationWebhook(tx *gorm.DB, webhook *models.Webhook) error {
 	integration, err := models.FindIntegrationByIDInTransaction(tx, *webhook.IntegrationID)
 	if err != nil {
 		return w.handleWebhookError(tx, webhook, err)

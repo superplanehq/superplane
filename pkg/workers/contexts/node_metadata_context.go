@@ -3,7 +3,7 @@ package contexts
 import (
 	"encoding/json"
 
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 )
@@ -12,7 +12,7 @@ type NodeMetadataContext struct {
 	node *models.WorkflowNode
 }
 
-func NewNodeMetadataContext(node *models.WorkflowNode) components.MetadataContext {
+func NewNodeMetadataContext(node *models.WorkflowNode) core.MetadataContext {
 	return &NodeMetadataContext{node: node}
 }
 

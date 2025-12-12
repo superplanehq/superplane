@@ -1,6 +1,7 @@
 package models
 
 import (
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,11 +49,26 @@ func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {
 		return nil
 	}
 
+	//
+	// Delete the webhook associated with the node,
+	// only if it does not have any other nodes associated with it.
+	//
 	webhook, err := FindWebhookInTransaction(tx, *node.WebhookID)
 	if err != nil {
 		return err
 	}
 
+	nodes, err := FindWebhookNodesInTransaction(tx, *node.WebhookID)
+	if err != nil {
+		return err
+	}
+
+	if len(nodes) > 0 {
+		log.Printf("Webhook %s has other nodes associated with it: %v", webhook.ID.String(), nodes)
+		return nil
+	}
+
+	log.Printf("Deleting webhook %s", webhook.ID.String())
 	return tx.Delete(&webhook).Error
 }
 

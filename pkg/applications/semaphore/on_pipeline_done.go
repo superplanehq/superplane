@@ -7,10 +7,9 @@ import (
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/triggers"
 )
 
 const MaxEventSize = 64 * 1024
@@ -30,7 +29,7 @@ func (p *OnPipelineDone) Name() string {
 }
 
 func (p *OnPipelineDone) Label() string {
-	return "On Push"
+	return "On Pipeline Done"
 }
 
 func (p *OnPipelineDone) Description() string {
@@ -56,7 +55,7 @@ func (p *OnPipelineDone) Configuration() []configuration.Field {
 	}
 }
 
-func (p *OnPipelineDone) Setup(ctx triggers.TriggerContext) error {
+func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 	var metadata OnPipelineDoneMetadata
 	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
@@ -81,22 +80,44 @@ func (p *OnPipelineDone) Setup(ctx triggers.TriggerContext) error {
 	}
 
 	//
-	// TODO: Check if project exists
-	// TODO: Set up web hook
+	// If this is the same project, nothing to do.
 	//
+	if metadata.Project != nil && (config.Project == metadata.Project.ID || config.Project == metadata.Project.Name) {
+		return nil
+	}
 
+	client, err := NewClient(ctx.AppInstallationContext)
+	if err != nil {
+		return err
+	}
+
+	project, err := client.GetProject(config.Project)
+	if err != nil {
+		return fmt.Errorf("error finding project %s: %v", config.Project, err)
+	}
+
+	ctx.MetadataContext.Set(OnPipelineDoneMetadata{
+		Project: &Project{
+			ID:   project.Metadata.ProjectID,
+			Name: project.Metadata.ProjectName,
+			URL:  fmt.Sprintf("%s/projects/%s", string(client.OrgURL), project.Metadata.ProjectID),
+		},
+	})
+
+	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+		Project: project.Metadata.ProjectID,
+	})
+}
+
+func (p *OnPipelineDone) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (p *OnPipelineDone) HandleAction(ctx core.TriggerActionContext) error {
 	return nil
 }
 
-func (p *OnPipelineDone) Actions() []components.Action {
-	return []components.Action{}
-}
-
-func (p *OnPipelineDone) HandleAction(ctx triggers.TriggerActionContext) error {
-	return nil
-}
-
-func (p *OnPipelineDone) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) {
+func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	signature := ctx.Headers.Get("X-Semaphore-Signature-256")
 	if signature == "" {
 		return http.StatusForbidden, fmt.Errorf("invalid signature")

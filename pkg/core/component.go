@@ -1,4 +1,4 @@
-package components
+package core
 
 import (
 	"time"
@@ -134,16 +134,9 @@ type IntegrationContext interface {
 	GetIntegration(ID string) (integrations.ResourceManager, error)
 }
 
-/*
- * AppInstallationContext allows components to access app installation information.
- */
-type AppInstallationContext interface {
-	GetConfig(name string) ([]byte, error)
-}
-
-type InstallationSecret struct {
-	Name  string
-	Value []byte
+type Webhook struct {
+	ID            uuid.UUID
+	Configuration any
 }
 
 /*

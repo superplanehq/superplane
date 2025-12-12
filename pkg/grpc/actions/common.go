@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
@@ -16,7 +16,6 @@ import (
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/triggers"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -824,7 +823,7 @@ func defaultValueFromProto(fieldType, defaultValue string) any {
 	}
 }
 
-func SerializeComponents(in []components.Component) []*componentpb.Component {
+func SerializeComponents(in []core.Component) []*componentpb.Component {
 	out := make([]*componentpb.Component, len(in))
 	for i, component := range in {
 		outputChannels := component.OutputChannels(nil)
@@ -855,7 +854,7 @@ func SerializeComponents(in []components.Component) []*componentpb.Component {
 	return out
 }
 
-func SerializeTriggers(in []triggers.Trigger) []*triggerpb.Trigger {
+func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 	out := make([]*triggerpb.Trigger, len(in))
 	for i, trigger := range in {
 		configFields := trigger.Configuration()

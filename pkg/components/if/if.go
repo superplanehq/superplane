@@ -6,8 +6,8 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -46,8 +46,8 @@ func (f *If) Color() string {
 	return "red"
 }
 
-func (f *If) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{
+func (f *If) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{
 		{Name: "true", Label: "True"},
 		{Name: "false", Label: "False"},
 	}
@@ -64,7 +64,7 @@ func (f *If) Configuration() []configuration.Field {
 	}
 }
 
-func (f *If) Execute(ctx components.ExecutionContext) error {
+func (f *If) Execute(ctx core.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
@@ -110,18 +110,18 @@ func (f *If) Execute(ctx components.ExecutionContext) error {
 	return ctx.ExecutionStateContext.Pass(outputs)
 }
 
-func (f *If) Actions() []components.Action {
-	return []components.Action{}
+func (f *If) Actions() []core.Action {
+	return []core.Action{}
 }
 
-func (f *If) HandleAction(ctx components.ActionContext) error {
+func (f *If) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("if does not support actions")
 }
 
-func (f *If) Setup(ctx components.SetupContext) error {
+func (f *If) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (f *If) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+func (f *If) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }

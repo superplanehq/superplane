@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type Client struct {
@@ -16,7 +16,7 @@ type Client struct {
 	APIToken string
 }
 
-func NewClient(ctx components.AppInstallationContext) (*Client, error) {
+func NewClient(ctx core.AppInstallationContext) (*Client, error) {
 	orgURL, err := ctx.GetConfig("organizationUrl")
 	if err != nil {
 		return nil, err
@@ -181,6 +181,194 @@ func (c *Client) RunWorkflow(params any) (*CreateWorkflowResponse, error) {
 	}
 
 	var response CreateWorkflowResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
+}
+
+type Notification struct {
+	APIVersion string               `json:"apiVersion"`
+	Kind       string               `json:"kind"`
+	Metadata   NotificationMetadata `json:"metadata"`
+	Spec       NotificationSpec     `json:"spec"`
+}
+
+type NotificationMetadata struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type NotificationRule struct {
+	Name   string                 `json:"name"`
+	Filter NotificationRuleFilter `json:"filter"`
+	Notify NotificationRuleNotify `json:"notify"`
+}
+
+type NotificationRuleNotify struct {
+	Webhook NotificationNotifyWebhook `json:"webhook"`
+
+	// TODO
+	// we don't really need this, but if it's not in the request,
+	// the API does not work properly.
+	// Once it's fixed, or we migrate to v2 API, we can remove it from here.
+	//
+	Slack NotificationNotifySlack `json:"slack"`
+}
+
+type NotificationNotifySlack struct {
+	Endpoint string   `json:"endpoint,omitempty"`
+	Channels []string `json:"channels,omitempty"`
+}
+
+type NotificationNotifyWebhook struct {
+	Endpoint string `json:"endpoint"`
+	Secret   string `json:"secret"`
+}
+
+type NotificationRuleFilter struct {
+	Branches  []string `json:"branches"`
+	Pipelines []string `json:"pipelines"`
+	Projects  []string `json:"projects"`
+	Results   []string `json:"results"`
+}
+
+type NotificationSpec struct {
+	Rules []NotificationRule `json:"rules"`
+}
+
+func (c *Client) GetNotification(id string) (*Notification, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", c.OrgURL, id)
+	responseBody, err := c.execRequest(http.MethodGet, URL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response Notification
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
+}
+
+func (c *Client) CreateNotification(params any) (*Notification, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/notifications", c.OrgURL)
+
+	notification, ok := params.(*Notification)
+	if !ok {
+		return nil, fmt.Errorf("invalid params type %T", params)
+	}
+
+	notification.APIVersion = "v1alpha"
+	notification.Kind = "Notification"
+	body, err := json.Marshal(notification)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling notification: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, URL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response Notification
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
+}
+
+func (c *Client) DeleteNotification(id string) error {
+	notificationURL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", c.OrgURL, id)
+	_, err := c.execRequest(http.MethodDelete, notificationURL, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting notification: %v", err)
+	}
+
+	return nil
+}
+
+type Secret struct {
+	APIVersion string         `json:"apiVersion"`
+	Kind       string         `json:"kind"`
+	Metadata   SecretMetadata `json:"metadata"`
+	Data       SecretSpecData `json:"data"`
+}
+
+type SecretMetadata struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type SecretSpecData struct {
+	EnvVars []SecretSpecDataEnvVar `json:"env_vars"`
+}
+
+type SecretSpecDataEnvVar struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+func (c *Client) GetSecret(id string) (*Secret, error) {
+	URL := fmt.Sprintf("%s/api/v1beta/secrets/%s", c.OrgURL, id)
+	responseBody, err := c.execRequest(http.MethodGet, URL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response Secret
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
+}
+
+func (c *Client) DeleteSecret(name string) error {
+	secretURL := fmt.Sprintf("%s/api/v1beta/secrets/%s", c.OrgURL, name)
+	_, err := c.execRequest(http.MethodDelete, secretURL, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting secret: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Client) CreateWebhookSecret(name, key string) (*Secret, error) {
+	URL := fmt.Sprintf("%s/api/v1beta/secrets", c.OrgURL)
+
+	secret := &Secret{
+		APIVersion: "v1beta",
+		Kind:       "Secret",
+		Metadata:   SecretMetadata{Name: name},
+		Data: SecretSpecData{
+			EnvVars: []SecretSpecDataEnvVar{
+				{
+					Name:  "WEBHOOK_SECRET",
+					Value: string(key),
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(secret)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling secret: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, URL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response Secret
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
