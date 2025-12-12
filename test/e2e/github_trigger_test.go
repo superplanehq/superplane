@@ -36,7 +36,6 @@ func TestGithubTrigger(t *testing.T) {
 		steps.givenAGithubIntegrationExists(githubOwner, githubTokenValue)
 		steps.givenACanvasExists()
 		steps.addGithubTriggerNode()
-		steps.saveCanvas()
 		steps.assertGithubTriggerNodeExistsInDB()
 	})
 
@@ -44,7 +43,6 @@ func TestGithubTrigger(t *testing.T) {
 		steps.start()
 		steps.givenAGithubIntegrationExists(githubOwner, githubTokenValue)
 		steps.givenACanvasWithGithubTriggerAndNoop()
-		steps.saveCanvas()
 		steps.waitForWebhookSetup()
 		steps.simulateReceivingGithubEvent()
 		steps.assertWebhookProcessed()

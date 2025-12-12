@@ -66,8 +66,9 @@ const getBlockType = (componentName: string): BlockData["type"] => {
     semaphore: "component",
     wait: "component",
     time_gate: "component",
+    merge: "merge",
   };
-  return typeMap[componentName] || "noop"; // Default to noop for unknown components
+  return typeMap[componentName] || "component"; // Default to noop for unknown components
 };
 
 // Helper function to create minimal BlockData for a component
@@ -298,8 +299,8 @@ export const CustomComponent = () => {
     async (customNodes?: Node[]) => {
       try {
         // Use provided nodes or current nodes from ref
-        const currentNodes = customNodes || nodesRef.current;
-
+        const rawNodes = customNodes || nodesRef.current || [];
+        const currentNodes = Array.isArray(rawNodes) ? rawNodes : [];
         // Filter out template nodes and serialize remaining nodes
         const blueprintNodes = currentNodes
           .filter((node) => !node.id.startsWith("template_")) // Exclude template nodes
@@ -364,7 +365,7 @@ export const CustomComponent = () => {
   );
 
   const getNodeEditData = useCallback((nodeId: string) => {
-    const node = nodesRef.current.find((n) => n.id === nodeId);
+    const node = (nodesRef.current || []).find((n) => n.id === nodeId);
     if (!node) return null;
 
     const component = componentsRef.current.find((p: any) => p.name === (node.data as any)._originalComponent);
@@ -383,7 +384,7 @@ export const CustomComponent = () => {
     async (nodeId: string, configuration: Record<string, any>, nodeName: string) => {
       saveSnapshot();
 
-      const node = nodesRef.current.find((n) => n.id === nodeId);
+      const node = (nodesRef.current || []).find((n) => n.id === nodeId);
       if (!node) return;
 
       const component = componentsRef.current.find((p: any) => p.name === (node.data as any)._originalComponent);
@@ -393,7 +394,7 @@ export const CustomComponent = () => {
       const filteredConfiguration = filterVisibleConfiguration(configuration, component.configuration || []);
 
       // Update existing node
-      const updatedNodes = nodesRef.current.map((n) => {
+      const updatedNodes = (nodesRef.current || []).map((n) => {
         if (n.id !== nodeId) return n;
 
         const nodeData = n.data as any;
@@ -470,7 +471,7 @@ export const CustomComponent = () => {
               y: Math.round(newNodeData.position.y),
             }
           : {
-              x: nodesRef.current.length * 250,
+              x: (nodesRef.current || []).length * 250,
               y: 100,
             },
         data: {
@@ -482,8 +483,7 @@ export const CustomComponent = () => {
 
       // Update nodes state
       const updatedNodes = (() => {
-        const currentNodes = nodesRef.current;
-        // Remove any template nodes and add the new real node
+        const currentNodes = nodesRef.current || [];
         const filteredNodes = currentNodes.filter((n) => !n.id.startsWith("template_"));
         return [...filteredNodes, newNode];
       })();
@@ -508,7 +508,7 @@ export const CustomComponent = () => {
 
   const handleNodeDuplicate = useCallback(
     (nodeId: string) => {
-      const nodeToDuplicate = nodesRef.current.find((node) => node.id === nodeId);
+      const nodeToDuplicate = (nodesRef.current || []).find((node) => node.id === nodeId);
       if (!nodeToDuplicate) return;
 
       // Save snapshot before making changes
@@ -571,7 +571,9 @@ export const CustomComponent = () => {
     [saveSnapshot],
   );
 
-  const handleSave = handleSaveBlueprint;
+  const handleSave = useCallback(() => {
+    return handleSaveBlueprint();
+  }, [handleSaveBlueprint]);
 
   if (blueprintLoading || componentsLoading) {
     return (
