@@ -12,6 +12,7 @@ import { Button } from "@/ui/button";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Alert, AlertDescription } from "@/ui/alert";
+import { resolveIcon } from "@/lib/utils";
 
 interface ApplicationDetailsProps {
   organizationId: string;
@@ -161,6 +162,11 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
+        {appDefinition?.icon &&
+          (() => {
+            const AppIcon = resolveIcon(appDefinition.icon);
+            return <AppIcon className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />;
+          })()}
         <div className="flex-1">
           <h4 className="text-2xl font-semibold">{installation.metadata?.name || installation.spec?.appName}</h4>
           {installation.spec?.appName && installation.metadata?.name !== installation.spec?.appName && (
@@ -195,7 +201,8 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
                           : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
                     }`}
                   >
-                    {installation.status?.state || "unknown"}
+                    {(installation.status?.state || "unknown").charAt(0).toUpperCase() +
+                      (installation.status?.state || "unknown").slice(1)}
                   </span>
                   {installation.status?.stateDescription && (
                     <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">

@@ -30,6 +30,8 @@ func serializeApplications(in []core.Application) []*pb.ApplicationDefinition {
 		out[i] = &pb.ApplicationDefinition{
 			Name:          application.Name(),
 			Label:         application.Label(),
+			Icon:          application.Icon(),
+			Description:   application.Description(),
 			Configuration: configuration,
 			Components:    actions.SerializeComponents(application.Components()),
 			Triggers:      actions.SerializeTriggers(application.Triggers()),

@@ -33,6 +33,14 @@ func (s *Semaphore) Label() string {
 	return "Semaphore"
 }
 
+func (s *Semaphore) Icon() string {
+	return "workflow"
+}
+
+func (s *Semaphore) Description() string {
+	return "Run and react to your Semaphore workflows"
+}
+
 func (s *Semaphore) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

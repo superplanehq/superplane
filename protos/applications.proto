@@ -50,7 +50,9 @@ message ListApplicationsResponse {
 message ApplicationDefinition {
   string name = 1;
   string label = 2;
-  repeated Configuration.Field configuration = 3;
-  repeated Components.Component components = 4;
-  repeated Triggers.Trigger triggers = 5;
+  string icon = 3;
+  string description = 4;
+  repeated Configuration.Field configuration = 5;
+  repeated Components.Component components = 6;
+  repeated Triggers.Trigger triggers = 7;
 }

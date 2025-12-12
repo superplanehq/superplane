@@ -22,6 +22,8 @@ var _ MappedNullable = &ApplicationsApplicationDefinition{}
 type ApplicationsApplicationDefinition struct {
 	Name          *string               `json:"name,omitempty"`
 	Label         *string               `json:"label,omitempty"`
+	Icon          *string               `json:"icon,omitempty"`
+	Description   *string               `json:"description,omitempty"`
 	Configuration []ConfigurationField  `json:"configuration,omitempty"`
 	Components    []ComponentsComponent `json:"components,omitempty"`
 	Triggers      []TriggersTrigger     `json:"triggers,omitempty"`
@@ -106,6 +108,70 @@ func (o *ApplicationsApplicationDefinition) HasLabel() bool {
 // SetLabel gets a reference to the given string and assigns it to the Label field.
 func (o *ApplicationsApplicationDefinition) SetLabel(v string) {
 	o.Label = &v
+}
+
+// GetIcon returns the Icon field value if set, zero value otherwise.
+func (o *ApplicationsApplicationDefinition) GetIcon() string {
+	if o == nil || IsNil(o.Icon) {
+		var ret string
+		return ret
+	}
+	return *o.Icon
+}
+
+// GetIconOk returns a tuple with the Icon field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ApplicationsApplicationDefinition) GetIconOk() (*string, bool) {
+	if o == nil || IsNil(o.Icon) {
+		return nil, false
+	}
+	return o.Icon, true
+}
+
+// HasIcon returns a boolean if a field has been set.
+func (o *ApplicationsApplicationDefinition) HasIcon() bool {
+	if o != nil && !IsNil(o.Icon) {
+		return true
+	}
+
+	return false
+}
+
+// SetIcon gets a reference to the given string and assigns it to the Icon field.
+func (o *ApplicationsApplicationDefinition) SetIcon(v string) {
+	o.Icon = &v
+}
+
+// GetDescription returns the Description field value if set, zero value otherwise.
+func (o *ApplicationsApplicationDefinition) GetDescription() string {
+	if o == nil || IsNil(o.Description) {
+		var ret string
+		return ret
+	}
+	return *o.Description
+}
+
+// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ApplicationsApplicationDefinition) GetDescriptionOk() (*string, bool) {
+	if o == nil || IsNil(o.Description) {
+		return nil, false
+	}
+	return o.Description, true
+}
+
+// HasDescription returns a boolean if a field has been set.
+func (o *ApplicationsApplicationDefinition) HasDescription() bool {
+	if o != nil && !IsNil(o.Description) {
+		return true
+	}
+
+	return false
+}
+
+// SetDescription gets a reference to the given string and assigns it to the Description field.
+func (o *ApplicationsApplicationDefinition) SetDescription(v string) {
+	o.Description = &v
 }
 
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
@@ -219,6 +285,12 @@ func (o ApplicationsApplicationDefinition) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.Label) {
 		toSerialize["label"] = o.Label
+	}
+	if !IsNil(o.Icon) {
+		toSerialize["icon"] = o.Icon
+	}
+	if !IsNil(o.Description) {
+		toSerialize["description"] = o.Description
 	}
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration

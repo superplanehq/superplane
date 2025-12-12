@@ -2704,6 +2704,12 @@
         "label": {
           "type": "string"
         },
+        "icon": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
         "configuration": {
           "type": "array",
           "items": {

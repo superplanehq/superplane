@@ -110,9 +110,11 @@ type ApplicationDefinition struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
 	Name          string                  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Label         string                  `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
-	Configuration []*configuration.Field  `protobuf:"bytes,3,rep,name=configuration,proto3" json:"configuration,omitempty"`
-	Components    []*components.Component `protobuf:"bytes,4,rep,name=components,proto3" json:"components,omitempty"`
-	Triggers      []*triggers.Trigger     `protobuf:"bytes,5,rep,name=triggers,proto3" json:"triggers,omitempty"`
+	Icon          string                  `protobuf:"bytes,3,opt,name=icon,proto3" json:"icon,omitempty"`
+	Description   string                  `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Configuration []*configuration.Field  `protobuf:"bytes,5,rep,name=configuration,proto3" json:"configuration,omitempty"`
+	Components    []*components.Component `protobuf:"bytes,6,rep,name=components,proto3" json:"components,omitempty"`
+	Triggers      []*triggers.Trigger     `protobuf:"bytes,7,rep,name=triggers,proto3" json:"triggers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -161,6 +163,20 @@ func (x *ApplicationDefinition) GetLabel() string {
 	return ""
 }
 
+func (x *ApplicationDefinition) GetIcon() string {
+	if x != nil {
+		return x.Icon
+	}
+	return ""
+}
+
+func (x *ApplicationDefinition) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
 func (x *ApplicationDefinition) GetConfiguration() []*configuration.Field {
 	if x != nil {
 		return x.Configuration
@@ -189,15 +205,17 @@ const file_applications_proto_rawDesc = "" +
 	"\x12applications.proto\x12\x17Superplane.Applications\x1a\x13configuration.proto\x1a\x10components.proto\x1a\x0etriggers.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x19\n" +
 	"\x17ListApplicationsRequest\"n\n" +
 	"\x18ListApplicationsResponse\x12R\n" +
-	"\fapplications\x18\x01 \x03(\v2..Superplane.Applications.ApplicationDefinitionR\fapplications\"\x84\x02\n" +
+	"\fapplications\x18\x01 \x03(\v2..Superplane.Applications.ApplicationDefinitionR\fapplications\"\xba\x02\n" +
 	"\x15ApplicationDefinition\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05label\x18\x02 \x01(\tR\x05label\x12E\n" +
-	"\rconfiguration\x18\x03 \x03(\v2\x1f.Superplane.Configuration.FieldR\rconfiguration\x12@\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12\x12\n" +
+	"\x04icon\x18\x03 \x01(\tR\x04icon\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12E\n" +
+	"\rconfiguration\x18\x05 \x03(\v2\x1f.Superplane.Configuration.FieldR\rconfiguration\x12@\n" +
 	"\n" +
-	"components\x18\x04 \x03(\v2 .Superplane.Components.ComponentR\n" +
+	"components\x18\x06 \x03(\v2 .Superplane.Components.ComponentR\n" +
 	"components\x128\n" +
-	"\btriggers\x18\x05 \x03(\v2\x1c.Superplane.Triggers.TriggerR\btriggers2\xf0\x01\n" +
+	"\btriggers\x18\a \x03(\v2\x1c.Superplane.Triggers.TriggerR\btriggers2\xf0\x01\n" +
 	"\fApplications\x12\xdf\x01\n" +
 	"\x10ListApplications\x120.Superplane.Applications.ListApplicationsRequest\x1a1.Superplane.Applications.ListApplicationsResponse\"f\x92AG\n" +
 	"\vApplication\x12\x1bList available applications\x1a\x1bList available applications\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/applicationsB\xd4\x01\x92A\x94\x01\x12j\n" +

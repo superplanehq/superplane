@@ -1,4 +1,4 @@
-import { AppWindow, Puzzle, Zap, Loader2, X } from "lucide-react";
+import { AppWindow, Loader2, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -9,6 +9,7 @@ import {
 import { Button } from "@/ui/button";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { ApplicationsApplicationDefinition } from "../../../api-client/types.gen";
+import { resolveIcon } from "@/lib/utils";
 
 interface ApplicationsProps {
   organizationId: string;
@@ -118,6 +119,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                   .map((app) => {
                     const appDefinition = availableApps.find((a) => a.name === app.spec?.appName);
                     const appLabel = appDefinition?.label || app.spec?.appName;
+                    const AppIcon = resolveIcon(appDefinition?.icon);
 
                     return (
                       <tr
@@ -143,10 +145,15 @@ export function Applications({ organizationId }: ApplicationsProps) {
                                   : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
                             }`}
                           >
-                            {app.status?.state}
+                            {app.status?.state?.charAt(0).toUpperCase() + app.status?.state?.slice(1)}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 truncate">{appLabel}</td>
+                        <td className="px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 truncate">
+                          <div className="flex items-center gap-2">
+                            <AppIcon className="w-4 h-4" />
+                            <span>{appLabel}</span>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
@@ -171,40 +178,32 @@ export function Applications({ organizationId }: ApplicationsProps) {
               </div>
             ) : (
               <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {availableApps.map((app) => (
-                  <div
-                    key={app.name}
-                    className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <AppWindow className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
-                        <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                          {app.label || app.name}
-                        </h3>
+                {availableApps.map((app) => {
+                  const Icon = resolveIcon(app.icon);
+                  return (
+                    <div
+                      key={app.name}
+                      className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Icon className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                          <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                            {app.label || app.name}
+                          </h3>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="space-y-1 text-xs text-zinc-600 dark:text-zinc-400 mb-3">
-                      <div className="flex items-center gap-1.5">
-                        <Puzzle className="w-3 h-3" />
-                        <span>
-                          {app.components?.length || 0} component{(app.components?.length || 0) !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Zap className="w-3 h-3" />
-                        <span>
-                          {app.triggers?.length} trigger{app.triggers?.length !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                    </div>
+                      {app.description && (
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3 line-clamp-2">{app.description}</p>
+                      )}
 
-                    <Button color="blue" onClick={() => handleInstallClick(app)} className="w-full text-sm py-1.5">
-                      Install
-                    </Button>
-                  </div>
-                ))}
+                      <Button color="blue" onClick={() => handleInstallClick(app)} className="w-full text-sm py-1.5">
+                        Install
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -212,97 +211,104 @@ export function Applications({ organizationId }: ApplicationsProps) {
       </div>
 
       {/* Install Modal */}
-      {isModalOpen && selectedApplication && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-800 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <AppWindow className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
-                  <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-                    Install {selectedApplication.label || selectedApplication.name}
-                  </h3>
-                </div>
-                <button
-                  onClick={handleCloseModal}
-                  className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-                  disabled={installMutation.isPending}
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {/* Installation Name Field */}
-                <div>
-                  <label className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-                    Installation Name
-                    <span className="text-red-500 ml-1">*</span>
-                  </label>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">A unique name for this installation</p>
-                  <input
-                    type="text"
-                    value={installationName}
-                    onChange={(e) => setInstallationName(e.target.value)}
-                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., my-app-integration"
-                    required
-                  />
-                </div>
-
-                {/* Configuration Fields */}
-                {selectedApplication.configuration && selectedApplication.configuration.length > 0 && (
-                  <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
-                    {selectedApplication.configuration.map((field) => {
-                      if (!field.name) return null;
-                      return (
-                        <ConfigurationFieldRenderer
-                          key={field.name}
-                          field={field}
-                          value={configuration[field.name]}
-                          onChange={(value) => handleConfigurationChange(field.name || "", value)}
-                          allValues={configuration}
-                          domainId={organizationId}
-                          domainType="DOMAIN_TYPE_ORGANIZATION"
-                        />
-                      );
-                    })}
+      {isModalOpen &&
+        selectedApplication &&
+        (() => {
+          const ModalIcon = resolveIcon(selectedApplication.icon);
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-800 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <ModalIcon className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
+                      <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+                        Install {selectedApplication.label || selectedApplication.name}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={handleCloseModal}
+                      className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                      disabled={installMutation.isPending}
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
                   </div>
-                )}
-              </div>
 
-              <div className="flex justify-end gap-3 mt-6">
-                <Button variant="outline" onClick={handleCloseModal} disabled={installMutation.isPending}>
-                  Cancel
-                </Button>
-                <Button
-                  color="blue"
-                  onClick={handleInstall}
-                  disabled={installMutation.isPending || !installationName.trim()}
-                  className="flex items-center gap-2"
-                >
-                  {installMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Installing...
-                    </>
-                  ) : (
-                    "Install"
+                  <div className="space-y-4">
+                    {/* Installation Name Field */}
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
+                        Installation Name
+                        <span className="text-red-500 ml-1">*</span>
+                      </label>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+                        A unique name for this installation
+                      </p>
+                      <input
+                        type="text"
+                        value={installationName}
+                        onChange={(e) => setInstallationName(e.target.value)}
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., my-app-integration"
+                        required
+                      />
+                    </div>
+
+                    {/* Configuration Fields */}
+                    {selectedApplication.configuration && selectedApplication.configuration.length > 0 && (
+                      <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
+                        {selectedApplication.configuration.map((field) => {
+                          if (!field.name) return null;
+                          return (
+                            <ConfigurationFieldRenderer
+                              key={field.name}
+                              field={field}
+                              value={configuration[field.name]}
+                              onChange={(value) => handleConfigurationChange(field.name || "", value)}
+                              allValues={configuration}
+                              domainId={organizationId}
+                              domainType="DOMAIN_TYPE_ORGANIZATION"
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end gap-3 mt-6">
+                    <Button variant="outline" onClick={handleCloseModal} disabled={installMutation.isPending}>
+                      Cancel
+                    </Button>
+                    <Button
+                      color="blue"
+                      onClick={handleInstall}
+                      disabled={installMutation.isPending || !installationName.trim()}
+                      className="flex items-center gap-2"
+                    >
+                      {installMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Installing...
+                        </>
+                      ) : (
+                        "Install"
+                      )}
+                    </Button>
+                  </div>
+
+                  {installMutation.isError && (
+                    <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                      <p className="text-sm text-red-800 dark:text-red-200">
+                        Failed to install application. Please try again.
+                      </p>
+                    </div>
                   )}
-                </Button>
-              </div>
-
-              {installMutation.isError && (
-                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                  <p className="text-sm text-red-800 dark:text-red-200">
-                    Failed to install application. Please try again.
-                  </p>
                 </div>
-              )}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          );
+        })()}
     </div>
   );
 }

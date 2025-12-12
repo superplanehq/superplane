@@ -64,6 +64,14 @@ func (g *GitHub) Label() string {
 	return "GitHub"
 }
 
+func (g *GitHub) Icon() string {
+	return "github"
+}
+
+func (g *GitHub) Description() string {
+	return "Manage and react to changes in your GitHub repositories"
+}
+
 func (g *GitHub) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

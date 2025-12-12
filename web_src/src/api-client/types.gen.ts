@@ -10,6 +10,8 @@ export type AppInstallationNodeRef = {
 export type ApplicationsApplicationDefinition = {
   name?: string;
   label?: string;
+  icon?: string;
+  description?: string;
   configuration?: Array<ConfigurationField>;
   components?: Array<ComponentsComponent>;
   triggers?: Array<TriggersTrigger>;

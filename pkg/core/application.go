@@ -19,6 +19,16 @@ type Application interface {
 	Label() string
 
 	/*
+	 * The icon used by the application.
+	 */
+	Icon() string
+
+	/*
+	 * A description of what the application does.
+	 */
+	Description() string
+
+	/*
 	 * The configuration fields of the application.
 	 */
 	Configuration() []configuration.Field
