@@ -17,7 +17,7 @@ func ListApplications(ctx context.Context, registry *registry.Registry, orgID st
 
 	protos := []*pb.AppInstallation{}
 	for _, appInstallation := range appInstallations {
-		proto, err := serializeAppInstallation(registry, &appInstallation)
+		proto, err := serializeAppInstallation(registry, &appInstallation, []models.WorkflowNodeReference{})
 		if err != nil {
 			return nil, err
 		}

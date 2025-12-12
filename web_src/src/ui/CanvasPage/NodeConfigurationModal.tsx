@@ -55,7 +55,7 @@ export function NodeConfigurationModal({
 
   // Filter installed applications by appName if provided
   const filteredApplications = appName
-    ? installedApplications.filter((app) => app.appName === appName)
+    ? installedApplications.filter((app) => app.spec?.appName === appName)
     : installedApplications;
 
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
@@ -175,11 +175,11 @@ export function NodeConfigurationModal({
 
       // If this is a component/trigger from an application, include the app installation ref
       if (appName && selectedAppInstallationId) {
-        const selectedInstallation = filteredApplications.find((app) => app.id === selectedAppInstallationId);
+        const selectedInstallation = filteredApplications.find((app) => app.metadata?.id === selectedAppInstallationId);
         if (selectedInstallation) {
           appInstallationRefToSave = {
-            id: selectedInstallation.id,
-            name: selectedInstallation.installationName,
+            id: selectedInstallation.metadata?.id,
+            name: selectedInstallation.metadata?.name,
           };
         }
       }
@@ -297,8 +297,8 @@ export function NodeConfigurationModal({
                     </SelectTrigger>
                     <SelectContent>
                       {filteredApplications.map((app) => (
-                        <SelectItem key={app.id} value={app.id!}>
-                          {app.installationName}
+                        <SelectItem key={app.metadata?.id} value={app.metadata?.id!}>
+                          {app.metadata?.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

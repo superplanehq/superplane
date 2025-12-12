@@ -65,7 +65,7 @@ func UpdateApplication(ctx context.Context, registry *registry.Registry, baseURL
 		return nil, status.Errorf(codes.Internal, "failed to save application installation: %v", err)
 	}
 
-	proto, err := serializeAppInstallation(registry, appInstallation)
+	proto, err := serializeAppInstallation(registry, appInstallation, []models.WorkflowNodeReference{})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to serialize application installation: %v", err)
 	}

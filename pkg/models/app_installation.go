@@ -91,6 +91,29 @@ func ListAppInstallationWebhooks(tx *gorm.DB, installationID uuid.UUID) ([]Webho
 	return webhooks, nil
 }
 
+type WorkflowNodeReference struct {
+	WorkflowID   uuid.UUID
+	WorkflowName string
+	NodeID       string
+	NodeName     string
+}
+
+func ListAppInstallationNodeReferences(installationID uuid.UUID) ([]WorkflowNodeReference, error) {
+	var nodeReferences []WorkflowNodeReference
+	err := database.Conn().
+		Table("workflow_nodes AS wn").
+		Joins("JOIN workflows AS w ON w.id = wn.workflow_id").
+		Select("w.id as workflow_id, w.name as workflow_name, wn.node_id as node_id, wn.name as node_name").
+		Where("wn.app_installation_id = ?", installationID).
+		Find(&nodeReferences).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+	return nodeReferences, nil
+}
+
 func FindUnscopedAppInstallation(installationID uuid.UUID) (*AppInstallation, error) {
 	return FindUnscopedAppInstallationInTransaction(database.Conn(), installationID)
 }

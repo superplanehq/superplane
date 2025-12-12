@@ -1098,6 +1098,42 @@
       }
     },
     "/api/v1/organizations/{id}/applications/{installationId}": {
+      "get": {
+        "summary": "Describe an application in an organization",
+        "description": "Returns details of a specific application in an organization",
+        "operationId": "Organizations_DescribeApplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsDescribeApplicationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "installationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
       "delete": {
         "summary": "Uninstall application",
         "description": "Uninstalls an application from an organization",
@@ -2642,6 +2678,23 @@
     }
   },
   "definitions": {
+    "AppInstallationNodeRef": {
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string"
+        },
+        "workflowName": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "nodeName": {
+          "type": "string"
+        }
+      }
+    },
     "ApplicationsApplicationDefinition": {
       "type": "object",
       "properties": {
@@ -3642,29 +3695,68 @@
     "OrganizationsAppInstallation": {
       "type": "object",
       "properties": {
+        "metadata": {
+          "$ref": "#/definitions/OrganizationsAppInstallationMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/OrganizationsAppInstallationSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/OrganizationsAppInstallationStatus"
+        }
+      }
+    },
+    "OrganizationsAppInstallationMetadata": {
+      "type": "object",
+      "properties": {
         "id": {
           "type": "string"
         },
+        "name": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "OrganizationsAppInstallationSpec": {
+      "type": "object",
+      "properties": {
         "appName": {
           "type": "string"
         },
-        "installationName": {
-          "type": "string"
-        },
+        "configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "OrganizationsAppInstallationStatus": {
+      "type": "object",
+      "properties": {
         "state": {
           "type": "string"
         },
         "stateDescription": {
           "type": "string"
         },
-        "configuration": {
-          "type": "object"
-        },
         "metadata": {
           "type": "object"
         },
         "browserAction": {
           "$ref": "#/definitions/OrganizationsBrowserAction"
+        },
+        "usedIn": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AppInstallationNodeRef"
+          }
         }
       }
     },
@@ -3706,6 +3798,14 @@
     },
     "OrganizationsDeleteOrganizationResponse": {
       "type": "object"
+    },
+    "OrganizationsDescribeApplicationResponse": {
+      "type": "object",
+      "properties": {
+        "installation": {
+          "$ref": "#/definitions/OrganizationsAppInstallation"
+        }
+      }
     },
     "OrganizationsDescribeOrganizationResponse": {
       "type": "object",

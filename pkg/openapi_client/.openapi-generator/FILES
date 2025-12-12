@@ -20,6 +20,7 @@ api_workflow_node.go
 api_workflow_node_execution.go
 client.go
 configuration.go
+docs/AppInstallationNodeRef.md
 docs/ApplicationAPI.md
 docs/ApplicationsApplicationDefinition.md
 docs/AuthToken.md
@@ -99,9 +100,13 @@ docs/NodeComponentRef.md
 docs/NodeTriggerRef.md
 docs/OrganizationAPI.md
 docs/OrganizationsAppInstallation.md
+docs/OrganizationsAppInstallationMetadata.md
+docs/OrganizationsAppInstallationSpec.md
+docs/OrganizationsAppInstallationStatus.md
 docs/OrganizationsBrowserAction.md
 docs/OrganizationsCreateInvitationBody.md
 docs/OrganizationsCreateInvitationResponse.md
+docs/OrganizationsDescribeApplicationResponse.md
 docs/OrganizationsDescribeOrganizationResponse.md
 docs/OrganizationsInstallApplicationBody.md
 docs/OrganizationsInstallApplicationResponse.md
@@ -189,6 +194,7 @@ docs/WorkflowsWorkflowNodeQueueItem.md
 docs/WorkflowsWorkflowSpec.md
 docs/WorkflowsWorkflowStatus.md
 git_push.sh
+model_app_installation_node_ref.go
 model_applications_application_definition.go
 model_auth_token.go
 model_authorization_domain_type.go
@@ -261,9 +267,13 @@ model_node_blueprint_ref.go
 model_node_component_ref.go
 model_node_trigger_ref.go
 model_organizations_app_installation.go
+model_organizations_app_installation_metadata.go
+model_organizations_app_installation_spec.go
+model_organizations_app_installation_status.go
 model_organizations_browser_action.go
 model_organizations_create_invitation_body.go
 model_organizations_create_invitation_response.go
+model_organizations_describe_application_response.go
 model_organizations_describe_organization_response.go
 model_organizations_install_application_body.go
 model_organizations_install_application_response.go

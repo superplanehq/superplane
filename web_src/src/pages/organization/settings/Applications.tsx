@@ -56,8 +56,8 @@ export function Applications({ organizationId }: ApplicationsProps) {
       setConfiguration({});
 
       // Redirect to the application installation details page
-      if (result.data?.installation?.id) {
-        navigate(`/${organizationId}/settings/applications/${result.data.installation.id}`);
+      if (result.data?.installation?.metadata?.id) {
+        navigate(`/${organizationId}/settings/applications/${result.data.installation.metadata.id}`);
       }
     } catch (error) {
       console.error("Failed to install application:", error);
@@ -114,36 +114,36 @@ export function Applications({ organizationId }: ApplicationsProps) {
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700">
                 {[...installedApps]
-                  .sort((a, b) => (a.appName || "").localeCompare(b.appName || ""))
+                  .sort((a, b) => (a.spec?.appName || "").localeCompare(b.spec?.appName || ""))
                   .map((app) => {
-                    const appDefinition = availableApps.find((a) => a.name === app.appName);
-                    const appLabel = appDefinition?.label || app.appName;
+                    const appDefinition = availableApps.find((a) => a.name === app.spec?.appName);
+                    const appLabel = appDefinition?.label || app.spec?.appName;
 
                     return (
                       <tr
-                        key={app.id}
-                        onClick={() => navigate(`/${organizationId}/settings/applications/${app.id}`)}
+                        key={app.metadata?.id}
+                        onClick={() => navigate(`/${organizationId}/settings/applications/${app.metadata?.id}`)}
                         className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer"
                       >
                         <td className="px-3 py-2 text-xs font-mono text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
-                          {app.id}
+                          {app.metadata?.id}
                         </td>
                         <td className="px-3 py-2 truncate">
                           <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                            {app.installationName}
+                            {app.metadata?.name}
                           </div>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              app.state === "ready"
+                              app.status?.state === "ready"
                                 ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                : app.state === "error"
+                                : app.status?.state === "error"
                                   ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
                                   : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
                             }`}
                           >
-                            {app.state}
+                            {app.status?.state}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 truncate">{appLabel}</td>

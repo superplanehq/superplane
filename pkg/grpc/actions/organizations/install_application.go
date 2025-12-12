@@ -67,7 +67,7 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, baseUR
 		}
 	}
 
-	proto, err := serializeAppInstallation(registry, appInstallation)
+	proto, err := serializeAppInstallation(registry, appInstallation, []models.WorkflowNodeReference{})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to serialize application installation: %v", err)
 	}
@@ -77,17 +77,8 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, baseUR
 	}, nil
 }
 
-func serializeAppInstallation(registry *registry.Registry, appInstallation *models.AppInstallation) (*pb.AppInstallation, error) {
-	// Get the app definition to check for sensitive fields
-	app, err := registry.GetApplication(appInstallation.AppName)
-	if err != nil {
-		return nil, err
-	}
-
-	// Sanitize sensitive fields by replacing them with SHA256 hashes
-	sanitizedConfig := sanitizeSensitiveFields(app, appInstallation.Configuration.Data())
-
-	config, err := structpb.NewStruct(sanitizedConfig)
+func serializeAppInstallation(registry *registry.Registry, appInstallation *models.AppInstallation, nodeRefs []models.WorkflowNodeReference) (*pb.AppInstallation, error) {
+	config, err := serializeAppInstallationConfig(registry, appInstallation)
 	if err != nil {
 		return nil, err
 	}
@@ -98,18 +89,25 @@ func serializeAppInstallation(registry *registry.Registry, appInstallation *mode
 	}
 
 	proto := &pb.AppInstallation{
-		Id:               appInstallation.ID.String(),
-		AppName:          appInstallation.AppName,
-		InstallationName: appInstallation.InstallationName,
-		State:            appInstallation.State,
-		StateDescription: appInstallation.StateDescription,
-		Configuration:    config,
-		Metadata:         metadata,
+		Metadata: &pb.AppInstallation_Metadata{
+			Id:   appInstallation.ID.String(),
+			Name: appInstallation.InstallationName,
+		},
+		Spec: &pb.AppInstallation_Spec{
+			AppName:       appInstallation.AppName,
+			Configuration: config,
+		},
+		Status: &pb.AppInstallation_Status{
+			State:            appInstallation.State,
+			StateDescription: appInstallation.StateDescription,
+			Metadata:         metadata,
+			UsedIn:           []*pb.AppInstallation_NodeRef{},
+		},
 	}
 
 	if appInstallation.BrowserAction != nil {
 		browserAction := appInstallation.BrowserAction.Data()
-		proto.BrowserAction = &pb.BrowserAction{
+		proto.Status.BrowserAction = &pb.BrowserAction{
 			Description: browserAction.Description,
 			Url:         browserAction.URL,
 			Method:      browserAction.Method,
@@ -117,7 +115,30 @@ func serializeAppInstallation(registry *registry.Registry, appInstallation *mode
 		}
 	}
 
+	for _, nodeRef := range nodeRefs {
+		proto.Status.UsedIn = append(proto.Status.UsedIn, &pb.AppInstallation_NodeRef{
+			WorkflowId:   nodeRef.WorkflowID.String(),
+			WorkflowName: nodeRef.WorkflowName,
+			NodeId:       nodeRef.NodeID,
+			NodeName:     nodeRef.NodeName,
+		})
+	}
+
 	return proto, nil
+}
+
+func serializeAppInstallationConfig(registry *registry.Registry, appInstallation *models.AppInstallation) (*structpb.Struct, error) {
+	app, err := registry.GetApplication(appInstallation.AppName)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := structpb.NewStruct(sanitizeSensitiveFields(app, appInstallation.Configuration.Data()))
+	if err != nil {
+		return nil, err
+	}
+
+	return config, nil
 }
 
 // encryptSensitiveFields encrypts all sensitive configuration fields

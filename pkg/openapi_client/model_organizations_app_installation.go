@@ -20,14 +20,9 @@ var _ MappedNullable = &OrganizationsAppInstallation{}
 
 // OrganizationsAppInstallation struct for OrganizationsAppInstallation
 type OrganizationsAppInstallation struct {
-	Id               *string                     `json:"id,omitempty"`
-	AppName          *string                     `json:"appName,omitempty"`
-	InstallationName *string                     `json:"installationName,omitempty"`
-	State            *string                     `json:"state,omitempty"`
-	StateDescription *string                     `json:"stateDescription,omitempty"`
-	Configuration    map[string]interface{}      `json:"configuration,omitempty"`
-	Metadata         map[string]interface{}      `json:"metadata,omitempty"`
-	BrowserAction    *OrganizationsBrowserAction `json:"browserAction,omitempty"`
+	Metadata *OrganizationsAppInstallationMetadata `json:"metadata,omitempty"`
+	Spec     *OrganizationsAppInstallationSpec     `json:"spec,omitempty"`
+	Status   *OrganizationsAppInstallationStatus   `json:"status,omitempty"`
 }
 
 // NewOrganizationsAppInstallation instantiates a new OrganizationsAppInstallation object
@@ -47,212 +42,20 @@ func NewOrganizationsAppInstallationWithDefaults() *OrganizationsAppInstallation
 	return &this
 }
 
-// GetId returns the Id field value if set, zero value otherwise.
-func (o *OrganizationsAppInstallation) GetId() string {
-	if o == nil || IsNil(o.Id) {
-		var ret string
-		return ret
-	}
-	return *o.Id
-}
-
-// GetIdOk returns a tuple with the Id field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *OrganizationsAppInstallation) GetIdOk() (*string, bool) {
-	if o == nil || IsNil(o.Id) {
-		return nil, false
-	}
-	return o.Id, true
-}
-
-// HasId returns a boolean if a field has been set.
-func (o *OrganizationsAppInstallation) HasId() bool {
-	if o != nil && !IsNil(o.Id) {
-		return true
-	}
-
-	return false
-}
-
-// SetId gets a reference to the given string and assigns it to the Id field.
-func (o *OrganizationsAppInstallation) SetId(v string) {
-	o.Id = &v
-}
-
-// GetAppName returns the AppName field value if set, zero value otherwise.
-func (o *OrganizationsAppInstallation) GetAppName() string {
-	if o == nil || IsNil(o.AppName) {
-		var ret string
-		return ret
-	}
-	return *o.AppName
-}
-
-// GetAppNameOk returns a tuple with the AppName field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *OrganizationsAppInstallation) GetAppNameOk() (*string, bool) {
-	if o == nil || IsNil(o.AppName) {
-		return nil, false
-	}
-	return o.AppName, true
-}
-
-// HasAppName returns a boolean if a field has been set.
-func (o *OrganizationsAppInstallation) HasAppName() bool {
-	if o != nil && !IsNil(o.AppName) {
-		return true
-	}
-
-	return false
-}
-
-// SetAppName gets a reference to the given string and assigns it to the AppName field.
-func (o *OrganizationsAppInstallation) SetAppName(v string) {
-	o.AppName = &v
-}
-
-// GetInstallationName returns the InstallationName field value if set, zero value otherwise.
-func (o *OrganizationsAppInstallation) GetInstallationName() string {
-	if o == nil || IsNil(o.InstallationName) {
-		var ret string
-		return ret
-	}
-	return *o.InstallationName
-}
-
-// GetInstallationNameOk returns a tuple with the InstallationName field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *OrganizationsAppInstallation) GetInstallationNameOk() (*string, bool) {
-	if o == nil || IsNil(o.InstallationName) {
-		return nil, false
-	}
-	return o.InstallationName, true
-}
-
-// HasInstallationName returns a boolean if a field has been set.
-func (o *OrganizationsAppInstallation) HasInstallationName() bool {
-	if o != nil && !IsNil(o.InstallationName) {
-		return true
-	}
-
-	return false
-}
-
-// SetInstallationName gets a reference to the given string and assigns it to the InstallationName field.
-func (o *OrganizationsAppInstallation) SetInstallationName(v string) {
-	o.InstallationName = &v
-}
-
-// GetState returns the State field value if set, zero value otherwise.
-func (o *OrganizationsAppInstallation) GetState() string {
-	if o == nil || IsNil(o.State) {
-		var ret string
-		return ret
-	}
-	return *o.State
-}
-
-// GetStateOk returns a tuple with the State field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *OrganizationsAppInstallation) GetStateOk() (*string, bool) {
-	if o == nil || IsNil(o.State) {
-		return nil, false
-	}
-	return o.State, true
-}
-
-// HasState returns a boolean if a field has been set.
-func (o *OrganizationsAppInstallation) HasState() bool {
-	if o != nil && !IsNil(o.State) {
-		return true
-	}
-
-	return false
-}
-
-// SetState gets a reference to the given string and assigns it to the State field.
-func (o *OrganizationsAppInstallation) SetState(v string) {
-	o.State = &v
-}
-
-// GetStateDescription returns the StateDescription field value if set, zero value otherwise.
-func (o *OrganizationsAppInstallation) GetStateDescription() string {
-	if o == nil || IsNil(o.StateDescription) {
-		var ret string
-		return ret
-	}
-	return *o.StateDescription
-}
-
-// GetStateDescriptionOk returns a tuple with the StateDescription field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *OrganizationsAppInstallation) GetStateDescriptionOk() (*string, bool) {
-	if o == nil || IsNil(o.StateDescription) {
-		return nil, false
-	}
-	return o.StateDescription, true
-}
-
-// HasStateDescription returns a boolean if a field has been set.
-func (o *OrganizationsAppInstallation) HasStateDescription() bool {
-	if o != nil && !IsNil(o.StateDescription) {
-		return true
-	}
-
-	return false
-}
-
-// SetStateDescription gets a reference to the given string and assigns it to the StateDescription field.
-func (o *OrganizationsAppInstallation) SetStateDescription(v string) {
-	o.StateDescription = &v
-}
-
-// GetConfiguration returns the Configuration field value if set, zero value otherwise.
-func (o *OrganizationsAppInstallation) GetConfiguration() map[string]interface{} {
-	if o == nil || IsNil(o.Configuration) {
-		var ret map[string]interface{}
-		return ret
-	}
-	return o.Configuration
-}
-
-// GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *OrganizationsAppInstallation) GetConfigurationOk() (map[string]interface{}, bool) {
-	if o == nil || IsNil(o.Configuration) {
-		return map[string]interface{}{}, false
-	}
-	return o.Configuration, true
-}
-
-// HasConfiguration returns a boolean if a field has been set.
-func (o *OrganizationsAppInstallation) HasConfiguration() bool {
-	if o != nil && !IsNil(o.Configuration) {
-		return true
-	}
-
-	return false
-}
-
-// SetConfiguration gets a reference to the given map[string]interface{} and assigns it to the Configuration field.
-func (o *OrganizationsAppInstallation) SetConfiguration(v map[string]interface{}) {
-	o.Configuration = v
-}
-
 // GetMetadata returns the Metadata field value if set, zero value otherwise.
-func (o *OrganizationsAppInstallation) GetMetadata() map[string]interface{} {
+func (o *OrganizationsAppInstallation) GetMetadata() OrganizationsAppInstallationMetadata {
 	if o == nil || IsNil(o.Metadata) {
-		var ret map[string]interface{}
+		var ret OrganizationsAppInstallationMetadata
 		return ret
 	}
-	return o.Metadata
+	return *o.Metadata
 }
 
 // GetMetadataOk returns a tuple with the Metadata field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsAppInstallation) GetMetadataOk() (map[string]interface{}, bool) {
+func (o *OrganizationsAppInstallation) GetMetadataOk() (*OrganizationsAppInstallationMetadata, bool) {
 	if o == nil || IsNil(o.Metadata) {
-		return map[string]interface{}{}, false
+		return nil, false
 	}
 	return o.Metadata, true
 }
@@ -266,41 +69,73 @@ func (o *OrganizationsAppInstallation) HasMetadata() bool {
 	return false
 }
 
-// SetMetadata gets a reference to the given map[string]interface{} and assigns it to the Metadata field.
-func (o *OrganizationsAppInstallation) SetMetadata(v map[string]interface{}) {
-	o.Metadata = v
+// SetMetadata gets a reference to the given OrganizationsAppInstallationMetadata and assigns it to the Metadata field.
+func (o *OrganizationsAppInstallation) SetMetadata(v OrganizationsAppInstallationMetadata) {
+	o.Metadata = &v
 }
 
-// GetBrowserAction returns the BrowserAction field value if set, zero value otherwise.
-func (o *OrganizationsAppInstallation) GetBrowserAction() OrganizationsBrowserAction {
-	if o == nil || IsNil(o.BrowserAction) {
-		var ret OrganizationsBrowserAction
+// GetSpec returns the Spec field value if set, zero value otherwise.
+func (o *OrganizationsAppInstallation) GetSpec() OrganizationsAppInstallationSpec {
+	if o == nil || IsNil(o.Spec) {
+		var ret OrganizationsAppInstallationSpec
 		return ret
 	}
-	return *o.BrowserAction
+	return *o.Spec
 }
 
-// GetBrowserActionOk returns a tuple with the BrowserAction field value if set, nil otherwise
+// GetSpecOk returns a tuple with the Spec field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsAppInstallation) GetBrowserActionOk() (*OrganizationsBrowserAction, bool) {
-	if o == nil || IsNil(o.BrowserAction) {
+func (o *OrganizationsAppInstallation) GetSpecOk() (*OrganizationsAppInstallationSpec, bool) {
+	if o == nil || IsNil(o.Spec) {
 		return nil, false
 	}
-	return o.BrowserAction, true
+	return o.Spec, true
 }
 
-// HasBrowserAction returns a boolean if a field has been set.
-func (o *OrganizationsAppInstallation) HasBrowserAction() bool {
-	if o != nil && !IsNil(o.BrowserAction) {
+// HasSpec returns a boolean if a field has been set.
+func (o *OrganizationsAppInstallation) HasSpec() bool {
+	if o != nil && !IsNil(o.Spec) {
 		return true
 	}
 
 	return false
 }
 
-// SetBrowserAction gets a reference to the given OrganizationsBrowserAction and assigns it to the BrowserAction field.
-func (o *OrganizationsAppInstallation) SetBrowserAction(v OrganizationsBrowserAction) {
-	o.BrowserAction = &v
+// SetSpec gets a reference to the given OrganizationsAppInstallationSpec and assigns it to the Spec field.
+func (o *OrganizationsAppInstallation) SetSpec(v OrganizationsAppInstallationSpec) {
+	o.Spec = &v
+}
+
+// GetStatus returns the Status field value if set, zero value otherwise.
+func (o *OrganizationsAppInstallation) GetStatus() OrganizationsAppInstallationStatus {
+	if o == nil || IsNil(o.Status) {
+		var ret OrganizationsAppInstallationStatus
+		return ret
+	}
+	return *o.Status
+}
+
+// GetStatusOk returns a tuple with the Status field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsAppInstallation) GetStatusOk() (*OrganizationsAppInstallationStatus, bool) {
+	if o == nil || IsNil(o.Status) {
+		return nil, false
+	}
+	return o.Status, true
+}
+
+// HasStatus returns a boolean if a field has been set.
+func (o *OrganizationsAppInstallation) HasStatus() bool {
+	if o != nil && !IsNil(o.Status) {
+		return true
+	}
+
+	return false
+}
+
+// SetStatus gets a reference to the given OrganizationsAppInstallationStatus and assigns it to the Status field.
+func (o *OrganizationsAppInstallation) SetStatus(v OrganizationsAppInstallationStatus) {
+	o.Status = &v
 }
 
 func (o OrganizationsAppInstallation) MarshalJSON() ([]byte, error) {
@@ -313,29 +148,14 @@ func (o OrganizationsAppInstallation) MarshalJSON() ([]byte, error) {
 
 func (o OrganizationsAppInstallation) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Id) {
-		toSerialize["id"] = o.Id
-	}
-	if !IsNil(o.AppName) {
-		toSerialize["appName"] = o.AppName
-	}
-	if !IsNil(o.InstallationName) {
-		toSerialize["installationName"] = o.InstallationName
-	}
-	if !IsNil(o.State) {
-		toSerialize["state"] = o.State
-	}
-	if !IsNil(o.StateDescription) {
-		toSerialize["stateDescription"] = o.StateDescription
-	}
-	if !IsNil(o.Configuration) {
-		toSerialize["configuration"] = o.Configuration
-	}
 	if !IsNil(o.Metadata) {
 		toSerialize["metadata"] = o.Metadata
 	}
-	if !IsNil(o.BrowserAction) {
-		toSerialize["browserAction"] = o.BrowserAction
+	if !IsNil(o.Spec) {
+		toSerialize["spec"] = o.Spec
+	}
+	if !IsNil(o.Status) {
+		toSerialize["status"] = o.Status
 	}
 	return toSerialize, nil
 }

@@ -2,12 +2,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   applicationsListApplications,
   organizationsListApplications,
+  organizationsDescribeApplication,
   organizationsInstallApplication,
   organizationsUpdateApplication,
   organizationsUninstallApplication,
 } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import type { OrganizationsInstallApplicationBody } from "@/api-client/types.gen";
 
 export const applicationKeys = {
   all: ["applications"] as const,
@@ -53,13 +53,12 @@ export const useApplicationInstallation = (organizationId: string, installationI
   return useQuery({
     queryKey: applicationKeys.installation(organizationId, installationId),
     queryFn: async () => {
-      const response = await organizationsListApplications(
+      const response = await organizationsDescribeApplication(
         withOrganizationHeader({
-          path: { id: organizationId },
+          path: { id: organizationId, installationId },
         }),
       );
-      const installations = response.data?.applications || [];
-      return installations.find((app) => app.id === installationId) || null;
+      return response.data?.installation || null;
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes

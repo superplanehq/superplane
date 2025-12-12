@@ -1,6 +1,6 @@
 import { ArrowLeft, ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import {
   useApplicationInstallation,
@@ -26,17 +26,41 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
   const { data: installation, isLoading, error } = useApplicationInstallation(organizationId, installationId || "");
 
   const { data: availableApps = [] } = useAvailableApplications();
-  const appDefinition = installation ? availableApps.find((app) => app.name === installation.appName) : undefined;
+  const appDefinition = installation ? availableApps.find((app) => app.name === installation.spec?.appName) : undefined;
 
   const updateMutation = useUpdateApplication(organizationId, installationId || "");
   const uninstallMutation = useUninstallApplication(organizationId, installationId || "");
 
   // Initialize config values when installation loads
   useEffect(() => {
-    if (installation?.configuration) {
-      setConfigValues(installation.configuration);
+    if (installation?.spec?.configuration) {
+      setConfigValues(installation.spec.configuration);
     }
   }, [installation]);
+
+  // Group usedIn nodes by workflow
+  const workflowGroups = useMemo(() => {
+    if (!installation?.status?.usedIn) return [];
+
+    const groups = new Map<string, { workflowName: string; nodes: Array<{ nodeId: string; nodeName: string }> }>();
+    installation.status.usedIn.forEach((nodeRef) => {
+      const workflowId = nodeRef.workflowId || "";
+      const workflowName = nodeRef.workflowName || workflowId;
+      const nodeId = nodeRef.nodeId || "";
+      const nodeName = nodeRef.nodeName || nodeId;
+
+      if (!groups.has(workflowId)) {
+        groups.set(workflowId, { workflowName, nodes: [] });
+      }
+      groups.get(workflowId)?.nodes.push({ nodeId, nodeName });
+    });
+
+    return Array.from(groups.entries()).map(([workflowId, data]) => ({
+      workflowId,
+      workflowName: data.workflowName,
+      nodes: data.nodes,
+    }));
+  }, [installation?.status?.usedIn]);
 
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,9 +73,9 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
   };
 
   const handleBrowserAction = () => {
-    if (!installation?.browserAction) return;
+    if (!installation?.status?.browserAction) return;
 
-    const { url, method, formFields } = installation.browserAction;
+    const { url, method, formFields } = installation.status.browserAction;
 
     if (method?.toUpperCase() === "POST" && formFields) {
       // Create a hidden form and submit it
@@ -138,9 +162,9 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1">
-          <h4 className="text-2xl font-semibold">{installation.installationName || installation.appName}</h4>
-          {installation.appName && installation.installationName !== installation.appName && (
-            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">Application: {installation.appName}</p>
+          <h4 className="text-2xl font-semibold">{installation.metadata?.name || installation.spec?.appName}</h4>
+          {installation.spec?.appName && installation.metadata?.name !== installation.spec?.appName && (
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">Application: {installation.spec.appName}</p>
           )}
         </div>
       </div>
@@ -158,26 +182,66 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-1">Installation ID</h3>
-                  <p className="text-sm text-zinc-900 dark:text-zinc-100 font-mono">{installation.id}</p>
+                  <p className="text-sm text-zinc-900 dark:text-zinc-100 font-mono">{installation.metadata?.id}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-1">State</h3>
                   <span
                     className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
-                      installation.state === "ready"
+                      installation.status?.state === "ready"
                         ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                        : installation.state === "error"
+                        : installation.status?.state === "error"
                           ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
                           : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
                     }`}
                   >
-                    {installation.state || "unknown"}
+                    {installation.status?.state || "unknown"}
                   </span>
-                  {installation.stateDescription && (
-                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">{installation.stateDescription}</p>
+                  {installation.status?.stateDescription && (
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
+                      {installation.status.stateDescription}
+                    </p>
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Used In */}
+          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+            <div className="p-6">
+              <h2 className="text-lg font-medium mb-4">Used By</h2>
+              {workflowGroups.length > 0 ? (
+                <>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
+                    This application is currently used in the following workflows:
+                  </p>
+                  <div className="space-y-2">
+                    {workflowGroups.map((group) => (
+                      <button
+                        key={group.workflowId}
+                        onClick={() => navigate(`/${organizationId}/workflows/${group.workflowId}`)}
+                        className="w-full flex items-center gap-2 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-md border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                            Workflow: {group.workflowName}
+                          </p>
+                          <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                            Used in {group.nodes.length} node{group.nodes.length !== 1 ? "s" : ""}:{" "}
+                            {group.nodes.map((node) => node.nodeName).join(", ")}
+                          </p>
+                        </div>
+                        <ExternalLink className="w-4 h-4 text-zinc-400 dark:text-zinc-500 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  This app installation is not used in any workflow yet.
+                </p>
+              )}
             </div>
           </div>
 
@@ -204,15 +268,20 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
         <TabsContent value="configuration">
           <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
             <div className="p-6">
-              {installation?.browserAction && (
+              {installation?.status?.browserAction && (
                 <Alert className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
                   <div className="flex items-start justify-between gap-4">
                     <AlertDescription className="flex-1 text-yellow-800 dark:text-yellow-200 [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:space-y-1">
-                      {installation.browserAction.description && (
-                        <ReactMarkdown>{installation.browserAction.description}</ReactMarkdown>
+                      {installation.status.browserAction.description && (
+                        <ReactMarkdown>{installation.status.browserAction.description}</ReactMarkdown>
                       )}
                     </AlertDescription>
-                    <Button type="button" variant="outline" onClick={handleBrowserAction} className="shrink-0 px-3 py-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleBrowserAction}
+                      className="shrink-0 px-3 py-1.5"
+                    >
                       <ExternalLink className="w-4 h-4 mr-2" />
                       Continue
                     </Button>
@@ -270,7 +339,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
             <div className="p-6">
               <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Uninstall Application</h3>
               <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
-                Are you sure you want to uninstall <strong>{installation?.installationName}</strong>? This action cannot
+                Are you sure you want to uninstall <strong>{installation?.metadata?.name}</strong>? This action cannot
                 be undone and all data will be permanently deleted.
               </p>
               <div className="flex justify-end gap-3">

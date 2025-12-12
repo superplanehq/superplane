@@ -92,6 +92,9 @@ import type {
   OrganizationsUninstallApplicationData,
   OrganizationsUninstallApplicationResponse2,
   OrganizationsUninstallApplicationError,
+  OrganizationsDescribeApplicationData,
+  OrganizationsDescribeApplicationResponse2,
+  OrganizationsDescribeApplicationError,
   OrganizationsUpdateApplicationData,
   OrganizationsUpdateApplicationResponse2,
   OrganizationsUpdateApplicationError,
@@ -727,6 +730,23 @@ export const organizationsUninstallApplication = <ThrowOnError extends boolean =
   return (options.client ?? _heyApiClient).delete<
     OrganizationsUninstallApplicationResponse2,
     OrganizationsUninstallApplicationError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/applications/{installationId}",
+    ...options,
+  });
+};
+
+/**
+ * Describe an application in an organization
+ * Returns details of a specific application in an organization
+ */
+export const organizationsDescribeApplication = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsDescribeApplicationData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    OrganizationsDescribeApplicationResponse2,
+    OrganizationsDescribeApplicationError,
     ThrowOnError
   >({
     url: "/api/v1/organizations/{id}/applications/{installationId}",
