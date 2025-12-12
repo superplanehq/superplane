@@ -307,40 +307,43 @@ export function NodeConfigurationModal({
               )}
 
               {/* Configuration section */}
-              {configurationFields && configurationFields.length > 0 && (
-                <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
-                  {configurationFields.map((field) => {
-                    if (!field.name) return null;
-                    const fieldName = field.name;
-                    return (
-                      <ConfigurationFieldRenderer
-                        key={fieldName}
-                        field={field}
-                        value={nodeConfiguration[fieldName]}
-                        onChange={(value) =>
-                          setNodeConfiguration({
-                            ...nodeConfiguration,
-                            [fieldName]: value,
-                          })
-                        }
-                        allValues={nodeConfiguration}
-                        domainId={domainId}
-                        domainType={domainType}
-                        hasError={
-                          showValidation &&
-                          (validationErrors.has(fieldName) ||
-                            // Check for nested errors in this field
-                            Array.from(validationErrors).some(
-                              (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
-                            ))
-                        }
-                        validationErrors={showValidation ? validationErrors : undefined}
-                        fieldPath={fieldName}
-                      />
-                    );
-                  })}
-                </div>
-              )}
+              {configurationFields &&
+                configurationFields.length > 0 &&
+                // Only show configuration fields if no app installation is required, or if app installations are available
+                (!appName || filteredApplications.length > 0) && (
+                  <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
+                    {configurationFields.map((field) => {
+                      if (!field.name) return null;
+                      const fieldName = field.name;
+                      return (
+                        <ConfigurationFieldRenderer
+                          key={fieldName}
+                          field={field}
+                          value={nodeConfiguration[fieldName]}
+                          onChange={(value) =>
+                            setNodeConfiguration({
+                              ...nodeConfiguration,
+                              [fieldName]: value,
+                            })
+                          }
+                          allValues={nodeConfiguration}
+                          domainId={domainId}
+                          domainType={domainType}
+                          hasError={
+                            showValidation &&
+                            (validationErrors.has(fieldName) ||
+                              // Check for nested errors in this field
+                              Array.from(validationErrors).some(
+                                (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
+                              ))
+                          }
+                          validationErrors={showValidation ? validationErrors : undefined}
+                          fieldPath={fieldName}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
             </div>
 
             <DialogFooter className="mt-6">

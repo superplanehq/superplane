@@ -75,11 +75,19 @@ func (s *Semaphore) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
 	}
 
+	client, err := NewClient(ctx.AppInstallation)
+	if err != nil {
+		return fmt.Errorf("error creating client: %v", err)
+	}
+
 	//
-	// TODO: Decrypt the API token to validate it can be decrypted
-	// TODO: list projects to check if credentials are correct.
-	// TODO: save projects in metadata? What if they change?
+	// Semaphore doesn't have a whoami endpoint, so
+	// we list projects just to verify that the connection is working.
 	//
+	_, err = client.listProjects()
+	if err != nil {
+		return fmt.Errorf("error listing projects: %v", err)
+	}
 
 	ctx.AppInstallation.SetState("ready")
 	return nil

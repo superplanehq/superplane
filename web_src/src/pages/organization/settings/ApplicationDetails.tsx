@@ -214,20 +214,20 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
             </div>
           </div>
 
-          {/* Used In */}
+          {/* Used By */}
           <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
             <div className="p-6">
               <h2 className="text-lg font-medium mb-4">Used By</h2>
               {workflowGroups.length > 0 ? (
                 <>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
-                    This application is currently used in the following workflows:
+                    This app installation is currently used in the following workflows:
                   </p>
                   <div className="space-y-2">
                     {workflowGroups.map((group) => (
                       <button
                         key={group.workflowId}
-                        onClick={() => navigate(`/${organizationId}/workflows/${group.workflowId}`)}
+                        onClick={() => window.open(`/${organizationId}/workflows/${group.workflowId}`, "_blank")}
                         className="w-full flex items-center gap-2 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-md border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left"
                       >
                         <div className="flex-1">

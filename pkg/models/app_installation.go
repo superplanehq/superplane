@@ -105,6 +105,7 @@ func ListAppInstallationNodeReferences(installationID uuid.UUID) ([]WorkflowNode
 		Joins("JOIN workflows AS w ON w.id = wn.workflow_id").
 		Select("w.id as workflow_id, w.name as workflow_name, wn.node_id as node_id, wn.name as node_name").
 		Where("wn.app_installation_id = ?", installationID).
+		Where("wn.deleted_at IS NULL").
 		Find(&nodeReferences).
 		Error
 
