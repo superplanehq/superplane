@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -20,7 +21,8 @@ type OnPullRequestMetadata struct {
 }
 
 type OnPullRequestConfiguration struct {
-	Repository string `json:"repository"`
+	Repository string   `json:"repository"`
+	Action     []string `json:"action"`
 }
 
 func (p *OnPullRequest) Name() string {
@@ -50,6 +52,27 @@ func (p *OnPullRequest) Configuration() []configuration.Field {
 			Label:    "Repository",
 			Type:     configuration.FieldTypeString,
 			Required: true,
+		},
+		{
+			Name:     "action",
+			Label:    "Action",
+			Type:     configuration.FieldTypeMultiSelect,
+			Required: true,
+			Default:  []string{"opened"},
+			TypeOptions: &configuration.TypeOptions{
+				MultiSelect: &configuration.MultiSelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Assigned", Value: "assigned"},
+						{Label: "Unassigned", Value: "unassigned"},
+						{Label: "Opened", Value: "opened"},
+						{Label: "Closed", Value: "closed"},
+						{Label: "Labeled", Value: "labeled"},
+						{Label: "Unlabeled", Value: "unlabeled"},
+						{Label: "Reopened", Value: "reopened"},
+						{Label: "Synchronize", Value: "synchronize"},
+					},
+				},
+			},
 		},
 	}
 }
@@ -127,7 +150,7 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
-	config := Configuration{}
+	config := OnPullRequestConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
@@ -158,6 +181,15 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+	}
+
+	action, ok := data["action"]
+	if !ok {
+		return http.StatusBadRequest, fmt.Errorf("missing action")
+	}
+
+	if !slices.Contains(config.Action, action.(string)) {
+		return http.StatusOK, nil
 	}
 
 	err = ctx.EventContext.Emit(data)

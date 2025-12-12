@@ -29,6 +29,7 @@ type Repository struct {
 
 type OnPushConfiguration struct {
 	Repository string `json:"repository"`
+	Branch     string `json:"branch"`
 }
 
 func (p *OnPush) Name() string {
@@ -58,6 +59,13 @@ func (p *OnPush) Configuration() []configuration.Field {
 			Label:    "Repository",
 			Type:     configuration.FieldTypeString,
 			Required: true,
+		},
+		{
+			Name:     "branch",
+			Label:    "Branch",
+			Type:     configuration.FieldTypeString,
+			Required: true,
+			Default:  "main",
 		},
 	}
 }
@@ -135,7 +143,7 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
 	}
 
-	config := Configuration{}
+	config := OnPushConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
@@ -172,6 +180,20 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	// If the event is a push event for branch deletion, ignore it.
 	//
 	if isBranchDeletionEvent(data) {
+		return http.StatusOK, nil
+	}
+
+	ref, ok := data["ref"]
+	if !ok {
+		return http.StatusBadRequest, fmt.Errorf("missing ref")
+	}
+
+	r, ok := ref.(string)
+	if !ok {
+		return http.StatusBadRequest, fmt.Errorf("invalid ref")
+	}
+
+	if "refs/heads/"+config.Branch != r {
 		return http.StatusOK, nil
 	}
 

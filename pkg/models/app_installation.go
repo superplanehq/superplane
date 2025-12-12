@@ -97,7 +97,7 @@ func FindUnscopedAppInstallation(installationID uuid.UUID) (*AppInstallation, er
 
 func FindUnscopedAppInstallationInTransaction(tx *gorm.DB, installationID uuid.UUID) (*AppInstallation, error) {
 	var appInstallation AppInstallation
-	err := database.Conn().
+	err := tx.
 		Where("id = ?", installationID).
 		First(&appInstallation).
 		Error
