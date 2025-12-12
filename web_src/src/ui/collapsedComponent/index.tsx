@@ -13,6 +13,7 @@ export interface CollapsedComponentProps extends ComponentActionsProps {
   shape?: "rounded" | "circle";
   children?: React.ReactNode;
   onDoubleClick?: () => void;
+  hideActionsButton?: boolean;
 }
 
 export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
@@ -34,6 +35,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   onDeactivate,
   onToggleView,
   onDelete,
+  hideActionsButton,
 }) => {
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
@@ -56,20 +58,22 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
           <Icon size={30} className={iconColor} />
         )}
       </div>
-      <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 -translate-y-2 z-10 nodrag">
-        <SidebarActionsDropdown
-          onRun={onRun}
-          runDisabled={runDisabled}
-          runDisabledTooltip={runDisabledTooltip}
-          onDuplicate={onDuplicate}
-          onEdit={onEdit}
-          onConfigure={onConfigure}
-          onDeactivate={onDeactivate}
-          onToggleView={onToggleView}
-          onDelete={onDelete}
-          isCompactView={true}
-        />
-      </div>
+      {!hideActionsButton && (
+        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 -translate-y-2 z-10 nodrag">
+          <SidebarActionsDropdown
+            onRun={onRun}
+            runDisabled={runDisabled}
+            runDisabledTooltip={runDisabledTooltip}
+            onDuplicate={onDuplicate}
+            onEdit={onEdit}
+            onConfigure={onConfigure}
+            onDeactivate={onDeactivate}
+            onToggleView={onToggleView}
+            onDelete={onDelete}
+            isCompactView={true}
+          />
+        </div>
+      )}
       <h2 className="absolute top-full left-1/2 transform -translate-x-1/2 text-base font-semibold text-neutral-900 pt-1 whitespace-nowrap">
         {title}
       </h2>

@@ -662,6 +662,7 @@ export function WorkflowPageV2() {
       // Update local cache without triggering API call
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
       markUnsavedChange("structural");
+      showSuccessToast("New configuration applied");
     },
     [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
   );

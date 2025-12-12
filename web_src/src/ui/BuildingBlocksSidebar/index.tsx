@@ -1,6 +1,7 @@
 import type { SuperplaneBlueprintsOutputChannel, SuperplaneComponentsOutputChannel } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { resolveIcon } from "@/lib/utils";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { ChevronRight, GripVerticalIcon, Menu, PanelLeftClose, Settings2 } from "lucide-react";
@@ -31,9 +32,16 @@ export interface BuildingBlocksSidebarProps {
   onToggle: (open: boolean) => void;
   blocks: BuildingBlockCategory[];
   canvasZoom?: number;
+  disabled?: boolean;
 }
 
-export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1 }: BuildingBlocksSidebarProps) {
+export function BuildingBlocksSidebar({
+  isOpen,
+  onToggle,
+  blocks,
+  canvasZoom = 1,
+  disabled = false,
+}: BuildingBlocksSidebarProps) {
   if (!isOpen) {
     return (
       <Button
@@ -116,7 +124,7 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
         {isConfigOpen && (
           <div
             role="menu"
-            className="absolute right-4 top-12 z-20 w-60 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg"
+            className="absolute right-4 top-12 z-40 w-60 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg"
           >
             <button
               className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
@@ -131,7 +139,7 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
         )}
       </div>
 
-      <div className="flex-1 overflow-y-scroll">
+      <div className="flex-1 overflow-y-scroll relative">
         {sortedCategories.map((category) => (
           <CategorySection
             key={category.name}
@@ -141,6 +149,18 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
             searchTerm={searchTerm}
           />
         ))}
+
+        {/* Disabled overlay - only over items */}
+        {disabled && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="absolute inset-0 bg-white/60 dark:bg-zinc-900/60 z-30 cursor-not-allowed" />
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={10}>
+              <p>Finish configuring the selected component first</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
     </div>
   );

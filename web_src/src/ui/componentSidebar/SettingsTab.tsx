@@ -1,39 +1,35 @@
 import { AuthorizationDomainType, ConfigurationField } from "@/api-client";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { isFieldRequired, validateFieldValue } from "@/utils/components";
 
-interface NodeConfigurationModalProps {
+interface SettingsTabProps {
   mode: "create" | "edit";
-  isOpen: boolean;
-  onClose: () => void;
   nodeName: string;
   nodeLabel?: string;
   configuration: Record<string, unknown>;
   configurationFields: ConfigurationField[];
   onSave: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string) => void;
+  onCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
 }
 
-export function NodeConfigurationModal({
+export function SettingsTab({
   mode,
-  isOpen,
-  onClose,
   nodeName,
-  nodeLabel,
+  nodeLabel: _nodeLabel,
   configuration,
   configurationFields,
   onSave,
+  onCancel,
   domainId,
   domainType,
-}: NodeConfigurationModalProps) {
+}: SettingsTabProps) {
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
@@ -120,7 +116,7 @@ export function NodeConfigurationModal({
     return errors.size === 0;
   }, [configurationFields, nodeConfiguration, currentNodeName, validateNestedFields]);
 
-  // Sync state when props change (e.g., when modal opens for a different node)
+  // Sync state when props change
   useEffect(() => {
     setNodeConfiguration(configuration || {});
     setCurrentNodeName(nodeName);
@@ -131,107 +127,94 @@ export function NodeConfigurationModal({
   const handleSave = () => {
     if (validateAllFields()) {
       onSave(nodeConfiguration, currentNodeName);
-      onClose();
     }
   };
 
-  const handleClose = () => {
+  const handleCancel = () => {
     // Reset to original configuration and name on cancel
     setNodeConfiguration(configuration || {});
     setCurrentNodeName(nodeName);
-    onClose();
+    setValidationErrors(new Set());
+    setShowValidation(false);
+    onCancel?.();
   };
 
-  const displayLabel = nodeLabel || nodeName || "Node configuration";
-  const title = mode === "edit" ? `Edit ${displayLabel}` : `New ${displayLabel}`;
-
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent
-        className="max-w-2xl p-0"
-        showCloseButton={false}
-        aria-describedby={undefined} /* Disable DialogDescription */
-      >
-        <DialogHeader className="px-6 pt-6 pb-0 text-left">
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <ScrollArea className="max-h-[80vh]">
-          <div className="p-6">
-            <div className="space-y-6">
-              {/* Node identification section */}
-              <div className="flex flex-col  gap-2 h-[60px]">
-                <Label
-                  className={`min-w-[100px] text-left ${
-                    showValidation && validationErrors.has("nodeName") ? "text-red-600 dark:text-red-400" : ""
-                  }`}
-                >
-                  Node Name
-                  <span className="text-red-500 ml-1">*</span>
-                  {showValidation && validationErrors.has("nodeName") && (
-                    <span className="text-red-500 text-xs ml-2">- required field</span>
-                  )}
-                </Label>
-                <Input
-                  data-testid="node-name-input"
-                  type="text"
-                  value={currentNodeName}
-                  onChange={(e) => setCurrentNodeName(e.target.value)}
-                  placeholder="Enter a name for this node"
-                  autoFocus
-                  className={`flex-1 shadow-none ${
-                    showValidation && validationErrors.has("nodeName") ? "border-red-500 border-2" : ""
-                  }`}
+    <div className="px-3 py-3">
+      <div className="space-y-6">
+        {/* Node identification section */}
+        <div className="flex flex-col gap-2 h-[60px]">
+          <Label
+            className={`min-w-[100px] text-left ${
+              showValidation && validationErrors.has("nodeName") ? "text-red-600 dark:text-red-400" : ""
+            }`}
+          >
+            Node Name
+            <span className="text-red-500 ml-1">*</span>
+            {showValidation && validationErrors.has("nodeName") && (
+              <span className="text-red-500 text-xs ml-2">- required field</span>
+            )}
+          </Label>
+          <Input
+            data-testid="node-name-input"
+            type="text"
+            value={currentNodeName}
+            onChange={(e) => setCurrentNodeName(e.target.value)}
+            placeholder="Enter a name for this node"
+            autoFocus
+            className={`flex-1 shadow-none ${
+              showValidation && validationErrors.has("nodeName") ? "border-red-500 border-2" : ""
+            }`}
+          />
+        </div>
+
+        {/* Configuration section */}
+        {configurationFields && configurationFields.length > 0 && (
+          <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
+            {configurationFields.map((field) => {
+              if (!field.name) return null;
+              const fieldName = field.name;
+              return (
+                <ConfigurationFieldRenderer
+                  key={fieldName}
+                  field={field}
+                  value={nodeConfiguration[fieldName]}
+                  onChange={(value) =>
+                    setNodeConfiguration({
+                      ...nodeConfiguration,
+                      [fieldName]: value,
+                    })
+                  }
+                  allValues={nodeConfiguration}
+                  domainId={domainId}
+                  domainType={domainType}
+                  hasError={
+                    showValidation &&
+                    (validationErrors.has(fieldName) ||
+                      // Check for nested errors in this field
+                      Array.from(validationErrors).some(
+                        (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
+                      ))
+                  }
+                  validationErrors={showValidation ? validationErrors : undefined}
+                  fieldPath={fieldName}
                 />
-              </div>
-
-              {/* Configuration section */}
-              {configurationFields && configurationFields.length > 0 && (
-                <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
-                  {configurationFields.map((field) => {
-                    if (!field.name) return null;
-                    const fieldName = field.name;
-                    return (
-                      <ConfigurationFieldRenderer
-                        key={fieldName}
-                        field={field}
-                        value={nodeConfiguration[fieldName]}
-                        onChange={(value) =>
-                          setNodeConfiguration({
-                            ...nodeConfiguration,
-                            [fieldName]: value,
-                          })
-                        }
-                        allValues={nodeConfiguration}
-                        domainId={domainId}
-                        domainType={domainType}
-                        hasError={
-                          showValidation &&
-                          (validationErrors.has(fieldName) ||
-                            // Check for nested errors in this field
-                            Array.from(validationErrors).some(
-                              (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
-                            ))
-                        }
-                        validationErrors={showValidation ? validationErrors : undefined}
-                        fieldPath={fieldName}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <DialogFooter className="mt-6">
-              <Button data-testid="cancel-node-add-button" variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button data-testid="add-node-button" variant="default" onClick={handleSave}>
-                {mode === "edit" ? "Save" : "Add"}
-              </Button>
-            </DialogFooter>
+              );
+            })}
           </div>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
+        )}
+      </div>
+
+      <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-zinc-700">
+        {mode === "create" && (
+          <Button data-testid="cancel-node-add-button" variant="outline" onClick={handleCancel}>
+            Cancel
+          </Button>
+        )}
+        <Button data-testid="add-node-button" variant="default" onClick={handleSave}>
+          {mode === "edit" ? "Save" : "Add"}
+        </Button>
+      </div>
+    </div>
   );
 }

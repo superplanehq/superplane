@@ -361,6 +361,7 @@ export const CustomComponent = () => {
         }),
       );
       setHasUnsavedChanges(true);
+      showSuccessToast("New configuration applied");
     },
     [saveSnapshot],
   );
@@ -592,6 +593,8 @@ export const CustomComponent = () => {
         getNodeEditData={getNodeEditData}
         onNodeConfigurationSave={handleNodeConfigurationSave}
         onNodeAdd={handleNodeAdd}
+        onAddTemplateNode={(templateNode) => setNodes((nds) => [...nds, templateNode])}
+        onRemoveTemplateNode={(nodeId) => setNodes((nds) => nds.filter((n) => n.id !== nodeId))}
         organizationId={organizationId}
         components={components}
         onSave={handleSave}

@@ -205,6 +205,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   metadata?: MetadataItem[];
   customField?: React.ReactNode;
   eventStateMap?: EventStateMap;
+  hideActionsButton?: boolean;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -236,6 +237,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   metadata,
   customField,
   eventStateMap,
+  hideActionsButton,
 }) => {
   if (collapsed) {
     return (
@@ -259,6 +261,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           onToggleView={onToggleView}
           onDelete={onDelete}
           isCompactView={isCompactView}
+          hideActionsButton={hideActionsButton}
         >
           <div className="flex flex-col items-center gap-1">
             {metadata?.map((item, index) => (
@@ -306,6 +309,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           onToggleView={onToggleView}
           onDelete={onDelete}
           isCompactView={isCompactView}
+          hideActionsButton={hideActionsButton}
         />
 
         {!hideMetadataList && metadata && metadata.length > 0 && <MetadataList items={metadata} />}

@@ -13,6 +13,7 @@ export interface ComponentHeaderProps extends ComponentActionsProps {
   title: string;
   description?: string;
   onDoubleClick?: () => void;
+  hideActionsButton?: boolean;
 }
 
 export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
@@ -34,6 +35,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   onToggleView,
   onDelete,
   isCompactView = false,
+  hideActionsButton = false,
 }) => {
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
@@ -59,21 +61,23 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
           )}
         </div>
         <h2 className="font-semibold">{title}</h2>
-        <div className="absolute top-2 right-2 rounded-sm flex items-center justify-center hover:bg-gray-950/10 nodrag">
-          <SidebarActionsDropdown
-            dataTestId={toTestId(`node-${title}-header-dropdown`)}
-            onRun={onRun}
-            runDisabled={runDisabled}
-            runDisabledTooltip={runDisabledTooltip}
-            onDuplicate={onDuplicate}
-            onEdit={onEdit}
-            onConfigure={onConfigure}
-            onDeactivate={onDeactivate}
-            onToggleView={onToggleView}
-            onDelete={onDelete}
-            isCompactView={isCompactView}
-          />
-        </div>
+        {!hideActionsButton && (
+          <div className="absolute top-2 right-2 rounded-sm flex items-center justify-center hover:bg-gray-950/10 nodrag">
+            <SidebarActionsDropdown
+              dataTestId={toTestId(`node-${title}-header-dropdown`)}
+              onRun={onRun}
+              runDisabled={runDisabled}
+              runDisabledTooltip={runDisabledTooltip}
+              onDuplicate={onDuplicate}
+              onEdit={onEdit}
+              onConfigure={onConfigure}
+              onDeactivate={onDeactivate}
+              onToggleView={onToggleView}
+              onDelete={onDelete}
+              isCompactView={isCompactView}
+            />
+          </div>
+        )}
       </div>
       {description && <p className="w-full text-base text-gray-900/60 px-8">{description}</p>}
     </div>

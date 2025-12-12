@@ -19,14 +19,14 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import type { MetadataItem } from "../metadataList";
 import { ViewToggle } from "../ViewToggle";
-import { EventState, EventStateMap } from "../componentBase";
+import { ComponentBaseProps, EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header, type BreadcrumbItem } from "./Header";
-import { NodeConfigurationModal } from "./NodeConfigurationModal";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
+import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 
 export interface SidebarEvent {
   id: string;
@@ -87,6 +87,7 @@ export interface NodeEditData {
 }
 
 export interface NewNodeData {
+  icon?: string;
   buildingBlock: BuildingBlock;
   nodeName: string;
   displayLabel?: string;
@@ -239,8 +240,9 @@ function CanvasPage(props: CanvasPageProps) {
   const cancelQueueItemRef = useRef<CanvasPageProps["onCancelQueueItem"]>(props.onCancelQueueItem);
   cancelQueueItemRef.current = props.onCancelQueueItem;
   const state = useCanvasState(props);
-  const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(null);
   const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
+  const [currentTab, setCurrentTab] = useState<"latest" | "settings">("latest");
+  const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
 
   // Use refs from props if provided, otherwise create local ones
   const hasFitToViewRef = props.hasFitToViewRef || useRef(false);
@@ -279,22 +281,30 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleNodeEdit = useCallback(
     (nodeId: string) => {
-      // Try the modal-based edit first (for node configuration)
-      if (props.getNodeEditData) {
-        const editData = props.getNodeEditData(nodeId);
-        if (editData) {
-          setEditingNodeData(editData);
-          return;
-        }
+      // Open the sidebar for this node (data will be automatically available via useMemo)
+      if (!state.componentSidebar.isOpen || state.componentSidebar.selectedNodeId !== nodeId) {
+        state.componentSidebar.open(nodeId);
       }
 
-      // Fall back to the simple onEdit callback
-      if (props.onEdit) {
+      // Switch to settings tab when edit is called
+      setCurrentTab("settings");
+
+      // Fall back to the simple onEdit callback if no getNodeEditData
+      if (!props.getNodeEditData && props.onEdit) {
         props.onEdit(nodeId);
       }
     },
-    [props],
+    [props.getNodeEditData, props.onEdit, state.componentSidebar],
   );
+
+  // Get editing data for the currently selected node
+  const { getNodeEditData } = props;
+  const editingNodeData = useMemo(() => {
+    if (state.componentSidebar.selectedNodeId && state.componentSidebar.isOpen && getNodeEditData) {
+      return getNodeEditData(state.componentSidebar.selectedNodeId);
+    }
+    return null;
+  }, [state.componentSidebar.selectedNodeId, state.componentSidebar.isOpen, getNodeEditData]);
 
   const handleNodeDelete = useCallback(
     (nodeId: string) => {
@@ -335,15 +345,64 @@ function CanvasPage(props: CanvasPageProps) {
     [emitModalData, props],
   );
 
-  const handleBuildingBlockDrop = useCallback((block: BuildingBlock, position?: { x: number; y: number }) => {
-    setNewNodeData({
-      buildingBlock: block,
-      nodeName: block.name || "",
-      displayLabel: block.label || block.name || "",
-      configuration: {},
-      position,
-    });
-  }, []);
+  const handleBuildingBlockDrop = useCallback(
+    (block: BuildingBlock, position?: { x: number; y: number }) => {
+      if (templateNodeId) {
+        return;
+      }
+
+      // Generate unique template node ID
+      const newTemplateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Create template node data
+      const templateNode: CanvasNode = {
+        id: newTemplateId,
+        type: "default",
+        position: position || { x: 0, y: 0 },
+        data: {
+          type: "component",
+          label: block.label || block.name || "New Component",
+          state: "neutral",
+          component: {
+            title: block.label || block.name || "New Component",
+            description: "Configure this component on Sidebar Settings tab...",
+            headerColor: "#e5e7eb",
+            iconSlug: block.icon,
+            iconColor: getColorClass("black"),
+            collapsedBackground: getBackgroundColorClass("white"),
+            hideActionsButton: true,
+            eventSections: [
+              {
+                title: "N/A",
+                eventState: "neutral",
+                eventTitle: "No events/executions to display",
+              },
+            ],
+          } as ComponentBaseProps,
+          isTemplate: true,
+          buildingBlock: block,
+          tempConfiguration: {},
+          tempNodeName: block.name || "",
+        },
+      };
+
+      state.setNodes((nodes) => [...nodes, templateNode]);
+
+      setTemplateNodeId(newTemplateId);
+      setNewNodeData({
+        icon: block.icon || "circle-off",
+        buildingBlock: block,
+        nodeName: block.name || "",
+        displayLabel: block.label || block.name || "",
+        configuration: {},
+        position,
+      });
+
+      state.componentSidebar.open(newTemplateId);
+      setCurrentTab("settings");
+    },
+    [templateNodeId, state, setCurrentTab],
+  );
 
   const handleSidebarToggle = useCallback(
     (open: boolean) => {
@@ -359,28 +418,53 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, any>, nodeName: string) => {
-      if (editingNodeData && props.onNodeConfigurationSave) {
+      if (templateNodeId && newNodeData) {
+        // This is a template node being saved
+        handleSaveNewNode(configuration, nodeName);
+      } else if (editingNodeData && props.onNodeConfigurationSave) {
         props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName);
       }
-      setEditingNodeData(null);
     },
-    [editingNodeData, props],
+    [templateNodeId, newNodeData, editingNodeData, props],
   );
 
   const handleSaveNewNode = useCallback(
     (configuration: Record<string, any>, nodeName: string) => {
-      if (newNodeData && props.onNodeAdd) {
+      if (newNodeData && props.onNodeAdd && templateNodeId) {
+        // Remove the template node first
+        state.setNodes((nodes) => nodes.filter((node) => node.id !== templateNodeId));
+
+        // Create the real node through the normal flow
         props.onNodeAdd({
           buildingBlock: newNodeData.buildingBlock,
           nodeName,
           configuration,
           position: newNodeData.position,
         });
+
+        // Clear template state
+        setTemplateNodeId(null);
+        setNewNodeData(null);
+
+        // Close sidebar and reset tab
+        state.componentSidebar.close();
+        setCurrentTab("latest");
       }
-      setNewNodeData(null);
     },
-    [newNodeData, props],
+    [newNodeData, props, templateNodeId, state],
   );
+
+  const handleCancelTemplate = useCallback(() => {
+    if (templateNodeId) {
+      state.setNodes((nodes) => nodes.filter((node) => node.id !== templateNodeId));
+
+      setTemplateNodeId(null);
+      setNewNodeData(null);
+
+      state.componentSidebar.close();
+      setCurrentTab("latest");
+    }
+  }, [templateNodeId, state]);
 
   const handleToggleView = useCallback(
     (nodeId: string) => {
@@ -410,6 +494,14 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleSidebarClose = useCallback(() => {
     state.componentSidebar.close();
+    // Reset to latest tab when sidebar closes
+    setCurrentTab("latest");
+
+    if (templateNodeId) {
+      setNewNodeData(null);
+      setTemplateNodeId(null);
+      state.setNodes((nodes) => nodes.filter((node) => node.id !== templateNodeId));
+    }
 
     // Clear ReactFlow's selection state
     state.setNodes((nodes) =>
@@ -418,7 +510,7 @@ function CanvasPage(props: CanvasPageProps) {
         selected: false,
       })),
     );
-  }, [state]);
+  }, [state, templateNodeId]);
 
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
@@ -443,6 +535,7 @@ function CanvasPage(props: CanvasPageProps) {
           onToggle={handleSidebarToggle}
           blocks={props.buildingBlocks || []}
           canvasZoom={canvasZoom}
+          disabled={!!templateNodeId}
         />
 
         <div className="flex-1 relative">
@@ -466,6 +559,7 @@ function CanvasPage(props: CanvasPageProps) {
               onZoomChange={setCanvasZoom}
               hasFitToViewRef={hasFitToViewRef}
               viewportRefProp={props.viewportRef}
+              templateNodeId={templateNodeId}
             />
           </ReactFlowProvider>
 
@@ -506,41 +600,20 @@ function CanvasPage(props: CanvasPageProps) {
             loadExecutionChain={props.loadExecutionChain}
             getExecutionState={props.getExecutionState}
             onSidebarClose={handleSidebarClose}
+            editingNodeData={editingNodeData}
+            onSaveConfiguration={handleSaveConfiguration}
+            onEdit={handleNodeEdit}
+            currentTab={currentTab}
+            onTabChange={setCurrentTab}
+            templateNodeId={templateNodeId}
+            onCancelTemplate={handleCancelTemplate}
+            newNodeData={newNodeData}
+            organizationId={props.organizationId}
           />
         </div>
       </div>
 
-      {/* Edit existing node modal */}
-      {editingNodeData && (
-        <NodeConfigurationModal
-          mode="edit"
-          isOpen={true}
-          onClose={() => setEditingNodeData(null)}
-          nodeName={editingNodeData.nodeName}
-          nodeLabel={editingNodeData.displayLabel}
-          configuration={editingNodeData.configuration}
-          configurationFields={editingNodeData.configurationFields}
-          onSave={handleSaveConfiguration}
-          domainId={props.organizationId}
-          domainType="DOMAIN_TYPE_ORGANIZATION"
-        />
-      )}
-
-      {/* Add new node modal */}
-      {newNodeData && (
-        <NodeConfigurationModal
-          mode="create"
-          isOpen={true}
-          onClose={() => setNewNodeData(null)}
-          nodeName={newNodeData.nodeName}
-          nodeLabel={newNodeData.displayLabel}
-          configuration={newNodeData.configuration}
-          configurationFields={newNodeData.buildingBlock.configuration || []}
-          onSave={handleSaveNewNode}
-          domainId={props.organizationId}
-          domainType="DOMAIN_TYPE_ORGANIZATION"
-        />
-      )}
+      {/* Edit existing node modal - now handled by settings sidebar */}
 
       {/* Emit Event Modal */}
       {emitModalData && (
@@ -589,6 +662,15 @@ function Sidebar({
   loadExecutionChain,
   getExecutionState,
   onSidebarClose,
+  editingNodeData,
+  onSaveConfiguration,
+  onEdit,
+  currentTab,
+  onTabChange,
+  templateNodeId,
+  onCancelTemplate,
+  newNodeData,
+  organizationId,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -622,8 +704,32 @@ function Sidebar({
     execution: WorkflowsWorkflowNodeExecution,
   ) => { map: EventStateMap; state: EventState };
   onSidebarClose?: () => void;
+  editingNodeData?: NodeEditData | null;
+  onSaveConfiguration?: (configuration: Record<string, any>, nodeName: string) => void;
+  onEdit?: (nodeId: string) => void;
+  currentTab?: "latest" | "settings";
+  onTabChange?: (tab: "latest" | "settings") => void;
+  templateNodeId?: string | null;
+  onCancelTemplate?: () => void;
+  newNodeData: NewNodeData | null;
+  organizationId?: string;
 }) {
   const sidebarData = useMemo(() => {
+    if (templateNodeId && newNodeData) {
+      return {
+        title: newNodeData.nodeName,
+        iconSlug: newNodeData.icon,
+        iconColor: "text-black",
+        latestEvents: [],
+        nextInQueueEvents: [],
+        metadata: [],
+        iconBackground: "",
+        totalInQueueCount: 0,
+        totalInHistoryCount: 0,
+        hideQueueEvents: true,
+      } as SidebarData;
+    }
+
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
       return null;
     }
@@ -722,6 +828,22 @@ function Sidebar({
       getExecutionState={
         getExecutionState ? (nodeId: string, execution: any) => getExecutionState(nodeId, execution) : undefined
       }
+      showSettingsTab={true}
+      nodeConfigMode="edit"
+      nodeName={editingNodeData?.nodeName || ""}
+      nodeLabel={editingNodeData?.displayLabel}
+      nodeConfiguration={editingNodeData?.configuration || {}}
+      nodeConfigurationFields={editingNodeData?.configurationFields || []}
+      onNodeConfigSave={onSaveConfiguration}
+      onNodeConfigCancel={undefined}
+      onEdit={onEdit ? () => onEdit(state.componentSidebar.selectedNodeId!) : undefined}
+      domainId={organizationId}
+      domainType="DOMAIN_TYPE_ORGANIZATION"
+      currentTab={currentTab}
+      onTabChange={onTabChange}
+      templateNodeId={templateNodeId}
+      onCancelTemplate={onCancelTemplate}
+      newNodeData={newNodeData}
     />
   );
 }
@@ -792,6 +914,7 @@ function CanvasContent({
   onZoomChange,
   hasFitToViewRef,
   viewportRefProp,
+  templateNodeId,
   runDisabled,
   runDisabledTooltip,
 }: {
@@ -812,6 +935,7 @@ function CanvasContent({
   onZoomChange?: (zoom: number) => void;
   hasFitToViewRef: React.MutableRefObject<boolean>;
   viewportRefProp?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
+  templateNodeId?: string | null;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
 }) {
@@ -841,17 +965,24 @@ function CanvasContent({
     }
   }, []);
 
-  const handleNodeClick = useCallback((nodeId: string) => {
-    stateRef.current.componentSidebar.open(nodeId);
+  const handleNodeClick = useCallback(
+    (nodeId: string) => {
+      // Don't allow switching nodes if there's a template being created
+      if (templateNodeId && nodeId !== templateNodeId) {
+        return;
+      }
 
-    // Update ReactFlow's selection state to highlight the clicked node
-    stateRef.current.setNodes((nodes) =>
-      nodes.map((node) => ({
-        ...node,
-        selected: node.id === nodeId,
-      })),
-    );
-  }, []);
+      stateRef.current.componentSidebar.open(nodeId);
+
+      stateRef.current.setNodes((nodes) =>
+        nodes.map((node) => ({
+          ...node,
+          selected: node.id === nodeId,
+        })),
+      );
+    },
+    [templateNodeId],
+  );
 
   const onRunRef = useRef(onRun);
   onRunRef.current = onRun;
@@ -947,6 +1078,9 @@ function CanvasContent({
   }, [state.toggleCollapse, onToggleCollapse]);
 
   const handlePaneClick = useCallback(() => {
+    // do not close sidebar while we are creating a new component
+    if (templateNodeId) return;
+
     stateRef.current.componentSidebar.close();
 
     // Clear ReactFlow's selection state
@@ -956,7 +1090,7 @@ function CanvasContent({
         selected: false,
       })),
     );
-  }, []);
+  }, [templateNodeId]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
