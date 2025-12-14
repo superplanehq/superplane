@@ -43,6 +43,7 @@ func TestGithubTrigger(t *testing.T) {
 		steps.start()
 		steps.givenAGithubIntegrationExists(githubOwner, githubTokenValue)
 		steps.givenACanvasWithGithubTriggerAndNoop()
+		steps.saveCanvas()
 		steps.waitForWebhookSetup()
 		steps.simulateReceivingGithubEvent()
 		steps.assertWebhookProcessed()
@@ -118,7 +119,8 @@ func (s *GithubTriggerSteps) addGithubTriggerNode() {
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Push")`))
 
 	s.session.Click(q.TestID("add-node-button"))
-	s.session.Sleep(300)
+
+	s.session.Sleep(1000)
 }
 
 func (s *GithubTriggerSteps) saveCanvas() {
