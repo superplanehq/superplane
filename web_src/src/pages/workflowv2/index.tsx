@@ -599,6 +599,34 @@ export function WorkflowPageV2() {
     [workflow, nodeExecutionsMap, nodeEventsMap, nodeQueueItemsMap],
   );
 
+  const handleSaveWorkflow = useCallback(
+    async (workflowToSave?: WorkflowsWorkflow) => {
+      const targetWorkflow = workflowToSave || workflow;
+      if (!targetWorkflow || !organizationId || !workflowId) return;
+
+      try {
+        await updateWorkflowMutation.mutateAsync({
+          name: targetWorkflow.metadata?.name!,
+          description: targetWorkflow.metadata?.description,
+          nodes: targetWorkflow.spec?.nodes,
+          edges: targetWorkflow.spec?.edges,
+        });
+
+        showSuccessToast("Canvas changes saved");
+        setHasUnsavedChanges(false);
+        setHasNonPositionalUnsavedChanges(false);
+
+        // Clear the snapshot since changes are now saved
+        setInitialWorkflowSnapshot(null);
+      } catch (error: any) {
+        console.error("Failed to save changes to the canvas:", error);
+        const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
+        showErrorToast(errorMessage);
+      }
+    },
+    [workflow, organizationId, workflowId, updateWorkflowMutation],
+  );
+
   const getNodeEditData = useCallback(
     (nodeId: string): NodeEditData | null => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
@@ -634,13 +662,13 @@ export function WorkflowPageV2() {
   );
 
   const handleNodeConfigurationSave = useCallback(
-    (nodeId: string, updatedConfiguration: Record<string, any>, updatedNodeName: string) => {
+    async (nodeId: string, updatedConfiguration: Record<string, any>, updatedNodeName: string) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
 
-      // Update the node's configuration and name in local cache only
+      // Update the node's configuration and name
       const updatedNodes = workflow?.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
@@ -659,12 +687,13 @@ export function WorkflowPageV2() {
         },
       };
 
-      // Update local cache without triggering API call
+      // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      markUnsavedChange("structural");
-      showSuccessToast("New configuration applied");
+
+      // Save to server immediately
+      await handleSaveWorkflow(updatedWorkflow);
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
   );
 
   const generateNodeId = (blockName: string, nodeName: string) => {
@@ -675,7 +704,7 @@ export function WorkflowPageV2() {
   };
 
   const handleNodeAdd = useCallback(
-    (newNodeData: NewNodeData) => {
+    async (newNodeData: NewNodeData) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       // Save snapshot before making changes
@@ -700,10 +729,15 @@ export function WorkflowPageV2() {
               ? "TYPE_BLUEPRINT"
               : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
-        position: position || {
-          x: (workflow?.spec?.nodes?.length || 0) * 250,
-          y: 100,
-        },
+        position: position
+          ? {
+              x: Math.round(position.x),
+              y: Math.round(position.y),
+            }
+          : {
+              x: (workflow?.spec?.nodes?.length || 0) * 250,
+              y: 100,
+            },
       };
 
       // Add type-specific reference
@@ -728,9 +762,11 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      markUnsavedChange("structural");
+
+      // Save to server immediately
+      await handleSaveWorkflow(updatedWorkflow);
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
   );
 
   const handleEdgeCreate = useCallback(

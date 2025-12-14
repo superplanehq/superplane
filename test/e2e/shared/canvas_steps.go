@@ -48,11 +48,11 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	target := q.TestID("rf__wrapper")
 
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
-	s.session.Sleep(300)
+	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.Click(q.TestID("add-node-button"))
-	s.session.Sleep(300)
+	s.session.Sleep(1000)
 }
 
 func (s *CanvasSteps) Save() {

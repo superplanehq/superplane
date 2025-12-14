@@ -36,7 +36,6 @@ func TestGithubTrigger(t *testing.T) {
 		steps.givenAGithubIntegrationExists(githubOwner, githubTokenValue)
 		steps.givenACanvasExists()
 		steps.addGithubTriggerNode()
-		steps.saveCanvas()
 		steps.assertGithubTriggerNodeExistsInDB()
 	})
 
@@ -120,7 +119,8 @@ func (s *GithubTriggerSteps) addGithubTriggerNode() {
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Push")`))
 
 	s.session.Click(q.TestID("add-node-button"))
-	s.session.Sleep(300)
+
+	s.session.Sleep(1000)
 }
 
 func (s *GithubTriggerSteps) saveCanvas() {
