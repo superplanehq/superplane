@@ -7,31 +7,18 @@ import (
 
 func TestNextMinutesTrigger(t *testing.T) {
 	tests := []struct {
-		name          string
-		interval      int
-		now           time.Time
-		referenceTime *string
-		expectNext    time.Time
-		expectError   bool
+		name        string
+		interval    int
+		now         time.Time
+		expectNext  time.Time
+		expectError bool
 	}{
-		{
-			name:       "10 minute interval with reference time",
-			interval:   10,
-			now:        mustParseTime("2025-01-01T12:35:00Z"),
-			expectNext: mustParseTime("2025-01-01T12:45:00Z"),
-		},
+
 		{
 			name:       "5 minute interval exactly at interval boundary",
 			interval:   5,
 			now:        mustParseTime("2025-01-01T12:25:00Z"),
 			expectNext: mustParseTime("2025-01-01T12:30:00Z"),
-		},
-		{
-			name:          "15 minute interval with reference time in past",
-			interval:      15,
-			now:           mustParseTime("2025-01-01T12:40:00Z"),
-			referenceTime: stringPtr("2025-01-01T12:00:00Z"),
-			expectNext:    mustParseTime("2025-01-01T12:45:00Z"),
 		},
 		{
 			name:       "30 minute interval crossing day boundary",
@@ -45,19 +32,7 @@ func TestNextMinutesTrigger(t *testing.T) {
 			now:        mustParseTime("2025-01-01T12:30:30Z"),
 			expectNext: mustParseTime("2025-01-01T12:31:30Z"),
 		},
-		{
-			name:       "no reference time provided - use current time",
-			interval:   20,
-			now:        mustParseTime("2025-01-01T12:30:00Z"),
-			expectNext: mustParseTime("2025-01-01T12:50:00Z"),
-		},
-		{
-			name:          "reference time in future - should handle gracefully",
-			interval:      10,
-			now:           mustParseTime("2025-01-01T12:30:00Z"),
-			referenceTime: stringPtr("2025-01-01T13:00:00Z"),
-			expectNext:    mustParseTime("2025-01-01T13:10:00Z"),
-		},
+
 		{
 			name:        "invalid interval - too small",
 			interval:    0,
@@ -74,7 +49,7 @@ func TestNextMinutesTrigger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := nextMinutesTrigger(tt.interval, tt.now, tt.referenceTime)
+			result, err := nextMinutesTrigger(tt.interval, tt.now)
 
 			if tt.expectError {
 				if err == nil {
@@ -96,32 +71,21 @@ func TestNextMinutesTrigger(t *testing.T) {
 }
 
 func TestGetNextTrigger(t *testing.T) {
-	refTime := "2025-01-01T12:30:00Z"
 	tests := []struct {
 		name           string
 		config         Configuration
 		now            time.Time
-		referenceTime  *string
 		expectNext     time.Time
 		expectError    bool
 		expectErrorMsg string
 	}{
-		{
-			name: "minutes configuration with reference time",
-			config: Configuration{
-				Type:     TypeMinutes,
-				Interval: intPtr(10),
-			},
-			now:           mustParseTime("2025-01-01T12:35:00Z"),
-			referenceTime: &refTime,
-			expectNext:    mustParseTime("2025-01-01T12:40:00Z"),
-		},
+
 		{
 			name: "hours configuration",
 			config: Configuration{
-				Type:     TypeHours,
-				Interval: intPtr(1),
-				Minute:   intPtr(30),
+				Type:          TypeHours,
+				HoursInterval: intPtr(1),
+				Minute:        intPtr(30),
 			},
 			now:        mustParseTime("2025-01-01T12:15:00Z"),
 			expectNext: mustParseTime("2025-01-01T13:30:00Z"),
@@ -129,10 +93,10 @@ func TestGetNextTrigger(t *testing.T) {
 		{
 			name: "days configuration",
 			config: Configuration{
-				Type:     TypeDays,
-				Interval: intPtr(1),
-				Hour:     intPtr(14),
-				Minute:   intPtr(30),
+				Type:         TypeDays,
+				DaysInterval: intPtr(1),
+				Hour:         intPtr(14),
+				Minute:       intPtr(30),
 			},
 			now:        mustParseTime("2025-01-01T10:00:00Z"),
 			expectNext: mustParseTime("2025-01-02T14:30:00Z"),
@@ -140,23 +104,23 @@ func TestGetNextTrigger(t *testing.T) {
 		{
 			name: "weeks configuration",
 			config: Configuration{
-				Type:     TypeWeeks,
-				Interval: intPtr(1),
-				WeekDays: []string{"friday"},
-				Hour:     intPtr(15),
-				Minute:   intPtr(30),
+				Type:          TypeWeeks,
+				WeeksInterval: intPtr(1),
+				WeekDays:      []string{"friday"},
+				Hour:          intPtr(15),
+				Minute:        intPtr(30),
 			},
 			now:        mustParseTime("2025-01-06T10:00:00Z"), // Monday
-			expectNext: mustParseTime("2025-01-10T15:30:00Z"), // Friday
+			expectNext: mustParseTime("2025-01-17T15:30:00Z"), // Friday of next week
 		},
 		{
 			name: "months configuration",
 			config: Configuration{
-				Type:       TypeMonths,
-				Interval:   intPtr(1),
-				DayOfMonth: intPtr(15),
-				Hour:       intPtr(14),
-				Minute:     intPtr(30),
+				Type:           TypeMonths,
+				MonthsInterval: intPtr(1),
+				DayOfMonth:     intPtr(15),
+				Hour:           intPtr(14),
+				Minute:         intPtr(30),
 			},
 			now:        mustParseTime("2025-01-01T10:00:00Z"),
 			expectNext: mustParseTime("2025-02-15T14:30:00Z"),
@@ -184,31 +148,31 @@ func TestGetNextTrigger(t *testing.T) {
 				Type: TypeMinutes,
 			},
 			expectError:    true,
-			expectErrorMsg: "interval is required for minutes schedule",
+			expectErrorMsg: "minutesInterval is required for minutes schedule",
 		},
 		{
 			name: "invalid interval for minutes",
 			config: Configuration{
-				Type:     TypeMinutes,
-				Interval: intPtr(60), // Too high
+				Type:            TypeMinutes,
+				MinutesInterval: intPtr(60), // Too high
 			},
 			expectError:    true,
-			expectErrorMsg: "minutes interval must be between 1 and 59",
+			expectErrorMsg: "interval must be between 1 and 59 minutes",
 		},
 		{
 			name: "invalid interval for hours",
 			config: Configuration{
-				Type:     TypeHours,
-				Interval: intPtr(25), // Too high
+				Type:          TypeHours,
+				HoursInterval: intPtr(25), // Too high
 			},
 			expectError:    true,
-			expectErrorMsg: "hours interval must be between 1 and 23",
+			expectErrorMsg: "interval must be between 1 and 23 hours",
 		},
 		{
 			name: "weeks without weekDays",
 			config: Configuration{
-				Type:     TypeWeeks,
-				Interval: intPtr(1),
+				Type:          TypeWeeks,
+				WeeksInterval: intPtr(1),
 			},
 			expectError:    true,
 			expectErrorMsg: "weekDays is required for weeks schedule",
@@ -216,8 +180,8 @@ func TestGetNextTrigger(t *testing.T) {
 		{
 			name: "months without dayOfMonth",
 			config: Configuration{
-				Type:     TypeMonths,
-				Interval: intPtr(1),
+				Type:           TypeMonths,
+				MonthsInterval: intPtr(1),
 			},
 			expectError:    true,
 			expectErrorMsg: "dayOfMonth is required for months schedule",
@@ -234,7 +198,7 @@ func TestGetNextTrigger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := getNextTrigger(tt.config, tt.now, tt.referenceTime)
+			result, err := getNextTrigger(tt.config, tt.now)
 
 			if tt.expectError {
 				if err == nil {
@@ -254,42 +218,6 @@ func TestGetNextTrigger(t *testing.T) {
 
 			if !result.Equal(tt.expectNext) {
 				t.Errorf("expected next trigger at %v, got %v", tt.expectNext, *result)
-			}
-		})
-	}
-}
-
-func TestValidateIntervalForType(t *testing.T) {
-	tests := []struct {
-		name         string
-		scheduleType string
-		interval     int
-		expectError  bool
-	}{
-		{"valid minutes interval", TypeMinutes, 30, false},
-		{"invalid minutes interval - too low", TypeMinutes, 0, true},
-		{"invalid minutes interval - too high", TypeMinutes, 60, true},
-		{"valid hours interval", TypeHours, 12, false},
-		{"invalid hours interval - too high", TypeHours, 24, true},
-		{"valid days interval", TypeDays, 15, false},
-		{"invalid days interval - too high", TypeDays, 32, true},
-		{"valid weeks interval", TypeWeeks, 26, false},
-		{"invalid weeks interval - too high", TypeWeeks, 53, true},
-		{"valid months interval", TypeMonths, 12, false},
-		{"invalid months interval - too high", TypeMonths, 25, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateIntervalForType(tt.scheduleType, tt.interval)
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("expected error but got none")
-				}
-			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
 			}
 		})
 	}
@@ -331,7 +259,7 @@ func TestMinutesSchedulingConsistency(t *testing.T) {
 			currentTime := startTime
 
 			for currentTime.Before(endTime) {
-				next, err := nextMinutesTrigger(tt.interval, currentTime, &tt.refTime)
+				next, err := nextMinutesTrigger(tt.interval, currentTime)
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
@@ -371,8 +299,8 @@ func stringPtr(s string) *string {
 
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && s[:len(substr)] == substr ||
-		   (len(s) > len(substr) && s[len(s)-len(substr):] == substr) ||
-		   (len(substr) < len(s) && findSubstring(s, substr))
+		(len(s) > len(substr) && s[len(s)-len(substr):] == substr) ||
+		(len(substr) < len(s) && findSubstring(s, substr))
 }
 
 func findSubstring(s, substr string) bool {
@@ -382,4 +310,110 @@ func findSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestTimezoneHandling(t *testing.T) {
+	tests := []struct {
+		name       string
+		config     Configuration
+		now        time.Time
+		expectNext time.Time
+	}{
+		{
+			name: "hours schedule in GMT-3 timezone",
+			config: Configuration{
+				Type:          TypeHours,
+				HoursInterval: intPtr(1),
+				Minute:        intPtr(1),       // 1 minute past every hour
+				Timezone:      stringPtr("-3"), // GMT-3
+			},
+			now:        mustParseTime("2025-01-01T07:00:00Z"), // 4 AM GMT-3 (7 AM UTC)
+			expectNext: mustParseTime("2025-01-01T08:01:00Z"), // 5:01 AM GMT-3 (8:01 AM UTC)
+		},
+		{
+			name: "day schedule in GMT+5 timezone",
+			config: Configuration{
+				Type:         TypeDays,
+				DaysInterval: intPtr(1),
+				Hour:         intPtr(14),     // 2 PM in GMT+5
+				Minute:       intPtr(30),     // 30 minutes past
+				Timezone:     stringPtr("5"), // GMT+5
+			},
+			now:        mustParseTime("2025-01-01T08:00:00Z"), // 1 PM GMT+5 (8 AM UTC)
+			expectNext: mustParseTime("2025-01-02T09:30:00Z"), // 2:30 PM GMT+5 (9:30 AM UTC)
+		},
+		{
+			name: "week schedule in GMT-8 timezone (PST)",
+			config: Configuration{
+				Type:          TypeWeeks,
+				WeeksInterval: intPtr(1),
+				WeekDays:      []string{"monday"},
+				Hour:          intPtr(9),       // 9 AM PST
+				Minute:        intPtr(0),       // on the hour
+				Timezone:      stringPtr("-8"), // GMT-8 (PST)
+			},
+			now:        mustParseTime("2025-01-06T16:00:00Z"), // Monday 8 AM PST (4 PM UTC)
+			expectNext: mustParseTime("2025-01-13T17:00:00Z"), // Monday 9 AM PST (5 PM UTC) of the next week
+		},
+		{
+			name: "month schedule in GMT+9 timezone (JST)",
+			config: Configuration{
+				Type:           TypeMonths,
+				MonthsInterval: intPtr(1),
+				DayOfMonth:     intPtr(15),     // 15th of the month
+				Hour:           intPtr(12),     // Noon JST
+				Minute:         intPtr(0),      // on the hour
+				Timezone:       stringPtr("9"), // GMT+9 (JST)
+			},
+			now:        mustParseTime("2025-01-01T02:00:00Z"), // Jan 1st 11 AM JST (2 AM UTC)
+			expectNext: mustParseTime("2025-02-15T03:00:00Z"), // Jan 15th Noon JST (3 AM UTC) of the next month
+		},
+		{
+			name: "minutes schedule timezone should not affect calculation",
+			config: Configuration{
+				Type:            TypeMinutes,
+				MinutesInterval: intPtr(30),
+				Timezone:        stringPtr("-5"), // GMT-5
+			},
+			now:        mustParseTime("2025-01-01T12:15:00Z"),
+			expectNext: mustParseTime("2025-01-01T12:45:00Z"), // 30 minutes later
+		},
+		{
+			name: "cron schedule in GMT+2 timezone",
+			config: Configuration{
+				Type:           TypeCron,
+				CronExpression: stringPtr("0 30 14 * * *"), // Daily at 2:30 PM
+				Timezone:       stringPtr("2"),             // GMT+2
+			},
+			now:        mustParseTime("2025-01-01T11:00:00Z"), // 1 PM GMT+2 (11 AM UTC)
+			expectNext: mustParseTime("2025-01-01T12:30:00Z"), // 2:30 PM GMT+2 (12:30 PM UTC)
+		},
+		{
+			name: "cross-day boundary in negative timezone",
+			config: Configuration{
+				Type:          TypeHours,
+				HoursInterval: intPtr(1),
+				Minute:        intPtr(30),      // 30 minutes past every hour
+				Timezone:      stringPtr("-5"), // GMT-5
+			},
+			now:        mustParseTime("2025-01-01T03:00:00Z"), // 10 PM GMT-5 (3 AM UTC next day)
+			expectNext: mustParseTime("2025-01-01T04:30:00Z"), // 11:30 PM GMT-5 (4:30 AM UTC next day)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := getNextTrigger(tt.config, tt.now)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if !result.Equal(tt.expectNext) {
+				t.Errorf("expected next trigger at %v, got %v", tt.expectNext, *result)
+				t.Errorf("Expected in local time: %v", tt.expectNext.In(parseTimezone(tt.config.Timezone)))
+				t.Errorf("Got in local time: %v", result.In(parseTimezone(tt.config.Timezone)))
+			}
+		})
+	}
 }

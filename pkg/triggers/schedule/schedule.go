@@ -39,19 +39,22 @@ const (
 type Schedule struct{}
 
 type Metadata struct {
-	NextTrigger   *string `json:"nextTrigger"`
-	ReferenceTime *string `json:"referenceTime"` // For minutes scheduling: time when schedule was first set up
+	NextTrigger *string `json:"nextTrigger"`
 }
 
 type Configuration struct {
-	Type           string   `json:"type"`
-	Interval       *int     `json:"interval"`       // Minutes (1-59), hours (1-23), days (1-31), weeks (1-52), months (1-24)
-	Minute         *int     `json:"minute"`         // 0-59 for hours, days, weeks, months
-	Hour           *int     `json:"hour"`           // 0-23 for days, weeks, months
-	WeekDays       []string `json:"weekDays"`       // For weeks scheduling (multiple days)
-	DayOfMonth     *int     `json:"dayOfMonth"`     // 1-31 for months scheduling
-	CronExpression *string  `json:"cronExpression"` // For cron scheduling
-	Timezone       *string  `json:"timezone"`       // Timezone offset (e.g., "0", "-5", "5.5")
+	Type            string   `json:"type"`
+	MinutesInterval *int     `json:"minutesInterval"` // 1-59 minutes between triggers
+	HoursInterval   *int     `json:"hoursInterval"`   // 1-23 hours between triggers
+	DaysInterval    *int     `json:"daysInterval"`    // 1-31 days between triggers
+	WeeksInterval   *int     `json:"weeksInterval"`   // 1-52 weeks between triggers
+	MonthsInterval  *int     `json:"monthsInterval"`  // 1-24 months between triggers
+	Minute          *int     `json:"minute"`          // 0-59 for hours, days, weeks, months
+	Hour            *int     `json:"hour"`            // 0-23 for days, weeks, months
+	WeekDays        []string `json:"weekDays"`        // For weeks scheduling (multiple days)
+	DayOfMonth      *int     `json:"dayOfMonth"`      // 1-31 for months scheduling
+	CronExpression  *string  `json:"cronExpression"`  // For cron scheduling
+	Timezone        *string  `json:"timezone"`        // Timezone offset (e.g., "0", "-5", "5.5")
 }
 
 func (s *Schedule) Name() string {
@@ -143,53 +146,117 @@ func (s *Schedule) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "interval",
-			Label:       "Interval",
+			Name:        "minutesInterval",
+			Label:       "Minutes between triggers",
 			Type:        configuration.FieldTypeNumber,
 			Default:     intPtr(1),
-			Description: "Minutes (1-59), Hours (1-23), Days (1-31), Weeks (1-52), Months (1-24)",
+			Description: "Number of minutes between triggers (1-59)",
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "type", Values: []string{"minutes", "hours", "days", "weeks", "months"}},
+				{Field: "type", Values: []string{"minutes"}},
 			},
 			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "type", Values: []string{"minutes", "hours", "days", "weeks", "months"}},
+				{Field: "type", Values: []string{"minutes"}},
 			},
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
 					Min: intPtr(1),
-					Max: intPtr(59), // Will be dynamically validated based on type
-				},
-			},
-		},
-		{
-			Name:        "minute",
-			Label:       "Trigger at minute",
-			Type:        configuration.FieldTypeNumber,
-			Default:     intPtr(0),
-			Description: "Minute of the hour (0-59)",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "type", Values: []string{"hours", "days", "weeks", "months"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Number: &configuration.NumberTypeOptions{
-					Min: intPtr(0),
 					Max: intPtr(59),
 				},
 			},
 		},
 		{
-			Name:        "hour",
-			Label:       "Trigger at hour",
+			Name:        "hoursInterval",
+			Label:       "Hours between triggers",
 			Type:        configuration.FieldTypeNumber,
-			Default:     intPtr(0),
-			Description: "Hour of the day (0-23)",
+			Default:     intPtr(1),
+			Description: "Number of hours between triggers (1-23)",
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "type", Values: []string{"days", "weeks", "months"}},
+				{Field: "type", Values: []string{"hours"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "type", Values: []string{"hours"}},
 			},
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
-					Min: intPtr(0),
+					Min: intPtr(1),
 					Max: intPtr(23),
+				},
+			},
+		},
+		{
+			Name:        "daysInterval",
+			Label:       "Days between triggers",
+			Type:        configuration.FieldTypeNumber,
+			Default:     intPtr(1),
+			Description: "Number of days between triggers (1-31)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "type", Values: []string{"days"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "type", Values: []string{"days"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: intPtr(1),
+					Max: intPtr(31),
+				},
+			},
+		},
+		{
+			Name:        "weeksInterval",
+			Label:       "Weeks between triggers",
+			Type:        configuration.FieldTypeNumber,
+			Default:     intPtr(1),
+			Description: "Number of weeks between triggers (1-52)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "type", Values: []string{"weeks"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "type", Values: []string{"weeks"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: intPtr(1),
+					Max: intPtr(52),
+				},
+			},
+		},
+		{
+			Name:        "monthsInterval",
+			Label:       "Months between triggers",
+			Type:        configuration.FieldTypeNumber,
+			Default:     intPtr(1),
+			Description: "Number of months between triggers (1-24)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "type", Values: []string{"months"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "type", Values: []string{"months"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: intPtr(1),
+					Max: intPtr(24),
+				},
+			},
+		},
+
+		{
+			Name:        "dayOfMonth",
+			Label:       "Trigger on day of the month",
+			Type:        configuration.FieldTypeNumber,
+			Default:     intPtr(1),
+			Description: "Day of the month (1-31)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "type", Values: []string{"months"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "type", Values: []string{"months"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: intPtr(1),
+					Max: intPtr(31),
 				},
 			},
 		},
@@ -220,21 +287,34 @@ func (s *Schedule) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "dayOfMonth",
-			Label:       "Trigger on day of the month",
+			Name:        "hour",
+			Label:       "Trigger at hour",
 			Type:        configuration.FieldTypeNumber,
-			Default:     intPtr(1),
-			Description: "Day of the month (1-31)",
+			Default:     intPtr(0),
+			Description: "Hour of the day (0-23)",
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "type", Values: []string{"months"}},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "type", Values: []string{"months"}},
+				{Field: "type", Values: []string{"days", "weeks", "months"}},
 			},
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
-					Min: intPtr(1),
-					Max: intPtr(31),
+					Min: intPtr(0),
+					Max: intPtr(23),
+				},
+			},
+		},
+		{
+			Name:        "minute",
+			Label:       "Trigger at minute",
+			Type:        configuration.FieldTypeNumber,
+			Default:     intPtr(0),
+			Description: "Minute of the hour (0-59)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "type", Values: []string{"hours", "days", "weeks", "months"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: intPtr(0),
+					Max: intPtr(59),
 				},
 			},
 		},
@@ -270,13 +350,7 @@ func (s *Schedule) Setup(ctx triggers.TriggerContext) error {
 	}
 
 	now := time.Now()
-
-	if config.Type == TypeMinutes && metadata.ReferenceTime == nil {
-		referenceTime := now.Format(time.RFC3339)
-		metadata.ReferenceTime = &referenceTime
-	}
-
-	nextTrigger, err := getNextTrigger(config, now, metadata.ReferenceTime)
+	nextTrigger, err := getNextTrigger(config, now)
 	if err != nil {
 		return err
 	}
@@ -305,8 +379,7 @@ func (s *Schedule) Setup(ctx triggers.TriggerContext) error {
 
 	formatted := nextTrigger.Format(time.RFC3339)
 	ctx.MetadataContext.Set(Metadata{
-		NextTrigger:   &formatted,
-		ReferenceTime: metadata.ReferenceTime,
+		NextTrigger: &formatted,
 	})
 	return nil
 }
@@ -348,7 +421,7 @@ func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
 	}
 
 	now := time.Now()
-	nextTrigger, err := getNextTrigger(spec, now, existingMetadata.ReferenceTime)
+	nextTrigger, err := getNextTrigger(spec, now)
 	if err != nil {
 		return err
 	}
@@ -360,44 +433,35 @@ func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
 
 	formatted := nextTrigger.Format(time.RFC3339)
 	ctx.MetadataContext.Set(Metadata{
-		NextTrigger:   &formatted,
-		ReferenceTime: existingMetadata.ReferenceTime,
+		NextTrigger: &formatted,
 	})
 	return nil
 }
 
-func getNextTrigger(config Configuration, now time.Time, referenceTime *string) (*time.Time, error) {
+func getNextTrigger(config Configuration, now time.Time) (*time.Time, error) {
 	timezone := parseTimezone(config.Timezone)
 	nowInTZ := now.In(timezone)
 
-	// Validate interval ranges based on type
-	if config.Interval != nil {
-		err := validateIntervalForType(config.Type, *config.Interval)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	switch config.Type {
 	case TypeMinutes:
-		if config.Interval == nil {
-			return nil, fmt.Errorf("interval is required for minutes schedule")
+		if config.MinutesInterval == nil {
+			return nil, fmt.Errorf("minutesInterval is required for minutes schedule")
 		}
-		return nextMinutesTrigger(*config.Interval, nowInTZ, referenceTime)
+		return nextMinutesTrigger(*config.MinutesInterval, nowInTZ)
 
 	case TypeHours:
-		if config.Interval == nil {
-			return nil, fmt.Errorf("interval is required for hours schedule")
+		if config.HoursInterval == nil {
+			return nil, fmt.Errorf("hoursInterval is required for hours schedule")
 		}
 		minute := 0
 		if config.Minute != nil {
 			minute = *config.Minute
 		}
-		return nextHoursTrigger(*config.Interval, minute, nowInTZ, referenceTime)
+		return nextHoursTrigger(*config.HoursInterval, minute, nowInTZ)
 
 	case TypeDays:
-		if config.Interval == nil {
-			return nil, fmt.Errorf("interval is required for days schedule")
+		if config.DaysInterval == nil {
+			return nil, fmt.Errorf("daysInterval is required for days schedule")
 		}
 		hour := 0
 		if config.Hour != nil {
@@ -407,11 +471,11 @@ func getNextTrigger(config Configuration, now time.Time, referenceTime *string) 
 		if config.Minute != nil {
 			minute = *config.Minute
 		}
-		return nextDaysTrigger(*config.Interval, hour, minute, nowInTZ, referenceTime)
+		return nextDaysTrigger(*config.DaysInterval, hour, minute, nowInTZ)
 
 	case TypeWeeks:
-		if config.Interval == nil {
-			return nil, fmt.Errorf("interval is required for weeks schedule")
+		if config.WeeksInterval == nil {
+			return nil, fmt.Errorf("weeksInterval is required for weeks schedule")
 		}
 		if config.WeekDays == nil || len(config.WeekDays) == 0 {
 			return nil, fmt.Errorf("weekDays is required for weeks schedule")
@@ -424,11 +488,11 @@ func getNextTrigger(config Configuration, now time.Time, referenceTime *string) 
 		if config.Minute != nil {
 			minute = *config.Minute
 		}
-		return nextWeeksTrigger(*config.Interval, config.WeekDays, hour, minute, nowInTZ, referenceTime)
+		return nextWeeksTrigger(*config.WeeksInterval, config.WeekDays, hour, minute, nowInTZ)
 
 	case TypeMonths:
-		if config.Interval == nil {
-			return nil, fmt.Errorf("interval is required for months schedule")
+		if config.MonthsInterval == nil {
+			return nil, fmt.Errorf("monthsInterval is required for months schedule")
 		}
 		if config.DayOfMonth == nil {
 			return nil, fmt.Errorf("dayOfMonth is required for months schedule")
@@ -441,7 +505,7 @@ func getNextTrigger(config Configuration, now time.Time, referenceTime *string) 
 		if config.Minute != nil {
 			minute = *config.Minute
 		}
-		return nextMonthsTrigger(*config.Interval, *config.DayOfMonth, hour, minute, nowInTZ, referenceTime)
+		return nextMonthsTrigger(*config.MonthsInterval, *config.DayOfMonth, hour, minute, nowInTZ)
 
 	case TypeCron:
 		if config.CronExpression == nil {
@@ -454,26 +518,13 @@ func getNextTrigger(config Configuration, now time.Time, referenceTime *string) 
 	}
 }
 
-func nextMinutesTrigger(interval int, now time.Time, referenceTime *string) (*time.Time, error) {
+func nextMinutesTrigger(interval int, now time.Time) (*time.Time, error) {
 	if interval < 1 || interval > 59 {
 		return nil, fmt.Errorf("interval must be between 1 and 59 minutes, got: %d", interval)
 	}
 
-	nowUTC := now.UTC()
-
-	var reference time.Time
-	if referenceTime != nil {
-		var err error
-		reference, err = time.Parse(time.RFC3339, *referenceTime)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse reference time: %w", err)
-		}
-		reference = reference.UTC()
-	} else {
-		reference = nowUTC
-	}
-
-	minutesElapsed := int(nowUTC.Sub(reference).Minutes())
+	nowInTZ := now
+	minutesElapsed := int(nowInTZ.Sub(nowInTZ).Minutes())
 
 	if minutesElapsed < 0 {
 		minutesElapsed = 0
@@ -481,13 +532,14 @@ func nextMinutesTrigger(interval int, now time.Time, referenceTime *string) (*ti
 	completedIntervals := minutesElapsed / interval
 
 	nextTriggerMinutes := (completedIntervals + 1) * interval
-	nextTrigger := reference.Add(time.Duration(nextTriggerMinutes) * time.Minute)
+	nextTrigger := nowInTZ.Add(time.Duration(nextTriggerMinutes) * time.Minute)
 
-	if nextTrigger.Before(nowUTC) || nextTrigger.Equal(nowUTC) {
+	if nextTrigger.Before(nowInTZ) || nextTrigger.Equal(nowInTZ) {
 		nextTrigger = nextTrigger.Add(time.Duration(interval) * time.Minute)
 	}
 
-	return &nextTrigger, nil
+	utcResult := nextTrigger.UTC()
+	return &utcResult, nil
 }
 
 func parseWeekday(weekDay string) (time.Weekday, error) {
@@ -532,32 +584,6 @@ func WeekdayToString(weekday time.Weekday) string {
 	}
 }
 
-func validateIntervalForType(scheduleType string, interval int) error {
-	switch scheduleType {
-	case TypeMinutes:
-		if interval < 1 || interval > 59 {
-			return fmt.Errorf("minutes interval must be between 1 and 59, got: %d", interval)
-		}
-	case TypeHours:
-		if interval < 1 || interval > 23 {
-			return fmt.Errorf("hours interval must be between 1 and 23, got: %d", interval)
-		}
-	case TypeDays:
-		if interval < 1 || interval > 31 {
-			return fmt.Errorf("days interval must be between 1 and 31, got: %d", interval)
-		}
-	case TypeWeeks:
-		if interval < 1 || interval > 52 {
-			return fmt.Errorf("weeks interval must be between 1 and 52, got: %d", interval)
-		}
-	case TypeMonths:
-		if interval < 1 || interval > 24 {
-			return fmt.Errorf("months interval must be between 1 and 24, got: %d", interval)
-		}
-	}
-	return nil
-}
-
 func parseTimezone(timezoneStr *string) *time.Location {
 	if timezoneStr == nil || *timezoneStr == "" {
 		return time.UTC
@@ -572,7 +598,7 @@ func parseTimezone(timezoneStr *string) *time.Location {
 	return time.FixedZone(fmt.Sprintf("GMT%+.1f", offsetHours), offsetSeconds)
 }
 
-func nextHoursTrigger(interval int, minute int, now time.Time, referenceTime *string) (*time.Time, error) {
+func nextHoursTrigger(interval int, minute int, now time.Time) (*time.Time, error) {
 	if interval < 1 || interval > 23 {
 		return nil, fmt.Errorf("interval must be between 1 and 23 hours, got: %d", interval)
 	}
@@ -580,38 +606,17 @@ func nextHoursTrigger(interval int, minute int, now time.Time, referenceTime *st
 		return nil, fmt.Errorf("minute must be between 0 and 59, got: %d", minute)
 	}
 
-	nowUTC := now.UTC()
+	nowInTZ := now
 
-	var reference time.Time
-	if referenceTime != nil {
-		var err error
-		reference, err = time.Parse(time.RFC3339, *referenceTime)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse reference time: %w", err)
-		}
-		reference = reference.UTC()
-	} else {
-		reference = nowUTC
-	}
+	// Start with the occurrence of the specified minute in the current hour
+	nextTrigger := time.Date(nowInTZ.Year(), nowInTZ.Month(), nowInTZ.Day(), nowInTZ.Hour(), minute, 0, 0, nowInTZ.Location())
+	nextTrigger = nextTrigger.Add(time.Duration(interval) * time.Hour)
 
-	hoursElapsed := int(nowUTC.Sub(reference).Hours())
-	if hoursElapsed < 0 {
-		hoursElapsed = 0
-	}
-	completedIntervals := hoursElapsed / interval
-
-	nextTriggerHours := (completedIntervals + 1) * interval
-	nextTrigger := reference.Add(time.Duration(nextTriggerHours) * time.Hour)
-	nextTrigger = time.Date(nextTrigger.Year(), nextTrigger.Month(), nextTrigger.Day(), nextTrigger.Hour(), minute, 0, 0, nextTrigger.Location())
-
-	if nextTrigger.Before(nowUTC) || nextTrigger.Equal(nowUTC) {
-		nextTrigger = nextTrigger.Add(time.Duration(interval) * time.Hour)
-	}
-
-	return &nextTrigger, nil
+	utcResult := nextTrigger.UTC()
+	return &utcResult, nil
 }
 
-func nextDaysTrigger(interval int, hour int, minute int, now time.Time, referenceTime *string) (*time.Time, error) {
+func nextDaysTrigger(interval int, hour int, minute int, now time.Time) (*time.Time, error) {
 	if interval < 1 || interval > 31 {
 		return nil, fmt.Errorf("interval must be between 1 and 31 days, got: %d", interval)
 	}
@@ -622,38 +627,16 @@ func nextDaysTrigger(interval int, hour int, minute int, now time.Time, referenc
 		return nil, fmt.Errorf("minute must be between 0 and 59, got: %d", minute)
 	}
 
-	nowUTC := now.UTC()
+	nowInTZ := now
 
-	var reference time.Time
-	if referenceTime != nil {
-		var err error
-		reference, err = time.Parse(time.RFC3339, *referenceTime)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse reference time: %w", err)
-		}
-		reference = reference.UTC()
-	} else {
-		reference = nowUTC
-	}
-
-	daysElapsed := int(nowUTC.Sub(reference).Hours() / 24)
-	if daysElapsed < 0 {
-		daysElapsed = 0
-	}
-	completedIntervals := daysElapsed / interval
-
-	nextTriggerDays := (completedIntervals + 1) * interval
-	nextTrigger := reference.AddDate(0, 0, nextTriggerDays)
+	nextTrigger := nowInTZ.AddDate(0, 0, interval)
 	nextTrigger = time.Date(nextTrigger.Year(), nextTrigger.Month(), nextTrigger.Day(), hour, minute, 0, 0, nextTrigger.Location())
 
-	if nextTrigger.Before(nowUTC) || nextTrigger.Equal(nowUTC) {
-		nextTrigger = nextTrigger.AddDate(0, 0, interval)
-	}
-
-	return &nextTrigger, nil
+	utcResult := nextTrigger.UTC()
+	return &utcResult, nil
 }
 
-func nextWeeksTrigger(interval int, weekDays []string, hour int, minute int, now time.Time, referenceTime *string) (*time.Time, error) {
+func nextWeeksTrigger(interval int, weekDays []string, hour int, minute int, now time.Time) (*time.Time, error) {
 	if interval < 1 || interval > 52 {
 		return nil, fmt.Errorf("interval must be between 1 and 52 weeks, got: %d", interval)
 	}
@@ -664,19 +647,7 @@ func nextWeeksTrigger(interval int, weekDays []string, hour int, minute int, now
 		return nil, fmt.Errorf("minute must be between 0 and 59, got: %d", minute)
 	}
 
-	nowUTC := now.UTC()
-
-	var reference time.Time
-	if referenceTime != nil {
-		var err error
-		reference, err = time.Parse(time.RFC3339, *referenceTime)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse reference time: %w", err)
-		}
-		reference = reference.UTC()
-	} else {
-		reference = nowUTC
-	}
+	nowInTZ := now
 
 	// Find next occurrence of any of the specified weekdays
 	validWeekdays := make(map[time.Weekday]bool)
@@ -688,38 +659,23 @@ func nextWeeksTrigger(interval int, weekDays []string, hour int, minute int, now
 		validWeekdays[weekday] = true
 	}
 
-	weeksElapsed := int(nowUTC.Sub(reference).Hours() / (24 * 7))
-	if weeksElapsed < 0 {
-		weeksElapsed = 0
-	}
-	completedIntervals := weeksElapsed / interval
+	nextIntervalStart := nowInTZ.AddDate(0, 0, interval*7)
 
-	// Check if current week has valid days after the reference interval
-	currentWeekStart := reference.AddDate(0, 0, completedIntervals*interval*7)
-	for i := 0; i < 14; i++ { // Check current and next week
-		checkDate := currentWeekStart.AddDate(0, 0, i)
-		if validWeekdays[checkDate.Weekday()] {
-			candidateTime := time.Date(checkDate.Year(), checkDate.Month(), checkDate.Day(), hour, minute, 0, 0, checkDate.Location())
-			if candidateTime.After(nowUTC) {
-				return &candidateTime, nil
-			}
-		}
-	}
-
-	// If no valid day found in current interval, check next interval
-	nextIntervalStart := reference.AddDate(0, 0, (completedIntervals+1)*interval*7)
+	// start the search on Sunday of the next week
+	nextIntervalStart.Add(-time.Duration(nextIntervalStart.Weekday()) * time.Hour)
 	for i := 0; i < 7; i++ {
 		checkDate := nextIntervalStart.AddDate(0, 0, i)
 		if validWeekdays[checkDate.Weekday()] {
 			candidateTime := time.Date(checkDate.Year(), checkDate.Month(), checkDate.Day(), hour, minute, 0, 0, checkDate.Location())
-			return &candidateTime, nil
+			utcResult := candidateTime.UTC()
+			return &utcResult, nil
 		}
 	}
 
 	return nil, fmt.Errorf("no valid weekday found")
 }
 
-func nextMonthsTrigger(interval int, dayOfMonth int, hour int, minute int, now time.Time, referenceTime *string) (*time.Time, error) {
+func nextMonthsTrigger(interval int, dayOfMonth int, hour int, minute int, now time.Time) (*time.Time, error) {
 	if interval < 1 || interval > 24 {
 		return nil, fmt.Errorf("interval must be between 1 and 24 months, got: %d", interval)
 	}
@@ -733,36 +689,13 @@ func nextMonthsTrigger(interval int, dayOfMonth int, hour int, minute int, now t
 		return nil, fmt.Errorf("minute must be between 0 and 59, got: %d", minute)
 	}
 
-	nowUTC := now.UTC()
-
-	var reference time.Time
-	if referenceTime != nil {
-		var err error
-		reference, err = time.Parse(time.RFC3339, *referenceTime)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse reference time: %w", err)
-		}
-		reference = reference.UTC()
-	} else {
-		reference = nowUTC
-	}
-
-	monthsElapsed := (nowUTC.Year()-reference.Year())*12 + int(nowUTC.Month()-reference.Month())
-	if monthsElapsed < 0 {
-		monthsElapsed = 0
-	}
-	completedIntervals := monthsElapsed / interval
-
-	nextTriggerMonths := (completedIntervals + 1) * interval
-	nextTrigger := reference.AddDate(0, nextTriggerMonths, 0)
+	nowInTZ := now
+	nextTriggerMonths := interval
+	nextTrigger := nowInTZ.AddDate(0, nextTriggerMonths, 0)
 	nextTrigger = time.Date(nextTrigger.Year(), nextTrigger.Month(), dayOfMonth, hour, minute, 0, 0, nextTrigger.Location())
 
-	if nextTrigger.Before(nowUTC) || nextTrigger.Equal(nowUTC) || nextTrigger.Day() != dayOfMonth {
-		nextTrigger = reference.AddDate(0, (completedIntervals+1)*interval, 0)
-		nextTrigger = time.Date(nextTrigger.Year(), nextTrigger.Month(), dayOfMonth, hour, minute, 0, 0, nextTrigger.Location())
-	}
-
-	return &nextTrigger, nil
+	utcResult := nextTrigger.UTC()
+	return &utcResult, nil
 }
 
 func nextCronTrigger(cronExpression string, now time.Time) (*time.Time, error) {
@@ -773,7 +706,9 @@ func nextCronTrigger(cronExpression string, now time.Time) (*time.Time, error) {
 	}
 
 	nextTime := schedule.Next(now)
-	return &nextTime, nil
+	// Convert result back to UTC for consistent API
+	utcResult := nextTime.UTC()
+	return &utcResult, nil
 }
 
 func intPtr(v int) *int {
