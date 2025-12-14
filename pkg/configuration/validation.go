@@ -306,19 +306,35 @@ func validateCron(field Field, value any) error {
 		return fmt.Errorf("cron expression cannot be empty")
 	}
 
-	// Parse with full cron fields: second, minute, hour, day of month, month, day of week
-	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
-	_, err := parser.Parse(cronStr)
-	if err != nil {
-		return fmt.Errorf("invalid cron expression: %w", err)
-	}
-
 	// Validate allowed wildcards: * , - /
 	validChars := "0123456789*,-/ abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	for _, char := range cronStr {
 		if !strings.ContainsRune(validChars, char) {
 			return fmt.Errorf("cron expression contains invalid character '%c'. Valid wildcards are: * , - /", char)
 		}
+	}
+
+	fields := strings.Fields(cronStr)
+
+	var parser cron.Parser
+	var formatDescription string
+
+	switch len(fields) {
+	case 5:
+		// Standard 5-field cron: minute, hour, day of month, month, day of week
+		parser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+		formatDescription = "5-field format (minute hour day month dayofweek)"
+	case 6:
+		// Extended 6-field cron: second, minute, hour, day of month, month, day of week
+		parser = cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+		formatDescription = "6-field format (second minute hour day month dayofweek)"
+	default:
+		return fmt.Errorf("cron expression must have either 5 fields (minute hour day month dayofweek) or 6 fields (second minute hour day month dayofweek), got %d fields", len(fields))
+	}
+
+	_, err := parser.Parse(cronStr)
+	if err != nil {
+		return fmt.Errorf("invalid cron expression for %s: %w", formatDescription, err)
 	}
 
 	return nil

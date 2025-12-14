@@ -16,20 +16,41 @@ export const CronFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
         type="text"
         value={currentValue}
         onChange={handleChange}
-        placeholder={field.placeholder || "0 30 14 * * MON-FRI"}
+        placeholder={field.placeholder || "30 14 * * MON-FRI"}
         className={hasError ? "border-red-500 border-2" : ""}
         spellCheck={false}
       />
 
       <div className="text-xs text-gray-500 dark:text-zinc-400">
-        <p className="mb-1">Cron format: <code className="bg-gray-100 dark:bg-zinc-800 px-1 rounded">second minute hour day month dayofweek</code></p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
-          <div>• <code>0 30 14 * * *</code> - Daily at 14:30</div>
-          <div>• <code>0 0 9 * * MON-FRI</code> - Weekdays at 9:00</div>
-          <div>• <code>0 0 0 1 * *</code> - First day of month</div>
-          <div>• <code>0 */15 * * * *</code> - Every 15 minutes</div>
+        <div className="space-y-1">
+          <p className="font-medium">Wildcards:</p>
+          <div className="ml-2 space-y-0.5">
+            <div>
+              <code className="bg-gray-100 dark:bg-zinc-800 px-1 rounded">*</code> any value
+            </div>
+            <div>
+              <code className="bg-gray-100 dark:bg-zinc-800 px-1 rounded">,</code> value list separator
+            </div>
+            <div>
+              <code className="bg-gray-100 dark:bg-zinc-800 px-1 rounded">-</code> range of values
+            </div>
+            <div>
+              <code className="bg-gray-100 dark:bg-zinc-800 px-1 rounded">/</code> step values
+            </div>
+          </div>
+          <p className="mt-2">
+            Check{" "}
+            <a
+              href="https://crontab.guru"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Crontab Guru
+            </a>{" "}
+            for more details on cron expressions
+          </p>
         </div>
-        <p className="mt-1">Valid wildcards: <code className="bg-gray-100 dark:bg-zinc-800 px-1 rounded">* , - /</code></p>
       </div>
     </div>
   );

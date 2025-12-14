@@ -129,18 +129,18 @@ func (s *Schedule) Configuration() []configuration.Field {
 		},
 		{
 			Name:     "type",
-			Label:    "Schedule Type",
+			Label:    "Frequency",
 			Type:     configuration.FieldTypeSelect,
 			Required: true,
 			Default:  TypeMinutes,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "Every X minutes", Value: "minutes"},
-						{Label: "Every X hours", Value: "hours"},
-						{Label: "Every X days", Value: "days"},
-						{Label: "Every X weeks", Value: "weeks"},
-						{Label: "Every X months", Value: "months"},
+						{Label: "Minutes", Value: "minutes"},
+						{Label: "Hours", Value: "hours"},
+						{Label: "Days", Value: "days"},
+						{Label: "Weeks", Value: "weeks"},
+						{Label: "Months", Value: "months"},
 						{Label: "Cron (Custom)", Value: "cron"},
 					},
 				},
@@ -323,7 +323,7 @@ func (s *Schedule) Configuration() []configuration.Field {
 			Name:        "cronExpression",
 			Label:       "Cron Expression",
 			Type:        configuration.FieldTypeCron,
-			Description: "Cron expression (e.g., '0 30 14 * * MON-FRI' for 2:30 PM weekdays). Valid wildcards: * , - /",
+			Description: "Cron expression in 5-field (e.g., '30 14 * * MON-FRI') or 6-field (e.g., '0 30 14 * * MON-FRI') format. Valid wildcards: * , - /",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "type", Values: []string{"cron"}},
 			},
@@ -721,7 +721,22 @@ func nextMonthsTrigger(interval int, dayOfMonth int, hour int, minute int, now t
 }
 
 func nextCronTrigger(cronExpression string, now time.Time) (*time.Time, error) {
-	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+	// Count fields to determine format
+	fields := strings.Fields(cronExpression)
+
+	var parser cron.Parser
+
+	switch len(fields) {
+	case 5:
+		// Standard 5-field cron: minute, hour, day of month, month, day of week
+		parser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+	case 6:
+		// Extended 6-field cron: second, minute, hour, day of month, month, day of week
+		parser = cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+	default:
+		return nil, fmt.Errorf("cron expression must have either 5 fields (minute hour day month dayofweek) or 6 fields (second minute hour day month dayofweek), got %d fields", len(fields))
+	}
+
 	schedule, err := parser.Parse(cronExpression)
 	if err != nil {
 		return nil, fmt.Errorf("invalid cron expression: %w", err)
