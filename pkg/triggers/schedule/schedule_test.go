@@ -49,7 +49,7 @@ func TestNextMinutesTrigger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := nextMinutesTrigger(tt.interval, tt.now)
+			result, err := nextMinutesTrigger(tt.interval, tt.now, nil)
 
 			if tt.expectError {
 				if err == nil {
@@ -198,7 +198,7 @@ func TestGetNextTrigger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := getNextTrigger(tt.config, tt.now)
+			result, err := getNextTrigger(tt.config, tt.now, nil)
 
 			if tt.expectError {
 				if err == nil {
@@ -259,7 +259,7 @@ func TestMinutesSchedulingConsistency(t *testing.T) {
 			currentTime := startTime
 
 			for currentTime.Before(endTime) {
-				next, err := nextMinutesTrigger(tt.interval, currentTime)
+				next, err := nextMinutesTrigger(tt.interval, currentTime, nil)
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
@@ -403,7 +403,7 @@ func TestTimezoneHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := getNextTrigger(tt.config, tt.now)
+			result, err := getNextTrigger(tt.config, tt.now, nil)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				return

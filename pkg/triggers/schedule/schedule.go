@@ -39,7 +39,8 @@ const (
 type Schedule struct{}
 
 type Metadata struct {
-	NextTrigger *string `json:"nextTrigger"`
+	NextTrigger   *string `json:"nextTrigger"`
+	ReferenceTime *string `json:"referenceTime"` // For minutes scheduling: time when schedule was first set up
 }
 
 type Configuration struct {
@@ -350,7 +351,13 @@ func (s *Schedule) Setup(ctx triggers.TriggerContext) error {
 	}
 
 	now := time.Now()
-	nextTrigger, err := getNextTrigger(config, now)
+
+	if config.Type == TypeMinutes && metadata.ReferenceTime == nil {
+		referenceTime := now.Format(time.RFC3339)
+		metadata.ReferenceTime = &referenceTime
+	}
+
+	nextTrigger, err := getNextTrigger(config, now, metadata.ReferenceTime)
 	if err != nil {
 		return err
 	}
@@ -379,7 +386,8 @@ func (s *Schedule) Setup(ctx triggers.TriggerContext) error {
 
 	formatted := nextTrigger.Format(time.RFC3339)
 	ctx.MetadataContext.Set(Metadata{
-		NextTrigger: &formatted,
+		NextTrigger:   &formatted,
+		ReferenceTime: metadata.ReferenceTime,
 	})
 	return nil
 }
@@ -421,7 +429,7 @@ func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
 	}
 
 	now := time.Now()
-	nextTrigger, err := getNextTrigger(spec, now)
+	nextTrigger, err := getNextTrigger(spec, now, existingMetadata.ReferenceTime)
 	if err != nil {
 		return err
 	}
@@ -433,12 +441,13 @@ func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
 
 	formatted := nextTrigger.Format(time.RFC3339)
 	ctx.MetadataContext.Set(Metadata{
-		NextTrigger: &formatted,
+		NextTrigger:   &formatted,
+		ReferenceTime: existingMetadata.ReferenceTime,
 	})
 	return nil
 }
 
-func getNextTrigger(config Configuration, now time.Time) (*time.Time, error) {
+func getNextTrigger(config Configuration, now time.Time, referenceTime *string) (*time.Time, error) {
 	timezone := parseTimezone(config.Timezone)
 	nowInTZ := now.In(timezone)
 
@@ -447,7 +456,7 @@ func getNextTrigger(config Configuration, now time.Time) (*time.Time, error) {
 		if config.MinutesInterval == nil {
 			return nil, fmt.Errorf("minutesInterval is required for minutes schedule")
 		}
-		return nextMinutesTrigger(*config.MinutesInterval, nowInTZ)
+		return nextMinutesTrigger(*config.MinutesInterval, nowInTZ, referenceTime)
 
 	case TypeHours:
 		if config.HoursInterval == nil {
@@ -518,13 +527,26 @@ func getNextTrigger(config Configuration, now time.Time) (*time.Time, error) {
 	}
 }
 
-func nextMinutesTrigger(interval int, now time.Time) (*time.Time, error) {
+func nextMinutesTrigger(interval int, now time.Time, referenceTime *string) (*time.Time, error) {
 	if interval < 1 || interval > 59 {
 		return nil, fmt.Errorf("interval must be between 1 and 59 minutes, got: %d", interval)
 	}
 
 	nowInTZ := now
-	minutesElapsed := int(nowInTZ.Sub(nowInTZ).Minutes())
+
+	var reference time.Time
+	if referenceTime != nil {
+		var err error
+		reference, err = time.Parse(time.RFC3339, *referenceTime)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse reference time: %w", err)
+		}
+		reference = reference.In(nowInTZ.Location())
+	} else {
+		reference = nowInTZ
+	}
+
+	minutesElapsed := int(nowInTZ.Sub(reference).Minutes())
 
 	if minutesElapsed < 0 {
 		minutesElapsed = 0
@@ -532,7 +554,7 @@ func nextMinutesTrigger(interval int, now time.Time) (*time.Time, error) {
 	completedIntervals := minutesElapsed / interval
 
 	nextTriggerMinutes := (completedIntervals + 1) * interval
-	nextTrigger := nowInTZ.Add(time.Duration(nextTriggerMinutes) * time.Minute)
+	nextTrigger := reference.Add(time.Duration(nextTriggerMinutes) * time.Minute)
 
 	if nextTrigger.Before(nowInTZ) || nextTrigger.Equal(nowInTZ) {
 		nextTrigger = nextTrigger.Add(time.Duration(interval) * time.Minute)
