@@ -6,7 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/stretchr/testify/require"
+	"gopkg.in/dnaeon/go-vcr.v2/cassette"
 	"gopkg.in/dnaeon/go-vcr.v2/recorder"
 )
 
@@ -17,6 +20,16 @@ var (
 	// Keep the original http transport to restore it back to normal after tests.
 	originalTransport = http.DefaultTransport
 )
+
+func customMatcher(r *http.Request, i cassette.Request) bool {
+	log.Printf("VCR: Trying to match request %s %s", r.Method, r.URL.String())
+	log.Printf("VCR: Against cassette entry %s %s", i.Method, i.URL)
+
+	matches := r.Method == i.Method && r.URL.String() == i.URL
+	log.Printf("VCR: Match result: %v", matches)
+
+	return matches
+}
 
 func Run(t *testing.T, testName string, testFunc func(t *testing.T)) {
 	t.Run(testName, func(t *testing.T) {
@@ -54,6 +67,7 @@ func startGlobalVCR(cassetteName string, mode recorder.Mode) error {
 	}
 
 	r.AddPassthrough(localTraficPassthrough)
+	r.SetMatcher(customMatcher)
 
 	globalRecorder = r
 	http.DefaultTransport = r
