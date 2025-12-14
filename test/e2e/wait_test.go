@@ -19,7 +19,6 @@ func TestWaitComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Wait Seconds")
 		steps.addWaitWithDuration(10, "Seconds")
-		steps.saveCanvas()
 		steps.assertWaitSavedToDB(10, "seconds")
 	})
 
@@ -27,7 +26,6 @@ func TestWaitComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Wait Minutes")
 		steps.addWaitWithDuration(5, "Minutes")
-		steps.saveCanvas()
 		steps.assertWaitSavedToDB(5, "minutes")
 	})
 
@@ -35,7 +33,6 @@ func TestWaitComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Wait Hours")
 		steps.addWaitWithDuration(2, "Hours")
-		steps.saveCanvas()
 		steps.assertWaitSavedToDB(2, "hours")
 	})
 

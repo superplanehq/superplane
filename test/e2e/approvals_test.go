@@ -18,7 +18,6 @@ func TestApprovals(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addApprovalToCanvas("TestApproval")
-		steps.saveCanvas()
 		steps.verifyApprovalSavedToDB("TestApproval")
 	})
 
@@ -26,7 +25,6 @@ func TestApprovals(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addApprovalToCanvas("ReleaseApproval")
-		steps.saveCanvas()
 		steps.verifyApprovalConfigurationPersisted()
 	})
 
