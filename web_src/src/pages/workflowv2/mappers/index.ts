@@ -1,7 +1,13 @@
-import { ComponentBaseMapper, TriggerRenderer, ComponentAdditionalDataBuilder, EventStateRegistry } from "./types";
+import {
+  ComponentBaseMapper,
+  TriggerRenderer,
+  ComponentAdditionalDataBuilder,
+  EventStateRegistry,
+  CustomFieldRenderer,
+} from "./types";
 import { defaultTriggerRenderer } from "./default";
 import { githubTriggerRenderer } from "./github";
-import { scheduleTriggerRenderer } from "./schedule";
+import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { noopMapper } from "./noop";
 import { ifMapper } from "./if";
 import { httpMapper } from "./http";
@@ -38,6 +44,10 @@ const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBui
 
 const eventStateRegistries: Record<string, EventStateRegistry> = {
   approval: APPROVAL_STATE_REGISTRY,
+};
+
+const customFieldRenderers: Record<string, CustomFieldRenderer> = {
+  schedule: scheduleCustomFieldRenderer,
 };
 
 /**
@@ -86,4 +96,12 @@ export function getStateMap(componentName: string) {
  */
 export function getState(componentName: string) {
   return getEventStateRegistry(componentName).getState;
+}
+
+/**
+ * Get the appropriate custom field renderer for a component/trigger type.
+ * Returns undefined if no specific renderer is registered.
+ */
+export function getCustomFieldRenderer(componentName: string): CustomFieldRenderer | undefined {
+  return customFieldRenderers[componentName];
 }

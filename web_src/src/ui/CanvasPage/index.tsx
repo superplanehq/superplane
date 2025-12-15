@@ -116,6 +116,7 @@ export interface CanvasPageProps {
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
+  getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
   onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
   onSave?: (nodes: CanvasNode[]) => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
@@ -607,6 +608,7 @@ function CanvasPage(props: CanvasPageProps) {
             onCancelTemplate={handleCancelTemplate}
             newNodeData={newNodeData}
             organizationId={props.organizationId}
+            getCustomField={props.getCustomField}
           />
         </div>
       </div>
@@ -669,6 +671,7 @@ function Sidebar({
   onCancelTemplate,
   newNodeData,
   organizationId,
+  getCustomField,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -711,6 +714,7 @@ function Sidebar({
   onCancelTemplate?: () => void;
   newNodeData: NewNodeData | null;
   organizationId?: string;
+  getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
 }) {
   const sidebarData = useMemo(() => {
     if (templateNodeId && newNodeData) {
@@ -758,7 +762,7 @@ function Sidebar({
   }
 
   // Show loading state when data is being fetched
-  if (sidebarData.isLoading) {
+  if (sidebarData.isLoading && currentTab === "latest") {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
     const sidebarWidth = saved ? parseInt(saved, 10) : 450;
 
@@ -837,6 +841,11 @@ function Sidebar({
       onEdit={onEdit ? () => onEdit(state.componentSidebar.selectedNodeId!) : undefined}
       domainId={organizationId}
       domainType="DOMAIN_TYPE_ORGANIZATION"
+      customField={
+        getCustomField && state.componentSidebar.selectedNodeId
+          ? getCustomField(state.componentSidebar.selectedNodeId) || undefined
+          : undefined
+      }
       currentTab={currentTab}
       onTabChange={onTabChange}
       templateNodeId={templateNodeId}

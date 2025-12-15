@@ -16,6 +16,7 @@ import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { AuthorizationDomainType, ConfigurationField, WorkflowsWorkflowNodeExecution } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
 import { NewNodeData } from "../CustomComponentBuilderPage";
+import { ReactNode } from "react";
 
 const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
   { value: "processed", label: "Processed" },
@@ -108,6 +109,7 @@ interface ComponentSidebarProps {
   onNodeConfigCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
+  customField?: (configuration: Record<string, unknown>) => ReactNode;
 }
 
 export const ComponentSidebar = ({
@@ -169,6 +171,7 @@ export const ComponentSidebar = ({
   onNodeConfigCancel,
   domainId,
   domainType,
+  customField,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -627,6 +630,7 @@ export const ComponentSidebar = ({
                   onCancel={isTemplateNode ? onCancelTemplate : onNodeConfigCancel}
                   domainId={domainId}
                   domainType={domainType}
+                  customField={customField}
                 />
               </TabsContent>
             )}
