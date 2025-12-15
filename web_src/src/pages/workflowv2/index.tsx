@@ -1788,16 +1788,6 @@ function prepareSidebarData(
   const triggerMetadata =
     node.type === "TYPE_TRIGGER" ? triggers.find((t) => t.name === node.trigger?.name) : undefined;
 
-  const configurationFields =
-    blueprintMetadata?.configuration || componentMetadata?.configuration || triggerMetadata?.configuration || [];
-
-  const fieldLabelMap = configurationFields.reduce<Record<string, string>>((acc, field) => {
-    if (field.name) {
-      acc[field.name] = field.label || field.name;
-    }
-    return acc;
-  }, {});
-
   const nodeTitle =
     componentMetadata?.label || blueprintMetadata?.name || triggerMetadata?.label || node.name || "Unknown";
   let iconSlug = "boxes";
@@ -1831,39 +1821,11 @@ function prepareSidebarData(
 
   // Convert queue items to sidebar events (next in queue)
   const nextInQueueEvents = mapQueueItemsToSidebarEvents(queueItems, nodes, 5);
-
-  // Build metadata from node configuration
-  const metadataItems = [
-    {
-      icon: "cog",
-      label: `Node ID: ${node.id}`,
-    },
-  ];
-
   const hideQueueEvents = node.type === "TYPE_TRIGGER";
-
-  // Add configuration fields to metadata (only simple types)
-  if (node.configuration) {
-    Object.entries(node.configuration).forEach(([key, value]) => {
-      // Only include simple types (string, number, boolean)
-      // Exclude objects, arrays, null, undefined
-      const valueType = typeof value;
-      const isSimpleType = valueType === "string" || valueType === "number" || valueType === "boolean";
-
-      if (isSimpleType) {
-        const displayKey = fieldLabelMap[key] || key;
-        metadataItems.push({
-          icon: "settings",
-          label: `${displayKey}: ${value}`,
-        });
-      }
-    });
-  }
 
   return {
     latestEvents,
     nextInQueueEvents,
-    metadata: metadataItems,
     title: nodeTitle,
     iconSlug,
     iconColor: getColorClass(color),

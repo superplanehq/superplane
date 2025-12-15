@@ -5,7 +5,6 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { resolveIcon } from "@/lib/utils";
 import { ArrowLeft, Plus, Search, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { MetadataItem, MetadataList } from "../metadataList";
 import { ChildEventsState } from "../composite";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
@@ -29,7 +28,6 @@ interface ComponentSidebarProps {
 
   latestEvents: SidebarEvent[];
   nextInQueueEvents: SidebarEvent[];
-  metadata: MetadataItem[];
   title: string;
   iconSrc?: string;
   iconSlug?: string;
@@ -113,7 +111,6 @@ interface ComponentSidebarProps {
 
 export const ComponentSidebar = ({
   isOpen,
-  metadata,
   title,
   iconSrc,
   iconSlug,
@@ -532,14 +529,6 @@ export const ComponentSidebar = ({
         </>
       ) : (
         <>
-          {metadata.length > 0 && (
-            <div className="px-3 py-1 border-b-1 border-border">
-              <MetadataList
-                items={metadata}
-                className="border-b-0 text-gray-500 font-medium gap-1.5 flex flex-col py-2"
-              />
-            </div>
-          )}
           <Tabs
             value={activeTab}
             onValueChange={(value) => onTabChange?.(value as "latest" | "settings")}

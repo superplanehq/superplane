@@ -24,17 +24,6 @@ const meta: Meta<typeof ComponentSidebar> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const mockMetadata = [
-  {
-    icon: "book",
-    label: "monarch-app",
-  },
-  {
-    icon: "filter",
-    label: "branch=main",
-  },
-];
-
 const mockLatestEvents = [
   {
     id: "event-1",
@@ -233,7 +222,6 @@ export const Default: Story = {
     );
   },
   args: {
-    metadata: mockMetadata,
     title: "Listen to code changes",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
@@ -295,7 +283,6 @@ export const WithInteractiveEvents: Story = {
     );
   },
   args: {
-    metadata: mockMetadata,
     title: "Interactive Event Sidebar",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
@@ -473,7 +460,6 @@ export const ZeroState: Story = {
     );
   },
   args: {
-    metadata: mockMetadata,
     title: "Empty Component",
     iconSlug: "circle-dashed",
     iconColor: "text-gray-800",
@@ -504,7 +490,6 @@ export const WithActionsDropdown: Story = {
     );
   },
   args: {
-    metadata: mockMetadata,
     title: "Component with All Actions",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
@@ -608,7 +593,6 @@ export const WithFullHistory: Story = {
     );
   },
   args: {
-    metadata: mockMetadata,
     title: "Full History Demo",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
@@ -660,7 +644,6 @@ export const HistoryCountDemo: Story = {
     );
   },
   args: {
-    metadata: mockMetadata,
     title: "History vs Queue Counts Demo",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",

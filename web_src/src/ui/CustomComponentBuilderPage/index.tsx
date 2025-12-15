@@ -707,7 +707,6 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             iconColor="text-black"
             latestEvents={[]}
             nextInQueueEvents={[]}
-            metadata={[]}
             iconBackground=""
             totalInQueueCount={0}
             totalInHistoryCount={0}
