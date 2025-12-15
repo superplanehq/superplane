@@ -4,6 +4,7 @@ package Superplane.Organizations;
 
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/organizations";
@@ -103,6 +104,63 @@ service Organizations {
       tags: "Organization";
     };
   }
+
+  rpc ListApplications(ListApplicationsRequest) returns (ListApplicationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/applications"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List applications in an organization";
+      description: "Returns a list of applications in an organization";
+      tags: "Organization";
+    };
+  }
+
+  rpc DescribeApplication(DescribeApplicationRequest) returns (DescribeApplicationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/applications/{installation_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe an application in an organization";
+      description: "Returns details of a specific application in an organization";
+      tags: "Organization";
+    };
+  }
+
+  rpc InstallApplication(InstallApplicationRequest) returns (InstallApplicationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/applications"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Install application on organization";
+      description: "Install an application on an organization";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateApplication(UpdateApplicationRequest) returns (UpdateApplicationResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id}/applications/{installation_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update application installation";
+      description: "Updates the configuration of an installed application";
+      tags: "Organization";
+    };
+  }
+
+  rpc UninstallApplication(UninstallApplicationRequest) returns (UninstallApplicationResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/organizations/{id}/applications/{installation_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Uninstall application";
+      description: "Uninstalls an application from an organization";
+      tags: "Organization";
+    };
+  }
 }
 
 message Organization {
@@ -178,6 +236,91 @@ message RemoveUserRequest {
 }
 
 message RemoveUserResponse {}
+
+message ListApplicationsRequest {
+  string id = 1;
+}
+
+message ListApplicationsResponse {
+  repeated AppInstallation applications = 1;
+}
+
+message InstallApplicationRequest {
+  string id = 1;
+  string app_name = 2;
+  string installation_name = 3;
+  google.protobuf.Struct configuration = 4;
+}
+
+message InstallApplicationResponse {
+  AppInstallation installation = 1;
+}
+
+message DescribeApplicationRequest {
+  string id = 1;
+  string installation_id = 2;
+}
+
+message DescribeApplicationResponse {
+  AppInstallation installation = 1;
+}
+
+message UpdateApplicationRequest {
+  string id = 1;
+  string installation_id = 2;
+  google.protobuf.Struct configuration = 3;
+}
+
+message UpdateApplicationResponse {
+  AppInstallation installation = 1;
+}
+
+message UninstallApplicationRequest {
+  string id = 1;
+  string installation_id = 2;
+}
+
+message UninstallApplicationResponse {}
+
+message AppInstallation {
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp updated_at = 5;
+  }
+
+  message Spec {
+    string app_name = 1;
+    google.protobuf.Struct configuration = 2;
+  }
+
+  message Status {
+    string state = 1;
+    string state_description = 2;
+    google.protobuf.Struct metadata = 3;
+    BrowserAction browser_action = 4;
+    repeated NodeRef used_in = 5;
+  }
+
+  message NodeRef {
+    string workflow_id = 1;
+    string workflow_name = 2;
+    string node_id = 3;
+    string node_name = 4;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
+  Status status = 3;
+}
+
+message BrowserAction {
+  string url = 1;
+  string method = 2;
+  map<string, string> form_fields = 3;
+  string description = 4;
+}
 
 // Event messages for organization lifecycle events
 message OrganizationCreated {

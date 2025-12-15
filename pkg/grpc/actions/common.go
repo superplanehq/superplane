@@ -7,12 +7,14 @@ import (
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -806,4 +808,56 @@ func defaultValueFromProto(fieldType, defaultValue string) any {
 	default:
 		return defaultValue
 	}
+}
+
+func SerializeComponents(in []core.Component) []*componentpb.Component {
+	out := make([]*componentpb.Component, len(in))
+	for i, component := range in {
+		outputChannels := component.OutputChannels(nil)
+		channels := make([]*componentpb.OutputChannel, len(outputChannels))
+		for j, channel := range outputChannels {
+			channels[j] = &componentpb.OutputChannel{
+				Name: channel.Name,
+			}
+		}
+
+		configFields := component.Configuration()
+		configuration := make([]*configpb.Field, len(configFields))
+		for j, field := range configFields {
+			configuration[j] = ConfigurationFieldToProto(field)
+		}
+
+		out[i] = &componentpb.Component{
+			Name:           component.Name(),
+			Label:          component.Label(),
+			Description:    component.Description(),
+			Icon:           component.Icon(),
+			Color:          component.Color(),
+			OutputChannels: channels,
+			Configuration:  configuration,
+		}
+	}
+
+	return out
+}
+
+func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
+	out := make([]*triggerpb.Trigger, len(in))
+	for i, trigger := range in {
+		configFields := trigger.Configuration()
+		configuration := make([]*configpb.Field, len(configFields))
+		for j, field := range configFields {
+			configuration[j] = ConfigurationFieldToProto(field)
+		}
+
+		out[i] = &triggerpb.Trigger{
+			Name:          trigger.Name(),
+			Label:         trigger.Label(),
+			Description:   trigger.Description(),
+			Icon:          trigger.Icon(),
+			Color:         trigger.Color(),
+			Configuration: configuration,
+		}
+	}
+	return out
 }

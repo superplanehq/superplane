@@ -26,6 +26,11 @@ const (
 	Organizations_CreateInvitation_FullMethodName     = "/Superplane.Organizations.Organizations/CreateInvitation"
 	Organizations_ListInvitations_FullMethodName      = "/Superplane.Organizations.Organizations/ListInvitations"
 	Organizations_RemoveInvitation_FullMethodName     = "/Superplane.Organizations.Organizations/RemoveInvitation"
+	Organizations_ListApplications_FullMethodName     = "/Superplane.Organizations.Organizations/ListApplications"
+	Organizations_DescribeApplication_FullMethodName  = "/Superplane.Organizations.Organizations/DescribeApplication"
+	Organizations_InstallApplication_FullMethodName   = "/Superplane.Organizations.Organizations/InstallApplication"
+	Organizations_UpdateApplication_FullMethodName    = "/Superplane.Organizations.Organizations/UpdateApplication"
+	Organizations_UninstallApplication_FullMethodName = "/Superplane.Organizations.Organizations/UninstallApplication"
 )
 
 // OrganizationsClient is the client API for Organizations service.
@@ -39,6 +44,11 @@ type OrganizationsClient interface {
 	CreateInvitation(ctx context.Context, in *CreateInvitationRequest, opts ...grpc.CallOption) (*CreateInvitationResponse, error)
 	ListInvitations(ctx context.Context, in *ListInvitationsRequest, opts ...grpc.CallOption) (*ListInvitationsResponse, error)
 	RemoveInvitation(ctx context.Context, in *RemoveInvitationRequest, opts ...grpc.CallOption) (*RemoveInvitationResponse, error)
+	ListApplications(ctx context.Context, in *ListApplicationsRequest, opts ...grpc.CallOption) (*ListApplicationsResponse, error)
+	DescribeApplication(ctx context.Context, in *DescribeApplicationRequest, opts ...grpc.CallOption) (*DescribeApplicationResponse, error)
+	InstallApplication(ctx context.Context, in *InstallApplicationRequest, opts ...grpc.CallOption) (*InstallApplicationResponse, error)
+	UpdateApplication(ctx context.Context, in *UpdateApplicationRequest, opts ...grpc.CallOption) (*UpdateApplicationResponse, error)
+	UninstallApplication(ctx context.Context, in *UninstallApplicationRequest, opts ...grpc.CallOption) (*UninstallApplicationResponse, error)
 }
 
 type organizationsClient struct {
@@ -119,6 +129,56 @@ func (c *organizationsClient) RemoveInvitation(ctx context.Context, in *RemoveIn
 	return out, nil
 }
 
+func (c *organizationsClient) ListApplications(ctx context.Context, in *ListApplicationsRequest, opts ...grpc.CallOption) (*ListApplicationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListApplicationsResponse)
+	err := c.cc.Invoke(ctx, Organizations_ListApplications_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) DescribeApplication(ctx context.Context, in *DescribeApplicationRequest, opts ...grpc.CallOption) (*DescribeApplicationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DescribeApplicationResponse)
+	err := c.cc.Invoke(ctx, Organizations_DescribeApplication_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) InstallApplication(ctx context.Context, in *InstallApplicationRequest, opts ...grpc.CallOption) (*InstallApplicationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InstallApplicationResponse)
+	err := c.cc.Invoke(ctx, Organizations_InstallApplication_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) UpdateApplication(ctx context.Context, in *UpdateApplicationRequest, opts ...grpc.CallOption) (*UpdateApplicationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateApplicationResponse)
+	err := c.cc.Invoke(ctx, Organizations_UpdateApplication_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) UninstallApplication(ctx context.Context, in *UninstallApplicationRequest, opts ...grpc.CallOption) (*UninstallApplicationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UninstallApplicationResponse)
+	err := c.cc.Invoke(ctx, Organizations_UninstallApplication_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrganizationsServer is the server API for Organizations service.
 // All implementations should embed UnimplementedOrganizationsServer
 // for forward compatibility.
@@ -130,6 +190,11 @@ type OrganizationsServer interface {
 	CreateInvitation(context.Context, *CreateInvitationRequest) (*CreateInvitationResponse, error)
 	ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error)
 	RemoveInvitation(context.Context, *RemoveInvitationRequest) (*RemoveInvitationResponse, error)
+	ListApplications(context.Context, *ListApplicationsRequest) (*ListApplicationsResponse, error)
+	DescribeApplication(context.Context, *DescribeApplicationRequest) (*DescribeApplicationResponse, error)
+	InstallApplication(context.Context, *InstallApplicationRequest) (*InstallApplicationResponse, error)
+	UpdateApplication(context.Context, *UpdateApplicationRequest) (*UpdateApplicationResponse, error)
+	UninstallApplication(context.Context, *UninstallApplicationRequest) (*UninstallApplicationResponse, error)
 }
 
 // UnimplementedOrganizationsServer should be embedded to have
@@ -159,6 +224,21 @@ func (UnimplementedOrganizationsServer) ListInvitations(context.Context, *ListIn
 }
 func (UnimplementedOrganizationsServer) RemoveInvitation(context.Context, *RemoveInvitationRequest) (*RemoveInvitationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveInvitation not implemented")
+}
+func (UnimplementedOrganizationsServer) ListApplications(context.Context, *ListApplicationsRequest) (*ListApplicationsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListApplications not implemented")
+}
+func (UnimplementedOrganizationsServer) DescribeApplication(context.Context, *DescribeApplicationRequest) (*DescribeApplicationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DescribeApplication not implemented")
+}
+func (UnimplementedOrganizationsServer) InstallApplication(context.Context, *InstallApplicationRequest) (*InstallApplicationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InstallApplication not implemented")
+}
+func (UnimplementedOrganizationsServer) UpdateApplication(context.Context, *UpdateApplicationRequest) (*UpdateApplicationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateApplication not implemented")
+}
+func (UnimplementedOrganizationsServer) UninstallApplication(context.Context, *UninstallApplicationRequest) (*UninstallApplicationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UninstallApplication not implemented")
 }
 func (UnimplementedOrganizationsServer) testEmbeddedByValue() {}
 
@@ -306,6 +386,96 @@ func _Organizations_RemoveInvitation_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_ListApplications_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListApplicationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).ListApplications(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_ListApplications_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).ListApplications(ctx, req.(*ListApplicationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_DescribeApplication_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribeApplicationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).DescribeApplication(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_DescribeApplication_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).DescribeApplication(ctx, req.(*DescribeApplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_InstallApplication_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InstallApplicationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).InstallApplication(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_InstallApplication_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).InstallApplication(ctx, req.(*InstallApplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_UpdateApplication_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateApplicationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).UpdateApplication(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_UpdateApplication_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).UpdateApplication(ctx, req.(*UpdateApplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_UninstallApplication_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UninstallApplicationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).UninstallApplication(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_UninstallApplication_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).UninstallApplication(ctx, req.(*UninstallApplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Organizations_ServiceDesc is the grpc.ServiceDesc for Organizations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -340,6 +510,26 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveInvitation",
 			Handler:    _Organizations_RemoveInvitation_Handler,
+		},
+		{
+			MethodName: "ListApplications",
+			Handler:    _Organizations_ListApplications_Handler,
+		},
+		{
+			MethodName: "DescribeApplication",
+			Handler:    _Organizations_DescribeApplication_Handler,
+		},
+		{
+			MethodName: "InstallApplication",
+			Handler:    _Organizations_InstallApplication_Handler,
+		},
+		{
+			MethodName: "UpdateApplication",
+			Handler:    _Organizations_UpdateApplication_Handler,
+		},
+		{
+			MethodName: "UninstallApplication",
+			Handler:    _Organizations_UninstallApplication_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

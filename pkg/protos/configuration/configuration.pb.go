@@ -33,10 +33,10 @@ type Field struct {
 	TypeOptions          *TypeOptions           `protobuf:"bytes,8,opt,name=type_options,json=typeOptions,proto3,oneof" json:"type_options,omitempty"`
 	RequiredConditions   []*RequiredCondition   `protobuf:"bytes,9,rep,name=required_conditions,json=requiredConditions,proto3" json:"required_conditions,omitempty"`
 	ValidationRules      []*ValidationRule      `protobuf:"bytes,10,rep,name=validation_rules,json=validationRules,proto3" json:"validation_rules,omitempty"`
-	// Optional placeholder text for UI inputs
-	Placeholder   *string `protobuf:"bytes,11,opt,name=placeholder,proto3,oneof" json:"placeholder,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Placeholder          *string                `protobuf:"bytes,11,opt,name=placeholder,proto3,oneof" json:"placeholder,omitempty"`
+	Sensitive            *bool                  `protobuf:"varint,12,opt,name=sensitive,proto3,oneof" json:"sensitive,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *Field) Reset() {
@@ -144,6 +144,13 @@ func (x *Field) GetPlaceholder() string {
 		return *x.Placeholder
 	}
 	return ""
+}
+
+func (x *Field) GetSensitive() bool {
+	if x != nil && x.Sensitive != nil {
+		return *x.Sensitive
+	}
+	return false
 }
 
 type TypeOptions struct {
@@ -990,7 +997,7 @@ var File_configuration_proto protoreflect.FileDescriptor
 
 const file_configuration_proto_rawDesc = "" +
 	"\n" +
-	"\x13configuration.proto\x12\x18Superplane.Configuration\"\xed\x04\n" +
+	"\x13configuration.proto\x12\x18Superplane.Configuration\"\x9e\x05\n" +
 	"\x05Field\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12 \n" +
@@ -1003,10 +1010,13 @@ const file_configuration_proto_rawDesc = "" +
 	"\x13required_conditions\x18\t \x03(\v2+.Superplane.Configuration.RequiredConditionR\x12requiredConditions\x12S\n" +
 	"\x10validation_rules\x18\n" +
 	" \x03(\v2(.Superplane.Configuration.ValidationRuleR\x0fvalidationRules\x12%\n" +
-	"\vplaceholder\x18\v \x01(\tH\x02R\vplaceholder\x88\x01\x01B\x10\n" +
+	"\vplaceholder\x18\v \x01(\tH\x02R\vplaceholder\x88\x01\x01\x12!\n" +
+	"\tsensitive\x18\f \x01(\bH\x03R\tsensitive\x88\x01\x01B\x10\n" +
 	"\x0e_default_valueB\x0f\n" +
 	"\r_type_optionsB\x0e\n" +
-	"\f_placeholder\"\x81\a\n" +
+	"\f_placeholderB\f\n" +
+	"\n" +
+	"_sensitive\"\x81\a\n" +
 	"\vTypeOptions\x12H\n" +
 	"\x06number\x18\x01 \x01(\v2+.Superplane.Configuration.NumberTypeOptionsH\x00R\x06number\x88\x01\x01\x12H\n" +
 	"\x06select\x18\x02 \x01(\v2+.Superplane.Configuration.SelectTypeOptionsH\x01R\x06select\x88\x01\x01\x12X\n" +
