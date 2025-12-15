@@ -72,16 +72,10 @@ export function convertUTCToLocalTime(utcTimeString: string, userTimezone?: stri
  * @param includeTimezone - Whether to include timezone abbreviation in the result
  * @returns Formatted datetime string
  */
-export function formatTimestampInUserTimezone(
-  timestamp: string | Date,
-  userTimezone?: string,
-  includeTimezone = true,
-): string {
+export function formatTimestampInUserTimezone(timestamp: string | Date, userTimezone?: string): string {
   const timezone = userTimezone || getUserTimezone();
   const date = typeof timestamp === "string" ? new Date(timestamp) : timestamp;
-
   const options: Intl.DateTimeFormatOptions = {
-    timeZone: timezone,
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -90,11 +84,7 @@ export function formatTimestampInUserTimezone(
     hour12: false, // Use 24-hour format instead of AM/PM
   };
 
-  if (includeTimezone) {
-    options.timeZoneName = "short";
-  }
-
-  return date.toLocaleDateString("en-US", options);
+  return date.toLocaleDateString("en-US", options) + ` ${timezone}`;
 }
 
 /**

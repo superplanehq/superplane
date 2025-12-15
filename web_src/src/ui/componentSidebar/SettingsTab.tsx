@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { isFieldRequired, isFieldVisible, parseDefaultValues, validateFieldForSubmission } from "@/utils/components";
+import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -40,6 +41,25 @@ export function SettingsTab({
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
   }, [configurationFields]);
+
+  const {
+    validationErrors: realtimeValidationErrors,
+    validateNow,
+    clearErrors: clearRealtimeErrors,
+    hasFieldError: hasRealtimeFieldError,
+  } = useRealtimeValidation(
+    configurationFields,
+    { ...nodeConfiguration, nodeName: currentNodeName },
+    {
+      debounceMs: 200,
+      validateOnMount: false,
+    },
+  );
+
+  // Helper to check if node name has real-time validation error
+  const hasNodeNameError = useMemo(() => {
+    return hasRealtimeFieldError("nodeName") || currentNodeName.trim() === "";
+  }, [hasRealtimeFieldError, currentNodeName]);
 
   const isFieldEmpty = (value: unknown): boolean => {
     if (value === null || value === undefined) return true;
@@ -111,17 +131,6 @@ export function SettingsTab({
     [],
   );
 
-  const validateAllFields = useCallback((): boolean => {
-    const errors = validateNestedFields(configurationFields, nodeConfiguration);
-
-    if (isFieldEmpty(currentNodeName)) {
-      errors.add("nodeName");
-    }
-    setValidationErrors(errors);
-    setShowValidation(true);
-    return errors.size === 0;
-  }, [configurationFields, nodeConfiguration, currentNodeName, validateNestedFields]);
-
   // Function to filter out invisible fields
   const filterVisibleFields = useCallback(
     (config: Record<string, unknown>) => {
@@ -152,7 +161,9 @@ export function SettingsTab({
   }, [configuration, nodeName, defaultValues, filterVisibleFields]);
 
   const handleSave = () => {
-    if (validateAllFields()) {
+    const isValidForm = validateNow();
+
+    if (isValidForm) {
       onSave(nodeConfiguration, currentNodeName);
     }
   };
@@ -162,6 +173,7 @@ export function SettingsTab({
     setCurrentNodeName(nodeName);
     setValidationErrors(new Set());
     setShowValidation(false);
+    clearRealtimeErrors();
     onCancel?.();
   };
 
@@ -170,16 +182,10 @@ export function SettingsTab({
       <div className="space-y-6">
         {/* Node identification section */}
         <div className="flex flex-col gap-2 h-[60px]">
-          <Label
-            className={`min-w-[100px] text-left ${
-              showValidation && validationErrors.has("nodeName") ? "text-red-600 dark:text-red-400" : ""
-            }`}
-          >
+          <Label className={`min-w-[100px] text-left ${hasNodeNameError ? "text-red-600 dark:text-red-400" : ""}`}>
             Node Name
             <span className="text-red-500 ml-1">*</span>
-            {showValidation && validationErrors.has("nodeName") && (
-              <span className="text-red-500 text-xs ml-2">- required field</span>
-            )}
+            {hasNodeNameError && <span className="text-red-500 text-xs ml-2">- required field</span>}
           </Label>
           <Input
             data-testid="node-name-input"
@@ -188,9 +194,7 @@ export function SettingsTab({
             onChange={(e) => setCurrentNodeName(e.target.value)}
             placeholder="Enter a name for this node"
             autoFocus
-            className={`flex-1 shadow-none ${
-              showValidation && validationErrors.has("nodeName") ? "border-red-500 border-2" : ""
-            }`}
+            className={`flex-1 shadow-none ${hasNodeNameError ? "border-red-500 border-2" : ""}`}
           />
         </div>
 
@@ -226,6 +230,8 @@ export function SettingsTab({
                   }
                   validationErrors={showValidation ? validationErrors : undefined}
                   fieldPath={fieldName}
+                  realtimeValidationErrors={realtimeValidationErrors}
+                  enableRealtimeValidation={true}
                 />
               );
             })}

@@ -223,7 +223,7 @@ export const Default: Story = {
     );
   },
   args: {
-    title: "Listen to code changes",
+    nodeName: "Listen to code changes",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
     onClose: () => console.log("Close sidebar"),
@@ -285,7 +285,7 @@ export const WithInteractiveEvents: Story = {
     );
   },
   args: {
-    title: "Interactive Event Sidebar",
+    nodeName: "Interactive Event Sidebar",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
     onClose: () => console.log("Close sidebar"),
@@ -352,7 +352,7 @@ export const WithDifferentIcon: Story = {
         label: "env=production",
       },
     ],
-    title: "Database Changes",
+    nodeName: "Database Changes",
     iconSlug: "database",
     iconColor: "text-blue-700",
     iconBackground: "bg-blue-200",
@@ -427,7 +427,7 @@ export const ExtendedMetadata: Story = {
         label: "team=backend",
       },
     ],
-    title: "Enterprise Application Monitoring",
+    nodeName: "Enterprise Application Monitoring",
     iconSlug: "eye",
     iconColor: "text-purple-800",
     iconBackground: "bg-purple-300",
@@ -465,7 +465,7 @@ export const ZeroState: Story = {
     );
   },
   args: {
-    title: "Empty Component",
+    nodeName: "Empty Component",
     iconSlug: "circle-dashed",
     iconColor: "text-gray-800",
     iconBackground: "bg-gray-200",
@@ -496,7 +496,7 @@ export const WithActionsDropdown: Story = {
     );
   },
   args: {
-    title: "Component with All Actions",
+    nodeName: "Component with All Actions",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
     onClose: () => console.log("Close sidebar"),
@@ -600,7 +600,7 @@ export const WithFullHistory: Story = {
     );
   },
   args: {
-    title: "Full History Demo",
+    nodeName: "Full History Demo",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
     onClose: () => console.log("Close sidebar"),
@@ -652,7 +652,7 @@ export const HistoryCountDemo: Story = {
     );
   },
   args: {
-    title: "History vs Queue Counts Demo",
+    nodeName: "History vs Queue Counts Demo",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
     onClose: () => console.log("Close sidebar"),
