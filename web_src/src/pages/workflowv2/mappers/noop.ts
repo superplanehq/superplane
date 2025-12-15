@@ -25,7 +25,8 @@ export const noopMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
       title: node.name!,
-      eventSections: getNoopEventSections(nodes, lastExecution, componentName),
+      eventSections: lastExecution ? getNoopEventSections(nodes, lastExecution, componentName) : undefined,
+      includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
   },
@@ -33,29 +34,19 @@ export const noopMapper: ComponentBaseMapper = {
 
 function getNoopEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution | null,
+  execution: WorkflowsWorkflowNodeExecution,
   _componentName: string,
 ): EventSection[] {
-  if (!execution) {
-    return [
-      {
-        title: "Last Run",
-        eventTitle: "No events received yet",
-        eventState: "neutral" as const,
-      },
-    ];
-  }
-
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
   return [
     {
-      title: "Last Run",
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventState: executionToEventSectionState(execution),
+      eventId: execution.rootEvent?.id,
     },
   ];
 }

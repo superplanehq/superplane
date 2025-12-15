@@ -29,7 +29,10 @@ export const timeGateMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
       title: node.name!,
-      eventSections: getTimeGateEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName),
+      eventSections: lastExecutions[0]
+        ? getTimeGateEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName)
+        : undefined,
+      includeEmptyState: !lastExecutions[0],
       metadata: getTimeGateMetadataList(node),
       specs: getTimeGateSpecs(node),
       eventStateMap: getStateMap(componentName),
@@ -38,21 +41,21 @@ export const timeGateMapper: ComponentBaseMapper = {
 };
 
 function getTimeGateMetadataList(node: ComponentsNode): MetadataItem[] {
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as Record<string, unknown>;
   const mode = configuration?.mode;
 
   return [
     {
       icon: "settings",
-      label: getTimeGateModeLabel(mode),
+      label: getTimeGateModeLabel(mode as string),
     },
     {
       icon: "clock",
-      label: getTimeWindow(mode, configuration),
+      label: getTimeWindow(mode as string, configuration),
     },
     {
       icon: "globe",
-      label: `Timezone: ${getTimezoneDisplay(configuration?.timezone || "0")}`,
+      label: `Timezone: ${getTimezoneDisplay((configuration?.timezone as string) || "0")}`,
     },
   ];
 }
@@ -72,7 +75,7 @@ function getTimeGateModeLabel(mode: string): string {
   }
 }
 
-function getTimeWindow(mode: string, configuration: any): string {
+function getTimeWindow(mode: string, configuration: Record<string, unknown>): string {
   let startTime = "00:00";
   let endTime = "23:59";
 
@@ -102,8 +105,8 @@ const daysOfWeekOrder = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, frid
 
 function getTimeGateSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
-  const configuration = node.configuration as any;
-  const days = configuration?.days || [];
+  const configuration = node.configuration as Record<string, unknown>;
+  const days = (configuration?.days as string[]) || [];
 
   if (days && days.length > 0) {
     specs.push({
@@ -135,61 +138,36 @@ function getTimeGateSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 
 function getTimeGateEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution | null,
-  nodeQueueItems: WorkflowsWorkflowNodeQueueItem[] | undefined,
+  execution: WorkflowsWorkflowNodeExecution,
+  _nodeQueueItems: WorkflowsWorkflowNodeQueueItem[] | undefined,
   componentName: string,
 ): EventSection[] {
-  const sections: EventSection[] = [];
+  const executionState = getState(componentName)(execution);
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
-  // Add Last Event section
-  if (!execution) {
-    sections.push({
-      eventTitle: "No events received yet",
-      eventState: "neutral" as const,
-    });
-  } else {
-    const executionState = getState(componentName)(execution);
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  let subtitle: string | undefined;
 
-    let subtitle: string | undefined;
-
-    // If running, show next run time in the subtitle
-    if (executionState === "running") {
-      const executionMetadata = execution.metadata as { nextValidTime?: string };
-      if (executionMetadata?.nextValidTime) {
-        const nextRunTime = new Date(executionMetadata.nextValidTime);
-        const now = new Date();
-        const timeDiff = nextRunTime.getTime() - now.getTime();
-        const timeLeftText = timeDiff > 0 ? calcRelativeTimeFromDiff(timeDiff) : "Ready to run";
-        subtitle = `Runs in ${timeLeftText}`;
-      }
-    }
-
-    sections.push({
-      subtitle: subtitle,
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: executionState,
-    });
-  }
-
-  // Add Next in Queue section if there are queued items
-  if (nodeQueueItems && nodeQueueItems.length > 0) {
-    const queueItem = nodeQueueItems[nodeQueueItems.length - 1];
-    const rootTriggerNode = nodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    if (queueItem.rootEvent) {
-      const { title } = rootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent);
-      sections.push({
-        receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
-        eventTitle: title,
-        eventState: "next-in-queue" as const,
-      });
+  // If running, show next run time in the subtitle
+  if (executionState === "running") {
+    const executionMetadata = execution.metadata as { nextValidTime?: string };
+    if (executionMetadata?.nextValidTime) {
+      const nextRunTime = new Date(executionMetadata.nextValidTime);
+      const now = new Date();
+      const timeDiff = nextRunTime.getTime() - now.getTime();
+      const timeLeftText = timeDiff > 0 ? calcRelativeTimeFromDiff(timeDiff) : "Ready to run";
+      subtitle = `Runs in ${timeLeftText}`;
     }
   }
 
-  return sections;
+  const eventSection: EventSection = {
+    receivedAt: new Date(execution.createdAt!),
+    eventTitle: title,
+    eventState: executionState,
+    eventId: execution.rootEvent?.id,
+    eventSubtitle: subtitle,
+  };
+
+  return [eventSection];
 }

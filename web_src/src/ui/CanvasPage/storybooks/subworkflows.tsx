@@ -658,7 +658,6 @@ export const Provisioner = {
           collapsed: false,
           eventSections: [
             {
-              title: "Last Run",
               eventState: "success",
               receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
               eventTitle: "FEAT: Add new feature",
@@ -682,7 +681,6 @@ export const Provisioner = {
           collapsed: false,
           eventSections: [
             {
-              title: "Last Run",
               eventState: "success",
               receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
               eventTitle: "FEAT: Add new feature",
@@ -727,7 +725,6 @@ export const Desprovisioner = {
           collapsed: false,
           eventSections: [
             {
-              title: "Last Run",
               eventState: "success",
               receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
               eventTitle: "FEAT: Add new feature",
@@ -751,7 +748,6 @@ export const Desprovisioner = {
           collapsed: false,
           eventSections: [
             {
-              title: "Last Run",
               eventState: "success",
               receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
               eventTitle: "FEAT: Add new feature",

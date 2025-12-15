@@ -38,7 +38,8 @@ export const filterMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
-      eventSections: getfilterEventSections(nodes, lastExecution, componentName),
+      eventSections: lastExecution ? getfilterEventSections(nodes, lastExecution, componentName) : undefined,
+      includeEmptyState: !lastExecution,
       specs,
       eventStateMap: getStateMap(componentName),
     };
@@ -47,32 +48,20 @@ export const filterMapper: ComponentBaseMapper = {
 
 function getfilterEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution | null,
+  execution: WorkflowsWorkflowNodeExecution,
   componentName: string,
 ): EventSection[] {
-  let lastEvent: Omit<EventSection, "title"> = {
-    eventTitle: "No events received yet",
-    eventState: "neutral" as const,
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+
+  const eventSection: EventSection = {
+    receivedAt: new Date(execution.createdAt!),
+    eventTitle: title,
+    eventState: getState(componentName)(execution),
+    eventId: execution.rootEvent?.id,
   };
-  if (execution) {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
 
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
-    lastEvent = {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: getState(componentName)(execution),
-    };
-  }
-
-  const eventSections: EventSection[] = [];
-  if (lastEvent) {
-    eventSections.push({
-      ...lastEvent,
-    });
-  }
-
-  return eventSections;
+  return [eventSection];
 }

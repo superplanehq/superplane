@@ -76,8 +76,8 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
         )}
       </div>
       <div className="flex justify-left items-center mt-2 gap-2">
-        {section.eventId && <span className="text-zinc-600 font-mono">#{section.eventId?.slice(0, 4)}</span>}
-        <span className="text-zinc-700 font-inter truncate text-md min-w-0 font-semibold truncate">
+        {section.eventId && <span className="text-sm text-zinc-600 font-mono">#{section.eventId?.slice(0, 4)}</span>}
+        <span className="text-sm text-zinc-700 font-inter truncate text-md min-w-0 font-semibold truncate">
           {section.eventTitle}
         </span>
       </div>
@@ -303,7 +303,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                     specValues={spec.values}
                     hideCount={hideCount}
                   >
-                    <span className="text-md underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 px-2 py-1 rounded-md font-inter font-medium cursor-help">
+                    <span className="text-sm underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 px-2 rounded-md font-inter font-medium cursor-help">
                       {hideCount ? "" : spec.values.length}{" "}
                       {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
                     </span>

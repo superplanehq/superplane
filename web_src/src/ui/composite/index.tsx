@@ -40,7 +40,6 @@ export interface CompositeProps extends ComponentActionsProps {
   iconBackground?: string;
   headerColor: string;
   title: string;
-  description?: string;
   metadata?: MetadataItem[];
   parameters?: ParameterGroup[];
   lastRunItem?: LastRunItem;
@@ -65,7 +64,6 @@ export const Composite: React.FC<CompositeProps> = ({
   iconBackground,
   headerColor,
   title,
-  description,
   metadata,
   parameters = [],
   lastRunItem,
@@ -219,7 +217,6 @@ export const Composite: React.FC<CompositeProps> = ({
           iconColor={iconColor}
           headerColor={headerColor}
           title={title}
-          description={description}
           onDoubleClick={onToggleCollapse}
           onRun={onRun}
           runDisabled={runDisabled}

@@ -34,13 +34,11 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
   const eventSections: EventSection[] = [];
   if (lastEvent) {
     eventSections.push({
-      title: "Last Event",
       ...lastEvent,
     });
   }
   if (nextInQueue) {
     eventSections.push({
-      title: "Next In Queue",
       eventTitle: nextInQueue.title,
       eventState: "neutral",
       handleComponent: nextInQueue.subtitle ? (
@@ -53,7 +51,6 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
     <ComponentBase
       title={title}
       iconSlug="git-merge"
-      headerColor="bg-blue-100"
       eventSections={eventSections}
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}

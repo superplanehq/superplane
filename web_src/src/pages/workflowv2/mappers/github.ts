@@ -79,7 +79,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, _trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
     const metadata = node.metadata as unknown as GitHubMetadata;
     const configuration = node.configuration as unknown as GithubConfiguration;
 
@@ -120,6 +120,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
           subtitle: eventData?.pull_request?.head?.sha || "",
           receivedAt: new Date(lastEvent.createdAt!),
           state: "processed",
+          eventId: lastEvent.id,
         };
       } else {
         props.lastEventData = {
@@ -127,6 +128,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
           subtitle: eventData?.head_commit?.id || "",
           receivedAt: new Date(lastEvent.createdAt!),
           state: "processed",
+          eventId: lastEvent.id,
         };
       }
     }

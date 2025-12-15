@@ -30,7 +30,10 @@ export const semaphoreMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
       title: node.name!,
-      eventSections: getSemaphoreEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName),
+      eventSections: lastExecutions[0]
+        ? getSemaphoreEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName)
+        : undefined,
+      includeEmptyState: !lastExecutions[0],
       metadata: getSemaphoreMetadataList(node),
       specs: getSemaphoreSpecs(node),
       eventStateMap: getStateMap(componentName),
@@ -40,25 +43,25 @@ export const semaphoreMapper: ComponentBaseMapper = {
 
 function getSemaphoreMetadataList(node: ComponentsNode): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
-  const nodeMetadata = node.metadata as any;
+  const configuration = node.configuration as Record<string, unknown>;
+  const nodeMetadata = node.metadata as Record<string, unknown>;
 
-  if (nodeMetadata?.project?.name) {
-    metadata.push({ icon: "folder", label: nodeMetadata.project.name });
+  if ((nodeMetadata as any)?.project?.name) {
+    metadata.push({ icon: "folder", label: (nodeMetadata as any).project.name });
   } else if (configuration?.project) {
-    metadata.push({ icon: "folder", label: configuration.project });
+    metadata.push({ icon: "folder", label: configuration.project as string });
   }
 
   if (configuration?.ref) {
-    metadata.push({ icon: "git-branch", label: configuration.ref });
+    metadata.push({ icon: "git-branch", label: configuration.ref as string });
   }
 
   if (configuration?.pipelineFile) {
-    metadata.push({ icon: "file-code", label: configuration.pipelineFile });
+    metadata.push({ icon: "file-code", label: configuration.pipelineFile as string });
   }
 
   if (configuration?.commitSha) {
-    metadata.push({ icon: "git-commit", label: configuration.commitSha });
+    metadata.push({ icon: "git-commit", label: configuration.commitSha as string });
   }
 
   return metadata;
@@ -66,7 +69,7 @@ function getSemaphoreMetadataList(node: ComponentsNode): MetadataItem[] {
 
 function getSemaphoreSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as Record<string, unknown>;
 
   const parameters = configuration?.parameters as Array<{ name: string; value: string }> | undefined;
   if (parameters && parameters.length > 0) {
@@ -106,47 +109,22 @@ interface ExecutionMetadata {
 function getSemaphoreEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution,
-  nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+  _nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   componentName?: string,
 ): EventSection[] {
-  const sections: EventSection[] = [];
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
-  // Add Last Run section
-  if (!execution) {
-    sections.push({
-      eventTitle: "No executions received yet",
-      eventState: "neutral" as const,
-    });
-  } else {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const eventSection: EventSection = {
+    showAutomaticTime: true,
+    receivedAt: new Date(execution.createdAt!),
+    eventTitle: title,
+    eventState: componentName ? getState(componentName)(execution) : executionToEventSectionState(execution),
+    eventId: execution.rootEvent?.id,
+  };
 
-    sections.push({
-      showAutomaticTime: true,
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventState: componentName ? getState(componentName)(execution) : executionToEventSectionState(execution),
-    });
-  }
-
-  // Add Next in Queue section if there are queued items
-  if (nodeQueueItems && nodeQueueItems.length > 0) {
-    const queueItem = nodeQueueItems[nodeQueueItems.length - 1];
-    const rootTriggerNode = nodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    if (queueItem.rootEvent) {
-      const { title } = rootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent);
-      sections.push({
-        receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
-        eventTitle: title,
-        eventState: "next-in-queue" as const,
-      });
-    }
-  }
-
-  return sections;
+  return [eventSection];
 }
 
 function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {

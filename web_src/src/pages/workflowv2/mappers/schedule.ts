@@ -5,6 +5,7 @@ import { getNextCronExecution } from "@/utils/cron";
 import { TriggerRenderer, CustomFieldRenderer } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import React from "react";
+import { formatTimeAgo } from "@/utils/date";
 
 type ScheduleConfigurationType = "minutes" | "hours" | "days" | "weeks" | "months" | "cron";
 
@@ -341,9 +342,10 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       props.lastEventData = {
         title: "Event emitted by schedule",
-        subtitle: lastEvent.id,
+        subtitle: formatTimeAgo(new Date(lastEvent.createdAt!)),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "processed",
+        eventId: lastEvent.id,
       };
     }
 

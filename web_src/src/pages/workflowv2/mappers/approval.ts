@@ -129,7 +129,8 @@ export const approvalMapper: ComponentBaseMapper = {
       headerColor: "bg-white",
       collapsed: node.isCollapsed,
       title: node.name || componentDefinition?.label || "Approval",
-      eventSections: getApprovalEventSections(nodes, lastExecution, additionalData),
+      eventSections: lastExecution ? getApprovalEventSections(nodes, lastExecution, additionalData) : undefined,
+      includeEmptyState: !lastExecution,
       specs: getApprovalSpecs(items, additionalData),
       customField: getApprovalCustomField(lastExecution, approvals),
       eventStateMap: APPROVAL_STATE_MAP,
@@ -145,6 +146,7 @@ function getApprovalCustomField(
   approvals: ApprovalItemProps[],
 ): React.ReactNode | undefined {
   const isAwaitingApproval = ["STATE_STARTED", "STATE_PENDING"].includes(lastExecution?.state || "");
+  if (!isAwaitingApproval || approvals.length == 0) return;
   return React.createElement(ApprovalGroup, { approvals, awaitingApproval: isAwaitingApproval });
 }
 
@@ -196,31 +198,24 @@ function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): Comp
 
 function getApprovalEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution | null,
+  execution: WorkflowsWorkflowNodeExecution,
   additionalData?: unknown,
 ): EventSection[] {
-  if (!execution) {
-    return [
-      {
-        eventTitle: "No events received yet",
-        eventState: "neutral" as const,
-      },
-    ];
-  }
-
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
   const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
   const eventSubtitle = getComponentSubtitle({} as ComponentsNode, execution, additionalData);
-  return [
-    {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: eventTitle,
-      eventSubtitle: eventSubtitle,
-      eventState: approvalStateFunction(execution),
-    },
-  ];
+
+  const eventSection: EventSection = {
+    receivedAt: new Date(execution.createdAt!),
+    eventTitle: eventTitle,
+    eventSubtitle: eventSubtitle,
+    eventState: approvalStateFunction(execution),
+    eventId: execution.rootEvent?.id,
+  };
+
+  return [eventSection];
 }
 
 function getComponentSubtitle(

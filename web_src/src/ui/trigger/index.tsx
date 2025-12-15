@@ -9,6 +9,7 @@ interface TriggerLastEventData {
   subtitle?: string;
   receivedAt: Date;
   state: LastEventState;
+  eventId?: string;
 }
 
 export interface TriggerProps extends Omit<ComponentBaseProps, "eventSections"> {
@@ -28,6 +29,7 @@ export const Trigger: React.FC<TriggerProps> = ({ lastEventData, ...componentBas
         eventState,
         eventTitle: lastEventData.title,
         eventSubtitle: lastEventData.subtitle,
+        eventId: lastEventData.eventId,
       },
     ];
   }, [lastEventData]);
