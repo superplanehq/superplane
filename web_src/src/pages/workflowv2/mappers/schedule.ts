@@ -1,17 +1,24 @@
 import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { convertUTCToLocalTime, formatTimestampInUserTimezone } from "@/utils/timezone";
+import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { TriggerRenderer } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 
-type ScheduleConfigurationType = "minutes" | "hourly" | "daily" | "weekly";
+type ScheduleConfigurationType = "minutes" | "hours" | "days" | "weeks" | "months" | "cron";
 
 interface ScheduleConfiguration {
   type: ScheduleConfigurationType;
-  interval?: number;
+  minutesInterval?: number;
+  hoursInterval?: number;
+  daysInterval?: number;
+  weeksInterval?: number;
+  monthsInterval?: number;
   minute?: number;
-  time?: string;
-  weekDay?: string;
+  hour?: number;
+  weekDays?: string[];
+  dayOfMonth?: number;
+  cronExpression?: string;
+  timezone?: string;
 }
 
 function formatScheduleDescription(configuration: ScheduleConfiguration): string {
@@ -21,25 +28,41 @@ function formatScheduleDescription(configuration: ScheduleConfiguration): string
 
   switch (configuration.type) {
     case "minutes": {
-      return configuration.interval !== undefined
-        ? `Every ${configuration.interval} minute${configuration.interval === 1 ? "" : "s"}`
+      return configuration.minutesInterval !== undefined
+        ? `Every ${configuration.minutesInterval} minute${configuration.minutesInterval === 1 ? "" : "s"}`
         : "Every X minutes";
     }
-    case "hourly": {
-      return configuration.minute !== undefined
-        ? `Hourly at :${configuration.minute.toString().padStart(2, "0")}`
-        : "Hourly";
+    case "hours": {
+      const interval = configuration.hoursInterval || 1;
+      const minute = configuration.minute || 0;
+      return `Every ${interval} hour${interval === 1 ? "" : "s"} at :${minute.toString().padStart(2, "0")}`;
     }
-    case "daily": {
-      return configuration.time ? `Daily at ${convertUTCToLocalTime(configuration.time)}` : "Daily";
+    case "days": {
+      const interval = configuration.daysInterval || 1;
+      const hour = configuration.hour || 0;
+      const minute = configuration.minute || 0;
+      const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+      return `Every ${interval} day${interval === 1 ? "" : "s"} at ${time}`;
     }
-    case "weekly": {
-      const dayLabel = configuration.weekDay
-        ? configuration.weekDay.charAt(0).toUpperCase() + configuration.weekDay.slice(1).toLowerCase()
-        : "";
-      return configuration.time && configuration.weekDay
-        ? `${dayLabel}s at ${convertUTCToLocalTime(configuration.time)}`
-        : "Weekly";
+    case "weeks": {
+      const interval = configuration.weeksInterval || 1;
+      const hour = configuration.hour || 0;
+      const minute = configuration.minute || 0;
+      const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+      const weekDays = configuration.weekDays || ["monday"];
+      const dayLabels = weekDays.map((day) => day.charAt(0).toUpperCase() + day.slice(1).toLowerCase()).join(", ");
+      return `Every ${interval} week${interval === 1 ? "" : "s"} on ${dayLabels} at ${time}`;
+    }
+    case "months": {
+      const interval = configuration.monthsInterval || 1;
+      const dayOfMonth = configuration.dayOfMonth || 1;
+      const hour = configuration.hour || 0;
+      const minute = configuration.minute || 0;
+      const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+      return `Every ${interval} month${interval === 1 ? "" : "s"} on day ${dayOfMonth} at ${time}`;
+    }
+    case "cron": {
+      return configuration.cronExpression ? `Cron: ${configuration.cronExpression}` : "Custom cron schedule";
     }
     default:
       return "Scheduled trigger";
@@ -47,113 +70,124 @@ function formatScheduleDescription(configuration: ScheduleConfiguration): string
 }
 
 function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNextTrigger?: string): Date | null {
+  // Always use backend-calculated nextTrigger first if available
+  if (referenceNextTrigger) {
+    try {
+      return new Date(referenceNextTrigger);
+    } catch {
+      // Fall through to frontend calculation if parsing fails
+    }
+  }
+
   const now = new Date();
+
+  // Apply timezone offset if specified
+  const timezoneOffset = configuration.timezone ? parseFloat(configuration.timezone) : 0;
+  const nowInTZ = new Date(now.getTime() + timezoneOffset * 60 * 60 * 1000);
 
   switch (configuration.type) {
     case "minutes": {
-      if (configuration.interval === undefined) return null;
+      if (configuration.minutesInterval === undefined) return null;
 
-      const interval = configuration.interval;
+      const interval = configuration.minutesInterval;
 
-      if (referenceNextTrigger) {
-        try {
-          const reference = new Date(referenceNextTrigger);
-          const minutesElapsed = Math.floor((now.getTime() - reference.getTime()) / 60000);
-
-          if (minutesElapsed < 0) {
-            return reference;
-          }
-
-          const completedIntervals = Math.floor(minutesElapsed / interval);
-          const nextTriggerMinutes = (completedIntervals + 1) * interval;
-          const nextTrigger = new Date(reference.getTime() + nextTriggerMinutes * 60000);
-          return nextTrigger;
-        } catch {
-          return null;
-        }
-      }
-
-      const nextMinuteRounded = new Date(now);
-      nextMinuteRounded.setSeconds(0);
-      nextMinuteRounded.setMilliseconds(0);
-      nextMinuteRounded.setMinutes(nextMinuteRounded.getMinutes() + 1);
-
-      const minutesSinceMidnight = nextMinuteRounded.getHours() * 60 + nextMinuteRounded.getMinutes();
-      const intervalsPassed = Math.floor(minutesSinceMidnight / interval);
-      const nextIntervalMinutes = (intervalsPassed + 1) * interval;
-
-      if (nextIntervalMinutes >= 1440) {
-        const nextDay = new Date(nextMinuteRounded);
-        nextDay.setDate(nextDay.getDate() + 1);
-        nextDay.setHours(0);
-        nextDay.setMinutes(interval);
-        return nextDay;
-      }
-
-      const intervalHours = Math.floor(nextIntervalMinutes / 60);
-      const intervalMinutes = nextIntervalMinutes % 60;
-      const nextTrigger = new Date(nextMinuteRounded);
-      nextTrigger.setHours(intervalHours);
-      nextTrigger.setMinutes(intervalMinutes);
-
+      // Fallback calculation when no backend reference is available
+      const nextTrigger = new Date(nowInTZ);
+      nextTrigger.setSeconds(0);
+      nextTrigger.setMilliseconds(0);
+      nextTrigger.setMinutes(nextTrigger.getMinutes() + interval);
       return nextTrigger;
     }
 
-    case "hourly": {
-      const nextHour = new Date(now);
-      nextHour.setMinutes(configuration.minute ?? 0);
-      nextHour.setSeconds(0);
-      nextHour.setMilliseconds(0);
+    case "hours": {
+      const interval = configuration.hoursInterval || 1;
+      const minute = configuration.minute || 0;
 
-      if (nextHour <= now) {
-        nextHour.setHours(nextHour.getHours() + 1);
-      }
-      return nextHour;
+      const nextTrigger = new Date(nowInTZ);
+      nextTrigger.setMinutes(minute);
+      nextTrigger.setSeconds(0);
+      nextTrigger.setMilliseconds(0);
+
+      // Add the interval
+      nextTrigger.setHours(nextTrigger.getHours() + interval);
+
+      return new Date(nextTrigger.getTime() - timezoneOffset * 60 * 60 * 1000);
     }
 
-    case "daily": {
-      if (!configuration.time) return null;
+    case "days": {
+      const interval = configuration.daysInterval || 1;
+      const hour = configuration.hour || 0;
+      const minute = configuration.minute || 0;
 
-      const [dailyHours, dailyMinutes] = configuration.time.split(":").map(Number);
-      const nextDay = new Date(now);
-      nextDay.setUTCHours(dailyHours);
-      nextDay.setUTCMinutes(dailyMinutes);
-      nextDay.setSeconds(0);
-      nextDay.setMilliseconds(0);
+      const nextTrigger = new Date(nowInTZ);
+      nextTrigger.setHours(hour);
+      nextTrigger.setMinutes(minute);
+      nextTrigger.setSeconds(0);
+      nextTrigger.setMilliseconds(0);
 
-      if (nextDay <= now) {
-        nextDay.setDate(nextDay.getDate() + 1);
-      }
-      return nextDay;
+      // Add the interval
+      nextTrigger.setDate(nextTrigger.getDate() + interval);
+
+      return new Date(nextTrigger.getTime() - timezoneOffset * 60 * 60 * 1000);
     }
 
-    case "weekly": {
-      if (!configuration.time || !configuration.weekDay) return null;
+    case "weeks": {
+      const interval = configuration.weeksInterval || 1;
+      const weekDays = configuration.weekDays || ["monday"];
+      const hour = configuration.hour || 0;
+      const minute = configuration.minute || 0;
 
-      const [weeklyHours, weeklyMinutes] = configuration.time.split(":").map(Number);
       const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-      const targetDayIndex = dayNames.indexOf(configuration.weekDay.toLowerCase());
+      const validDayIndices = weekDays
+        .map((day) => dayNames.indexOf(day.toLowerCase()))
+        .filter((index) => index !== -1);
 
-      if (targetDayIndex === -1) return null;
+      if (validDayIndices.length === 0) return null;
 
-      const nextWeek = new Date(now);
-      const currentDayIndex = nextWeek.getDay();
-      let daysUntilTarget = targetDayIndex - currentDayIndex;
+      const nextTrigger = new Date(nowInTZ);
+      nextTrigger.setHours(hour);
+      nextTrigger.setMinutes(minute);
+      nextTrigger.setSeconds(0);
+      nextTrigger.setMilliseconds(0);
 
-      if (
-        daysUntilTarget < 0 ||
-        (daysUntilTarget === 0 && now.getUTCHours() * 60 + now.getUTCMinutes() >= weeklyHours * 60 + weeklyMinutes)
-      ) {
-        daysUntilTarget += 7;
+      // Add the interval in weeks and find next valid day
+      nextTrigger.setDate(nextTrigger.getDate() + interval * 7);
+
+      // Find the closest valid weekday
+      for (let i = 0; i < 7; i++) {
+        const testDate = new Date(nextTrigger);
+        testDate.setDate(testDate.getDate() + i);
+        if (validDayIndices.includes(testDate.getDay())) {
+          testDate.setHours(hour);
+          testDate.setMinutes(minute);
+          return new Date(testDate.getTime() - timezoneOffset * 60 * 60 * 1000);
+        }
       }
 
-      nextWeek.setDate(nextWeek.getDate() + daysUntilTarget);
-      nextWeek.setUTCHours(weeklyHours);
-      nextWeek.setUTCMinutes(weeklyMinutes);
-      nextWeek.setSeconds(0);
-      nextWeek.setMilliseconds(0);
+      return null;
+    }
 
-      return nextWeek;
+    case "months": {
+      const interval = configuration.monthsInterval || 1;
+      const dayOfMonth = configuration.dayOfMonth || 1;
+      const hour = configuration.hour || 0;
+      const minute = configuration.minute || 0;
+
+      const nextTrigger = new Date(nowInTZ);
+      nextTrigger.setMonth(nextTrigger.getMonth() + interval);
+      nextTrigger.setDate(dayOfMonth);
+      nextTrigger.setHours(hour);
+      nextTrigger.setMinutes(minute);
+      nextTrigger.setSeconds(0);
+      nextTrigger.setMilliseconds(0);
+
+      return new Date(nextTrigger.getTime() - timezoneOffset * 60 * 60 * 1000);
+    }
+
+    case "cron": {
+      // For cron expressions, we can't easily calculate in frontend
+      // The backend handles the actual cron scheduling
+      return null;
     }
 
     default:
@@ -162,10 +196,7 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
 }
 
 function formatNextTrigger(configuration: ScheduleConfiguration, metadata?: { nextTrigger?: string }): string {
-  const nextTrigger = calculateNextTrigger(
-    configuration,
-    configuration.type === "minutes" ? metadata?.nextTrigger : undefined,
-  );
+  const nextTrigger = calculateNextTrigger(configuration, metadata?.nextTrigger);
 
   if (!nextTrigger) {
     return "-";
