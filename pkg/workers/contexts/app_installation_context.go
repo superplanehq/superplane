@@ -144,11 +144,11 @@ func findConfigDef(configs []configuration.Field, name string) (configuration.Fi
 	return configuration.Field{}, fmt.Errorf("config %s not found", name)
 }
 
-func (m *AppInstallationContext) GetMetadata() any {
-	return m.appInstallation.Metadata.Data()
+func (c *AppInstallationContext) GetMetadata() any {
+	return c.appInstallation.Metadata.Data()
 }
 
-func (m *AppInstallationContext) SetMetadata(value any) {
+func (c *AppInstallationContext) SetMetadata(value any) {
 	b, err := json.Marshal(value)
 	if err != nil {
 		return
@@ -160,33 +160,33 @@ func (m *AppInstallationContext) SetMetadata(value any) {
 		return
 	}
 
-	m.appInstallation.Metadata = datatypes.NewJSONType(v)
+	c.appInstallation.Metadata = datatypes.NewJSONType(v)
 }
 
-func (m *AppInstallationContext) GetState() string {
-	return m.appInstallation.State
+func (c *AppInstallationContext) GetState() string {
+	return c.appInstallation.State
 }
 
-func (m *AppInstallationContext) SetState(value string) {
-	m.appInstallation.State = value
+func (c *AppInstallationContext) SetState(value string) {
+	c.appInstallation.State = value
 }
 
-func (m *AppInstallationContext) SetSecret(name string, value []byte) error {
+func (c *AppInstallationContext) SetSecret(name string, value []byte) error {
 	now := time.Now()
 
 	// Encrypt the secret value using the installation ID as associated data
-	encryptedValue, err := m.encryptor.Encrypt(
+	encryptedValue, err := c.encryptor.Encrypt(
 		context.Background(),
 		value,
-		[]byte(m.appInstallation.ID.String()),
+		[]byte(c.appInstallation.ID.String()),
 	)
 	if err != nil {
 		return err
 	}
 
 	var secret models.AppInstallationSecret
-	err = m.tx.
-		Where("installation_id = ?", m.appInstallation.ID).
+	err = c.tx.
+		Where("installation_id = ?", c.appInstallation.ID).
 		Where("name = ?", name).
 		First(&secret).
 		Error
@@ -197,27 +197,27 @@ func (m *AppInstallationContext) SetSecret(name string, value []byte) error {
 		}
 
 		secret = models.AppInstallationSecret{
-			OrganizationID: m.appInstallation.OrganizationID,
-			InstallationID: m.appInstallation.ID,
+			OrganizationID: c.appInstallation.OrganizationID,
+			InstallationID: c.appInstallation.ID,
 			Name:           name,
 			Value:          encryptedValue,
 			CreatedAt:      &now,
 			UpdatedAt:      &now,
 		}
 
-		return m.tx.Create(&secret).Error
+		return c.tx.Create(&secret).Error
 	}
 
 	secret.Value = encryptedValue
 	secret.UpdatedAt = &now
 
-	return m.tx.Save(&secret).Error
+	return c.tx.Save(&secret).Error
 }
 
-func (m *AppInstallationContext) GetSecrets() ([]core.InstallationSecret, error) {
+func (c *AppInstallationContext) GetSecrets() ([]core.InstallationSecret, error) {
 	var fromDB []models.AppInstallationSecret
-	err := m.tx.
-		Where("installation_id = ?", m.appInstallation.ID).
+	err := c.tx.
+		Where("installation_id = ?", c.appInstallation.ID).
 		Find(&fromDB).
 		Error
 
@@ -227,10 +227,10 @@ func (m *AppInstallationContext) GetSecrets() ([]core.InstallationSecret, error)
 
 	var secrets []core.InstallationSecret
 	for _, secret := range fromDB {
-		decryptedValue, err := m.encryptor.Decrypt(
+		decryptedValue, err := c.encryptor.Decrypt(
 			context.Background(),
 			secret.Value,
-			[]byte(m.appInstallation.ID.String()),
+			[]byte(c.appInstallation.ID.String()),
 		)
 
 		if err != nil {
@@ -246,7 +246,7 @@ func (m *AppInstallationContext) GetSecrets() ([]core.InstallationSecret, error)
 	return secrets, nil
 }
 
-func (m *AppInstallationContext) NewBrowserAction(action core.BrowserAction) {
+func (c *AppInstallationContext) NewBrowserAction(action core.BrowserAction) {
 	d := datatypes.NewJSONType(models.BrowserAction{
 		URL:         action.URL,
 		Method:      action.Method,
@@ -254,9 +254,9 @@ func (m *AppInstallationContext) NewBrowserAction(action core.BrowserAction) {
 		Description: action.Description,
 	})
 
-	m.appInstallation.BrowserAction = &d
+	c.appInstallation.BrowserAction = &d
 }
 
-func (m *AppInstallationContext) RemoveBrowserAction() {
-	m.appInstallation.BrowserAction = nil
+func (c *AppInstallationContext) RemoveBrowserAction() {
+	c.appInstallation.BrowserAction = nil
 }
