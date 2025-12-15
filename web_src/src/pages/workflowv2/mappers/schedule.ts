@@ -77,7 +77,6 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
   // Always use backend-calculated nextTrigger first if available
   if (referenceNextTrigger) {
     try {
-      console.log(referenceNextTrigger)
       return new Date(referenceNextTrigger);
     } catch {
       // Fall through to frontend calculation if parsing fails

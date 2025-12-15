@@ -16,8 +16,8 @@ function validateCronExpression(cronExpression: string): string | null {
   const parts = trimmed.split(/\s+/);
 
   // Cron expressions should have 6 parts (second minute hour day month dayofweek)
-  if (parts.length !== 6) {
-    return `Expected 6 fields (second minute hour day month dayofweek), got ${parts.length}`;
+  if (parts.length !== 6 && parts.length !== 5) {
+    return `Expected 5 or 6 fields, got ${parts.length}`;
   }
 
   // Validate each part contains only allowed characters
@@ -474,4 +474,66 @@ function compareValues(
   }
 
   return null;
+}
+
+/**
+ * Parses default values based on field type to match API expectations
+ */
+export function parseDefaultValues(configurationFields: ConfigurationField[]): Record<string, unknown> {
+  return configurationFields
+    .map((field) => [field.name, field.defaultValue, field.type] as const)
+    .reduce(
+      (acc, [name, defaultValue, fieldType]) => {
+        if (name && defaultValue != null) {
+          // Parse defaultValue based on field type
+          let parsedValue: unknown = defaultValue;
+
+          if (typeof defaultValue === "string" && defaultValue !== "") {
+            switch (fieldType) {
+              case "number": {
+                const num = Number(defaultValue);
+                if (!isNaN(num)) {
+                  parsedValue = num;
+                }
+                break;
+              }
+              case "boolean": {
+                parsedValue = defaultValue === "true";
+                break;
+              }
+              case "multi-select":
+              case "list": {
+                try {
+                  parsedValue = JSON.parse(defaultValue);
+                } catch {
+                  // If parsing fails, treat as single item array for multi-select
+                  if (fieldType === "multi-select") {
+                    parsedValue = [defaultValue];
+                  }
+                }
+                break;
+              }
+              case "object": {
+                try {
+                  parsedValue = JSON.parse(defaultValue);
+                } catch {
+                  // If parsing fails, keep as empty object
+                  parsedValue = {};
+                }
+                break;
+              }
+              // For string, select, date, time, datetime, day-in-year, cron, url, integration, etc.
+              // keep as string
+              default:
+                parsedValue = defaultValue;
+                break;
+            }
+          }
+
+          acc[name] = parsedValue;
+        }
+        return acc;
+      },
+      {} as Record<string, unknown>,
+    );
 }

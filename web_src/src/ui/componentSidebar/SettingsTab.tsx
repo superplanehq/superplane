@@ -1,11 +1,11 @@
 import { AuthorizationDomainType, ConfigurationField } from "@/api-client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
-import { isFieldRequired, validateFieldForSubmission } from "@/utils/components";
+import { isFieldRequired, isFieldVisible, parseDefaultValues, validateFieldForSubmission } from "@/utils/components";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -34,6 +34,10 @@ export function SettingsTab({
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
+
+  const defaultValues = useMemo(() => {
+    return parseDefaultValues(configurationFields);
+  }, [configurationFields]);
 
   const isFieldEmpty = (value: unknown): boolean => {
     if (value === null || value === undefined) return true;
@@ -116,13 +120,34 @@ export function SettingsTab({
     return errors.size === 0;
   }, [configurationFields, nodeConfiguration, currentNodeName, validateNestedFields]);
 
+  // Function to filter out invisible fields
+  const filterVisibleFields = useCallback(
+    (config: Record<string, unknown>) => {
+      const filtered = { ...config };
+      configurationFields.forEach((field) => {
+        if (field.name && !isFieldVisible(field, config)) {
+          delete filtered[field.name];
+        }
+      });
+      return filtered;
+    },
+    [configurationFields],
+  );
+
   // Sync state when props change
   useEffect(() => {
-    setNodeConfiguration(configuration || {});
+    let newConfig;
+    if (Object.values(configuration).length === 0 || !configuration) {
+      newConfig = defaultValues;
+    } else {
+      newConfig = { ...defaultValues, ...configuration };
+    }
+
+    setNodeConfiguration(filterVisibleFields(newConfig));
     setCurrentNodeName(nodeName);
     setValidationErrors(new Set());
     setShowValidation(false);
-  }, [configuration, nodeName]);
+  }, [configuration, nodeName, defaultValues, filterVisibleFields]);
 
   const handleSave = () => {
     if (validateAllFields()) {
@@ -131,7 +156,6 @@ export function SettingsTab({
   };
 
   const handleCancel = () => {
-    // Reset to original configuration and name on cancel
     setNodeConfiguration(configuration || {});
     setCurrentNodeName(nodeName);
     setValidationErrors(new Set());
@@ -179,12 +203,14 @@ export function SettingsTab({
                   key={fieldName}
                   field={field}
                   value={nodeConfiguration[fieldName]}
-                  onChange={(value) =>
-                    setNodeConfiguration({
+                  onChange={(value) => {
+                    const newConfig = {
+                      ...defaultValues,
                       ...nodeConfiguration,
                       [fieldName]: value,
-                    })
-                  }
+                    };
+                    setNodeConfiguration(filterVisibleFields(newConfig));
+                  }}
                   allValues={nodeConfiguration}
                   domainId={domainId}
                   domainType={domainType}
