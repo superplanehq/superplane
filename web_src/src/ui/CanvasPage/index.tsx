@@ -1309,7 +1309,7 @@ function CanvasContent({
             fitView={false}
             style={{ opacity: isInitialized ? 1 : 0 }}
           >
-            <Background bgColor="#F1F5F9" color="#F1F5F9" />
+            <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
           </ReactFlow>
         </div>
       </div>
