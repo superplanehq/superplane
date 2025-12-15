@@ -100,7 +100,6 @@ export const GitHubNoEvents: Story = {
   args: {
     ...GithubProps,
     lastEventData: undefined,
-    zeroStateText: "Waiting for the first push...",
   },
 };
 
@@ -108,6 +107,5 @@ export const DockerHubNoEvents: Story = {
   args: {
     ...DockerHubProps,
     lastEventData: undefined,
-    zeroStateText: "No images pushed yet...",
   },
 };

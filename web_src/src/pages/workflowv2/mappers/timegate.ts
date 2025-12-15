@@ -144,7 +144,6 @@ function getTimeGateEventSections(
   // Add Last Event section
   if (!execution) {
     sections.push({
-      
       eventTitle: "No events received yet",
       eventState: "neutral" as const,
     });
@@ -169,7 +168,6 @@ function getTimeGateEventSections(
     }
 
     sections.push({
-      
       subtitle: subtitle,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,

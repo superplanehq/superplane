@@ -371,6 +371,7 @@ function CanvasPage(props: CanvasPageProps) {
             collapsedBackground: getBackgroundColorClass("white"),
             hideActionsButton: true,
             includeEmptyState: true,
+            emptyStateTitle: block.type === "trigger" ? "Waiting for the first event" : undefined,
           } as ComponentBaseProps,
           isTemplate: true,
           buildingBlock: block,

@@ -109,7 +109,6 @@ export const githubTriggerRenderer: TriggerRenderer = {
       headerColor: "bg-white",
       collapsedBackground: "bg-white",
       metadata: metadataItems,
-      zeroStateText: "Waiting for the first push...",
     };
 
     if (lastEvent) {

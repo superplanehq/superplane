@@ -106,6 +106,7 @@ export interface ComponentBaseSpec {
   // - value for JSON specs (like payload)
   //
   values?: ComponentBaseSpecValue[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   value?: any;
 }
 
@@ -182,6 +183,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   eventStateMap?: EventStateMap;
   hideActionsButton?: boolean;
   includeEmptyState?: boolean;
+  emptyStateTitle?: string;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -214,6 +216,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   eventStateMap,
   hideActionsButton,
   includeEmptyState = false,
+  emptyStateTitle,
 }) => {
   if (collapsed) {
     return (
@@ -329,7 +332,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           />
         ))}
 
-        {includeEmptyState && <EmptyState />}
+        {includeEmptyState && <EmptyState title={emptyStateTitle} />}
 
         {customField || null}
       </div>

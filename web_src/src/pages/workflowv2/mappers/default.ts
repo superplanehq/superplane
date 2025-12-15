@@ -24,7 +24,6 @@ export const defaultTriggerRenderer: TriggerRenderer = {
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: [],
-      zeroStateText: "No events yet",
     };
 
     if (lastEvent) {

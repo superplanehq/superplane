@@ -336,7 +336,6 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
           label: formatNextTrigger(node.configuration as unknown as ScheduleConfiguration, node.metadata),
         },
       ],
-      zeroStateText: "This schedule has not been triggered yet.",
     };
 
     if (lastEvent) {
