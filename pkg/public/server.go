@@ -425,7 +425,7 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	app.HandleRequest(core.HttpRequestContext{
+	app.HandleRequest(core.HTTPRequestContext{
 		Request:        r,
 		Response:       &w,
 		BaseURL:        s.BaseURL,

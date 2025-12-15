@@ -25,622 +25,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type ListApplicationsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListApplicationsRequest) Reset() {
-	*x = ListApplicationsRequest{}
-	mi := &file_organizations_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListApplicationsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListApplicationsRequest) ProtoMessage() {}
-
-func (x *ListApplicationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListApplicationsRequest.ProtoReflect.Descriptor instead.
-func (*ListApplicationsRequest) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *ListApplicationsRequest) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-type ListApplicationsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Applications  []*AppInstallation     `protobuf:"bytes,1,rep,name=applications,proto3" json:"applications,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListApplicationsResponse) Reset() {
-	*x = ListApplicationsResponse{}
-	mi := &file_organizations_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListApplicationsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListApplicationsResponse) ProtoMessage() {}
-
-func (x *ListApplicationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListApplicationsResponse.ProtoReflect.Descriptor instead.
-func (*ListApplicationsResponse) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *ListApplicationsResponse) GetApplications() []*AppInstallation {
-	if x != nil {
-		return x.Applications
-	}
-	return nil
-}
-
-type InstallApplicationRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	AppName          string                 `protobuf:"bytes,2,opt,name=app_name,json=appName,proto3" json:"app_name,omitempty"`
-	InstallationName string                 `protobuf:"bytes,3,opt,name=installation_name,json=installationName,proto3" json:"installation_name,omitempty"`
-	Configuration    *_struct.Struct        `protobuf:"bytes,4,opt,name=configuration,proto3" json:"configuration,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
-}
-
-func (x *InstallApplicationRequest) Reset() {
-	*x = InstallApplicationRequest{}
-	mi := &file_organizations_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *InstallApplicationRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*InstallApplicationRequest) ProtoMessage() {}
-
-func (x *InstallApplicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use InstallApplicationRequest.ProtoReflect.Descriptor instead.
-func (*InstallApplicationRequest) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *InstallApplicationRequest) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *InstallApplicationRequest) GetAppName() string {
-	if x != nil {
-		return x.AppName
-	}
-	return ""
-}
-
-func (x *InstallApplicationRequest) GetInstallationName() string {
-	if x != nil {
-		return x.InstallationName
-	}
-	return ""
-}
-
-func (x *InstallApplicationRequest) GetConfiguration() *_struct.Struct {
-	if x != nil {
-		return x.Configuration
-	}
-	return nil
-}
-
-type InstallApplicationResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Installation  *AppInstallation       `protobuf:"bytes,1,opt,name=installation,proto3" json:"installation,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *InstallApplicationResponse) Reset() {
-	*x = InstallApplicationResponse{}
-	mi := &file_organizations_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *InstallApplicationResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*InstallApplicationResponse) ProtoMessage() {}
-
-func (x *InstallApplicationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use InstallApplicationResponse.ProtoReflect.Descriptor instead.
-func (*InstallApplicationResponse) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *InstallApplicationResponse) GetInstallation() *AppInstallation {
-	if x != nil {
-		return x.Installation
-	}
-	return nil
-}
-
-type DescribeApplicationRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	InstallationId string                 `protobuf:"bytes,2,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *DescribeApplicationRequest) Reset() {
-	*x = DescribeApplicationRequest{}
-	mi := &file_organizations_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DescribeApplicationRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DescribeApplicationRequest) ProtoMessage() {}
-
-func (x *DescribeApplicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DescribeApplicationRequest.ProtoReflect.Descriptor instead.
-func (*DescribeApplicationRequest) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *DescribeApplicationRequest) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *DescribeApplicationRequest) GetInstallationId() string {
-	if x != nil {
-		return x.InstallationId
-	}
-	return ""
-}
-
-type DescribeApplicationResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Installation  *AppInstallation       `protobuf:"bytes,1,opt,name=installation,proto3" json:"installation,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DescribeApplicationResponse) Reset() {
-	*x = DescribeApplicationResponse{}
-	mi := &file_organizations_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DescribeApplicationResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DescribeApplicationResponse) ProtoMessage() {}
-
-func (x *DescribeApplicationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DescribeApplicationResponse.ProtoReflect.Descriptor instead.
-func (*DescribeApplicationResponse) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *DescribeApplicationResponse) GetInstallation() *AppInstallation {
-	if x != nil {
-		return x.Installation
-	}
-	return nil
-}
-
-type UpdateApplicationRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	InstallationId string                 `protobuf:"bytes,2,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
-	Configuration  *_struct.Struct        `protobuf:"bytes,3,opt,name=configuration,proto3" json:"configuration,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *UpdateApplicationRequest) Reset() {
-	*x = UpdateApplicationRequest{}
-	mi := &file_organizations_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdateApplicationRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdateApplicationRequest) ProtoMessage() {}
-
-func (x *UpdateApplicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdateApplicationRequest.ProtoReflect.Descriptor instead.
-func (*UpdateApplicationRequest) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *UpdateApplicationRequest) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *UpdateApplicationRequest) GetInstallationId() string {
-	if x != nil {
-		return x.InstallationId
-	}
-	return ""
-}
-
-func (x *UpdateApplicationRequest) GetConfiguration() *_struct.Struct {
-	if x != nil {
-		return x.Configuration
-	}
-	return nil
-}
-
-type UpdateApplicationResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Installation  *AppInstallation       `protobuf:"bytes,1,opt,name=installation,proto3" json:"installation,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UpdateApplicationResponse) Reset() {
-	*x = UpdateApplicationResponse{}
-	mi := &file_organizations_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdateApplicationResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdateApplicationResponse) ProtoMessage() {}
-
-func (x *UpdateApplicationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdateApplicationResponse.ProtoReflect.Descriptor instead.
-func (*UpdateApplicationResponse) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *UpdateApplicationResponse) GetInstallation() *AppInstallation {
-	if x != nil {
-		return x.Installation
-	}
-	return nil
-}
-
-type UninstallApplicationRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	InstallationId string                 `protobuf:"bytes,2,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *UninstallApplicationRequest) Reset() {
-	*x = UninstallApplicationRequest{}
-	mi := &file_organizations_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UninstallApplicationRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UninstallApplicationRequest) ProtoMessage() {}
-
-func (x *UninstallApplicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UninstallApplicationRequest.ProtoReflect.Descriptor instead.
-func (*UninstallApplicationRequest) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *UninstallApplicationRequest) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *UninstallApplicationRequest) GetInstallationId() string {
-	if x != nil {
-		return x.InstallationId
-	}
-	return ""
-}
-
-type UninstallApplicationResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UninstallApplicationResponse) Reset() {
-	*x = UninstallApplicationResponse{}
-	mi := &file_organizations_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UninstallApplicationResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UninstallApplicationResponse) ProtoMessage() {}
-
-func (x *UninstallApplicationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UninstallApplicationResponse.ProtoReflect.Descriptor instead.
-func (*UninstallApplicationResponse) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{9}
-}
-
-type AppInstallation struct {
-	state         protoimpl.MessageState    `protogen:"open.v1"`
-	Metadata      *AppInstallation_Metadata `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Spec          *AppInstallation_Spec     `protobuf:"bytes,2,opt,name=spec,proto3" json:"spec,omitempty"`
-	Status        *AppInstallation_Status   `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AppInstallation) Reset() {
-	*x = AppInstallation{}
-	mi := &file_organizations_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AppInstallation) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AppInstallation) ProtoMessage() {}
-
-func (x *AppInstallation) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AppInstallation.ProtoReflect.Descriptor instead.
-func (*AppInstallation) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *AppInstallation) GetMetadata() *AppInstallation_Metadata {
-	if x != nil {
-		return x.Metadata
-	}
-	return nil
-}
-
-func (x *AppInstallation) GetSpec() *AppInstallation_Spec {
-	if x != nil {
-		return x.Spec
-	}
-	return nil
-}
-
-func (x *AppInstallation) GetStatus() *AppInstallation_Status {
-	if x != nil {
-		return x.Status
-	}
-	return nil
-}
-
-type BrowserAction struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
-	Method        string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
-	FormFields    map[string]string      `protobuf:"bytes,3,rep,name=form_fields,json=formFields,proto3" json:"form_fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BrowserAction) Reset() {
-	*x = BrowserAction{}
-	mi := &file_organizations_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BrowserAction) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BrowserAction) ProtoMessage() {}
-
-func (x *BrowserAction) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BrowserAction.ProtoReflect.Descriptor instead.
-func (*BrowserAction) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *BrowserAction) GetUrl() string {
-	if x != nil {
-		return x.Url
-	}
-	return ""
-}
-
-func (x *BrowserAction) GetMethod() string {
-	if x != nil {
-		return x.Method
-	}
-	return ""
-}
-
-func (x *BrowserAction) GetFormFields() map[string]string {
-	if x != nil {
-		return x.FormFields
-	}
-	return nil
-}
-
-func (x *BrowserAction) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
 type Organization struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Metadata      *Organization_Metadata `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -650,7 +34,7 @@ type Organization struct {
 
 func (x *Organization) Reset() {
 	*x = Organization{}
-	mi := &file_organizations_proto_msgTypes[12]
+	mi := &file_organizations_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -662,7 +46,7 @@ func (x *Organization) String() string {
 func (*Organization) ProtoMessage() {}
 
 func (x *Organization) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[12]
+	mi := &file_organizations_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -675,7 +59,7 @@ func (x *Organization) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Organization.ProtoReflect.Descriptor instead.
 func (*Organization) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{12}
+	return file_organizations_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Organization) GetMetadata() *Organization_Metadata {
@@ -694,7 +78,7 @@ type DescribeOrganizationRequest struct {
 
 func (x *DescribeOrganizationRequest) Reset() {
 	*x = DescribeOrganizationRequest{}
-	mi := &file_organizations_proto_msgTypes[13]
+	mi := &file_organizations_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -706,7 +90,7 @@ func (x *DescribeOrganizationRequest) String() string {
 func (*DescribeOrganizationRequest) ProtoMessage() {}
 
 func (x *DescribeOrganizationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[13]
+	mi := &file_organizations_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -719,7 +103,7 @@ func (x *DescribeOrganizationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeOrganizationRequest.ProtoReflect.Descriptor instead.
 func (*DescribeOrganizationRequest) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{13}
+	return file_organizations_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *DescribeOrganizationRequest) GetId() string {
@@ -738,7 +122,7 @@ type DescribeOrganizationResponse struct {
 
 func (x *DescribeOrganizationResponse) Reset() {
 	*x = DescribeOrganizationResponse{}
-	mi := &file_organizations_proto_msgTypes[14]
+	mi := &file_organizations_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -750,7 +134,7 @@ func (x *DescribeOrganizationResponse) String() string {
 func (*DescribeOrganizationResponse) ProtoMessage() {}
 
 func (x *DescribeOrganizationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[14]
+	mi := &file_organizations_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -763,7 +147,7 @@ func (x *DescribeOrganizationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeOrganizationResponse.ProtoReflect.Descriptor instead.
 func (*DescribeOrganizationResponse) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{14}
+	return file_organizations_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *DescribeOrganizationResponse) GetOrganization() *Organization {
@@ -783,7 +167,7 @@ type UpdateOrganizationRequest struct {
 
 func (x *UpdateOrganizationRequest) Reset() {
 	*x = UpdateOrganizationRequest{}
-	mi := &file_organizations_proto_msgTypes[15]
+	mi := &file_organizations_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -795,7 +179,7 @@ func (x *UpdateOrganizationRequest) String() string {
 func (*UpdateOrganizationRequest) ProtoMessage() {}
 
 func (x *UpdateOrganizationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[15]
+	mi := &file_organizations_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -808,7 +192,7 @@ func (x *UpdateOrganizationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateOrganizationRequest.ProtoReflect.Descriptor instead.
 func (*UpdateOrganizationRequest) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{15}
+	return file_organizations_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *UpdateOrganizationRequest) GetId() string {
@@ -834,7 +218,7 @@ type UpdateOrganizationResponse struct {
 
 func (x *UpdateOrganizationResponse) Reset() {
 	*x = UpdateOrganizationResponse{}
-	mi := &file_organizations_proto_msgTypes[16]
+	mi := &file_organizations_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -846,7 +230,7 @@ func (x *UpdateOrganizationResponse) String() string {
 func (*UpdateOrganizationResponse) ProtoMessage() {}
 
 func (x *UpdateOrganizationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[16]
+	mi := &file_organizations_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -859,7 +243,7 @@ func (x *UpdateOrganizationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateOrganizationResponse.ProtoReflect.Descriptor instead.
 func (*UpdateOrganizationResponse) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{16}
+	return file_organizations_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *UpdateOrganizationResponse) GetOrganization() *Organization {
@@ -878,7 +262,7 @@ type DeleteOrganizationRequest struct {
 
 func (x *DeleteOrganizationRequest) Reset() {
 	*x = DeleteOrganizationRequest{}
-	mi := &file_organizations_proto_msgTypes[17]
+	mi := &file_organizations_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -890,7 +274,7 @@ func (x *DeleteOrganizationRequest) String() string {
 func (*DeleteOrganizationRequest) ProtoMessage() {}
 
 func (x *DeleteOrganizationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[17]
+	mi := &file_organizations_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -903,7 +287,7 @@ func (x *DeleteOrganizationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteOrganizationRequest.ProtoReflect.Descriptor instead.
 func (*DeleteOrganizationRequest) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{17}
+	return file_organizations_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *DeleteOrganizationRequest) GetId() string {
@@ -921,7 +305,7 @@ type DeleteOrganizationResponse struct {
 
 func (x *DeleteOrganizationResponse) Reset() {
 	*x = DeleteOrganizationResponse{}
-	mi := &file_organizations_proto_msgTypes[18]
+	mi := &file_organizations_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -933,7 +317,7 @@ func (x *DeleteOrganizationResponse) String() string {
 func (*DeleteOrganizationResponse) ProtoMessage() {}
 
 func (x *DeleteOrganizationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[18]
+	mi := &file_organizations_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -946,7 +330,7 @@ func (x *DeleteOrganizationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteOrganizationResponse.ProtoReflect.Descriptor instead.
 func (*DeleteOrganizationResponse) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{18}
+	return file_organizations_proto_rawDescGZIP(), []int{6}
 }
 
 type Invitation struct {
@@ -962,7 +346,7 @@ type Invitation struct {
 
 func (x *Invitation) Reset() {
 	*x = Invitation{}
-	mi := &file_organizations_proto_msgTypes[19]
+	mi := &file_organizations_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -974,7 +358,7 @@ func (x *Invitation) String() string {
 func (*Invitation) ProtoMessage() {}
 
 func (x *Invitation) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[19]
+	mi := &file_organizations_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -987,7 +371,7 @@ func (x *Invitation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Invitation.ProtoReflect.Descriptor instead.
 func (*Invitation) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{19}
+	return file_organizations_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Invitation) GetId() string {
@@ -1035,7 +419,7 @@ type CreateInvitationRequest struct {
 
 func (x *CreateInvitationRequest) Reset() {
 	*x = CreateInvitationRequest{}
-	mi := &file_organizations_proto_msgTypes[20]
+	mi := &file_organizations_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1047,7 +431,7 @@ func (x *CreateInvitationRequest) String() string {
 func (*CreateInvitationRequest) ProtoMessage() {}
 
 func (x *CreateInvitationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[20]
+	mi := &file_organizations_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1060,7 +444,7 @@ func (x *CreateInvitationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateInvitationRequest.ProtoReflect.Descriptor instead.
 func (*CreateInvitationRequest) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{20}
+	return file_organizations_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CreateInvitationRequest) GetId() string {
@@ -1086,7 +470,7 @@ type CreateInvitationResponse struct {
 
 func (x *CreateInvitationResponse) Reset() {
 	*x = CreateInvitationResponse{}
-	mi := &file_organizations_proto_msgTypes[21]
+	mi := &file_organizations_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1098,7 +482,7 @@ func (x *CreateInvitationResponse) String() string {
 func (*CreateInvitationResponse) ProtoMessage() {}
 
 func (x *CreateInvitationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[21]
+	mi := &file_organizations_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1111,7 +495,7 @@ func (x *CreateInvitationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateInvitationResponse.ProtoReflect.Descriptor instead.
 func (*CreateInvitationResponse) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{21}
+	return file_organizations_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CreateInvitationResponse) GetInvitation() *Invitation {
@@ -1130,7 +514,7 @@ type ListInvitationsRequest struct {
 
 func (x *ListInvitationsRequest) Reset() {
 	*x = ListInvitationsRequest{}
-	mi := &file_organizations_proto_msgTypes[22]
+	mi := &file_organizations_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1142,7 +526,7 @@ func (x *ListInvitationsRequest) String() string {
 func (*ListInvitationsRequest) ProtoMessage() {}
 
 func (x *ListInvitationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[22]
+	mi := &file_organizations_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1155,7 +539,7 @@ func (x *ListInvitationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInvitationsRequest.ProtoReflect.Descriptor instead.
 func (*ListInvitationsRequest) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{22}
+	return file_organizations_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListInvitationsRequest) GetId() string {
@@ -1174,7 +558,7 @@ type ListInvitationsResponse struct {
 
 func (x *ListInvitationsResponse) Reset() {
 	*x = ListInvitationsResponse{}
-	mi := &file_organizations_proto_msgTypes[23]
+	mi := &file_organizations_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1186,7 +570,7 @@ func (x *ListInvitationsResponse) String() string {
 func (*ListInvitationsResponse) ProtoMessage() {}
 
 func (x *ListInvitationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[23]
+	mi := &file_organizations_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1199,7 +583,7 @@ func (x *ListInvitationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInvitationsResponse.ProtoReflect.Descriptor instead.
 func (*ListInvitationsResponse) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{23}
+	return file_organizations_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListInvitationsResponse) GetInvitations() []*Invitation {
@@ -1219,7 +603,7 @@ type RemoveInvitationRequest struct {
 
 func (x *RemoveInvitationRequest) Reset() {
 	*x = RemoveInvitationRequest{}
-	mi := &file_organizations_proto_msgTypes[24]
+	mi := &file_organizations_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1231,7 +615,7 @@ func (x *RemoveInvitationRequest) String() string {
 func (*RemoveInvitationRequest) ProtoMessage() {}
 
 func (x *RemoveInvitationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[24]
+	mi := &file_organizations_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1244,7 +628,7 @@ func (x *RemoveInvitationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveInvitationRequest.ProtoReflect.Descriptor instead.
 func (*RemoveInvitationRequest) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{24}
+	return file_organizations_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RemoveInvitationRequest) GetId() string {
@@ -1269,7 +653,7 @@ type RemoveInvitationResponse struct {
 
 func (x *RemoveInvitationResponse) Reset() {
 	*x = RemoveInvitationResponse{}
-	mi := &file_organizations_proto_msgTypes[25]
+	mi := &file_organizations_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1281,7 +665,7 @@ func (x *RemoveInvitationResponse) String() string {
 func (*RemoveInvitationResponse) ProtoMessage() {}
 
 func (x *RemoveInvitationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[25]
+	mi := &file_organizations_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1294,7 +678,7 @@ func (x *RemoveInvitationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveInvitationResponse.ProtoReflect.Descriptor instead.
 func (*RemoveInvitationResponse) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{25}
+	return file_organizations_proto_rawDescGZIP(), []int{13}
 }
 
 type RemoveUserRequest struct {
@@ -1307,7 +691,7 @@ type RemoveUserRequest struct {
 
 func (x *RemoveUserRequest) Reset() {
 	*x = RemoveUserRequest{}
-	mi := &file_organizations_proto_msgTypes[26]
+	mi := &file_organizations_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1319,7 +703,7 @@ func (x *RemoveUserRequest) String() string {
 func (*RemoveUserRequest) ProtoMessage() {}
 
 func (x *RemoveUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[26]
+	mi := &file_organizations_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1332,7 +716,7 @@ func (x *RemoveUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveUserRequest.ProtoReflect.Descriptor instead.
 func (*RemoveUserRequest) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{26}
+	return file_organizations_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RemoveUserRequest) GetId() string {
@@ -1357,7 +741,7 @@ type RemoveUserResponse struct {
 
 func (x *RemoveUserResponse) Reset() {
 	*x = RemoveUserResponse{}
-	mi := &file_organizations_proto_msgTypes[27]
+	mi := &file_organizations_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1369,7 +753,7 @@ func (x *RemoveUserResponse) String() string {
 func (*RemoveUserResponse) ProtoMessage() {}
 
 func (x *RemoveUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[27]
+	mi := &file_organizations_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1382,7 +766,623 @@ func (x *RemoveUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveUserResponse.ProtoReflect.Descriptor instead.
 func (*RemoveUserResponse) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{15}
+}
+
+type ListApplicationsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListApplicationsRequest) Reset() {
+	*x = ListApplicationsRequest{}
+	mi := &file_organizations_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListApplicationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListApplicationsRequest) ProtoMessage() {}
+
+func (x *ListApplicationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListApplicationsRequest.ProtoReflect.Descriptor instead.
+func (*ListApplicationsRequest) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ListApplicationsRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type ListApplicationsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Applications  []*AppInstallation     `protobuf:"bytes,1,rep,name=applications,proto3" json:"applications,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListApplicationsResponse) Reset() {
+	*x = ListApplicationsResponse{}
+	mi := &file_organizations_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListApplicationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListApplicationsResponse) ProtoMessage() {}
+
+func (x *ListApplicationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListApplicationsResponse.ProtoReflect.Descriptor instead.
+func (*ListApplicationsResponse) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ListApplicationsResponse) GetApplications() []*AppInstallation {
+	if x != nil {
+		return x.Applications
+	}
+	return nil
+}
+
+type InstallApplicationRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AppName          string                 `protobuf:"bytes,2,opt,name=app_name,json=appName,proto3" json:"app_name,omitempty"`
+	InstallationName string                 `protobuf:"bytes,3,opt,name=installation_name,json=installationName,proto3" json:"installation_name,omitempty"`
+	Configuration    *_struct.Struct        `protobuf:"bytes,4,opt,name=configuration,proto3" json:"configuration,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *InstallApplicationRequest) Reset() {
+	*x = InstallApplicationRequest{}
+	mi := &file_organizations_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InstallApplicationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InstallApplicationRequest) ProtoMessage() {}
+
+func (x *InstallApplicationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InstallApplicationRequest.ProtoReflect.Descriptor instead.
+func (*InstallApplicationRequest) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *InstallApplicationRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *InstallApplicationRequest) GetAppName() string {
+	if x != nil {
+		return x.AppName
+	}
+	return ""
+}
+
+func (x *InstallApplicationRequest) GetInstallationName() string {
+	if x != nil {
+		return x.InstallationName
+	}
+	return ""
+}
+
+func (x *InstallApplicationRequest) GetConfiguration() *_struct.Struct {
+	if x != nil {
+		return x.Configuration
+	}
+	return nil
+}
+
+type InstallApplicationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Installation  *AppInstallation       `protobuf:"bytes,1,opt,name=installation,proto3" json:"installation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InstallApplicationResponse) Reset() {
+	*x = InstallApplicationResponse{}
+	mi := &file_organizations_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InstallApplicationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InstallApplicationResponse) ProtoMessage() {}
+
+func (x *InstallApplicationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InstallApplicationResponse.ProtoReflect.Descriptor instead.
+func (*InstallApplicationResponse) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *InstallApplicationResponse) GetInstallation() *AppInstallation {
+	if x != nil {
+		return x.Installation
+	}
+	return nil
+}
+
+type DescribeApplicationRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	InstallationId string                 `protobuf:"bytes,2,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *DescribeApplicationRequest) Reset() {
+	*x = DescribeApplicationRequest{}
+	mi := &file_organizations_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DescribeApplicationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DescribeApplicationRequest) ProtoMessage() {}
+
+func (x *DescribeApplicationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DescribeApplicationRequest.ProtoReflect.Descriptor instead.
+func (*DescribeApplicationRequest) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *DescribeApplicationRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *DescribeApplicationRequest) GetInstallationId() string {
+	if x != nil {
+		return x.InstallationId
+	}
+	return ""
+}
+
+type DescribeApplicationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Installation  *AppInstallation       `protobuf:"bytes,1,opt,name=installation,proto3" json:"installation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DescribeApplicationResponse) Reset() {
+	*x = DescribeApplicationResponse{}
+	mi := &file_organizations_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DescribeApplicationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DescribeApplicationResponse) ProtoMessage() {}
+
+func (x *DescribeApplicationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DescribeApplicationResponse.ProtoReflect.Descriptor instead.
+func (*DescribeApplicationResponse) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *DescribeApplicationResponse) GetInstallation() *AppInstallation {
+	if x != nil {
+		return x.Installation
+	}
+	return nil
+}
+
+type UpdateApplicationRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	InstallationId string                 `protobuf:"bytes,2,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
+	Configuration  *_struct.Struct        `protobuf:"bytes,3,opt,name=configuration,proto3" json:"configuration,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *UpdateApplicationRequest) Reset() {
+	*x = UpdateApplicationRequest{}
+	mi := &file_organizations_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateApplicationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateApplicationRequest) ProtoMessage() {}
+
+func (x *UpdateApplicationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateApplicationRequest.ProtoReflect.Descriptor instead.
+func (*UpdateApplicationRequest) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *UpdateApplicationRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UpdateApplicationRequest) GetInstallationId() string {
+	if x != nil {
+		return x.InstallationId
+	}
+	return ""
+}
+
+func (x *UpdateApplicationRequest) GetConfiguration() *_struct.Struct {
+	if x != nil {
+		return x.Configuration
+	}
+	return nil
+}
+
+type UpdateApplicationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Installation  *AppInstallation       `protobuf:"bytes,1,opt,name=installation,proto3" json:"installation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateApplicationResponse) Reset() {
+	*x = UpdateApplicationResponse{}
+	mi := &file_organizations_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateApplicationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateApplicationResponse) ProtoMessage() {}
+
+func (x *UpdateApplicationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateApplicationResponse.ProtoReflect.Descriptor instead.
+func (*UpdateApplicationResponse) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *UpdateApplicationResponse) GetInstallation() *AppInstallation {
+	if x != nil {
+		return x.Installation
+	}
+	return nil
+}
+
+type UninstallApplicationRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	InstallationId string                 `protobuf:"bytes,2,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *UninstallApplicationRequest) Reset() {
+	*x = UninstallApplicationRequest{}
+	mi := &file_organizations_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UninstallApplicationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UninstallApplicationRequest) ProtoMessage() {}
+
+func (x *UninstallApplicationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UninstallApplicationRequest.ProtoReflect.Descriptor instead.
+func (*UninstallApplicationRequest) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *UninstallApplicationRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UninstallApplicationRequest) GetInstallationId() string {
+	if x != nil {
+		return x.InstallationId
+	}
+	return ""
+}
+
+type UninstallApplicationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UninstallApplicationResponse) Reset() {
+	*x = UninstallApplicationResponse{}
+	mi := &file_organizations_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UninstallApplicationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UninstallApplicationResponse) ProtoMessage() {}
+
+func (x *UninstallApplicationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UninstallApplicationResponse.ProtoReflect.Descriptor instead.
+func (*UninstallApplicationResponse) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{25}
+}
+
+type AppInstallation struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Metadata      *AppInstallation_Metadata `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Spec          *AppInstallation_Spec     `protobuf:"bytes,2,opt,name=spec,proto3" json:"spec,omitempty"`
+	Status        *AppInstallation_Status   `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AppInstallation) Reset() {
+	*x = AppInstallation{}
+	mi := &file_organizations_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AppInstallation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AppInstallation) ProtoMessage() {}
+
+func (x *AppInstallation) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AppInstallation.ProtoReflect.Descriptor instead.
+func (*AppInstallation) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *AppInstallation) GetMetadata() *AppInstallation_Metadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AppInstallation) GetSpec() *AppInstallation_Spec {
+	if x != nil {
+		return x.Spec
+	}
+	return nil
+}
+
+func (x *AppInstallation) GetStatus() *AppInstallation_Status {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+type BrowserAction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	Method        string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
+	FormFields    map[string]string      `protobuf:"bytes,3,rep,name=form_fields,json=formFields,proto3" json:"form_fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BrowserAction) Reset() {
+	*x = BrowserAction{}
+	mi := &file_organizations_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BrowserAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BrowserAction) ProtoMessage() {}
+
+func (x *BrowserAction) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BrowserAction.ProtoReflect.Descriptor instead.
+func (*BrowserAction) Descriptor() ([]byte, []int) {
 	return file_organizations_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *BrowserAction) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *BrowserAction) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *BrowserAction) GetFormFields() map[string]string {
+	if x != nil {
+		return x.FormFields
+	}
+	return nil
+}
+
+func (x *BrowserAction) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
 }
 
 // Event messages for organization lifecycle events
@@ -1594,6 +1594,82 @@ func (x *InvitationCreated) GetTimestamp() *timestamp.Timestamp {
 	return nil
 }
 
+type Organization_Metadata struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Organization_Metadata) Reset() {
+	*x = Organization_Metadata{}
+	mi := &file_organizations_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Organization_Metadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Organization_Metadata) ProtoMessage() {}
+
+func (x *Organization_Metadata) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Organization_Metadata.ProtoReflect.Descriptor instead.
+func (*Organization_Metadata) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{0, 0}
+}
+
+func (x *Organization_Metadata) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Organization_Metadata) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Organization_Metadata) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *Organization_Metadata) GetCreatedAt() *timestamp.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Organization_Metadata) GetUpdatedAt() *timestamp.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
 type AppInstallation_Metadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1606,7 +1682,7 @@ type AppInstallation_Metadata struct {
 
 func (x *AppInstallation_Metadata) Reset() {
 	*x = AppInstallation_Metadata{}
-	mi := &file_organizations_proto_msgTypes[32]
+	mi := &file_organizations_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1618,7 +1694,7 @@ func (x *AppInstallation_Metadata) String() string {
 func (*AppInstallation_Metadata) ProtoMessage() {}
 
 func (x *AppInstallation_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[32]
+	mi := &file_organizations_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1631,7 +1707,7 @@ func (x *AppInstallation_Metadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppInstallation_Metadata.ProtoReflect.Descriptor instead.
 func (*AppInstallation_Metadata) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{10, 0}
+	return file_organizations_proto_rawDescGZIP(), []int{26, 0}
 }
 
 func (x *AppInstallation_Metadata) GetId() string {
@@ -1672,7 +1748,7 @@ type AppInstallation_Spec struct {
 
 func (x *AppInstallation_Spec) Reset() {
 	*x = AppInstallation_Spec{}
-	mi := &file_organizations_proto_msgTypes[33]
+	mi := &file_organizations_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1684,7 +1760,7 @@ func (x *AppInstallation_Spec) String() string {
 func (*AppInstallation_Spec) ProtoMessage() {}
 
 func (x *AppInstallation_Spec) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[33]
+	mi := &file_organizations_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1697,7 +1773,7 @@ func (x *AppInstallation_Spec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppInstallation_Spec.ProtoReflect.Descriptor instead.
 func (*AppInstallation_Spec) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{10, 1}
+	return file_organizations_proto_rawDescGZIP(), []int{26, 1}
 }
 
 func (x *AppInstallation_Spec) GetAppName() string {
@@ -1727,7 +1803,7 @@ type AppInstallation_Status struct {
 
 func (x *AppInstallation_Status) Reset() {
 	*x = AppInstallation_Status{}
-	mi := &file_organizations_proto_msgTypes[34]
+	mi := &file_organizations_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1739,7 +1815,7 @@ func (x *AppInstallation_Status) String() string {
 func (*AppInstallation_Status) ProtoMessage() {}
 
 func (x *AppInstallation_Status) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[34]
+	mi := &file_organizations_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1752,7 +1828,7 @@ func (x *AppInstallation_Status) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppInstallation_Status.ProtoReflect.Descriptor instead.
 func (*AppInstallation_Status) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{10, 2}
+	return file_organizations_proto_rawDescGZIP(), []int{26, 2}
 }
 
 func (x *AppInstallation_Status) GetState() string {
@@ -1802,7 +1878,7 @@ type AppInstallation_NodeRef struct {
 
 func (x *AppInstallation_NodeRef) Reset() {
 	*x = AppInstallation_NodeRef{}
-	mi := &file_organizations_proto_msgTypes[35]
+	mi := &file_organizations_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1814,7 +1890,7 @@ func (x *AppInstallation_NodeRef) String() string {
 func (*AppInstallation_NodeRef) ProtoMessage() {}
 
 func (x *AppInstallation_NodeRef) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[35]
+	mi := &file_organizations_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1827,7 +1903,7 @@ func (x *AppInstallation_NodeRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppInstallation_NodeRef.ProtoReflect.Descriptor instead.
 func (*AppInstallation_NodeRef) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{10, 3}
+	return file_organizations_proto_rawDescGZIP(), []int{26, 3}
 }
 
 func (x *AppInstallation_NodeRef) GetWorkflowId() string {
@@ -1858,87 +1934,60 @@ func (x *AppInstallation_NodeRef) GetNodeName() string {
 	return ""
 }
 
-type Organization_Metadata struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Organization_Metadata) Reset() {
-	*x = Organization_Metadata{}
-	mi := &file_organizations_proto_msgTypes[37]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Organization_Metadata) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Organization_Metadata) ProtoMessage() {}
-
-func (x *Organization_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[37]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Organization_Metadata.ProtoReflect.Descriptor instead.
-func (*Organization_Metadata) Descriptor() ([]byte, []int) {
-	return file_organizations_proto_rawDescGZIP(), []int{12, 0}
-}
-
-func (x *Organization_Metadata) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *Organization_Metadata) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *Organization_Metadata) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
-func (x *Organization_Metadata) GetCreatedAt() *timestamp.Timestamp {
-	if x != nil {
-		return x.CreatedAt
-	}
-	return nil
-}
-
-func (x *Organization_Metadata) GetUpdatedAt() *timestamp.Timestamp {
-	if x != nil {
-		return x.UpdatedAt
-	}
-	return nil
-}
-
 var File_organizations_proto protoreflect.FileDescriptor
 
 const file_organizations_proto_rawDesc = "" +
 	"\n" +
-	"\x13organizations.proto\x12\x18Superplane.Organizations\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\")\n" +
+	"\x13organizations.proto\x12\x18Superplane.Organizations\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xa4\x02\n" +
+	"\fOrganization\x12K\n" +
+	"\bmetadata\x18\x01 \x01(\v2/.Superplane.Organizations.Organization.MetadataR\bmetadata\x1a\xc6\x01\n" +
+	"\bMetadata\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x129\n" +
+	"\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"-\n" +
+	"\x1bDescribeOrganizationRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"j\n" +
+	"\x1cDescribeOrganizationResponse\x12J\n" +
+	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\"w\n" +
+	"\x19UpdateOrganizationRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12J\n" +
+	"\forganization\x18\x02 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\"h\n" +
+	"\x1aUpdateOrganizationResponse\x12J\n" +
+	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\"+\n" +
+	"\x19DeleteOrganizationRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x1c\n" +
+	"\x1aDeleteOrganizationResponse\"\xac\x01\n" +
+	"\n" +
+	"Invitation\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
+	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12\x14\n" +
+	"\x05state\x18\x04 \x01(\tR\x05state\x129\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"?\n" +
+	"\x17CreateInvitationRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\"`\n" +
+	"\x18CreateInvitationResponse\x12D\n" +
+	"\n" +
+	"invitation\x18\x01 \x01(\v2$.Superplane.Organizations.InvitationR\n" +
+	"invitation\"(\n" +
+	"\x16ListInvitationsRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"a\n" +
+	"\x17ListInvitationsResponse\x12F\n" +
+	"\vinvitations\x18\x01 \x03(\v2$.Superplane.Organizations.InvitationR\vinvitations\"N\n" +
+	"\x17RemoveInvitationRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
+	"\rinvitation_id\x18\x02 \x01(\tR\finvitationId\"\x1a\n" +
+	"\x18RemoveInvitationResponse\"<\n" +
+	"\x11RemoveUserRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\"\x14\n" +
+	"\x12RemoveUserResponse\")\n" +
 	"\x17ListApplicationsRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"i\n" +
 	"\x18ListApplicationsResponse\x12M\n" +
@@ -1999,56 +2048,7 @@ const file_organizations_proto_rawDesc = "" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x1a=\n" +
 	"\x0fFormFieldsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa4\x02\n" +
-	"\fOrganization\x12K\n" +
-	"\bmetadata\x18\x01 \x01(\v2/.Superplane.Organizations.Organization.MetadataR\bmetadata\x1a\xc6\x01\n" +
-	"\bMetadata\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x129\n" +
-	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
-	"\n" +
-	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"-\n" +
-	"\x1bDescribeOrganizationRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"j\n" +
-	"\x1cDescribeOrganizationResponse\x12J\n" +
-	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\"w\n" +
-	"\x19UpdateOrganizationRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12J\n" +
-	"\forganization\x18\x02 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\"h\n" +
-	"\x1aUpdateOrganizationResponse\x12J\n" +
-	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\"+\n" +
-	"\x19DeleteOrganizationRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\x1c\n" +
-	"\x1aDeleteOrganizationResponse\"\xac\x01\n" +
-	"\n" +
-	"Invitation\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
-	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x14\n" +
-	"\x05email\x18\x03 \x01(\tR\x05email\x12\x14\n" +
-	"\x05state\x18\x04 \x01(\tR\x05state\x129\n" +
-	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"?\n" +
-	"\x17CreateInvitationRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
-	"\x05email\x18\x02 \x01(\tR\x05email\"`\n" +
-	"\x18CreateInvitationResponse\x12D\n" +
-	"\n" +
-	"invitation\x18\x01 \x01(\v2$.Superplane.Organizations.InvitationR\n" +
-	"invitation\"(\n" +
-	"\x16ListInvitationsRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"a\n" +
-	"\x17ListInvitationsResponse\x12F\n" +
-	"\vinvitations\x18\x01 \x03(\v2$.Superplane.Organizations.InvitationR\vinvitations\"N\n" +
-	"\x17RemoveInvitationRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
-	"\rinvitation_id\x18\x02 \x01(\tR\finvitationId\"\x1a\n" +
-	"\x18RemoveInvitationResponse\"<\n" +
-	"\x11RemoveUserRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
-	"\auser_id\x18\x02 \x01(\tR\x06userId\"\x14\n" +
-	"\x12RemoveUserResponse\"x\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"x\n" +
 	"\x13OrganizationCreated\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x128\n" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"x\n" +
@@ -2104,101 +2104,101 @@ func file_organizations_proto_rawDescGZIP() []byte {
 
 var file_organizations_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_organizations_proto_goTypes = []any{
-	(*ListApplicationsRequest)(nil),      // 0: Superplane.Organizations.ListApplicationsRequest
-	(*ListApplicationsResponse)(nil),     // 1: Superplane.Organizations.ListApplicationsResponse
-	(*InstallApplicationRequest)(nil),    // 2: Superplane.Organizations.InstallApplicationRequest
-	(*InstallApplicationResponse)(nil),   // 3: Superplane.Organizations.InstallApplicationResponse
-	(*DescribeApplicationRequest)(nil),   // 4: Superplane.Organizations.DescribeApplicationRequest
-	(*DescribeApplicationResponse)(nil),  // 5: Superplane.Organizations.DescribeApplicationResponse
-	(*UpdateApplicationRequest)(nil),     // 6: Superplane.Organizations.UpdateApplicationRequest
-	(*UpdateApplicationResponse)(nil),    // 7: Superplane.Organizations.UpdateApplicationResponse
-	(*UninstallApplicationRequest)(nil),  // 8: Superplane.Organizations.UninstallApplicationRequest
-	(*UninstallApplicationResponse)(nil), // 9: Superplane.Organizations.UninstallApplicationResponse
-	(*AppInstallation)(nil),              // 10: Superplane.Organizations.AppInstallation
-	(*BrowserAction)(nil),                // 11: Superplane.Organizations.BrowserAction
-	(*Organization)(nil),                 // 12: Superplane.Organizations.Organization
-	(*DescribeOrganizationRequest)(nil),  // 13: Superplane.Organizations.DescribeOrganizationRequest
-	(*DescribeOrganizationResponse)(nil), // 14: Superplane.Organizations.DescribeOrganizationResponse
-	(*UpdateOrganizationRequest)(nil),    // 15: Superplane.Organizations.UpdateOrganizationRequest
-	(*UpdateOrganizationResponse)(nil),   // 16: Superplane.Organizations.UpdateOrganizationResponse
-	(*DeleteOrganizationRequest)(nil),    // 17: Superplane.Organizations.DeleteOrganizationRequest
-	(*DeleteOrganizationResponse)(nil),   // 18: Superplane.Organizations.DeleteOrganizationResponse
-	(*Invitation)(nil),                   // 19: Superplane.Organizations.Invitation
-	(*CreateInvitationRequest)(nil),      // 20: Superplane.Organizations.CreateInvitationRequest
-	(*CreateInvitationResponse)(nil),     // 21: Superplane.Organizations.CreateInvitationResponse
-	(*ListInvitationsRequest)(nil),       // 22: Superplane.Organizations.ListInvitationsRequest
-	(*ListInvitationsResponse)(nil),      // 23: Superplane.Organizations.ListInvitationsResponse
-	(*RemoveInvitationRequest)(nil),      // 24: Superplane.Organizations.RemoveInvitationRequest
-	(*RemoveInvitationResponse)(nil),     // 25: Superplane.Organizations.RemoveInvitationResponse
-	(*RemoveUserRequest)(nil),            // 26: Superplane.Organizations.RemoveUserRequest
-	(*RemoveUserResponse)(nil),           // 27: Superplane.Organizations.RemoveUserResponse
+	(*Organization)(nil),                 // 0: Superplane.Organizations.Organization
+	(*DescribeOrganizationRequest)(nil),  // 1: Superplane.Organizations.DescribeOrganizationRequest
+	(*DescribeOrganizationResponse)(nil), // 2: Superplane.Organizations.DescribeOrganizationResponse
+	(*UpdateOrganizationRequest)(nil),    // 3: Superplane.Organizations.UpdateOrganizationRequest
+	(*UpdateOrganizationResponse)(nil),   // 4: Superplane.Organizations.UpdateOrganizationResponse
+	(*DeleteOrganizationRequest)(nil),    // 5: Superplane.Organizations.DeleteOrganizationRequest
+	(*DeleteOrganizationResponse)(nil),   // 6: Superplane.Organizations.DeleteOrganizationResponse
+	(*Invitation)(nil),                   // 7: Superplane.Organizations.Invitation
+	(*CreateInvitationRequest)(nil),      // 8: Superplane.Organizations.CreateInvitationRequest
+	(*CreateInvitationResponse)(nil),     // 9: Superplane.Organizations.CreateInvitationResponse
+	(*ListInvitationsRequest)(nil),       // 10: Superplane.Organizations.ListInvitationsRequest
+	(*ListInvitationsResponse)(nil),      // 11: Superplane.Organizations.ListInvitationsResponse
+	(*RemoveInvitationRequest)(nil),      // 12: Superplane.Organizations.RemoveInvitationRequest
+	(*RemoveInvitationResponse)(nil),     // 13: Superplane.Organizations.RemoveInvitationResponse
+	(*RemoveUserRequest)(nil),            // 14: Superplane.Organizations.RemoveUserRequest
+	(*RemoveUserResponse)(nil),           // 15: Superplane.Organizations.RemoveUserResponse
+	(*ListApplicationsRequest)(nil),      // 16: Superplane.Organizations.ListApplicationsRequest
+	(*ListApplicationsResponse)(nil),     // 17: Superplane.Organizations.ListApplicationsResponse
+	(*InstallApplicationRequest)(nil),    // 18: Superplane.Organizations.InstallApplicationRequest
+	(*InstallApplicationResponse)(nil),   // 19: Superplane.Organizations.InstallApplicationResponse
+	(*DescribeApplicationRequest)(nil),   // 20: Superplane.Organizations.DescribeApplicationRequest
+	(*DescribeApplicationResponse)(nil),  // 21: Superplane.Organizations.DescribeApplicationResponse
+	(*UpdateApplicationRequest)(nil),     // 22: Superplane.Organizations.UpdateApplicationRequest
+	(*UpdateApplicationResponse)(nil),    // 23: Superplane.Organizations.UpdateApplicationResponse
+	(*UninstallApplicationRequest)(nil),  // 24: Superplane.Organizations.UninstallApplicationRequest
+	(*UninstallApplicationResponse)(nil), // 25: Superplane.Organizations.UninstallApplicationResponse
+	(*AppInstallation)(nil),              // 26: Superplane.Organizations.AppInstallation
+	(*BrowserAction)(nil),                // 27: Superplane.Organizations.BrowserAction
 	(*OrganizationCreated)(nil),          // 28: Superplane.Organizations.OrganizationCreated
 	(*OrganizationUpdated)(nil),          // 29: Superplane.Organizations.OrganizationUpdated
 	(*OrganizationDeleted)(nil),          // 30: Superplane.Organizations.OrganizationDeleted
 	(*InvitationCreated)(nil),            // 31: Superplane.Organizations.InvitationCreated
-	(*AppInstallation_Metadata)(nil),     // 32: Superplane.Organizations.AppInstallation.Metadata
-	(*AppInstallation_Spec)(nil),         // 33: Superplane.Organizations.AppInstallation.Spec
-	(*AppInstallation_Status)(nil),       // 34: Superplane.Organizations.AppInstallation.Status
-	(*AppInstallation_NodeRef)(nil),      // 35: Superplane.Organizations.AppInstallation.NodeRef
-	nil,                                  // 36: Superplane.Organizations.BrowserAction.FormFieldsEntry
-	(*Organization_Metadata)(nil),        // 37: Superplane.Organizations.Organization.Metadata
-	(*_struct.Struct)(nil),               // 38: google.protobuf.Struct
-	(*timestamp.Timestamp)(nil),          // 39: google.protobuf.Timestamp
+	(*Organization_Metadata)(nil),        // 32: Superplane.Organizations.Organization.Metadata
+	(*AppInstallation_Metadata)(nil),     // 33: Superplane.Organizations.AppInstallation.Metadata
+	(*AppInstallation_Spec)(nil),         // 34: Superplane.Organizations.AppInstallation.Spec
+	(*AppInstallation_Status)(nil),       // 35: Superplane.Organizations.AppInstallation.Status
+	(*AppInstallation_NodeRef)(nil),      // 36: Superplane.Organizations.AppInstallation.NodeRef
+	nil,                                  // 37: Superplane.Organizations.BrowserAction.FormFieldsEntry
+	(*timestamp.Timestamp)(nil),          // 38: google.protobuf.Timestamp
+	(*_struct.Struct)(nil),               // 39: google.protobuf.Struct
 }
 var file_organizations_proto_depIdxs = []int32{
-	10, // 0: Superplane.Organizations.ListApplicationsResponse.applications:type_name -> Superplane.Organizations.AppInstallation
-	38, // 1: Superplane.Organizations.InstallApplicationRequest.configuration:type_name -> google.protobuf.Struct
-	10, // 2: Superplane.Organizations.InstallApplicationResponse.installation:type_name -> Superplane.Organizations.AppInstallation
-	10, // 3: Superplane.Organizations.DescribeApplicationResponse.installation:type_name -> Superplane.Organizations.AppInstallation
-	38, // 4: Superplane.Organizations.UpdateApplicationRequest.configuration:type_name -> google.protobuf.Struct
-	10, // 5: Superplane.Organizations.UpdateApplicationResponse.installation:type_name -> Superplane.Organizations.AppInstallation
-	32, // 6: Superplane.Organizations.AppInstallation.metadata:type_name -> Superplane.Organizations.AppInstallation.Metadata
-	33, // 7: Superplane.Organizations.AppInstallation.spec:type_name -> Superplane.Organizations.AppInstallation.Spec
-	34, // 8: Superplane.Organizations.AppInstallation.status:type_name -> Superplane.Organizations.AppInstallation.Status
-	36, // 9: Superplane.Organizations.BrowserAction.form_fields:type_name -> Superplane.Organizations.BrowserAction.FormFieldsEntry
-	37, // 10: Superplane.Organizations.Organization.metadata:type_name -> Superplane.Organizations.Organization.Metadata
-	12, // 11: Superplane.Organizations.DescribeOrganizationResponse.organization:type_name -> Superplane.Organizations.Organization
-	12, // 12: Superplane.Organizations.UpdateOrganizationRequest.organization:type_name -> Superplane.Organizations.Organization
-	12, // 13: Superplane.Organizations.UpdateOrganizationResponse.organization:type_name -> Superplane.Organizations.Organization
-	39, // 14: Superplane.Organizations.Invitation.created_at:type_name -> google.protobuf.Timestamp
-	19, // 15: Superplane.Organizations.CreateInvitationResponse.invitation:type_name -> Superplane.Organizations.Invitation
-	19, // 16: Superplane.Organizations.ListInvitationsResponse.invitations:type_name -> Superplane.Organizations.Invitation
-	39, // 17: Superplane.Organizations.OrganizationCreated.timestamp:type_name -> google.protobuf.Timestamp
-	39, // 18: Superplane.Organizations.OrganizationUpdated.timestamp:type_name -> google.protobuf.Timestamp
-	39, // 19: Superplane.Organizations.OrganizationDeleted.timestamp:type_name -> google.protobuf.Timestamp
-	39, // 20: Superplane.Organizations.InvitationCreated.timestamp:type_name -> google.protobuf.Timestamp
-	39, // 21: Superplane.Organizations.AppInstallation.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	39, // 22: Superplane.Organizations.AppInstallation.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	38, // 23: Superplane.Organizations.AppInstallation.Spec.configuration:type_name -> google.protobuf.Struct
-	38, // 24: Superplane.Organizations.AppInstallation.Status.metadata:type_name -> google.protobuf.Struct
-	11, // 25: Superplane.Organizations.AppInstallation.Status.browser_action:type_name -> Superplane.Organizations.BrowserAction
-	35, // 26: Superplane.Organizations.AppInstallation.Status.used_in:type_name -> Superplane.Organizations.AppInstallation.NodeRef
-	39, // 27: Superplane.Organizations.Organization.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	39, // 28: Superplane.Organizations.Organization.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	13, // 29: Superplane.Organizations.Organizations.DescribeOrganization:input_type -> Superplane.Organizations.DescribeOrganizationRequest
-	15, // 30: Superplane.Organizations.Organizations.UpdateOrganization:input_type -> Superplane.Organizations.UpdateOrganizationRequest
-	17, // 31: Superplane.Organizations.Organizations.DeleteOrganization:input_type -> Superplane.Organizations.DeleteOrganizationRequest
-	26, // 32: Superplane.Organizations.Organizations.RemoveUser:input_type -> Superplane.Organizations.RemoveUserRequest
-	20, // 33: Superplane.Organizations.Organizations.CreateInvitation:input_type -> Superplane.Organizations.CreateInvitationRequest
-	22, // 34: Superplane.Organizations.Organizations.ListInvitations:input_type -> Superplane.Organizations.ListInvitationsRequest
-	24, // 35: Superplane.Organizations.Organizations.RemoveInvitation:input_type -> Superplane.Organizations.RemoveInvitationRequest
-	0,  // 36: Superplane.Organizations.Organizations.ListApplications:input_type -> Superplane.Organizations.ListApplicationsRequest
-	4,  // 37: Superplane.Organizations.Organizations.DescribeApplication:input_type -> Superplane.Organizations.DescribeApplicationRequest
-	2,  // 38: Superplane.Organizations.Organizations.InstallApplication:input_type -> Superplane.Organizations.InstallApplicationRequest
-	6,  // 39: Superplane.Organizations.Organizations.UpdateApplication:input_type -> Superplane.Organizations.UpdateApplicationRequest
-	8,  // 40: Superplane.Organizations.Organizations.UninstallApplication:input_type -> Superplane.Organizations.UninstallApplicationRequest
-	14, // 41: Superplane.Organizations.Organizations.DescribeOrganization:output_type -> Superplane.Organizations.DescribeOrganizationResponse
-	16, // 42: Superplane.Organizations.Organizations.UpdateOrganization:output_type -> Superplane.Organizations.UpdateOrganizationResponse
-	18, // 43: Superplane.Organizations.Organizations.DeleteOrganization:output_type -> Superplane.Organizations.DeleteOrganizationResponse
-	27, // 44: Superplane.Organizations.Organizations.RemoveUser:output_type -> Superplane.Organizations.RemoveUserResponse
-	21, // 45: Superplane.Organizations.Organizations.CreateInvitation:output_type -> Superplane.Organizations.CreateInvitationResponse
-	23, // 46: Superplane.Organizations.Organizations.ListInvitations:output_type -> Superplane.Organizations.ListInvitationsResponse
-	25, // 47: Superplane.Organizations.Organizations.RemoveInvitation:output_type -> Superplane.Organizations.RemoveInvitationResponse
-	1,  // 48: Superplane.Organizations.Organizations.ListApplications:output_type -> Superplane.Organizations.ListApplicationsResponse
-	5,  // 49: Superplane.Organizations.Organizations.DescribeApplication:output_type -> Superplane.Organizations.DescribeApplicationResponse
-	3,  // 50: Superplane.Organizations.Organizations.InstallApplication:output_type -> Superplane.Organizations.InstallApplicationResponse
-	7,  // 51: Superplane.Organizations.Organizations.UpdateApplication:output_type -> Superplane.Organizations.UpdateApplicationResponse
-	9,  // 52: Superplane.Organizations.Organizations.UninstallApplication:output_type -> Superplane.Organizations.UninstallApplicationResponse
+	32, // 0: Superplane.Organizations.Organization.metadata:type_name -> Superplane.Organizations.Organization.Metadata
+	0,  // 1: Superplane.Organizations.DescribeOrganizationResponse.organization:type_name -> Superplane.Organizations.Organization
+	0,  // 2: Superplane.Organizations.UpdateOrganizationRequest.organization:type_name -> Superplane.Organizations.Organization
+	0,  // 3: Superplane.Organizations.UpdateOrganizationResponse.organization:type_name -> Superplane.Organizations.Organization
+	38, // 4: Superplane.Organizations.Invitation.created_at:type_name -> google.protobuf.Timestamp
+	7,  // 5: Superplane.Organizations.CreateInvitationResponse.invitation:type_name -> Superplane.Organizations.Invitation
+	7,  // 6: Superplane.Organizations.ListInvitationsResponse.invitations:type_name -> Superplane.Organizations.Invitation
+	26, // 7: Superplane.Organizations.ListApplicationsResponse.applications:type_name -> Superplane.Organizations.AppInstallation
+	39, // 8: Superplane.Organizations.InstallApplicationRequest.configuration:type_name -> google.protobuf.Struct
+	26, // 9: Superplane.Organizations.InstallApplicationResponse.installation:type_name -> Superplane.Organizations.AppInstallation
+	26, // 10: Superplane.Organizations.DescribeApplicationResponse.installation:type_name -> Superplane.Organizations.AppInstallation
+	39, // 11: Superplane.Organizations.UpdateApplicationRequest.configuration:type_name -> google.protobuf.Struct
+	26, // 12: Superplane.Organizations.UpdateApplicationResponse.installation:type_name -> Superplane.Organizations.AppInstallation
+	33, // 13: Superplane.Organizations.AppInstallation.metadata:type_name -> Superplane.Organizations.AppInstallation.Metadata
+	34, // 14: Superplane.Organizations.AppInstallation.spec:type_name -> Superplane.Organizations.AppInstallation.Spec
+	35, // 15: Superplane.Organizations.AppInstallation.status:type_name -> Superplane.Organizations.AppInstallation.Status
+	37, // 16: Superplane.Organizations.BrowserAction.form_fields:type_name -> Superplane.Organizations.BrowserAction.FormFieldsEntry
+	38, // 17: Superplane.Organizations.OrganizationCreated.timestamp:type_name -> google.protobuf.Timestamp
+	38, // 18: Superplane.Organizations.OrganizationUpdated.timestamp:type_name -> google.protobuf.Timestamp
+	38, // 19: Superplane.Organizations.OrganizationDeleted.timestamp:type_name -> google.protobuf.Timestamp
+	38, // 20: Superplane.Organizations.InvitationCreated.timestamp:type_name -> google.protobuf.Timestamp
+	38, // 21: Superplane.Organizations.Organization.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	38, // 22: Superplane.Organizations.Organization.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	38, // 23: Superplane.Organizations.AppInstallation.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	38, // 24: Superplane.Organizations.AppInstallation.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	39, // 25: Superplane.Organizations.AppInstallation.Spec.configuration:type_name -> google.protobuf.Struct
+	39, // 26: Superplane.Organizations.AppInstallation.Status.metadata:type_name -> google.protobuf.Struct
+	27, // 27: Superplane.Organizations.AppInstallation.Status.browser_action:type_name -> Superplane.Organizations.BrowserAction
+	36, // 28: Superplane.Organizations.AppInstallation.Status.used_in:type_name -> Superplane.Organizations.AppInstallation.NodeRef
+	1,  // 29: Superplane.Organizations.Organizations.DescribeOrganization:input_type -> Superplane.Organizations.DescribeOrganizationRequest
+	3,  // 30: Superplane.Organizations.Organizations.UpdateOrganization:input_type -> Superplane.Organizations.UpdateOrganizationRequest
+	5,  // 31: Superplane.Organizations.Organizations.DeleteOrganization:input_type -> Superplane.Organizations.DeleteOrganizationRequest
+	14, // 32: Superplane.Organizations.Organizations.RemoveUser:input_type -> Superplane.Organizations.RemoveUserRequest
+	8,  // 33: Superplane.Organizations.Organizations.CreateInvitation:input_type -> Superplane.Organizations.CreateInvitationRequest
+	10, // 34: Superplane.Organizations.Organizations.ListInvitations:input_type -> Superplane.Organizations.ListInvitationsRequest
+	12, // 35: Superplane.Organizations.Organizations.RemoveInvitation:input_type -> Superplane.Organizations.RemoveInvitationRequest
+	16, // 36: Superplane.Organizations.Organizations.ListApplications:input_type -> Superplane.Organizations.ListApplicationsRequest
+	20, // 37: Superplane.Organizations.Organizations.DescribeApplication:input_type -> Superplane.Organizations.DescribeApplicationRequest
+	18, // 38: Superplane.Organizations.Organizations.InstallApplication:input_type -> Superplane.Organizations.InstallApplicationRequest
+	22, // 39: Superplane.Organizations.Organizations.UpdateApplication:input_type -> Superplane.Organizations.UpdateApplicationRequest
+	24, // 40: Superplane.Organizations.Organizations.UninstallApplication:input_type -> Superplane.Organizations.UninstallApplicationRequest
+	2,  // 41: Superplane.Organizations.Organizations.DescribeOrganization:output_type -> Superplane.Organizations.DescribeOrganizationResponse
+	4,  // 42: Superplane.Organizations.Organizations.UpdateOrganization:output_type -> Superplane.Organizations.UpdateOrganizationResponse
+	6,  // 43: Superplane.Organizations.Organizations.DeleteOrganization:output_type -> Superplane.Organizations.DeleteOrganizationResponse
+	15, // 44: Superplane.Organizations.Organizations.RemoveUser:output_type -> Superplane.Organizations.RemoveUserResponse
+	9,  // 45: Superplane.Organizations.Organizations.CreateInvitation:output_type -> Superplane.Organizations.CreateInvitationResponse
+	11, // 46: Superplane.Organizations.Organizations.ListInvitations:output_type -> Superplane.Organizations.ListInvitationsResponse
+	13, // 47: Superplane.Organizations.Organizations.RemoveInvitation:output_type -> Superplane.Organizations.RemoveInvitationResponse
+	17, // 48: Superplane.Organizations.Organizations.ListApplications:output_type -> Superplane.Organizations.ListApplicationsResponse
+	21, // 49: Superplane.Organizations.Organizations.DescribeApplication:output_type -> Superplane.Organizations.DescribeApplicationResponse
+	19, // 50: Superplane.Organizations.Organizations.InstallApplication:output_type -> Superplane.Organizations.InstallApplicationResponse
+	23, // 51: Superplane.Organizations.Organizations.UpdateApplication:output_type -> Superplane.Organizations.UpdateApplicationResponse
+	25, // 52: Superplane.Organizations.Organizations.UninstallApplication:output_type -> Superplane.Organizations.UninstallApplicationResponse
 	41, // [41:53] is the sub-list for method output_type
 	29, // [29:41] is the sub-list for method input_type
 	29, // [29:29] is the sub-list for extension type_name

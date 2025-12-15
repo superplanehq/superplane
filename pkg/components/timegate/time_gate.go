@@ -246,10 +246,6 @@ func (tg *TimeGate) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.Work
 	return ctx.DefaultProcessing()
 }
 
-func (tg *TimeGate) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
-}
-
 func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
@@ -760,4 +756,8 @@ func (tg *TimeGate) findNextExcludeSpecificEndTime(now time.Time, spec Spec) tim
 
 func (tg *TimeGate) Cancel(ctx core.ExecutionContext) error {
 	return nil
+}
+
+func (tg *TimeGate) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }

@@ -137,7 +137,7 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
-func (g *GitHub) HandleRequest(ctx core.HttpRequestContext) {
+func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 	metadata := Metadata{}
 	err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata)
 	if err != nil {
@@ -263,7 +263,7 @@ func (g *GitHub) CleanupWebhook(ctx core.AppInstallationContext, options core.We
 	return nil
 }
 
-func afterAppCreation(ctx core.HttpRequestContext, metadata Metadata) {
+func afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata) {
 	code := ctx.Request.URL.Query().Get("code")
 	state := ctx.Request.URL.Query().Get("state")
 
@@ -324,7 +324,7 @@ func afterAppCreation(ctx core.HttpRequestContext, metadata Metadata) {
 	)
 }
 
-func afterAppInstallation(ctx core.HttpRequestContext, metadata Metadata) {
+func afterAppInstallation(ctx core.HTTPRequestContext, metadata Metadata) {
 	installationID := ctx.Request.URL.Query().Get("installation_id")
 	setupAction := ctx.Request.URL.Query().Get("setup_action")
 	state := ctx.Request.URL.Query().Get("state")
@@ -342,7 +342,7 @@ func afterAppInstallation(ctx core.HttpRequestContext, metadata Metadata) {
 	}
 }
 
-func afterAppInstallationInstall(ctx core.HttpRequestContext, installationID string, metadata Metadata) {
+func afterAppInstallationInstall(ctx core.HTTPRequestContext, installationID string, metadata Metadata) {
 	metadata.InstallationID = installationID
 	client, err := NewClient(ctx.AppInstallation, metadata.GitHubApp.ID, installationID)
 	if err != nil {

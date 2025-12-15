@@ -97,6 +97,8 @@ func TruncateTables() error {
 			users,
 			organizations,
 			organization_invitations,
+			app_installations,
+			app_installation_secrets,
 			casbin_rule,
 			role_metadata,
 			group_metadata,

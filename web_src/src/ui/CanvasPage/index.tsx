@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ComponentsAppInstallationRef, ConfigurationField, OrganizationsAppInstallation, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { getCustomFieldRenderer } from "@/pages/workflowv2/mappers";
 import { AiSidebar } from "../ai";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
@@ -640,6 +641,36 @@ function CanvasPage(props: CanvasPageProps) {
   );
 }
 
+/**
+ * Create a custom field renderer for template nodes based on building block data
+ */
+function getTemplateCustomField(
+  buildingBlock: BuildingBlock,
+): ((configuration: Record<string, unknown>) => React.ReactNode) | null {
+  // Determine component name based on building block type and name
+  let componentName = "";
+  if (buildingBlock.type === "trigger") {
+    componentName = buildingBlock.name;
+  } else if (buildingBlock.type === "component") {
+    componentName = buildingBlock.name;
+  } else if (buildingBlock.type === "blueprint") {
+    componentName = "default";
+  }
+
+  const renderer = getCustomFieldRenderer(componentName);
+  if (!renderer) return null;
+
+  // Return a function that takes the current configuration
+  return (configuration: Record<string, unknown>) => {
+    // Create a mock node for the renderer - it only needs name and the configuration
+    const mockNode = {
+      name: configuration.nodeName || buildingBlock.label || buildingBlock.name,
+      configuration,
+    };
+    return renderer.render(mockNode as any, configuration);
+  };
+}
+
 function Sidebar({
   state,
   getSidebarData,
@@ -798,7 +829,6 @@ function Sidebar({
       onClose={onSidebarClose || state.componentSidebar.close}
       latestEvents={latestEvents}
       nextInQueueEvents={nextInQueueEvents}
-      title={sidebarData.title}
       nodeId={state.componentSidebar.selectedNodeId || undefined}
       iconSrc={sidebarData.iconSrc}
       iconSlug={sidebarData.iconSlug}
@@ -852,9 +882,12 @@ function Sidebar({
       domainId={organizationId}
       domainType="DOMAIN_TYPE_ORGANIZATION"
       customField={
-        getCustomField && state.componentSidebar.selectedNodeId
-          ? getCustomField(state.componentSidebar.selectedNodeId) || undefined
-          : undefined
+        // For template nodes, derive customField from buildingBlock
+        templateNodeId && newNodeData
+          ? getTemplateCustomField(newNodeData.buildingBlock) || undefined
+          : getCustomField && state.componentSidebar.selectedNodeId
+            ? getCustomField(state.componentSidebar.selectedNodeId) || undefined
+            : undefined
       }
       appName={editingNodeData?.appName}
       appInstallationRef={editingNodeData?.appInstallationRef}

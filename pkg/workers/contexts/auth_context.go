@@ -18,7 +18,7 @@ type AuthContext struct {
 	authenticatedUser *models.User
 }
 
-func NewAuthContext(tx *gorm.DB, orgID uuid.UUID, authService authorization.Authorization, authenticatedUser *models.User) core.AuthContext {
+func NewAuthContext(tx *gorm.DB, orgID uuid.UUID, authService authorization.Authorization, authenticatedUser *models.User) *AuthContext {
 	return &AuthContext{
 		tx:                tx,
 		orgID:             orgID,

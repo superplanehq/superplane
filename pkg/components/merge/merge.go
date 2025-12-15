@@ -93,10 +93,6 @@ func (m *Merge) Configuration() []configuration.Field {
 	}
 }
 
-func (m *Merge) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
-}
-
 func (m *Merge) Actions() []core.Action {
 	return []core.Action{
 		{Name: "timeoutReached"},
@@ -278,6 +274,10 @@ func (m *Merge) Execute(ctx core.ExecutionContext) error {
 
 func (m *Merge) Cancel(ctx core.ExecutionContext) error {
 	return nil
+}
+
+func (m *Merge) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }
 
 func durationFrom(value int, unit string) time.Duration {

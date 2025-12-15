@@ -104,9 +104,6 @@ func RunServer(baseURL string, encryptor crypto.Encryptor, authService authoriza
 	integrationsService := NewIntegrationService(encryptor, authService, registry)
 	integrationPb.RegisterIntegrationsServer(grpcServer, integrationsService)
 
-	applicationService := NewApplicationService(encryptor, registry)
-	apppb.RegisterApplicationsServer(grpcServer, applicationService)
-
 	meService := NewMeService()
 	mepb.RegisterMeServer(grpcServer, meService)
 
@@ -121,6 +118,9 @@ func RunServer(baseURL string, encryptor crypto.Encryptor, authService authoriza
 
 	workflowService := NewWorkflowService(authService, registry, encryptor)
 	pbWorkflows.RegisterWorkflowsServer(grpcServer, workflowService)
+
+	applicationService := NewApplicationService(encryptor, registry)
+	apppb.RegisterApplicationsServer(grpcServer, applicationService)
 
 	reflection.Register(grpcServer)
 

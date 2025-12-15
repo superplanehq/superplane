@@ -211,10 +211,6 @@ func (s *Semaphore) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (s *Semaphore) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
-}
-
 func (s *Semaphore) Execute(ctx core.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
@@ -283,6 +279,10 @@ func (s *Semaphore) Actions() []core.Action {
 			},
 		},
 	}
+}
+
+func (s *Semaphore) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }
 
 func (s *Semaphore) HandleAction(ctx core.ActionContext) error {

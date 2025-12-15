@@ -355,10 +355,6 @@ func (a *Approval) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.Workf
 	return ctx.DefaultProcessing()
 }
 
-func (a *Approval) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
-}
-
 func (a *Approval) Execute(ctx core.ExecutionContext) error {
 	config := Config{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
@@ -540,4 +536,8 @@ func (a *Approval) handleReject(ctx core.ActionContext) (*Metadata, error) {
 
 func (a *Approval) Cancel(ctx core.ExecutionContext) error {
 	return nil
+}
+
+func (a *Approval) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }

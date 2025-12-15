@@ -13,7 +13,13 @@ import { SidebarEvent } from "./types";
 import { LatestTab } from "./LatestTab";
 import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
-import { AuthorizationDomainType, ComponentsAppInstallationRef, ConfigurationField, OrganizationsAppInstallation, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import {
+  AuthorizationDomainType,
+  ComponentsAppInstallationRef,
+  ConfigurationField,
+  OrganizationsAppInstallation,
+  WorkflowsWorkflowNodeExecution,
+} from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
 import { NewNodeData } from "../CustomComponentBuilderPage";
 import { ReactNode } from "react";
@@ -29,7 +35,6 @@ interface ComponentSidebarProps {
 
   latestEvents: SidebarEvent[];
   nextInQueueEvents: SidebarEvent[];
-  title: string;
   nodeId?: string;
   iconSrc?: string;
   iconSlug?: string;
@@ -105,7 +110,11 @@ interface ComponentSidebarProps {
   nodeLabel?: string;
   nodeConfiguration?: Record<string, unknown>;
   nodeConfigurationFields?: ConfigurationField[];
-  onNodeConfigSave?: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => void;
+  onNodeConfigSave?: (
+    updatedConfiguration: Record<string, unknown>,
+    updatedNodeName: string,
+    appInstallationRef?: ComponentsAppInstallationRef,
+  ) => void;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
@@ -117,7 +126,6 @@ interface ComponentSidebarProps {
 
 export const ComponentSidebar = ({
   isOpen,
-  title,
   nodeId,
   iconSrc,
   iconSlug,
@@ -416,12 +424,16 @@ export const ComponentSidebar = ({
           <div
             className={`w-7 h-7 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
           >
-            {iconSrc ? <img src={iconSrc} alt={title} className="w-6 h-6" /> : <Icon size={16} className={iconColor} />}
+            {iconSrc ? (
+              <img src={iconSrc} alt={nodeName} className="w-6 h-6" />
+            ) : (
+              <Icon size={16} className={iconColor} />
+            )}
           </div>
           <div className="flex justify-between gap-3 w-full">
             <div className="flex flex-col gap-1">
-              <h2 className="text-xl font-semibold">{title}</h2>
-              {nodeId && (
+              <h2 className="text-xl font-semibold">{isTemplateNode ? newNodeData.nodeName : nodeName}</h2>
+              {nodeId && !isTemplateNode && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500 font-mono">{nodeId}</span>
                   <button

@@ -101,10 +101,6 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionStateContext.Pass(outputs)
 }
 
-func (f *Filter) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
-}
-
 func (f *Filter) Actions() []core.Action {
 	return []core.Action{}
 }
@@ -123,4 +119,8 @@ func (f *Filter) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.Workflo
 
 func (f *Filter) Cancel(ctx core.ExecutionContext) error {
 	return nil
+}
+
+func (f *Filter) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }

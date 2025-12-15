@@ -93,7 +93,7 @@ func (s *Semaphore) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
-func (s *Semaphore) HandleRequest(ctx core.HttpRequestContext) {
+func (s *Semaphore) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 

@@ -13,7 +13,7 @@ type MockExecutionStateContext struct {
 	mock.Mock
 }
 
-func (m *MockExecutionStateContext) SetKV(key, value string) error {
+func (m *MockExecutionStateContext) SetKV(key string, value string) error {
 	args := m.Called(key, value)
 	return args.Error(0)
 }

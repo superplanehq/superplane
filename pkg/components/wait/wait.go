@@ -113,10 +113,6 @@ func (w *Wait) Execute(ctx core.ExecutionContext) error {
 	return ctx.RequestContext.ScheduleActionCall("timeReached", map[string]any{}, interval)
 }
 
-func (w *Wait) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
-}
-
 func (w *Wait) Actions() []core.Action {
 	return []core.Action{
 		{
@@ -166,6 +162,10 @@ func (w *Wait) HandlePushThrough(ctx core.ActionContext) error {
 
 func (w *Wait) Setup(ctx core.SetupContext) error {
 	return nil
+}
+
+func (w *Wait) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }
 
 func (w *Wait) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {

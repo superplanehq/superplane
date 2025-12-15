@@ -68,10 +68,10 @@ func (c *NoOp) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (c *NoOp) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
-}
-
 func (c *NoOp) Cancel(ctx core.ExecutionContext) error {
 	return nil
+}
+
+func (c *NoOp) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }

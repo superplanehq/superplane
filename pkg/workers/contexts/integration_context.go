@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -16,7 +15,7 @@ type IntegrationContext struct {
 	registry *registry.Registry
 }
 
-func NewIntegrationContext(tx *gorm.DB, registry *registry.Registry) core.IntegrationContext {
+func NewIntegrationContext(tx *gorm.DB, registry *registry.Registry) *IntegrationContext {
 	return &IntegrationContext{
 		tx:       tx,
 		registry: registry,

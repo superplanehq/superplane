@@ -722,6 +722,27 @@ CREATE INDEX idx_account_providers_provider ON public.account_providers USING bt
 
 
 --
+-- Name: idx_app_installation_secrets_installation_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_installation_secrets_installation_id ON public.app_installation_secrets USING btree (installation_id);
+
+
+--
+-- Name: idx_app_installation_secrets_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_installation_secrets_organization_id ON public.app_installation_secrets USING btree (organization_id);
+
+
+--
+-- Name: idx_app_installations_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_installations_organization_id ON public.app_installations USING btree (organization_id);
+
+
+--
 -- Name: idx_blueprints_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1233,7 +1254,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251212015706	f
+20251208205307	f
 \.
 
 

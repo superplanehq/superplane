@@ -39,9 +39,6 @@ type AppInstallationSecret struct {
 	UpdatedAt      *time.Time
 }
 
-// TODO: this is copied from pkg/applications here,
-// because there is a circular dependency issue that was
-// introduced by having pkg/components require pkg/models.
 type BrowserAction struct {
 	URL         string
 	Method      string

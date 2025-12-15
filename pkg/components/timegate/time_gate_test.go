@@ -108,7 +108,7 @@ type actionMockExecutionStateContext struct {
 	failed   bool
 }
 
-func (m *actionMockExecutionStateContext) SetKV(key, value string) error {
+func (m *actionMockExecutionStateContext) SetKV(key string, value string) error {
 	return nil
 }
 

@@ -163,6 +163,80 @@ service Organizations {
   }
 }
 
+message Organization {
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string description = 3;
+    google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp updated_at = 5;
+  }
+
+  Metadata metadata = 1;
+}
+
+message DescribeOrganizationRequest {
+  string id = 1;
+}
+
+message DescribeOrganizationResponse {
+  Organization organization = 1;
+}
+
+message UpdateOrganizationRequest {
+  string id = 1;
+  Organization organization = 2;
+}
+
+message UpdateOrganizationResponse {
+  Organization organization = 1;
+}
+
+message DeleteOrganizationRequest {
+  string id = 1;
+}
+
+message DeleteOrganizationResponse {}
+
+message Invitation {
+  string id = 1;
+  string organization_id = 2;
+  string email = 3;
+  string state = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateInvitationRequest {
+  string id = 1;
+  string email = 2;
+}
+
+message CreateInvitationResponse {
+  Invitation invitation = 1;
+}
+
+message ListInvitationsRequest {
+  string id = 1;
+}
+
+message ListInvitationsResponse {
+  repeated Invitation invitations = 1;
+}
+
+message RemoveInvitationRequest {
+  string id = 1;
+  string invitation_id = 2;
+}
+
+message RemoveInvitationResponse {}
+
+message RemoveUserRequest {
+  string id = 1;
+  string user_id = 2;
+}
+
+message RemoveUserResponse {}
+
 message ListApplicationsRequest {
   string id = 1;
 }
@@ -247,80 +321,6 @@ message BrowserAction {
   map<string, string> form_fields = 3;
   string description = 4;
 }
-
-message Organization {
-  message Metadata {
-    string id = 1;
-    string name = 2;
-    string description = 3;
-    google.protobuf.Timestamp created_at = 4;
-    google.protobuf.Timestamp updated_at = 5;
-  }
-
-  Metadata metadata = 1;
-}
-
-message DescribeOrganizationRequest {
-  string id = 1;
-}
-
-message DescribeOrganizationResponse {
-  Organization organization = 1;
-}
-
-message UpdateOrganizationRequest {
-  string id = 1;
-  Organization organization = 2;
-}
-
-message UpdateOrganizationResponse {
-  Organization organization = 1;
-}
-
-message DeleteOrganizationRequest {
-  string id = 1;
-}
-
-message DeleteOrganizationResponse {}
-
-message Invitation {
-  string id = 1;
-  string organization_id = 2;
-  string email = 3;
-  string state = 4;
-  google.protobuf.Timestamp created_at = 5;
-}
-
-message CreateInvitationRequest {
-  string id = 1;
-  string email = 2;
-}
-
-message CreateInvitationResponse {
-  Invitation invitation = 1;
-}
-
-message ListInvitationsRequest {
-  string id = 1;
-}
-
-message ListInvitationsResponse {
-  repeated Invitation invitations = 1;
-}
-
-message RemoveInvitationRequest {
-  string id = 1;
-  string invitation_id = 2;
-}
-
-message RemoveInvitationResponse {}
-
-message RemoveUserRequest {
-  string id = 1;
-  string user_id = 2;
-}
-
-message RemoveUserResponse {}
 
 // Event messages for organization lifecycle events
 message OrganizationCreated {

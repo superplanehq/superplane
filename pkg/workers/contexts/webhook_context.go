@@ -20,7 +20,7 @@ type WebhookContext struct {
 	node      *models.WorkflowNode
 }
 
-func NewWebhookContext(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, node *models.WorkflowNode) core.WebhookContext {
+func NewWebhookContext(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, node *models.WorkflowNode) *WebhookContext {
 	return &WebhookContext{
 		tx:        tx,
 		ctx:       ctx,

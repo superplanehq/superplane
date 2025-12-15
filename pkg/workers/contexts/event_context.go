@@ -3,7 +3,6 @@ package contexts
 import (
 	"time"
 
-	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -14,7 +13,7 @@ type EventContext struct {
 	workflowNode *models.WorkflowNode
 }
 
-func NewEventContext(tx *gorm.DB, workflowNode *models.WorkflowNode) core.EventContext {
+func NewEventContext(tx *gorm.DB, workflowNode *models.WorkflowNode) *EventContext {
 	return &EventContext{tx: tx, workflowNode: workflowNode}
 }
 
