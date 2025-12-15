@@ -13,6 +13,12 @@ function validateCronExpression(cronExpression: string): string | null {
   }
 
   const trimmed = cronExpression.trim();
+
+  // Quick check for obviously invalid expressions to avoid expensive parsing
+  if (trimmed.length < 5) {
+    return "Cron expression too short";
+  }
+
   const parts = trimmed.split(/\s+/);
 
   // Cron expressions should have 6 parts (second minute hour day month dayofweek)
@@ -20,39 +26,44 @@ function validateCronExpression(cronExpression: string): string | null {
     return `Expected 5 or 6 fields, got ${parts.length}`;
   }
 
-  // Validate each part contains only allowed characters
+  // Quick validation with pre-compiled regex for better performance
   const validChars = /^[0-9*,\-/A-Z]+$/;
-  const invalidParts = parts.filter((part, index) => {
-    if (!validChars.test(part)) return true;
 
-    // Additional basic range checks
-    if (part === "*") return false; // Wildcard is always valid
-    if (part.includes(",") || part.includes("-") || part.includes("/")) return false; // Complex expressions
+  // Use a more efficient approach - validate only the problematic parts
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+
+    if (!validChars.test(part)) {
+      return "Invalid characters. Use only: numbers, *, ,, -, / and day names";
+    }
+
+    // Skip expensive range checks for wildcards and complex expressions
+    if (part === "*" || part.includes(",") || part.includes("-") || part.includes("/")) {
+      continue;
+    }
 
     const num = parseInt(part);
-    if (isNaN(num)) return false; // Allow named values like MON, TUE
-
-    // Basic range validation
-    switch (index) {
-      case 0:
-        return num < 0 || num > 59; // second
-      case 1:
-        return num < 0 || num > 59; // minute
-      case 2:
-        return num < 0 || num > 23; // hour
-      case 3:
-        return num < 1 || num > 31; // day
-      case 4:
-        return num < 1 || num > 12; // month
-      case 5:
-        return num < 0 || num > 6; // dayofweek
-      default:
-        return false;
+    if (!isNaN(num)) {
+      // Basic range validation with early exit
+      switch (i) {
+        case 0: // second (for 6-field format)
+        case 1: // minute
+          if (num < 0 || num > 59) return "Invalid minute/second value";
+          break;
+        case 2: // hour
+          if (num < 0 || num > 23) return "Invalid hour value";
+          break;
+        case 3: // day
+          if (num < 1 || num > 31) return "Invalid day value";
+          break;
+        case 4: // month
+          if (num < 1 || num > 12) return "Invalid month value";
+          break;
+        case 5: // dayofweek
+          if (num < 0 || num > 6) return "Invalid day of week value";
+          break;
+      }
     }
-  });
-
-  if (invalidParts.length > 0) {
-    return "Invalid characters or values. Use only: numbers, *, ,, -, / and day names";
   }
 
   return null;

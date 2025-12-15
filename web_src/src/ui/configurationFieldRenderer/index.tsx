@@ -31,6 +31,9 @@ interface ConfigurationFieldRendererProps extends FieldRendererProps {
   hasError?: boolean;
   validationErrors?: ValidationError[] | Set<string>;
   fieldPath?: string;
+  // New real-time validation props
+  realtimeValidationErrors?: Array<{ field: string; message: string; type: string }>;
+  enableRealtimeValidation?: boolean;
 }
 
 export const ConfigurationFieldRenderer = ({
@@ -43,6 +46,8 @@ export const ConfigurationFieldRenderer = ({
   hasError = false,
   validationErrors,
   fieldPath,
+  realtimeValidationErrors,
+  enableRealtimeValidation = false,
 }: ConfigurationFieldRendererProps) => {
   // Check visibility conditions
   const isVisible = React.useMemo(() => {
@@ -54,9 +59,10 @@ export const ConfigurationFieldRenderer = ({
     return isFieldRequired(field, allValues);
   }, [field, allValues]);
 
-  // Validate field value (only when validation is explicitly requested)
+  // Validate field value (only when validation is explicitly requested and real-time validation is disabled)
   const fieldValidationErrors = React.useMemo(() => {
-    if (!field.name || !validationErrors) return [];
+    // Only run this validation if real-time validation is disabled
+    if (!field.name || !validationErrors || enableRealtimeValidation) return [];
 
     const errors = validateFieldForSubmission(field, value, allValues);
     return errors.map((error) => ({
@@ -64,50 +70,85 @@ export const ConfigurationFieldRenderer = ({
       message: error,
       type: "validation_rule" as const,
     }));
-  }, [field, value, allValues, validationErrors]);
+  }, [field, value, allValues, validationErrors, enableRealtimeValidation]);
 
   // Get field-specific validation errors
   const fieldErrors = React.useMemo(() => {
-    if (!field.name || !validationErrors) return [];
+    const errors: ValidationError[] = [];
 
-    if (validationErrors instanceof Set) {
-      // Handle legacy Set<string> format
-      const fieldName = field.name;
-      const fieldPathName = fieldPath || fieldName;
-      const hasError =
-        validationErrors.has(fieldName) ||
-        Array.from(validationErrors).some(
-          (error) => error.startsWith(`${fieldPathName}.`) || error.startsWith(`${fieldPathName}[`),
+    if (field.name && validationErrors) {
+      if (validationErrors instanceof Set) {
+        // Handle legacy Set<string> format
+        const fieldName = field.name;
+        const fieldPathName = fieldPath || fieldName;
+        const hasError =
+          validationErrors.has(fieldName) ||
+          Array.from(validationErrors).some(
+            (error) => error.startsWith(`${fieldPathName}.`) || error.startsWith(`${fieldPathName}[`),
+          );
+
+        if (hasError) {
+          errors.push({
+            field: fieldName,
+            message: "",
+            type: "validation_rule" as const,
+          });
+        }
+      } else {
+        // Handle new ValidationError[] format
+        const matchingErrors = validationErrors.filter(
+          (error) => error.field === field.name || error.field.startsWith(`${fieldPath || field.name}.`),
         );
-
-      return hasError
-        ? [
-            {
-              field: fieldName,
-              message: "",
-              type: "validation_rule" as const,
-            },
-          ]
-        : [];
-    } else {
-      // Handle new ValidationError[] format
-      return validationErrors.filter(
-        (error) => error.field === field.name || error.field.startsWith(`${fieldPath || field.name}.`),
-      );
+        errors.push(...matchingErrors);
+      }
     }
-  }, [validationErrors, field.name, fieldPath]);
+
+    // Add real-time validation errors if enabled
+    if (field.name && enableRealtimeValidation && realtimeValidationErrors) {
+      const realtimeErrors = realtimeValidationErrors
+        .filter(
+          (error) =>
+            error.field === field.name ||
+            error.field.startsWith(`${fieldPath || field.name}.`) ||
+            error.field.startsWith(`${fieldPath || field.name}[`),
+        )
+        .map((error) => ({
+          field: error.field,
+          message: error.message,
+          type: error.type as "validation_rule" | "required" | "visibility",
+        }));
+      errors.push(...(realtimeErrors as ValidationError[]));
+    }
+
+    return errors;
+  }, [validationErrors, realtimeValidationErrors, enableRealtimeValidation, field.name, fieldPath]);
 
   // Combine all errors
   const allFieldErrors = React.useMemo(() => {
     return [...fieldErrors, ...fieldValidationErrors];
   }, [fieldErrors, fieldValidationErrors]);
 
-  // Check if there are any errors or if required field is empty (only when validation is requested)
+  // Check if there are any errors or if required field is empty
   const hasFieldError = React.useMemo(() => {
     if (allFieldErrors.length > 0) return true;
-    if (validationErrors && isRequired && (value === undefined || value === null || value === "")) return true;
+
+    // For real-time validation, check if required field is empty
+    if (enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) {
+      return true;
+    }
+
+    // For traditional validation, check if validation is shown and required field is empty
+    if (
+      !enableRealtimeValidation &&
+      validationErrors &&
+      isRequired &&
+      (value === undefined || value === null || value === "")
+    ) {
+      return true;
+    }
+
     return hasError;
-  }, [allFieldErrors, isRequired, value, hasError, validationErrors]);
+  }, [allFieldErrors, isRequired, value, hasError, validationErrors, enableRealtimeValidation]);
 
   if (!isVisible) {
     return null;
@@ -221,9 +262,14 @@ export const ConfigurationFieldRenderer = ({
       <Label className={`block text-left ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
         {field.label || field.name}
         {isRequired && <span className="text-red-500 ml-1">*</span>}
-        {hasFieldError && validationErrors && isRequired && (value === undefined || value === null || value === "") && (
-          <span className="text-red-500 text-xs ml-2">- required field</span>
-        )}
+        {hasFieldError &&
+          ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
+            (!enableRealtimeValidation &&
+              validationErrors &&
+              isRequired &&
+              (value === undefined || value === null || value === ""))) && (
+            <span className="text-red-500 text-xs ml-2">- required field</span>
+          )}
       </Label>
       <div className="flex items-center gap-2">
         <div className="flex-1">{renderField()}</div>
