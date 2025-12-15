@@ -1,7 +1,5 @@
 import React from "react";
-import { Info } from "lucide-react";
 import { Label } from "../label";
-import { Tooltip, TooltipTrigger, TooltipContent } from "../tooltip";
 import { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
@@ -229,21 +227,6 @@ export const ConfigurationFieldRenderer = ({
       </Label>
       <div className="flex items-center gap-2">
         <div className="flex-1">{renderField()}</div>
-        {field.description && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                className="text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300"
-              >
-                <Info className="h-4 w-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              <p className="max-w-xs">{field.description}</p>
-            </TooltipContent>
-          </Tooltip>
-        )}
       </div>
 
       {/* Display validation errors */}
