@@ -9,10 +9,9 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/robfig/cron/v3"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/triggers"
 )
 
 func init() {
@@ -78,7 +77,7 @@ func (s *Schedule) Color() string {
 	return "yellow"
 }
 
-func (s *Schedule) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) {
+func (s *Schedule) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
@@ -310,7 +309,7 @@ func (s *Schedule) Configuration() []configuration.Field {
 	}
 }
 
-func (s *Schedule) Setup(ctx triggers.TriggerContext) error {
+func (s *Schedule) Setup(ctx core.TriggerContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
@@ -365,8 +364,8 @@ func (s *Schedule) Setup(ctx triggers.TriggerContext) error {
 	return nil
 }
 
-func (s *Schedule) Actions() []components.Action {
-	return []components.Action{
+func (s *Schedule) Actions() []core.Action {
+	return []core.Action{
 		{
 			Name:           "emitEvent",
 			UserAccessible: false,
@@ -374,7 +373,7 @@ func (s *Schedule) Actions() []components.Action {
 	}
 }
 
-func (s *Schedule) HandleAction(ctx triggers.TriggerActionContext) error {
+func (s *Schedule) HandleAction(ctx core.TriggerActionContext) error {
 	switch ctx.Name {
 	case "emitEvent":
 		return s.emitEvent(ctx)
@@ -383,7 +382,7 @@ func (s *Schedule) HandleAction(ctx triggers.TriggerActionContext) error {
 	return fmt.Errorf("action %s not supported", ctx.Name)
 }
 
-func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
+func (s *Schedule) emitEvent(ctx core.TriggerActionContext) error {
 	spec := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {

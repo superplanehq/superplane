@@ -2,12 +2,13 @@ package filter
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/expr-lang/expr"
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -36,8 +37,8 @@ func (f *Filter) Description() string {
 	return "Filter events based on their content"
 }
 
-func (f *Filter) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{components.DefaultOutputChannel}
+func (f *Filter) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 func (f *Filter) Icon() string {
@@ -60,7 +61,7 @@ func (f *Filter) Configuration() []configuration.Field {
 	}
 }
 
-func (f *Filter) Execute(ctx components.ExecutionContext) error {
+func (f *Filter) Execute(ctx core.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
@@ -94,28 +95,32 @@ func (f *Filter) Execute(ctx components.ExecutionContext) error {
 
 	outputs := map[string][]any{}
 	if matches {
-		outputs[components.DefaultOutputChannel.Name] = []any{make(map[string]any)}
+		outputs[core.DefaultOutputChannel.Name] = []any{make(map[string]any)}
 	}
 
 	return ctx.ExecutionStateContext.Pass(outputs)
 }
 
-func (f *Filter) Actions() []components.Action {
-	return []components.Action{}
+func (f *Filter) Actions() []core.Action {
+	return []core.Action{}
 }
 
-func (f *Filter) HandleAction(ctx components.ActionContext) error {
+func (f *Filter) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("filter does not support actions")
 }
 
-func (f *Filter) Setup(ctx components.SetupContext) error {
+func (f *Filter) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (f *Filter) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+func (f *Filter) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (f *Filter) Cancel(ctx components.ExecutionContext) error {
+func (f *Filter) Cancel(ctx core.ExecutionContext) error {
 	return nil
+}
+
+func (f *Filter) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }

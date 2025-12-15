@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/superplanehq/superplane/pkg/triggers"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 func TestNextMinutesTrigger(t *testing.T) {
@@ -504,7 +504,7 @@ func TestEmitEvent(t *testing.T) {
 			// Mock request context
 			mockRequestContext := &mockRequestContext{}
 
-			ctx := triggers.TriggerActionContext{
+			ctx := core.TriggerActionContext{
 				Name:            "emitEvent",
 				Configuration:   tt.config,
 				EventContext:    mockEventContext,

@@ -3,7 +3,6 @@ package contexts
 import (
 	"encoding/json"
 
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 )
@@ -12,7 +11,7 @@ type ExecutionMetadataContext struct {
 	execution *models.WorkflowNodeExecution
 }
 
-func NewExecutionMetadataContext(execution *models.WorkflowNodeExecution) components.MetadataContext {
+func NewExecutionMetadataContext(execution *models.WorkflowNodeExecution) *ExecutionMetadataContext {
 	return &ExecutionMetadataContext{execution: execution}
 }
 

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 func TestTimeGate_Name(t *testing.T) {
@@ -108,6 +108,10 @@ type actionMockExecutionStateContext struct {
 	failed   bool
 }
 
+func (m *actionMockExecutionStateContext) SetKV(key string, value string) error {
+	return nil
+}
+
 func (m *actionMockExecutionStateContext) IsFinished() bool { return m.finished }
 func (m *actionMockExecutionStateContext) Pass(outputs map[string][]any) error {
 	m.passed = true
@@ -124,7 +128,7 @@ func TestTimeGate_HandleAction_PushThrough_Finishes(t *testing.T) {
 	tg := &TimeGate{}
 
 	mockState := &actionMockExecutionStateContext{}
-	ctx := components.ActionContext{
+	ctx := core.ActionContext{
 		Name:                  "pushThrough",
 		ExecutionStateContext: mockState,
 		Parameters:            map[string]any{},

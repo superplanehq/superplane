@@ -8,14 +8,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/superplanehq/superplane/pkg/triggers"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 func Test__HandleWebhook(t *testing.T) {
 	trigger := &GitHub{}
 
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
-		code, err := trigger.HandleWebhook(triggers.WebhookRequestContext{
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers: http.Header{},
 		})
 
@@ -27,7 +27,7 @@ func Test__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 
-		code, err := trigger.HandleWebhook(triggers.WebhookRequestContext{
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:        headers,
 			EventContext:   &DummyEventContext{},
 			WebhookContext: &DummyWebhookContext{},
@@ -43,7 +43,7 @@ func Test__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "pull_request")
 
 		eventContext := &DummyEventContext{}
-		code, err := trigger.HandleWebhook(triggers.WebhookRequestContext{
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:        headers,
 			Configuration:  Configuration{EventType: "push"},
 			EventContext:   eventContext,
@@ -62,7 +62,7 @@ func Test__HandleWebhook(t *testing.T) {
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 		headers.Set("X-GitHub-Event", "push")
 
-		code, err := trigger.HandleWebhook(triggers.WebhookRequestContext{
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:           []byte(`{"ref":"refs/heads/main"}`),
 			Headers:        headers,
 			Configuration:  Configuration{EventType: "push"},
@@ -87,7 +87,7 @@ func Test__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "push")
 
 		eventContext := &DummyEventContext{}
-		code, err := trigger.HandleWebhook(triggers.WebhookRequestContext{
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:           body,
 			Headers:        headers,
 			Configuration:  Configuration{EventType: "push"},
@@ -113,7 +113,7 @@ func Test__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "push")
 
 		eventContext := &DummyEventContext{}
-		code, err := trigger.HandleWebhook(triggers.WebhookRequestContext{
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:           body,
 			Headers:        headers,
 			Configuration:  Configuration{EventType: "push"},
@@ -135,7 +135,7 @@ func (w *DummyWebhookContext) GetSecret() ([]byte, error) {
 	return []byte(w.Secret), nil
 }
 
-func (w *DummyWebhookContext) Setup(options *triggers.WebhookSetupOptions) error {
+func (w *DummyWebhookContext) Setup(options *core.WebhookSetupOptions) error {
 	return nil
 }
 

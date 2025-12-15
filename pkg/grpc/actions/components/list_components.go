@@ -3,7 +3,7 @@ package components
 import (
 	"context"
 
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/components"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
@@ -16,7 +16,7 @@ func ListComponents(ctx context.Context, registry *registry.Registry) (*pb.ListC
 	}, nil
 }
 
-func serializeComponents(in []components.Component) []*pb.Component {
+func serializeComponents(in []core.Component) []*pb.Component {
 	out := make([]*pb.Component, len(in))
 	for i, component := range in {
 		outputChannels := component.OutputChannels(nil)

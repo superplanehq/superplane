@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -77,7 +77,7 @@ func InvokeNodeExecutionAction(
 	}
 
 	tx := database.Conn()
-	actionCtx := components.ActionContext{
+	actionCtx := core.ActionContext{
 		Name:                  actionName,
 		Parameters:            parameters,
 		Configuration:         node.Configuration.Data(),
@@ -107,7 +107,7 @@ func InvokeNodeExecutionAction(
 	return &pb.InvokeNodeExecutionActionResponse{}, nil
 }
 
-func findAction(component components.Component, actionName string) *components.Action {
+func findAction(component core.Component, actionName string) *core.Action {
 	for _, action := range component.Actions() {
 		if action.Name == actionName {
 			return &action
