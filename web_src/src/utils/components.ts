@@ -272,6 +272,20 @@ export function validateFieldForSubmission(
     }
   }
 
+  // Add min/max validation for number fields
+  if (field.type === "number" && value != null && value !== "") {
+    const numValue = Number(value);
+    if (!isNaN(numValue) && field.typeOptions?.number) {
+      const { min, max } = field.typeOptions.number;
+      if (min !== undefined && numValue < min) {
+        errors.push(`Value must be at least ${min}`);
+      }
+      if (max !== undefined && numValue > max) {
+        errors.push(`Value must not exceed ${max}`);
+      }
+    }
+  }
+
   // Also run the regular validation rules
   const regularErrors = validateFieldValue(field, value, allValues);
   errors.push(...regularErrors);

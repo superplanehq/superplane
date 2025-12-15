@@ -3,9 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { resolveIcon } from "@/lib/utils";
-import { ArrowLeft, Plus, Search, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, Plus, Search, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { MetadataItem, MetadataList } from "../metadataList";
 import { ChildEventsState } from "../composite";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
@@ -29,8 +28,8 @@ interface ComponentSidebarProps {
 
   latestEvents: SidebarEvent[];
   nextInQueueEvents: SidebarEvent[];
-  metadata: MetadataItem[];
   title: string;
+  nodeId?: string;
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
@@ -113,8 +112,8 @@ interface ComponentSidebarProps {
 
 export const ComponentSidebar = ({
   isOpen,
-  metadata,
   title,
+  nodeId,
   iconSrc,
   iconSlug,
   iconColor,
@@ -186,6 +185,15 @@ export const ComponentSidebar = ({
   const activeTab = isTemplateNode ? "settings" : currentTab || "latest";
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
+  const [justCopied, setJustCopied] = useState(false);
+
+  const handleCopyNodeId = useCallback(async () => {
+    if (nodeId) {
+      await navigator.clipboard.writeText(nodeId);
+      setJustCopied(true);
+      setTimeout(() => setJustCopied(false), 1000);
+    }
+  }, [nodeId]);
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -402,7 +410,21 @@ export const ComponentSidebar = ({
             {iconSrc ? <img src={iconSrc} alt={title} className="w-6 h-6" /> : <Icon size={16} className={iconColor} />}
           </div>
           <div className="flex justify-between gap-3 w-full">
-            <h2 className="text-xl font-semibold">{title}</h2>
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-semibold">{title}</h2>
+              {nodeId && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500 font-mono">{nodeId}</span>
+                  <button
+                    onClick={handleCopyNodeId}
+                    className={"text-gray-400 hover:text-gray-600"}
+                    title={justCopied ? "Copied!" : "Copy Node ID"}
+                  >
+                    {justCopied ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                </div>
+              )}
+            </div>
             {!templateNodeId && (
               <SidebarActionsDropdown
                 onRun={onRun}
@@ -532,14 +554,6 @@ export const ComponentSidebar = ({
         </>
       ) : (
         <>
-          {metadata.length > 0 && (
-            <div className="px-3 py-1 border-b-1 border-border">
-              <MetadataList
-                items={metadata}
-                className="border-b-0 text-gray-500 font-medium gap-1.5 flex flex-col py-2"
-              />
-            </div>
-          )}
           <Tabs
             value={activeTab}
             onValueChange={(value) => onTabChange?.(value as "latest" | "settings")}

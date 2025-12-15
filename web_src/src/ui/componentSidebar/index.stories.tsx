@@ -24,17 +24,6 @@ const meta: Meta<typeof ComponentSidebar> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const mockMetadata = [
-  {
-    icon: "book",
-    label: "monarch-app",
-  },
-  {
-    icon: "filter",
-    label: "branch=main",
-  },
-];
-
 const mockLatestEvents = [
   {
     id: "event-1",
@@ -221,6 +210,7 @@ export const Default: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
@@ -233,7 +223,6 @@ export const Default: Story = {
     );
   },
   args: {
-    metadata: mockMetadata,
     title: "Listen to code changes",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
@@ -283,6 +272,7 @@ export const WithInteractiveEvents: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
@@ -295,7 +285,6 @@ export const WithInteractiveEvents: Story = {
     );
   },
   args: {
-    metadata: mockMetadata,
     title: "Interactive Event Sidebar",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
@@ -340,6 +329,7 @@ export const WithDifferentIcon: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
@@ -406,6 +396,7 @@ export const ExtendedMetadata: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
@@ -461,6 +452,7 @@ export const ZeroState: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={[]}
           nextInQueueEvents={[]}
@@ -473,7 +465,6 @@ export const ZeroState: Story = {
     );
   },
   args: {
-    metadata: mockMetadata,
     title: "Empty Component",
     iconSlug: "circle-dashed",
     iconColor: "text-gray-800",
@@ -492,6 +483,7 @@ export const WithActionsDropdown: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={mockLatestEvents}
           nextInQueueEvents={mockNextInQueueEvents}
@@ -504,7 +496,6 @@ export const WithActionsDropdown: Story = {
     );
   },
   args: {
-    metadata: mockMetadata,
     title: "Component with All Actions",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
@@ -592,6 +583,7 @@ export const WithFullHistory: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
@@ -608,7 +600,6 @@ export const WithFullHistory: Story = {
     );
   },
   args: {
-    metadata: mockMetadata,
     title: "Full History Demo",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",
@@ -648,6 +639,7 @@ export const HistoryCountDemo: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
@@ -660,7 +652,6 @@ export const HistoryCountDemo: Story = {
     );
   },
   args: {
-    metadata: mockMetadata,
     title: "History vs Queue Counts Demo",
     iconSrc: GithubIcon,
     iconBackground: "bg-white",

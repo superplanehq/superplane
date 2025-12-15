@@ -17,7 +17,6 @@ import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../
 import { ComponentSidebar } from "../componentSidebar";
 import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
-import type { MetadataItem } from "../metadataList";
 import { ViewToggle } from "../ViewToggle";
 import { ComponentBaseProps, EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
@@ -45,7 +44,6 @@ export interface SidebarEvent {
 export interface SidebarData {
   latestEvents: SidebarEvent[];
   nextInQueueEvents: SidebarEvent[];
-  metadata: MetadataItem[];
   title: string;
   iconSrc?: string;
   iconSlug?: string;
@@ -786,8 +784,8 @@ function Sidebar({
       onClose={onSidebarClose || state.componentSidebar.close}
       latestEvents={latestEvents}
       nextInQueueEvents={nextInQueueEvents}
-      metadata={sidebarData.metadata}
       title={sidebarData.title}
+      nodeId={state.componentSidebar.selectedNodeId || undefined}
       iconSrc={sidebarData.iconSrc}
       iconSlug={sidebarData.iconSlug}
       iconColor={sidebarData.iconColor}
