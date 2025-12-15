@@ -7,7 +7,6 @@ import {
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
-import { getBackgroundColorClass } from "@/utils/colors";
 import { parseExpression } from "@/lib/expressionParser";
 
 type IfEvent = {
@@ -39,9 +38,9 @@ export const ifMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: "split",
-      headerColor: "bg-gray-50",
+      headerColor: "bg-white",
       collapsed: node.isCollapsed,
-      collapsedBackground: getBackgroundColorClass("white"),
+      collapsedBackground: "bg-white",
       title: node.name!,
       eventSections: getEventSections(nodes, lastExecutions, componentName),
       specs: specs,

@@ -34,7 +34,7 @@ export const filterMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: "filter",
-      headerColor: "bg-gray-50",
+      headerColor: "bg-white",
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
@@ -70,7 +70,6 @@ function getfilterEventSections(
   const eventSections: EventSection[] = [];
   if (lastEvent) {
     eventSections.push({
-      title: "Last Event",
       ...lastEvent,
     });
   }

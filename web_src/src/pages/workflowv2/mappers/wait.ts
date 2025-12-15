@@ -8,9 +8,8 @@ import {
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
-import { getBackgroundColorClass } from "@/utils/colors";
-import { formatDuration, formatTimestamp } from "@/lib/utils";
 import { TimeLeftCountdown } from "@/ui/timeLeftCountdown";
+import { formatTimestamp } from "@/lib/utils";
 
 export const waitMapper: ComponentBaseMapper = {
   props(
@@ -24,10 +23,6 @@ export const waitMapper: ComponentBaseMapper = {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const duration = node.configuration?.duration as { value: number; unit: "seconds" | "minutes" | "hours" };
 
-    const description = duration
-      ? `Waiting for ${formatDuration(duration.value, duration.unit)}...`
-      : "No duration configured";
-
     const metadata = [
       {
         icon: "clock",
@@ -37,14 +32,12 @@ export const waitMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: componentDefinition.icon || "circle-off",
-      iconBackground: "bg-yellow-100",
-      iconColor: "text-yellow-600",
-      headerColor: "bg-yellow-100",
+      iconColor: "text-black",
+      headerColor: "bg-white",
       metadata,
       collapsed: node.isCollapsed,
-      collapsedBackground: getBackgroundColorClass("white"),
+      collapsedBackground: "bg-white",
       title: node.name!,
-      description,
       eventSections: getWaitEventSections(nodes, lastExecution, nodeQueueItems, duration, componentName),
       hideMetadataList: true,
       eventStateMap: getStateMap(componentName),
@@ -64,7 +57,6 @@ function getWaitEventSections(
   // Add Last Event section
   if (!execution) {
     sections.push({
-      title: "LAST RUN",
       eventTitle: "No events received yet",
       eventState: "neutral" as const,
     });
@@ -99,7 +91,6 @@ function getWaitEventSections(
     }
 
     sections.push({
-      title: "LAST EVENT",
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventSubtitle,
@@ -115,7 +106,6 @@ function getWaitEventSections(
     if (queueItem.rootEvent) {
       const { title } = rootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent);
       sections.push({
-        title: "NEXT IN QUEUE",
         receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
         eventTitle: title,
         eventState: "next-in-queue" as const,

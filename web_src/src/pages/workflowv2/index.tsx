@@ -1502,9 +1502,7 @@ function prepareCompositeNode(
       outputChannels: blueprintMetadata?.outputChannels?.map((c) => c.name!) || ["default"],
       composite: {
         iconSlug: blueprintMetadata?.icon || "box-x",
-        iconColor: getColorClass(color),
-        iconBackground: getBackgroundColorClass(color),
-        headerColor: getBackgroundColorClass(color),
+        iconColor: getColorClass("black"),
         collapsedBackground: getBackgroundColorClass(color),
         collapsed: node.isCollapsed,
         title: displayLabel,

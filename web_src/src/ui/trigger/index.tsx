@@ -20,7 +20,7 @@ export interface TriggerProps extends ComponentActionsProps {
   iconSlug?: string;
   iconColor?: string;
   iconBackground?: string;
-  headerColor: string;
+  headerColor?: string;
   title: string;
   description?: string;
   metadata: MetadataItem[];
@@ -38,7 +38,6 @@ export const Trigger: React.FC<TriggerProps> = ({
   iconBackground,
   headerColor,
   title,
-  description,
   metadata,
   lastEventData,
   zeroStateText = "No events yet",
@@ -128,9 +127,8 @@ export const Trigger: React.FC<TriggerProps> = ({
           iconSlug={iconSlug}
           iconBackground={iconBackground}
           iconColor={iconColor}
-          headerColor={headerColor}
+          headerColor={headerColor || "bg-white"}
           title={title}
-          description={description}
           onDoubleClick={onToggleCollapse}
           onRun={onRun}
           runDisabled={runDisabled}

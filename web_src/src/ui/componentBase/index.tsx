@@ -15,6 +15,7 @@ interface EventSectionDisplayProps {
   totalSections: number;
   className?: string;
   stateMap?: EventStateMap;
+  lastSection?: boolean;
 }
 
 const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
@@ -23,6 +24,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
   totalSections,
   className,
   stateMap = DEFAULT_EVENT_STATE_MAP,
+  lastSection = false,
 }) => {
   // Live timer for running executions
   const [liveDuration, setLiveDuration] = React.useState<number | null>(null);
@@ -45,54 +47,40 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
     }
   }, [section.eventState, section.receivedAt]);
 
-  const now = new Date();
-  const diff = section.receivedAt ? now.getTime() - section.receivedAt.getTime() : 0;
-  const timeAgo = section.receivedAt ? calcRelativeTimeFromDiff(diff) : "";
-  const durationText = liveDuration !== null ? calcRelativeTimeFromDiff(liveDuration) : "";
-
   const currentState = section.eventState || "neutral";
   const stateStyle = stateMap[currentState];
 
-  const LastEventIcon = resolveIcon(stateStyle.icon);
-  const LastEventColor = stateStyle.textColor;
   const LastEventBackground = stateStyle.backgroundColor;
-  const LastEventIconColor = stateStyle.iconColor;
-  const iconSize = stateStyle.iconSize;
-  const iconClassName = stateStyle.iconClassName;
-
-  // Determine what to show in the top-right corner
-  let topRightText = "";
-  if (section.subtitle) {
-    topRightText = section.subtitle;
-  } else if (section.showAutomaticTime) {
-    topRightText = durationText && section.eventState === "running" ? `Running for: ${durationText}` : timeAgo;
-  } else {
-    topRightText = timeAgo;
-  }
+  const LastEventStateColor = stateStyle.badgeColor;
+  const durationText = liveDuration !== null ? calcRelativeTimeFromDiff(liveDuration) : "";
 
   return (
     <div
       key={index}
-      className={"px-4 pt-2 relative" + (index < totalSections - 1 ? " border-b" : "") + ` ${className}`}
+      className={
+        `px-4 pt-2 relative ${lastSection ? "rounded-b-md" : ""} ${LastEventBackground}` +
+        (index < totalSections - 1 ? " border-b-2 border-slate-300" : "") +
+        ` ${className}`
+      }
     >
-      <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-        <span className="uppercase text-xs font-semibold tracking-wide">{section.title}</span>
-        {topRightText && <span className="text-sm">{topRightText}</span>}
-      </div>
-      <div
-        className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastEventBackground} ${LastEventColor}`}
-      >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${LastEventIconColor}`}>
-            <LastEventIcon size={iconSize} className={iconClassName} />
-          </div>
-          <span className="truncate text-sm min-w-0">{section.eventTitle}</span>
+      <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
+        <div
+          className={`uppercase text-sm py-[1px] px-[6px] font-semibold rounded flex items-center justify-center text-white ${LastEventStateColor}`}
+        >
+          <span>{currentState}</span>
         </div>
         {section.eventSubtitle && (
-          <span className="text-sm truncate flex-shrink-0 max-w-[40%] text-gray-500">{section.eventSubtitle}</span>
+          <span className="text-sm truncate flex-shrink-0 max-w-[40%] text-gray-500">
+            {section.showAutomaticTime && durationText ? durationText : section.eventSubtitle}
+          </span>
         )}
       </div>
-      {section.handleComponent}
+      <div className="flex justify-left items-center mt-2 gap-2">
+        {section.eventId && <span className="text-zinc-600 font-mono">#{section.eventId?.slice(0, 4)}</span>}
+        <span className="text-zinc-700 font-inter truncate text-md min-w-0 font-semibold truncate">
+          {section.eventTitle}
+        </span>
+      </div>
     </div>
   );
 };
@@ -127,9 +115,7 @@ export interface EventStateStyle {
   icon: string;
   textColor: string;
   backgroundColor: string;
-  iconColor: string;
-  iconSize: number;
-  iconClassName: string;
+  badgeColor: string;
 }
 
 export type EventStateMap = Record<EventState, EventStateStyle>;
@@ -138,50 +124,39 @@ export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
   success: {
     icon: "circle-check",
     textColor: "text-green-700",
-    backgroundColor: "bg-green-200",
-    iconColor: "text-green-600 ",
-    iconSize: 16,
-    iconClassName: "",
+    backgroundColor: "bg-green-100",
+    badgeColor: "bg-emerald-500",
   },
   failed: {
     icon: "circle-x",
     textColor: "text-red-700",
-    backgroundColor: "bg-red-200",
-    iconColor: "text-red-600 ",
-    iconSize: 16,
-    iconClassName: "",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-400",
   },
   neutral: {
     icon: "circle",
     textColor: "text-gray-500",
-    backgroundColor: "bg-gray-100",
-    iconColor: "text-white bg-gray-400",
-    iconSize: 12,
-    iconClassName: "",
+    backgroundColor: "bg-gray-50",
+    badgeColor: "bg-gray-400",
   },
   "next-in-queue": {
     icon: "circle-dashed",
     textColor: "text-gray-500",
-    backgroundColor: "bg-gray-100",
-    iconColor: "text-gray-500",
-    iconSize: 16,
-    iconClassName: "",
+    backgroundColor: "bg-gray-50",
+    badgeColor: "bg-gray-400",
   },
   running: {
     icon: "refresh-cw",
     textColor: "text-blue-800",
     backgroundColor: "bg-sky-100",
-    iconColor: "text-blue-800",
-    iconSize: 16,
-    iconClassName: "animate-spin",
+    badgeColor: "bg-blue-500",
   },
 };
 
 export interface EventSection {
-  title: string;
-  subtitle?: string;
   showAutomaticTime?: boolean;
   receivedAt?: Date;
+  eventId?: string;
   eventState?: EventState;
   eventTitle?: string;
   eventSubtitle?: string | React.ReactNode;
@@ -193,9 +168,8 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   iconSlug?: string;
   iconColor?: string;
   iconBackground?: string;
-  headerColor: string;
+  headerColor?: string;
   title: string;
-  description?: string;
   specs?: ComponentBaseSpec[];
   hideCount?: boolean;
   hideMetadataList?: boolean;
@@ -217,7 +191,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   iconBackground,
   headerColor,
   title,
-  description,
   specs,
   collapsed = false,
   collapsedBackground,
@@ -292,15 +265,14 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col outline outline-black-15 rounded-md w-[23rem] bg-white">
+      <div className="flex flex-col outline-2 outline-slate-300 rounded-md w-[23rem] bg-white">
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
           iconBackground={iconBackground}
           iconColor={iconColor}
-          headerColor={headerColor}
+          headerColor={headerColor || "bg-white"}
           title={title}
-          description={description}
           onDoubleClick={onToggleCollapse}
           onRun={onRun}
           runDisabled={runDisabled}
@@ -318,9 +290,9 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         {!hideMetadataList && metadata && metadata.length > 0 && <MetadataList items={metadata} />}
 
         {specs && specs.length > 0 && (
-          <div className="px-2 py-2 border-b text-gray-500 flex flex-col gap-2">
+          <div className="px-2 py-2 border-b-2 border-slate-300 text-gray-500 flex flex-col gap-2">
             {specs.map((spec, index) => (
-              <div key={index} className="flex items-center gap-2 text-md text-gray-500">
+              <div key={index} className="flex items-center gap-1 text-md text-gray-500">
                 {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 18 })}
                 {spec.values ? (
                   <SpecsTooltip
@@ -328,7 +300,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                     specValues={spec.values}
                     hideCount={hideCount}
                   >
-                    <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
+                    <span className="text-md underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 px-2 py-1 rounded-md font-inter font-medium cursor-help">
                       {hideCount ? "" : spec.values.length}{" "}
                       {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
                     </span>
@@ -347,12 +319,13 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
         {eventSections?.map((section, index) => (
           <EventSectionDisplay
-            className={customField ? "pb-0" : "pb-6"}
+            className={"pb-3" + (!!includeEmptyState || !!customField ? " border-b-2 border-slate-300" : "")}
             key={index}
             section={section}
             index={index}
             totalSections={eventSections.length}
             stateMap={eventStateMap}
+            lastSection={index === eventSections.length - 1 && !includeEmptyState && !customField}
           />
         ))}
 

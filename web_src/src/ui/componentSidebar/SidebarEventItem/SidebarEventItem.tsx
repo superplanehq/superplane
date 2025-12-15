@@ -316,19 +316,14 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     }
   }, [tabData, activeTab, getDefaultActiveTab]);
 
-  const EventIcon = resolveIcon(eventStateStyle.icon);
-  const EventColor = eventStateStyle.textColor;
   const EventBackground = eventStateStyle.backgroundColor;
+  const EventBadgeColor = eventStateStyle.badgeColor;
   const titleColor = eventStateStyle.textColor;
-  const iconSize = eventStateStyle.iconSize;
-  const iconContainerSize = 4;
-  const iconStrokeWidth = 2;
-  const iconClassName = eventStateStyle.iconClassName;
 
   return (
     <div
       key={event.title + index}
-      className={`flex flex-col items-center justify-between gap-1 px-2 py-1.5 rounded-md ${EventBackground} ${EventColor}`}
+      className={`flex flex-col items-center justify-between gap-1 px-2 py-1.5 rounded-md ${EventBackground}`}
     >
       <div className="flex items-center gap-3 rounded-md w-full min-w-0">
         <div
@@ -340,9 +335,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           }}
         >
           <div
-            className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center ${EventColor} ${iconClassName}`}
+            className={`uppercase text-sm py-[1px] px-[6px] font-semibold rounded flex items-center justify-center text-white ${EventBadgeColor}`}
           >
-            <EventIcon size={iconSize} strokeWidth={iconStrokeWidth} className="thick" />
+            <span>{event.state || "neutral"}</span>
           </div>
           <span className={`truncate text-sm ${titleColor}`}>{event.title}</span>
         </div>
@@ -564,11 +559,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     <div key={index} className="flex flex-col">
                       {/* Main execution */}
                       <div className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0 group hover:bg-gray-100">
-                        <div className="flex-shrink-0">
-                          {React.createElement(resolveIcon(execution.icon), {
-                            size: execution.iconSize,
-                            className: `${execution.textColor} ${execution.iconClassName} `,
-                          })}
+                        <div
+                          className={`uppercase text-xs py-[1px] px-[4px] font-semibold rounded flex items-center justify-center text-white ${execution.badgeColor} flex-shrink-0`}
+                        >
+                          <span>{execution.state}</span>
                         </div>
                         <span className="text-sm text-gray-800 truncate flex-1">{execution.name}</span>
                         {/* Hover Icons */}
@@ -633,26 +627,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                                 className: "text-gray-400",
                               })}
                             </div>
-                            <div className="flex-shrink-0">
-                              {child.state === "completed"
-                                ? React.createElement(resolveIcon("circle-check"), {
-                                    size: 16,
-                                    className: "text-green-600",
-                                  })
-                                : child.state === "failed"
-                                  ? React.createElement(resolveIcon("x"), {
-                                      size: 16,
-                                      className: "text-red-600",
-                                    })
-                                  : child.state === "running"
-                                    ? React.createElement(resolveIcon("refresh-cw"), {
-                                        size: 16,
-                                        className: "text-blue-600 animate-spin",
-                                      })
-                                    : React.createElement(resolveIcon("circle"), {
-                                        size: 16,
-                                        className: "text-gray-400",
-                                      })}
+                            <div
+                              className={`uppercase text-xs py-[1px] px-[3px] font-semibold rounded flex items-center justify-center text-white flex-shrink-0 ${child.badgeColor}`}
+                            >
+                              <span>{child.state}</span>
                             </div>
                             <span className="text-sm text-gray-700 truncate flex-1">{child.name}</span>
                           </div>

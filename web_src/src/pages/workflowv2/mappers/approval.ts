@@ -40,41 +40,31 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
     icon: "clock",
     textColor: "text-amber-700",
     backgroundColor: "bg-amber-100",
-    iconColor: "text-amber-600",
-    iconSize: 16,
-    iconClassName: "",
+    badgeColor: "bg-amber-500",
   },
   success: {
     icon: "circle-check",
     textColor: "text-green-700",
     backgroundColor: "bg-green-200",
-    iconColor: "text-green-600",
-    iconSize: 16,
-    iconClassName: "",
+    badgeColor: "bg-emerald-500",
   },
   failed: {
     icon: "circle-x",
     textColor: "text-red-700",
-    backgroundColor: "bg-red-200",
-    iconColor: "text-red-600",
-    iconSize: 16,
-    iconClassName: "",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-400",
   },
   error: {
     icon: "triangle-alert",
     textColor: "text-red-700",
-    backgroundColor: "bg-red-200",
-    iconColor: "text-red-600",
-    iconSize: 16,
-    iconClassName: "",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-400",
   },
   running: {
     icon: "clock",
     textColor: "text-amber-700",
     backgroundColor: "bg-amber-100",
-    iconColor: "text-amber-600",
-    iconSize: 16,
-    iconClassName: "",
+    badgeColor: "bg-amber-500",
   },
 };
 
@@ -134,13 +124,11 @@ export const approvalMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: componentDefinition.icon || "hand",
-      iconColor: getColorClass("orange"),
-      headerColor: "bg-orange-100",
-      iconBackground: getBackgroundColorClass("orange"),
+      iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass("orange"),
+      headerColor: "bg-white",
       collapsed: node.isCollapsed,
       title: node.name || componentDefinition?.label || "Approval",
-      description: componentDefinition?.description,
       eventSections: getApprovalEventSections(nodes, lastExecution, additionalData),
       specs: getApprovalSpecs(items, additionalData),
       customField: getApprovalCustomField(lastExecution, approvals),
@@ -214,7 +202,6 @@ function getApprovalEventSections(
   if (!execution) {
     return [
       {
-        title: "Last Run",
         eventTitle: "No events received yet",
         eventState: "neutral" as const,
       },
@@ -224,16 +211,10 @@ function getApprovalEventSections(
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
   const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-  let sectionTitle = "Last Run";
-
-  if (execution.state === "STATE_STARTED") {
-    sectionTitle = "Awaiting Approval";
-  }
 
   const eventSubtitle = getComponentSubtitle({} as ComponentsNode, execution, additionalData);
   return [
     {
-      title: sectionTitle,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: eventTitle,
       eventSubtitle: eventSubtitle,

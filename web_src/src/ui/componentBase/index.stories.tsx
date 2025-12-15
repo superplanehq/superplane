@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ComponentBase, type ComponentBaseProps } from "./";
-import dockerIcon from "@/assets/icons/integrations/docker.svg";
 
 const FilterComponentProps: ComponentBaseProps = {
   title: "Filter events based on branch",
@@ -39,10 +38,11 @@ const FilterComponentProps: ComponentBaseProps = {
   ],
   eventSections: [
     {
-      title: "Last Event",
       receivedAt: new Date(),
       eventState: "success",
       eventTitle: "Build completed successfully",
+      eventSubtitle: "4m",
+      eventId: "1aee34-aae100-32123",
     },
   ],
 };
@@ -76,16 +76,18 @@ const IfComponentProps: ComponentBaseProps = {
   ],
   eventSections: [
     {
-      title: "TRUE",
       receivedAt: new Date(),
       eventState: "success",
       eventTitle: "Build completed successfully",
+      eventSubtitle: "4m",
+      eventId: "1aee34-aae100-32123",
     },
     {
-      title: "FALSE",
       receivedAt: new Date(),
       eventState: "failed",
       eventTitle: "Build failed",
+      eventSubtitle: "4m",
+      eventId: "1aee34-aae100-32123",
     },
   ],
 };
@@ -96,10 +98,11 @@ const NoopComponentProps: ComponentBaseProps = {
   headerColor: "bg-gray-50",
   eventSections: [
     {
-      title: "Last Event",
       receivedAt: new Date(),
       eventState: "success",
       eventTitle: "Build completed successfully",
+      eventSubtitle: "4m",
+      eventId: "1aee34-aae100-32123",
     },
   ],
 };
@@ -109,6 +112,27 @@ const EmptyStateComponentProps: ComponentBaseProps = {
   iconSlug: "plus-circle",
   headerColor: "bg-gray-50",
   includeEmptyState: true,
+};
+
+const MetadataComponentProps: ComponentBaseProps = {
+  title: "Process with metadata",
+  iconSlug: "server",
+  headerColor: "bg-blue-50",
+  metadata: [
+    { icon: "clock", label: "5min timeout" },
+    { icon: "cpu", label: "2 cores" },
+    { icon: "hard-drive", label: "512MB memory" },
+    { icon: "tag", label: "v1.2.3" },
+  ],
+  eventSections: [
+    {
+      receivedAt: new Date(),
+      eventState: "running",
+      eventTitle: "Processing deployment...",
+      eventSubtitle: "4m",
+      eventId: "1aee34-aae100-32123",
+    },
+  ],
 };
 
 const SwitchComponentProps: ComponentBaseProps = {
@@ -153,18 +177,24 @@ const SwitchComponentProps: ComponentBaseProps = {
       receivedAt: new Date(),
       eventState: "success",
       eventTitle: "fix: Branch name contains 'superplane'",
+      eventSubtitle: "4m",
+      eventId: "1aee34-aae100-32123",
     },
     {
       title: "STAGE",
       receivedAt: new Date(),
       eventState: "success",
       eventTitle: "feature: Branch name contains 'dev'",
+      eventSubtitle: "4m",
+      eventId: "1aee34-aae100-32123",
     },
     {
       title: "DEV",
       receivedAt: new Date(),
       eventState: "failed",
       eventTitle: "Build failed",
+      eventSubtitle: "4m",
+      eventId: "1aee34-aae100-32123",
     },
   ],
 };
@@ -199,4 +229,8 @@ export const Noop: Story = {
 
 export const EmptyState: Story = {
   args: EmptyStateComponentProps,
+};
+
+export const WithMetadata: Story = {
+  args: MetadataComponentProps,
 };

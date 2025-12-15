@@ -6,7 +6,7 @@ import {
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getState, getStateMap } from ".";
 
@@ -22,11 +22,11 @@ export const httpMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: componentDefinition.icon || "globe",
-      headerColor: getBackgroundColorClass(componentDefinition?.color || "gray"),
-      iconColor: getColorClass(componentDefinition?.color || "gray"),
-      iconBackground: getBackgroundColorClass(componentDefinition?.color || "gray"),
+      headerColor: "bg-white",
+      iconColor: getColorClass("black"),
+      iconBackground: "bg-white",
       collapsed: node.isCollapsed,
-      collapsedBackground: getBackgroundColorClass("white"),
+      collapsedBackground: "bg-white",
       title: node.name!,
       eventSections: getHTTPEventSections(lastExecutions[0], componentName),
       metadata: getHTTPMetadataList(node),

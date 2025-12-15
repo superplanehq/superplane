@@ -6,7 +6,7 @@ import {
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { calcRelativeTimeFromDiff } from "@/lib/utils";
@@ -23,11 +23,11 @@ export const timeGateMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: "clock",
-      headerColor: getBackgroundColorClass(componentDefinition?.color || "blue"),
-      iconColor: getColorClass(componentDefinition?.color || "blue"),
-      iconBackground: getBackgroundColorClass(componentDefinition?.color || "blue"),
+      headerColor: "bg-white",
+      iconColor: getColorClass("black"),
+      iconBackground: "bg-white",
       collapsed: node.isCollapsed,
-      collapsedBackground: getBackgroundColorClass("white"),
+      collapsedBackground: "bg-white",
       title: node.name!,
       eventSections: getTimeGateEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName),
       metadata: getTimeGateMetadataList(node),
@@ -144,7 +144,7 @@ function getTimeGateEventSections(
   // Add Last Event section
   if (!execution) {
     sections.push({
-      title: "LAST EVENT",
+      
       eventTitle: "No events received yet",
       eventState: "neutral" as const,
     });
@@ -169,7 +169,7 @@ function getTimeGateEventSections(
     }
 
     sections.push({
-      title: "LAST EVENT",
+      
       subtitle: subtitle,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
@@ -186,7 +186,6 @@ function getTimeGateEventSections(
     if (queueItem.rootEvent) {
       const { title } = rootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent);
       sections.push({
-        title: "NEXT IN QUEUE",
         receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
         eventTitle: title,
         eventState: "next-in-queue" as const,

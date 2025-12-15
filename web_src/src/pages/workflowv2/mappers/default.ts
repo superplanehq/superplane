@@ -21,8 +21,7 @@ export const defaultTriggerRenderer: TriggerRenderer = {
     const props: TriggerProps = {
       title: node.name!,
       iconSlug: trigger.icon || "bolt",
-      iconColor: getColorClass(trigger.color),
-      headerColor: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: [],
       zeroStateText: "No events yet",

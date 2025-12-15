@@ -6,7 +6,7 @@ import {
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState } from "@/ui/componentBase";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
@@ -24,11 +24,11 @@ export const semaphoreMapper: ComponentBaseMapper = {
     return {
       iconSrc: SemaphoreLogo,
       iconSlug: componentDefinition.icon || "workflow",
-      headerColor: getBackgroundColorClass(componentDefinition?.color || "gray"),
-      iconColor: getColorClass(componentDefinition?.color || "gray"),
-      iconBackground: getBackgroundColorClass(componentDefinition?.color || "gray"),
+      headerColor: "bg-white",
+      iconColor: getColorClass("black"),
+      iconBackground: "bg-white",
       collapsed: node.isCollapsed,
-      collapsedBackground: getBackgroundColorClass("white"),
+      collapsedBackground: "bg-white",
       title: node.name!,
       eventSections: getSemaphoreEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName),
       metadata: getSemaphoreMetadataList(node),
@@ -114,7 +114,6 @@ function getSemaphoreEventSections(
   // Add Last Run section
   if (!execution) {
     sections.push({
-      title: "Last Run",
       eventTitle: "No executions received yet",
       eventState: "neutral" as const,
     });
@@ -124,7 +123,6 @@ function getSemaphoreEventSections(
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
     sections.push({
-      title: "Last Run",
       showAutomaticTime: true,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
@@ -141,7 +139,6 @@ function getSemaphoreEventSections(
     if (queueItem.rootEvent) {
       const { title } = rootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent);
       sections.push({
-        title: "Next in Queue",
         receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
         eventTitle: title,
         eventState: "next-in-queue" as const,

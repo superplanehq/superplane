@@ -7,7 +7,6 @@ import {
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
 import { getTriggerRenderer, getStateMap } from ".";
-import { getBackgroundColorClass } from "@/utils/colors";
 
 export const noopMapper: ComponentBaseMapper = {
   props(
@@ -22,9 +21,9 @@ export const noopMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: componentDefinition.icon || "circle-off",
-      headerColor: "bg-gray-50",
+      headerColor: "bg-white",
       collapsed: node.isCollapsed,
-      collapsedBackground: getBackgroundColorClass("white"),
+      collapsedBackground: "bg-white",
       title: node.name!,
       eventSections: getNoopEventSections(nodes, lastExecution, componentName),
       eventStateMap: getStateMap(componentName),

@@ -1,5 +1,5 @@
 import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
-import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
+import { getColorClass } from "@/utils/colors";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { getNextCronExecution } from "@/utils/cron";
 import { TriggerRenderer, CustomFieldRenderer } from "./types";
@@ -323,9 +323,9 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
     const props: TriggerProps = {
       title: node.name!,
       iconSlug: trigger.icon,
-      iconColor: getColorClass(trigger.color),
-      headerColor: getBackgroundColorClass(trigger.color),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass("black"),
+      headerColor: "bg-white",
+      collapsedBackground: "bg-white",
       metadata: [
         {
           icon: "calendar-cog",
