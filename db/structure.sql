@@ -72,6 +72,40 @@ CREATE TABLE public.accounts (
 
 
 --
+-- Name: app_installation_secrets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.app_installation_secrets (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    installation_id uuid NOT NULL,
+    name character varying(64) NOT NULL,
+    value bytea NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: app_installations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.app_installations (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    app_name character varying(255) NOT NULL,
+    installation_name character varying(255) NOT NULL,
+    state character varying(32) NOT NULL,
+    state_description character varying(255),
+    configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    browser_action jsonb,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: blueprints; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -270,7 +304,8 @@ CREATE TABLE public.webhooks (
     updated_at timestamp without time zone NOT NULL,
     deleted_at timestamp without time zone,
     retry_count integer DEFAULT 0 NOT NULL,
-    max_retries integer DEFAULT 3 NOT NULL
+    max_retries integer DEFAULT 3 NOT NULL,
+    app_installation_id uuid
 );
 
 
@@ -379,7 +414,8 @@ CREATE TABLE public.workflow_nodes (
     "position" jsonb DEFAULT '{}'::jsonb NOT NULL,
     is_collapsed boolean DEFAULT false NOT NULL,
     parent_node_id character varying(128),
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    app_installation_id uuid
 );
 
 
@@ -445,6 +481,22 @@ ALTER TABLE ONLY public.accounts
 
 ALTER TABLE ONLY public.accounts
     ADD CONSTRAINT accounts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: app_installation_secrets app_installation_secrets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_secrets
+    ADD CONSTRAINT app_installation_secrets_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: app_installations app_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installations
+    ADD CONSTRAINT app_installations_pkey PRIMARY KEY (id);
 
 
 --
@@ -670,6 +722,27 @@ CREATE INDEX idx_account_providers_provider ON public.account_providers USING bt
 
 
 --
+-- Name: idx_app_installation_secrets_installation_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_installation_secrets_installation_id ON public.app_installation_secrets USING btree (installation_id);
+
+
+--
+-- Name: idx_app_installation_secrets_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_installation_secrets_organization_id ON public.app_installation_secrets USING btree (organization_id);
+
+
+--
+-- Name: idx_app_installations_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_installations_organization_id ON public.app_installations USING btree (organization_id);
+
+
+--
 -- Name: idx_blueprints_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -730,6 +803,13 @@ CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (d
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_webhooks_app_installation_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_webhooks_app_installation_id ON public.webhooks USING btree (app_installation_id);
 
 
 --
@@ -824,6 +904,13 @@ CREATE INDEX idx_workflow_node_executions_workflow_node_id ON public.workflow_no
 
 
 --
+-- Name: idx_workflow_node_installation_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_installation_id ON public.workflow_nodes USING btree (app_installation_id);
+
+
+--
 -- Name: idx_workflow_node_queue_items_root_event_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -878,6 +965,30 @@ CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (orga
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
+
+
+--
+-- Name: app_installation_secrets app_installation_secrets_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_secrets
+    ADD CONSTRAINT app_installation_secrets_installation_id_fkey FOREIGN KEY (installation_id) REFERENCES public.app_installations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: app_installation_secrets app_installation_secrets_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_secrets
+    ADD CONSTRAINT app_installation_secrets_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: app_installations app_installations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installations
+    ADD CONSTRAINT app_installations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -958,6 +1069,14 @@ ALTER TABLE ONLY public.users
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: webhooks webhooks_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhooks
+    ADD CONSTRAINT webhooks_app_installation_id_fkey FOREIGN KEY (app_installation_id) REFERENCES public.app_installations(id);
 
 
 --
@@ -1073,6 +1192,14 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 
 --
+-- Name: workflow_nodes workflow_nodes_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_nodes
+    ADD CONSTRAINT workflow_nodes_app_installation_id_fkey FOREIGN KEY (app_installation_id) REFERENCES public.app_installations(id) ON DELETE SET NULL;
+
+
+--
 -- Name: workflow_nodes workflow_nodes_webhook_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1120,7 +1247,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251202210000	f
+20251208205307	f
 \.
 
 

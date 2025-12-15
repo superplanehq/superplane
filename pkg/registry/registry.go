@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,9 +21,10 @@ import (
 )
 
 var (
-	registeredComponents = make(map[string]core.Component)
-	registeredTriggers   = make(map[string]core.Trigger)
-	mu                   sync.RWMutex
+	registeredComponents   = make(map[string]core.Component)
+	registeredTriggers     = make(map[string]core.Trigger)
+	registeredApplications = make(map[string]core.Application)
+	mu                     sync.RWMutex
 )
 
 func RegisterComponent(name string, c core.Component) {
@@ -37,6 +39,12 @@ func RegisterTrigger(name string, t core.Trigger) {
 	registeredTriggers[name] = t
 }
 
+func RegisterApplication(name string, i core.Application) {
+	mu.Lock()
+	defer mu.Unlock()
+	registeredApplications[name] = i
+}
+
 type Integration struct {
 	EventHandler       integrations.EventHandler
 	OIDCVerifier       integrations.OIDCVerifier
@@ -47,6 +55,7 @@ type Registry struct {
 	httpClient   *http.Client
 	Encryptor    crypto.Encryptor
 	Integrations map[string]Integration
+	Applications map[string]core.Application
 	Components   map[string]core.Component
 	Triggers     map[string]core.Trigger
 }
@@ -58,6 +67,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 		httpClient:   &http.Client{Timeout: 10 * time.Second},
 		Components:   map[string]core.Component{},
 		Triggers:     map[string]core.Trigger{},
+		Applications: map[string]core.Application{},
 	}
 
 	r.Init()
@@ -93,6 +103,10 @@ func (r *Registry) Init() {
 
 	for name, trigger := range registeredTriggers {
 		r.Triggers[name] = trigger
+	}
+
+	for name, application := range registeredApplications {
+		r.Applications[name] = application
 	}
 }
 
@@ -191,12 +205,21 @@ func (r *Registry) ListTriggers() []core.Trigger {
 }
 
 func (r *Registry) GetTrigger(name string) (core.Trigger, error) {
-	trigger, ok := r.Triggers[name]
-	if !ok {
-		return nil, fmt.Errorf("trigger %s not registered", name)
+	parts := strings.SplitN(name, ".", 2)
+	if len(parts) > 2 {
+		return nil, fmt.Errorf("invalid trigger name: %s", name)
 	}
 
-	return trigger, nil
+	if len(parts) == 1 {
+		trigger, ok := r.Triggers[name]
+		if !ok {
+			return nil, fmt.Errorf("trigger %s not registered", name)
+		}
+
+		return trigger, nil
+	}
+
+	return r.GetApplicationTrigger(parts[0], name)
 }
 
 func (r *Registry) ListComponents() []core.Component {
@@ -213,10 +236,71 @@ func (r *Registry) ListComponents() []core.Component {
 }
 
 func (r *Registry) GetComponent(name string) (core.Component, error) {
-	component, ok := r.Components[name]
-	if !ok {
-		return nil, fmt.Errorf("component %s not registered", name)
+	parts := strings.SplitN(name, ".", 2)
+	if len(parts) > 2 {
+		return nil, fmt.Errorf("invalid component name: %s", name)
 	}
 
-	return component, nil
+	if len(parts) == 1 {
+		component, ok := r.Components[name]
+		if !ok {
+			return nil, fmt.Errorf("component %s not registered", name)
+		}
+
+		return component, nil
+	}
+
+	return r.GetApplicationComponent(parts[0], name)
+}
+
+func (r *Registry) GetApplication(name string) (core.Application, error) {
+	application, ok := r.Applications[name]
+	if !ok {
+		return nil, fmt.Errorf("application %s not registered", name)
+	}
+
+	return application, nil
+}
+
+func (r *Registry) ListApplications() []core.Application {
+	applications := make([]core.Application, 0, len(r.Applications))
+	for _, application := range r.Applications {
+		applications = append(applications, application)
+	}
+
+	sort.Slice(applications, func(i, j int) bool {
+		return applications[i].Name() < applications[j].Name()
+	})
+
+	return applications
+}
+
+func (r *Registry) GetApplicationTrigger(appName, triggerName string) (core.Trigger, error) {
+	application, err := r.GetApplication(appName)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, trigger := range application.Triggers() {
+		if trigger.Name() == triggerName {
+			return trigger, nil
+		}
+	}
+
+	return nil, fmt.Errorf("trigger %s not found for app %s", triggerName, appName)
+}
+
+func (r *Registry) GetApplicationComponent(appName, componentName string) (core.Component, error) {
+	application, err := r.GetApplication(appName)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, component := range application.Components() {
+		if component.Name() == componentName {
+			return component, nil
+		}
+	}
+
+	return nil, fmt.Errorf("component %s not found for app %s", componentName, appName)
 }
