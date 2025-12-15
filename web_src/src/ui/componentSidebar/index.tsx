@@ -416,8 +416,8 @@ export const ComponentSidebar = ({
           </div>
           <div className="flex justify-between gap-3 w-full">
             <div className="flex flex-col gap-1">
-              <h2 className="text-xl font-semibold">{nodeName}</h2>
-              {nodeId && (
+              <h2 className="text-xl font-semibold">{isTemplateNode ? newNodeData.nodeName : nodeName}</h2>
+              {nodeId && !isTemplateNode && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500 font-mono">{nodeId}</span>
                   <button
