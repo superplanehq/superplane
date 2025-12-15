@@ -7,6 +7,7 @@ import { JsonTooltip } from "./JsonTooltip";
 import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
 import { MetadataItem, MetadataList } from "../metadataList";
+import { EmptyState } from "../emptyState";
 
 interface EventSectionDisplayProps {
   section: EventSection;
@@ -206,6 +207,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   customField?: React.ReactNode;
   eventStateMap?: EventStateMap;
   hideActionsButton?: boolean;
+  includeEmptyState?: boolean;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -238,6 +240,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   customField,
   eventStateMap,
   hideActionsButton,
+  includeEmptyState = false,
 }) => {
   if (collapsed) {
     return (
@@ -352,6 +355,8 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
             stateMap={eventStateMap}
           />
         ))}
+
+        {includeEmptyState && <EmptyState />}
 
         {customField || null}
       </div>

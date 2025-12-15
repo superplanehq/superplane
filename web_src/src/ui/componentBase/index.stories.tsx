@@ -104,6 +104,13 @@ const NoopComponentProps: ComponentBaseProps = {
   ],
 };
 
+const EmptyStateComponentProps: ComponentBaseProps = {
+  title: "New Component",
+  iconSlug: "plus-circle",
+  headerColor: "bg-gray-50",
+  includeEmptyState: true,
+};
+
 const SwitchComponentProps: ComponentBaseProps = {
   title: "Branch processed events",
   iconSlug: "git-branch",
@@ -188,4 +195,8 @@ export const Switch: Story = {
 
 export const Noop: Story = {
   args: NoopComponentProps,
+};
+
+export const EmptyState: Story = {
+  args: EmptyStateComponentProps,
 };

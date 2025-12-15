@@ -28,7 +28,7 @@ import {
   OutputChannel,
 } from "../CustomComponentConfigurationSidebar";
 import { ComponentSidebar } from "../componentSidebar";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass } from "@/utils/colors";
 import { ComponentBaseProps } from "../componentBase";
 import { buildBuildingBlockCategories } from "../buildingBlocks";
 import { ConfigurationFieldModal } from "./ConfigurationFieldModal";
@@ -388,19 +388,12 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           outputChannels: ["default"],
           component: {
             title: block.label || block.name || "New Component",
-            description: "Configure this component on Sidebar Settings tab...",
             headerColor: "#e5e7eb",
             iconSlug: block.icon,
-            iconColor: getColorClass("black"),
+            iconColor: "text-indigo-700",
             collapsedBackground: getBackgroundColorClass("white"),
             hideActionsButton: true,
-            eventSections: [
-              {
-                title: "N/A",
-                eventState: "neutral",
-                eventTitle: "No events/executions to display",
-              },
-            ],
+            includeEmptyState: true,
           } as ComponentBaseProps,
           isTemplate: true,
           buildingBlock: block,
