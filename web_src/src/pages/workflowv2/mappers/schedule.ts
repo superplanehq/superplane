@@ -118,7 +118,7 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
         nextTriggerInTZ.setTime(nextTriggerInTZ.getTime() + interval * 60 * 1000);
       }
 
-      return new Date(nextTriggerInTZ.getTime());
+      return new Date(nextTriggerInTZ.getTime() - timezoneOffsetMs);
     }
 
     case "hours": {
@@ -141,7 +141,7 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
       nextTriggerInTZ.setSeconds(0);
       nextTriggerInTZ.setMilliseconds(0);
 
-      return new Date(nextTriggerInTZ.getTime());
+      return new Date(nextTriggerInTZ.getTime() - timezoneOffsetMs);
     }
 
     case "days": {
