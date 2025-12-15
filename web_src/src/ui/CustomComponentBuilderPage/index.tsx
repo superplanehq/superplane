@@ -703,6 +703,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             isOpen={isNodeSidebarOpen}
             onClose={handleNodeSidebarClose}
             title={editingNodeData?.displayLabel || newNodeData?.displayLabel || "Node Configuration"}
+            nodeId={selectedNodeId}
             iconSlug={newNodeData?.icon || "gear"}
             iconColor="text-black"
             latestEvents={[]}

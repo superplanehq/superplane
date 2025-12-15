@@ -210,6 +210,7 @@ export const Default: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
@@ -271,6 +272,7 @@ export const WithInteractiveEvents: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
@@ -327,6 +329,7 @@ export const WithDifferentIcon: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
@@ -393,6 +396,7 @@ export const ExtendedMetadata: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
@@ -448,6 +452,7 @@ export const ZeroState: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={[]}
           nextInQueueEvents={[]}
@@ -478,6 +483,7 @@ export const WithActionsDropdown: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={mockLatestEvents}
           nextInQueueEvents={mockNextInQueueEvents}
@@ -577,6 +583,7 @@ export const WithFullHistory: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
@@ -632,6 +639,7 @@ export const HistoryCountDemo: Story = {
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
           {...args}
+          nodeId="node_123abc"
           isOpen={true}
           latestEvents={latestEvents}
           nextInQueueEvents={nextEvents}
