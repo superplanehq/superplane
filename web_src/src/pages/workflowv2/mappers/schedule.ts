@@ -23,7 +23,6 @@ interface ScheduleConfiguration {
   timezone?: string;
 }
 
-
 function formatScheduleDescription(configuration: ScheduleConfiguration): string {
   if (!configuration.type) {
     return "";
@@ -381,7 +380,11 @@ export const scheduleCustomFieldRenderer: CustomFieldRenderer = {
             { className: "text-sm font-medium text-gray-700 dark:text-gray-300" },
             "Next run:",
           ),
-          React.createElement("div", { className: "text-sm text-gray-900 dark:text-gray-100 mt-1 border-1 p-2 bg-zinc-100" }, nextTrigger),
+          React.createElement(
+            "div",
+            { className: "text-sm text-gray-900 dark:text-gray-100 mt-1 border-1 p-2 bg-zinc-100" },
+            nextTrigger,
+          ),
         ),
       ),
     );
