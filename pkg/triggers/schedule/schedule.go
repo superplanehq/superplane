@@ -85,17 +85,6 @@ func (s *Schedule) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error
 func (s *Schedule) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "timezone",
-			Label:       "Timezone",
-			Type:        configuration.FieldTypeTimezone,
-			Required:    true,
-			Default:     "current",
-			Description: "Timezone offset for scheduling calculations (default: your current timezone)",
-			TypeOptions: &configuration.TypeOptions{
-				Timezone: &configuration.TimezoneTypeOptions{},
-			},
-		},
-		{
 			Name:     "type",
 			Label:    "Frequency",
 			Type:     configuration.FieldTypeSelect,
@@ -112,6 +101,22 @@ func (s *Schedule) Configuration() []configuration.Field {
 						{Label: "Cron (Custom)", Value: "cron"},
 					},
 				},
+			},
+		},
+		{
+			Name:        "timezone",
+			Label:       "Timezone",
+			Type:        configuration.FieldTypeTimezone,
+			Default:     "current",
+			Description: "Timezone offset for scheduling calculations (default: your current timezone)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "type", Values: []string{"days", "weeks", "months", "cron"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "type", Values: []string{"days", "weeks", "months", "cron"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Timezone: &configuration.TimezoneTypeOptions{},
 			},
 		},
 		{
@@ -379,13 +384,42 @@ func (s *Schedule) HandleAction(ctx triggers.TriggerActionContext) error {
 }
 
 func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
-	err := ctx.EventContext.Emit(map[string]any{})
+	spec := Configuration{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
 		return err
 	}
 
-	spec := Configuration{}
-	err = mapstructure.Decode(ctx.Configuration, &spec)
+	var timezone *time.Location
+	var now time.Time
+
+	// Only use timezone for schedule types that support it
+	if spec.Type == TypeDays || spec.Type == TypeWeeks || spec.Type == TypeMonths || spec.Type == TypeCron {
+		timezone = parseTimezone(spec.Timezone)
+		now = time.Now().In(timezone)
+	} else {
+		now = time.Now()
+	}
+
+	payload := map[string]any{
+		"timestamp":     now.Format(time.RFC3339),
+		"Readable date": now.Format("January 2nd 2006, 15:04:05 pm"),
+		"Readable time": now.Format("15:04:05 pm"),
+		"Day of week":   now.Format("Monday"),
+		"Year":          now.Format("2006"),
+		"Month":         now.Format("January"),
+		"Day of month":  now.Format("2"),
+		"Hour":          now.Format("15"),
+		"Minute":        now.Format("04"),
+		"Second":        now.Format("05"),
+	}
+
+	// Only include timezone for schedule types that support it
+	if timezone != nil {
+		payload["Timezone"] = formatTimezone(timezone)
+	}
+
+	err = ctx.EventContext.Emit(payload)
 	if err != nil {
 		return err
 	}
@@ -396,8 +430,8 @@ func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
 		return fmt.Errorf("failed to parse existing metadata: %w", err)
 	}
 
-	now := time.Now()
-	nextTrigger, err := getNextTrigger(spec, now, existingMetadata.ReferenceTime)
+	nowUTC := time.Now()
+	nextTrigger, err := getNextTrigger(spec, nowUTC, existingMetadata.ReferenceTime)
 	if err != nil {
 		return err
 	}
@@ -718,4 +752,24 @@ func nextCronTrigger(cronExpression string, now time.Time) (*time.Time, error) {
 
 func intPtr(v int) *int {
 	return &v
+}
+
+func formatTimezone(loc *time.Location) string {
+	if loc == time.UTC {
+		return "UTC (UTC+00:00)"
+	}
+
+	now := time.Now().In(loc)
+	_, offset := now.Zone()
+	hours := offset / 3600
+	minutes := (offset % 3600) / 60
+
+	sign := "+"
+	if offset < 0 {
+		sign = "-"
+		hours = -hours
+		minutes = -minutes
+	}
+
+	return fmt.Sprintf("%s (UTC%s%02d:%02d)", loc.String(), sign, hours, minutes)
 }

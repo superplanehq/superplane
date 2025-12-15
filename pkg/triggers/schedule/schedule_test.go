@@ -3,6 +3,8 @@ package schedule
 import (
 	"testing"
 	"time"
+
+	"github.com/superplanehq/superplane/pkg/triggers"
 )
 
 func TestNextMinutesTrigger(t *testing.T) {
@@ -416,4 +418,178 @@ func TestTimezoneHandling(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEmitEvent(t *testing.T) {
+	tests := []struct {
+		name               string
+		config             Configuration
+		timezone           string
+		shouldHaveTimezone bool
+	}{
+		{
+			name: "emit event with minutes interval (no timezone)",
+			config: Configuration{
+				Type:            TypeMinutes,
+				MinutesInterval: intPtr(5),
+			},
+			shouldHaveTimezone: false,
+		},
+		{
+			name: "emit event with hours interval (no timezone)",
+			config: Configuration{
+				Type:          TypeHours,
+				HoursInterval: intPtr(1),
+				Minute:        intPtr(0),
+			},
+			shouldHaveTimezone: false,
+		},
+		{
+			name: "emit event with days interval (with timezone)",
+			config: Configuration{
+				Type:         TypeDays,
+				DaysInterval: intPtr(1),
+				Hour:         intPtr(9),
+				Minute:       intPtr(0),
+				Timezone:     stringPtr("-5"),
+			},
+			timezone:           "GMT-5.0 (UTC-05:00)",
+			shouldHaveTimezone: true,
+		},
+		{
+			name: "emit event with weeks interval (with timezone)",
+			config: Configuration{
+				Type:          TypeWeeks,
+				WeeksInterval: intPtr(1),
+				WeekDays:      []string{"monday"},
+				Hour:          intPtr(14),
+				Minute:        intPtr(30),
+				Timezone:      stringPtr("1"),
+			},
+			timezone:           "GMT+1.0 (UTC+01:00)",
+			shouldHaveTimezone: true,
+		},
+		{
+			name: "emit event with cron interval (with timezone)",
+			config: Configuration{
+				Type:           TypeCron,
+				CronExpression: stringPtr("0 30 14 * * *"),
+				Timezone:       stringPtr("2"),
+			},
+			timezone:           "GMT+2.0 (UTC+02:00)",
+			shouldHaveTimezone: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schedule := &Schedule{}
+
+			// Mock event context that captures the emitted payload
+			var emittedPayload map[string]any
+			mockEventContext := &mockEventContext{
+				emitFunc: func(payload any) error {
+					if p, ok := payload.(map[string]any); ok {
+						emittedPayload = p
+					}
+					return nil
+				},
+			}
+
+			// Mock metadata context
+			mockMetadataContext := &mockMetadataContext{
+				data: map[string]any{},
+			}
+
+			// Mock request context
+			mockRequestContext := &mockRequestContext{}
+
+			ctx := triggers.TriggerActionContext{
+				Name:            "emitEvent",
+				Configuration:   tt.config,
+				EventContext:    mockEventContext,
+				MetadataContext: mockMetadataContext,
+				RequestContext:  mockRequestContext,
+			}
+
+			err := schedule.emitEvent(ctx)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			// Validate payload structure
+			if emittedPayload == nil {
+				t.Errorf("expected payload to be emitted, but got nil")
+				return
+			}
+
+			baseFields := []string{
+				"timestamp", "Readable date", "Readable time", "Day of week",
+				"Year", "Month", "Day of month", "Hour", "Minute", "Second",
+			}
+
+			for _, field := range baseFields {
+				if _, ok := emittedPayload[field]; !ok {
+					t.Errorf("expected field %q in payload, but it was missing", field)
+				}
+			}
+
+			// Validate timezone field presence based on schedule type
+			if tt.shouldHaveTimezone {
+				if timezone, ok := emittedPayload["Timezone"].(string); ok {
+					if timezone != tt.timezone {
+						t.Errorf("expected timezone %q, got %q", tt.timezone, timezone)
+					}
+				} else {
+					t.Errorf("expected Timezone field to be present and be a string")
+				}
+			} else {
+				if _, ok := emittedPayload["Timezone"]; ok {
+					t.Errorf("expected Timezone field to be absent for schedule type %q", tt.config.Type)
+				}
+			}
+
+			// Validate timestamp format
+			if timestamp, ok := emittedPayload["timestamp"].(string); ok {
+				_, err := time.Parse(time.RFC3339, timestamp)
+				if err != nil {
+					t.Errorf("expected timestamp to be in RFC3339 format, but parsing failed: %v", err)
+				}
+			} else {
+				t.Errorf("expected timestamp field to be a string")
+			}
+		})
+	}
+}
+
+// Mock implementations for testing
+type mockEventContext struct {
+	emitFunc func(any) error
+}
+
+func (m *mockEventContext) Emit(payload any) error {
+	if m.emitFunc != nil {
+		return m.emitFunc(payload)
+	}
+	return nil
+}
+
+type mockMetadataContext struct {
+	data any
+}
+
+func (m *mockMetadataContext) Get() any {
+	return m.data
+}
+
+func (m *mockMetadataContext) Set(data any) {
+	m.data = data
+}
+
+type mockRequestContext struct{}
+
+func (m *mockRequestContext) ScheduleActionCall(actionName string, payload map[string]any, delay time.Duration) error {
+	// Not implemented for this test
+	return nil
 }
