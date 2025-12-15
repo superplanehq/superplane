@@ -13,7 +13,7 @@ import { SidebarEvent } from "./types";
 import { LatestTab } from "./LatestTab";
 import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
-import { AuthorizationDomainType, ConfigurationField, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { AuthorizationDomainType, ComponentsAppInstallationRef, ConfigurationField, OrganizationsAppInstallation, WorkflowsWorkflowNodeExecution } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
 import { NewNodeData } from "../CustomComponentBuilderPage";
 import { ReactNode } from "react";
@@ -105,11 +105,14 @@ interface ComponentSidebarProps {
   nodeLabel?: string;
   nodeConfiguration?: Record<string, unknown>;
   nodeConfigurationFields?: ConfigurationField[];
-  onNodeConfigSave?: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string) => void;
+  onNodeConfigSave?: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => void;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
+  installedApplications?: OrganizationsAppInstallation[];
 }
 
 export const ComponentSidebar = ({
@@ -172,6 +175,9 @@ export const ComponentSidebar = ({
   domainId,
   domainType,
   customField,
+  appName,
+  appInstallationRef,
+  installedApplications,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -631,6 +637,9 @@ export const ComponentSidebar = ({
                   domainId={domainId}
                   domainType={domainType}
                   customField={customField}
+                  appName={isTemplateNode ? newNodeData.appName : appName}
+                  appInstallationRef={isTemplateNode ? newNodeData.appInstallationRef : appInstallationRef}
+                  installedApplications={installedApplications}
                 />
               </TabsContent>
             )}

@@ -1,9 +1,12 @@
-import { AuthorizationDomainType, ConfigurationField } from "@/api-client";
+import { AuthorizationDomainType, ComponentsAppInstallationRef, ConfigurationField, OrganizationsAppInstallation } from "@/api-client";
 import { useCallback, useEffect, useMemo, useState, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { AlertCircle } from "lucide-react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { isFieldRequired, isFieldVisible, parseDefaultValues, validateFieldForSubmission } from "@/utils/components";
 
@@ -13,11 +16,14 @@ interface SettingsTabProps {
   nodeLabel?: string;
   configuration: Record<string, unknown>;
   configurationFields: ConfigurationField[];
-  onSave: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string) => void;
+  onSave: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => void;
   onCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
+  installedApplications?: OrganizationsAppInstallation[];
 }
 
 export function SettingsTab({
@@ -31,15 +37,27 @@ export function SettingsTab({
   domainId,
   domainType,
   customField,
+  appName,
+  appInstallationRef,
+  installedApplications = [],
 }: SettingsTabProps) {
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
+  const [selectedAppInstallation, setSelectedAppInstallation] = useState<ComponentsAppInstallationRef | undefined>(appInstallationRef);
 
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
   }, [configurationFields]);
+
+  // Filter installations by app name
+  const availableInstallations = useMemo(() => {
+    if (!appName) return [];
+    return installedApplications.filter(
+      (app) => app.spec?.appName === appName && app.status?.state === "ready"
+    );
+  }, [installedApplications, appName]);
 
   const isFieldEmpty = (value: unknown): boolean => {
     if (value === null || value === undefined) return true;
@@ -117,10 +135,16 @@ export function SettingsTab({
     if (isFieldEmpty(currentNodeName)) {
       errors.add("nodeName");
     }
+
+    // Validate app installation if required
+    if (appName && !selectedAppInstallation) {
+      errors.add("appInstallation");
+    }
+
     setValidationErrors(errors);
     setShowValidation(true);
     return errors.size === 0;
-  }, [configurationFields, nodeConfiguration, currentNodeName, validateNestedFields]);
+  }, [configurationFields, nodeConfiguration, currentNodeName, validateNestedFields, appName, selectedAppInstallation]);
 
   // Function to filter out invisible fields
   const filterVisibleFields = useCallback(
@@ -147,13 +171,24 @@ export function SettingsTab({
 
     setNodeConfiguration(filterVisibleFields(newConfig));
     setCurrentNodeName(nodeName);
+    setSelectedAppInstallation(appInstallationRef);
     setValidationErrors(new Set());
     setShowValidation(false);
-  }, [configuration, nodeName, defaultValues, filterVisibleFields]);
+  }, [configuration, nodeName, defaultValues, filterVisibleFields, appInstallationRef]);
+
+  // Auto-select if only one installation is available (create mode only)
+  useEffect(() => {
+    if (mode === "create" && availableInstallations.length === 1 && !selectedAppInstallation) {
+      setSelectedAppInstallation({
+        id: availableInstallations[0].metadata?.id,
+        name: availableInstallations[0].metadata?.name,
+      });
+    }
+  }, [mode, availableInstallations, selectedAppInstallation]);
 
   const handleSave = () => {
     if (validateAllFields()) {
-      onSave(nodeConfiguration, currentNodeName);
+      onSave(nodeConfiguration, currentNodeName, selectedAppInstallation);
     }
   };
 
@@ -194,8 +229,86 @@ export function SettingsTab({
           />
         </div>
 
+        {/* App Installation section */}
+        {appName && (
+          <div className="border-t border-gray-200 dark:border-zinc-700 pt-6">
+            {availableInstallations.length === 0 ? (
+              // Warning when no installations available
+              <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertTitle className="text-amber-900 dark:text-amber-100">
+                  App Installation Required
+                </AlertTitle>
+                <AlertDescription className="text-amber-800 dark:text-amber-200">
+                  This component requires a {appName} installation.{" "}
+                  <a
+                    href={`/${domainId}/settings/applications`}
+                    className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Install {appName}
+                  </a>{" "}
+                  to configure this component.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              // Select when installations are available
+              <div className="flex flex-col gap-2">
+                <Label
+                  className={`min-w-[100px] text-left ${
+                    showValidation && validationErrors.has("appInstallation")
+                      ? "text-red-600 dark:text-red-400"
+                      : ""
+                  }`}
+                >
+                  App Installation
+                  <span className="text-red-500 ml-1">*</span>
+                  {showValidation && validationErrors.has("appInstallation") && (
+                    <span className="text-red-500 text-xs ml-2">- required field</span>
+                  )}
+                </Label>
+                <Select
+                  value={selectedAppInstallation?.id || ""}
+                  onValueChange={(value) => {
+                    const installation = availableInstallations.find(
+                      (app) => app.metadata?.id === value
+                    );
+                    if (installation) {
+                      setSelectedAppInstallation({
+                        id: installation.metadata?.id,
+                        name: installation.metadata?.name,
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger
+                    className={`w-full shadow-none ${
+                      showValidation && validationErrors.has("appInstallation")
+                        ? "border-red-500 border-2"
+                        : ""
+                    }`}
+                  >
+                    <SelectValue placeholder="Select an installation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableInstallations.map((installation) => (
+                      <SelectItem
+                        key={installation.metadata?.id}
+                        value={installation.metadata?.id || ""}
+                      >
+                        {installation.metadata?.name || "Unnamed installation"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Configuration section */}
-        {configurationFields && configurationFields.length > 0 && (
+        {configurationFields && configurationFields.length > 0 && (!appName || availableInstallations.length > 0) && (
           <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
             {configurationFields.map((field) => {
               if (!field.name) return null;

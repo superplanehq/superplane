@@ -423,7 +423,7 @@ function CanvasPage(props: CanvasPageProps) {
     (configuration: Record<string, any>, nodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => {
       if (templateNodeId && newNodeData) {
         // This is a template node being saved
-        handleSaveNewNode(configuration, nodeName);
+        handleSaveNewNode(configuration, nodeName, appInstallationRef);
       } else if (editingNodeData && props.onNodeConfigurationSave) {
         props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
       }
@@ -590,6 +590,7 @@ function CanvasPage(props: CanvasPageProps) {
             onDocs={props.onDocs}
             onConfigure={props.onConfigure}
             onDeactivate={props.onDeactivate}
+            onToggleView={handleToggleView}
             onDelete={handleNodeDelete}
             runDisabled={props.runDisabled}
             runDisabledTooltip={props.runDisabledTooltip}
@@ -615,6 +616,7 @@ function CanvasPage(props: CanvasPageProps) {
             newNodeData={newNodeData}
             organizationId={props.organizationId}
             getCustomField={props.getCustomField}
+            installedApplications={props.installedApplications}
           />
         </div>
       </div>
@@ -678,6 +680,7 @@ function Sidebar({
   newNodeData,
   organizationId,
   getCustomField,
+  installedApplications,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -721,6 +724,7 @@ function Sidebar({
   newNodeData: NewNodeData | null;
   organizationId?: string;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
+  installedApplications?: OrganizationsAppInstallation[];
 }) {
   const sidebarData = useMemo(() => {
     if (templateNodeId && newNodeData) {
@@ -852,6 +856,9 @@ function Sidebar({
           ? getCustomField(state.componentSidebar.selectedNodeId) || undefined
           : undefined
       }
+      appName={editingNodeData?.appName}
+      appInstallationRef={editingNodeData?.appInstallationRef}
+      installedApplications={installedApplications}
       currentTab={currentTab}
       onTabChange={onTabChange}
       templateNodeId={templateNodeId}
