@@ -12,17 +12,24 @@ import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./blueprint-canvas-reset.css";
 
-import { ComponentsComponent, ConfigurationField, SuperplaneBlueprintsOutputChannel } from "@/api-client";
+import {
+  ComponentsComponent,
+  ConfigurationField,
+  SuperplaneBlueprintsOutputChannel,
+  AuthorizationDomainType,
+} from "@/api-client";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { Block, BlockData } from "../CanvasPage/Block";
 import { CustomEdge } from "../CanvasPage/CustomEdge";
 import { BreadcrumbItem, Header } from "../CanvasPage/Header";
-import { NodeConfigurationModal } from "../CanvasPage/NodeConfigurationModal";
 import {
   BlueprintMetadata,
   CustomComponentConfigurationSidebar,
   OutputChannel,
 } from "../CustomComponentConfigurationSidebar";
+import { ComponentSidebar } from "../componentSidebar";
+import { getBackgroundColorClass } from "@/utils/colors";
+import { ComponentBaseProps } from "../componentBase";
 import { buildBuildingBlockCategories } from "../buildingBlocks";
 import { ConfigurationFieldModal } from "./ConfigurationFieldModal";
 import { OutputChannelConfigurationModal } from "./OutputChannelConfigurationModal";
@@ -36,6 +43,7 @@ export interface NodeEditData {
 }
 
 export interface NewNodeData {
+  icon?: string;
   buildingBlock: BuildingBlock;
   nodeName: string;
   displayLabel?: string;
@@ -77,6 +85,10 @@ export interface CustomComponentBuilderPageProps {
 
   // Building blocks
   components: ComponentsComponent[];
+
+  // Template node helpers
+  onAddTemplateNode?: (node: Node) => void;
+  onRemoveTemplateNode?: (nodeId: string) => void;
 
   // Actions
   onSave: () => void;
@@ -124,12 +136,14 @@ function CanvasContent({
   onEdgesChange,
   onConnect,
   onNodeDoubleClick,
+  onNodeClick,
   onBuildingBlockDrop,
   onZoomChange,
   onEdgeMouseEnter,
   onEdgeMouseLeave,
   onConnectStart,
   onConnectEnd,
+  templateNodeId,
 }: {
   nodes: Node[];
   edges: Edge[];
@@ -138,6 +152,7 @@ function CanvasContent({
   onEdgesChange: (changes: any) => void;
   onConnect: (connection: Connection) => void;
   onNodeDoubleClick?: (event: any, node: Node) => void;
+  onNodeClick?: (nodeId: string) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onZoomChange?: (zoom: number) => void;
   onEdgeMouseEnter?: (event: React.MouseEvent, edge: any) => void;
@@ -147,6 +162,7 @@ function CanvasContent({
     params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
   ) => void;
   onConnectEnd?: () => void;
+  templateNodeId?: string | null;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -196,6 +212,23 @@ function CanvasContent({
     [onZoomChange],
   );
 
+  const handleNodeClick = useCallback(
+    (_event: any, node: Node) => {
+      // Don't allow switching nodes if there's a template being created
+      if (templateNodeId && node.id !== templateNodeId) {
+        return;
+      }
+      onNodeClick?.(node.id);
+    },
+    [onNodeClick, templateNodeId],
+  );
+
+  const handlePaneClick = useCallback(() => {
+    // do not close sidebar while we are creating a new component
+    if (templateNodeId) return;
+    // Could add pane click handling here if needed
+  }, [templateNodeId]);
+
   // Initialize: fit to view on mount with zoom constraints
   useEffect(() => {
     fitView({ maxZoom: 1.0, padding: 0.5 });
@@ -217,7 +250,9 @@ function CanvasContent({
       onConnect={onConnect}
       onConnectStart={onConnectStart}
       onConnectEnd={onConnectEnd}
+      onNodeClick={handleNodeClick}
       onNodeDoubleClick={onNodeDoubleClick}
+      onPaneClick={handlePaneClick}
       onEdgeMouseEnter={onEdgeMouseEnter}
       onEdgeMouseLeave={onEdgeMouseLeave}
       onDragOver={handleDragOver}
@@ -245,17 +280,17 @@ function CanvasContent({
 export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProps) {
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+  const [isNodeSidebarOpen, setIsNodeSidebarOpen] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [canvasZoom, setCanvasZoom] = useState(1);
+  const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
+  const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
 
   // Modal state management
   const [isConfigFieldModalOpen, setIsConfigFieldModalOpen] = useState(false);
   const [editingConfigFieldIndex, setEditingConfigFieldIndex] = useState<number | null>(null);
   const [isOutputChannelModalOpen, setIsOutputChannelModalOpen] = useState(false);
   const [editingOutputChannelIndex, setEditingOutputChannelIndex] = useState<number | null>(null);
-
-  // Node configuration modal state
-  const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(null);
-  const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
 
   // Modal handlers
   const handleAddConfigField = useCallback(() => {
@@ -315,56 +350,162 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   // Node configuration handlers
   const handleNodeEdit = useCallback(
     (nodeId: string) => {
-      // Try the modal-based edit first (for node configuration)
-      if (props.getNodeEditData) {
-        const editData = props.getNodeEditData(nodeId);
-        if (editData) {
-          setEditingNodeData(editData);
-        }
+      if (!isNodeSidebarOpen || selectedNodeId !== nodeId) {
+        setIsNodeSidebarOpen(true);
+        setSelectedNodeId(nodeId);
       }
+      // Always shows settings tab - no tab switching needed
     },
-    [props.getNodeEditData],
+    [isNodeSidebarOpen, selectedNodeId],
   );
 
-  const handleBuildingBlockDrop = useCallback((block: BuildingBlock, position?: { x: number; y: number }) => {
-    setNewNodeData({
-      buildingBlock: block,
-      nodeName: block.name || "",
-      displayLabel: block.label || block.name || "",
-      configuration: {},
-      position,
-    });
-  }, []);
+  // Get editing data for the currently selected node
+  const editingNodeData = useMemo(() => {
+    if (selectedNodeId && isNodeSidebarOpen && props.getNodeEditData) {
+      return props.getNodeEditData(selectedNodeId);
+    }
+    return null;
+  }, [selectedNodeId, isNodeSidebarOpen, props.getNodeEditData]);
+
+  const handleBuildingBlockDrop = useCallback(
+    (block: BuildingBlock, position?: { x: number; y: number }) => {
+      if (templateNodeId) {
+        return;
+      }
+
+      // Generate unique template node ID
+      const newTemplateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Create template node data
+      const templateNode: Node = {
+        id: newTemplateId,
+        type: "default",
+        position: position || { x: props.nodes.length * 250, y: 100 },
+        data: {
+          type: "component",
+          label: block.label || block.name || "New Component",
+          state: "pending" as const,
+          outputChannels: ["default"],
+          component: {
+            title: block.label || block.name || "New Component",
+            headerColor: "#e5e7eb",
+            iconSlug: block.icon,
+            iconColor: "text-indigo-700",
+            collapsedBackground: getBackgroundColorClass("white"),
+            hideActionsButton: true,
+            includeEmptyState: true,
+          } as ComponentBaseProps,
+          isTemplate: true,
+          buildingBlock: block,
+          tempConfiguration: {},
+          tempNodeName: block.name || "",
+          _originalComponent: block.name,
+          _originalConfiguration: {},
+        } as any,
+      };
+
+      // Add the template node using the helper callback
+      if (props.onAddTemplateNode) {
+        props.onAddTemplateNode(templateNode);
+      }
+
+      setTemplateNodeId(newTemplateId);
+      setNewNodeData({
+        icon: block.icon || "circle-off",
+        buildingBlock: block,
+        nodeName: block.name || "",
+        displayLabel: block.label || block.name || "",
+        configuration: {},
+        position,
+      });
+
+      setIsNodeSidebarOpen(true);
+      setSelectedNodeId(newTemplateId);
+      // Always opens to settings tab
+    },
+    [templateNodeId, props],
+  );
 
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, any>, nodeName: string) => {
-      if (editingNodeData && props.onNodeConfigurationSave) {
+      if (templateNodeId && newNodeData) {
+        // This is a template node being saved
+        handleSaveNewNode(configuration, nodeName);
+      } else if (editingNodeData && props.onNodeConfigurationSave) {
         props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName);
       }
-      setEditingNodeData(null);
     },
-    [editingNodeData, props],
+    [templateNodeId, newNodeData, editingNodeData, props],
   );
 
   const handleSaveNewNode = useCallback(
     (configuration: Record<string, any>, nodeName: string) => {
-      if (newNodeData && props.onNodeAdd) {
+      if (newNodeData && props.onNodeAdd && templateNodeId) {
+        // Remove the template node first
+        if (props.onRemoveTemplateNode) {
+          props.onRemoveTemplateNode(templateNodeId);
+        }
+
+        // Create the real node through the normal flow
         props.onNodeAdd({
           buildingBlock: newNodeData.buildingBlock,
           nodeName,
           configuration,
           position: newNodeData.position,
         });
+
+        // Clear template state
+        setTemplateNodeId(null);
+        setNewNodeData(null);
+        setIsNodeSidebarOpen(false);
+        setSelectedNodeId(null);
       }
-      setNewNodeData(null);
     },
-    [newNodeData, props],
+    [newNodeData, props, templateNodeId],
   );
+
+  const handleCancelTemplate = useCallback(() => {
+    if (templateNodeId) {
+      if (props.onRemoveTemplateNode) {
+        props.onRemoveTemplateNode(templateNodeId);
+      }
+      setTemplateNodeId(null);
+      setNewNodeData(null);
+      setIsNodeSidebarOpen(false);
+      setSelectedNodeId(null);
+    }
+  }, [templateNodeId, props]);
+
+  const handleNodeSidebarClose = useCallback(() => {
+    setIsNodeSidebarOpen(false);
+    setSelectedNodeId(null);
+
+    if (templateNodeId) {
+      setNewNodeData(null);
+      setTemplateNodeId(null);
+      if (props.onRemoveTemplateNode) {
+        props.onRemoveTemplateNode(templateNodeId);
+      }
+    }
+  }, [templateNodeId, props]);
 
   // Use shared builder (merge mocks + live components)
   const buildingBlockCategories = useMemo<BuildingBlockCategory[]>(
     () => buildBuildingBlockCategories([], props.components, [], []),
     [props.components],
+  );
+
+  const handleNodeClick = useCallback(
+    (nodeId: string) => {
+      // Don't allow switching nodes if there's a template being created
+      if (templateNodeId && nodeId !== templateNodeId) {
+        return;
+      }
+
+      setIsNodeSidebarOpen(true);
+      setSelectedNodeId(nodeId);
+    },
+    [templateNodeId],
   );
 
   const handleConnect = useCallback(
@@ -507,6 +648,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           onToggle={setIsLeftSidebarOpen}
           blocks={buildingBlockCategories}
           canvasZoom={canvasZoom}
+          disabled={!!templateNodeId}
         />
 
         {/* React Flow Canvas */}
@@ -520,12 +662,14 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
               onEdgesChange={props.onEdgesChange}
               onConnect={handleConnect}
               onNodeDoubleClick={props.onNodeDoubleClick}
+              onNodeClick={handleNodeClick}
               onBuildingBlockDrop={handleBuildingBlockDrop}
               onZoomChange={setCanvasZoom}
               onEdgeMouseEnter={handleEdgeMouseEnter}
               onEdgeMouseLeave={handleEdgeMouseLeave}
               onConnectStart={handleConnectStart}
               onConnectEnd={handleConnectEnd}
+              templateNodeId={templateNodeId}
             />
           </ReactFlowProvider>
         </div>
@@ -545,6 +689,40 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           onAddOutputChannel={handleAddOutputChannel}
           onEditOutputChannel={handleEditOutputChannel}
         />
+
+        {/* Node Configuration Sidebar */}
+        {isNodeSidebarOpen && selectedNodeId && (
+          <ComponentSidebar
+            isOpen={isNodeSidebarOpen}
+            onClose={handleNodeSidebarClose}
+            title={editingNodeData?.displayLabel || newNodeData?.displayLabel || "Node Configuration"}
+            nodeId={selectedNodeId}
+            iconSlug={newNodeData?.icon || "gear"}
+            iconColor="text-black"
+            latestEvents={[]}
+            nextInQueueEvents={[]}
+            iconBackground=""
+            totalInQueueCount={0}
+            totalInHistoryCount={0}
+            hideQueueEvents={true}
+            showSettingsTab={true}
+            currentTab="settings"
+            onTabChange={() => {}} // No tab switching in custom component builder
+            templateNodeId={templateNodeId}
+            newNodeData={newNodeData}
+            onCancelTemplate={handleCancelTemplate}
+            nodeConfigMode={templateNodeId ? "create" : "edit"}
+            nodeName={editingNodeData?.nodeName || ""}
+            nodeLabel={editingNodeData?.displayLabel}
+            nodeConfiguration={editingNodeData?.configuration || {}}
+            nodeConfigurationFields={editingNodeData?.configurationFields || []}
+            onNodeConfigSave={handleSaveConfiguration}
+            onNodeConfigCancel={undefined}
+            domainId={props.organizationId}
+            domainType={"DOMAIN_TYPE_ORGANIZATION" as AuthorizationDomainType}
+            customField={undefined}
+          />
+        )}
       </div>
 
       {/* Configuration Field Modal */}
@@ -578,37 +756,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         onSave={handleSaveOutputChannel}
       />
 
-      {/* Edit existing node modal */}
-      {editingNodeData && (
-        <NodeConfigurationModal
-          mode="edit"
-          isOpen={true}
-          onClose={() => setEditingNodeData(null)}
-          nodeName={editingNodeData.nodeName}
-          nodeLabel={editingNodeData.displayLabel}
-          configuration={editingNodeData.configuration}
-          configurationFields={editingNodeData.configurationFields}
-          onSave={handleSaveConfiguration}
-          domainId={props.organizationId}
-          domainType="DOMAIN_TYPE_ORGANIZATION"
-        />
-      )}
-
-      {/* Add new node modal */}
-      {newNodeData && (
-        <NodeConfigurationModal
-          mode="create"
-          isOpen={true}
-          onClose={() => setNewNodeData(null)}
-          nodeName={newNodeData.nodeName}
-          nodeLabel={newNodeData.displayLabel}
-          configuration={newNodeData.configuration}
-          configurationFields={newNodeData.buildingBlock.configuration || []}
-          onSave={handleSaveNewNode}
-          domainId={props.organizationId}
-          domainType="DOMAIN_TYPE_ORGANIZATION"
-        />
-      )}
+      {/* Node configuration is now handled by the ComponentSidebar */}
     </div>
   );
 }

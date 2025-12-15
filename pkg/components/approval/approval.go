@@ -281,9 +281,10 @@ func (a *Approval) OutputChannels(configuration any) []core.OutputChannel {
 func (a *Approval) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:  "items",
-			Label: "Items",
-			Type:  configuration.FieldTypeList,
+			Name:     "items",
+			Label:    "Items",
+			Type:     configuration.FieldTypeList,
+			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Item",
@@ -535,4 +536,8 @@ func (a *Approval) handleReject(ctx core.ActionContext) (*Metadata, error) {
 	}
 
 	return &metadata, nil
+}
+
+func (a *Approval) Cancel(ctx core.ExecutionContext) error {
+	return nil
 }

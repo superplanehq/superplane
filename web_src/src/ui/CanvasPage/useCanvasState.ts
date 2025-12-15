@@ -12,7 +12,7 @@ export interface CanvasPageState {
   nodes: Node[];
   edges: Edge[];
 
-  setNodes: (nodes: Node[]) => void;
+  setNodes: (nodes: Node[] | ((prevNodes: Node[]) => Node[])) => void;
   setEdges: (edges: Edge[]) => void;
 
   onNodesChange: (changes: NodeChange[]) => void;
@@ -43,7 +43,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
   // Sync nodes from props, but preserve collapsed state from collapsedNodeIds
   useEffect(() => {
-    if (!initialNodes) return;
+    if (!initialNodes || !loaded) return;
     const newCollapsedNodeIds: string[] = [];
 
     setNodes(
@@ -75,7 +75,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
     }
   }, [collapsedNodeIds, loaded]); // Only depend on collapsedNodeIds, not initialNodes
 
-  // Sync node data changes from parent (but not collapsed state)
+  // Sync node data changes from parent (but not collapsed state or selected state)
   useEffect(() => {
     if (!initialNodes) return;
 
@@ -96,7 +96,12 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
           };
         }
 
-        return { ...newNode, data: nodeData };
+        // Preserve selected state from existing node
+        return {
+          ...newNode,
+          data: nodeData,
+          selected: existingNode?.selected ?? newNode.selected,
+        };
       });
     });
   }, [initialNodes]);
@@ -180,6 +185,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
           return { ...node, data: nodeData };
         }),
       );
+
       if (newCollapsed) {
         setCollapsedNodeIds(nodes.map((node) => node.id));
       } else {
@@ -187,7 +193,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
       }
       return newCollapsed;
     });
-  }, [nodes]);
+  }, [nodes, setNodes]);
 
   const toggleNodeCollapse = useCallback((nodeId: string) => {
     setCollapsedNodeIds((prev) => {

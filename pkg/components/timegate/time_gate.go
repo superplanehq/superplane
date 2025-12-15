@@ -757,3 +757,7 @@ func (tg *TimeGate) findNextExcludeSpecificEndTime(now time.Time, spec Spec) tim
 	// We're inside the excluded range, return end time
 	return endDateTime
 }
+
+func (tg *TimeGate) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}

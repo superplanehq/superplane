@@ -3,7 +3,6 @@ package semaphore
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -263,9 +262,11 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, time.Minute)
 }
 
-func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	log.Printf("runWorkflow.HandleWebhook")
+func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}
 
+func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	signature := ctx.Headers.Get("X-Semaphore-Signature-256")
 	if signature == "" {
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
@@ -306,7 +307,6 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	// so we just ignore them.
 	//
 	if err != nil {
-		log.Printf("runWorkflow.HandleWebhook - execution not found for %s: %v", hook.Pipeline.ID, err)
 		return http.StatusOK, nil
 	}
 
@@ -320,7 +320,6 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	// Already finished, do not do anything.
 	//
 	if metadata.Pipeline.State == "done" {
-		log.Printf("runWorkflow.HandleWebhook - pipeline already finished for %s", hook.Pipeline.ID)
 		return http.StatusOK, nil
 	}
 
@@ -349,8 +348,6 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	// TODO: remove request for polling
 	// TODO: remove KV record
 	//
-
-	log.Printf("runWorkflow.HandleWebhook - pipeline %s finished with result %s", hook.Pipeline.ID, hook.Pipeline.Result)
 	return http.StatusOK, nil
 }
 

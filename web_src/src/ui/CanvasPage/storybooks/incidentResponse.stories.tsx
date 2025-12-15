@@ -485,11 +485,11 @@ export const IncidentResponse: Story = {
             };
           }
 
-          if (nodeData.type === "approval" && nodeData.approval) {
-            console.log("Toggling approval from", nodeData.approval.collapsed, "to", !nodeData.approval.collapsed);
-            nodeData.approval = {
-              ...nodeData.approval,
-              collapsed: !nodeData.approval.collapsed,
+          if (nodeData.type === "component" && nodeData.component) {
+            console.log("Toggling component from", nodeData.component.collapsed, "to", !nodeData.component.collapsed);
+            nodeData.component = {
+              ...nodeData.component,
+              collapsed: !nodeData.component.collapsed,
             };
           }
 

@@ -1,14 +1,17 @@
+import { WorkflowsWorkflowEvent } from "@/api-client";
 import { ChildEventsState } from "../composite";
 
 export interface SidebarEvent {
   // Unique UI identifier for the item (remains stable across types)
   id: string;
   title: string;
-  subtitle?: string;
+  subtitle?: string | React.ReactNode;
   state: ChildEventsState;
   isOpen: boolean;
   receivedAt?: Date;
   values?: Record<string, string>;
+  originalEvent?: WorkflowsWorkflowEvent;
+  originalExecution?: WorkflowsWorkflowEvent;
 
   // Optional specific identifiers to avoid overloading `id`
   // Present for execution items

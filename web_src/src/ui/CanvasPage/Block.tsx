@@ -1,4 +1,3 @@
-import { Approval, type ApprovalProps } from "@/ui/approval";
 import { Composite, type CompositeProps } from "@/ui/composite";
 import { SwitchComponent, type SwitchComponentProps } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
@@ -10,7 +9,7 @@ import { ComponentActionsProps } from "../types/componentActions";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType = "trigger" | "component" | "composite" | "approval" | "merge" | "switch";
+type BlockType = "trigger" | "component" | "composite" | "merge" | "switch";
 
 interface BlockAi {
   show: boolean;
@@ -39,9 +38,6 @@ export interface BlockData {
 
   // composite node specific props
   composite?: CompositeProps;
-
-  // approval node specific props
-  approval?: ApprovalProps;
 
   // switch node specific props
   switch?: SwitchComponentProps;
@@ -100,7 +96,6 @@ function LeftHandle({ data, nodeId }: BlockProps) {
 
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
-    (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed) ||
     (data.type === "component" && data.component?.collapsed);
 
@@ -145,7 +140,6 @@ function LeftHandle({ data, nodeId }: BlockProps) {
 function RightHandle({ data, nodeId }: BlockProps) {
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
-    (data.type === "approval" && data.approval?.collapsed) ||
     (data.type === "trigger" && data.trigger?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed) ||
     (data.type === "component" && data.component?.collapsed);
@@ -372,8 +366,6 @@ function BlockContent({
           {...actionProps}
         />
       );
-    case "approval":
-      return <Approval {...(data.approval as ApprovalProps)} selected={selected} {...actionProps} />;
     case "switch":
       return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} {...actionProps} />;
     case "merge":

@@ -120,3 +120,7 @@ func (f *Filter) Setup(ctx core.SetupContext) error {
 func (f *Filter) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (f *Filter) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}

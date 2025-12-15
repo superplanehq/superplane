@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -367,5 +368,48 @@ func TestApproval_Execute(t *testing.T) {
 		assert.NoError(t, err)
 		mockExecStateCtx.AssertNotCalled(t, "Pass")
 		mockMetadataCtx.AssertCalled(t, "Set", mock.Anything)
+	})
+}
+
+func TestApproval_Configuration_Validation(t *testing.T) {
+	approval := &Approval{}
+	config := approval.Configuration()
+
+	t.Run("items field is required", func(t *testing.T) {
+		itemsField := config[0]
+		assert.Equal(t, "items", itemsField.Name)
+		assert.True(t, itemsField.Required)
+	})
+
+	t.Run("empty items list fails validation", func(t *testing.T) {
+		configData := map[string]any{
+			"items": []any{},
+		}
+
+		err := configuration.ValidateConfiguration(config, configData)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "must contain at least one item")
+	})
+
+	t.Run("missing items field fails validation", func(t *testing.T) {
+		configData := map[string]any{}
+
+		err := configuration.ValidateConfiguration(config, configData)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "is required")
+	})
+
+	t.Run("valid items list passes validation", func(t *testing.T) {
+		configData := map[string]any{
+			"items": []any{
+				map[string]any{
+					"type": "user",
+					"user": "test-user-id",
+				},
+			},
+		}
+
+		err := configuration.ValidateConfiguration(config, configData)
+		assert.NoError(t, err)
 	})
 }

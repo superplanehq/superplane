@@ -127,6 +127,10 @@ func (f *If) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNod
 	return ctx.DefaultProcessing()
 }
 
+func (f *If) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}
+
 func (f *If) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }

@@ -18,9 +18,8 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
   workflowsEmitNodeEvent,
-  workflowsInvokeNodeExecutionAction,
 } from "@/api-client";
-import { organizationKeys, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -47,14 +46,20 @@ import {
   SidebarData,
   SidebarEvent,
 } from "@/ui/CanvasPage";
-import { EventState } from "@/ui/componentBase";
+import { EventState, EventStateMap } from "@/ui/componentBase";
 import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { getComponentBaseMapper, getTriggerRenderer } from "./mappers";
-import { TriggerRenderer } from "./mappers/types";
+import {
+  getComponentAdditionalDataBuilder,
+  getComponentBaseMapper,
+  getTriggerRenderer,
+  getCustomFieldRenderer,
+  getState,
+  getStateMap,
+} from "./mappers";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
@@ -353,6 +358,9 @@ export function WorkflowPageV2() {
         eventsMapForSidebar,
         totalHistoryCount,
         totalQueueCount,
+        workflowId,
+        queryClient,
+        organizationId,
       );
 
       // Add loading state to sidebar data
@@ -390,6 +398,9 @@ export function WorkflowPageV2() {
     nodeType: currentHistoryNode?.nodeType || "TYPE_ACTION",
     allNodes: workflow?.spec?.nodes || [],
     enabled: !!currentHistoryNode && !!workflowId,
+    components,
+    organizationId: organizationId || "",
+    queryClient,
   });
 
   const queueHistoryQuery = useQueueHistory({
@@ -623,6 +634,34 @@ export function WorkflowPageV2() {
     [workflow, nodeExecutionsMap, nodeEventsMap, nodeQueueItemsMap],
   );
 
+  const handleSaveWorkflow = useCallback(
+    async (workflowToSave?: WorkflowsWorkflow) => {
+      const targetWorkflow = workflowToSave || workflow;
+      if (!targetWorkflow || !organizationId || !workflowId) return;
+
+      try {
+        await updateWorkflowMutation.mutateAsync({
+          name: targetWorkflow.metadata?.name!,
+          description: targetWorkflow.metadata?.description,
+          nodes: targetWorkflow.spec?.nodes,
+          edges: targetWorkflow.spec?.edges,
+        });
+
+        showSuccessToast("Canvas changes saved");
+        setHasUnsavedChanges(false);
+        setHasNonPositionalUnsavedChanges(false);
+
+        // Clear the snapshot since changes are now saved
+        setInitialWorkflowSnapshot(null);
+      } catch (error: any) {
+        console.error("Failed to save changes to the canvas:", error);
+        const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
+        showErrorToast(errorMessage);
+      }
+    },
+    [workflow, organizationId, workflowId, updateWorkflowMutation],
+  );
+
   const getNodeEditData = useCallback(
     (nodeId: string): NodeEditData | null => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
@@ -677,7 +716,7 @@ export function WorkflowPageV2() {
   );
 
   const handleNodeConfigurationSave = useCallback(
-    (
+    async (
       nodeId: string,
       updatedConfiguration: Record<string, any>,
       updatedNodeName: string,
@@ -708,11 +747,13 @@ export function WorkflowPageV2() {
         },
       };
 
-      // Update local cache without triggering API call
+      // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      markUnsavedChange("structural");
+
+      // Save to server immediately
+      await handleSaveWorkflow(updatedWorkflow);
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
   );
 
   const generateNodeId = (blockName: string, nodeName: string) => {
@@ -723,7 +764,7 @@ export function WorkflowPageV2() {
   };
 
   const handleNodeAdd = useCallback(
-    (newNodeData: NewNodeData) => {
+    async (newNodeData: NewNodeData) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       // Save snapshot before making changes
@@ -748,11 +789,16 @@ export function WorkflowPageV2() {
               ? "TYPE_BLUEPRINT"
               : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
-        position: position || {
-          x: (workflow?.spec?.nodes?.length || 0) * 250,
-          y: 100,
-        },
         appInstallation: appInstallationRef,
+        position: position
+          ? {
+              x: Math.round(position.x),
+              y: Math.round(position.y),
+            }
+          : {
+              x: (workflow?.spec?.nodes?.length || 0) * 250,
+              y: 100,
+            },
       };
 
       // Add type-specific reference
@@ -777,9 +823,11 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      markUnsavedChange("structural");
+
+      // Save to server immediately
+      await handleSaveWorkflow(updatedWorkflow);
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
   );
 
   const handleEdgeCreate = useCallback(
@@ -1147,6 +1195,59 @@ export function WorkflowPageV2() {
     workflow,
   });
 
+  // Provide state function based on component type
+  const getExecutionState = useCallback(
+    (nodeId: string, execution: WorkflowsWorkflowNodeExecution): { map: EventStateMap; state: EventState } => {
+      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+      if (!node) {
+        return {
+          map: getStateMap("default"),
+          state: getState("default")(execution),
+        };
+      }
+
+      let componentName = "default";
+      if (node.type === "TYPE_COMPONENT" && node.component?.name) {
+        componentName = node.component.name;
+      } else if (node.type === "TYPE_TRIGGER" && node.trigger?.name) {
+        componentName = node.trigger.name;
+      } else if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id) {
+        componentName = "default";
+      }
+
+      return {
+        map: getStateMap(componentName),
+        state: getState(componentName)(execution),
+      };
+    },
+    [workflow],
+  );
+
+  const getCustomField = useCallback(
+    (nodeId: string) => {
+      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+      if (!node) return null;
+
+      let componentName = "";
+      if (node.type === "TYPE_TRIGGER" && node.trigger?.name) {
+        componentName = node.trigger.name;
+      } else if (node.type === "TYPE_COMPONENT" && node.component?.name) {
+        componentName = node.component.name;
+      } else if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id) {
+        componentName = "default";
+      }
+
+      const renderer = getCustomFieldRenderer(componentName);
+      if (!renderer) return null;
+
+      // Return a function that takes the current configuration
+      return (configuration: Record<string, unknown>) => {
+        return renderer.render(node, configuration);
+      };
+    },
+    [workflow],
+  );
+
   // Show loading indicator while data is being fetched
   if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
     return (
@@ -1199,6 +1300,7 @@ export function WorkflowPageV2() {
       loadSidebarData={loadSidebarData}
       getTabData={getTabData}
       getNodeEditData={getNodeEditData}
+      getCustomField={getCustomField}
       onNodeConfigurationSave={handleNodeConfigurationSave}
       onSave={handleSave}
       onEdgeCreate={handleEdgeCreate}
@@ -1238,6 +1340,7 @@ export function WorkflowPageV2() {
       getLoadingMoreQueue={getLoadingMoreQueue}
       onReEmit={handleReEmit}
       loadExecutionChain={loadExecutionChain}
+      getExecutionState={getExecutionState}
       breadcrumbs={[
         {
           label: "Canvases",
@@ -1594,7 +1697,7 @@ function prepareComponentNode(
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   workflowId: string,
-  queryClient: any,
+  queryClient: QueryClient,
   organizationId?: string,
 ): CanvasNode {
   const componentNameParts = node.component?.name?.split(".") || [];
@@ -1602,7 +1705,6 @@ function prepareComponentNode(
 
   switch (componentName) {
     case "approval":
-      return prepareApprovalNode(nodes, node, components, nodeExecutionsMap, workflowId, queryClient, organizationId);
     case "noop":
     case "http":
     case "semaphore":
@@ -1610,7 +1712,16 @@ function prepareComponentNode(
     case "filter":
     case "if":
     case "wait":
-      return prepareComponentBaseNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
+      return prepareComponentBaseNode(
+        nodes,
+        node,
+        components,
+        nodeExecutionsMap,
+        nodeQueueItemsMap,
+        workflowId,
+        queryClient,
+        organizationId || "",
+      );
     case "merge":
       return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
   }
@@ -1636,245 +1747,31 @@ function prepareComponentNode(
   return compositeNode;
 }
 
-function prepareApprovalNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  workflowId: string,
-  queryClient: any,
-  organizationId?: string,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "approval");
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-  const executionMetadata = execution?.metadata as any;
-  const configuration = (node.configuration || {}) as any;
-  const items: any[] = Array.isArray(configuration.items) ? configuration.items : [];
-
-  // Try to enrich display values from cached org users/roles
-  let usersById: Record<string, { email?: string; name?: string }> = {};
-  let rolesByName: Record<string, string> = {};
-  if (organizationId) {
-    const usersResp: any = queryClient.getQueryData(organizationKeys.users(organizationId));
-    if (Array.isArray(usersResp)) {
-      usersResp.forEach((u: any) => {
-        const id = u.metadata?.id;
-        const email = u.metadata?.email;
-        const name = u.spec?.displayName;
-        if (id) usersById[id] = { email, name };
-      });
-    }
-
-    const rolesResp: any = queryClient.getQueryData(organizationKeys.roles(organizationId));
-    if (Array.isArray(rolesResp)) {
-      rolesResp.forEach((r: any) => {
-        const name = r.metadata?.name;
-        const display = r.spec?.displayName;
-        if (name) rolesByName[name] = display || name;
-      });
-    }
-  }
-
-  let rootTriggerRenderer: TriggerRenderer | null = null;
-  if (execution) {
-    const rootTriggerNode = nodes.find((n) => n.id === execution!.rootEvent?.nodeId);
-    rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  }
-
-  // Map backend records to approval items
-  const approvals = (executionMetadata?.records || []).map((record: any) => {
-    const isPending = record.state === "pending";
-    const isExecutionActive = execution?.state === "STATE_STARTED";
-
-    const approvalComment = record.approval?.comment;
-    const hasApprovalArtifacts = record.state === "approved" && approvalComment;
-
-    return {
-      id: `${record.index}`,
-      title:
-        record.type === "user" && record.user
-          ? record.user.name || record.user.email
-          : record.type === "role" && record.role
-            ? record.role
-            : record.type === "group" && record.group
-              ? record.group
-              : "Unknown",
-      approved: record.state === "approved",
-      rejected: record.state === "rejected",
-      approverName: record.user?.name,
-      approverAvatar: record.user?.avatarUrl,
-      rejectionComment: record.rejection?.reason,
-      interactive: isPending && isExecutionActive,
-      requireArtifacts:
-        isPending && isExecutionActive
-          ? [
-              {
-                label: "comment",
-                optional: true,
-              },
-            ]
-          : undefined,
-      artifacts: hasApprovalArtifacts
-        ? {
-            Comment: approvalComment,
-          }
-        : undefined,
-      artifactCount: hasApprovalArtifacts ? 1 : undefined,
-      onApprove: async (artifacts?: Record<string, string>) => {
-        if (!execution?.id) return;
-
-        try {
-          await workflowsInvokeNodeExecutionAction(
-            withOrganizationHeader({
-              path: {
-                workflowId: workflowId,
-                executionId: execution.id,
-                actionName: "approve",
-              },
-              body: {
-                parameters: {
-                  index: record.index,
-                  comment: artifacts?.comment,
-                },
-              },
-            }),
-          );
-
-          queryClient.invalidateQueries({
-            queryKey: workflowKeys.nodeExecution(workflowId, node.id!),
-          });
-        } catch (error: any) {
-          console.error("Failed to approve:", error);
-        }
-      },
-      onReject: async (comment?: string) => {
-        if (!execution?.id) return;
-
-        try {
-          await workflowsInvokeNodeExecutionAction(
-            withOrganizationHeader({
-              path: {
-                workflowId: workflowId,
-                executionId: execution.id,
-                actionName: "reject",
-              },
-              body: {
-                parameters: {
-                  index: record.index,
-                  reason: comment,
-                },
-              },
-            }),
-          );
-
-          queryClient.invalidateQueries({
-            queryKey: workflowKeys.nodeExecution(workflowId, node.id!),
-          });
-        } catch (error: any) {
-          console.error("Failed to reject:", error);
-        }
-      },
-    };
-  });
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x!, y: node.position?.y! },
-    data: {
-      type: "approval",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      approval: {
-        iconSlug: metadata?.icon || "hand",
-        iconColor: getColorClass(metadata?.color || "orange"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "orange"),
-        headerColor: getBackgroundColorClass(metadata?.color || "orange"),
-        collapsedBackground: getBackgroundColorClass(metadata?.color || "orange"),
-        collapsed: node.isCollapsed,
-        title: displayLabel,
-        description: metadata?.description,
-        receivedAt: execution ? new Date(execution.createdAt!) : undefined,
-        approvals,
-        // Display Approval settings similar to IF component specs
-        spec:
-          items.length > 0
-            ? {
-                title: "approvals required",
-                tooltipTitle: "approvals required",
-                values: items.map((item) => {
-                  const type = (item.type || "").toString();
-                  let value =
-                    type === "user"
-                      ? item.user || ""
-                      : type === "role"
-                        ? item.role || ""
-                        : type === "group"
-                          ? item.group || ""
-                          : "";
-                  const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
-
-                  // Pretty-print values
-                  if (type === "user" && value && usersById[value]) {
-                    value = usersById[value].email || usersById[value].name || value;
-                  }
-                  if (type === "role" && value) {
-                    value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
-                    // Fallback to simple suffix mapping when not found
-                    const suffix = (item.role || "").split("_").pop();
-                    if (!rolesByName[item.role || ""] && suffix) {
-                      const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
-                      value = map[suffix] || value;
-                    }
-                  }
-                  return {
-                    badges: [
-                      { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-                      { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
-                    ],
-                  };
-                }),
-              }
-            : undefined,
-        awaitingEvent:
-          execution?.state === "STATE_STARTED" && rootTriggerRenderer
-            ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!)
-            : undefined,
-        lastRunData:
-          execution && rootTriggerRenderer
-            ? {
-                title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
-                subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
-                receivedAt: new Date(execution.createdAt!),
-                state:
-                  getRunItemState(execution) === "success"
-                    ? ("processed" as const)
-                    : getRunItemState(execution) === "running"
-                      ? ("running" as const)
-                      : ("discarded" as const),
-              }
-            : undefined,
-      },
-    },
-  };
-}
-
 function prepareComponentBaseNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
+  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
+  workflowId: string,
+  queryClient: QueryClient,
+  organizationId: string,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const metadata = components.find((c) => c.name === node.component?.name);
   const displayLabel = node.name || metadata?.label;
   const componentDef = components.find((c) => c.name === node.component?.name);
   const nodeQueueItems = nodeQueueItemsMap?.[node.id!];
+
+  const additionalData = getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData(
+    nodes,
+    node,
+    componentDef!,
+    executions,
+    workflowId,
+    queryClient,
+    organizationId,
+  );
 
   return {
     id: node.id!,
@@ -1890,6 +1787,7 @@ function prepareComponentBaseNode(
         componentDef!,
         executions,
         nodeQueueItems,
+        additionalData,
       ),
     },
   };
@@ -1965,6 +1863,9 @@ function prepareSidebarData(
   nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
   totalHistoryCount?: number,
   totalQueueCount?: number,
+  workflowId?: string,
+  queryClient?: QueryClient,
+  organizationId?: string,
 ): SidebarData {
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
@@ -1977,16 +1878,6 @@ function prepareSidebarData(
     node.type === "TYPE_COMPONENT" ? components.find((c) => c.name === node.component?.name) : undefined;
   const triggerMetadata =
     node.type === "TYPE_TRIGGER" ? triggers.find((t) => t.name === node.trigger?.name) : undefined;
-
-  const configurationFields =
-    blueprintMetadata?.configuration || componentMetadata?.configuration || triggerMetadata?.configuration || [];
-
-  const fieldLabelMap = configurationFields.reduce<Record<string, string>>((acc, field) => {
-    if (field.name) {
-      acc[field.name] = field.label || field.name;
-    }
-    return acc;
-  }, {});
 
   const nodeTitle =
     componentMetadata?.label || blueprintMetadata?.name || triggerMetadata?.label || node.name || "Unknown";
@@ -2004,46 +1895,28 @@ function prepareSidebarData(
     color = triggerMetadata.color || color;
   }
 
+  const additionalData = getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData(
+    nodes,
+    node,
+    componentMetadata!,
+    executions,
+    workflowId || "",
+    queryClient as QueryClient,
+    organizationId || "",
+  );
+
   const latestEvents =
     node.type === "TYPE_TRIGGER"
       ? mapTriggerEventsToSidebarEvents(events, node, 5)
-      : mapExecutionsToSidebarEvents(executions, nodes, 5);
+      : mapExecutionsToSidebarEvents(executions, nodes, 5, additionalData);
 
   // Convert queue items to sidebar events (next in queue)
   const nextInQueueEvents = mapQueueItemsToSidebarEvents(queueItems, nodes, 5);
-
-  // Build metadata from node configuration
-  const metadataItems = [
-    {
-      icon: "cog",
-      label: `Node ID: ${node.id}`,
-    },
-  ];
-
   const hideQueueEvents = node.type === "TYPE_TRIGGER";
-
-  // Add configuration fields to metadata (only simple types)
-  if (node.configuration) {
-    Object.entries(node.configuration).forEach(([key, value]) => {
-      // Only include simple types (string, number, boolean)
-      // Exclude objects, arrays, null, undefined
-      const valueType = typeof value;
-      const isSimpleType = valueType === "string" || valueType === "number" || valueType === "boolean";
-
-      if (isSimpleType) {
-        const displayKey = fieldLabelMap[key] || key;
-        metadataItems.push({
-          icon: "settings",
-          label: `${displayKey}: ${value}`,
-        });
-      }
-    });
-  }
 
   return {
     latestEvents,
     nextInQueueEvents,
-    metadata: metadataItems,
     title: nodeTitle,
     iconSlug,
     iconColor: getColorClass(color),

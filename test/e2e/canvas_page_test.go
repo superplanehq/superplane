@@ -20,7 +20,6 @@ func TestCanvasPage(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("Hello")
-		steps.saveCanvas()
 		steps.assertNodeIsAdded("Hello")
 	})
 
@@ -28,21 +27,11 @@ func TestCanvasPage(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("Hello")
-		steps.saveCanvas()
 		steps.duplicateNodeOnCanvas("Hello")
 		steps.assertUnsavedChangesNoteIsVisible()
 		steps.saveCanvas()
 		steps.canvas.RenameNode("Hello", "Hello previous")
 		steps.assertNodeDuplicatedInDB("Hello previous", "Hello")
-	})
-
-	t.Run("run is disabled when you have unsaved changes", func(t *testing.T) {
-		steps.start()
-		steps.givenACanvasExists()
-		steps.addNoop("Hello")
-		steps.assertUnsavedChangesNoteIsVisible()
-		steps.assertCantRunNode("Hello")
-		steps.assertExplainationIsShownWhenHoverOverRun()
 	})
 
 	t.Run("deleting a node from a canvas", func(t *testing.T) {
@@ -162,7 +151,6 @@ func (s *CanvasPageSteps) givenACanvasExistsWithANoopNode() {
 	s.canvas.Create()
 	s.canvas.Visit()
 	s.canvas.AddNoop("DeleteMe", models.Position{X: 500, Y: 200})
-	s.canvas.Save()
 }
 
 func (s *CanvasPageSteps) duplicateNodeOnCanvas(nodeName string) {

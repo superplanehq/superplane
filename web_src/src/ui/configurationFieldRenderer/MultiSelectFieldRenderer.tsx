@@ -34,7 +34,7 @@ export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, 
 
   // Get current selected values
   const currentValue =
-    value ??
+    (typeof value !== "string" ? value : JSON.parse(value)) ??
     (field.defaultValue
       ? Array.isArray(field.defaultValue)
         ? field.defaultValue

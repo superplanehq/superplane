@@ -91,7 +91,9 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	if os.Getenv("START_WEBHOOK_PROVISIONER") == "yes" {
 		log.Println("Starting Webhook Provisioner")
 
-		w := workers.NewWebhookProvisioner(baseURL, encryptor, registry)
+		url := getWebhooksBaseURL()
+
+		w := workers.NewWebhookProvisioner(url, encryptor, registry)
 		go w.Start(context.Background())
 	}
 
@@ -289,4 +291,15 @@ func Start() {
 	log.Println("Superplane is UP.")
 
 	select {}
+}
+
+func getWebhooksBaseURL() string {
+	// This allows for setting up a fake base URL for webhooks in e2e tests
+	baseURL := os.Getenv("WEBHOOKS_BASE_URL")
+
+	if baseURL == "" {
+		baseURL = os.Getenv("BASE_URL")
+	}
+
+	return baseURL
 }

@@ -45,29 +45,40 @@ export const mockNodes: Node[] = [
     data: {
       label: "Production Approval",
       state: "pending",
-      type: "approval",
+      type: "component",
       outputChannels: ["default"],
-      approval: {
+      component: {
         title: "Production Approval",
         description: "Get approval before deploying to production",
         iconSlug: "hand",
         iconColor: "text-orange-500",
         headerColor: "bg-orange-100",
         collapsedBackground: "bg-orange-100",
-        approvals: [
+        collapsed: false,
+        specs: [
           {
-            id: "approval-1",
-            title: "Security Team",
-            approved: false,
-          },
-          {
-            id: "approval-2",
-            title: "Engineering Lead",
-            approved: false,
+            title: "Approvers Required",
+            tooltipTitle: "approval configuration",
+            values: [
+              {
+                badges: [
+                  {
+                    label: "Security Team, Engineering Lead",
+                    bgColor: "bg-orange-100",
+                    textColor: "text-orange-800",
+                  },
+                ],
+              },
+            ],
           },
         ],
-        awaitingEvent: null,
-        collapsed: false,
+        eventSections: [
+          {
+            title: "Approval Status",
+            eventTitle: "Awaiting approvals",
+            eventState: "running",
+          },
+        ],
       },
     },
   },

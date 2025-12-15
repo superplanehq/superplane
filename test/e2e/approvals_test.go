@@ -18,7 +18,6 @@ func TestApprovals(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addApprovalToCanvas("TestApproval")
-		steps.saveCanvas()
 		steps.verifyApprovalSavedToDB("TestApproval")
 	})
 
@@ -26,8 +25,6 @@ func TestApprovals(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addApprovalToCanvas("ReleaseApproval")
-		steps.configureApprovalForCurrentUser()
-		steps.saveCanvas()
 		steps.verifyApprovalConfigurationPersisted()
 	})
 
@@ -110,19 +107,6 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
 
 	s.canvas.Connect("Start", "Approval")
 	s.canvas.Connect("Approval", "Output")
-
-	// set up manual approval configuration
-	s.canvas.StartEditingNode("Approval")
-
-	s.session.Click(q.Locator(`button:has-text("Add Item")`))
-	s.session.Click(q.Locator(`button:has-text("Select Type")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("User")`))
-
-	s.session.Click(q.Locator(`button:has-text("Select user")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
-
-	s.session.Click(q.TestID("add-node-button"))
-	s.session.Sleep(300)
 
 	s.saveCanvas()
 }

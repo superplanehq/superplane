@@ -6,7 +6,7 @@ import {
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer, getState, getStateMap } from ".";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { parseExpression } from "@/lib/expressionParser";
 
@@ -20,10 +20,11 @@ export const ifMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
-    _componentDefinition: ComponentsComponent,
+    componentDefinition: ComponentsComponent,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     _nodeQueueItems: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
+    const componentName = componentDefinition.name || "if";
     const expression = node.configuration?.expression as string | undefined;
     const conditions = expression ? parseExpression(expression) : [];
     const specs = expression
@@ -42,15 +43,20 @@ export const ifMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,
-      eventSections: getEventSections(nodes, lastExecutions),
+      eventSections: getEventSections(nodes, lastExecutions, componentName),
       specs: specs,
       runDisabled: false,
       runDisabledTooltip: undefined,
+      eventStateMap: getStateMap(componentName),
     };
   },
 };
 
-function getEventSections(nodes: ComponentsNode[], executions: WorkflowsWorkflowNodeExecution[]): EventSection[] {
+function getEventSections(
+  nodes: ComponentsNode[],
+  executions: WorkflowsWorkflowNodeExecution[],
+  componentName: string,
+): EventSection[] {
   const lastTrueExecution = executions.length > 0 ? executions.find((e) => e.outputs?.["true"]) : null;
   const lastFalseExecution = executions.length > 0 ? executions.find((e) => e.outputs?.["false"]) : null;
 
@@ -63,7 +69,7 @@ function getEventSections(nodes: ComponentsNode[], executions: WorkflowsWorkflow
     const eventData: IfEvent = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: executionToEventSectionState(execution),
+      eventState: getState(componentName)(execution),
     };
 
     return eventData;
@@ -100,16 +106,4 @@ function getEventSections(nodes: ComponentsNode[], executions: WorkflowsWorkflow
   }
 
   return eventSections;
-}
-
-function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
-  }
-
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
-    return "success";
-  }
-
-  return "failed";
 }

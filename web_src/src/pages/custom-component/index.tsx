@@ -60,14 +60,15 @@ const getBlockType = (componentName: string): BlockData["type"] => {
   const typeMap: Record<string, BlockData["type"]> = {
     if: "component",
     filter: "component",
-    approval: "approval",
+    approval: "component",
     noop: "component",
     http: "component",
     semaphore: "component",
     wait: "component",
     time_gate: "component",
+    merge: "merge",
   };
-  return typeMap[componentName] || "noop"; // Default to noop for unknown components
+  return typeMap[componentName] || "component"; // Default to noop for unknown components
 };
 
 // Helper function to create minimal BlockData for a component
@@ -81,25 +82,8 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
     state: "pending",
     type: blockType,
     outputChannels: channels,
+    component: getComponentBaseMapper(component?.name!).props([], node, component!, [], undefined),
   };
-  // Add type-specific props based on component type
-  switch (blockType) {
-    case "approval":
-      baseData.approval = {
-        title: node.name,
-        description: component?.description,
-        iconSlug: component?.icon,
-        iconColor: "text-orange-500",
-        headerColor: "bg-orange-100",
-        collapsedBackground: "bg-orange-100",
-        approvals: [],
-        collapsed: false,
-      };
-      break;
-    case "component":
-      baseData.component = getComponentBaseMapper(component?.name!).props([], node, component!, [], undefined);
-      break;
-  }
 
   return baseData;
 };
@@ -311,8 +295,77 @@ export const CustomComponent = () => {
     return `${sanitizedComponent}-${sanitizedName}-${randomChars}`;
   };
 
+  const handleSaveBlueprint = useCallback(
+    async (customNodes?: Node[]) => {
+      try {
+        // Use provided nodes or current nodes from ref
+        const rawNodes = customNodes || nodesRef.current || [];
+        const currentNodes = Array.isArray(rawNodes) ? rawNodes : [];
+        // Filter out template nodes and serialize remaining nodes
+        const blueprintNodes = currentNodes
+          .filter((node) => !node.id.startsWith("template_")) // Exclude template nodes
+          .map((node) => {
+            const nodeData = node.data as any;
+            return {
+              id: node.id,
+              name: nodeData.label as string,
+              type: "TYPE_COMPONENT",
+              component: {
+                name: nodeData._originalComponent as string,
+              },
+              configuration: nodeData._originalConfiguration || {},
+              position: {
+                x: Math.round(node.position.x),
+                y: Math.round(node.position.y),
+              },
+            };
+          });
+
+        const blueprintEdges = edges
+          .filter((edge) => !edge.source.startsWith("template_") && !edge.target.startsWith("template_"))
+          .map((edge) => ({
+            sourceId: edge.source!,
+            targetId: edge.target!,
+            channel: edge.sourceHandle || "default",
+          }));
+
+        await updateBlueprintMutation.mutateAsync({
+          name: blueprintName,
+          description: blueprintDescription,
+          nodes: blueprintNodes,
+          edges: blueprintEdges,
+          configuration: blueprintConfiguration,
+          outputChannels: blueprintOutputChannels,
+          icon: blueprintIcon,
+          color: blueprintColor,
+        });
+
+        showSuccessToast("Component saved successfully");
+        setHasUnsavedChanges(false);
+
+        // Clear the snapshot since changes are now saved
+        setInitialBlueprintSnapshot(null);
+      } catch (error: any) {
+        console.error("Error saving component:", error);
+        const errorMessage = error?.response?.data?.message || error?.message || "Failed to save component";
+        showErrorToast(errorMessage);
+      }
+    },
+    [
+      nodes,
+      edges,
+      blueprintName,
+      blueprintDescription,
+      blueprintConfiguration,
+      blueprintOutputChannels,
+      blueprintIcon,
+      blueprintColor,
+      updateBlueprintMutation,
+    ],
+  );
+
   const getNodeEditData = useCallback((nodeId: string) => {
-    const node = nodesRef.current.find((n) => n.id === nodeId);
+    const node = (nodesRef.current || []).find((n) => n.id === nodeId);
     if (!node) return null;
 
     const component = componentsRef.current.find((p: any) => p.name === (node.data as any)._originalComponent);
@@ -328,10 +381,10 @@ export const CustomComponent = () => {
   }, []);
 
   const handleNodeConfigurationSave = useCallback(
-    (nodeId: string, configuration: Record<string, any>, nodeName: string) => {
+    async (nodeId: string, configuration: Record<string, any>, nodeName: string) => {
       saveSnapshot();
 
-      const node = nodesRef.current.find((n) => n.id === nodeId);
+      const node = (nodesRef.current || []).find((n) => n.id === nodeId);
       if (!node) return;
 
       const component = componentsRef.current.find((p: any) => p.name === (node.data as any)._originalComponent);
@@ -341,59 +394,51 @@ export const CustomComponent = () => {
       const filteredConfiguration = filterVisibleConfiguration(configuration, component.configuration || []);
 
       // Update existing node
-      setNodes((nds) =>
-        nds.map((n) => {
-          if (n.id !== nodeId) return n;
+      const updatedNodes = (nodesRef.current || []).map((n) => {
+        if (n.id !== nodeId) return n;
 
-          const nodeData = n.data as any;
-          const updatedData = {
-            ...nodeData,
-            label: nodeName.trim(),
-            _originalConfiguration: filteredConfiguration,
+        const nodeData = n.data as any;
+        const updatedData = {
+          ...nodeData,
+          label: nodeName.trim(),
+          _originalConfiguration: filteredConfiguration,
+        };
+
+        if (nodeData.component) {
+          const updatedNode: ComponentsNode = {
+            id: node.id,
+            name: nodeName.trim(),
+            type: "TYPE_COMPONENT",
+            configuration: filteredConfiguration,
+            component: {
+              name: component.name,
+            },
           };
+          updatedData.component = getComponentBaseMapper(component.name!).props(
+            [],
+            updatedNode,
+            component,
+            [],
+            undefined,
+          );
+        }
 
-          if (nodeData.approval) {
-            updatedData.approval = { ...nodeData.approval, title: nodeName.trim() };
-          }
-          if (nodeData.wait) {
-            updatedData.wait = {
-              ...nodeData.wait,
-              title: nodeName.trim(),
-              duration: filteredConfiguration.duration,
-            };
-          }
-          if (nodeData.component) {
-            const updatedNode: ComponentsNode = {
-              id: node.id,
-              name: nodeName.trim(),
-              type: "TYPE_COMPONENT",
-              configuration: filteredConfiguration,
-              component: {
-                name: component.name,
-              },
-            };
-            updatedData.component = getComponentBaseMapper(component.name!).props(
-              [],
-              updatedNode,
-              component,
-              [],
-              undefined,
-            );
-          }
+        return {
+          ...n,
+          data: updatedData,
+        };
+      });
 
-          return {
-            ...n,
-            data: updatedData,
-          };
-        }),
-      );
-      setHasUnsavedChanges(true);
+      setNodes(updatedNodes);
+
+      // Save to server immediately with the updated nodes
+      await handleSaveBlueprint(updatedNodes);
     },
-    [saveSnapshot],
+    [saveSnapshot, handleSaveBlueprint],
   );
 
   const handleNodeAdd = useCallback(
-    (newNodeData: NewNodeData) => {
+    async (newNodeData: NewNodeData) => {
       // Save snapshot before making changes
       saveSnapshot();
 
@@ -420,17 +465,35 @@ export const CustomComponent = () => {
       const newNode: Node = {
         id: newNodeId,
         type: "default",
-        position: newNodeData.position || { x: nodesRef.current.length * 250, y: 100 },
+        position: newNodeData.position
+          ? {
+              x: Math.round(newNodeData.position.x),
+              y: Math.round(newNodeData.position.y),
+            }
+          : {
+              x: (nodesRef.current || []).length * 250,
+              y: 100,
+            },
         data: {
           ...blockData,
           _originalComponent: component.name,
           _originalConfiguration: filteredConfiguration,
         },
       };
-      setNodes((nds) => [...nds, newNode]);
-      setHasUnsavedChanges(true);
+
+      // Update nodes state
+      const updatedNodes = (() => {
+        const currentNodes = nodesRef.current || [];
+        const filteredNodes = currentNodes.filter((n) => !n.id.startsWith("template_"));
+        return [...filteredNodes, newNode];
+      })();
+
+      setNodes(updatedNodes);
+
+      // Save to server immediately with the updated nodes
+      await handleSaveBlueprint(updatedNodes);
     },
-    [saveSnapshot],
+    [saveSnapshot, handleSaveBlueprint],
   );
 
   const handleNodeDelete = useCallback(
@@ -445,7 +508,7 @@ export const CustomComponent = () => {
 
   const handleNodeDuplicate = useCallback(
     (nodeId: string) => {
-      const nodeToDuplicate = nodesRef.current.find((node) => node.id === nodeId);
+      const nodeToDuplicate = (nodesRef.current || []).find((node) => node.id === nodeId);
       if (!nodeToDuplicate) return;
 
       // Save snapshot before making changes
@@ -474,31 +537,6 @@ export const CustomComponent = () => {
         data: {
           ...nodeData,
           label: duplicateName,
-          // Update type-specific props with new title
-          ...(nodeData.if && {
-            if: {
-              ...nodeData.if,
-              title: duplicateName,
-            },
-          }),
-          ...(nodeData.filter && {
-            filter: {
-              ...nodeData.filter,
-              title: duplicateName,
-            },
-          }),
-          ...(nodeData.approval && {
-            approval: {
-              ...nodeData.approval,
-              title: duplicateName,
-            },
-          }),
-          ...(nodeData.wait && {
-            wait: {
-              ...nodeData.wait,
-              title: duplicateName,
-            },
-          }),
           ...(nodeData.component && {
             component: {
               ...nodeData.component,
@@ -533,54 +571,9 @@ export const CustomComponent = () => {
     [saveSnapshot],
   );
 
-  const handleSave = async () => {
-    try {
-      // Serialize all nodes
-      const blueprintNodes = nodes.map((node) => {
-        const nodeData = node.data as any;
-        return {
-          id: node.id,
-          name: nodeData.label as string,
-          type: "TYPE_COMPONENT",
-          component: {
-            name: nodeData._originalComponent as string,
-          },
-          configuration: nodeData._originalConfiguration || {},
-          position: {
-            x: Math.round(node.position.x),
-            y: Math.round(node.position.y),
-          },
-        };
-      });
-
-      const blueprintEdges = edges.map((edge) => ({
-        sourceId: edge.source!,
-        targetId: edge.target!,
-        channel: edge.sourceHandle || "default",
-      }));
-
-      await updateBlueprintMutation.mutateAsync({
-        name: blueprintName,
-        description: blueprintDescription,
-        nodes: blueprintNodes,
-        edges: blueprintEdges,
-        configuration: blueprintConfiguration,
-        outputChannels: blueprintOutputChannels,
-        icon: blueprintIcon,
-        color: blueprintColor,
-      });
-
-      showSuccessToast("Component saved successfully");
-      setHasUnsavedChanges(false);
-
-      // Clear the snapshot since changes are now saved
-      setInitialBlueprintSnapshot(null);
-    } catch (error: any) {
-      console.error("Error saving component:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to save component";
-      showErrorToast(errorMessage);
-    }
-  };
+  const handleSave = useCallback(() => {
+    return handleSaveBlueprint();
+  }, [handleSaveBlueprint]);
 
   if (blueprintLoading || componentsLoading) {
     return (
@@ -644,6 +637,8 @@ export const CustomComponent = () => {
         getNodeEditData={getNodeEditData}
         onNodeConfigurationSave={handleNodeConfigurationSave}
         onNodeAdd={handleNodeAdd}
+        onAddTemplateNode={(templateNode) => setNodes((nds) => [...nds, templateNode])}
+        onRemoveTemplateNode={(nodeId) => setNodes((nds) => nds.filter((n) => n.id !== nodeId))}
         organizationId={organizationId}
         components={components}
         onSave={handleSave}

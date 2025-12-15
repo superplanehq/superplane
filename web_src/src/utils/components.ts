@@ -4,6 +4,60 @@
 
 import type { ConfigurationField, ConfigurationValidationRule } from "../api-client";
 
+/**
+ * Validates a cron expression
+ */
+function validateCronExpression(cronExpression: string): string | null {
+  if (!cronExpression || cronExpression.trim() === "") {
+    return "Cron expression cannot be empty";
+  }
+
+  const trimmed = cronExpression.trim();
+  const parts = trimmed.split(/\s+/);
+
+  // Cron expressions should have 6 parts (second minute hour day month dayofweek)
+  if (parts.length !== 6 && parts.length !== 5) {
+    return `Expected 5 or 6 fields, got ${parts.length}`;
+  }
+
+  // Validate each part contains only allowed characters
+  const validChars = /^[0-9*,\-/A-Z]+$/;
+  const invalidParts = parts.filter((part, index) => {
+    if (!validChars.test(part)) return true;
+
+    // Additional basic range checks
+    if (part === "*") return false; // Wildcard is always valid
+    if (part.includes(",") || part.includes("-") || part.includes("/")) return false; // Complex expressions
+
+    const num = parseInt(part);
+    if (isNaN(num)) return false; // Allow named values like MON, TUE
+
+    // Basic range validation
+    switch (index) {
+      case 0:
+        return num < 0 || num > 59; // second
+      case 1:
+        return num < 0 || num > 59; // minute
+      case 2:
+        return num < 0 || num > 23; // hour
+      case 3:
+        return num < 1 || num > 31; // day
+      case 4:
+        return num < 1 || num > 12; // month
+      case 5:
+        return num < 0 || num > 6; // dayofweek
+      default:
+        return false;
+    }
+  });
+
+  if (invalidParts.length > 0) {
+    return "Invalid characters or values. Use only: numbers, *, ,, -, / and day names";
+  }
+
+  return null;
+}
+
 export function getDefaultEventType(sourceType: string): string {
   switch (sourceType) {
     case "github":
@@ -196,6 +250,45 @@ export function validateFieldValue(
       errors.push(rule.message || error);
     }
   }
+
+  return errors;
+}
+
+/**
+ * Validates a single field value for form submission (includes type-specific validation)
+ */
+export function validateFieldForSubmission(
+  field: ConfigurationField,
+  value: unknown,
+  allValues: Record<string, unknown>,
+): string[] {
+  const errors: string[] = [];
+
+  // Add type-specific validation for form submission
+  if (field.type === "cron" && value != null && value !== "") {
+    const cronError = validateCronExpression(String(value));
+    if (cronError) {
+      errors.push(cronError);
+    }
+  }
+
+  // Add min/max validation for number fields
+  if (field.type === "number" && value != null && value !== "") {
+    const numValue = Number(value);
+    if (!isNaN(numValue) && field.typeOptions?.number) {
+      const { min, max } = field.typeOptions.number;
+      if (min !== undefined && numValue < min) {
+        errors.push(`Value must be at least ${min}`);
+      }
+      if (max !== undefined && numValue > max) {
+        errors.push(`Value must not exceed ${max}`);
+      }
+    }
+  }
+
+  // Also run the regular validation rules
+  const regularErrors = validateFieldValue(field, value, allValues);
+  errors.push(...regularErrors);
 
   return errors;
 }
@@ -402,4 +495,75 @@ function compareValues(
   }
 
   return null;
+}
+
+/**
+ * Parses default values based on field type to match API expectations
+ */
+export function parseDefaultValues(configurationFields: ConfigurationField[]): Record<string, unknown> {
+  return configurationFields
+    .map((field) => [field.name, field.defaultValue, field.type] as const)
+    .reduce(
+      (acc, [name, defaultValue, fieldType]) => {
+        if (name && defaultValue != null) {
+          // Parse defaultValue based on field type
+          let parsedValue: unknown = defaultValue;
+
+          if (typeof defaultValue === "string" && defaultValue !== "") {
+            switch (fieldType) {
+              case "number": {
+                const num = Number(defaultValue);
+                if (!isNaN(num)) {
+                  parsedValue = num;
+                }
+                break;
+              }
+              case "boolean": {
+                parsedValue = defaultValue === "true";
+                break;
+              }
+              case "multi-select":
+              case "list": {
+                try {
+                  parsedValue = JSON.parse(defaultValue);
+                } catch {
+                  // If parsing fails, treat as single item array for multi-select
+                  if (fieldType === "multi-select") {
+                    parsedValue = [defaultValue];
+                  }
+                }
+                break;
+              }
+              case "object": {
+                try {
+                  parsedValue = JSON.parse(defaultValue);
+                } catch {
+                  // If parsing fails, keep as empty object
+                  parsedValue = {};
+                }
+                break;
+              }
+              case "timezone": {
+                if (defaultValue === "current") {
+                  const offset = -new Date().getTimezoneOffset() / 60;
+                  parsedValue = offset.toString();
+                } else {
+                  parsedValue = defaultValue;
+                }
+                break;
+              }
+              // For string, select, date, time, datetime, day-in-year, cron, url, integration, etc.
+              // keep as string
+              default:
+                parsedValue = defaultValue;
+                break;
+            }
+          }
+
+          acc[name] = parsedValue;
+        }
+        return acc;
+      },
+      {} as Record<string, unknown>,
+    );
 }

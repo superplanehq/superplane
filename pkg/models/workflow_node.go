@@ -87,6 +87,20 @@ func FindWorkflowNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*Workfl
 	return &node, nil
 }
 
+func FindWorkflowNodesByIDs(tx *gorm.DB, workflowID uuid.UUID, nodeIDs []string) ([]WorkflowNode, error) {
+	var nodes []WorkflowNode
+	err := tx.
+		Where("workflow_id = ? AND node_id IN ?", workflowID, nodeIDs).
+		Find(&nodes).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
 func ListWorkflowNodesReady() ([]WorkflowNode, error) {
 	var nodes []WorkflowNode
 	err := database.Conn().

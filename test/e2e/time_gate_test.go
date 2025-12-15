@@ -27,7 +27,6 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("00:00", "23:59")
 		steps.setTimezone("0")
 		steps.saveTimeGate()
-		steps.saveCanvas()
 		steps.assertTimeGateSavedToDB("exclude_range", "00:00", "23:59", "0", weekendDays)
 	})
 
@@ -40,7 +39,6 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("09:00", "17:00")
 		steps.setTimezone("-5")
 		steps.saveTimeGate()
-		steps.saveCanvas()
 		steps.assertTimeGateSavedToDB("include_range", "09:00", "17:00", "-5", workweekDays)
 	})
 

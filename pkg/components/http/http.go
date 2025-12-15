@@ -208,3 +208,7 @@ func (e *HTTP) getBody(method string, payload any) (io.Reader, error) {
 
 	return bytes.NewReader(bodyData), nil
 }
+
+func (e *HTTP) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}

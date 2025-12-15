@@ -172,6 +172,10 @@ func (w *Wait) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowN
 	return ctx.DefaultProcessing()
 }
 
+func (w *Wait) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}
+
 func findInterval(spec Spec) time.Duration {
 	switch spec.Duration.Unit {
 	case "seconds":

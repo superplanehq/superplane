@@ -1,16 +1,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { resolveIcon } from "@/lib/utils";
-import { ArrowLeft, Plus, Search, TextAlignStart, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, Plus, Search, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { MetadataItem, MetadataList } from "../metadataList";
 import { ChildEventsState } from "../composite";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
+import { LatestTab } from "./LatestTab";
+import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
+import { AuthorizationDomainType, ConfigurationField, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { EventState, EventStateMap } from "../componentBase";
+import { NewNodeData } from "../CustomComponentBuilderPage";
+import { ReactNode } from "react";
 
 const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
   { value: "processed", label: "Processed" },
@@ -23,8 +29,8 @@ interface ComponentSidebarProps {
 
   latestEvents: SidebarEvent[];
   nextInQueueEvents: SidebarEvent[];
-  metadata: MetadataItem[];
   title: string;
+  nodeId?: string;
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
@@ -80,12 +86,36 @@ interface ComponentSidebarProps {
     currentExecution?: Record<string, unknown>,
     forceReload?: boolean,
   ) => Promise<any[]>;
+
+  // State registry function for determining execution states
+  getExecutionState?: (
+    nodeId: string,
+    execution: WorkflowsWorkflowNodeExecution,
+  ) => { map: EventStateMap; state: EventState };
+
+  // Settings tab props
+  showSettingsTab?: boolean;
+  currentTab?: "latest" | "settings";
+  onTabChange?: (tab: "latest" | "settings") => void;
+  templateNodeId?: string | null;
+  newNodeData: NewNodeData | null;
+  onCancelTemplate?: () => void;
+  nodeConfigMode?: "create" | "edit";
+  nodeName?: string;
+  nodeLabel?: string;
+  nodeConfiguration?: Record<string, unknown>;
+  nodeConfigurationFields?: ConfigurationField[];
+  onNodeConfigSave?: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string) => void;
+  onNodeConfigCancel?: () => void;
+  domainId?: string;
+  domainType?: AuthorizationDomainType;
+  customField?: (configuration: Record<string, unknown>) => ReactNode;
 }
 
 export const ComponentSidebar = ({
   isOpen,
-  metadata,
   title,
+  nodeId,
   iconSrc,
   iconSlug,
   iconColor,
@@ -125,6 +155,23 @@ export const ComponentSidebar = ({
   getHasMoreQueue,
   getLoadingMoreQueue,
   loadExecutionChain,
+  getExecutionState,
+  showSettingsTab = false,
+  currentTab = "latest",
+  onTabChange,
+  templateNodeId,
+  onCancelTemplate,
+  newNodeData,
+  nodeConfigMode = "edit",
+  nodeName = "",
+  nodeLabel,
+  nodeConfiguration = {},
+  nodeConfigurationFields = [],
+  onNodeConfigSave,
+  onNodeConfigCancel,
+  domainId,
+  domainType,
+  customField,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -136,8 +183,20 @@ export const ComponentSidebar = ({
   const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
 
   const [page, setPage] = useState<"overview" | "history" | "queue">("overview");
+  // For template nodes, force settings tab and block latest tab
+  const isTemplateNode = !!templateNodeId && !!newNodeData;
+  const activeTab = isTemplateNode ? "settings" : currentTab || "latest";
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
+  const [justCopied, setJustCopied] = useState(false);
+
+  const handleCopyNodeId = useCallback(async () => {
+    if (nodeId) {
+      await navigator.clipboard.writeText(nodeId);
+      setJustCopied(true);
+      setTimeout(() => setJustCopied(false), 1000);
+    }
+  }, [nodeId]);
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -301,7 +360,7 @@ export const ComponentSidebar = ({
       events = events.filter(
         (event) =>
           event.title.toLowerCase().includes(query) ||
-          event.subtitle?.toLowerCase().includes(query) ||
+          (typeof event.subtitle === "string" && event.subtitle?.toLowerCase().includes(query)) ||
           Object.values(event.values || {}).some((value) => String(value).toLowerCase().includes(query)),
       );
     }
@@ -354,20 +413,36 @@ export const ComponentSidebar = ({
             {iconSrc ? <img src={iconSrc} alt={title} className="w-6 h-6" /> : <Icon size={16} className={iconColor} />}
           </div>
           <div className="flex justify-between gap-3 w-full">
-            <h2 className="text-xl font-semibold">{title}</h2>
-            <SidebarActionsDropdown
-              onRun={onRun}
-              runDisabled={runDisabled}
-              runDisabledTooltip={runDisabledTooltip}
-              onDuplicate={onDuplicate}
-              onDocs={onDocs}
-              onEdit={onEdit}
-              onConfigure={onConfigure}
-              onDeactivate={onDeactivate}
-              onToggleView={onToggleView}
-              onDelete={onDelete}
-              isCompactView={isCompactView}
-            />
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-semibold">{title}</h2>
+              {nodeId && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500 font-mono">{nodeId}</span>
+                  <button
+                    onClick={handleCopyNodeId}
+                    className={"text-gray-400 hover:text-gray-600"}
+                    title={justCopied ? "Copied!" : "Copy Node ID"}
+                  >
+                    {justCopied ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                </div>
+              )}
+            </div>
+            {!templateNodeId && (
+              <SidebarActionsDropdown
+                onRun={onRun}
+                runDisabled={runDisabled}
+                runDisabledTooltip={runDisabledTooltip}
+                onDuplicate={onDuplicate}
+                onDocs={onDocs}
+                onEdit={onEdit}
+                onConfigure={onConfigure}
+                onDeactivate={onDeactivate}
+                onToggleView={onToggleView}
+                onDelete={onDelete}
+                isCompactView={isCompactView}
+              />
+            )}
           </div>
           <div
             onClick={() => onClose?.()}
@@ -460,6 +535,7 @@ export const ComponentSidebar = ({
                       supportsPushThrough={supportsPushThrough}
                       onReEmit={onReEmit}
                       loadExecutionChain={loadExecutionChain}
+                      getExecutionState={getExecutionState}
                     />
                   ))}
                   {hasMoreItems && !searchQuery && statusFilter === "all" && (
@@ -480,95 +556,85 @@ export const ComponentSidebar = ({
           </div>
         </>
       ) : (
-        // Overview (Original Content)
         <>
-          {metadata.length > 0 && (
-            <div className="px-3 py-1 border-b-1 border-border">
-              <MetadataList
-                items={metadata}
-                className="border-b-0 text-gray-500 font-medium gap-1.5 flex flex-col py-2"
-              />
-            </div>
-          )}
-          <div className="px-3 py-1 border-b-1 border-border pb-3 text-left">
-            <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Latest events</h2>
-            <div className="flex flex-col gap-2">
-              {latestEvents.length === 0 ? (
-                <div className="text-center py-4 text-gray-500 text-sm">No events found</div>
-              ) : (
-                <>
-                  {latestEvents.slice(0, 5).map((event, index) => {
-                    return (
-                      <SidebarEventItem
-                        key={event.id}
-                        event={event}
-                        index={index}
-                        variant="latest"
-                        isOpen={openEventIds.has(event.id) || event.isOpen}
-                        onToggleOpen={handleToggleOpen}
-                        onEventClick={onEventClick}
-                        tabData={getTabData?.(event)}
-                        onPushThrough={onPushThrough}
-                        onCancelExecution={onCancelExecution}
-                        supportsPushThrough={supportsPushThrough}
-                        onReEmit={onReEmit}
-                        loadExecutionChain={loadExecutionChain}
-                      />
-                    );
-                  })}
-                  {handleSeeFullHistory && (
-                    <button
-                      onClick={handleSeeFullHistory}
-                      className="text-sm text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
-                    >
-                      <TextAlignStart size={16} />
-                      See full history
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-          {!hideQueueEvents && (
-            <div className="px-3 py-1 pb-3 text-left">
-              <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Next in queue</h2>
-              <div className="flex flex-col gap-2">
-                {nextInQueueEvents.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500 text-sm">Queue is empty</div>
-                ) : (
-                  <>
-                    {nextInQueueEvents.slice(0, 5).map((event, index) => {
-                      return (
-                        <SidebarEventItem
-                          key={event.id}
-                          event={event}
-                          index={index}
-                          variant="queue"
-                          isOpen={openEventIds.has(event.id) || event.isOpen}
-                          onToggleOpen={handleToggleOpen}
-                          onEventClick={onEventClick}
-                          tabData={getTabData?.(event)}
-                          onCancelQueueItem={onCancelQueueItem}
-                          onPushThrough={onPushThrough}
-                          supportsPushThrough={supportsPushThrough}
-                          loadExecutionChain={loadExecutionChain}
-                        />
-                      );
-                    })}
-                    {totalInQueueCount > 5 && (
-                      <button
-                        onClick={handleSeeQueue}
-                        className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
-                      >
-                        <TextAlignStart size={16} />
-                        {totalInQueueCount - 5} more in the queue
-                      </button>
-                    )}
-                  </>
-                )}
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => onTabChange?.(value as "latest" | "settings")}
+            className="flex-1"
+          >
+            {showSettingsTab && (
+              <div className="px-3">
+                <div className="flex border-gray-200 dark:border-zinc-700">
+                  <button
+                    onClick={() => !isTemplateNode && onTabChange?.("latest")}
+                    disabled={isTemplateNode}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      isTemplateNode
+                        ? "border-transparent text-gray-300 cursor-not-allowed dark:text-gray-600"
+                        : activeTab === "latest"
+                          ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    Latest
+                  </button>
+                  <button
+                    onClick={() => onTabChange?.("settings")}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === "settings"
+                        ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    Settings
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            <TabsContent value="latest" className={!showSettingsTab ? "" : "mt-0"}>
+              <LatestTab
+                latestEvents={latestEvents}
+                nextInQueueEvents={nextInQueueEvents}
+                totalInQueueCount={totalInQueueCount}
+                hideQueueEvents={hideQueueEvents}
+                openEventIds={openEventIds}
+                onToggleOpen={handleToggleOpen}
+                onEventClick={onEventClick}
+                onSeeFullHistory={handleSeeFullHistory}
+                onSeeQueue={handleSeeQueue}
+                getTabData={getTabData}
+                onCancelQueueItem={onCancelQueueItem}
+                onCancelExecution={onCancelExecution}
+                onPushThrough={onPushThrough}
+                supportsPushThrough={supportsPushThrough}
+                onReEmit={onReEmit}
+                loadExecutionChain={loadExecutionChain}
+                getExecutionState={getExecutionState}
+              />
+            </TabsContent>
+
+            {showSettingsTab && (
+              <TabsContent value="settings" className="mt-0">
+                <SettingsTab
+                  mode={isTemplateNode ? "create" : nodeConfigMode}
+                  nodeName={isTemplateNode ? newNodeData.nodeName : nodeName}
+                  nodeLabel={isTemplateNode ? newNodeData.displayLabel : nodeLabel}
+                  configuration={isTemplateNode ? newNodeData.configuration : nodeConfiguration}
+                  configurationFields={
+                    isTemplateNode
+                      ? (newNodeData.buildingBlock.configuration as ConfigurationField[])
+                      : nodeConfigurationFields
+                  }
+                  onSave={onNodeConfigSave || (() => {})}
+                  onCancel={isTemplateNode ? onCancelTemplate : onNodeConfigCancel}
+                  domainId={domainId}
+                  domainType={domainType}
+                  customField={customField}
+                />
+              </TabsContent>
+            )}
+          </Tabs>
         </>
       )}
     </div>
