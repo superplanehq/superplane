@@ -8,11 +8,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/triggers"
 )
 
 const MaxEventSize = 64 * 1024
@@ -91,7 +90,7 @@ func (s *Semaphore) Configuration() []configuration.Field {
 	}
 }
 
-func (s *Semaphore) Setup(ctx triggers.TriggerContext) error {
+func (s *Semaphore) Setup(ctx core.TriggerContext) error {
 	var metadata Metadata
 	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
@@ -134,7 +133,7 @@ func (s *Semaphore) Setup(ctx triggers.TriggerContext) error {
 		return fmt.Errorf("failed to find project %s: %w", config.Project, err)
 	}
 
-	err = ctx.WebhookContext.Setup(&triggers.WebhookSetupOptions{
+	err = ctx.WebhookContext.Setup(&core.WebhookSetupOptions{
 		IntegrationID: &integrationID,
 		Resource:      resource,
 		Configuration: config,
@@ -155,15 +154,15 @@ func (s *Semaphore) Setup(ctx triggers.TriggerContext) error {
 	return nil
 }
 
-func (s *Semaphore) Actions() []components.Action {
-	return []components.Action{}
+func (s *Semaphore) Actions() []core.Action {
+	return []core.Action{}
 }
 
-func (s *Semaphore) HandleAction(ctx triggers.TriggerActionContext) error {
+func (s *Semaphore) HandleAction(ctx core.TriggerActionContext) error {
 	return nil
 }
 
-func (s *Semaphore) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) {
+func (s *Semaphore) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	signature := ctx.Headers.Get("X-Semaphore-Signature-256")
 	if signature == "" {
 		return http.StatusForbidden, fmt.Errorf("invalid signature")

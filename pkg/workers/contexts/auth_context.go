@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -18,7 +18,7 @@ type AuthContext struct {
 	authenticatedUser *models.User
 }
 
-func NewAuthContext(tx *gorm.DB, orgID uuid.UUID, authService authorization.Authorization, authenticatedUser *models.User) components.AuthContext {
+func NewAuthContext(tx *gorm.DB, orgID uuid.UUID, authService authorization.Authorization, authenticatedUser *models.User) *AuthContext {
 	return &AuthContext{
 		tx:                tx,
 		orgID:             orgID,
@@ -27,25 +27,25 @@ func NewAuthContext(tx *gorm.DB, orgID uuid.UUID, authService authorization.Auth
 	}
 }
 
-func (c *AuthContext) AuthenticatedUser() *components.User {
+func (c *AuthContext) AuthenticatedUser() *core.User {
 	if c.authenticatedUser == nil {
 		return nil
 	}
 
-	return &components.User{
+	return &core.User{
 		ID:    c.authenticatedUser.ID.String(),
 		Name:  c.authenticatedUser.Name,
 		Email: c.authenticatedUser.Email,
 	}
 }
 
-func (c *AuthContext) GetUser(id uuid.UUID) (*components.User, error) {
+func (c *AuthContext) GetUser(id uuid.UUID) (*core.User, error) {
 	user, err := models.FindActiveUserByIDInTransaction(c.tx, c.orgID.String(), id.String())
 	if err != nil {
 		return nil, err
 	}
 
-	return &components.User{
+	return &core.User{
 		ID:    user.ID.String(),
 		Name:  user.Name,
 		Email: user.Email,

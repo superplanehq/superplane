@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 // mockExecutionStateContext implements components.ExecutionStateContext for tests
@@ -12,6 +12,10 @@ type mockExecutionStateContext struct {
 	finished bool
 	passed   bool
 	failed   bool
+}
+
+func (m *mockExecutionStateContext) SetKV(key, value string) error {
+	return nil
 }
 
 func (m *mockExecutionStateContext) IsFinished() bool { return m.finished }
@@ -30,7 +34,7 @@ func TestWait_HandleAction_PushThrough(t *testing.T) {
 	w := &Wait{}
 
 	mockState := &mockExecutionStateContext{}
-	ctx := components.ActionContext{
+	ctx := core.ActionContext{
 		Name:                  "pushThrough",
 		ExecutionStateContext: mockState,
 		MetadataContext:       nil,
@@ -48,7 +52,7 @@ func TestWait_HandleAction_TimeReached(t *testing.T) {
 	w := &Wait{}
 
 	mockState := &mockExecutionStateContext{}
-	ctx := components.ActionContext{
+	ctx := core.ActionContext{
 		Name:                  "timeReached",
 		ExecutionStateContext: mockState,
 		Parameters:            map[string]any{},
@@ -64,7 +68,7 @@ func TestWait_HandleAction_Unknown(t *testing.T) {
 	w := &Wait{}
 
 	mockState := &mockExecutionStateContext{}
-	ctx := components.ActionContext{
+	ctx := core.ActionContext{
 		Name:                  "unknown",
 		ExecutionStateContext: mockState,
 		Parameters:            map[string]any{},

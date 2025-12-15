@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
@@ -16,23 +16,22 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
-	"github.com/superplanehq/superplane/pkg/triggers"
 	"gorm.io/gorm"
 )
 
 var (
-	registeredComponents = make(map[string]components.Component)
-	registeredTriggers   = make(map[string]triggers.Trigger)
+	registeredComponents = make(map[string]core.Component)
+	registeredTriggers   = make(map[string]core.Trigger)
 	mu                   sync.RWMutex
 )
 
-func RegisterComponent(name string, c components.Component) {
+func RegisterComponent(name string, c core.Component) {
 	mu.Lock()
 	defer mu.Unlock()
 	registeredComponents[name] = c
 }
 
-func RegisterTrigger(name string, t triggers.Trigger) {
+func RegisterTrigger(name string, t core.Trigger) {
 	mu.Lock()
 	defer mu.Unlock()
 	registeredTriggers[name] = t
@@ -48,8 +47,8 @@ type Registry struct {
 	httpClient   *http.Client
 	Encryptor    crypto.Encryptor
 	Integrations map[string]Integration
-	Components   map[string]components.Component
-	Triggers     map[string]triggers.Trigger
+	Components   map[string]core.Component
+	Triggers     map[string]core.Trigger
 }
 
 func NewRegistry(encryptor crypto.Encryptor) *Registry {
@@ -57,8 +56,8 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 		Encryptor:    encryptor,
 		Integrations: map[string]Integration{},
 		httpClient:   &http.Client{Timeout: 10 * time.Second},
-		Components:   map[string]components.Component{},
-		Triggers:     map[string]triggers.Trigger{},
+		Components:   map[string]core.Component{},
+		Triggers:     map[string]core.Trigger{},
 	}
 
 	r.Init()
@@ -178,8 +177,8 @@ func (r *Registry) getAuthFn(ctx context.Context, tx *gorm.DB, integration *mode
 	return nil, fmt.Errorf("integration auth type %s not supported", integration.AuthType)
 }
 
-func (r *Registry) ListTriggers() []triggers.Trigger {
-	triggers := make([]triggers.Trigger, 0, len(r.Triggers))
+func (r *Registry) ListTriggers() []core.Trigger {
+	triggers := make([]core.Trigger, 0, len(r.Triggers))
 	for _, trigger := range r.Triggers {
 		triggers = append(triggers, trigger)
 	}
@@ -191,7 +190,7 @@ func (r *Registry) ListTriggers() []triggers.Trigger {
 	return triggers
 }
 
-func (r *Registry) GetTrigger(name string) (triggers.Trigger, error) {
+func (r *Registry) GetTrigger(name string) (core.Trigger, error) {
 	trigger, ok := r.Triggers[name]
 	if !ok {
 		return nil, fmt.Errorf("trigger %s not registered", name)
@@ -200,8 +199,8 @@ func (r *Registry) GetTrigger(name string) (triggers.Trigger, error) {
 	return trigger, nil
 }
 
-func (r *Registry) ListComponents() []components.Component {
-	components := make([]components.Component, 0, len(r.Components))
+func (r *Registry) ListComponents() []core.Component {
+	components := make([]core.Component, 0, len(r.Components))
 	for _, component := range r.Components {
 		components = append(components, component)
 	}
@@ -213,7 +212,7 @@ func (r *Registry) ListComponents() []components.Component {
 	return components
 }
 
-func (r *Registry) GetComponent(name string) (components.Component, error) {
+func (r *Registry) GetComponent(name string) (core.Component, error) {
 	component, ok := r.Components[name]
 	if !ok {
 		return nil, fmt.Errorf("component %s not registered", name)

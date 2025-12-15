@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -220,7 +220,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
 
-	ctx := components.ExecutionContext{
+	ctx := core.ExecutionContext{
 		ID:                    execution.ID.String(),
 		WorkflowID:            execution.WorkflowID.String(),
 		Configuration:         execution.Configuration.Data(),

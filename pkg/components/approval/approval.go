@@ -2,12 +2,13 @@ package approval
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -53,14 +54,14 @@ type Metadata struct {
 }
 
 type Record struct {
-	Index     int              `mapstructure:"index" json:"index"`
-	Type      string           `mapstructure:"type" json:"type"`
-	State     string           `mapstructure:"state" json:"state"`
-	User      *components.User `mapstructure:"user" json:"user,omitempty"`
-	Role      *string          `mapstructure:"role" json:"role,omitempty"`
-	Group     *string          `mapstructure:"group" json:"group,omitempty"`
-	Approval  *ApprovalInfo    `mapstructure:"approval" json:"approval,omitempty"`
-	Rejection *RejectionInfo   `mapstructure:"rejection" json:"rejection,omitempty"`
+	Index     int            `mapstructure:"index" json:"index"`
+	Type      string         `mapstructure:"type" json:"type"`
+	State     string         `mapstructure:"state" json:"state"`
+	User      *core.User     `mapstructure:"user" json:"user,omitempty"`
+	Role      *string        `mapstructure:"role" json:"role,omitempty"`
+	Group     *string        `mapstructure:"group" json:"group,omitempty"`
+	Approval  *ApprovalInfo  `mapstructure:"approval" json:"approval,omitempty"`
+	Rejection *RejectionInfo `mapstructure:"rejection" json:"rejection,omitempty"`
 }
 
 type ApprovalInfo struct {
@@ -107,7 +108,7 @@ func (m *Metadata) UpdateResult() {
 	m.Result = StateApproved
 }
 
-func (m *Metadata) Approve(record *Record, index int, ctx components.ActionContext) error {
+func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) error {
 	err := m.validateAction(record, ctx)
 	if err != nil {
 		return err
@@ -125,7 +126,7 @@ func (m *Metadata) Approve(record *Record, index int, ctx components.ActionConte
 	return nil
 }
 
-func (m *Metadata) Reject(record *Record, index int, ctx components.ActionContext) error {
+func (m *Metadata) Reject(record *Record, index int, ctx core.ActionContext) error {
 	err := m.validateAction(record, ctx)
 	if err != nil {
 		return err
@@ -152,7 +153,7 @@ func (m *Metadata) Reject(record *Record, index int, ctx components.ActionContex
 	return nil
 }
 
-func (m *Metadata) validateAction(record *Record, ctx components.ActionContext) error {
+func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error {
 	authenticatedUser := ctx.AuthContext.AuthenticatedUser()
 	switch record.Type {
 	case ItemTypeUser:
@@ -190,7 +191,7 @@ func (m *Metadata) validateAction(record *Record, ctx components.ActionContext) 
 	return fmt.Errorf("unknown record type: %s", record.Type)
 }
 
-func NewMetadata(ctx components.ExecutionContext, items []Item) (*Metadata, error) {
+func NewMetadata(ctx core.ExecutionContext, items []Item) (*Metadata, error) {
 	records := []Record{}
 
 	for i, item := range items {
@@ -208,7 +209,7 @@ func NewMetadata(ctx components.ExecutionContext, items []Item) (*Metadata, erro
 	}, nil
 }
 
-func approvalItemToRecord(ctx components.ExecutionContext, item Item, index int) (*Record, error) {
+func approvalItemToRecord(ctx core.ExecutionContext, item Item, index int) (*Record, error) {
 	switch item.Type {
 	case ItemTypeUser:
 		userID, err := uuid.Parse(item.User)
@@ -270,8 +271,8 @@ func (a *Approval) Color() string {
 	return "orange"
 }
 
-func (a *Approval) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{
+func (a *Approval) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{
 		{Name: ChannelApproved, Label: "Approved", Description: "All required actors approved"},
 		{Name: ChannelRejected, Label: "Rejected", Description: "At least one actor rejected (after everyone responded)"},
 	}
@@ -346,15 +347,15 @@ func (a *Approval) Configuration() []configuration.Field {
 	}
 }
 
-func (a *Approval) Setup(ctx components.SetupContext) error {
+func (a *Approval) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (a *Approval) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+func (a *Approval) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (a *Approval) Execute(ctx components.ExecutionContext) error {
+func (a *Approval) Execute(ctx core.ExecutionContext) error {
 	config := Config{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
@@ -381,8 +382,8 @@ func (a *Approval) Execute(ctx components.ExecutionContext) error {
 	return nil
 }
 
-func (a *Approval) Actions() []components.Action {
-	return []components.Action{
+func (a *Approval) Actions() []core.Action {
+	return []core.Action{
 		{
 			Name:           "approve",
 			Description:    "Approve this execution",
@@ -428,7 +429,7 @@ func (a *Approval) Actions() []components.Action {
 	}
 }
 
-func (a *Approval) HandleAction(ctx components.ActionContext) error {
+func (a *Approval) HandleAction(ctx core.ActionContext) error {
 	var err error
 	var metadata *Metadata
 	switch ctx.Name {
@@ -474,7 +475,7 @@ func (a *Approval) HandleAction(ctx components.ActionContext) error {
 	})
 }
 
-func (a *Approval) handleApprove(ctx components.ActionContext) (*Metadata, error) {
+func (a *Approval) handleApprove(ctx core.ActionContext) (*Metadata, error) {
 	var metadata Metadata
 	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
@@ -513,7 +514,7 @@ func (a *Approval) findPendingRecord(metadata Metadata, parameters map[string]an
 	return &record, nil
 }
 
-func (a *Approval) handleReject(ctx components.ActionContext) (*Metadata, error) {
+func (a *Approval) handleReject(ctx core.ActionContext) (*Metadata, error) {
 	var metadata Metadata
 	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
@@ -533,6 +534,10 @@ func (a *Approval) handleReject(ctx components.ActionContext) (*Metadata, error)
 	return &metadata, nil
 }
 
-func (a *Approval) Cancel(ctx components.ExecutionContext) error {
+func (a *Approval) Cancel(ctx core.ExecutionContext) error {
 	return nil
+}
+
+func (a *Approval) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }

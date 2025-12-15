@@ -6,11 +6,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type MockExecutionStateContext struct {
 	mock.Mock
+}
+
+func (m *MockExecutionStateContext) SetKV(key string, value string) error {
+	args := m.Called(key, value)
+	return args.Error(0)
 }
 
 func (m *MockExecutionStateContext) Pass(outputs map[string][]any) error {
@@ -63,7 +68,7 @@ func TestNoop_Execute_EmitsEmptyEvents(t *testing.T) {
 
 			mockExecStateCtx.On("Pass", map[string][]any{"default": {make(map[string]any)}}).Return(nil)
 
-			ctx := components.ExecutionContext{
+			ctx := core.ExecutionContext{
 				Data:                  tt.inputData,
 				ExecutionStateContext: mockExecStateCtx,
 			}
@@ -88,12 +93,12 @@ func TestNoop_Execute_AlwaysEmitsEmpty(t *testing.T) {
 		}
 
 		mockExecStateCtx.AssertNotCalled(t, "Pass", map[string][]any{
-			components.DefaultOutputChannel.Name: {originalData},
+			core.DefaultOutputChannel.Name: {originalData},
 		})
 
 		mockExecStateCtx.On("Pass", map[string][]any{"default": {make(map[string]any)}}).Return(nil)
 
-		ctx := components.ExecutionContext{
+		ctx := core.ExecutionContext{
 			Data:                  originalData,
 			ExecutionStateContext: mockExecStateCtx,
 		}

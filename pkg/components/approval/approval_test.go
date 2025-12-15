@@ -7,12 +7,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type MockExecutionStateContext struct {
 	mock.Mock
+}
+
+func (m *MockExecutionStateContext) SetKV(key, value string) error {
+	args := m.Called(key, value)
+	return args.Error(0)
 }
 
 func (m *MockExecutionStateContext) Pass(outputs map[string][]any) error {
@@ -47,9 +52,9 @@ type MockAuthContext struct {
 	mock.Mock
 }
 
-func (m *MockAuthContext) AuthenticatedUser() *components.User {
+func (m *MockAuthContext) AuthenticatedUser() *core.User {
 	args := m.Called()
-	return args.Get(0).(*components.User)
+	return args.Get(0).(*core.User)
 }
 
 func (m *MockAuthContext) HasRole(role string) (bool, error) {
@@ -62,9 +67,9 @@ func (m *MockAuthContext) InGroup(group string) (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *MockAuthContext) GetUser(userID uuid.UUID) (*components.User, error) {
+func (m *MockAuthContext) GetUser(userID uuid.UUID) (*core.User, error) {
 	args := m.Called(userID)
-	return args.Get(0).(*components.User), args.Error(1)
+	return args.Get(0).(*core.User), args.Error(1)
 }
 
 func TestApproval_OutputChannels(t *testing.T) {
@@ -84,7 +89,7 @@ func TestApproval_OutputChannels(t *testing.T) {
 func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 	approval := &Approval{}
 
-	user := &components.User{ID: "test-user"}
+	user := &core.User{ID: "test-user"}
 	metadata := &Metadata{
 		Result: StatePending,
 		Records: []Record{
@@ -106,7 +111,7 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 		return hasApproved
 	})).Return(nil)
 
-	ctx := components.ActionContext{
+	ctx := core.ActionContext{
 		Name: "approve",
 		Parameters: map[string]any{
 			"index": float64(0),
@@ -125,7 +130,7 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 	approval := &Approval{}
 
-	user := &components.User{ID: "test-user"}
+	user := &core.User{ID: "test-user"}
 	metadata := &Metadata{
 		Result: StatePending,
 		Records: []Record{
@@ -147,7 +152,7 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 		return hasRejected
 	})).Return(nil)
 
-	ctx := components.ActionContext{
+	ctx := core.ActionContext{
 		Name: "reject",
 		Parameters: map[string]any{
 			"index":  float64(0),
@@ -167,8 +172,8 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 	approval := &Approval{}
 
-	user1 := &components.User{ID: "test-user-1"}
-	user2 := &components.User{ID: "test-user-2"}
+	user1 := &core.User{ID: "test-user-1"}
+	user2 := &core.User{ID: "test-user-2"}
 	metadata := &Metadata{
 		Result: StatePending,
 		Records: []Record{
@@ -186,7 +191,7 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 
 	mockAuthCtx.On("AuthenticatedUser").Return(user1)
 
-	ctx := components.ActionContext{
+	ctx := core.ActionContext{
 		Name: "approve",
 		Parameters: map[string]any{
 			"index": float64(0),
@@ -205,8 +210,8 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 
 func TestMetadata_UpdateResult(t *testing.T) {
 	t.Run("all approved sets approved", func(t *testing.T) {
-		user1 := &components.User{ID: "user-1"}
-		user2 := &components.User{ID: "user-2"}
+		user1 := &core.User{ID: "user-1"}
+		user2 := &core.User{ID: "user-2"}
 
 		metadata := &Metadata{
 			Result: StatePending,
@@ -222,8 +227,8 @@ func TestMetadata_UpdateResult(t *testing.T) {
 	})
 
 	t.Run("one rejected sets rejected", func(t *testing.T) {
-		user1 := &components.User{ID: "user-1"}
-		user2 := &components.User{ID: "user-2"}
+		user1 := &core.User{ID: "user-1"}
+		user2 := &core.User{ID: "user-2"}
 
 		metadata := &Metadata{
 			Result: StatePending,
@@ -239,8 +244,8 @@ func TestMetadata_UpdateResult(t *testing.T) {
 	})
 
 	t.Run("first rejected sets rejected", func(t *testing.T) {
-		user1 := &components.User{ID: "user-1"}
-		user2 := &components.User{ID: "user-2"}
+		user1 := &core.User{ID: "user-1"}
+		user2 := &core.User{ID: "user-2"}
 
 		metadata := &Metadata{
 			Result: StatePending,
@@ -258,8 +263,8 @@ func TestMetadata_UpdateResult(t *testing.T) {
 
 func TestMetadata_Completed(t *testing.T) {
 	t.Run("all approved returns true", func(t *testing.T) {
-		user1 := &components.User{ID: "user-1"}
-		user2 := &components.User{ID: "user-2"}
+		user1 := &core.User{ID: "user-1"}
+		user2 := &core.User{ID: "user-2"}
 
 		metadata := &Metadata{
 			Result: StatePending,
@@ -273,8 +278,8 @@ func TestMetadata_Completed(t *testing.T) {
 	})
 
 	t.Run("one pending returns false", func(t *testing.T) {
-		user1 := &components.User{ID: "user-1"}
-		user2 := &components.User{ID: "user-2"}
+		user1 := &core.User{ID: "user-1"}
+		user2 := &core.User{ID: "user-2"}
 
 		metadata := &Metadata{
 			Result: StatePending,
@@ -288,8 +293,8 @@ func TestMetadata_Completed(t *testing.T) {
 	})
 
 	t.Run("mixed approved and rejected returns true", func(t *testing.T) {
-		user1 := &components.User{ID: "user-1"}
-		user2 := &components.User{ID: "user-2"}
+		user1 := &core.User{ID: "user-1"}
+		user2 := &core.User{ID: "user-2"}
 
 		metadata := &Metadata{
 			Result: StatePending,
@@ -317,7 +322,7 @@ func TestApproval_Execute(t *testing.T) {
 			return hasApproved
 		})).Return(nil)
 
-		ctx := components.ExecutionContext{
+		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"items": []any{},
 			},
@@ -339,12 +344,12 @@ func TestApproval_Execute(t *testing.T) {
 		mockAuthCtx := &MockAuthContext{}
 
 		userID := uuid.New()
-		user := &components.User{ID: userID.String()}
+		user := &core.User{ID: userID.String()}
 
 		mockMetadataCtx.On("Set", mock.Anything)
 		mockAuthCtx.On("GetUser", userID).Return(user, nil)
 
-		ctx := components.ExecutionContext{
+		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"items": []any{
 					map[string]any{

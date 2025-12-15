@@ -21,9 +21,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/triggers"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	nooptrace "go.opentelemetry.io/otel/trace/noop"
@@ -629,7 +629,7 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 	}
 
 	tx := database.Conn()
-	return trigger.HandleWebhook(triggers.WebhookRequestContext{
+	return trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:           body,
 		Headers:        headers,
 		Configuration:  node.Configuration.Data(),

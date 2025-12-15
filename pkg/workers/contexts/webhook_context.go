@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/triggers"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -20,7 +20,7 @@ type WebhookContext struct {
 	node      *models.WorkflowNode
 }
 
-func NewWebhookContext(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, node *models.WorkflowNode) triggers.WebhookContext {
+func NewWebhookContext(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, node *models.WorkflowNode) *WebhookContext {
 	return &WebhookContext{
 		tx:        tx,
 		ctx:       ctx,
@@ -42,7 +42,7 @@ func (c *WebhookContext) GetSecret() ([]byte, error) {
 	return c.encryptor.Decrypt(c.ctx, webhook.Secret, []byte(webhook.ID.String()))
 }
 
-func (c *WebhookContext) Setup(options *triggers.WebhookSetupOptions) error {
+func (c *WebhookContext) Setup(options *core.WebhookSetupOptions) error {
 	webhook, err := c.findOrCreateWebhook(options)
 	if err != nil {
 		return fmt.Errorf("failed to find or create webhook: %w", err)
@@ -52,7 +52,7 @@ func (c *WebhookContext) Setup(options *triggers.WebhookSetupOptions) error {
 	return nil
 }
 
-func (c *WebhookContext) findOrCreateWebhook(options *triggers.WebhookSetupOptions) (*models.Webhook, error) {
+func (c *WebhookContext) findOrCreateWebhook(options *core.WebhookSetupOptions) (*models.Webhook, error) {
 	//
 	// If webhook already exists, just return it
 	//
