@@ -22,6 +22,7 @@ import { UserFieldRenderer } from "./UserFieldRenderer";
 import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
+import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
 import { isFieldVisible, isFieldRequired, validateFieldForSubmission } from "../../utils/components";
 import { ValidationError } from "./types";
 import { AuthorizationDomainType } from "@/api-client";
@@ -207,6 +208,9 @@ export const ConfigurationFieldRenderer = ({
 
       case "object":
         return <ObjectFieldRenderer {...commonProps} domainId={domainId} domainType={domainType} />;
+
+      case "timezone":
+        return <TimezoneFieldRenderer {...commonProps} />;
 
       default:
         // Fallback to text input

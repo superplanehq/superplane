@@ -3,6 +3,7 @@ package configuration
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -412,6 +413,9 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeCron:
 		return validateCron(field, value)
+
+	case FieldTypeTimezone:
+		return validateTimezone(field, value)
 	}
 
 	return nil
@@ -684,5 +688,42 @@ func compareDayInYearValues(valueDayOfYear, compareDayOfYear int, valueStr, comp
 	default:
 		return fmt.Errorf("unknown validation rule type: %s", rule.Type)
 	}
+	return nil
+}
+
+func validateTimezone(field Field, value any) error {
+	timezoneStr, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	if timezoneStr == "" {
+		return fmt.Errorf("timezone cannot be empty")
+	}
+
+	if timezoneStr == "current" {
+		return fmt.Errorf("timezone value 'current' should be replaced with actual timezone offset before submission")
+	}
+
+	var offsetHours float64
+	var err error
+
+	// Handle cases with or without + prefix
+	cleanTz := strings.TrimPrefix(timezoneStr, "+")
+	offsetHours, err = strconv.ParseFloat(cleanTz, 64)
+	if err != nil {
+		return fmt.Errorf("invalid timezone format: must be a numeric offset like '-5', '0', '5.5', or '+8'")
+	}
+
+	// Check valid range: UTC-12 to UTC+14
+	if offsetHours < -12 || offsetHours > 14 {
+		return fmt.Errorf("timezone offset must be between -12 and +14 hours, got: %g", offsetHours)
+	}
+
+	// Additional validation: only allow .5 decimal for half-hour timezones
+	if offsetHours != float64(int(offsetHours)) && offsetHours != float64(int(offsetHours))+0.5 {
+		return fmt.Errorf("timezone offset must be a whole number or half hour (e.g., 5.5), got: %g", offsetHours)
+	}
+
 	return nil
 }

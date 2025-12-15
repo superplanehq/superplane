@@ -34,13 +34,20 @@ function validateCronExpression(cronExpression: string): string | null {
 
     // Basic range validation
     switch (index) {
-      case 0: return num < 0 || num > 59; // second
-      case 1: return num < 0 || num > 59; // minute
-      case 2: return num < 0 || num > 23; // hour
-      case 3: return num < 1 || num > 31; // day
-      case 4: return num < 1 || num > 12; // month
-      case 5: return num < 0 || num > 6;  // dayofweek
-      default: return false;
+      case 0:
+        return num < 0 || num > 59; // second
+      case 1:
+        return num < 0 || num > 59; // minute
+      case 2:
+        return num < 0 || num > 23; // hour
+      case 3:
+        return num < 1 || num > 31; // day
+      case 4:
+        return num < 1 || num > 12; // month
+      case 5:
+        return num < 0 || num > 6; // dayofweek
+      default:
+        return false;
     }
   });
 
@@ -519,6 +526,15 @@ export function parseDefaultValues(configurationFields: ConfigurationField[]): R
                 } catch {
                   // If parsing fails, keep as empty object
                   parsedValue = {};
+                }
+                break;
+              }
+              case "timezone": {
+                if (defaultValue === "current") {
+                  const offset = -new Date().getTimezoneOffset() / 60;
+                  parsedValue = offset.toString();
+                } else {
+                  parsedValue = defaultValue;
                 }
                 break;
               }

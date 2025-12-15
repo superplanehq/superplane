@@ -21,6 +21,7 @@ const (
 	FieldTypeUser      = "user"
 	FieldTypeRole      = "role"
 	FieldTypeGroup     = "group"
+	FieldTypeTimezone  = "timezone"
 )
 
 type Field struct {
@@ -98,6 +99,7 @@ type TypeOptions struct {
 	DateTime    *DateTimeTypeOptions    `json:"datetime,omitempty"`
 	DayInYear   *DayInYearTypeOptions   `json:"day_in_year,omitempty"`
 	Cron        *CronTypeOptions        `json:"cron,omitempty"`
+	Timezone    *TimezoneTypeOptions    `json:"timezone,omitempty"`
 }
 
 /*
@@ -148,6 +150,13 @@ type DayInYearTypeOptions struct {
  */
 type CronTypeOptions struct {
 	AllowedFields []string `json:"allowed_fields,omitempty"` // Optional: limit which cron fields are allowed
+}
+
+/*
+ * TimezoneTypeOptions specifies constraints for timezone fields
+ */
+type TimezoneTypeOptions struct {
+	// Could add supported timezones list here if needed in the future
 }
 
 /*

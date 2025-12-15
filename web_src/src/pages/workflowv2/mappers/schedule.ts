@@ -50,9 +50,7 @@ function formatScheduleDescription(configuration: ScheduleConfiguration): string
       const minute = configuration.minute || 0;
       const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
       const weekDays = configuration.weekDays || ["monday"];
-      const dayLabels = weekDays.map(day =>
-        day.charAt(0).toUpperCase() + day.slice(1).toLowerCase()
-      ).join(", ");
+      const dayLabels = weekDays.map((day) => day.charAt(0).toUpperCase() + day.slice(1).toLowerCase()).join(", ");
       return `Every ${interval} week${interval === 1 ? "" : "s"} on ${dayLabels} at ${time}`;
     }
     case "months": {
@@ -64,9 +62,7 @@ function formatScheduleDescription(configuration: ScheduleConfiguration): string
       return `Every ${interval} month${interval === 1 ? "" : "s"} on day ${dayOfMonth} at ${time}`;
     }
     case "cron": {
-      return configuration.cronExpression
-        ? `Cron: ${configuration.cronExpression}`
-        : "Custom cron schedule";
+      return configuration.cronExpression ? `Cron: ${configuration.cronExpression}` : "Custom cron schedule";
     }
     default:
       return "Scheduled trigger";
@@ -143,8 +139,8 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
 
       const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
       const validDayIndices = weekDays
-        .map(day => dayNames.indexOf(day.toLowerCase()))
-        .filter(index => index !== -1);
+        .map((day) => dayNames.indexOf(day.toLowerCase()))
+        .filter((index) => index !== -1);
 
       if (validDayIndices.length === 0) return null;
 
@@ -200,10 +196,7 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
 }
 
 function formatNextTrigger(configuration: ScheduleConfiguration, metadata?: { nextTrigger?: string }): string {
-  const nextTrigger = calculateNextTrigger(
-    configuration,
-    metadata?.nextTrigger,
-  );
+  const nextTrigger = calculateNextTrigger(configuration, metadata?.nextTrigger);
 
   if (!nextTrigger) {
     return "-";
