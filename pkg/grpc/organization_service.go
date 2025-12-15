@@ -21,9 +21,9 @@ func NewOrganizationService(
 	baseURL string,
 ) *OrganizationService {
 	return &OrganizationService{
-		authorizationService: authorizationService,
 		registry:             registry,
 		baseURL:              baseURL,
+		authorizationService: authorizationService,
 	}
 }
 

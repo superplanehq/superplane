@@ -110,7 +110,6 @@ func findNode(nodes []models.WorkflowNode, nodeID string) *models.WorkflowNode {
 func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.Node, workflowID uuid.UUID) (*models.WorkflowNode, error) {
 	now := time.Now()
 
-	// Convert AppInstallationID string to UUID pointer
 	var appInstallationID *uuid.UUID
 	if node.AppInstallationID != nil && *node.AppInstallationID != "" {
 		parsedID, err := uuid.Parse(*node.AppInstallationID)
