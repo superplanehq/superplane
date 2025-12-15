@@ -28,14 +28,14 @@ func UpdateApplication(ctx context.Context, registry *registry.Registry, baseURL
 		return nil, status.Errorf(codes.Internal, "application %s not found", appInstallation.AppName)
 	}
 
-	encryptedConfig, err := encryptSensitiveFields(ctx, registry, app, configuration, orgID)
+	existingConfig := appInstallation.Configuration.Data()
+	configuration, err = encryptConfigurationIfNeeded(ctx, registry, app, configuration, orgID, existingConfig)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to encrypt sensitive configuration: %v", err)
 	}
 
-	configData := appInstallation.Configuration.Data()
-	maps.Copy(configData, encryptedConfig)
-	appInstallation.Configuration = datatypes.NewJSONType(configData)
+	maps.Copy(existingConfig, configuration)
+	appInstallation.Configuration = datatypes.NewJSONType(existingConfig)
 
 	appCtx := contexts.NewAppInstallationContext(
 		database.Conn(),

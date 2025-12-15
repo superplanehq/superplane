@@ -2,10 +2,9 @@ package organizations
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
+	"maps"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -25,14 +24,15 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, baseUR
 		return nil, status.Errorf(codes.InvalidArgument, "application %s not found", appName)
 	}
 
-	// Encrypt sensitive configuration fields before storing
-	configMap := appConfig.AsMap()
-	encryptedConfig, err := encryptSensitiveFields(ctx, registry, app, configMap, orgID)
+	//
+	// We must encrypt the sensitive configuration fields before storing
+	//
+	configuration, err := encryptConfigurationIfNeeded(ctx, registry, app, appConfig.AsMap(), orgID, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to encrypt sensitive configuration: %v", err)
 	}
 
-	appInstallation, err := models.CreateAppInstallation(uuid.MustParse(orgID), appName, installationName, encryptedConfig)
+	appInstallation, err := models.CreateAppInstallation(uuid.MustParse(orgID), appName, installationName, configuration)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create application installation: %v", err)
 	}
@@ -78,7 +78,15 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, baseUR
 }
 
 func serializeAppInstallation(registry *registry.Registry, appInstallation *models.AppInstallation, nodeRefs []models.WorkflowNodeReference) (*pb.AppInstallation, error) {
-	config, err := serializeAppInstallationConfig(registry, appInstallation)
+	app, err := registry.GetApplication(appInstallation.AppName)
+	if err != nil {
+		return nil, err
+	}
+
+	//
+	// We do not return sensitive values when serializing app installations.
+	//
+	config, err := structpb.NewStruct(sanitizeConfigurationIfNeeded(app, appInstallation.Configuration.Data()))
 	if err != nil {
 		return nil, err
 	}
@@ -127,85 +135,68 @@ func serializeAppInstallation(registry *registry.Registry, appInstallation *mode
 	return proto, nil
 }
 
-func serializeAppInstallationConfig(registry *registry.Registry, appInstallation *models.AppInstallation) (*structpb.Struct, error) {
-	app, err := registry.GetApplication(appInstallation.AppName)
-	if err != nil {
-		return nil, err
-	}
+func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Registry, app core.Application, config map[string]any, orgID string, existingConfig map[string]any) (map[string]any, error) {
+	result := maps.Clone(config)
 
-	config, err := structpb.NewStruct(sanitizeSensitiveFields(app, appInstallation.Configuration.Data()))
-	if err != nil {
-		return nil, err
-	}
+	for _, field := range app.Configuration() {
+		if !field.Sensitive {
+			continue
+		}
 
-	return config, nil
-}
+		value, exists := config[field.Name]
+		if !exists {
+			continue
+		}
 
-// encryptSensitiveFields encrypts all sensitive configuration fields
-func encryptSensitiveFields(ctx context.Context, registry *registry.Registry, app core.Application, config map[string]any, orgID string) (map[string]any, error) {
-	result := make(map[string]any)
-	for k, v := range config {
-		result[k] = v
-	}
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("sensitive field %s must be a string", field.Name)
+		}
 
-	configFields := app.Configuration()
-	for _, field := range configFields {
-		if field.Sensitive {
-			value, exists := config[field.Name]
-			if !exists {
-				continue
-			}
-
-			// Convert value to string
-			strValue, ok := value.(string)
-			if !ok {
-				return nil, fmt.Errorf("sensitive field %s must be a string", field.Name)
-			}
-
-			// Encrypt the value using orgID as associated data
-			encrypted, err := registry.Encryptor.Encrypt(ctx, []byte(strValue), []byte(orgID))
+		//
+		// If the value is not <redacted>, encrypt it, since it's new.
+		//
+		if s != "<redacted>" {
+			encrypted, err := registry.Encryptor.Encrypt(ctx, []byte(s), []byte(orgID))
 			if err != nil {
 				return nil, fmt.Errorf("failed to encrypt field %s: %v", field.Name, err)
 			}
 
-			// Encode encrypted bytes as base64 string so it can be decoded by mapstructure
 			result[field.Name] = base64.StdEncoding.EncodeToString(encrypted)
+			continue
+		}
+
+		//
+		// If <redacted> is used, just preserve the existing value.
+		//
+		if existingConfig == nil {
+			continue
+		}
+
+		v, exists := existingConfig[field.Name]
+		if exists {
+			result[field.Name] = v
 		}
 	}
 
 	return result, nil
 }
 
-// sanitizeSensitiveFields replaces encrypted sensitive configuration fields with their SHA256 hash
-func sanitizeSensitiveFields(app core.Application, config map[string]any) map[string]any {
-	result := make(map[string]any)
-	for k, v := range config {
-		result[k] = v
-	}
+func sanitizeConfigurationIfNeeded(app core.Application, config map[string]any) map[string]any {
+	sanitized := maps.Clone(config)
 
-	configFields := app.Configuration()
-	for _, field := range configFields {
-		if field.Sensitive {
-			value, exists := config[field.Name]
-			if !exists {
-				continue
-			}
-
-			// Convert base64-encoded encrypted value to string
-			var encryptedStr string
-			switch v := value.(type) {
-			case string:
-				encryptedStr = v
-			default:
-				// If it's not a string, skip
-				continue
-			}
-
-			// Compute SHA256 of the base64-encoded encrypted value
-			hash := sha256.Sum256([]byte(encryptedStr))
-			result[field.Name] = hex.EncodeToString(hash[:])
+	for _, field := range app.Configuration() {
+		if !field.Sensitive {
+			continue
 		}
+
+		_, exists := config[field.Name]
+		if !exists {
+			continue
+		}
+
+		sanitized[field.Name] = "<redacted>"
 	}
 
-	return result
+	return sanitized
 }
