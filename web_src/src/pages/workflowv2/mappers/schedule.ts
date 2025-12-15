@@ -290,15 +290,14 @@ function formatNextTrigger(configuration: ScheduleConfiguration, metadata?: { ne
     }
 
     const timeZoneOffset = configuration.timezone ? parseFloat(configuration.timezone) : 0;
-    const sign = timeZoneOffset >= 0 ? '+' : '-';
+    const sign = timeZoneOffset >= 0 ? "+" : "-";
     const absOffset = Math.abs(timeZoneOffset);
 
     const hours = Math.floor(absOffset);
     const minutes = (absOffset % 1) * 60;
-    const timeZoneShortDetailed = minutes > 0 
-      ? `GMT${sign}${hours}:${minutes.toString().padStart(2, '0')}`
-      : `GMT${sign}${hours}`;
-      
+    const timeZoneShortDetailed =
+      minutes > 0 ? `GMT${sign}${hours}:${minutes.toString().padStart(2, "0")}` : `GMT${sign}${hours}`;
+
     return formatTimestampInUserTimezone(nextTrigger.toISOString(), timeZoneShortDetailed);
   } catch {
     return "";

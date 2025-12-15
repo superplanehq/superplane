@@ -72,10 +72,7 @@ export function convertUTCToLocalTime(utcTimeString: string, userTimezone?: stri
  * @param includeTimezone - Whether to include timezone abbreviation in the result
  * @returns Formatted datetime string
  */
-export function formatTimestampInUserTimezone(
-  timestamp: string | Date,
-  userTimezone?: string,
-): string {
+export function formatTimestampInUserTimezone(timestamp: string | Date, userTimezone?: string): string {
   const timezone = userTimezone || getUserTimezone();
   const date = typeof timestamp === "string" ? new Date(timestamp) : timestamp;
   const options: Intl.DateTimeFormatOptions = {

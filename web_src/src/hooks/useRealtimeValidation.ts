@@ -16,14 +16,14 @@ interface UseRealtimeValidationOptions {
 export function useRealtimeValidation(
   fields: ConfigurationField[],
   values: Record<string, unknown>,
-  options: UseRealtimeValidationOptions = {}
+  options: UseRealtimeValidationOptions = {},
 ) {
   const { debounceMs = 300, validateOnMount = false } = options;
 
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [isValidating, setIsValidating] = useState(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const lastValidationRef = useRef<string>('');
+  const lastValidationRef = useRef<string>("");
 
   // Memoized validation function to prevent unnecessary re-runs
   const validateAllFields = useCallback(() => {
@@ -32,7 +32,7 @@ export function useRealtimeValidation(
     const validateNestedFields = (
       fieldsToValidate: ConfigurationField[],
       currentValues: Record<string, unknown>,
-      fieldPath = ""
+      fieldPath = "",
     ) => {
       fieldsToValidate.forEach((field) => {
         if (!field.name) return;
@@ -51,7 +51,7 @@ export function useRealtimeValidation(
           errors.push({
             field: fullFieldName,
             message: "This field is required",
-            type: "required"
+            type: "required",
           });
         }
 
@@ -74,7 +74,7 @@ export function useRealtimeValidation(
               errors.push({
                 field: fullFieldName,
                 message,
-                type: "validation_rule"
+                type: "validation_rule",
               });
             });
           }
@@ -82,11 +82,7 @@ export function useRealtimeValidation(
 
         // Handle nested object validation
         if (field.type === "object" && field.typeOptions?.object?.schema && value) {
-          validateNestedFields(
-            field.typeOptions.object.schema,
-            value as Record<string, unknown>,
-            fullFieldName
-          );
+          validateNestedFields(field.typeOptions.object.schema, value as Record<string, unknown>, fullFieldName);
         }
 
         // Handle list validation (if list has item validation schema)
@@ -104,7 +100,7 @@ export function useRealtimeValidation(
   // Debounced validation function
   const debouncedValidate = useCallback(() => {
     // Create a lightweight hash to avoid duplicate validations
-    const fieldNames = fields.map(f => f.name).join(',');
+    const fieldNames = fields.map((f) => f.name).join(",");
     const valuesHash = JSON.stringify(values);
     const currentHash = `${fieldNames}:${valuesHash}`;
 
@@ -121,7 +117,7 @@ export function useRealtimeValidation(
 
     debounceTimeoutRef.current = setTimeout(() => {
       // Double-check the hash hasn't changed during the timeout
-      const recheckHash = `${fields.map(f => f.name).join(',')}:${JSON.stringify(values)}`;
+      const recheckHash = `${fields.map((f) => f.name).join(",")}:${JSON.stringify(values)}`;
       if (recheckHash !== lastValidationRef.current) {
         const errors = validateAllFields();
         setValidationErrors(errors);
@@ -160,18 +156,25 @@ export function useRealtimeValidation(
   }, []);
 
   // Helper function to get errors for a specific field
-  const getFieldErrors = useCallback((fieldName: string) => {
-    return validationErrors.filter(error =>
-      error.field === fieldName ||
-      error.field.startsWith(`${fieldName}.`) ||
-      error.field.startsWith(`${fieldName}[`)
-    );
-  }, [validationErrors]);
+  const getFieldErrors = useCallback(
+    (fieldName: string) => {
+      return validationErrors.filter(
+        (error) =>
+          error.field === fieldName ||
+          error.field.startsWith(`${fieldName}.`) ||
+          error.field.startsWith(`${fieldName}[`),
+      );
+    },
+    [validationErrors],
+  );
 
   // Helper function to check if a field has errors
-  const hasFieldError = useCallback((fieldName: string) => {
-    return getFieldErrors(fieldName).length > 0;
-  }, [getFieldErrors]);
+  const hasFieldError = useCallback(
+    (fieldName: string) => {
+      return getFieldErrors(fieldName).length > 0;
+    },
+    [getFieldErrors],
+  );
 
   // Helper function to check if form is valid
   const isValid = useMemo(() => {
@@ -197,6 +200,6 @@ export function useRealtimeValidation(
     getFieldErrors,
     hasFieldError,
     validateNow,
-    clearErrors: () => setValidationErrors([])
+    clearErrors: () => setValidationErrors([]),
   };
 }
