@@ -51,7 +51,7 @@ type Application interface {
 	/*
 	 * HTTP request handler
 	 */
-	HandleRequest(ctx HttpRequestContext)
+	HandleRequest(ctx HTTPRequestContext)
 
 	/*
 	 * Request a webhook from the app installation.
@@ -155,7 +155,7 @@ type BrowserAction struct {
 	FormFields  map[string]string
 }
 
-type HttpRequestContext struct {
+type HTTPRequestContext struct {
 	Request         *http.Request
 	Response        *http.ResponseWriter
 	OrganizationID  string
