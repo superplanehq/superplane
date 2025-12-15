@@ -2,6 +2,7 @@ package filter
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/expr-lang/expr"
@@ -98,6 +99,10 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 	}
 
 	return ctx.ExecutionStateContext.Pass(outputs)
+}
+
+func (f *Filter) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }
 
 func (f *Filter) Actions() []core.Action {

@@ -2,6 +2,7 @@ package wait
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -110,6 +111,10 @@ func (w *Wait) Execute(ctx core.ExecutionContext) error {
 	}
 
 	return ctx.RequestContext.ScheduleActionCall("timeReached", map[string]any{}, interval)
+}
+
+func (w *Wait) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }
 
 func (w *Wait) Actions() []core.Action {

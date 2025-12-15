@@ -221,7 +221,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
               {workflowGroups.length > 0 ? (
                 <>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
-                    This app installation is currently used in the following workflows:
+                    This app installation is currently used in the following canvases:
                   </p>
                   <div className="space-y-2">
                     {workflowGroups.map((group) => (
@@ -232,7 +232,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
                       >
                         <div className="flex-1">
                           <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                            Workflow: {group.workflowName}
+                            Canvas: {group.workflowName}
                           </p>
                           <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
                             Used in {group.nodes.length} node{group.nodes.length !== 1 ? "s" : ""}:{" "}

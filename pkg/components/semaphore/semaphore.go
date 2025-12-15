@@ -2,6 +2,7 @@ package semaphore
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -208,6 +209,10 @@ func (s *Semaphore) Setup(ctx core.SetupContext) error {
 	})
 
 	return nil
+}
+
+func (s *Semaphore) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }
 
 func (s *Semaphore) Execute(ctx core.ExecutionContext) error {

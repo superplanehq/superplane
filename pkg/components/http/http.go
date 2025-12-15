@@ -134,6 +134,10 @@ func (e *HTTP) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("http does not support actions")
 }
 
+func (e *HTTP) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
+}
+
 func (e *HTTP) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
 }

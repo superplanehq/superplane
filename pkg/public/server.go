@@ -678,10 +678,14 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
-	if node.Type != models.NodeTypeTrigger {
-		return http.StatusOK, nil
+	if node.Type == models.NodeTypeTrigger {
+		return s.executeTriggerNode(ctx, body, headers, node)
 	}
 
+	return s.executeComponenteNode(ctx, body, headers, node)
+}
+
+func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
 	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -692,19 +696,47 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 	return trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:           body,
 		Headers:        headers,
+		WorkflowID:     node.WorkflowID.String(),
+		NodeID:         node.NodeID,
 		Configuration:  node.Configuration.Data(),
 		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node),
 		EventContext:   contexts.NewEventContext(tx, &node),
 	})
 }
 
-func parseHeaders(headers *http.Header) ([]byte, error) {
-	parsedHeaders := make(map[string]string, len(*headers))
-	for key, value := range *headers {
-		parsedHeaders[key] = value[0]
+func (s *Server) executeComponenteNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
+	ref := node.Ref.Data()
+	component, err := s.registry.GetComponent(ref.Component.Name)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("component not found: %w", err)
 	}
 
-	return json.Marshal(parsedHeaders)
+	tx := database.Conn()
+	return component.HandleWebhook(core.WebhookRequestContext{
+		Body:           body,
+		Headers:        headers,
+		WorkflowID:     node.WorkflowID.String(),
+		NodeID:         node.NodeID,
+		Configuration:  node.Configuration.Data(),
+		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node),
+		EventContext:   contexts.NewEventContext(tx, &node),
+		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
+			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
+			if err != nil {
+				return nil, err
+			}
+
+			return &core.ExecutionContext{
+				ID:                    execution.ID.String(),
+				WorkflowID:            execution.WorkflowID.String(),
+				Configuration:         execution.Configuration.Data(),
+				MetadataContext:       contexts.NewExecutionMetadataContext(execution),
+				NodeMetadataContext:   contexts.NewNodeMetadataContext(&node),
+				ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
+				RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
+			}, nil
+		},
+	})
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {

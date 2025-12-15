@@ -2,6 +2,7 @@ package noop
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -65,4 +66,8 @@ func (c *NoOp) HandleAction(ctx core.ActionContext) error {
 
 func (c *NoOp) Setup(ctx core.SetupContext) error {
 	return nil
+}
+
+func (c *NoOp) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }

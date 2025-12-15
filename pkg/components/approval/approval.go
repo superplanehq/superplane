@@ -2,6 +2,7 @@ package approval
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -351,6 +352,10 @@ func (a *Approval) Setup(ctx core.SetupContext) error {
 
 func (a *Approval) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
+}
+
+func (a *Approval) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }
 
 func (a *Approval) Execute(ctx core.ExecutionContext) error {

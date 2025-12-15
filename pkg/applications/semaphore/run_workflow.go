@@ -1,12 +1,17 @@
 package semaphore
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -190,6 +195,10 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 		},
 	})
 
+	ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+		Project: project.Metadata.ProjectName,
+	})
+
 	return nil
 }
 
@@ -237,7 +246,112 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 		},
 	})
 
-	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
+	//
+	// This is what allows the component to associate a semaphore webhook
+	// for a pipeline finishing to a SuperPlane execution.
+	//
+	err = ctx.ExecutionStateContext.SetKV("pipeline", response.PipelineID)
+	if err != nil {
+		return err
+	}
+
+	//
+	// We still set up the poller to check for pipeline finishing,
+	// just in case something wrong happens with the update through the webhook.
+	// TODO: increase this to 5min.
+	//
+	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, time.Minute)
+}
+
+func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	log.Printf("runWorkflow.HandleWebhook")
+
+	signature := ctx.Headers.Get("X-Semaphore-Signature-256")
+	if signature == "" {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
+	}
+
+	signature = strings.TrimPrefix(signature, "sha256=")
+	if signature == "" {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
+	}
+
+	secret, err := ctx.WebhookContext.GetSecret()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
+	}
+
+	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
+	}
+
+	type Hook struct {
+		Pipeline struct {
+			ID     string `json:"id"`
+			State  string `json:"state"`
+			Result string `json:"result"`
+		} `json:"pipeline"`
+	}
+
+	hook := Hook{}
+	err = json.Unmarshal(ctx.Body, &hook)
+	if err != nil {
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+	}
+
+	executionCtx, err := ctx.FindExecutionByKV("pipeline", hook.Pipeline.ID)
+
+	//
+	// We will receive hooks for pipelines that weren't started by SuperPlane,
+	// so we just ignore them.
+	//
+	if err != nil {
+		log.Printf("runWorkflow.HandleWebhook - execution not found for %s: %v", hook.Pipeline.ID, err)
+		return http.StatusOK, nil
+	}
+
+	metadata := RunWorkflowExecutionMetadata{}
+	err = mapstructure.Decode(executionCtx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %v", err)
+	}
+
+	//
+	// Already finished, do not do anything.
+	//
+	if metadata.Pipeline.State == "done" {
+		log.Printf("runWorkflow.HandleWebhook - pipeline already finished for %s", hook.Pipeline.ID)
+		return http.StatusOK, nil
+	}
+
+	metadata.Pipeline.State = hook.Pipeline.State
+	metadata.Pipeline.Result = hook.Pipeline.Result
+	executionCtx.MetadataContext.Set(metadata)
+
+	if metadata.Pipeline.Result == "passed" {
+		err = executionCtx.ExecutionStateContext.Pass(map[string][]any{
+			PassedOutputChannel: {metadata},
+		})
+	} else {
+		err = executionCtx.ExecutionStateContext.Pass(map[string][]any{
+			FailedOutputChannel: {metadata},
+		})
+	}
+
+	//
+	// TODO: not sure if returning an error here is the right thing.
+	//
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	//
+	// TODO: remove request for polling
+	// TODO: remove KV record
+	//
+
+	log.Printf("runWorkflow.HandleWebhook - pipeline %s finished with result %s", hook.Pipeline.ID, hook.Pipeline.Result)
+	return http.StatusOK, nil
 }
 
 func (r *RunWorkflow) Actions() []core.Action {

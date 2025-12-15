@@ -88,6 +88,11 @@ type Component interface {
 	 * on a specific execution of the component.
 	 */
 	HandleAction(ctx ActionContext) error
+
+	/*
+	 * Handler for webhooks.
+	 */
+	HandleWebhook(ctx WebhookRequestContext) (int, error)
 }
 
 type OutputChannel struct {
@@ -155,6 +160,7 @@ type ExecutionStateContext interface {
 	IsFinished() bool
 	Pass(outputs map[string][]any) error
 	Fail(reason, message string) error
+	SetKV(key, value string) error
 }
 
 /*

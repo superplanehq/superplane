@@ -108,6 +108,10 @@ type actionMockExecutionStateContext struct {
 	failed   bool
 }
 
+func (m *actionMockExecutionStateContext) SetKV(key, value string) error {
+	return nil
+}
+
 func (m *actionMockExecutionStateContext) IsFinished() bool { return m.finished }
 func (m *actionMockExecutionStateContext) Pass(outputs map[string][]any) error {
 	m.passed = true

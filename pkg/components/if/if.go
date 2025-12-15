@@ -2,6 +2,7 @@ package ifp
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/expr-lang/expr"
@@ -124,4 +125,8 @@ func (f *If) Setup(ctx core.SetupContext) error {
 
 func (f *If) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
+}
+
+func (f *If) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }

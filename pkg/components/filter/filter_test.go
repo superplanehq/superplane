@@ -13,6 +13,11 @@ type MockExecutionStateContext struct {
 	mock.Mock
 }
 
+func (m *MockExecutionStateContext) SetKV(key, value string) error {
+	args := m.Called(key, value)
+	return args.Error(0)
+}
+
 func (m *MockExecutionStateContext) Pass(outputs map[string][]any) error {
 	args := m.Called(outputs)
 	return args.Error(0)

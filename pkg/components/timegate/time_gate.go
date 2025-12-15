@@ -2,6 +2,7 @@ package timegate
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -243,6 +244,10 @@ func (tg *TimeGate) Setup(ctx core.SetupContext) error {
 
 func (tg *TimeGate) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	return ctx.DefaultProcessing()
+}
+
+func (tg *TimeGate) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }
 
 func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {

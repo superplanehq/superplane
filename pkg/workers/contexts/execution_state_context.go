@@ -32,3 +32,7 @@ func (s *ExecutionStateContext) Fail(reason, message string) error {
 	err := s.execution.FailInTransaction(s.tx, reason, message)
 	return err
 }
+
+func (s *ExecutionStateContext) SetKV(key, value string) error {
+	return models.CreateWorkflowNodeExecutionKVInTransaction(s.tx, s.execution.WorkflowID, s.execution.NodeID, s.execution.ID, key, value)
+}

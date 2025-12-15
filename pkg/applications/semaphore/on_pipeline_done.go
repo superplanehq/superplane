@@ -105,7 +105,7 @@ func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 	})
 
 	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
-		Project: project.Metadata.ProjectID,
+		Project: project.Metadata.ProjectName,
 	})
 }
 

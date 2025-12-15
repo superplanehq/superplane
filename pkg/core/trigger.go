@@ -99,9 +99,17 @@ type TriggerActionContext struct {
 type WebhookRequestContext struct {
 	Body           []byte
 	Headers        http.Header
+	WorkflowID     string
+	NodeID         string
 	Configuration  any
 	WebhookContext WebhookContext
 	EventContext   EventContext
+
+	//
+	// Return an execution context for a given execution,
+	// through a referencing key-value pair.
+	//
+	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 }
 
 type WebhookContext interface {

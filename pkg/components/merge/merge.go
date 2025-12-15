@@ -2,6 +2,7 @@ package merge
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/expr-lang/expr"
@@ -90,6 +91,10 @@ func (m *Merge) Configuration() []configuration.Field {
 			Required:    false,
 		},
 	}
+}
+
+func (m *Merge) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }
 
 func (m *Merge) Actions() []core.Action {
