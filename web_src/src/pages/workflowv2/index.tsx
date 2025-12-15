@@ -54,6 +54,7 @@ import {
   getComponentAdditionalDataBuilder,
   getComponentBaseMapper,
   getTriggerRenderer,
+  getCustomFieldRenderer,
   getState,
   getStateMap,
 } from "./mappers";
@@ -1162,6 +1163,31 @@ export function WorkflowPageV2() {
     [workflow],
   );
 
+  const getCustomField = useCallback(
+    (nodeId: string) => {
+      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+      if (!node) return null;
+
+      let componentName = "";
+      if (node.type === "TYPE_TRIGGER" && node.trigger?.name) {
+        componentName = node.trigger.name;
+      } else if (node.type === "TYPE_COMPONENT" && node.component?.name) {
+        componentName = node.component.name;
+      } else if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id) {
+        componentName = "default";
+      }
+
+      const renderer = getCustomFieldRenderer(componentName);
+      if (!renderer) return null;
+
+      // Return a function that takes the current configuration
+      return (configuration: Record<string, unknown>) => {
+        return renderer.render(node, configuration);
+      };
+    },
+    [workflow],
+  );
+
   // Show loading indicator while data is being fetched
   if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
     return (
@@ -1214,6 +1240,7 @@ export function WorkflowPageV2() {
       loadSidebarData={loadSidebarData}
       getTabData={getTabData}
       getNodeEditData={getNodeEditData}
+      getCustomField={getCustomField}
       onNodeConfigurationSave={handleNodeConfigurationSave}
       onSave={handleSave}
       onEdgeCreate={handleEdgeCreate}

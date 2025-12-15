@@ -1,8 +1,10 @@
 import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
-import { TriggerRenderer } from "./types";
+import { getNextCronExecution } from "@/utils/cron";
+import { TriggerRenderer, CustomFieldRenderer } from "./types";
 import { TriggerProps } from "@/ui/trigger";
+import React from "react";
 
 type ScheduleConfigurationType = "minutes" | "hours" | "days" | "weeks" | "months" | "cron";
 
@@ -79,88 +81,136 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
     }
   }
 
+  if (!configuration.type) return null;
+
   const now = new Date();
 
-  // Apply timezone offset if specified
+  // Parse timezone like the Go backend - create location from offset
   const timezoneOffset = configuration.timezone ? parseFloat(configuration.timezone) : 0;
-  const nowInTZ = new Date(now.getTime() + timezoneOffset * 60 * 60 * 1000);
+  const timezoneOffsetMs = timezoneOffset * 60 * 60 * 1000;
+
+  // Convert current time to the target timezone
+  const nowInTZ = new Date(now.getTime() + timezoneOffsetMs);
 
   switch (configuration.type) {
     case "minutes": {
-      if (configuration.minutesInterval === undefined) return null;
+      if (
+        configuration.minutesInterval === undefined ||
+        configuration.minutesInterval < 1 ||
+        configuration.minutesInterval > 59
+      )
+        return null;
 
       const interval = configuration.minutesInterval;
 
-      // Fallback calculation when no backend reference is available
-      const nextTrigger = new Date(nowInTZ);
-      nextTrigger.setSeconds(0);
-      nextTrigger.setMilliseconds(0);
-      nextTrigger.setMinutes(nextTrigger.getMinutes() + interval);
-      return nextTrigger;
+      // Simulate reference time logic from Go - for minutes we need a reference point
+      // Since we don't have referenceTime in frontend, use current time as reference
+      const reference = nowInTZ;
+      const minutesElapsed = Math.floor((nowInTZ.getTime() - reference.getTime()) / (60 * 1000));
+
+      const completedIntervals = Math.floor(Math.max(0, minutesElapsed) / interval);
+      const nextTriggerMinutes = (completedIntervals + 1) * interval;
+
+      const nextTriggerInTZ = new Date(reference.getTime() + nextTriggerMinutes * 60 * 1000);
+
+      // If nextTrigger is in the past or now, add another interval
+      if (nextTriggerInTZ <= nowInTZ) {
+        nextTriggerInTZ.setTime(nextTriggerInTZ.getTime() + interval * 60 * 1000);
+      }
+
+      return new Date(nextTriggerInTZ.getTime());
     }
 
     case "hours": {
-      const interval = configuration.hoursInterval || 1;
+      if (
+        configuration.hoursInterval === undefined ||
+        configuration.hoursInterval < 1 ||
+        configuration.hoursInterval > 23
+      )
+        return null;
+
+      const interval = configuration.hoursInterval;
       const minute = configuration.minute || 0;
 
-      const nextTrigger = new Date(nowInTZ);
-      nextTrigger.setMinutes(minute);
-      nextTrigger.setSeconds(0);
-      nextTrigger.setMilliseconds(0);
+      if (minute < 0 || minute > 59) return null;
 
-      // Add the interval
-      nextTrigger.setHours(nextTrigger.getHours() + interval);
+      // Match Go backend: start with current time in timezone + interval, set minute
+      const nextTriggerInTZ = new Date(nowInTZ);
+      nextTriggerInTZ.setHours(nextTriggerInTZ.getHours() + interval);
+      nextTriggerInTZ.setMinutes(minute);
+      nextTriggerInTZ.setSeconds(0);
+      nextTriggerInTZ.setMilliseconds(0);
 
-      return new Date(nextTrigger.getTime() - timezoneOffset * 60 * 60 * 1000);
+      return new Date(nextTriggerInTZ.getTime());
     }
 
     case "days": {
-      const interval = configuration.daysInterval || 1;
+      if (configuration.daysInterval === undefined || configuration.daysInterval < 1 || configuration.daysInterval > 31)
+        return null;
+
+      const interval = configuration.daysInterval;
       const hour = configuration.hour || 0;
       const minute = configuration.minute || 0;
 
-      const nextTrigger = new Date(nowInTZ);
-      nextTrigger.setHours(hour);
-      nextTrigger.setMinutes(minute);
-      nextTrigger.setSeconds(0);
-      nextTrigger.setMilliseconds(0);
+      if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
 
-      // Add the interval
-      nextTrigger.setDate(nextTrigger.getDate() + interval);
+      // Match Go backend: add interval days in timezone, set time
+      const nextTriggerInTZ = new Date(nowInTZ);
+      nextTriggerInTZ.setDate(nextTriggerInTZ.getDate() + interval);
+      nextTriggerInTZ.setHours(hour);
+      nextTriggerInTZ.setMinutes(minute);
+      nextTriggerInTZ.setSeconds(0);
+      nextTriggerInTZ.setMilliseconds(0);
 
-      return new Date(nextTrigger.getTime() - timezoneOffset * 60 * 60 * 1000);
+      return new Date(nextTriggerInTZ.getTime());
     }
 
     case "weeks": {
-      const interval = configuration.weeksInterval || 1;
-      const weekDays = configuration.weekDays || ["monday"];
+      if (
+        configuration.weeksInterval === undefined ||
+        configuration.weeksInterval < 1 ||
+        configuration.weeksInterval > 52
+      )
+        return null;
+      if (!configuration.weekDays || configuration.weekDays.length === 0) return null;
+
+      const interval = configuration.weeksInterval;
+      const weekDays = configuration.weekDays;
       const hour = configuration.hour || 0;
       const minute = configuration.minute || 0;
 
+      if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+
       const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-      const validDayIndices = weekDays
-        .map((day) => dayNames.indexOf(day.toLowerCase()))
-        .filter((index) => index !== -1);
+      const validDayIndices = new Set();
 
-      if (validDayIndices.length === 0) return null;
+      for (const dayStr of weekDays) {
+        const dayIndex = dayNames.indexOf(dayStr.toLowerCase());
+        if (dayIndex !== -1) {
+          validDayIndices.add(dayIndex);
+        }
+      }
 
-      const nextTrigger = new Date(nowInTZ);
-      nextTrigger.setHours(hour);
-      nextTrigger.setMinutes(minute);
-      nextTrigger.setSeconds(0);
-      nextTrigger.setMilliseconds(0);
+      if (validDayIndices.size === 0) return null;
 
-      // Add the interval in weeks and find next valid day
-      nextTrigger.setDate(nextTrigger.getDate() + interval * 7);
+      // Match Go backend: add interval weeks in timezone, then find first valid weekday
+      const nextIntervalStart = new Date(nowInTZ);
+      nextIntervalStart.setDate(nextIntervalStart.getDate() + interval * 7);
 
-      // Find the closest valid weekday
+      // Go to start of week (Sunday = 0)
+      const daysToSubtract = nextIntervalStart.getDay();
+      nextIntervalStart.setDate(nextIntervalStart.getDate() - daysToSubtract);
+
+      // Find first valid weekday in that week
       for (let i = 0; i < 7; i++) {
-        const testDate = new Date(nextTrigger);
-        testDate.setDate(testDate.getDate() + i);
-        if (validDayIndices.includes(testDate.getDay())) {
-          testDate.setHours(hour);
-          testDate.setMinutes(minute);
-          return new Date(testDate.getTime() - timezoneOffset * 60 * 60 * 1000);
+        const checkDate = new Date(nextIntervalStart);
+        checkDate.setDate(checkDate.getDate() + i);
+        if (validDayIndices.has(checkDate.getDay())) {
+          checkDate.setHours(hour);
+          checkDate.setMinutes(minute);
+          checkDate.setSeconds(0);
+          checkDate.setMilliseconds(0);
+          return new Date(checkDate.getTime());
         }
       }
 
@@ -168,26 +218,46 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
     }
 
     case "months": {
-      const interval = configuration.monthsInterval || 1;
-      const dayOfMonth = configuration.dayOfMonth || 1;
+      if (
+        configuration.monthsInterval === undefined ||
+        configuration.monthsInterval < 1 ||
+        configuration.monthsInterval > 24
+      )
+        return null;
+      if (configuration.dayOfMonth === undefined || configuration.dayOfMonth < 1 || configuration.dayOfMonth > 31)
+        return null;
+
+      const interval = configuration.monthsInterval;
+      const dayOfMonth = configuration.dayOfMonth;
       const hour = configuration.hour || 0;
       const minute = configuration.minute || 0;
 
-      const nextTrigger = new Date(nowInTZ);
-      nextTrigger.setMonth(nextTrigger.getMonth() + interval);
-      nextTrigger.setDate(dayOfMonth);
-      nextTrigger.setHours(hour);
-      nextTrigger.setMinutes(minute);
-      nextTrigger.setSeconds(0);
-      nextTrigger.setMilliseconds(0);
+      if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
 
-      return new Date(nextTrigger.getTime() - timezoneOffset * 60 * 60 * 1000);
+      // Match Go backend: add interval months in timezone, set day/hour/minute
+      const nextTriggerInTZ = new Date(nowInTZ);
+      nextTriggerInTZ.setMonth(nextTriggerInTZ.getMonth() + interval);
+      nextTriggerInTZ.setDate(dayOfMonth);
+      nextTriggerInTZ.setHours(hour);
+      nextTriggerInTZ.setMinutes(minute);
+      nextTriggerInTZ.setSeconds(0);
+      nextTriggerInTZ.setMilliseconds(0);
+
+      return new Date(nextTriggerInTZ.getTime());
     }
 
     case "cron": {
-      // For cron expressions, we can't easily calculate in frontend
-      // The backend handles the actual cron scheduling
-      return null;
+      if (!configuration.cronExpression) return null;
+
+      try {
+        const nextTime = getNextCronExecution(configuration.cronExpression, nowInTZ);
+
+        if (!nextTime) return null;
+
+        return new Date(nextTime.getTime());
+      } catch {
+        return null;
+      }
     }
 
     default:
@@ -270,5 +340,53 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
     }
 
     return props;
+  },
+};
+
+/**
+ * Custom field renderer for schedule trigger configuration
+ */
+export const scheduleCustomFieldRenderer: CustomFieldRenderer = {
+  render: (_node: ComponentsNode, configuration: Record<string, unknown>) => {
+    const scheduleConfig = configuration as unknown as ScheduleConfiguration;
+    const scheduleDescription = formatScheduleDescription(scheduleConfig);
+    const nextTrigger = formatNextTrigger(scheduleConfig, undefined);
+
+    return React.createElement(
+      "div",
+      { className: "border-t-1 border-gray-200" },
+      React.createElement(
+        "div",
+        { className: "space-y-3" },
+        React.createElement(
+          "div",
+          null,
+          React.createElement(
+            "span",
+            { className: "text-sm font-medium text-gray-700 dark:text-gray-300" },
+            "Runs on:",
+          ),
+          React.createElement(
+            "div",
+            { className: "text-sm text-gray-900 dark:text-gray-100 mt-1 border-1 p-2 bg-zinc-100" },
+            scheduleDescription || "Schedule not configured",
+          ),
+        ),
+        React.createElement(
+          "div",
+          null,
+          React.createElement(
+            "span",
+            { className: "text-sm font-medium text-gray-700 dark:text-gray-300" },
+            "Next run:",
+          ),
+          React.createElement(
+            "div",
+            { className: "text-sm text-gray-900 dark:text-gray-100 mt-1 border-1 p-2 bg-zinc-100" },
+            nextTrigger,
+          ),
+        ),
+      ),
+    );
   },
 };

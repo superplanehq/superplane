@@ -720,6 +720,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             onNodeConfigCancel={undefined}
             domainId={props.organizationId}
             domainType={"DOMAIN_TYPE_ORGANIZATION" as AuthorizationDomainType}
+            customField={undefined}
           />
         )}
       </div>

@@ -9,6 +9,7 @@ import {
 import { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
 import { TriggerProps } from "@/ui/trigger";
 import { QueryClient } from "@tanstack/react-query";
+import { ReactNode } from "react";
 
 /**
  * A trigger renderer converts backend data into UI props for a specific trigger type.
@@ -89,4 +90,18 @@ export type StateFunction = (execution: WorkflowsWorkflowNodeExecution) => Event
 export interface EventStateRegistry {
   stateMap: EventStateMap;
   getState: StateFunction;
+}
+
+/**
+ * A custom field renderer renders additional UI elements in the settings tab
+ * for specific component/trigger types
+ */
+export interface CustomFieldRenderer {
+  /**
+   * Render custom UI for the given node configuration
+   * @param node The node from the backend
+   * @param configuration Current node configuration
+   * @returns React node to render
+   */
+  render(node: ComponentsNode, configuration: Record<string, unknown>): ReactNode;
 }

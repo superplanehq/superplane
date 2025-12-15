@@ -1,5 +1,5 @@
 import { AuthorizationDomainType, ConfigurationField } from "@/api-client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ interface SettingsTabProps {
   onCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
+  customField?: (configuration: Record<string, unknown>) => ReactNode;
 }
 
 export function SettingsTab({
@@ -29,6 +30,7 @@ export function SettingsTab({
   onCancel,
   domainId,
   domainType,
+  customField,
 }: SettingsTabProps) {
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
@@ -227,6 +229,19 @@ export function SettingsTab({
                 />
               );
             })}
+          </div>
+        )}
+
+        {/* Custom field section */}
+        {customField && (
+          <div
+            className={
+              configurationFields && configurationFields.length > 0
+                ? ""
+                : "border-t border-gray-200 dark:border-zinc-700 pt-6"
+            }
+          >
+            {customField(nodeConfiguration)}
           </div>
         )}
       </div>
