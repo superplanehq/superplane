@@ -4,7 +4,7 @@ import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { resolveIcon } from "@/lib/utils";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { ChevronRight, GripVerticalIcon, Menu, Settings2, X } from "lucide-react";
+import { ChevronRight, GripVerticalIcon, Menu, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { createNodeDragPreview } from "./createNodeDragPreview";
@@ -58,7 +58,6 @@ export function BuildingBlocksSidebar({
   }
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -66,20 +65,6 @@ export function BuildingBlocksSidebar({
     return saved ? parseInt(saved, 10) : 450;
   });
   const [isResizing, setIsResizing] = useState(false);
-
-  // Initialize showWip from localStorage
-  const [showWip, setShowWip] = useState(() => {
-    const storedShowWip = localStorage.getItem("buildingBlocksShowWip");
-    if (storedShowWip !== null) {
-      return JSON.parse(storedShowWip);
-    }
-    return false; // default value
-  });
-
-  // Save showWip to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem("buildingBlocksShowWip", JSON.stringify(showWip));
-  }, [showWip]);
 
   // Close sidebar when clicking outside (for clicks in header, etc.)
   useEffect(() => {
@@ -205,53 +190,25 @@ export function BuildingBlocksSidebar({
         </div>
       </div>
 
-      {/* Search and Settings */}
+      {/* Search */}
       <div className="flex items-center gap-2 px-3 py-3 border-b-1 border-border">
         <div className="flex-1">
           <input
             type="text"
-            placeholder="Search components..."
+            placeholder="Filter components..."
             className="w-full px-3 py-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-500 dark:placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setIsConfigOpen((v) => !v)}
-          aria-haspopup="menu"
-          aria-expanded={isConfigOpen}
-          aria-label="Configure"
-        >
-          <Settings2 size={20} />
-        </Button>
-
-        {isConfigOpen && (
-          <div
-            role="menu"
-            className="absolute right-4 top-24 z-40 w-60 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg"
-          >
-            <button
-              className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
-              onClick={() => {
-                setShowWip((v: boolean) => !v);
-                setIsConfigOpen(false);
-              }}
-            >
-              {showWip ? "Hide WIP elements" : "Show WIP elements"}
-            </button>
-          </div>
-        )}
       </div>
 
-      <div className="flex-1 overflow-y-scroll relative">
+      <div className="flex-1 gap-2 py-3 relative">
         {sortedCategories.map((category) => (
           <CategorySection
             key={category.name}
             category={category}
             canvasZoom={canvasZoom}
-            showWip={showWip}
             searchTerm={searchTerm}
             isDraggingRef={isDraggingRef}
           />
@@ -277,11 +234,10 @@ interface CategorySectionProps {
   category: BuildingBlockCategory;
   canvasZoom: number;
   searchTerm?: string;
-  showWip?: boolean;
   isDraggingRef: React.RefObject<boolean>;
 }
 
-function CategorySection({ category, canvasZoom, searchTerm = "", showWip = false, isDraggingRef }: CategorySectionProps) {
+function CategorySection({ category, canvasZoom, searchTerm = "", isDraggingRef }: CategorySectionProps) {
   const query = searchTerm.trim().toLowerCase();
   const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
 
@@ -293,7 +249,8 @@ function CategorySection({ category, canvasZoom, searchTerm = "", showWip = fals
         return name.includes(query) || label.includes(query);
       });
 
-  const allBlocks = showWip ? baseBlocks : baseBlocks.filter((b) => b.isLive);
+  // Only show live/ready blocks
+  const allBlocks = baseBlocks.filter((b) => b.isLive);
 
   if (allBlocks.length === 0) {
     return null;
