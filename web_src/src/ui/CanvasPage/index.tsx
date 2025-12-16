@@ -11,7 +11,12 @@ import {
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ComponentsAppInstallationRef, ConfigurationField, OrganizationsAppInstallation, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import {
+  ComponentsAppInstallationRef,
+  ConfigurationField,
+  OrganizationsAppInstallation,
+  WorkflowsWorkflowNodeExecution,
+} from "@/api-client";
 import { getCustomFieldRenderer } from "@/pages/workflowv2/mappers";
 import { AiSidebar } from "../ai";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";

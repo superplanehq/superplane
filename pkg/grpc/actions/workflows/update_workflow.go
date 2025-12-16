@@ -130,8 +130,8 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		existingNode.Configuration = datatypes.NewJSONType(node.Configuration)
 		existingNode.Position = datatypes.NewJSONType(node.Position)
 		existingNode.IsCollapsed = node.IsCollapsed
-		existingNode.Metadata = datatypes.NewJSONType(node.Metadata)
 		existingNode.AppInstallationID = appInstallationID
+
 		// Set parent if internal namespaced id
 		if idx := strings.Index(node.ID, ":"); idx != -1 {
 			parent := node.ID[:idx]
@@ -139,6 +139,7 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		} else {
 			existingNode.ParentNodeID = nil
 		}
+
 		existingNode.UpdatedAt = &now
 		err := tx.Save(&existingNode).Error
 		if err != nil {

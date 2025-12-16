@@ -145,7 +145,9 @@ export function Applications({ organizationId }: ApplicationsProps) {
                                   : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
                             }`}
                           >
-                            {app.status?.state ? app.status.state.charAt(0).toUpperCase() + app.status.state.slice(1) : 'Unknown'}
+                            {app.status?.state
+                              ? app.status.state.charAt(0).toUpperCase() + app.status.state.slice(1)
+                              : "Unknown"}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 truncate">

@@ -6,25 +6,25 @@ import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface OnPipelineDoneMetadata {
   project?: {
-    id: string,
-    name: string,
-    url: string
-  },
+    id: string;
+    name: string;
+    url: string;
+  };
 }
 
 interface OnPipelineDoneEventData {
   project?: {
-    name: string
-  },
+    name: string;
+  };
   repository?: {
-    slug: string
-  },
+    slug: string;
+  };
   pipeline?: {
-    name: string,
-    state: string,
-    result: string,
-    done_at: string,
-  }
+    name: string;
+    state: string;
+    result: string;
+    done_at: string;
+  };
 }
 
 /**
@@ -44,10 +44,10 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     const eventData = lastEvent.data as OnPipelineDoneEventData;
 
     return {
-      "Project": eventData?.project?.name || "",
-      "Repository": eventData?.repository?.slug || "",
-      "Pipeline": eventData?.pipeline?.name || "",
-      "Result": eventData?.pipeline?.result || "",
+      Project: eventData?.project?.name || "",
+      Repository: eventData?.repository?.slug || "",
+      Pipeline: eventData?.pipeline?.name || "",
+      Result: eventData?.pipeline?.result || "",
       "Done At": eventData?.pipeline?.done_at || "",
     };
   },

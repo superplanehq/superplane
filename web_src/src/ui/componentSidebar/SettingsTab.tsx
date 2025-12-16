@@ -1,4 +1,9 @@
-import { AuthorizationDomainType, ComponentsAppInstallationRef, ConfigurationField, OrganizationsAppInstallation } from "@/api-client";
+import {
+  AuthorizationDomainType,
+  ComponentsAppInstallationRef,
+  ConfigurationField,
+  OrganizationsAppInstallation,
+} from "@/api-client";
 import { useCallback, useEffect, useMemo, useState, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -17,7 +22,11 @@ interface SettingsTabProps {
   nodeLabel?: string;
   configuration: Record<string, unknown>;
   configurationFields: ConfigurationField[];
-  onSave: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => void;
+  onSave: (
+    updatedConfiguration: Record<string, unknown>,
+    updatedNodeName: string,
+    appInstallationRef?: ComponentsAppInstallationRef,
+  ) => void;
   onCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
@@ -46,7 +55,9 @@ export function SettingsTab({
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
-  const [selectedAppInstallation, setSelectedAppInstallation] = useState<ComponentsAppInstallationRef | undefined>(appInstallationRef);
+  const [selectedAppInstallation, setSelectedAppInstallation] = useState<ComponentsAppInstallationRef | undefined>(
+    appInstallationRef,
+  );
 
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
@@ -55,9 +66,7 @@ export function SettingsTab({
   // Filter installations by app name
   const availableInstallations = useMemo(() => {
     if (!appName) return [];
-    return installedApplications.filter(
-      (app) => app.spec?.appName === appName && app.status?.state === "ready"
-    );
+    return installedApplications.filter((app) => app.spec?.appName === appName && app.status?.state === "ready");
   }, [installedApplications, appName]);
   const {
     validationErrors: realtimeValidationErrors,
@@ -233,9 +242,7 @@ export function SettingsTab({
               // Warning when no installations available
               <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
                 <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <AlertTitle className="text-amber-900 dark:text-amber-100">
-                  App Installation Required
-                </AlertTitle>
+                <AlertTitle className="text-amber-900 dark:text-amber-100">App Installation Required</AlertTitle>
                 <AlertDescription className="text-amber-800 dark:text-amber-200">
                   This component requires a {appName} installation.{" "}
                   <a
@@ -254,9 +261,7 @@ export function SettingsTab({
               <div className="flex flex-col gap-2">
                 <Label
                   className={`min-w-[100px] text-left ${
-                    showValidation && validationErrors.has("appInstallation")
-                      ? "text-red-600 dark:text-red-400"
-                      : ""
+                    showValidation && validationErrors.has("appInstallation") ? "text-red-600 dark:text-red-400" : ""
                   }`}
                 >
                   App Installation
@@ -268,9 +273,7 @@ export function SettingsTab({
                 <Select
                   value={selectedAppInstallation?.id || ""}
                   onValueChange={(value) => {
-                    const installation = availableInstallations.find(
-                      (app) => app.metadata?.id === value
-                    );
+                    const installation = availableInstallations.find((app) => app.metadata?.id === value);
                     if (installation) {
                       setSelectedAppInstallation({
                         id: installation.metadata?.id,
@@ -281,19 +284,14 @@ export function SettingsTab({
                 >
                   <SelectTrigger
                     className={`w-full shadow-none ${
-                      showValidation && validationErrors.has("appInstallation")
-                        ? "border-red-500 border-2"
-                        : ""
+                      showValidation && validationErrors.has("appInstallation") ? "border-red-500 border-2" : ""
                     }`}
                   >
                     <SelectValue placeholder="Select an installation" />
                   </SelectTrigger>
                   <SelectContent>
                     {availableInstallations.map((installation) => (
-                      <SelectItem
-                        key={installation.metadata?.id}
-                        value={installation.metadata?.id || ""}
-                      >
+                      <SelectItem key={installation.metadata?.id} value={installation.metadata?.id || ""}>
                         {installation.metadata?.name || "Unnamed installation"}
                       </SelectItem>
                     ))}

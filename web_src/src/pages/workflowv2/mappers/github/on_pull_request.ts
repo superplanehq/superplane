@@ -22,9 +22,9 @@ interface OnPullRequestEventData {
   pull_request?: {
     _links?: {
       html?: {
-        href: string
-      }
-    },
+        href: string;
+      };
+    };
     title?: string;
     id?: string;
     url?: string;
@@ -54,8 +54,6 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
     const eventData = lastEvent.data as OnPullRequestEventData;
-
-    console.log(eventData)
 
     return {
       URL: eventData?.pull_request?._links?.html?.href || "",
