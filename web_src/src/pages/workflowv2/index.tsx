@@ -588,7 +588,7 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
 
-      const { buildingBlock, nodeName, configuration, position } = newNodeData;
+      const { buildingBlock, nodeName, configuration, position, sourceConnection } = newNodeData;
 
       // Filter configuration to only include visible fields
       const filteredConfiguration = filterVisibleConfiguration(configuration, buildingBlock.configuration || []);
@@ -630,11 +630,23 @@ export function WorkflowPageV2() {
       // Add the new node to the workflow
       const updatedNodes = [...(workflow.spec?.nodes || []), newNode];
 
+      // If there's a source connection, create the edge
+      let updatedEdges = workflow.spec?.edges || [];
+      if (sourceConnection) {
+        const newEdge: ComponentsEdge = {
+          sourceId: sourceConnection.nodeId,
+          targetId: newNodeId,
+          channel: sourceConnection.handleId || "default",
+        };
+        updatedEdges = [...updatedEdges, newEdge];
+      }
+
       const updatedWorkflow = {
         ...workflow,
         spec: {
           ...workflow.spec,
           nodes: updatedNodes,
+          edges: updatedEdges,
         },
       };
 

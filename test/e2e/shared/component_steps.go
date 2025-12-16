@@ -32,7 +32,22 @@ func (s *ComponentSteps) Create() {
 	s.session.Sleep(300)
 }
 
+func (s *ComponentSteps) OpenBuildingBlocksSidebar() {
+	// Try to open the sidebar if it's not already open
+	// The button only appears when sidebar is closed
+	openButton := q.TestID("open-sidebar-button")
+	loc := openButton.Run(s.session)
+
+	// Check if the button is visible (sidebar is closed)
+	if isVisible, _ := loc.IsVisible(); isVisible {
+		s.session.Click(openButton)
+		s.session.Sleep(300)
+	}
+}
+
 func (s *ComponentSteps) AddNoop(name string, pos models.Position) {
+	s.OpenBuildingBlocksSidebar()
+
 	source := q.TestID("building-block-noop")
 	target := q.TestID("rf__wrapper")
 
@@ -50,6 +65,8 @@ func (s *ComponentSteps) Save() {
 }
 
 func (s *ComponentSteps) AddApproval(nodeName string, pos models.Position) {
+	s.OpenBuildingBlocksSidebar()
+
 	source := q.TestID("building-block-approval")
 	target := q.TestID("rf__wrapper")
 
@@ -62,6 +79,8 @@ func (s *ComponentSteps) AddApproval(nodeName string, pos models.Position) {
 }
 
 func (s *ComponentSteps) AddManualTrigger(name string, pos models.Position) {
+	s.OpenBuildingBlocksSidebar()
+
 	startSource := q.TestID("building-block-start")
 	target := q.TestID("rf__wrapper")
 
@@ -71,6 +90,8 @@ func (s *ComponentSteps) AddManualTrigger(name string, pos models.Position) {
 }
 
 func (s *ComponentSteps) AddWait(name string, pos models.Position, duration int, unit string) {
+	s.OpenBuildingBlocksSidebar()
+
 	source := q.TestID("building-block-wait")
 	target := q.TestID("rf__wrapper")
 
@@ -90,6 +111,8 @@ func (s *ComponentSteps) AddWait(name string, pos models.Position, duration int,
 }
 
 func (s *ComponentSteps) StartAddingTimeGate(name string, pos models.Position) {
+	s.OpenBuildingBlocksSidebar()
+
 	source := q.TestID("building-block-time_gate")
 	target := q.TestID("rf__wrapper")
 
@@ -100,6 +123,8 @@ func (s *ComponentSteps) StartAddingTimeGate(name string, pos models.Position) {
 }
 
 func (s *ComponentSteps) AddTimeGate(name string, pos models.Position) {
+	s.OpenBuildingBlocksSidebar()
+
 	source := q.TestID("building-block-time_gate")
 	target := q.TestID("rf__wrapper")
 

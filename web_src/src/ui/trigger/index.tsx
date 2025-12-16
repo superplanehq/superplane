@@ -33,7 +33,13 @@ export const Trigger: React.FC<TriggerProps> = ({ lastEventData, ...componentBas
   }, [lastEventData]);
 
   if (!lastEventData) {
-    return <ComponentBase {...componentBaseProps} includeEmptyState emptyStateTitle="Waiting for the first event" />;
+    return (
+      <ComponentBase
+        {...componentBaseProps}
+        includeEmptyState
+        emptyStateProps={{ title: "Waiting for the first event" }}
+      />
+    );
   }
 
   return <ComponentBase {...componentBaseProps} eventSections={eventSections} />;
