@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { resolveIcon } from "@/lib/utils";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass } from "@/utils/colors";
 import { ChevronRight, GripVerticalIcon, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
@@ -246,7 +246,7 @@ export function BuildingBlocksSidebar({
             title={hoveredBlock.label || hoveredBlock.name || "New Component"}
             headerColor="bg-gray-50"
             iconSlug={hoveredBlock.icon}
-            iconColor={getColorClass(hoveredBlock.color)}
+            iconColor="text-indigo-700"
             collapsedBackground={getBackgroundColorClass("white")}
             hideActionsButton={true}
             includeEmptyState={true}
@@ -304,7 +304,6 @@ function CategorySection({
         {allBlocks.map((block) => {
           const iconSlug = block.icon || "zap";
           const IconComponent = resolveIcon(iconSlug);
-          const colorClass = getColorClass(block.color);
 
           const isLive = !!block.isLive;
           return (
@@ -376,7 +375,7 @@ function CategorySection({
               size="sm"
             >
               <ItemMedia>
-                <IconComponent size={14} className={colorClass} />
+                <IconComponent size={14} className="text-indigo-700" />
               </ItemMedia>
 
               <ItemContent>
