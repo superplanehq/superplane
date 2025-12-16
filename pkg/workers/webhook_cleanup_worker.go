@@ -89,7 +89,7 @@ func (w *WebhookCleanupWorker) processWebhook(tx *gorm.DB, webhook *models.Webho
 }
 
 func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhook *models.Webhook) error {
-	appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *webhook.AppInstallationID)
+	appInstallation, err := models.FindMaybeDeletedInstallationInTransaction(tx, *webhook.AppInstallationID)
 	if err != nil {
 		return err
 	}

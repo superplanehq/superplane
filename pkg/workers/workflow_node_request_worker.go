@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -139,6 +140,11 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Wor
 	if node.AppInstallationID != nil {
 		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				w.log("app installation %s not found - completing request", *node.AppInstallationID)
+				return request.Complete(tx)
+			}
+
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 

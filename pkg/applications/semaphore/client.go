@@ -17,6 +17,10 @@ type Client struct {
 }
 
 func NewClient(ctx core.AppInstallationContext) (*Client, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("no app installation context")
+	}
+
 	orgURL, err := ctx.GetConfig("organizationUrl")
 	if err != nil {
 		return nil, err

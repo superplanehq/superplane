@@ -390,6 +390,10 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 		return err
 	}
 
+	if ctx.ExecutionStateContext.IsFinished() {
+		return nil
+	}
+
 	metadata := RunWorkflowExecutionMetadata{}
 	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {

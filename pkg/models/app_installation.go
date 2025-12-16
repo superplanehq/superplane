@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -27,6 +28,7 @@ type AppInstallation struct {
 	BrowserAction    *datatypes.JSONType[BrowserAction]
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
+	DeletedAt        gorm.DeletedAt `gorm:"index"`
 }
 
 type AppInstallationSecret struct {
@@ -88,6 +90,19 @@ func ListAppInstallationWebhooks(tx *gorm.DB, installationID uuid.UUID) ([]Webho
 	return webhooks, nil
 }
 
+func ListUnscopedAppInstallationWebhooks(tx *gorm.DB, installationID uuid.UUID) ([]Webhook, error) {
+	var webhooks []Webhook
+	err := tx.Unscoped().
+		Where("app_installation_id = ?", installationID).
+		Find(&webhooks).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+	return webhooks, nil
+}
+
 type WorkflowNodeReference struct {
 	WorkflowID   uuid.UUID
 	WorkflowName string
@@ -130,6 +145,20 @@ func FindUnscopedAppInstallationInTransaction(tx *gorm.DB, installationID uuid.U
 	return &appInstallation, nil
 }
 
+func FindMaybeDeletedInstallationInTransaction(tx *gorm.DB, installationID uuid.UUID) (*AppInstallation, error) {
+	var appInstallation AppInstallation
+	err := tx.Unscoped().
+		Where("id = ?", installationID).
+		First(&appInstallation).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &appInstallation, nil
+}
+
 func FindAppInstallation(orgID, installationID uuid.UUID) (*AppInstallation, error) {
 	var appInstallation AppInstallation
 	err := database.Conn().
@@ -143,4 +172,34 @@ func FindAppInstallation(orgID, installationID uuid.UUID) (*AppInstallation, err
 	}
 
 	return &appInstallation, nil
+}
+
+func ListDeletedAppInstallations() ([]AppInstallation, error) {
+	var installations []AppInstallation
+	err := database.Conn().Unscoped().
+		Where("deleted_at IS NOT NULL").
+		Find(&installations).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return installations, nil
+}
+
+func LockAppInstallation(tx *gorm.DB, ID uuid.UUID) (*AppInstallation, error) {
+	var installation AppInstallation
+
+	err := tx.Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ?", ID).
+		First(&installation).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &installation, nil
 }

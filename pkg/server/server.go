@@ -104,6 +104,13 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_INSTALLATION_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting App Installation Cleanup Worker")
+
+		w := workers.NewInstallationCleanupWorker()
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Workflow Cleanup Worker")
 

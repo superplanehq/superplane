@@ -21,7 +21,7 @@ import {
   WorkflowsWorkflowNodeExecution,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
-import { NewNodeData } from "../CustomComponentBuilderPage";
+import { NewNodeData } from "../CanvasPage";
 import { ReactNode } from "react";
 
 const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
