@@ -22,7 +22,7 @@ type OnPullRequestMetadata struct {
 
 type OnPullRequestConfiguration struct {
 	Repository string   `json:"repository"`
-	Action     []string `json:"action"`
+	Actions    []string `json:"action"`
 }
 
 func (p *OnPullRequest) Name() string {
@@ -54,8 +54,8 @@ func (p *OnPullRequest) Configuration() []configuration.Field {
 			Required: true,
 		},
 		{
-			Name:     "action",
-			Label:    "Action",
+			Name:     "actions",
+			Label:    "Actions",
 			Type:     configuration.FieldTypeMultiSelect,
 			Required: true,
 			Default:  []string{"opened"},
@@ -188,7 +188,7 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 		return http.StatusBadRequest, fmt.Errorf("missing action")
 	}
 
-	if !slices.Contains(config.Action, action.(string)) {
+	if !slices.Contains(config.Actions, action.(string)) {
 		return http.StatusOK, nil
 	}
 
