@@ -81,9 +81,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
     setNodes((currentNodes) => {
       // Preserve locally-added template and pending connection nodes
-      const localOnlyNodes = currentNodes.filter(
-        (node) => node.data.isTemplate || node.data.isPendingConnection,
-      );
+      const localOnlyNodes = currentNodes.filter((node) => node.data.isTemplate || node.data.isPendingConnection);
 
       const syncedNodes = initialNodes.map((newNode) => {
         const existingNode = currentNodes.find((n) => n.id === newNode.id);
