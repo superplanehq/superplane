@@ -51,7 +51,7 @@ export function BuildingBlocksSidebar({
         variant="outline"
         onClick={() => onToggle(true)}
         aria-label="Open sidebar"
-        className="absolute top-4 right-4 z-10"
+        className="absolute top-4 right-16 z-10"
       >
         <Plus size={16} />
         Components

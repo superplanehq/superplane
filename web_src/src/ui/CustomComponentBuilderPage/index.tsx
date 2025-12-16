@@ -250,7 +250,10 @@ function CanvasContent({
       if (templateNodeId && node.id !== templateNodeId) {
         // Check if current template is configured (not just pending)
         const currentTemplate = nodes.find((n) => n.id === templateNodeId);
-        const currentIsConfigured = currentTemplate && (currentTemplate.data as any)?.isTemplate && !(currentTemplate.data as any)?.isPendingConnection;
+        const currentIsConfigured =
+          currentTemplate &&
+          (currentTemplate.data as any)?.isTemplate &&
+          !(currentTemplate.data as any)?.isPendingConnection;
 
         // Block if: there's a configured template AND we're not clicking on a pending node or template node
         if (currentIsConfigured && !clickedIsPending && !clickedIsTemplate) {
@@ -364,8 +367,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   const [localNewNodeData, setLocalNewNodeData] = useState<NewNodeData | null>(null);
   const templateNodeId = props.templateNodeId !== undefined ? props.templateNodeId : localTemplateNodeId;
   const newNodeData = props.newNodeData !== undefined ? props.newNodeData : localNewNodeData;
-  const setTemplateNodeId = props.templateNodeId !== undefined ? (() => {}) : setLocalTemplateNodeId;
-  const setNewNodeData = props.newNodeData !== undefined ? (() => {}) : setLocalNewNodeData;
+  const setTemplateNodeId = props.templateNodeId !== undefined ? () => {} : setLocalTemplateNodeId;
+  const setNewNodeData = props.newNodeData !== undefined ? () => {} : setLocalNewNodeData;
 
   // In delegated mode, open the ComponentSidebar when newNodeData is set, close when cleared
   useEffect(() => {
@@ -468,11 +471,21 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
       // Generate unique template node ID
       const newTemplateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+      // Deselect all existing nodes first
+      props.onNodesChange(
+        props.nodes.map((node) => ({
+          type: "select",
+          id: node.id,
+          selected: false,
+        })),
+      );
+
       // Create template node data
       const templateNode: Node = {
         id: newTemplateId,
         type: "default",
         position: position || { x: props.nodes.length * 250, y: 100 },
+        selected: true,
         data: {
           type: "component",
           label: block.label || block.name || "New Component",
@@ -501,19 +514,35 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         props.onAddTemplateNode(templateNode);
       }
 
-      setTemplateNodeId(newTemplateId);
-      setNewNodeData({
-        icon: block.icon || "circle-off",
-        buildingBlock: block,
-        nodeName: block.name || "",
-        displayLabel: block.label || block.name || "",
-        configuration: {},
-        position,
-      });
+      // In delegated mode, we need to notify parent to set template state
+      // In non-delegated mode, set local state
+      if (props.templateNodeId !== undefined) {
+        // Delegated mode - parent manages state via onAddTemplateNode callback
+        // The parent's onAddTemplateNode will set both templateNodeId and newNodeData
+        // Then the useEffect will open the ComponentSidebar automatically
+      } else {
+        // Non-delegated mode - manage state locally
+        setTemplateNodeId(newTemplateId);
+        setNewNodeData({
+          icon: block.icon || "circle-off",
+          buildingBlock: block,
+          nodeName: block.name || "",
+          displayLabel: block.label || block.name || "",
+          configuration: {},
+          position,
+        });
 
-      setIsNodeSidebarOpen(true);
-      setSelectedNodeId(newTemplateId);
-      // Always opens to settings tab
+        // Open sidebar in non-delegated mode
+        setIsNodeSidebarOpen(true);
+        setSelectedNodeId(newTemplateId);
+      }
+
+      // Close building blocks sidebar after dropping a block
+      if (props.onBuildingBlocksSidebarToggle) {
+        props.onBuildingBlocksSidebarToggle(false);
+      } else {
+        setIsLeftSidebarOpen(false);
+      }
     },
     [templateNodeId, props],
   );
@@ -604,7 +633,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
 
       // Check if the current template is a configured template (not just pending connection)
       const currentTemplateNode = templateNodeId ? props.nodes.find((n) => n.id === templateNodeId) : null;
-      const isCurrentTemplateConfigured = (currentTemplateNode?.data as any)?.isTemplate && !(currentTemplateNode?.data as any)?.isPendingConnection;
+      const isCurrentTemplateConfigured =
+        (currentTemplateNode?.data as any)?.isTemplate && !(currentTemplateNode?.data as any)?.isPendingConnection;
 
       // Allow switching to pending connection nodes or other template nodes even if there's a configured template
       // But block switching to other regular/real nodes
@@ -786,11 +816,15 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
       <div className="flex-1 flex relative overflow-hidden">
         {/* Left Sidebar - Building Blocks */}
         <BuildingBlocksSidebar
-          isOpen={props.isBuildingBlocksSidebarOpen !== undefined ? props.isBuildingBlocksSidebarOpen : isLeftSidebarOpen}
+          isOpen={
+            props.isBuildingBlocksSidebarOpen !== undefined ? props.isBuildingBlocksSidebarOpen : isLeftSidebarOpen
+          }
           onToggle={props.onBuildingBlocksSidebarToggle || setIsLeftSidebarOpen}
           blocks={buildingBlockCategories}
           canvasZoom={canvasZoom}
-          disabled={!!templateNodeId && !props.nodes.find((n) => n.id === templateNodeId && (n.data as any).isPendingConnection)}
+          disabled={
+            !!templateNodeId && !props.nodes.find((n) => n.id === templateNodeId && (n.data as any).isPendingConnection)
+          }
           onBlockClick={props.onBuildingBlockClick}
         />
 

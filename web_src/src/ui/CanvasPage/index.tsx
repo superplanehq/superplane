@@ -394,7 +394,8 @@ function CanvasPage(props: CanvasPageProps) {
 
       // Check if current template is a configured template (not just pending connection)
       const currentTemplateNode = templateNodeId ? state.nodes.find((n) => n.id === templateNodeId) : null;
-      const isCurrentTemplateConfigured = currentTemplateNode?.data?.isTemplate && !currentTemplateNode?.data?.isPendingConnection;
+      const isCurrentTemplateConfigured =
+        currentTemplateNode?.data?.isTemplate && !currentTemplateNode?.data?.isPendingConnection;
 
       // Only select and set as template if there isn't a configured template being created
       // Allow switching between pending nodes, but prevent overwriting configured templates
@@ -456,8 +457,8 @@ function CanvasPage(props: CanvasPageProps) {
       setTemplateNodeId(nodeId);
       setNewNodeData({
         buildingBlock: buildingBlock,
-        nodeName: (templateNode.data.nodeName || buildingBlock?.name || 'New Component') as string,
-        icon: (templateNode.data.icon || buildingBlock?.icon || 'Box') as string,
+        nodeName: (templateNode.data.nodeName || buildingBlock?.name || "New Component") as string,
+        icon: (templateNode.data.icon || buildingBlock?.icon || "Box") as string,
         configuration: templateNode.data.configuration || {},
         position: templateNode.position,
         sourceConnection: templateNode.data.sourceConnection as { nodeId: string; handleId: string | null } | undefined,
@@ -495,7 +496,7 @@ function CanvasPage(props: CanvasPageProps) {
                     includeEmptyState: true,
                   } as ComponentBaseProps,
                   isTemplate: true,
-                  isPendingConnection: false,  // Remove pending connection flag
+                  isPendingConnection: false, // Remove pending connection flag
                   buildingBlock: block,
                   tempConfiguration: {},
                   tempNodeName: block.name || "",
@@ -539,6 +540,7 @@ function CanvasPage(props: CanvasPageProps) {
         id: newTemplateId,
         type: "default",
         position: position || { x: 0, y: 0 },
+        selected: true,
         data: {
           type: "component",
           label: block.label || block.name || "New Component",
@@ -559,7 +561,8 @@ function CanvasPage(props: CanvasPageProps) {
         },
       };
 
-      state.setNodes((nodes) => [...nodes, templateNode]);
+      // Deselect all existing nodes and add the new selected template node
+      state.setNodes((nodes) => [...nodes.map((n) => ({ ...n, selected: false })), templateNode]);
 
       setTemplateNodeId(newTemplateId);
       setNewNodeData({
@@ -1215,7 +1218,8 @@ function CanvasContent({
 
       // Check if the current template is a configured template (not just pending connection)
       const currentTemplateNode = templateNodeId ? stateRef.current.nodes?.find((n) => n.id === templateNodeId) : null;
-      const isCurrentTemplateConfigured = currentTemplateNode?.data?.isTemplate && !currentTemplateNode?.data?.isPendingConnection;
+      const isCurrentTemplateConfigured =
+        currentTemplateNode?.data?.isTemplate && !currentTemplateNode?.data?.isPendingConnection;
 
       // Allow switching to pending connection nodes or other template nodes even if there's a configured template
       // But block switching to other regular/real nodes
@@ -1227,7 +1231,6 @@ function CanvasContent({
         // Notify parent that a pending connection node was clicked
         onPendingConnectionNodeClick(nodeId);
       } else {
-
         if (isTemplateNode && onTemplateNodeClick) {
           // Notify parent to restore template state
           onTemplateNodeClick(nodeId);
