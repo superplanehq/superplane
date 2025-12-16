@@ -80,7 +80,12 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
     if (!initialNodes) return;
 
     setNodes((currentNodes) => {
-      return initialNodes.map((newNode) => {
+      // Preserve locally-added template and pending connection nodes
+      const localOnlyNodes = currentNodes.filter(
+        (node) => node.data.isTemplate || node.data.isPendingConnection,
+      );
+
+      const syncedNodes = initialNodes.map((newNode) => {
         const existingNode = currentNodes.find((n) => n.id === newNode.id);
         const nodeData = { ...newNode.data };
         const nodeType = nodeData.type as string;
@@ -103,12 +108,31 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
           selected: existingNode?.selected ?? newNode.selected,
         };
       });
+
+      // Append local-only nodes at the end
+      return [...syncedNodes, ...localOnlyNodes];
     });
   }, [initialNodes]);
 
   useEffect(() => {
-    if (initialEdges) setEdges(initialEdges);
-  }, [initialEdges]);
+    if (!initialEdges) return;
+
+    setEdges((currentEdges) => {
+      // Preserve edges connected to template or pending connection nodes
+      const localOnlyEdges = currentEdges.filter((edge) => {
+        const sourceIsLocal = nodes.some(
+          (n) => n.id === edge.source && (n.data.isTemplate || n.data.isPendingConnection),
+        );
+        const targetIsLocal = nodes.some(
+          (n) => n.id === edge.target && (n.data.isTemplate || n.data.isPendingConnection),
+        );
+        return sourceIsLocal || targetIsLocal;
+      });
+
+      // Combine synced edges with local-only edges
+      return [...initialEdges, ...localOnlyEdges];
+    });
+  }, [initialEdges, nodes]);
 
   // Apply initial collapsed state to nodes
   useEffect(() => {

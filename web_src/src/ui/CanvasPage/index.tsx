@@ -8,7 +8,7 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Puzzle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ConfigurationField, WorkflowsWorkflowNodeExecution } from "@/api-client";
@@ -92,6 +92,10 @@ export interface NewNodeData {
   displayLabel?: string;
   configuration: Record<string, any>;
   position?: { x: number; y: number };
+  sourceConnection?: {
+    nodeId: string;
+    handleId: string | null;
+  };
 }
 
 export interface CanvasPageProps {
@@ -347,6 +351,127 @@ function CanvasPage(props: CanvasPageProps) {
     [emitModalData, props],
   );
 
+  const handleConnectionDropInEmptySpace = useCallback(
+    (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
+      if (!sourceConnection) return;
+
+      const pendingNodeId = `pending_connection_${Date.now()}`;
+
+      const placeholderNode: CanvasNode = {
+        id: pendingNodeId,
+        type: "default",
+        position: {
+          x: position.x,
+          y: position.y - 30,
+        },
+        data: {
+          type: "component",
+          label: "New Component",
+          state: "neutral",
+          component: {
+            title: "New Component",
+            headerColor: "bg-gray-50",
+            iconSlug: "puzzle",
+            iconColor: "text-indigo-700",
+            collapsedBackground: getBackgroundColorClass("white"),
+            hideActionsButton: true,
+            includeEmptyState: true,
+            emptyStateProps: {
+              icon: Puzzle,
+              title: "Select the component from sidebar",
+            },
+          } as ComponentBaseProps,
+          isPendingConnection: true,
+          sourceConnection: {
+            nodeId: sourceConnection.nodeId,
+            handleId: sourceConnection.handleId,
+          },
+        },
+      };
+
+      state.setNodes((nodes) => [...nodes, placeholderNode]);
+      setTemplateNodeId(pendingNodeId);
+
+      // Create edge locally (not via parent) - it will be preserved by useCanvasState
+      const edgeId = `${sourceConnection.nodeId}--${pendingNodeId}--${sourceConnection.handleId || "default"}`;
+      state.setEdges([
+        ...state.edges,
+        {
+          id: edgeId,
+          source: sourceConnection.nodeId,
+          target: pendingNodeId,
+          sourceHandle: sourceConnection.handleId || "default",
+        },
+      ]);
+
+      // Open BuildingBlocksSidebar for component selection
+      setIsBuildingBlocksSidebarOpen(true);
+    },
+    [state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen],
+  );
+
+  const handlePendingConnectionNodeClick = useCallback(
+    (nodeId: string) => {
+      // Set this node as the active template
+      setTemplateNodeId(nodeId);
+      // Open the BuildingBlocksSidebar so user can select a component
+      setIsBuildingBlocksSidebarOpen(true);
+    },
+    [setTemplateNodeId, setIsBuildingBlocksSidebarOpen],
+  );
+
+  const handleBuildingBlockClick = useCallback(
+    (block: BuildingBlock) => {
+      const pendingNode = state.nodes.find((n) => n.id === templateNodeId && n.data.isPendingConnection);
+      if (!pendingNode || !templateNodeId) {
+        return;
+      }
+
+      // Update the same node (keep ID to preserve edge)
+      state.setNodes((nodes) =>
+        nodes.map((n) =>
+          n.id === templateNodeId
+            ? {
+                ...n,
+                data: {
+                  type: "component",
+                  label: block.label || block.name || "New Component",
+                  state: "neutral",
+                  component: {
+                    title: block.label || block.name || "New Component",
+                    headerColor: "#e5e7eb",
+                    iconSlug: block.icon,
+                    iconColor: "text-indigo-700",
+                    collapsedBackground: getBackgroundColorClass("white"),
+                    hideActionsButton: true,
+                    includeEmptyState: true,
+                  } as ComponentBaseProps,
+                  isTemplate: true,
+                  buildingBlock: block,
+                  tempConfiguration: {},
+                  tempNodeName: block.name || "",
+                },
+              }
+            : n,
+        ),
+      );
+
+      setNewNodeData({
+        buildingBlock: block,
+        nodeName: block.name || "",
+        displayLabel: block.label || block.name || "",
+        configuration: {},
+        position: pendingNode.position,
+        sourceConnection: pendingNode.data.sourceConnection as { nodeId: string; handleId: string | null } | undefined,
+      });
+
+      setIsBuildingBlocksSidebarOpen(false);
+      state.componentSidebar.open(templateNodeId);
+      setCurrentTab("settings");
+    },
+    [templateNodeId, state, setCurrentTab, setNewNodeData, setIsBuildingBlocksSidebarOpen],
+  );
+
   const handleBuildingBlockDrop = useCallback(
     (block: BuildingBlock, position?: { x: number; y: number }) => {
       if (templateNodeId) {
@@ -431,12 +556,16 @@ function CanvasPage(props: CanvasPageProps) {
         // Remove the template node first
         state.setNodes((nodes) => nodes.filter((node) => node.id !== templateNodeId));
 
+        // Remove edges connected to the template node (they'll be recreated by parent if needed)
+        state.setEdges(state.edges.filter((edge) => edge.source !== templateNodeId && edge.target !== templateNodeId));
+
         // Create the real node through the normal flow
         props.onNodeAdd({
           buildingBlock: newNodeData.buildingBlock,
           nodeName,
           configuration,
           position: newNodeData.position,
+          sourceConnection: newNodeData.sourceConnection,
         });
 
         // Clear template state
@@ -490,14 +619,25 @@ function CanvasPage(props: CanvasPageProps) {
   };
 
   const handleSidebarClose = useCallback(() => {
+    // Check if the currently open node is a pending connection
+    const currentNode = state.nodes.find((n) => n.id === state.componentSidebar.selectedNodeId);
+    const isPendingConnection = currentNode?.data?.isPendingConnection;
+
     state.componentSidebar.close();
     // Reset to latest tab when sidebar closes
     setCurrentTab("latest");
 
-    if (templateNodeId) {
-      setNewNodeData(null);
-      setTemplateNodeId(null);
-      state.setNodes((nodes) => nodes.filter((node) => node.id !== templateNodeId));
+    // Only remove the node if it's a pending connection node (not yet configured)
+    if (isPendingConnection && state.componentSidebar.selectedNodeId) {
+      const nodeIdToRemove = state.componentSidebar.selectedNodeId;
+      state.setNodes((nodes) => nodes.filter((node) => node.id !== nodeIdToRemove));
+      state.setEdges(state.edges.filter((edge) => edge.source !== nodeIdToRemove && edge.target !== nodeIdToRemove));
+
+      // Clear template tracking if this was the active template
+      if (templateNodeId === nodeIdToRemove) {
+        setNewNodeData(null);
+        setTemplateNodeId(null);
+      }
     }
 
     // Clear ReactFlow's selection state
@@ -532,7 +672,8 @@ function CanvasPage(props: CanvasPageProps) {
           onToggle={handleSidebarToggle}
           blocks={props.buildingBlocks || []}
           canvasZoom={canvasZoom}
-          disabled={!!templateNodeId}
+          disabled={!!templateNodeId && !state.nodes.find((n) => n.id === templateNodeId && n.data.isPendingConnection)}
+          onBlockClick={handleBuildingBlockClick}
         />
 
         <div className="flex-1 relative">
@@ -554,6 +695,8 @@ function CanvasPage(props: CanvasPageProps) {
               runDisabledTooltip={props.runDisabledTooltip}
               onBuildingBlockDrop={handleBuildingBlockDrop}
               onBuildingBlocksSidebarToggle={handleSidebarToggle}
+              onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
+              onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
               onZoomChange={setCanvasZoom}
               hasFitToViewRef={hasFitToViewRef}
               viewportRefProp={props.viewportRef}
@@ -950,12 +1093,14 @@ function CanvasContent({
   onToggleCollapse,
   onBuildingBlockDrop,
   onBuildingBlocksSidebarToggle,
+  onConnectionDropInEmptySpace,
   onZoomChange,
   hasFitToViewRef,
   viewportRefProp,
   templateNodeId,
   runDisabled,
   runDisabledTooltip,
+  onPendingConnectionNodeClick,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -972,12 +1117,17 @@ function CanvasContent({
   onDelete?: (nodeId: string) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onBuildingBlocksSidebarToggle?: (open: boolean) => void;
+  onConnectionDropInEmptySpace?: (
+    position: { x: number; y: number },
+    sourceConnection: { nodeId: string; handleId: string | null },
+  ) => void;
   onZoomChange?: (zoom: number) => void;
   hasFitToViewRef: React.MutableRefObject<boolean>;
   viewportRefProp?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
   templateNodeId?: string | null;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
+  onPendingConnectionNodeClick?: (nodeId: string) => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1012,11 +1162,21 @@ function CanvasContent({
         return;
       }
 
-      stateRef.current.componentSidebar.open(nodeId);
+      // Check if this is a pending connection node
+      const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
+      const isPendingConnection = clickedNode?.data?.isPendingConnection;
 
-      // Close building blocks sidebar when clicking on a node
-      if (onBuildingBlocksSidebarToggle) {
-        onBuildingBlocksSidebarToggle(false);
+      if (isPendingConnection && onPendingConnectionNodeClick) {
+        // Notify parent that a pending connection node was clicked
+        onPendingConnectionNodeClick(nodeId);
+      } else {
+        // Regular node click
+        stateRef.current.componentSidebar.open(nodeId);
+
+        // Close building blocks sidebar when clicking on a regular node
+        if (onBuildingBlocksSidebarToggle) {
+          onBuildingBlocksSidebarToggle(false);
+        }
       }
 
       stateRef.current.setNodes((nodes) =>
@@ -1026,7 +1186,7 @@ function CanvasContent({
         })),
       );
     },
-    [templateNodeId, onBuildingBlocksSidebarToggle],
+    [templateNodeId, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick],
   );
 
   const onRunRef = useRef(onRun);
@@ -1058,6 +1218,7 @@ function CanvasContent({
 
   const handleConnect = useCallback(
     (connection: any) => {
+      connectionCompletedRef.current = true;
       if (onEdgeCreate && connection.source && connection.target) {
         onEdgeCreate(connection.source, connection.target, connection.sourceHandle);
       }
@@ -1220,6 +1381,14 @@ function CanvasContent({
     handleType: "source" | "target" | null;
   } | null>(null);
 
+  // Track connection completion for empty space drop detection
+  const connectionCompletedRef = useRef(false);
+  const connectingFromRef = useRef<{
+    nodeId: string;
+    handleId: string | null;
+    handleType: "source" | "target" | null;
+  } | null>(null);
+
   const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: any) => {
     setHoveredEdgeId(edge.id);
   }, []);
@@ -1234,15 +1403,36 @@ function CanvasContent({
       params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
     ) => {
       if (params.nodeId) {
-        setConnectingFrom({ nodeId: params.nodeId, handleId: params.handleId, handleType: params.handleType });
+        const connectionInfo = { nodeId: params.nodeId, handleId: params.handleId, handleType: params.handleType };
+        setConnectingFrom(connectionInfo);
+        connectingFromRef.current = connectionInfo;
       }
     },
     [],
   );
 
-  const handleConnectEnd = useCallback(() => {
-    setConnectingFrom(null);
-  }, []);
+  const handleConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      const currentConnectingFrom = connectingFromRef.current;
+
+      if (currentConnectingFrom && !connectionCompletedRef.current) {
+        const mouseEvent = event as MouseEvent;
+        const canvasPosition = screenToFlowPosition({
+          x: mouseEvent.clientX,
+          y: mouseEvent.clientY,
+        });
+
+        if (onConnectionDropInEmptySpace) {
+          onConnectionDropInEmptySpace(canvasPosition, currentConnectingFrom);
+        }
+      }
+
+      setConnectingFrom(null);
+      connectingFromRef.current = null;
+      connectionCompletedRef.current = false;
+    },
+    [screenToFlowPosition, onConnectionDropInEmptySpace],
+  );
 
   // Find the hovered edge to get its source and target
   const hoveredEdge = useMemo(() => {

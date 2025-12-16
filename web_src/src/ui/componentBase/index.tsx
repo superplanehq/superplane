@@ -208,6 +208,11 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   eventStateMap?: EventStateMap;
   hideActionsButton?: boolean;
   includeEmptyState?: boolean;
+  emptyStateProps?: {
+    icon?: React.ComponentType<{ size?: number }>;
+    title?: string;
+    description?: string;
+  };
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -241,6 +246,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   eventStateMap,
   hideActionsButton,
   includeEmptyState = false,
+  emptyStateProps,
 }) => {
   if (collapsed) {
     return (
@@ -356,7 +362,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           />
         ))}
 
-        {includeEmptyState && <EmptyState />}
+        {includeEmptyState && <EmptyState {...emptyStateProps} />}
 
         {customField || null}
       </div>

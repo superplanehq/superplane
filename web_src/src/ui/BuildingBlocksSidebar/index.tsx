@@ -34,6 +34,7 @@ export interface BuildingBlocksSidebarProps {
   blocks: BuildingBlockCategory[];
   canvasZoom?: number;
   disabled?: boolean;
+  onBlockClick?: (block: BuildingBlock) => void;
 }
 
 export function BuildingBlocksSidebar({
@@ -42,6 +43,7 @@ export function BuildingBlocksSidebar({
   blocks,
   canvasZoom = 1,
   disabled = false,
+  onBlockClick,
 }: BuildingBlocksSidebarProps) {
   if (!isOpen) {
     return (
@@ -218,6 +220,7 @@ export function BuildingBlocksSidebar({
             isDraggingRef={isDraggingRef}
             setHoveredBlock={setHoveredBlock}
             dragPreviewRef={dragPreviewRef}
+            onBlockClick={onBlockClick}
           />
         ))}
 
@@ -268,6 +271,7 @@ interface CategorySectionProps {
   isDraggingRef: React.RefObject<boolean>;
   setHoveredBlock: (block: BuildingBlock | null) => void;
   dragPreviewRef: React.RefObject<HTMLDivElement | null>;
+  onBlockClick?: (block: BuildingBlock) => void;
 }
 
 function CategorySection({
@@ -277,6 +281,7 @@ function CategorySection({
   isDraggingRef,
   setHoveredBlock,
   dragPreviewRef,
+  onBlockClick,
 }: CategorySectionProps) {
   const query = searchTerm.trim().toLowerCase();
   const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
@@ -314,6 +319,11 @@ function CategorySection({
               data-testid={toTestId(`building-block-${block.name}`)}
               key={`${block.type}-${block.name}`}
               draggable={isLive}
+              onClick={() => {
+                if (isLive && onBlockClick) {
+                  onBlockClick(block);
+                }
+              }}
               onMouseEnter={() => {
                 if (isLive) {
                   setHoveredBlock(block);
