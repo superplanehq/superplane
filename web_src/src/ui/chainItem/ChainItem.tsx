@@ -2,10 +2,21 @@
 import { resolveIcon, isUrl, calcRelativeTimeFromDiff } from "@/lib/utils";
 import React, { useCallback, useMemo, useState } from "react";
 import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
-import { WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { WorkflowsWorkflowNodeExecution, ComponentsNode } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { formatTimeAgo } from "@/utils/date";
+import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
+
+export interface ChildExecution {
+  name: string;
+  state: string;
+  nodeId: string;
+  executionId: string;
+  badgeColor?: string;
+  backgroundColor?: string;
+  componentIcon?: string;
+}
 
 export interface ChainItemData {
   id: string;
@@ -18,6 +29,9 @@ export interface ChainItemData {
   state?: string; // Make state optional since it will be calculated
   executionId?: string;
   originalExecution?: WorkflowsWorkflowNodeExecution; // Add execution data
+  childExecutions?: ChildExecution[]; // Add child executions for composite components
+  workflowNode?: ComponentsNode; // Add workflow node for subtitle generation
+  additionalData?: unknown; // Add additional data for subtitle generation
   tabData?: {
     current?: Record<string, any>;
     payload?: any;
@@ -65,6 +79,15 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     const { map, state } = getExecutionState(item.nodeId || "", item.originalExecution);
     return map[state];
   }, [item.nodeId, item.originalExecution, getExecutionState, item.state]);
+
+  const componentSubtitle = useMemo(() => {
+    if (!item.workflowNode?.component?.name || !item.originalExecution) {
+      return undefined;
+    }
+
+    const mapper = getComponentBaseMapper(item.workflowNode.component.name);
+    return mapper.subtitle?.(item.workflowNode, item.originalExecution, item.additionalData);
+  }, [item.workflowNode, item.originalExecution, item.additionalData]);
 
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
@@ -114,10 +137,14 @@ export const ChainItem: React.FC<ChainItemProps> = ({
               {item.nodeDisplayName || item.nodeName || item.componentName}
             </span>
           </div>
-          <div
-            className={`uppercase text-sm py-[1px] px-[6px] font-semibold rounded flex items-center justify-center text-white ${EventBadgeColor}`}
-          >
-            <span>{state}</span>
+          <div className="flex items-center gap-2">
+            {/* Component subtitle */}
+            {componentSubtitle && <span className="text-sm text-gray-500 truncate">{componentSubtitle}</span>}
+            <div
+              className={`uppercase text-sm py-[1px] px-[6px] font-semibold rounded flex items-center justify-center text-white ${EventBadgeColor}`}
+            >
+              <span>{state}</span>
+            </div>
           </div>
         </div>
 
@@ -126,18 +153,64 @@ export const ChainItem: React.FC<ChainItemProps> = ({
           <span className="text-sm text-gray-500">
             {formatTimeAgo(new Date(item.originalExecution?.createdAt || ""))}
             {item.originalExecution?.state === "STATE_FINISHED" &&
-             item.originalExecution?.createdAt &&
-             item.originalExecution?.updatedAt && (
+              item.originalExecution?.createdAt &&
+              item.originalExecution?.updatedAt && (
+                <>
+                  <span className="mx-1">•</span>
+                  <span>
+                    Duration:{" "}
+                    {calcRelativeTimeFromDiff(
+                      new Date(item.originalExecution.updatedAt).getTime() -
+                        new Date(item.originalExecution.createdAt).getTime(),
+                    )}
+                  </span>
+                </>
+              )}
+            {(item.childExecutions?.length || 0) > 0 && (
               <>
                 <span className="mx-1">•</span>
-                <span>Duration: {calcRelativeTimeFromDiff(
-                  new Date(item.originalExecution.updatedAt).getTime() -
-                  new Date(item.originalExecution.createdAt).getTime()
-                )}</span>
+                <span>
+                  {item.childExecutions?.length} execution{item.childExecutions!.length > 1 ? "s" : ""}
+                </span>
               </>
             )}
           </span>
         </div>
+
+        {/* Child executions for composite components */}
+        {item.childExecutions && item.childExecutions.length > 0 && (
+          <div className="ml-8 mt-1 space-y-1">
+            {item.childExecutions.map((child, childIndex) => (
+              <div key={`${item.id}-child-${childIndex}`} className="flex items-center justify-between gap-2 text-sm">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="flex-shrink-0">
+                    {React.createElement(resolveIcon("corner-down-right"), {
+                      size: 16,
+                      className: "text-gray-400",
+                    })}
+                  </div>
+                  {/* Component Icon */}
+                  {child.componentIcon && (
+                    <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+                      {React.createElement(resolveIcon(child.componentIcon), {
+                        size: 14,
+                        className: "text-gray-600",
+                      })}
+                    </div>
+                  )}
+                  <span className="text-sm text-gray-600 truncate flex-1">{child.name}</span>
+                </div>
+                <div
+                  className={`capitalize text-xs py-[1px] px-[3px] rounded flex items-center justify-center flex-shrink-0 ${
+                    child.badgeColor?.replace("bg", "text") || "bg-gray-400"
+                  }`}
+                >
+                  <span>{child.state}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Expandable content */}
         {isOpen && item.tabData && (

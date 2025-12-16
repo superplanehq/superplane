@@ -17,7 +17,7 @@ import {
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
-  BlueprintsBlueprint
+  BlueprintsBlueprint,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
 import { NewNodeData } from "../CustomComponentBuilderPage";
@@ -306,12 +306,15 @@ export const ComponentSidebar = ({
     setExecutionChainTriggerEvent(null);
   }, [page, previousPage]);
 
-  const handleSeeExecutionChain = useCallback((eventId: string, triggerEvent?: SidebarEvent) => {
-    setPreviousPage(page as "overview" | "history" | "queue");
-    setExecutionChainEventId(eventId);
-    setExecutionChainTriggerEvent(triggerEvent || null);
-    setPage("execution-chain");
-  }, [page]);
+  const handleSeeExecutionChain = useCallback(
+    (eventId: string, triggerEvent?: SidebarEvent) => {
+      setPreviousPage(page as "overview" | "history" | "queue");
+      setExecutionChainEventId(eventId);
+      setExecutionChainTriggerEvent(triggerEvent || null);
+      setPage("execution-chain");
+    },
+    [page],
+  );
 
   const allEvents = React.useMemo(() => {
     if (page === "overview") return [];
@@ -624,4 +627,3 @@ export const ComponentSidebar = ({
     </div>
   );
 };
-

@@ -17,7 +17,7 @@ import {
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
-  BlueprintsBlueprint
+  BlueprintsBlueprint,
 } from "@/api-client";
 import { getCustomFieldRenderer } from "@/pages/workflowv2/mappers";
 import { AiSidebar } from "../ai";

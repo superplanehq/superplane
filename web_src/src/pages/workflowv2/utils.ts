@@ -154,7 +154,7 @@ export function buildTabData(
     nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>;
     nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>;
     nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>;
-  }
+  },
 ): TabData | undefined {
   const { workflowNodes, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap } = options;
   const node = workflowNodes.find((n) => n.id === nodeId);

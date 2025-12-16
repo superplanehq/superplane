@@ -54,7 +54,6 @@ export const LatestTab = ({
   loadExecutionChain,
   getExecutionState,
 }: LatestTabProps) => {
-
   const handleSeeQueue = () => {
     onSeeQueue?.();
   };

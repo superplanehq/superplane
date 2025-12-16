@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { resolveIcon, flattenObject } from "@/lib/utils";
-import { ChainItem, type ChainItemData } from "../../chainItem";
+import { ChainItem, type ChainItemData, type ChildExecution } from "../../chainItem";
 import { SidebarEventItem } from "../SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "../types";
 import {
@@ -9,7 +9,7 @@ import {
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
-  BlueprintsBlueprint
+  BlueprintsBlueprint,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../../componentBase";
 function buildExecutionTabData(
@@ -96,72 +96,160 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Load execution chain data function
+  const loadChainData = async () => {
+    if (!eventId || !loadExecutionChain) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const rawExecutions = await loadExecutionChain(eventId, undefined, undefined, true);
+
+      const transformedItems: ChainItemData[] = rawExecutions.map((exec: any, index: number) => {
+        // Find the workflow node for this execution
+        const workflowNode = workflowNodes.find((node) => node.id === exec.nodeId);
+
+        // Get metadata based on node type
+        let nodeDisplayName = exec.componentName || exec.nodeId || "Unknown";
+        let nodeIconSlug = "box";
+
+        if (workflowNode) {
+          nodeDisplayName = workflowNode.name || nodeDisplayName;
+
+          // Get icon based on node type
+          if (workflowNode.type === "TYPE_COMPONENT" && workflowNode.component?.name) {
+            const componentMeta = components.find((c) => c.name === workflowNode.component!.name);
+            nodeIconSlug = componentMeta?.icon || "box";
+          } else if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.trigger?.name) {
+            const triggerMeta = triggers.find((t) => t.name === workflowNode.trigger!.name);
+            nodeIconSlug = triggerMeta?.icon || "play";
+          } else if (workflowNode.type === "TYPE_BLUEPRINT" && workflowNode.blueprint?.id) {
+            const blueprintMeta = blueprints.find((b) => b.id === workflowNode.blueprint!.id);
+            nodeIconSlug = blueprintMeta?.icon || "box";
+          }
+        }
+
+        // Process child executions for composite components
+        let childExecutions: ChildExecution[] | undefined = undefined;
+        if (exec.childExecutions && exec.childExecutions.length > 0) {
+          childExecutions = exec.childExecutions
+            .slice()
+            .sort((a: any, b: any) => {
+              const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+              const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+              return timeA - timeB;
+            })
+            .map((childExec: any) => {
+              const nodeId = childExec?.nodeId?.split(":")?.at(-1);
+              let badgeColor = "bg-gray-400";
+              let componentName = "Unknown";
+              let componentIcon = "box";
+
+              // Find the blueprint node information
+              if (workflowNode?.blueprint?.id && nodeId) {
+                const blueprint = blueprints.find((b) => b.id === workflowNode.blueprint!.id);
+                if (blueprint?.nodes) {
+                  const blueprintNode = blueprint.nodes.find((node: any) => node.id === nodeId);
+                  if (blueprintNode) {
+                    componentName = blueprintNode.name || blueprintNode.component?.name || "Unknown";
+
+                    // Get component icon from components metadata
+                    if (blueprintNode.component?.name) {
+                      const componentMeta = components.find((c) => c.name === blueprintNode.component!.name);
+                      componentIcon = componentMeta?.icon || "box";
+                    }
+                  }
+                }
+              }
+
+              if (getExecutionState) {
+                const { map, state } = getExecutionState(exec.nodeId, childExec);
+                badgeColor = map[state]?.badgeColor || "bg-gray-400";
+
+                return {
+                  name: componentName,
+                  state: state,
+                  nodeId: childExec.nodeId || "",
+                  executionId: childExec.id || "",
+                  badgeColor,
+                  backgroundColor: map[state]?.backgroundColor,
+                  componentIcon,
+                };
+              }
+
+              return {
+                name: componentName,
+                state: childExec.state?.replace("STATE_", "").toLowerCase() || "unknown",
+                nodeId: childExec.nodeId || "",
+                executionId: childExec.id || "",
+                badgeColor,
+                componentIcon,
+              };
+            });
+        }
+
+        return {
+          id: exec.id || `execution-${index}`,
+          nodeId: exec.nodeId || "",
+          componentName: exec.componentName || exec.nodeId || "Unknown",
+          nodeName: exec.nodeName,
+          nodeDisplayName,
+          nodeIcon: exec.nodeIcon || "box",
+          nodeIconSlug,
+          state: exec.state || "neutral",
+          executionId: exec.id,
+          originalExecution: exec, // Pass the full execution data
+          childExecutions,
+          workflowNode,
+          tabData: buildExecutionTabData(exec, workflowNode || ({} as ComponentsNode), workflowNodes),
+        };
+      });
+
+      setChainItems(transformedItems);
+    } catch (err) {
+      console.error("Failed to load execution chain:", err);
+      setError(err instanceof Error ? err.message : "Failed to load execution chain");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Load execution chain data
   useEffect(() => {
-    const loadChainData = async () => {
-      if (!eventId || !loadExecutionChain) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        const rawExecutions = await loadExecutionChain(eventId);
-
-        const transformedItems: ChainItemData[] = rawExecutions.map((exec: any, index: number) => {
-          // Find the workflow node for this execution
-          const workflowNode = workflowNodes.find((node) => node.id === exec.nodeId);
-
-          // Get metadata based on node type
-          let nodeDisplayName = exec.componentName || exec.nodeId || "Unknown";
-          let nodeIconSlug = "box";
-
-          if (workflowNode) {
-            nodeDisplayName = workflowNode.name || nodeDisplayName;
-
-            // Get icon based on node type
-            if (workflowNode.type === "TYPE_COMPONENT" && workflowNode.component?.name) {
-              const componentMeta = components.find((c) => c.name === workflowNode.component!.name);
-              nodeIconSlug = componentMeta?.icon || "box";
-            } else if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.trigger?.name) {
-              const triggerMeta = triggers.find((t) => t.name === workflowNode.trigger!.name);
-              nodeIconSlug = triggerMeta?.icon || "play";
-            } else if (workflowNode.type === "TYPE_BLUEPRINT" && workflowNode.blueprint?.id) {
-              const blueprintMeta = blueprints.find((b) => b.id === workflowNode.blueprint!.id);
-              nodeIconSlug = blueprintMeta?.icon || "box";
-            }
-          }
-
-          return {
-            id: exec.id || `execution-${index}`,
-            nodeId: exec.nodeId || "",
-            componentName: exec.componentName || exec.nodeId || "Unknown",
-            nodeName: exec.nodeName,
-            nodeDisplayName,
-            nodeIcon: exec.nodeIcon || "box",
-            nodeIconSlug,
-            state: exec.state || "neutral",
-            executionId: exec.id,
-            originalExecution: exec, // Pass the full execution data
-            tabData: buildExecutionTabData(exec, workflowNode || {} as ComponentsNode, workflowNodes),
-          };
-        });
-
-        setChainItems(transformedItems);
-      } catch (err) {
-        console.error("Failed to load execution chain:", err);
-        setError(err instanceof Error ? err.message : "Failed to load execution chain");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadChainData();
   }, [eventId, loadExecutionChain, workflowNodes, components, triggers, blueprints]);
 
-  if (loading) {
+  // Use ref to track current values without causing re-renders
+  const pollingRef = useRef<{
+    startedPolling: boolean;
+    loadData: (() => void) | null;
+  }>({
+    startedPolling: false,
+    loadData: null,
+  });
+
+  pollingRef.current.loadData = loadChainData;
+
+  // Polling effect for in-progress executions
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      const { loadData } = pollingRef.current;
+      if (loadData) {
+        pollingRef.current.startedPolling = true;
+        loadData();
+      }
+    }, 1500);
+
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, []);
+
+  if (loading && !pollingRef.current.startedPolling) {
     return (
       <div className="flex items-center justify-center py-8">
         <div className="flex flex-col items-center gap-2">
