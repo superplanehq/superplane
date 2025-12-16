@@ -108,8 +108,8 @@ func (s *CanvasPageSteps) addNoop(name string) {
 }
 
 func (s *CanvasPageSteps) addTwoNodesAndConnect() {
-	s.canvas.AddManualTrigger("First", models.Position{X: 200, Y: 200})
-	s.canvas.AddNoop("Second", models.Position{X: 600, Y: 200})
+	s.canvas.AddManualTrigger("First", models.Position{X: 500, Y: 200})
+	s.canvas.AddNoop("Second", models.Position{X: 900, Y: 200})
 	s.canvas.Connect("First", "Second")
 }
 
@@ -201,8 +201,8 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 	s.canvas = shared.NewCanvasSteps("E2E Canvas With Queue", s.t, s.session)
 
 	s.canvas.Create()
-	s.canvas.AddManualTrigger("Start", models.Position{X: 200, Y: 200})
-	s.canvas.AddWait("Wait", models.Position{X: 600, Y: 200}, 10, "Seconds")
+	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
+	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 10, "Seconds")
 	s.session.TakeScreenshot()
 	s.canvas.Connect("Start", "Wait")
 	s.canvas.Save()

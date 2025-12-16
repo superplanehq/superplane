@@ -151,9 +151,9 @@ func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput() {
 	s.canvas = shared.NewCanvasSteps("Time Gate Push Through", s.t, s.session)
 
 	s.canvas.Create()
-	s.canvas.AddManualTrigger("Start", models.Position{X: 50, Y: 200})
-	s.canvas.AddTimeGate("TimeGate", models.Position{X: 300, Y: 250})
-	s.canvas.AddNoop("Output", models.Position{X: 600, Y: 200})
+	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
+	s.canvas.AddTimeGate("TimeGate", models.Position{X: 1000, Y: 250})
+	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
 
 	s.canvas.Connect("Start", "TimeGate")
 	s.canvas.Connect("TimeGate", "Output")

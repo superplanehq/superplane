@@ -63,8 +63,8 @@ func (s *CustomComponentsSteps) StartCreatingComponent() {
 }
 
 func (s *CustomComponentsSteps) AddTwoNodesAndConnect() {
-	s.component.AddNoop("First", models.Position{X: 200, Y: 250})
-	s.component.AddNoop("Second", models.Position{X: 600, Y: 250})
+	s.component.AddNoop("First", models.Position{X: 900, Y: 250})
+	s.component.AddNoop("Second", models.Position{X: 1200, Y: 250})
 	s.component.Connect("First", "Second")
 }
 
@@ -94,8 +94,8 @@ func (s *CustomComponentsSteps) AssertComponentHasOutputs() {
 
 func (s *CustomComponentsSteps) GivenADeploymentComponentExists() {
 	s.component.Create()
-	s.component.AddNoop("Prepare", models.Position{X: 200, Y: 250})
-	s.component.AddNoop("Deploy", models.Position{X: 600, Y: 250})
+	s.component.AddNoop("Prepare", models.Position{X: 500, Y: 250})
+	s.component.AddNoop("Deploy", models.Position{X: 900, Y: 250})
 	s.component.Connect("Prepare", "Deploy")
 	s.component.Save()
 }
