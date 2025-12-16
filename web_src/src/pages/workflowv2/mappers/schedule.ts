@@ -310,8 +310,19 @@ function formatNextTrigger(configuration: ScheduleConfiguration, metadata?: { ne
  */
 export const scheduleTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+    const eventDate = new Date(event.createdAt!);
+    const formattedDate = eventDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'short'
+    });
+
     return {
-      title: "Event emitted by schedule",
+      title: `Schedule: ${formattedDate}`,
       subtitle: event.id!,
     };
   },
@@ -340,8 +351,19 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
+      const eventDate = new Date(lastEvent.createdAt!);
+      const formattedDate = eventDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+      });
+
       props.lastEventData = {
-        title: "Event emitted by schedule",
+        title: `Schedule: ${formattedDate}`,
         subtitle: formatTimeAgo(new Date(lastEvent.createdAt!)),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "processed",
