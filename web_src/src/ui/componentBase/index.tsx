@@ -49,7 +49,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
   }, [section.eventState, section.receivedAt]);
 
   const currentState = section.eventState || "neutral";
-  const stateStyle = stateMap[currentState];
+  const stateStyle = stateMap[currentState] || stateMap["neutral"];
 
   const LastEventBackground = stateStyle.backgroundColor;
   const LastEventStateColor = stateStyle.badgeColor;

@@ -90,7 +90,6 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
       headerColor: getBackgroundColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,
-      zeroStateText: "Waiting for the first pull request...",
     };
 
     if (lastEvent) {
@@ -100,7 +99,8 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
         title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,
         subtitle: eventData?.action || "",
         receivedAt: new Date(lastEvent.createdAt!),
-        state: "processed",
+        state: "triggered",
+        eventId: lastEvent.id,
       };
     }
 

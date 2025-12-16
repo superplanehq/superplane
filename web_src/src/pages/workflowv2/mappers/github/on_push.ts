@@ -78,7 +78,6 @@ export const onPushTriggerRenderer: TriggerRenderer = {
       headerColor: getBackgroundColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,
-      zeroStateText: "Waiting for the first push...",
     };
 
     if (lastEvent) {
@@ -87,7 +86,8 @@ export const onPushTriggerRenderer: TriggerRenderer = {
         title: eventData?.head_commit?.message || "",
         subtitle: eventData?.head_commit?.id || "",
         receivedAt: new Date(lastEvent.createdAt!),
-        state: "processed",
+        state: "triggered",
+        eventId: lastEvent.id,
       };
     }
 

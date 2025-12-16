@@ -71,7 +71,6 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
       headerColor: getBackgroundColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,
-      zeroStateText: "Waiting for the first run...",
     };
 
     if (lastEvent) {
@@ -80,7 +79,8 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
         title: eventData.pipeline?.name || "",
         subtitle: eventData.pipeline?.result || "",
         receivedAt: new Date(lastEvent.createdAt!),
-        state: "processed",
+        state: "triggered",
+        eventId: lastEvent.id,
       };
     }
 
