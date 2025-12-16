@@ -10,7 +10,15 @@ import { SidebarEvent } from "./types";
 import { LatestTab } from "./LatestTab";
 import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
-import { AuthorizationDomainType, ConfigurationField, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import {
+  AuthorizationDomainType,
+  ConfigurationField,
+  WorkflowsWorkflowNodeExecution,
+  ComponentsNode,
+  ComponentsComponent,
+  TriggersTrigger,
+  BlueprintsBlueprint
+} from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
 import { NewNodeData } from "../CustomComponentBuilderPage";
 import { ReactNode } from "react";
@@ -107,6 +115,12 @@ interface ComponentSidebarProps {
   domainId?: string;
   domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
+
+  // Workflow metadata for ExecutionChainPage
+  workflowNodes?: ComponentsNode[];
+  components?: ComponentsComponent[];
+  triggers?: TriggersTrigger[];
+  blueprints?: BlueprintsBlueprint[];
 }
 
 export const ComponentSidebar = ({
@@ -166,6 +180,10 @@ export const ComponentSidebar = ({
   domainId,
   domainType,
   customField,
+  workflowNodes = [],
+  components = [],
+  triggers = [],
+  blueprints = [],
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -490,6 +508,10 @@ export const ComponentSidebar = ({
                 getExecutionState={getExecutionState}
                 getTabData={getTabData}
                 onEventClick={onEventClick}
+                workflowNodes={workflowNodes}
+                components={components}
+                triggers={triggers}
+                blueprints={blueprints}
               />
             ) : (
               <HistoryQueuePage

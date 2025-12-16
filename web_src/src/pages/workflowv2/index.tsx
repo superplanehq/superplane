@@ -62,6 +62,7 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import {
+  buildTabData,
   getNextInQueueInfo,
   mapExecutionsToSidebarEvents,
   mapQueueItemsToSidebarEvents,
@@ -467,135 +468,12 @@ export function WorkflowPageV2() {
 
   const getTabData = useCallback(
     (nodeId: string, event: SidebarEvent): TabData | undefined => {
-      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
-      if (!node) return undefined;
-
-      if (node.type === "TYPE_TRIGGER") {
-        const events = nodeEventsMap[nodeId] || [];
-        const triggerEvent = events.find((evt) => evt.id === event.id);
-
-        if (!triggerEvent) return undefined;
-
-        const tabData: TabData = {};
-        const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
-
-        const eventValues = triggerRenderer.getRootEventValues(triggerEvent);
-
-        tabData.current = {
-          ...eventValues,
-          "Event ID": triggerEvent.id,
-          "Node ID": triggerEvent.nodeId,
-          "Created At": triggerEvent.createdAt ? new Date(triggerEvent.createdAt).toLocaleString() : undefined,
-        };
-
-        // Payload tab: raw event data
-        let payload: Record<string, unknown> = {};
-
-        if (triggerEvent.data) {
-          payload = triggerEvent.data;
-        }
-
-        tabData.payload = payload;
-
-        return Object.keys(tabData).length > 0 ? tabData : undefined;
-      }
-
-      if (event.kind === "queue") {
-        // Handle queue items - get the queue item data
-        const queueItems = nodeQueueItemsMap[nodeId] || [];
-        const queueItem = queueItems.find((item: WorkflowsWorkflowNodeQueueItem) => item.id === event.id);
-
-        if (!queueItem) return undefined;
-
-        const tabData: TabData = {};
-
-        if (queueItem.rootEvent) {
-          const rootTriggerNode = workflow?.spec?.nodes?.find((n) => n.id === queueItem.rootEvent?.nodeId);
-          const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-          const rootEventValues = rootTriggerRenderer.getRootEventValues(queueItem.rootEvent);
-
-          tabData.root = {
-            ...rootEventValues,
-            "Event ID": queueItem.rootEvent.id,
-            "Node ID": queueItem.rootEvent.nodeId,
-            "Created At": queueItem.rootEvent.createdAt
-              ? new Date(queueItem.rootEvent.createdAt).toLocaleString()
-              : undefined,
-          };
-        }
-
-        tabData.current = {
-          "Queue Item ID": queueItem.id,
-          "Node ID": queueItem.nodeId,
-          "Created At": queueItem.createdAt ? new Date(queueItem.createdAt).toLocaleString() : undefined,
-        };
-
-        tabData.payload = queueItem.input || {};
-
-        return Object.keys(tabData).length > 0 ? tabData : undefined;
-      }
-
-      // Handle other components (non-triggers) - get execution for this event
-      const executions = nodeExecutionsMap[nodeId] || [];
-      const execution = executions.find((exec: WorkflowsWorkflowNodeExecution) => exec.id === event.id);
-
-      if (!execution) return undefined;
-
-      // Extract tab data from execution
-      const tabData: TabData = {};
-
-      // Current tab: use outputs if available and non-empty, otherwise use metadata
-      const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
-      const dataSource = hasOutputs ? execution.outputs : execution.metadata || {};
-      const flattened = flattenObject(dataSource);
-
-      const currentData = {
-        ...flattened,
-        "Execution ID": execution.id,
-        "Execution State": execution.state?.replace("STATE_", "").toLowerCase(),
-        "Execution Result": execution.result?.replace("RESULT_", "").toLowerCase(),
-        "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
-      };
-
-      // Filter out undefined and empty values
-      tabData.current = Object.fromEntries(
-        Object.entries(currentData).filter(([_, value]) => value !== undefined && value !== "" && value !== null),
-      );
-
-      // Root tab: root event data
-      if (execution.rootEvent) {
-        const rootTriggerNode = workflow?.spec?.nodes?.find((n) => n.id === execution.rootEvent?.nodeId);
-        const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-        const rootEventValues = rootTriggerRenderer.getRootEventValues(execution.rootEvent);
-
-        tabData.root = {
-          ...rootEventValues,
-          "Event ID": execution.rootEvent.id,
-          "Node ID": execution.rootEvent.nodeId,
-          "Created At": execution.rootEvent.createdAt
-            ? new Date(execution.rootEvent.createdAt).toLocaleString()
-            : undefined,
-        };
-      }
-
-      // Payload tab: execution inputs and outputs (raw data)
-      let payload: Record<string, unknown> = {};
-
-      if (execution.outputs) {
-        const outputData: unknown[] = Object.values(execution.outputs)?.find((output) => {
-          return Array.isArray(output) && output?.length > 0;
-        }) as unknown[];
-
-        if (outputData?.length > 0) {
-          payload = outputData?.[0] as Record<string, unknown>;
-        }
-      }
-
-      tabData.payload = payload;
-
-      // Execution Chain will be loaded lazily when requested
-
-      return Object.keys(tabData).length > 0 ? tabData : undefined;
+      return buildTabData(nodeId, event, {
+        workflowNodes: workflow?.spec?.nodes || [],
+        nodeEventsMap,
+        nodeExecutionsMap,
+        nodeQueueItemsMap,
+      });
     },
     [workflow, nodeExecutionsMap, nodeEventsMap, nodeQueueItemsMap],
   );
@@ -1280,6 +1158,10 @@ export function WorkflowPageV2() {
       onReEmit={handleReEmit}
       loadExecutionChain={loadExecutionChain}
       getExecutionState={getExecutionState}
+      workflowNodes={workflow?.spec?.nodes}
+      components={components}
+      triggers={triggers}
+      blueprints={blueprints}
       breadcrumbs={[
         {
           label: "Canvases",

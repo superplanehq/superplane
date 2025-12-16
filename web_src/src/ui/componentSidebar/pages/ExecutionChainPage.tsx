@@ -1,11 +1,59 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
-import { resolveIcon } from "@/lib/utils";
+import { resolveIcon, flattenObject } from "@/lib/utils";
 import { ChainItem, type ChainItemData } from "../../chainItem";
 import { SidebarEventItem } from "../SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "../types";
-import { WorkflowsWorkflowNodeExecution } from "@/api-client";
+import {
+  WorkflowsWorkflowNodeExecution,
+  ComponentsNode,
+  ComponentsComponent,
+  TriggersTrigger,
+  BlueprintsBlueprint
+} from "@/api-client";
 import { EventState, EventStateMap } from "../../componentBase";
+function buildExecutionTabData(
+  execution: WorkflowsWorkflowNodeExecution,
+  _workflowNode: ComponentsNode,
+  _workflowNodes: ComponentsNode[],
+): { current?: Record<string, any>; payload?: any } {
+  const tabData: { current?: Record<string, any>; payload?: any } = {};
+
+  // Current tab: use outputs if available and non-empty, otherwise use metadata
+  const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
+  const dataSource = hasOutputs ? execution.outputs : execution.metadata || {};
+  const flattened = flattenObject(dataSource);
+
+  const currentData = {
+    ...flattened,
+    "Execution ID": execution.id,
+    "Execution State": execution.state?.replace("STATE_", "").toLowerCase(),
+    "Execution Result": execution.result?.replace("RESULT_", "").toLowerCase(),
+    "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
+  };
+
+  // Filter out undefined and empty values
+  tabData.current = Object.fromEntries(
+    Object.entries(currentData).filter(([_, value]) => value !== undefined && value !== "" && value !== null),
+  );
+
+  // Payload tab: execution inputs and outputs (raw data)
+  let payload: Record<string, unknown> = {};
+
+  if (execution.outputs) {
+    const outputData: unknown[] = Object.values(execution.outputs)?.find((output) => {
+      return Array.isArray(output) && output?.length > 0;
+    }) as unknown[];
+
+    if (outputData?.length > 0) {
+      payload = outputData?.[0] as Record<string, unknown>;
+    }
+  }
+
+  tabData.payload = payload;
+
+  return tabData;
+}
 
 interface ExecutionChainPageProps {
   eventId: string | null;
@@ -24,6 +72,10 @@ interface ExecutionChainPageProps {
   ) => { map: EventStateMap; state: EventState };
   getTabData?: (event: SidebarEvent) => any;
   onEventClick?: (event: SidebarEvent) => void;
+  workflowNodes?: ComponentsNode[]; // Workflow spec nodes for metadata lookup
+  components?: ComponentsComponent[]; // Component metadata
+  triggers?: TriggersTrigger[]; // Trigger metadata
+  blueprints?: BlueprintsBlueprint[]; // Blueprint metadata
 }
 
 export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
@@ -35,6 +87,10 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   getExecutionState,
   getTabData,
   onEventClick,
+  workflowNodes = [],
+  components = [],
+  triggers = [],
+  blueprints = [],
 }) => {
   const [chainItems, setChainItems] = useState<ChainItemData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,20 +110,44 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
 
         const rawExecutions = await loadExecutionChain(eventId);
 
-        const transformedItems: ChainItemData[] = rawExecutions.map((exec: any, index: number) => ({
-          id: exec.id || `execution-${index}`,
-          nodeId: exec.nodeId || "",
-          componentName: exec.componentName || exec.nodeId || "Unknown",
-          nodeName: exec.nodeName,
-          nodeIcon: exec.nodeIcon || "box",
-          state: exec.state || "neutral",
-          executionId: exec.id,
-          originalExecution: exec, // Pass the full execution data
-          tabData: {
-            current: exec.current || exec.metadata || exec.details,
-            payload: exec.payload || exec.outputs || exec.data,
-          },
-        }));
+        const transformedItems: ChainItemData[] = rawExecutions.map((exec: any, index: number) => {
+          // Find the workflow node for this execution
+          const workflowNode = workflowNodes.find((node) => node.id === exec.nodeId);
+
+          // Get metadata based on node type
+          let nodeDisplayName = exec.componentName || exec.nodeId || "Unknown";
+          let nodeIconSlug = "box";
+
+          if (workflowNode) {
+            nodeDisplayName = workflowNode.name || nodeDisplayName;
+
+            // Get icon based on node type
+            if (workflowNode.type === "TYPE_COMPONENT" && workflowNode.component?.name) {
+              const componentMeta = components.find((c) => c.name === workflowNode.component!.name);
+              nodeIconSlug = componentMeta?.icon || "box";
+            } else if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.trigger?.name) {
+              const triggerMeta = triggers.find((t) => t.name === workflowNode.trigger!.name);
+              nodeIconSlug = triggerMeta?.icon || "play";
+            } else if (workflowNode.type === "TYPE_BLUEPRINT" && workflowNode.blueprint?.id) {
+              const blueprintMeta = blueprints.find((b) => b.id === workflowNode.blueprint!.id);
+              nodeIconSlug = blueprintMeta?.icon || "box";
+            }
+          }
+
+          return {
+            id: exec.id || `execution-${index}`,
+            nodeId: exec.nodeId || "",
+            componentName: exec.componentName || exec.nodeId || "Unknown",
+            nodeName: exec.nodeName,
+            nodeDisplayName,
+            nodeIcon: exec.nodeIcon || "box",
+            nodeIconSlug,
+            state: exec.state || "neutral",
+            executionId: exec.id,
+            originalExecution: exec, // Pass the full execution data
+            tabData: buildExecutionTabData(exec, workflowNode || {} as ComponentsNode, workflowNodes),
+          };
+        });
 
         setChainItems(transformedItems);
       } catch (err) {
@@ -79,7 +159,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
     };
 
     loadChainData();
-  }, [eventId, loadExecutionChain]);
+  }, [eventId, loadExecutionChain, workflowNodes, components, triggers, blueprints]);
 
   if (loading) {
     return (

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { resolveIcon, isUrl } from "@/lib/utils";
+import { resolveIcon, isUrl, calcRelativeTimeFromDiff } from "@/lib/utils";
 import React, { useCallback, useMemo, useState } from "react";
 import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
 import { WorkflowsWorkflowNodeExecution } from "@/api-client";
@@ -12,7 +12,9 @@ export interface ChainItemData {
   nodeId: string;
   componentName: string;
   nodeName?: string;
+  nodeDisplayName?: string; // The actual display name from workflow node
   nodeIcon?: string;
+  nodeIconSlug?: string; // Icon slug from component/trigger/blueprint metadata
   state?: string; // Make state optional since it will be calculated
   executionId?: string;
   originalExecution?: WorkflowsWorkflowNodeExecution; // Add execution data
@@ -88,7 +90,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
       <div
         key={item.id + index}
         className={
-          `cursor-pointer px-4 pt-2 pb-3 relative rounded-lg border-1 border-slate-300 ${EventBackground}` +
+          `cursor-pointer px-4 pt-2 pb-2 relative rounded-lg border-1 border-slate-300 ${EventBackground}` +
           (showConnectingLine ? " mb-3" : "")
         }
         onClick={(e) => {
@@ -100,13 +102,16 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             {/* Component Icon */}
-            {item.nodeIcon && (
+            {(item.nodeIconSlug || item.nodeIcon) && (
               <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
-                {React.createElement(resolveIcon(item.nodeIcon), { size: 16, className: "text-gray-600" })}
+                {React.createElement(resolveIcon(item.nodeIconSlug || item.nodeIcon), {
+                  size: 16,
+                  className: "text-gray-600",
+                })}
               </div>
             )}
             <span className="text-lg text-zinc-700 font-inter truncate min-w-0 font-semibold">
-              {item.nodeName || item.componentName}
+              {item.nodeDisplayName || item.nodeName || item.componentName}
             </span>
           </div>
           <div
@@ -116,10 +121,21 @@ export const ChainItem: React.FC<ChainItemProps> = ({
           </div>
         </div>
 
-        {/* Second row: Node ID */}
+        {/* Second row: Time ago and duration */}
         <div className="flex items-center mt-0 ml-8 gap-2">
           <span className="text-sm text-gray-500">
             {formatTimeAgo(new Date(item.originalExecution?.createdAt || ""))}
+            {item.originalExecution?.state === "STATE_FINISHED" &&
+             item.originalExecution?.createdAt &&
+             item.originalExecution?.updatedAt && (
+              <>
+                <span className="mx-1">•</span>
+                <span>Duration: {calcRelativeTimeFromDiff(
+                  new Date(item.originalExecution.updatedAt).getTime() -
+                  new Date(item.originalExecution.createdAt).getTime()
+                )}</span>
+              </>
+            )}
           </span>
         </div>
 
