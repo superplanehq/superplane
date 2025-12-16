@@ -3,6 +3,7 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
+import { formatTimeAgo } from "@/utils/date";
 
 /**
  * Default renderer for trigger types that don't have a specific renderer.
@@ -10,30 +11,29 @@ import { flattenObject } from "@/lib/utils";
  */
 export const defaultTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    return { title: event.id!, subtitle: "" };
+    return { title: `Event received at ${new Date(event.createdAt!).toLocaleString()}`, subtitle: "" };
   },
 
   getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
     return flattenObject(event.data || {});
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: any) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
     const props: TriggerProps = {
       title: node.name!,
       iconSlug: trigger.icon || "bolt",
-      iconColor: getColorClass(trigger.color),
-      headerColor: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: [],
-      zeroStateText: "No events yet",
     };
 
     if (lastEvent) {
       props.lastEventData = {
         title: "Event emitted by trigger",
-        subtitle: lastEvent.id,
+        subtitle: formatTimeAgo(new Date(lastEvent.createdAt!)),
         receivedAt: new Date(lastEvent.createdAt!),
-        state: "processed",
+        state: "triggered",
+        eventId: lastEvent.id,
       };
     }
 

@@ -6,7 +6,7 @@ import {
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getState, getStateMap } from ".";
 
@@ -22,13 +22,14 @@ export const httpMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: componentDefinition.icon || "globe",
-      headerColor: getBackgroundColorClass(componentDefinition?.color || "gray"),
-      iconColor: getColorClass(componentDefinition?.color || "gray"),
-      iconBackground: getBackgroundColorClass(componentDefinition?.color || "gray"),
+      headerColor: "bg-white",
+      iconColor: getColorClass("black"),
+      iconBackground: "bg-white",
       collapsed: node.isCollapsed,
-      collapsedBackground: getBackgroundColorClass("white"),
+      collapsedBackground: "bg-white",
       title: node.name!,
-      eventSections: getHTTPEventSections(lastExecutions[0], componentName),
+      eventSections: lastExecutions[0] ? getHTTPEventSections(lastExecutions[0], componentName) : undefined,
+      includeEmptyState: !lastExecutions[0],
       metadata: getHTTPMetadataList(node),
       specs: getHTTPSpecs(node),
       eventStateMap: getStateMap(componentName),
@@ -89,25 +90,16 @@ function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 }
 
 function getHTTPEventSections(execution: WorkflowsWorkflowNodeExecution, componentName: string): EventSection[] {
-  if (!execution) {
-    return [
-      {
-        title: "Last Run",
-        eventTitle: "No events received yet",
-        eventState: "neutral" as const,
-      },
-    ];
-  }
+  const outputs = execution.outputs as Record<string, unknown>;
+  const defaultArray = outputs?.default as unknown[];
+  const response = defaultArray?.[0] as { status?: string };
 
-  const outputs = execution.outputs as any;
-  const response = outputs?.default?.[0];
+  const eventSection: EventSection = {
+    receivedAt: new Date(execution.createdAt!),
+    eventTitle: execution.state == "STATE_FINISHED" ? `Status: ${response?.status}` : "Running...",
+    eventState: getState(componentName)(execution),
+    eventId: execution.rootEvent?.id,
+  };
 
-  return [
-    {
-      title: "Last Run",
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: execution.state == "STATE_FINISHED" ? `Status: ${response?.status}` : "Running...",
-      eventState: getState(componentName)(execution),
-    },
-  ];
+  return [eventSection];
 }

@@ -11,7 +11,14 @@ import {
 import { Loader2, Puzzle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ConfigurationField, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import {
+  ConfigurationField,
+  WorkflowsWorkflowNodeExecution,
+  ComponentsNode,
+  ComponentsComponent,
+  TriggersTrigger,
+  BlueprintsBlueprint,
+} from "@/api-client";
 import { getCustomFieldRenderer } from "@/pages/workflowv2/mappers";
 import { AiSidebar } from "../ai";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
@@ -32,7 +39,7 @@ export interface SidebarEvent {
   id: string;
   title: string;
   subtitle?: string | React.ReactNode;
-  state: "processed" | "discarded" | "waiting" | "running";
+  state: string;
   isOpen: boolean;
   receivedAt?: Date;
   values?: Record<string, string>;
@@ -185,6 +192,12 @@ export interface CanvasPageProps {
     nodeId: string,
     execution: WorkflowsWorkflowNodeExecution,
   ) => { map: EventStateMap; state: EventState };
+
+  // Workflow metadata for ExecutionChainPage
+  workflowNodes?: ComponentsNode[];
+  components?: ComponentsComponent[];
+  triggers?: TriggersTrigger[];
+  blueprints?: BlueprintsBlueprint[];
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -553,6 +566,7 @@ function CanvasPage(props: CanvasPageProps) {
             collapsedBackground: getBackgroundColorClass("white"),
             hideActionsButton: true,
             includeEmptyState: true,
+            emptyStateTitle: block.type === "trigger" ? "Waiting for the first event" : undefined,
           } as ComponentBaseProps,
           isTemplate: true,
           buildingBlock: block,
@@ -801,6 +815,10 @@ function CanvasPage(props: CanvasPageProps) {
             newNodeData={newNodeData}
             organizationId={props.organizationId}
             getCustomField={props.getCustomField}
+            workflowNodes={props.workflowNodes}
+            components={props.components}
+            triggers={props.triggers}
+            blueprints={props.blueprints}
           />
         </div>
       </div>
@@ -894,6 +912,10 @@ function Sidebar({
   newNodeData,
   organizationId,
   getCustomField,
+  workflowNodes,
+  components,
+  triggers,
+  blueprints,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -937,6 +959,10 @@ function Sidebar({
   newNodeData: NewNodeData | null;
   organizationId?: string;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
+  workflowNodes?: ComponentsNode[];
+  components?: ComponentsComponent[];
+  triggers?: TriggersTrigger[];
+  blueprints?: BlueprintsBlueprint[];
 }) {
   const sidebarData = useMemo(() => {
     if (templateNodeId && newNodeData) {
@@ -1075,6 +1101,10 @@ function Sidebar({
       templateNodeId={templateNodeId}
       onCancelTemplate={onCancelTemplate}
       newNodeData={newNodeData}
+      workflowNodes={workflowNodes}
+      components={components}
+      triggers={triggers}
+      blueprints={blueprints}
     />
   );
 }
@@ -1581,7 +1611,7 @@ function CanvasContent({
             fitView={false}
             style={{ opacity: isInitialized ? 1 : 0 }}
           >
-            <Background bgColor="#F1F5F9" color="#F1F5F9" />
+            <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
           </ReactFlow>
         </div>
       </div>

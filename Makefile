@@ -50,6 +50,9 @@ test.e2e.setup:
 test.e2e:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --packages="$(E2E_TEST_PACKAGES)" -- -p 1
 
+test.e2e.single:
+	bash ./scripts/vscode_run_tests.sh $(FILE) $(LINE)
+
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
 

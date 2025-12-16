@@ -28,10 +28,12 @@ export interface TabData {
 interface SidebarEventItemProps {
   event: SidebarEvent;
   index: number;
+  totalItems?: number;
   variant?: "latest" | "queue";
   isOpen: boolean;
   onToggleOpen: (eventId: string) => void;
   onEventClick?: (event: SidebarEvent) => void;
+  onTriggerNavigate?: (event: SidebarEvent) => void;
   tabData?: TabData;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
@@ -53,9 +55,11 @@ interface SidebarEventItemProps {
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   event,
   index,
+  totalItems,
   isOpen,
   onToggleOpen,
   onEventClick,
+  onTriggerNavigate,
   tabData,
   onCancelQueueItem,
   onCancelExecution,
@@ -86,15 +90,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const eventStateStyle: EventStateStyle = useMemo(() => {
     if (!getExecutionState) return DEFAULT_EVENT_STATE_MAP["neutral"];
 
-    if (event.kind === "queue") return DEFAULT_EVENT_STATE_MAP["next-in-queue"];
+    if (event.kind === "queue") return DEFAULT_EVENT_STATE_MAP["queued"];
 
     if (event.kind === "trigger") {
-      const triggerState = {
-        processed: "success",
-        discarded: "failed",
-      };
-      const state = triggerState[event.state as "processed" | "discarded"];
-      return DEFAULT_EVENT_STATE_MAP[state as EventState];
+      return DEFAULT_EVENT_STATE_MAP[event.state as EventState] || DEFAULT_EVENT_STATE_MAP["neutral"];
     }
 
     const { map, state } = getExecutionState(
@@ -316,58 +315,69 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     }
   }, [tabData, activeTab, getDefaultActiveTab]);
 
-  const EventIcon = resolveIcon(eventStateStyle.icon);
-  const EventColor = eventStateStyle.textColor;
   const EventBackground = eventStateStyle.backgroundColor;
-  const titleColor = eventStateStyle.textColor;
-  const iconSize = eventStateStyle.iconSize;
-  const iconContainerSize = 4;
-  const iconStrokeWidth = 2;
-  const iconClassName = eventStateStyle.iconClassName;
+  const EventBadgeColor = eventStateStyle.badgeColor;
 
   return (
     <div
       key={event.title + index}
-      className={`flex flex-col items-center justify-between gap-1 px-2 py-1.5 rounded-md ${EventBackground} ${EventColor}`}
+      className={
+        `cursor-pointer px-4 pt-2 pb-3 relative rounded-lg border-1 border-slate-300 ${EventBackground}` +
+        (totalItems && index < totalItems - 1 ? " mb-3" : "")
+      }
+      onClick={(e) => {
+        e.stopPropagation();
+        // For trigger events, navigate to execution chain instead of toggling inline
+        if (event.kind === "trigger" && onTriggerNavigate) {
+          onTriggerNavigate(event);
+        } else {
+          onToggleOpen(event.id);
+        }
+        onEventClick?.(event);
+      }}
     >
-      <div className="flex items-center gap-3 rounded-md w-full min-w-0">
+      {/* First row: Badge and subtitle */}
+      <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
         <div
-          className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleOpen(event.id);
-            onEventClick?.(event);
-          }}
+          className={`uppercase text-sm py-[1px] px-[6px] font-semibold rounded flex items-center justify-center text-white ${EventBadgeColor}`}
         >
-          <div
-            className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center ${EventColor} ${iconClassName}`}
-          >
-            <EventIcon size={iconSize} strokeWidth={iconStrokeWidth} className="thick" />
-          </div>
-          <span className={`truncate text-sm ${titleColor}`}>{event.title}</span>
+          <span>{event.state || "neutral"}</span>
         </div>
         {event.subtitle && (
-          <span className="text-xs text-black/50 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
+          <span className="text-sm truncate flex-shrink-0 max-w-[40%] text-gray-500">{event.subtitle}</span>
         )}
+      </div>
 
-        <SidebarEventActionsMenu
-          eventId={event.id}
-          executionId={event.executionId}
-          onCancelQueueItem={onCancelQueueItem}
-          onCancelExecution={onCancelExecution}
-          onPushThrough={onPushThrough}
-          supportsPushThrough={supportsPushThrough}
-          eventState={event.state}
-          kind={event.kind || "execution"}
-          onReEmit={() => {
-            if (["queue", "execution"].includes(event.kind || "")) return;
-            onReEmit?.(event.nodeId || "", event.id);
-          }}
-        />
+      {/* Second row: Event ID and title with actions */}
+      <div className="flex items-center mt-2 gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
+          {event.id && <span className="text-sm text-zinc-600 font-mono">#{event.id?.slice(0, 4)}</span>}
+          <span className="text-sm text-zinc-700 font-inter truncate text-md min-w-0 font-semibold">{event.title}</span>
+        </div>
+
+        <div onClick={(e) => e.stopPropagation()}>
+          <SidebarEventActionsMenu
+            eventId={event.id}
+            executionId={event.executionId}
+            onCancelQueueItem={onCancelQueueItem}
+            onCancelExecution={onCancelExecution}
+            onPushThrough={onPushThrough}
+            supportsPushThrough={supportsPushThrough}
+            eventState={event.state}
+            kind={event.kind || "execution"}
+            onReEmit={() => {
+              if (["queue", "execution"].includes(event.kind || "")) return;
+              onReEmit?.(event.nodeId || "", event.id);
+            }}
+          />
+        </div>
       </div>
 
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
-        <div className="rounded-sm bg-white outline outline-black/15 text-gray-500 w-full mb-0.5">
+        <div
+          className="mt-3 rounded-sm bg-white outline outline-black/15 text-gray-500 w-full mb-0.5"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Tab Navigation */}
           {tabData && (
             <div className="flex justify-between items-center border-b-1 border-gray-200">
@@ -564,11 +574,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     <div key={index} className="flex flex-col">
                       {/* Main execution */}
                       <div className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0 group hover:bg-gray-100">
-                        <div className="flex-shrink-0">
-                          {React.createElement(resolveIcon(execution.icon), {
-                            size: execution.iconSize,
-                            className: `${execution.textColor} ${execution.iconClassName} `,
-                          })}
+                        <div
+                          className={`uppercase text-xs py-[1px] px-[4px] font-semibold rounded flex items-center justify-center text-white ${execution.badgeColor} flex-shrink-0`}
+                        >
+                          <span>{execution.state}</span>
                         </div>
                         <span className="text-sm text-gray-800 truncate flex-1">{execution.name}</span>
                         {/* Hover Icons */}
@@ -633,26 +642,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                                 className: "text-gray-400",
                               })}
                             </div>
-                            <div className="flex-shrink-0">
-                              {child.state === "completed"
-                                ? React.createElement(resolveIcon("circle-check"), {
-                                    size: 16,
-                                    className: "text-green-600",
-                                  })
-                                : child.state === "failed"
-                                  ? React.createElement(resolveIcon("x"), {
-                                      size: 16,
-                                      className: "text-red-600",
-                                    })
-                                  : child.state === "running"
-                                    ? React.createElement(resolveIcon("refresh-cw"), {
-                                        size: 16,
-                                        className: "text-blue-600 animate-spin",
-                                      })
-                                    : React.createElement(resolveIcon("circle"), {
-                                        size: 16,
-                                        className: "text-gray-400",
-                                      })}
+                            <div
+                              className={`uppercase text-xs py-[1px] px-[3px] font-semibold rounded flex items-center justify-center text-white flex-shrink-0 ${child.badgeColor}`}
+                            >
+                              <span>{child.state}</span>
                             </div>
                             <span className="text-sm text-gray-700 truncate flex-1">{child.name}</span>
                           </div>

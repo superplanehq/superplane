@@ -1,178 +1,40 @@
-import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import React from "react";
-import { ComponentHeader } from "../componentHeader";
-import { CollapsedComponent } from "../collapsedComponent";
-import { MetadataList, type MetadataItem } from "../metadataList";
-import { SelectionWrapper } from "../selectionWrapper";
-import { ComponentActionsProps } from "../types/componentActions";
+import { ComponentBase, type ComponentBaseProps, type EventSection } from "../componentBase";
+import { type MetadataItem } from "../metadataList";
 
-type LastEventState = "processed" | "discarded";
+type LastEventState = string;
 
 interface TriggerLastEventData {
   title: string;
   subtitle?: string;
   receivedAt: Date;
   state: LastEventState;
+  eventId?: string;
 }
 
-export interface TriggerProps extends ComponentActionsProps {
-  iconSrc?: string;
-  iconSlug?: string;
-  iconColor?: string;
-  iconBackground?: string;
-  headerColor: string;
-  title: string;
-  description?: string;
+export interface TriggerProps extends Omit<ComponentBaseProps, "eventSections"> {
   metadata: MetadataItem[];
   lastEventData?: TriggerLastEventData;
-  zeroStateText?: string;
-  collapsedBackground?: string;
-  collapsed?: boolean;
-  selected?: boolean;
 }
 
-export const Trigger: React.FC<TriggerProps> = ({
-  iconSrc,
-  iconSlug,
-  iconColor,
-  iconBackground,
-  headerColor,
-  title,
-  description,
-  metadata,
-  lastEventData,
-  zeroStateText = "No events yet",
-  collapsed = false,
-  collapsedBackground,
-  selected = false,
-  onToggleCollapse,
-  onRun,
-  runDisabled,
-  runDisabledTooltip,
-  onEdit,
-  onDuplicate,
-  onDeactivate,
-  onToggleView,
-  onDelete,
-  isCompactView,
-}) => {
-  const timeAgo = React.useMemo(() => {
-    if (!lastEventData) return null;
-    const now = new Date();
-    const diff = now.getTime() - lastEventData.receivedAt.getTime();
-    return calcRelativeTimeFromDiff(diff);
+export const Trigger: React.FC<TriggerProps> = ({ lastEventData, ...componentBaseProps }) => {
+  const eventSections: EventSection[] = React.useMemo(() => {
+    if (!lastEventData) return [];
+
+    return [
+      {
+        receivedAt: lastEventData.receivedAt,
+        eventState: lastEventData.state,
+        eventTitle: lastEventData.title,
+        eventSubtitle: lastEventData.subtitle,
+        eventId: lastEventData.eventId,
+      },
+    ];
   }, [lastEventData]);
 
-  const LastEventIcon = React.useMemo(() => {
-    if (!lastEventData) return null;
-    if (lastEventData.state === "processed") {
-      return resolveIcon("circle-check");
-    } else {
-      return resolveIcon("circle-x");
-    }
-  }, [lastEventData]);
-
-  const LastEventColor = React.useMemo(() => {
-    if (!lastEventData) return "text-gray-700";
-    if (lastEventData.state === "processed") {
-      return "text-green-700";
-    } else {
-      return "text-red-700";
-    }
-  }, [lastEventData]);
-
-  const LastEventBackground = React.useMemo(() => {
-    if (!lastEventData) return "bg-gray-200";
-    if (lastEventData.state === "processed") {
-      return "bg-green-200";
-    } else {
-      return "bg-red-200";
-    }
-  }, [lastEventData]);
-
-  if (collapsed) {
-    return (
-      <SelectionWrapper selected={selected} fullRounded>
-        <CollapsedComponent
-          iconSrc={iconSrc}
-          iconSlug={iconSlug}
-          iconColor={iconColor}
-          iconBackground={iconBackground}
-          title={title}
-          collapsedBackground={collapsedBackground}
-          shape="circle"
-          onDoubleClick={onToggleCollapse}
-          onRun={onRun}
-          runDisabled={runDisabled}
-          runDisabledTooltip={runDisabledTooltip}
-          onEdit={onEdit}
-          onDuplicate={onDuplicate}
-          onDeactivate={onDeactivate}
-          onToggleView={onToggleView}
-          onDelete={onDelete}
-          isCompactView={isCompactView}
-        >
-          <div className="flex flex-col items-center gap-1">
-            <MetadataList items={metadata} className="flex flex-col gap-1 text-gray-500" iconSize={12} />
-          </div>
-        </CollapsedComponent>
-      </SelectionWrapper>
-    );
+  if (!lastEventData) {
+    return <ComponentBase {...componentBaseProps} includeEmptyState emptyStateTitle="Waiting for the first event" />;
   }
 
-  return (
-    <SelectionWrapper selected={selected}>
-      <div className="flex flex-col outline outline-black-15 rounded-md w-[23rem] bg-white">
-        <ComponentHeader
-          iconSrc={iconSrc}
-          iconSlug={iconSlug}
-          iconBackground={iconBackground}
-          iconColor={iconColor}
-          headerColor={headerColor}
-          title={title}
-          description={description}
-          onDoubleClick={onToggleCollapse}
-          onRun={onRun}
-          runDisabled={runDisabled}
-          runDisabledTooltip={runDisabledTooltip}
-          onEdit={onEdit}
-          onDuplicate={onDuplicate}
-          onDeactivate={onDeactivate}
-          onToggleView={onToggleView}
-          onDelete={onDelete}
-          isCompactView={isCompactView}
-        />
-        <MetadataList items={metadata} />
-        <div className="px-4 pt-3 pb-6">
-          {lastEventData ? (
-            <>
-              <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-                <span className="uppercase text-xs font-semibold tracking-wide">Last Event</span>
-                <span className="text-sm">{timeAgo}</span>
-              </div>
-              <div
-                className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastEventBackground} ${LastEventColor}`}
-              >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div
-                    className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${lastEventData.state === "processed" ? "text-green-600" : "text-red-600"}`}
-                  >
-                    {LastEventIcon && <LastEventIcon size={16} />}
-                  </div>
-                  <span className="truncate text-sm min-w-0">{lastEventData.title}</span>
-                </div>
-                {lastEventData.subtitle && (
-                  <span className="text-sm truncate flex-shrink-0 max-w-[40%]">{lastEventData.subtitle}</span>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center justify-center px-2 py-4 rounded-md bg-gray-50 border border-dashed border-gray-300">
-              <span className="text-sm text-gray-400">{zeroStateText}</span>
-            </div>
-          )}
-        </div>
-      </div>
-    </SelectionWrapper>
-  );
+  return <ComponentBase {...componentBaseProps} eventSections={eventSections} />;
 };

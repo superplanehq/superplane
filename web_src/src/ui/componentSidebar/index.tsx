@@ -1,22 +1,28 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { resolveIcon } from "@/lib/utils";
-import { ArrowLeft, Check, Copy, Plus, Search, X } from "lucide-react";
+import { Check, Copy, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChildEventsState } from "../composite";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
-import { SidebarEventItem } from "./SidebarEventItem";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
 import { LatestTab } from "./LatestTab";
 import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
-import { AuthorizationDomainType, ConfigurationField, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import {
+  AuthorizationDomainType,
+  ConfigurationField,
+  WorkflowsWorkflowNodeExecution,
+  ComponentsNode,
+  ComponentsComponent,
+  TriggersTrigger,
+  BlueprintsBlueprint,
+} from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
 import { NewNodeData } from "../CustomComponentBuilderPage";
 import { ReactNode } from "react";
+import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 
 const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
   { value: "processed", label: "Processed" },
@@ -109,6 +115,12 @@ interface ComponentSidebarProps {
   domainId?: string;
   domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
+
+  // Workflow metadata for ExecutionChainPage
+  workflowNodes?: ComponentsNode[];
+  components?: ComponentsComponent[];
+  triggers?: TriggersTrigger[];
+  blueprints?: BlueprintsBlueprint[];
 }
 
 export const ComponentSidebar = ({
@@ -116,8 +128,6 @@ export const ComponentSidebar = ({
   nodeId,
   iconSrc,
   iconSlug,
-  iconColor,
-  iconBackground,
   onEventClick,
   onClose,
   latestEvents,
@@ -170,6 +180,10 @@ export const ComponentSidebar = ({
   domainId,
   domainType,
   customField,
+  workflowNodes = [],
+  components = [],
+  triggers = [],
+  blueprints = [],
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -180,7 +194,10 @@ export const ComponentSidebar = ({
   // Keep expanded state stable across parent re-renders
   const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
 
-  const [page, setPage] = useState<"overview" | "history" | "queue">("overview");
+  const [page, setPage] = useState<"overview" | "history" | "queue" | "execution-chain">("overview");
+  const [previousPage, setPreviousPage] = useState<"overview" | "history" | "queue">("overview");
+  const [executionChainEventId, setExecutionChainEventId] = useState<string | null>(null);
+  const [executionChainTriggerEvent, setExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
   // For template nodes, force settings tab and block latest tab
   const isTemplateNode = !!templateNodeId && !!newNodeData;
   const activeTab = isTemplateNode ? "settings" : currentTab || "latest";
@@ -265,20 +282,39 @@ export const ComponentSidebar = ({
   }, []);
 
   const handleSeeQueue = useCallback(() => {
+    setPreviousPage(page as "overview" | "history" | "queue");
     setPage("queue");
     onSeeQueue?.();
-  }, [onSeeQueue]);
+  }, [onSeeQueue, page]);
 
   const handleSeeFullHistory = useCallback(() => {
+    setPreviousPage(page as "overview" | "history" | "queue");
     setPage("history");
     onSeeFullHistory?.();
-  }, [onSeeFullHistory]);
+  }, [onSeeFullHistory, page]);
 
   const handleBackToOverview = useCallback(() => {
-    setPage("overview");
+    if (page === "execution-chain") {
+      // When coming back from execution chain, go to the previous page
+      setPage(previousPage);
+    } else {
+      setPage("overview");
+    }
     setSearchQuery("");
     setStatusFilter("all");
-  }, []);
+    setExecutionChainEventId(null);
+    setExecutionChainTriggerEvent(null);
+  }, [page, previousPage]);
+
+  const handleSeeExecutionChain = useCallback(
+    (eventId: string, triggerEvent?: SidebarEvent) => {
+      setPreviousPage(page as "overview" | "history" | "queue");
+      setExecutionChainEventId(eventId);
+      setExecutionChainTriggerEvent(triggerEvent || null);
+      setPage("execution-chain");
+    },
+    [page],
+  );
 
   const allEvents = React.useMemo(() => {
     if (page === "overview") return [];
@@ -405,18 +441,14 @@ export const ComponentSidebar = ({
       </div>
       <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-border bg-gray-50">
         <div className="flex flex-col items-start gap-3 w-full mt-2">
-          <div
-            className={`w-7 h-7 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
-          >
-            {iconSrc ? (
-              <img src={iconSrc} alt={nodeName} className="w-6 h-6" />
-            ) : (
-              <Icon size={16} className={iconColor} />
-            )}
-          </div>
           <div className="flex justify-between gap-3 w-full">
             <div className="flex flex-col gap-1">
-              <h2 className="text-xl font-semibold">{isTemplateNode ? newNodeData.nodeName : nodeName}</h2>
+              <div className="flex items-center gap-2">
+                <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
+                  {iconSrc ? <img src={iconSrc} alt={nodeName} className="w-6 h-6" /> : <Icon size={16} />}
+                </div>
+                <h2 className="text-xl font-semibold">{isTemplateNode ? newNodeData.nodeName : nodeName}</h2>
+              </div>
               {nodeId && !isTemplateNode && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500 font-mono">{nodeId}</span>
@@ -456,105 +488,57 @@ export const ComponentSidebar = ({
       </div>
       {page !== "overview" ? (
         <>
-          {/* Back to Overview Section */}
-          <div className="px-3 py-2 border-b-1 border-border">
-            <button
-              onClick={handleBackToOverview}
-              className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 cursor-pointer"
-            >
-              <ArrowLeft size={16} />
-              Back to Overview
-            </button>
-          </div>
+          <PageHeader
+            page={page as "history" | "queue" | "execution-chain"}
+            onBackToOverview={handleBackToOverview}
+            previousPage={previousPage}
+            showSearchAndFilter={page !== "execution-chain"}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            statusFilter={statusFilter}
+            onStatusFilterChange={(value) => setStatusFilter(value as ChildEventsState | "all")}
+            extraStatusOptions={extraStatusOptions}
+          />
 
-          {/* Full History Header with Search and Filter */}
-          <div className="px-3 py-3">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-semibold uppercase text-gray-500">
-                {page === "history" ? "Full History" : "Queue"}
-              </h2>
-            </div>
-            <div className="flex gap-2">
-              {/* Search Input */}
-              <div className="relative flex-1">
-                <Search size={16} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500" />
-                <Input
-                  type="text"
-                  placeholder="Search events..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 h-9 text-sm"
-                />
-              </div>
-              {/* Status Filter */}
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => setStatusFilter(value as ChildEventsState | "all")}
-              >
-                <SelectTrigger className="w-[160px] h-9 text-sm text-gray-500">
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-gray-500">
-                    All Statuses
-                  </SelectItem>
-                  {DEFAULT_STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value} className="text-gray-500">
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                  {extraStatusOptions.map((status) => (
-                    <SelectItem key={status} value={status} className="text-gray-500">
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Full History Events List */}
           <div className="px-3 py-1 pb-3">
-            <div className="flex flex-col gap-2">
-              {filteredHistoryEvents.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 text-sm">
-                  {searchQuery || statusFilter !== "all" ? "No matching events found" : "No events found"}
-                </div>
-              ) : (
-                <>
-                  {filteredHistoryEvents.map((event, index) => (
-                    <SidebarEventItem
-                      key={event.id}
-                      event={event}
-                      index={index}
-                      variant={page === "history" ? "latest" : "queue"}
-                      isOpen={openEventIds.has(event.id) || event.isOpen}
-                      onToggleOpen={handleToggleOpen}
-                      onEventClick={onEventClick}
-                      tabData={getTabData?.(event)}
-                      onPushThrough={onPushThrough}
-                      onCancelExecution={onCancelExecution}
-                      supportsPushThrough={supportsPushThrough}
-                      onReEmit={onReEmit}
-                      loadExecutionChain={loadExecutionChain}
-                      getExecutionState={getExecutionState}
-                    />
-                  ))}
-                  {hasMoreItems && !searchQuery && statusFilter === "all" && (
-                    <div className="flex justify-center pt-1">
-                      <button
-                        onClick={handleLoadMoreItems}
-                        disabled={loadingMoreItems}
-                        className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed rounded-md px-2 py-1.5 border border-border shadow-xs"
-                      >
-                        {loadingMoreItems ? null : <Plus size={16} />}
-                        {loadingMoreItems ? "Loading..." : `Show ${showMoreCount > 10 ? "10" : showMoreCount} more`}
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+            {page === "execution-chain" ? (
+              <ExecutionChainPage
+                eventId={executionChainEventId}
+                triggerEvent={executionChainTriggerEvent || undefined}
+                loadExecutionChain={loadExecutionChain}
+                openEventIds={openEventIds}
+                onToggleOpen={handleToggleOpen}
+                getExecutionState={getExecutionState}
+                getTabData={getTabData}
+                onEventClick={onEventClick}
+                workflowNodes={workflowNodes}
+                components={components}
+                triggers={triggers}
+                blueprints={blueprints}
+              />
+            ) : (
+              <HistoryQueuePage
+                page={page as "history" | "queue"}
+                filteredEvents={filteredHistoryEvents}
+                openEventIds={openEventIds}
+                onToggleOpen={handleToggleOpen}
+                onEventClick={onEventClick}
+                onTriggerNavigate={(event) => handleSeeExecutionChain(event.triggerEventId || event.id, event)}
+                getTabData={getTabData}
+                onPushThrough={onPushThrough}
+                onCancelExecution={onCancelExecution}
+                supportsPushThrough={supportsPushThrough}
+                onReEmit={onReEmit}
+                loadExecutionChain={loadExecutionChain}
+                getExecutionState={getExecutionState}
+                hasMoreItems={hasMoreItems}
+                loadingMoreItems={loadingMoreItems}
+                showMoreCount={showMoreCount}
+                onLoadMoreItems={handleLoadMoreItems}
+                searchQuery={searchQuery}
+                statusFilter={statusFilter}
+              />
+            )}
           </div>
         </>
       ) : (
@@ -605,6 +589,7 @@ export const ComponentSidebar = ({
                 onEventClick={onEventClick}
                 onSeeFullHistory={handleSeeFullHistory}
                 onSeeQueue={handleSeeQueue}
+                onSeeExecutionChain={handleSeeExecutionChain}
                 getTabData={getTabData}
                 onCancelQueueItem={onCancelQueueItem}
                 onCancelExecution={onCancelExecution}

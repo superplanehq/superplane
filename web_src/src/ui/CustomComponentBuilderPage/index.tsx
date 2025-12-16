@@ -349,7 +349,7 @@ function CanvasContent({
       nodesConnectable={true}
       elementsSelectable={true}
     >
-      <Background bgColor="#F1F5F9" color="#F1F5F9" />
+      <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
       <Controls />
     </ReactFlow>
   );
@@ -499,6 +499,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             collapsedBackground: getBackgroundColorClass("white"),
             hideActionsButton: true,
             includeEmptyState: true,
+            emptyStateTitle: block.type === "trigger" ? "Waiting for the first event" : undefined,
           } as ComponentBaseProps,
           isTemplate: true,
           buildingBlock: block,
