@@ -186,7 +186,10 @@ export function BuildingBlocksSidebar({
               <h2 className="text-xl font-semibold">New Component</h2>
             </div>
           </div>
-          <div onClick={() => onToggle(false)} className="flex items-center justify-center absolute top-6 right-3 cursor-pointer">
+          <div
+            onClick={() => onToggle(false)}
+            className="flex items-center justify-center absolute top-6 right-3 cursor-pointer"
+          >
             <X size={18} />
           </div>
         </div>
