@@ -119,7 +119,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
           title: eventData?.pull_request?.title || "",
           subtitle: eventData?.pull_request?.head?.sha || "",
           receivedAt: new Date(lastEvent.createdAt!),
-          state: "processed",
+          state: "triggered",
           eventId: lastEvent.id,
         };
       } else {
@@ -127,7 +127,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
           title: eventData?.head_commit?.message || "",
           subtitle: eventData?.head_commit?.id || "",
           receivedAt: new Date(lastEvent.createdAt!),
-          state: "processed",
+          state: "triggered",
           eventId: lastEvent.id,
         };
       }

@@ -40,7 +40,7 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
   if (nextInQueue) {
     eventSections.push({
       eventTitle: nextInQueue.title,
-      eventState: "neutral",
+      eventState: "queued",
       handleComponent: nextInQueue.subtitle ? (
         <div className="mt-2 text-right text-xs text-gray-500">{nextInQueue.subtitle}</div>
       ) : undefined,
@@ -64,6 +64,7 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
       onToggleView={onToggleView}
       onDelete={onDelete}
       isCompactView={isCompactView}
+      includeEmptyState={!lastEvent}
     />
   );
 };

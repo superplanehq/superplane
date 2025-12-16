@@ -89,7 +89,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     if (event.kind === "queue") return DEFAULT_EVENT_STATE_MAP["queued"];
 
     if (event.kind === "trigger") {
-      return DEFAULT_EVENT_STATE_MAP[event.state as EventState];
+      return DEFAULT_EVENT_STATE_MAP[event.state as EventState] || DEFAULT_EVENT_STATE_MAP["neutral"];
     }
 
     const { map, state } = getExecutionState(

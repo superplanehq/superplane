@@ -1749,6 +1749,7 @@ function prepareMergeNode(
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventState: executionToEventSectionState(execution),
+      eventId: execution.rootEvent?.id,
     };
   }
 
@@ -1763,10 +1764,7 @@ function prepareMergeNode(
       state: "pending" as const,
       merge: {
         title: displayLabel,
-        lastEvent: lastEvent || {
-          eventTitle: "No events received yet",
-          eventState: "neutral" as const,
-        },
+        lastEvent: lastEvent,
         nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,

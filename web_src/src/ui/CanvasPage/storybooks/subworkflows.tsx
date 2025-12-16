@@ -25,7 +25,7 @@ export const MainSubWorkflow = {
             receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
             childEventsInfo: {
               count: 3,
-              state: "processed",
+              state: "triggered",
               waitingInfos: [],
             },
             state: "success",
@@ -102,7 +102,7 @@ export const MainSubWorkflow = {
             receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60),
             childEventsInfo: {
               count: 2,
-              state: "processed",
+              state: "triggered",
               waitingInfos: [],
             },
             state: "success",

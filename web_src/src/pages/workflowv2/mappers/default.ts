@@ -32,7 +32,7 @@ export const defaultTriggerRenderer: TriggerRenderer = {
         title: "Event emitted by trigger",
         subtitle: formatTimeAgo(new Date(lastEvent.createdAt!)),
         receivedAt: new Date(lastEvent.createdAt!),
-        state: "processed",
+        state: "triggered",
         eventId: lastEvent.id,
       };
     }
