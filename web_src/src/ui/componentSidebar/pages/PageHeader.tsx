@@ -13,6 +13,7 @@ const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
 interface PageHeaderProps {
   page: "history" | "queue" | "execution-chain";
   onBackToOverview: () => void;
+  previousPage?: "overview" | "history" | "queue";
 
   // Search and filter props (only for history/queue)
   showSearchAndFilter?: boolean;
@@ -26,6 +27,7 @@ interface PageHeaderProps {
 export const PageHeader: React.FC<PageHeaderProps> = ({
   page,
   onBackToOverview,
+  previousPage = "overview",
   showSearchAndFilter = false,
   searchQuery = "",
   onSearchChange,
@@ -46,6 +48,20 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     }
   };
 
+  const getBackButtonText = () => {
+    if (page === "execution-chain") {
+      switch (previousPage) {
+        case "history":
+          return "Back to History";
+        case "queue":
+          return "Back to Queue";
+        default:
+          return "Back to Overview";
+      }
+    }
+    return "Back to Overview";
+  };
+
   return (
     <>
       {/* Back to Overview Section */}
@@ -55,18 +71,16 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 cursor-pointer"
         >
           <ArrowLeft size={16} />
-          Back to Overview
+          {getBackButtonText()}
         </button>
       </div>
 
       {/* Page Header with Search and Filter */}
-      <div className="px-3 py-3">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-semibold uppercase text-gray-500">
-            {getPageTitle()}
-          </h2>
-        </div>
-        {showSearchAndFilter && (
+      {showSearchAndFilter && (
+        <div className={`px-3 py-3`}>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold uppercase text-gray-500">{getPageTitle()}</h2>
+          </div>
           <div className="flex gap-2">
             {/* Search Input */}
             <div className="relative flex-1">
@@ -80,10 +94,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
               />
             </div>
             {/* Status Filter */}
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => onStatusFilterChange?.(value)}
-            >
+            <Select value={statusFilter} onValueChange={(value) => onStatusFilterChange?.(value)}>
               <SelectTrigger className="w-[160px] h-9 text-sm text-gray-500">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
@@ -104,8 +115,8 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
               </SelectContent>
             </Select>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 };

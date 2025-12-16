@@ -13,6 +13,7 @@ interface HistoryQueuePageProps {
   openEventIds: Set<string>;
   onToggleOpen: (eventId: string) => void;
   onEventClick?: (event: SidebarEvent) => void;
+  onTriggerNavigate?: (event: SidebarEvent) => void;
   getTabData?: (event: SidebarEvent) => TabData | undefined;
   onPushThrough?: (executionId: string) => void;
   onCancelExecution?: (executionId: string) => void;
@@ -46,6 +47,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
   openEventIds,
   onToggleOpen,
   onEventClick,
+  onTriggerNavigate,
   getTabData,
   onPushThrough,
   onCancelExecution,
@@ -77,6 +79,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
               isOpen={openEventIds.has(event.id) || event.isOpen}
               onToggleOpen={onToggleOpen}
               onEventClick={onEventClick}
+              onTriggerNavigate={onTriggerNavigate}
               tabData={getTabData?.(event)}
               onPushThrough={onPushThrough}
               onCancelExecution={onCancelExecution}

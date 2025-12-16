@@ -296,7 +296,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
       </div>
 
       {/* Connecting line */}
-      {showConnectingLine && <div className="absolute left-5 bottom-0 w-[1px] h-3 bg-gray-300 z-10" />}
+      {showConnectingLine && <div className="absolute left-5 -bottom-3 w-[1px] h-3 bg-gray-300 z-10" />}
     </div>
   );
 };

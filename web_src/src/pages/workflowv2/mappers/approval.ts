@@ -45,7 +45,7 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
   approved: {
     icon: "circle-check",
     textColor: "text-black",
-    backgroundColor: "bg-green-200",
+    backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   rejected: {

@@ -177,7 +177,9 @@ export const ComponentSidebar = ({
   const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
 
   const [page, setPage] = useState<"overview" | "history" | "queue" | "execution-chain">("overview");
+  const [previousPage, setPreviousPage] = useState<"overview" | "history" | "queue">("overview");
   const [executionChainEventId, setExecutionChainEventId] = useState<string | null>(null);
+  const [executionChainTriggerEvent, setExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
   // For template nodes, force settings tab and block latest tab
   const isTemplateNode = !!templateNodeId && !!newNodeData;
   const activeTab = isTemplateNode ? "settings" : currentTab || "latest";
@@ -262,26 +264,36 @@ export const ComponentSidebar = ({
   }, []);
 
   const handleSeeQueue = useCallback(() => {
+    setPreviousPage(page as "overview" | "history" | "queue");
     setPage("queue");
     onSeeQueue?.();
-  }, [onSeeQueue]);
+  }, [onSeeQueue, page]);
 
   const handleSeeFullHistory = useCallback(() => {
+    setPreviousPage(page as "overview" | "history" | "queue");
     setPage("history");
     onSeeFullHistory?.();
-  }, [onSeeFullHistory]);
+  }, [onSeeFullHistory, page]);
 
   const handleBackToOverview = useCallback(() => {
-    setPage("overview");
+    if (page === "execution-chain") {
+      // When coming back from execution chain, go to the previous page
+      setPage(previousPage);
+    } else {
+      setPage("overview");
+    }
     setSearchQuery("");
     setStatusFilter("all");
     setExecutionChainEventId(null);
-  }, []);
+    setExecutionChainTriggerEvent(null);
+  }, [page, previousPage]);
 
-  const handleSeeExecutionChain = useCallback((eventId: string) => {
+  const handleSeeExecutionChain = useCallback((eventId: string, triggerEvent?: SidebarEvent) => {
+    setPreviousPage(page as "overview" | "history" | "queue");
     setExecutionChainEventId(eventId);
+    setExecutionChainTriggerEvent(triggerEvent || null);
     setPage("execution-chain");
-  }, []);
+  }, [page]);
 
   const allEvents = React.useMemo(() => {
     if (page === "overview") return [];
@@ -458,6 +470,7 @@ export const ComponentSidebar = ({
           <PageHeader
             page={page as "history" | "queue" | "execution-chain"}
             onBackToOverview={handleBackToOverview}
+            previousPage={previousPage}
             showSearchAndFilter={page !== "execution-chain"}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -470,10 +483,13 @@ export const ComponentSidebar = ({
             {page === "execution-chain" ? (
               <ExecutionChainPage
                 eventId={executionChainEventId}
+                triggerEvent={executionChainTriggerEvent || undefined}
                 loadExecutionChain={loadExecutionChain}
                 openEventIds={openEventIds}
                 onToggleOpen={handleToggleOpen}
                 getExecutionState={getExecutionState}
+                getTabData={getTabData}
+                onEventClick={onEventClick}
               />
             ) : (
               <HistoryQueuePage
@@ -482,6 +498,7 @@ export const ComponentSidebar = ({
                 openEventIds={openEventIds}
                 onToggleOpen={handleToggleOpen}
                 onEventClick={onEventClick}
+                onTriggerNavigate={(event) => handleSeeExecutionChain(event.triggerEventId || event.id, event)}
                 getTabData={getTabData}
                 onPushThrough={onPushThrough}
                 onCancelExecution={onCancelExecution}

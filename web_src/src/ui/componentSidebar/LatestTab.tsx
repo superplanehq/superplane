@@ -15,7 +15,7 @@ interface LatestTabProps {
   onEventClick?: (event: SidebarEvent) => void;
   onSeeFullHistory?: () => void;
   onSeeQueue?: () => void;
-  onSeeExecutionChain?: (eventId: string) => void;
+  onSeeExecutionChain?: (eventId: string, triggerEvent?: SidebarEvent) => void;
   getTabData?: (event: SidebarEvent) => TabData | undefined;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
@@ -65,7 +65,7 @@ export const LatestTab = ({
 
   const handleTriggerNavigate = (event: SidebarEvent) => {
     const eventId = event.triggerEventId || event.id;
-    onSeeExecutionChain?.(eventId);
+    onSeeExecutionChain?.(eventId, event);
   };
 
   return (
