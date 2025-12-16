@@ -98,7 +98,7 @@ func (s *GithubTriggerSteps) addGithubTriggerNode() {
 	source := q.TestID("building-block-github")
 	target := q.TestID("rf__wrapper")
 
-	s.session.DragAndDrop(source, target, 800, 200)
+	s.session.DragAndDrop(source, target, 300, 200)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), "GitHub Trigger")
@@ -136,7 +136,7 @@ func (s *GithubTriggerSteps) givenACanvasWithGithubTriggerAndNoop() {
 	s.givenACanvasExists()
 	s.addGithubTriggerNode()
 
-	s.canvas.AddNoop("Noop", models.Position{X: 1500, Y: 200})
+	s.canvas.AddNoop("Noop", models.Position{X: 600, Y: 200})
 	s.canvas.Connect("GitHub Trigger", "Noop")
 }
 
