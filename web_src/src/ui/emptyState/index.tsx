@@ -1,5 +1,5 @@
 import React from "react";
-import { Puzzle } from "lucide-react";
+import { Rabbit } from "lucide-react";
 
 interface EmptyStateProps {
   icon?: React.ComponentType<{ size?: number }>;
@@ -9,8 +9,8 @@ interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  icon: Icon = Puzzle,
-  title = "Please finish configuring your component",
+  icon: Icon = Rabbit,
+  title = "Waiting for the first run...",
   description,
   className = "",
 }) => {
