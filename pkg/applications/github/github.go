@@ -46,7 +46,7 @@ type Metadata struct {
 	InstallationID string            `mapstructure:"installationId" json:"installationId"`
 	State          string            `mapstructure:"state" json:"state"`
 	Owner          string            `mapstructure:"owner" json:"owner"`
-	Repositories   []string          `mapstructure:"repositories" json:"repositories"`
+	Repositories   []Repository      `mapstructure:"repositories" json:"repositories"`
 	GitHubApp      GitHubAppMetadata `mapstructure:"githubApp" json:"githubApp"`
 }
 
@@ -366,9 +366,13 @@ func afterAppInstallationInstall(ctx core.HTTPRequestContext, installationID str
 		return
 	}
 
-	repos := []string{}
+	repos := []Repository{}
 	for _, r := range response.Repositories {
-		repos = append(repos, r.GetFullName())
+		repos = append(repos, Repository{
+			ID:   *r.ID,
+			Name: r.GetName(),
+			URL:  r.GetHTMLURL(),
+		})
 	}
 
 	metadata.Repositories = repos

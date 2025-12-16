@@ -1,7 +1,6 @@
 package github
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -107,22 +106,15 @@ func (p *OnPullRequest) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("error decoding app installation metadata: %v", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
+	repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r Repository) bool {
+		return r.Name == config.Repository
+	})
+
+	if repoIndex == -1 {
+		return fmt.Errorf("repository %s is not accessible to app installation", config.Repository)
 	}
 
-	repo, _, err := client.Repositories.Get(context.Background(), appMetadata.Owner, config.Repository)
-	if err != nil {
-		return fmt.Errorf("failed to get repository: %w", err)
-	}
-
-	metadata.Repository = &Repository{
-		ID:   repo.GetID(),
-		Name: repo.GetName(),
-		URL:  repo.GetHTMLURL(),
-	}
-
+	metadata.Repository = &appMetadata.Repositories[repoIndex]
 	ctx.MetadataContext.Set(metadata)
 
 	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
