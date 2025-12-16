@@ -230,7 +230,7 @@ export const Composite: React.FC<CompositeProps> = ({
       onDelete={onDelete}
       isCompactView={isCompactView}
       includeEmptyState={eventsToDisplay.length === 0}
-      emptyStateTitle="No executions received yet"
+      emptyStateProps={{ title: "No executions received yet" }}
       customField={customField}
     />
   );
