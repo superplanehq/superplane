@@ -110,6 +110,14 @@ export const CustomComponent = () => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
 
+  // Template node state for drag-edge-to-empty-space functionality
+  const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
+  const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
+  const [isBuildingBlocksSidebarOpen, setIsBuildingBlocksSidebarOpen] = useState(false);
+
+  // Track template node IDs that have been converted to real nodes and should not be preserved
+  const convertedTemplateIdsRef = useRef<Set<string>>(new Set());
+
   // Revert functionality - track initial blueprint snapshot
   const [initialBlueprintSnapshot, setInitialBlueprintSnapshot] = useState<any>(null);
 
@@ -181,48 +189,105 @@ export const CustomComponent = () => {
   useEffect(() => {
     if (!blueprint || components.length === 0) return;
 
-    const allNodes: Node[] = (blueprint.nodes || [])
-      .map((node: ComponentsNode) => {
-        // Handle component nodes
-        const component = components.find((p: any) => p.name === node.component?.name);
-        const blockData = createBlockData(node, component);
+    console.log('[USEEFFECT] Blueprint changed, syncing nodes');
+    console.log('[USEEFFECT] convertedTemplateIdsRef contains:', Array.from(convertedTemplateIdsRef.current));
 
-        return {
-          id: node.id,
-          type: "default", // BlueprintBuilderPage uses 'default' type for all nodes
-          data: {
-            ...blockData,
-            // Store original data for serialization
-            _originalComponent: node.component?.name,
-            _originalConfiguration: node.configuration || {},
-          },
-          position: node.position || { x: 0, y: 0 },
-        };
-      })
-      .filter(Boolean) as Node[];
+    setNodes((currentNodes) => {
+      console.log('[USEEFFECT] currentNodes:', currentNodes.map(n => ({ id: n.id, isTemplate: (n.data as any).isTemplate, isPending: (n.data as any).isPendingConnection })));
 
-    const loadedEdges: Edge[] = (blueprint.edges || []).map((edge: any, index: number) => ({
-      id: `e${index}`,
-      source: edge.sourceId,
-      sourceHandle: edge.channel || "default",
-      target: edge.targetId,
-      style: { strokeWidth: 3, stroke: "#C9D5E1" },
-    }));
+      // Preserve pending connection nodes and template nodes
+      // But exclude template nodes that have been converted to real nodes
+      const localOnlyNodes = currentNodes.filter((node) => {
+        const isPending = (node.data as any).isPendingConnection;
+        const isTemplate = (node.data as any).isTemplate;
 
-    // Check if we have saved positions
-    const hasPositions = allNodes.some((node) => node.position && (node.position.x !== 0 || node.position.y !== 0));
+        // Always preserve pending connection nodes
+        if (isPending) return true;
 
-    if (hasPositions) {
-      // Use saved positions
-      setNodes(allNodes);
-      setEdges(loadedEdges);
-    } else {
-      // Apply elk layout for blueprints without saved positions
-      getLayoutedElements(allNodes, loadedEdges).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
-        setNodes(layoutedNodes);
-        setEdges(layoutedEdges);
+        // Preserve template nodes UNLESS they've been converted to real nodes
+        if (isTemplate) {
+          const shouldPreserve = !convertedTemplateIdsRef.current.has(node.id);
+          console.log('[USEEFFECT] Template node', node.id, '- shouldPreserve:', shouldPreserve);
+          if (shouldPreserve) return true;
+        }
+
+        return false;
       });
-    }
+
+      console.log('[USEEFFECT] localOnlyNodes to preserve:', localOnlyNodes.map(n => ({ id: n.id, isTemplate: (n.data as any).isTemplate, isPending: (n.data as any).isPendingConnection })));
+
+      const allNodes: Node[] = (blueprint.nodes || [])
+        .map((node: ComponentsNode) => {
+          // Handle component nodes
+          const component = components.find((p: any) => p.name === node.component?.name);
+          const blockData = createBlockData(node, component);
+
+          // Find if this node exists in current state to preserve selection
+          const existingNode = currentNodes.find((n) => n.id === node.id);
+
+          return {
+            id: node.id,
+            type: "default",
+            data: {
+              ...blockData,
+              _originalComponent: node.component?.name,
+              _originalConfiguration: node.configuration || {},
+            },
+            position: node.position || { x: 0, y: 0 },
+            selected: existingNode?.selected ?? false, // Preserve selection
+          };
+        })
+        .filter(Boolean) as Node[];
+
+      // Check if we have saved positions
+      const hasPositions = allNodes.some((node) => node.position && (node.position.x !== 0 || node.position.y !== 0));
+
+      if (hasPositions) {
+        // Use saved positions and append local-only nodes
+        return [...allNodes, ...localOnlyNodes];
+      } else {
+        // Apply elk layout for blueprints without saved positions
+        // We'll handle this async, so just return current for now
+        getLayoutedElements(allNodes, []).then(({ nodes: layoutedNodes }) => {
+          setNodes((current) => {
+            const localOnly = current.filter(
+              (node) => (node.data as any).isTemplate || (node.data as any).isPendingConnection,
+            );
+            return [...layoutedNodes, ...localOnly];
+          });
+        });
+        return [...allNodes, ...localOnlyNodes];
+      }
+    });
+
+    setEdges((currentEdges) => {
+      // Preserve edges connected to pending connection nodes or template nodes
+      // But exclude edges to template nodes that have been converted
+      const localOnlyEdges = currentEdges.filter((edge) => {
+        const sourceNode = nodes.find((n) => n.id === edge.source);
+        const targetNode = nodes.find((n) => n.id === edge.target);
+
+        const sourceIsLocal = sourceNode &&
+          ((sourceNode.data as any).isPendingConnection ||
+           ((sourceNode.data as any).isTemplate && !convertedTemplateIdsRef.current.has(sourceNode.id)));
+
+        const targetIsLocal = targetNode &&
+          ((targetNode.data as any).isPendingConnection ||
+           ((targetNode.data as any).isTemplate && !convertedTemplateIdsRef.current.has(targetNode.id)));
+
+        return sourceIsLocal || targetIsLocal;
+      });
+
+      const loadedEdges: Edge[] = (blueprint.edges || []).map((edge: any, index: number) => ({
+        id: `e${index}`,
+        source: edge.sourceId,
+        sourceHandle: edge.channel || "default",
+        target: edge.targetId,
+        style: { strokeWidth: 3, stroke: "#C9D5E1" },
+      }));
+
+      return [...loadedEdges, ...localOnlyEdges];
+    });
   }, [blueprint, components]);
 
   // Use refs to access latest values without causing re-renders
@@ -296,14 +361,14 @@ export const CustomComponent = () => {
   };
 
   const handleSaveBlueprint = useCallback(
-    async (customNodes?: Node[]) => {
+    async (customNodes?: Node[], customEdges?: Edge[]) => {
       try {
         // Use provided nodes or current nodes from ref
         const rawNodes = customNodes || nodesRef.current || [];
         const currentNodes = Array.isArray(rawNodes) ? rawNodes : [];
-        // Filter out template nodes and serialize remaining nodes
+        // Filter out template and pending connection nodes and serialize remaining nodes
         const blueprintNodes = currentNodes
-          .filter((node) => !node.id.startsWith("template_")) // Exclude template nodes
+          .filter((node) => !node.id.startsWith("template_") && !node.id.startsWith("pending_connection_")) // Exclude template and pending nodes
           .map((node) => {
             const nodeData = node.data as any;
             return {
@@ -321,8 +386,15 @@ export const CustomComponent = () => {
             };
           });
 
-        const blueprintEdges = edges
-          .filter((edge) => !edge.source.startsWith("template_") && !edge.target.startsWith("template_"))
+        // Use provided edges or current edges
+        const currentEdges = customEdges || edges;
+        const blueprintEdges = currentEdges
+          .filter((edge) =>
+            !edge.source.startsWith("template_") &&
+            !edge.target.startsWith("template_") &&
+            !edge.source.startsWith("pending_connection_") &&
+            !edge.target.startsWith("pending_connection_")
+          )
           .map((edge) => ({
             sourceId: edge.source!,
             targetId: edge.target!,
@@ -382,8 +454,132 @@ export const CustomComponent = () => {
 
   const handleNodeConfigurationSave = useCallback(
     async (nodeId: string, configuration: Record<string, any>, nodeName: string) => {
+      console.log('[HANDLE SAVE] Called with nodeId:', nodeId);
+      console.log('[HANDLE SAVE] templateNodeId:', templateNodeId);
+      console.log('[HANDLE SAVE] newNodeData:', newNodeData);
+      console.log('[HANDLE SAVE] newNodeData.sourceConnection:', (newNodeData as any)?.sourceConnection);
+
       saveSnapshot();
 
+      // Check if this is a template node with sourceConnection (needs to be converted to real node)
+      if (templateNodeId && newNodeData && (newNodeData as any).sourceConnection) {
+        console.log('[HANDLE SAVE] Entering template-to-real-node conversion path');
+        // This is a template node created from dragging edge - convert to real node
+        const component = componentsRef.current.find(
+          (c: ComponentsComponent) => c.name === newNodeData.buildingBlock.name,
+        );
+        if (!component) return;
+
+        // Filter configuration to only include visible fields
+        const filteredConfiguration = filterVisibleConfiguration(configuration, component.configuration || []);
+
+        // Create new node
+        const newNodeId = generateNodeId(component.name!, nodeName.trim());
+        const mockNode = {
+          component: { name: component.name },
+          name: nodeName.trim(),
+          configuration: filteredConfiguration,
+        };
+        const blockData = createBlockData(mockNode, component);
+
+        const newNode: Node = {
+          id: newNodeId,
+          type: "default",
+          position: newNodeData.position
+            ? {
+                x: Math.round(newNodeData.position.x),
+                y: Math.round(newNodeData.position.y),
+              }
+            : {
+                x: (nodesRef.current || []).length * 250,
+                y: 100,
+              },
+          data: {
+            ...blockData,
+            _originalComponent: component.name,
+            _originalConfiguration: filteredConfiguration,
+          },
+          selected: true,
+        };
+
+        // Remove the template node and add the real node - deselect all other nodes
+        const nodesWithoutTemplate = (nodesRef.current || [])
+          .filter((n) => n.id !== templateNodeId)
+          .map((n) => ({ ...n, selected: false }));
+        const updatedNodes = [...nodesWithoutTemplate, newNode];
+
+        // Calculate updated edges synchronously
+        const sourceConnection = (newNodeData as any).sourceConnection;
+        let updatedEdges = edges;
+
+        if (sourceConnection) {
+          const newEdge = {
+            id: `${sourceConnection.nodeId}--${newNodeId}--${sourceConnection.handleId || "default"}`,
+            source: sourceConnection.nodeId,
+            target: newNodeId,
+            sourceHandle: sourceConnection.handleId || "default",
+            style: { strokeWidth: 3, stroke: "#C9D5E1" },
+          };
+          // Remove any edges connected to the template node and add new edge
+          const edgesWithoutTemplate = edges.filter(
+            (e) => e.source !== templateNodeId && e.target !== templateNodeId
+          );
+          updatedEdges = [...edgesWithoutTemplate, newEdge];
+        }
+
+        // Mark this template as converted so it won't be preserved in useEffect
+        console.log('[SAVE] Marking template as converted:', templateNodeId);
+        console.log('[SAVE] convertedTemplateIdsRef now contains:', Array.from(convertedTemplateIdsRef.current));
+        convertedTemplateIdsRef.current.add(templateNodeId);
+
+        // Update state
+        console.log('[SAVE] Setting nodes - removing template, adding real node');
+        console.log('[SAVE] updatedNodes:', updatedNodes.map(n => ({ id: n.id, isTemplate: (n.data as any).isTemplate, isPending: (n.data as any).isPendingConnection })));
+        setNodes(updatedNodes);
+        setEdges(updatedEdges);
+
+        // Clear template state
+        setTemplateNodeId(null);
+        setNewNodeData(null);
+        setHasUnsavedChanges(true);
+
+        // Save to server with both updated nodes and edges
+        await handleSaveBlueprint(updatedNodes, updatedEdges);
+
+        // Clean up the converted template ID after save completes
+        // (give it time for the useEffect to run first)
+        setTimeout(() => {
+          convertedTemplateIdsRef.current.delete(templateNodeId);
+        }, 1000);
+
+        return;
+      }
+
+      // Check if this is a template node being updated in place (no sourceConnection)
+      if (templateNodeId && newNodeData) {
+        // Update template node configuration in place
+        const updatedNodes = (nodesRef.current || []).map((n) =>
+          n.id === templateNodeId
+            ? {
+                ...n,
+                data: {
+                  ...(n.data as any),
+                  configuration,
+                  nodeName,
+                },
+              }
+            : n,
+        );
+        setNodes(updatedNodes);
+
+        // Clear template state
+        setTemplateNodeId(null);
+        setNewNodeData(null);
+        setHasUnsavedChanges(true);
+        return;
+      }
+
+      // Regular node configuration save
       const node = (nodesRef.current || []).find((n) => n.id === nodeId);
       if (!node) return;
 
@@ -434,7 +630,7 @@ export const CustomComponent = () => {
       // Save to server immediately with the updated nodes
       await handleSaveBlueprint(updatedNodes);
     },
-    [saveSnapshot, handleSaveBlueprint],
+    [saveSnapshot, handleSaveBlueprint, templateNodeId, newNodeData],
   );
 
   const handleNodeAdd = useCallback(
@@ -479,21 +675,67 @@ export const CustomComponent = () => {
           _originalComponent: component.name,
           _originalConfiguration: filteredConfiguration,
         },
+        selected: true,
       };
 
-      // Update nodes state
+      // Mark the current template as converted before filtering it out
+      const currentNodes = nodesRef.current || [];
+      // Save the template ID before clearing it
+      const savedTemplateId = templateNodeId;
+
+      // Only mark the template being saved, not all templates
+      if (savedTemplateId) {
+        console.log('[HANDLE NODE ADD] Marking template as converted:', savedTemplateId);
+        convertedTemplateIdsRef.current.add(savedTemplateId);
+      }
+
+      // Update nodes state - remove only the saved template, keep other templates, deselect all, add new node
       const updatedNodes = (() => {
-        const currentNodes = nodesRef.current || [];
-        const filteredNodes = currentNodes.filter((n) => !n.id.startsWith("template_"));
+        const filteredNodes = currentNodes
+          .filter((n) => {
+            // Keep all nodes except:
+            // 1. The template being saved (savedTemplateId)
+            // 2. Old-style template_ nodes
+            if (n.id.startsWith("template_")) return false;
+            if (n.id === savedTemplateId) return false;
+            return true;
+          })
+          .map((n) => ({ ...n, selected: false }));
         return [...filteredNodes, newNode];
       })();
 
-      setNodes(updatedNodes);
+      // Handle edge creation if there's a sourceConnection
+      let updatedEdges = edges;
+      if (newNodeData.sourceConnection) {
+        console.log('[HANDLE NODE ADD] Creating edge from sourceConnection:', newNodeData.sourceConnection);
+        const newEdge = {
+          id: `${newNodeData.sourceConnection.nodeId}--${newNodeId}--${newNodeData.sourceConnection.handleId || "default"}`,
+          source: newNodeData.sourceConnection.nodeId,
+          target: newNodeId,
+          sourceHandle: newNodeData.sourceConnection.handleId || "default",
+          style: { strokeWidth: 3, stroke: "#C9D5E1" },
+        };
+        updatedEdges = [...edges, newEdge];
+      }
 
-      // Save to server immediately with the updated nodes
-      await handleSaveBlueprint(updatedNodes);
+      setNodes(updatedNodes);
+      setEdges(updatedEdges);
+
+      // Clear template state
+      setTemplateNodeId(null);
+      setNewNodeData(null);
+
+      // Save to server immediately with the updated nodes and edges
+      await handleSaveBlueprint(updatedNodes, updatedEdges);
+
+      // Clean up the converted template ID after save completes
+      if (savedTemplateId) {
+        setTimeout(() => {
+          convertedTemplateIdsRef.current.delete(savedTemplateId);
+        }, 1000);
+      }
     },
-    [saveSnapshot, handleSaveBlueprint],
+    [saveSnapshot, handleSaveBlueprint, edges],
   );
 
   const handleNodeDelete = useCallback(
@@ -552,6 +794,205 @@ export const CustomComponent = () => {
     },
     [saveSnapshot],
   );
+
+  // Handle dropping edge in empty space to create pending connection node
+  const handleConnectionDropInEmptySpace = useCallback(
+    (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
+      saveSnapshot();
+      const pendingNodeId = `pending_connection_${Date.now()}`;
+
+      // Create a placeholder "New Component" node
+      const placeholderNode: Node = {
+        id: pendingNodeId,
+        type: "default",
+        position,
+        data: {
+          type: "component",
+          label: "New Component",
+          state: "neutral",
+          component: {
+            title: "New Component",
+            headerColor: "#e5e7eb",
+            iconSlug: "Puzzle",
+            iconColor: "text-gray-500",
+            collapsedBackground: "bg-white",
+            hideActionsButton: true,
+            includeEmptyState: true,
+          },
+          isPendingConnection: true,
+          sourceConnection,
+          emptyState: {
+            icon: "Puzzle",
+            title: "Select the component from sidebar",
+          },
+        },
+      };
+
+      setNodes((nodes) => [...nodes, placeholderNode]);
+
+      // Check if current template is a configured template (not just pending connection)
+      const currentTemplateNode = templateNodeId ? nodes.find((n) => n.id === templateNodeId) : null;
+      const isCurrentTemplateConfigured = currentTemplateNode?.data && (currentTemplateNode.data as any).isTemplate && !(currentTemplateNode.data as any).isPendingConnection;
+
+      // Only select and set as template if there isn't a configured template being created
+      // Allow switching between pending nodes, but prevent overwriting configured templates
+      if (!isCurrentTemplateConfigured) {
+        // Then update all nodes to set selection (deselect others, select the new one)
+        // This needs to happen in a separate setNodes call to ensure ReactFlow processes the selection
+        setTimeout(() => {
+          setNodes((nodes) =>
+            nodes.map((node) => ({
+              ...node,
+              selected: node.id === pendingNodeId,
+            })),
+          );
+        }, 0);
+        setTemplateNodeId(pendingNodeId);
+      }
+
+      // Create edge
+      const edgeId = `${sourceConnection.nodeId}--${pendingNodeId}--${sourceConnection.handleId || "default"}`;
+      setEdges((edges) => [
+        ...edges,
+        {
+          id: edgeId,
+          source: sourceConnection.nodeId,
+          sourceHandle: sourceConnection.handleId || "default",
+          target: pendingNodeId,
+          style: { strokeWidth: 3, stroke: "#C9D5E1" },
+        },
+      ]);
+
+      // Open building blocks sidebar
+      setIsBuildingBlocksSidebarOpen(true);
+      setHasUnsavedChanges(true);
+    },
+    [saveSnapshot, nodes, templateNodeId],
+  );
+
+  // Handle clicking on a pending connection node
+  const handlePendingConnectionNodeClick = useCallback(
+    (nodeId: string) => {
+      console.log('[PARENT handlePendingConnectionNodeClick] Called with nodeId:', nodeId);
+      setTemplateNodeId(nodeId);
+      setIsBuildingBlocksSidebarOpen(true);
+      // Clear any existing template configuration (close ComponentSidebar)
+      setNewNodeData(null);
+      console.log('[PARENT handlePendingConnectionNodeClick] Set templateNodeId, cleared newNodeData, and opened BuildingBlocksSidebar');
+    },
+    [],
+  );
+
+  // Handle clicking on a template node (already configured, re-opening for editing)
+  const handleTemplateNodeClick = useCallback(
+    (nodeId: string) => {
+      console.log('[PARENT handleTemplateNodeClick] Called with nodeId:', nodeId);
+      const templateNode = nodes.find((n) => n.id === nodeId);
+      if (!templateNode) {
+        console.log('[PARENT handleTemplateNodeClick] Template node not found');
+        return;
+      }
+
+      const buildingBlock = (templateNode.data as any).buildingBlock;
+      console.log('[PARENT handleTemplateNodeClick] Found template node with buildingBlock:', buildingBlock?.name);
+
+      setTemplateNodeId(nodeId);
+      setNewNodeData({
+        buildingBlock: buildingBlock,
+        nodeName: ((templateNode.data as any).nodeName || buildingBlock?.name || 'New Component'),
+        icon: ((templateNode.data as any).icon || buildingBlock?.icon || 'Box'),
+        configuration: (templateNode.data as any).configuration || {},
+        position: templateNode.position,
+        sourceConnection: (templateNode.data as any).sourceConnection as { nodeId: string; handleId: string | null } | undefined,
+      });
+      console.log('[PARENT handleTemplateNodeClick] Set newNodeData for template:', nodeId);
+    },
+    [nodes],
+  );
+
+  // Handle selecting a building block for a pending connection node
+  const handleBuildingBlockClick = useCallback(
+    (block: any) => {
+      console.log('[PARENT handleBuildingBlockClick] Called with block:', block.name, 'templateNodeId:', templateNodeId);
+      if (!templateNodeId) {
+        console.log('[PARENT handleBuildingBlockClick] No templateNodeId, returning');
+        return;
+      }
+
+      saveSnapshot();
+
+      // Find the pending node first to get its data
+      const pendingNode = nodes.find((n) => n.id === templateNodeId && (n.data as any).isPendingConnection);
+      console.log('[PARENT handleBuildingBlockClick] Found pending node:', pendingNode?.id);
+
+      if (!pendingNode) {
+        console.log('[PARENT handleBuildingBlockClick] No pending node found');
+        return;
+      }
+
+      const pendingNodePosition = pendingNode.position;
+      const pendingNodeSourceConnection = (pendingNode.data as any).sourceConnection;
+
+      // Update the node to template state
+      setNodes((currentNodes) =>
+        currentNodes.map((n) =>
+          n.id === templateNodeId
+            ? {
+                ...n,
+                data: {
+                  type: "component",
+                  label: block.label || block.name || "New Component",
+                  state: "neutral",
+                  component: {
+                    title: block.label || block.name || "New Component",
+                    headerColor: "#e5e7eb",
+                    iconSlug: block.icon,
+                    iconColor: "text-indigo-700",
+                    collapsedBackground: "bg-white",
+                    hideActionsButton: true,
+                    includeEmptyState: true,
+                  },
+                  isTemplate: true,
+                  isPendingConnection: false,  // Remove pending connection flag
+                  buildingBlock: block,
+                  tempConfiguration: {},
+                  tempNodeName: block.name || "",
+                  sourceConnection: pendingNodeSourceConnection,
+                  configuration: {},
+                  nodeName: block.name || "",
+                  icon: block.icon,
+                },
+              }
+            : n,
+        )
+      );
+
+      // Set newNodeData with the pending node's data
+      console.log('[PARENT handleBuildingBlockClick] Setting newNodeData with sourceConnection:', pendingNodeSourceConnection);
+      setNewNodeData({
+        buildingBlock: block,
+        nodeName: block.name || "",
+        displayLabel: block.label || block.name || "",
+        configuration: {},
+        position: pendingNodePosition,
+        sourceConnection: pendingNodeSourceConnection,
+      });
+
+      setIsBuildingBlocksSidebarOpen(false);
+      setHasUnsavedChanges(true);
+    },
+    [templateNodeId, saveSnapshot],
+  );
+
+  // Handle canceling template creation
+  const handleCancelTemplate = useCallback(() => {
+    console.log('[PARENT handleCancelTemplate] Called with templateNodeId:', templateNodeId);
+    if (templateNodeId) {
+      console.log('[PARENT handleCancelTemplate] Clearing template state');
+      setTemplateNodeId(null);
+      setNewNodeData(null);
+    }
+  }, [templateNodeId]);
 
   const handleConfigurationFieldsChange = useCallback(
     (fields: any[]) => {
@@ -648,6 +1089,15 @@ export const CustomComponent = () => {
         saveIsPrimary={hasUnsavedChanges}
         onUndo={handleRevert}
         canUndo={initialBlueprintSnapshot !== null}
+        templateNodeId={templateNodeId}
+        newNodeData={newNodeData}
+        isBuildingBlocksSidebarOpen={isBuildingBlocksSidebarOpen}
+        onBuildingBlocksSidebarToggle={setIsBuildingBlocksSidebarOpen}
+        onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
+        onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
+        onTemplateNodeClick={handleTemplateNodeClick}
+        onBuildingBlockClick={handleBuildingBlockClick}
+        onCancelTemplate={handleCancelTemplate}
       />
     </>
   );

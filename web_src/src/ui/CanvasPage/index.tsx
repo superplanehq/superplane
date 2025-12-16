@@ -402,7 +402,6 @@ function CanvasPage(props: CanvasPageProps) {
         // Then update all nodes to set selection (deselect others, select the new one)
         // This needs to happen in a separate setNodes call to ensure ReactFlow processes the selection
         setTimeout(() => {
-          console.log('[DEBUG] Setting selection for pending node:', pendingNodeId);
           state.setNodes((nodes) =>
             nodes.map((node) => ({
               ...node,
@@ -410,10 +409,7 @@ function CanvasPage(props: CanvasPageProps) {
             })),
           );
         }, 0);
-        console.log('[DEBUG] Setting templateNodeId to:', pendingNodeId);
         setTemplateNodeId(pendingNodeId);
-      } else {
-        console.log('[DEBUG] Skipping selection/template update, configured template in progress:', templateNodeId);
       }
 
       // Create edge locally (not via parent) - it will be preserved by useCanvasState
@@ -439,7 +435,6 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handlePendingConnectionNodeClick = useCallback(
     (nodeId: string) => {
-      console.log('[DEBUG] handlePendingConnectionNodeClick called with nodeId:', nodeId);
       // Set this node as the active template
       setTemplateNodeId(nodeId);
       // Open the BuildingBlocksSidebar so user can select a component
@@ -452,7 +447,6 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleTemplateNodeClick = useCallback(
     (nodeId: string) => {
-      console.log('[DEBUG] handleTemplateNodeClick called with nodeId:', nodeId);
       const templateNode = state.nodes.find((n) => n.id === nodeId);
       if (!templateNode) return;
 
@@ -476,11 +470,8 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleBuildingBlockClick = useCallback(
     (block: BuildingBlock) => {
-      console.log('[DEBUG] handleBuildingBlockClick called, templateNodeId:', templateNodeId);
       const pendingNode = state.nodes.find((n) => n.id === templateNodeId && n.data.isPendingConnection);
-      console.log('[DEBUG] Found pending node:', pendingNode?.id);
       if (!pendingNode || !templateNodeId) {
-        console.log('[DEBUG] No pending node or templateNodeId, returning');
         return;
       }
 
@@ -504,6 +495,7 @@ function CanvasPage(props: CanvasPageProps) {
                     includeEmptyState: true,
                   } as ComponentBaseProps,
                   isTemplate: true,
+                  isPendingConnection: false,  // Remove pending connection flag
                   buildingBlock: block,
                   tempConfiguration: {},
                   tempNodeName: block.name || "",
@@ -527,9 +519,7 @@ function CanvasPage(props: CanvasPageProps) {
       });
 
       setIsBuildingBlocksSidebarOpen(false);
-      console.log('[DEBUG] Opening component sidebar for templateNodeId:', templateNodeId);
       state.componentSidebar.open(templateNodeId);
-      console.log('[DEBUG] Setting current tab to settings');
       setCurrentTab("settings");
     },
     [templateNodeId, state, setCurrentTab, setNewNodeData, setIsBuildingBlocksSidebarOpen],
@@ -604,58 +594,31 @@ function CanvasPage(props: CanvasPageProps) {
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, any>, nodeName: string) => {
       if (templateNodeId && newNodeData) {
-        // Check if this template was created from a pending connection (should create real node)
-        // vs just editing an existing template (should update in place)
-        const hasSourceConnection = !!newNodeData.sourceConnection;
+        // Template nodes should always be converted to real nodes
+        // Remove the template node first
+        state.setNodes((nodes) => nodes.filter((node) => node.id !== templateNodeId));
 
-        if (hasSourceConnection) {
-          // This template was created from dragging an edge - convert to real node
-          // Remove the template node first
-          state.setNodes((nodes) => nodes.filter((node) => node.id !== templateNodeId));
+        // Remove edges connected to the template node (they'll be recreated by parent if needed)
+        state.setEdges(state.edges.filter((edge) => edge.source !== templateNodeId && edge.target !== templateNodeId));
 
-          // Remove edges connected to the template node (they'll be recreated by parent if needed)
-          state.setEdges(state.edges.filter((edge) => edge.source !== templateNodeId && edge.target !== templateNodeId));
-
-          // Create the real node through the normal flow
-          if (props.onNodeAdd) {
-            props.onNodeAdd({
-              buildingBlock: newNodeData.buildingBlock,
-              nodeName,
-              configuration,
-              position: newNodeData.position,
-              sourceConnection: newNodeData.sourceConnection,
-            });
-          }
-
-          // Clear template state
-          setTemplateNodeId(null);
-          setNewNodeData(null);
-
-          // Close sidebar and reset tab
-          state.componentSidebar.close();
-          setCurrentTab("latest");
-        } else {
-          // This is an existing template being edited - just update in place
-          state.setNodes((nodes) =>
-            nodes.map((node) =>
-              node.id === templateNodeId
-                ? {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      configuration,
-                      nodeName,
-                    },
-                  }
-                : node,
-            ),
-          );
-          // Clear template state and close sidebar
-          setTemplateNodeId(null);
-          setNewNodeData(null);
-          state.componentSidebar.close();
-          setCurrentTab("latest");
+        // Create the real node through the normal flow
+        if (props.onNodeAdd) {
+          props.onNodeAdd({
+            buildingBlock: newNodeData.buildingBlock,
+            nodeName,
+            configuration,
+            position: newNodeData.position,
+            sourceConnection: newNodeData.sourceConnection, // Will be undefined for dropped components
+          });
         }
+
+        // Clear template state
+        setTemplateNodeId(null);
+        setNewNodeData(null);
+
+        // Close sidebar and reset tab
+        state.componentSidebar.close();
+        setCurrentTab("latest");
       } else if (editingNodeData && props.onNodeConfigurationSave) {
         props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName);
       }
@@ -1243,35 +1206,29 @@ function CanvasContent({
 
   const handleNodeClick = useCallback(
     (nodeId: string) => {
-      console.log('[DEBUG] handleNodeClick called with nodeId:', nodeId, 'current templateNodeId:', templateNodeId);
-
       // Check if this is a pending connection node
       const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       const isPendingConnection = clickedNode?.data?.isPendingConnection;
-      console.log('[DEBUG] clicked node isPendingConnection:', isPendingConnection);
+
+      // Check if this is a template node
+      const isTemplateNode = clickedNode?.data?.isTemplate && !clickedNode?.data?.isPendingConnection;
 
       // Check if the current template is a configured template (not just pending connection)
       const currentTemplateNode = templateNodeId ? stateRef.current.nodes?.find((n) => n.id === templateNodeId) : null;
       const isCurrentTemplateConfigured = currentTemplateNode?.data?.isTemplate && !currentTemplateNode?.data?.isPendingConnection;
-      console.log('[DEBUG] current template node:', currentTemplateNode?.id, 'isConfigured:', isCurrentTemplateConfigured);
 
-      // Allow switching to pending connection nodes even if there's a configured template
-      // But block switching to other regular/configured nodes
-      if (isCurrentTemplateConfigured && nodeId !== templateNodeId && !isPendingConnection) {
-        console.log('[DEBUG] BLOCKING click - configured template in progress, can only switch to pending nodes');
+      // Allow switching to pending connection nodes or other template nodes even if there's a configured template
+      // But block switching to other regular/real nodes
+      if (isCurrentTemplateConfigured && nodeId !== templateNodeId && !isPendingConnection && !isTemplateNode) {
         return;
       }
 
       if (isPendingConnection && onPendingConnectionNodeClick) {
-        console.log('[DEBUG] Calling onPendingConnectionNodeClick with', nodeId);
         // Notify parent that a pending connection node was clicked
         onPendingConnectionNodeClick(nodeId);
       } else {
-        // Check if this is a template node
-        const isTemplateNode = clickedNode?.data?.isTemplate && !clickedNode?.data?.isPendingConnection;
 
         if (isTemplateNode && onTemplateNodeClick) {
-          console.log('[DEBUG] Clicked on template node, calling onTemplateNodeClick');
           // Notify parent to restore template state
           onTemplateNodeClick(nodeId);
         } else {

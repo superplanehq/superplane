@@ -49,6 +49,7 @@ export interface NewNodeData {
   displayLabel?: string;
   configuration: Record<string, any>;
   position?: { x: number; y: number };
+  sourceConnection?: { nodeId: string; handleId: string | null };
 }
 
 export interface CustomComponentBuilderPageProps {
@@ -89,6 +90,20 @@ export interface CustomComponentBuilderPageProps {
   // Template node helpers
   onAddTemplateNode?: (node: Node) => void;
   onRemoveTemplateNode?: (nodeId: string) => void;
+
+  // Drag-edge-to-empty-space functionality
+  templateNodeId?: string | null;
+  newNodeData?: NewNodeData | null;
+  isBuildingBlocksSidebarOpen?: boolean;
+  onBuildingBlocksSidebarToggle?: (open: boolean) => void;
+  onConnectionDropInEmptySpace?: (
+    position: { x: number; y: number },
+    sourceConnection: { nodeId: string; handleId: string | null },
+  ) => void;
+  onPendingConnectionNodeClick?: (nodeId: string) => void;
+  onTemplateNodeClick?: (nodeId: string) => void;
+  onBuildingBlockClick?: (block: BuildingBlock) => void;
+  onCancelTemplate?: () => void;
 
   // Actions
   onSave: () => void;
@@ -143,6 +158,9 @@ function CanvasContent({
   onEdgeMouseLeave,
   onConnectStart,
   onConnectEnd,
+  onConnectionDropInEmptySpace,
+  connectionCompletedRef,
+  connectingFromRef,
   templateNodeId,
 }: {
   nodes: Node[];
@@ -162,6 +180,16 @@ function CanvasContent({
     params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
   ) => void;
   onConnectEnd?: () => void;
+  onConnectionDropInEmptySpace?: (
+    position: { x: number; y: number },
+    sourceConnection: { nodeId: string; handleId: string | null },
+  ) => void;
+  connectionCompletedRef?: React.MutableRefObject<boolean>;
+  connectingFromRef?: React.MutableRefObject<{
+    nodeId: string;
+    handleId: string | null;
+    handleType: "source" | "target" | null;
+  } | null>;
   templateNodeId?: string | null;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
@@ -214,13 +242,25 @@ function CanvasContent({
 
   const handleNodeClick = useCallback(
     (_event: any, node: Node) => {
-      // Don't allow switching nodes if there's a template being created
+      // Allow clicking on the same template node, other pending connection nodes, or other template nodes
+      // But block clicking on regular nodes when a configured template is being created
+      const clickedIsPending = (node.data as any)?.isPendingConnection;
+      const clickedIsTemplate = (node.data as any)?.isTemplate && !clickedIsPending;
+
       if (templateNodeId && node.id !== templateNodeId) {
-        return;
+        // Check if current template is configured (not just pending)
+        const currentTemplate = nodes.find((n) => n.id === templateNodeId);
+        const currentIsConfigured = currentTemplate && (currentTemplate.data as any)?.isTemplate && !(currentTemplate.data as any)?.isPendingConnection;
+
+        // Block if: there's a configured template AND we're not clicking on a pending node or template node
+        if (currentIsConfigured && !clickedIsPending && !clickedIsTemplate) {
+          return;
+        }
       }
+
       onNodeClick?.(node.id);
     },
-    [onNodeClick, templateNodeId],
+    [onNodeClick, templateNodeId, nodes],
   );
 
   const handlePaneClick = useCallback(() => {
@@ -228,6 +268,41 @@ function CanvasContent({
     if (templateNodeId) return;
     // Could add pane click handling here if needed
   }, [templateNodeId]);
+
+  const handleConnect = useCallback(
+    (connection: Connection) => {
+      // Mark that a connection was successfully completed
+      if (connectionCompletedRef) {
+        connectionCompletedRef.current = true;
+      }
+      onConnect(connection);
+    },
+    [onConnect, connectionCompletedRef],
+  );
+
+  const handleConnectEndInternal = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      const currentConnectingFrom = connectingFromRef?.current;
+
+      if (currentConnectingFrom && connectionCompletedRef && !connectionCompletedRef.current) {
+        const mouseEvent = event as MouseEvent;
+        const canvasPosition = screenToFlowPosition({
+          x: mouseEvent.clientX,
+          y: mouseEvent.clientY,
+        });
+
+        if (onConnectionDropInEmptySpace) {
+          onConnectionDropInEmptySpace(canvasPosition, currentConnectingFrom);
+        }
+      }
+
+      // Call the parent's onConnectEnd
+      if (onConnectEnd) {
+        onConnectEnd();
+      }
+    },
+    [screenToFlowPosition, onConnectionDropInEmptySpace, onConnectEnd, connectionCompletedRef, connectingFromRef],
+  );
 
   // Initialize: fit to view on mount with zoom constraints
   useEffect(() => {
@@ -247,9 +322,9 @@ function CanvasContent({
       edgeTypes={edgeTypes}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
+      onConnect={handleConnect}
       onConnectStart={onConnectStart}
-      onConnectEnd={onConnectEnd}
+      onConnectEnd={handleConnectEndInternal}
       onNodeClick={handleNodeClick}
       onNodeDoubleClick={onNodeDoubleClick}
       onPaneClick={handlePaneClick}
@@ -283,8 +358,28 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   const [isNodeSidebarOpen, setIsNodeSidebarOpen] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [canvasZoom, setCanvasZoom] = useState(1);
-  const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
-  const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
+
+  // Use parent's state if provided (delegated mode), otherwise use local state
+  const [localTemplateNodeId, setLocalTemplateNodeId] = useState<string | null>(null);
+  const [localNewNodeData, setLocalNewNodeData] = useState<NewNodeData | null>(null);
+  const templateNodeId = props.templateNodeId !== undefined ? props.templateNodeId : localTemplateNodeId;
+  const newNodeData = props.newNodeData !== undefined ? props.newNodeData : localNewNodeData;
+  const setTemplateNodeId = props.templateNodeId !== undefined ? (() => {}) : setLocalTemplateNodeId;
+  const setNewNodeData = props.newNodeData !== undefined ? (() => {}) : setLocalNewNodeData;
+
+  // In delegated mode, open the ComponentSidebar when newNodeData is set, close when cleared
+  useEffect(() => {
+    console.log('[USEEFFECT SIDEBAR] templateNodeId:', props.templateNodeId, 'newNodeData:', props.newNodeData, 'local templateNodeId:', templateNodeId);
+    if (props.templateNodeId !== undefined && props.newNodeData && templateNodeId) {
+      console.log('[USEEFFECT SIDEBAR] Opening ComponentSidebar for template:', templateNodeId);
+      setIsNodeSidebarOpen(true);
+      setSelectedNodeId(templateNodeId);
+    } else if (props.newNodeData === null) {
+      console.log('[USEEFFECT SIDEBAR] Closing ComponentSidebar - newNodeData is null');
+      setIsNodeSidebarOpen(false);
+      setSelectedNodeId(null);
+    }
+  }, [props.templateNodeId, props.newNodeData, templateNodeId]);
 
   // Modal state management
   const [isConfigFieldModalOpen, setIsConfigFieldModalOpen] = useState(false);
@@ -452,6 +547,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           nodeName,
           configuration,
           position: newNodeData.position,
+          sourceConnection: newNodeData.sourceConnection,
         });
 
         // Clear template state
@@ -465,16 +561,23 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   );
 
   const handleCancelTemplate = useCallback(() => {
+    // If parent provides onCancelTemplate, delegate to it (for pending connection nodes)
+    if (props.onCancelTemplate) {
+      props.onCancelTemplate();
+      return;
+    }
+
+    // Otherwise, handle locally (for regular template nodes)
     if (templateNodeId) {
       if (props.onRemoveTemplateNode) {
         props.onRemoveTemplateNode(templateNodeId);
       }
-      setTemplateNodeId(null);
-      setNewNodeData(null);
+      setLocalTemplateNodeId(null);
+      setLocalNewNodeData(null);
       setIsNodeSidebarOpen(false);
       setSelectedNodeId(null);
     }
-  }, [templateNodeId, props]);
+  }, [templateNodeId, props, setLocalTemplateNodeId, setLocalNewNodeData]);
 
   const handleNodeSidebarClose = useCallback(() => {
     setIsNodeSidebarOpen(false);
@@ -497,15 +600,53 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
 
   const handleNodeClick = useCallback(
     (nodeId: string) => {
-      // Don't allow switching nodes if there's a template being created
-      if (templateNodeId && nodeId !== templateNodeId) {
+      console.log('[CHILD handleNodeClick] Called with nodeId:', nodeId);
+      // Check if this is a pending connection node
+      const clickedNode = props.nodes.find((n) => n.id === nodeId);
+      const isPendingConnection = (clickedNode?.data as any)?.isPendingConnection;
+      const isTemplateNode = (clickedNode?.data as any)?.isTemplate && !isPendingConnection;
+      const nodeLabel = (clickedNode?.data as any)?.label || (clickedNode?.data as any)?.buildingBlock?.name;
+      console.log('[CHILD handleNodeClick] Node label:', nodeLabel, 'isPendingConnection:', isPendingConnection, 'isTemplateNode:', isTemplateNode);
+
+      // Check if the current template is a configured template (not just pending connection)
+      const currentTemplateNode = templateNodeId ? props.nodes.find((n) => n.id === templateNodeId) : null;
+      const isCurrentTemplateConfigured = (currentTemplateNode?.data as any)?.isTemplate && !(currentTemplateNode?.data as any)?.isPendingConnection;
+      console.log('[CHILD handleNodeClick] currentTemplateId:', templateNodeId, 'isCurrentTemplateConfigured:', isCurrentTemplateConfigured);
+
+      // Allow switching to pending connection nodes or other template nodes even if there's a configured template
+      // But block switching to other regular/real nodes
+      if (isCurrentTemplateConfigured && nodeId !== templateNodeId && !isPendingConnection && !isTemplateNode) {
+        console.log('[CHILD handleNodeClick] BLOCKING - configured template exists and trying to click non-template/non-pending node');
         return;
       }
 
-      setIsNodeSidebarOpen(true);
-      setSelectedNodeId(nodeId);
+      if (isPendingConnection && props.onPendingConnectionNodeClick) {
+        console.log('[CHILD handleNodeClick] Calling onPendingConnectionNodeClick');
+        // Notify parent that a pending connection node was clicked
+        props.onPendingConnectionNodeClick(nodeId);
+      } else if (isTemplateNode && props.onTemplateNodeClick) {
+        console.log('[CHILD handleNodeClick] Calling onTemplateNodeClick');
+        // Notify parent to restore template state
+        props.onTemplateNodeClick(nodeId);
+      } else {
+        console.log('[CHILD handleNodeClick] Regular node click or no handlers');
+        // Regular node click - only in non-delegated mode
+        if (props.templateNodeId === undefined) {
+          setIsNodeSidebarOpen(true);
+          setSelectedNodeId(nodeId);
+        }
+      }
+
+      // Update selection
+      props.onNodesChange(
+        props.nodes.map((node) => ({
+          type: "select",
+          id: node.id,
+          selected: node.id === nodeId,
+        })),
+      );
     },
-    [templateNodeId],
+    [templateNodeId, props],
   );
 
   const handleConnect = useCallback(
@@ -552,6 +693,14 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     handleType: "source" | "target" | null;
   } | null>(null);
 
+  // Track connection completion for empty space drop detection
+  const connectionCompletedRef = useRef(false);
+  const connectingFromRef = useRef<{
+    nodeId: string;
+    handleId: string | null;
+    handleType: "source" | "target" | null;
+  } | null>(null);
+
   const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: any) => {
     setHoveredEdgeId(edge.id);
   }, []);
@@ -566,7 +715,9 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
       params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
     ) => {
       if (params.nodeId) {
-        setConnectingFrom({ nodeId: params.nodeId, handleId: params.handleId, handleType: params.handleType });
+        const connectionInfo = { nodeId: params.nodeId, handleId: params.handleId, handleType: params.handleType };
+        setConnectingFrom(connectionInfo);
+        connectingFromRef.current = connectionInfo;
       }
     },
     [],
@@ -574,6 +725,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
 
   const handleConnectEnd = useCallback(() => {
     setConnectingFrom(null);
+    connectingFromRef.current = null;
+    connectionCompletedRef.current = false;
   }, []);
 
   // Find the hovered edge to get its source and target
@@ -603,8 +756,15 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
 
   // Add hovered edge and connecting state to nodes
   const nodesWithHoveredEdge = useMemo(
-    () =>
-      props.nodes.map((node) => ({
+    () => {
+      console.log('[NODES UPDATE] All nodes:', props.nodes.map(n => ({
+        id: n.id,
+        label: (n.data as any)?.label || (n.data as any)?.buildingBlock?.name,
+        isPending: (n.data as any)?.isPendingConnection,
+        isTemplate: (n.data as any)?.isTemplate,
+        position: n.position
+      })));
+      return props.nodes.map((node) => ({
         ...node,
         data: {
           ...node.data,
@@ -613,7 +773,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           _allEdges: props.edges,
           _callbacksRef: callbacksRef,
         },
-      })),
+      }));
+    },
     [props.nodes, hoveredEdge, connectingFrom, props.edges],
   );
 
@@ -644,11 +805,12 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
       <div className="flex-1 flex relative overflow-hidden">
         {/* Left Sidebar - Building Blocks */}
         <BuildingBlocksSidebar
-          isOpen={isLeftSidebarOpen}
-          onToggle={setIsLeftSidebarOpen}
+          isOpen={props.isBuildingBlocksSidebarOpen !== undefined ? props.isBuildingBlocksSidebarOpen : isLeftSidebarOpen}
+          onToggle={props.onBuildingBlocksSidebarToggle || setIsLeftSidebarOpen}
           blocks={buildingBlockCategories}
           canvasZoom={canvasZoom}
-          disabled={!!templateNodeId}
+          disabled={!!templateNodeId && !props.nodes.find((n) => n.id === templateNodeId && (n.data as any).isPendingConnection)}
+          onBlockClick={props.onBuildingBlockClick}
         />
 
         {/* React Flow Canvas */}
@@ -669,6 +831,9 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
               onEdgeMouseLeave={handleEdgeMouseLeave}
               onConnectStart={handleConnectStart}
               onConnectEnd={handleConnectEnd}
+              onConnectionDropInEmptySpace={props.onConnectionDropInEmptySpace}
+              connectionCompletedRef={connectionCompletedRef}
+              connectingFromRef={connectingFromRef}
               templateNodeId={templateNodeId}
             />
           </ReactFlowProvider>
