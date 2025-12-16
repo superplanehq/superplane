@@ -389,7 +389,19 @@ function CanvasPage(props: CanvasPageProps) {
         },
       };
 
+      // Add the new node first
       state.setNodes((nodes) => [...nodes, placeholderNode]);
+
+      // Then update all nodes to set selection (deselect others, select the new one)
+      // This needs to happen in a separate setNodes call to ensure ReactFlow processes the selection
+      setTimeout(() => {
+        state.setNodes((nodes) =>
+          nodes.map((node) => ({
+            ...node,
+            selected: node.id === pendingNodeId,
+          })),
+        );
+      }, 0);
       setTemplateNodeId(pendingNodeId);
 
       // Create edge locally (not via parent) - it will be preserved by useCanvasState
@@ -403,6 +415,9 @@ function CanvasPage(props: CanvasPageProps) {
           sourceHandle: sourceConnection.handleId || "default",
         },
       ]);
+
+      // Open component sidebar to track the selected node
+      state.componentSidebar.open(pendingNodeId);
 
       // Open BuildingBlocksSidebar for component selection
       setIsBuildingBlocksSidebarOpen(true);
