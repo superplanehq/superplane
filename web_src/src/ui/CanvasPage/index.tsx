@@ -392,17 +392,25 @@ function CanvasPage(props: CanvasPageProps) {
       // Add the new node first
       state.setNodes((nodes) => [...nodes, placeholderNode]);
 
-      // Then update all nodes to set selection (deselect others, select the new one)
-      // This needs to happen in a separate setNodes call to ensure ReactFlow processes the selection
-      setTimeout(() => {
-        state.setNodes((nodes) =>
-          nodes.map((node) => ({
-            ...node,
-            selected: node.id === pendingNodeId,
-          })),
-        );
-      }, 0);
-      setTemplateNodeId(pendingNodeId);
+      // Only select and set as template if there isn't already a templateNodeId
+      // This prevents overwriting the active template when creating multiple pending nodes
+      if (!templateNodeId) {
+        // Then update all nodes to set selection (deselect others, select the new one)
+        // This needs to happen in a separate setNodes call to ensure ReactFlow processes the selection
+        setTimeout(() => {
+          console.log('[DEBUG] Setting selection for pending node:', pendingNodeId);
+          state.setNodes((nodes) =>
+            nodes.map((node) => ({
+              ...node,
+              selected: node.id === pendingNodeId,
+            })),
+          );
+        }, 0);
+        console.log('[DEBUG] Setting templateNodeId to:', pendingNodeId);
+        setTemplateNodeId(pendingNodeId);
+      } else {
+        console.log('[DEBUG] Skipping selection/template update, templateNodeId already set to:', templateNodeId);
+      }
 
       // Create edge locally (not via parent) - it will be preserved by useCanvasState
       const edgeId = `${sourceConnection.nodeId}--${pendingNodeId}--${sourceConnection.handleId || "default"}`;
@@ -427,6 +435,7 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handlePendingConnectionNodeClick = useCallback(
     (nodeId: string) => {
+      console.log('[DEBUG] handlePendingConnectionNodeClick called with nodeId:', nodeId);
       // Set this node as the active template
       setTemplateNodeId(nodeId);
       // Open the BuildingBlocksSidebar so user can select a component
@@ -437,8 +446,11 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleBuildingBlockClick = useCallback(
     (block: BuildingBlock) => {
+      console.log('[DEBUG] handleBuildingBlockClick called, templateNodeId:', templateNodeId);
       const pendingNode = state.nodes.find((n) => n.id === templateNodeId && n.data.isPendingConnection);
+      console.log('[DEBUG] Found pending node:', pendingNode?.id);
       if (!pendingNode || !templateNodeId) {
+        console.log('[DEBUG] No pending node or templateNodeId, returning');
         return;
       }
 
@@ -481,7 +493,9 @@ function CanvasPage(props: CanvasPageProps) {
       });
 
       setIsBuildingBlocksSidebarOpen(false);
+      console.log('[DEBUG] Opening component sidebar for templateNodeId:', templateNodeId);
       state.componentSidebar.open(templateNodeId);
+      console.log('[DEBUG] Setting current tab to settings');
       setCurrentTab("settings");
     },
     [templateNodeId, state, setCurrentTab, setNewNodeData, setIsBuildingBlocksSidebarOpen],
@@ -923,7 +937,7 @@ function Sidebar({
       return null;
     }
     return getSidebarData(state.componentSidebar.selectedNodeId);
-  }, [state.componentSidebar.selectedNodeId, getSidebarData]);
+  }, [state.componentSidebar.selectedNodeId, getSidebarData, templateNodeId, newNodeData]);
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
@@ -1172,16 +1186,26 @@ function CanvasContent({
 
   const handleNodeClick = useCallback(
     (nodeId: string) => {
-      // Don't allow switching nodes if there's a template being created
-      if (templateNodeId && nodeId !== templateNodeId) {
+      console.log('[DEBUG] handleNodeClick called with nodeId:', nodeId, 'current templateNodeId:', templateNodeId);
+
+      // Check if the current template is a configured template (not just pending connection)
+      const currentTemplateNode = templateNodeId ? stateRef.current.nodes?.find((n) => n.id === templateNodeId) : null;
+      const isCurrentTemplateConfigured = currentTemplateNode?.data?.isTemplate && !currentTemplateNode?.data?.isPendingConnection;
+      console.log('[DEBUG] current template node:', currentTemplateNode?.id, 'isConfigured:', isCurrentTemplateConfigured);
+
+      // Don't allow switching nodes if there's a configured template being created
+      if (isCurrentTemplateConfigured && nodeId !== templateNodeId) {
+        console.log('[DEBUG] BLOCKING click - configured template in progress');
         return;
       }
 
       // Check if this is a pending connection node
       const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       const isPendingConnection = clickedNode?.data?.isPendingConnection;
+      console.log('[DEBUG] clicked node isPendingConnection:', isPendingConnection);
 
       if (isPendingConnection && onPendingConnectionNodeClick) {
+        console.log('[DEBUG] Calling onPendingConnectionNodeClick with', nodeId);
         // Notify parent that a pending connection node was clicked
         onPendingConnectionNodeClick(nodeId);
       } else {
