@@ -53,7 +53,7 @@ const sampleNodes: Node[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 6), // 6 minutes ago
           childEventsInfo: {
             count: 3,
-            state: "processed",
+            state: "triggered",
             waitingInfos: [],
           },
           state: "success",
@@ -95,7 +95,7 @@ const sampleNodes: Node[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 8), // 8 minutes ago
           childEventsInfo: {
             count: 2,
-            state: "processed",
+            state: "triggered",
             waitingInfos: [],
           },
           state: "failure",
@@ -137,7 +137,7 @@ const sampleNodes: Node[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 15), // 15 minutes ago
           childEventsInfo: {
             count: 3,
-            state: "processed",
+            state: "triggered",
             waitingInfos: [],
           },
           state: "success",
@@ -173,7 +173,7 @@ const sampleNodes: Node[] = [
           title: "refactor: update README.md",
           subtitle: "ef53adfa",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 45), // 45 minutes ago
-          state: "processed",
+          state: "triggered",
         },
         collapsed: true,
       },
@@ -199,7 +199,7 @@ const sampleNodes: Node[] = [
           title: "v3.18.217",
           subtitle: "972.5 MB",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 3), // 3 hours ago
-          state: "processed",
+          state: "triggered",
         },
         collapsed: true,
       },
@@ -317,7 +317,7 @@ const sampleNodes: Node[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 5), // 5 hours ago
           childEventsInfo: {
             count: 2,
-            state: "processed",
+            state: "triggered",
             waitingInfos: [],
           },
           state: "success",
@@ -425,7 +425,7 @@ const sampleNodes: Node[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 12), // 12 hours ago
           childEventsInfo: {
             count: 1,
-            state: "processed",
+            state: "triggered",
             waitingInfos: [],
           },
           state: "fail",

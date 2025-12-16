@@ -1,5 +1,5 @@
 import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
-import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
+import { getColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "./types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
@@ -79,7 +79,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, _trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
     const metadata = node.metadata as unknown as GitHubMetadata;
     const configuration = node.configuration as unknown as GithubConfiguration;
 
@@ -105,11 +105,10 @@ export const githubTriggerRenderer: TriggerRenderer = {
       title: node.name!,
       iconSrc: githubIcon,
       iconBackground: "bg-white",
-      iconColor: getColorClass(trigger.color),
-      headerColor: getBackgroundColorClass(trigger.color),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass("black"),
+      headerColor: "bg-white",
+      collapsedBackground: "bg-white",
       metadata: metadataItems,
-      zeroStateText: "Waiting for the first push...",
     };
 
     if (lastEvent) {
@@ -120,14 +119,16 @@ export const githubTriggerRenderer: TriggerRenderer = {
           title: eventData?.pull_request?.title || "",
           subtitle: eventData?.pull_request?.head?.sha || "",
           receivedAt: new Date(lastEvent.createdAt!),
-          state: "processed",
+          state: "triggered",
+          eventId: lastEvent.id,
         };
       } else {
         props.lastEventData = {
           title: eventData?.head_commit?.message || "",
           subtitle: eventData?.head_commit?.id || "",
           receivedAt: new Date(lastEvent.createdAt!),
-          state: "processed",
+          state: "triggered",
+          eventId: lastEvent.id,
         };
       }
     }

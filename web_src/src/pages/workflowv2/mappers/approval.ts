@@ -36,45 +36,35 @@ type ApprovalItem = {
 
 export const APPROVAL_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
-  "next-in-queue": {
+  waiting: {
     icon: "clock",
-    textColor: "text-amber-700",
-    backgroundColor: "bg-amber-100",
-    iconColor: "text-amber-600",
-    iconSize: 16,
-    iconClassName: "",
+    textColor: "text-black",
+    backgroundColor: "bg-orange-100",
+    badgeColor: "bg-yellow-600",
   },
-  success: {
+  approved: {
     icon: "circle-check",
-    textColor: "text-green-700",
-    backgroundColor: "bg-green-200",
-    iconColor: "text-green-600",
-    iconSize: 16,
-    iconClassName: "",
+    textColor: "text-black",
+    backgroundColor: "bg-green-100",
+    badgeColor: "bg-emerald-500",
   },
-  failed: {
+  rejected: {
     icon: "circle-x",
-    textColor: "text-red-700",
-    backgroundColor: "bg-red-200",
-    iconColor: "text-red-600",
-    iconSize: 16,
-    iconClassName: "",
+    textColor: "text-black",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-400",
   },
   error: {
     icon: "triangle-alert",
-    textColor: "text-red-700",
-    backgroundColor: "bg-red-200",
-    iconColor: "text-red-600",
-    iconSize: 16,
-    iconClassName: "",
+    textColor: "text-black",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-400",
   },
   running: {
     icon: "clock",
-    textColor: "text-amber-700",
+    textColor: "text-black",
     backgroundColor: "bg-amber-100",
-    iconColor: "text-amber-600",
-    iconSize: 16,
-    iconClassName: "",
+    badgeColor: "bg-amber-500",
   },
 };
 
@@ -84,31 +74,31 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
 export const approvalStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
   // Error state - component could not evaluate or apply approval logic
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED") {
-    return "error"; // Using neutral for error state with triangle-alert icon
+    return "error";
   }
 
   // Waiting state - some or all required actors have not yet responded
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
-    return "next-in-queue"; // Using next-in-queue for waiting state with clock icon
+    return "waiting";
   }
 
   // Check execution outputs for approval/rejection decision
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
     const metadata = execution.metadata as Record<string, any> | undefined;
     if (metadata?.result === "approved") {
-      return "success";
+      return "approved";
     }
 
     if (metadata?.result === "rejected") {
-      return "failed";
+      return "rejected";
     }
 
     // Default to success if finished and passed but no specific result
-    return "success";
+    return "approved";
   }
 
   // Default fallback
-  return "failed";
+  return "error";
 };
 
 /**
@@ -134,14 +124,13 @@ export const approvalMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: componentDefinition.icon || "hand",
-      iconColor: getColorClass("orange"),
-      headerColor: "bg-orange-100",
-      iconBackground: getBackgroundColorClass("orange"),
+      iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass("orange"),
+      headerColor: "bg-white",
       collapsed: node.isCollapsed,
       title: node.name || componentDefinition?.label || "Approval",
-      description: componentDefinition?.description,
-      eventSections: getApprovalEventSections(nodes, lastExecution, additionalData),
+      eventSections: lastExecution ? getApprovalEventSections(nodes, lastExecution, additionalData) : undefined,
+      includeEmptyState: !lastExecution,
       specs: getApprovalSpecs(items, additionalData),
       customField: getApprovalCustomField(lastExecution, approvals),
       eventStateMap: APPROVAL_STATE_MAP,
@@ -157,6 +146,7 @@ function getApprovalCustomField(
   approvals: ApprovalItemProps[],
 ): React.ReactNode | undefined {
   const isAwaitingApproval = ["STATE_STARTED", "STATE_PENDING"].includes(lastExecution?.state || "");
+  if (!isAwaitingApproval || approvals.length == 0) return;
   return React.createElement(ApprovalGroup, { approvals, awaitingApproval: isAwaitingApproval });
 }
 
@@ -208,38 +198,24 @@ function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): Comp
 
 function getApprovalEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution | null,
+  execution: WorkflowsWorkflowNodeExecution,
   additionalData?: unknown,
 ): EventSection[] {
-  if (!execution) {
-    return [
-      {
-        title: "Last Run",
-        eventTitle: "No events received yet",
-        eventState: "neutral" as const,
-      },
-    ];
-  }
-
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
   const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-  let sectionTitle = "Last Run";
-
-  if (execution.state === "STATE_STARTED") {
-    sectionTitle = "Awaiting Approval";
-  }
 
   const eventSubtitle = getComponentSubtitle({} as ComponentsNode, execution, additionalData);
-  return [
-    {
-      title: sectionTitle,
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: eventTitle,
-      eventSubtitle: eventSubtitle,
-      eventState: approvalStateFunction(execution),
-    },
-  ];
+
+  const eventSection: EventSection = {
+    receivedAt: new Date(execution.createdAt!),
+    eventTitle: eventTitle,
+    eventSubtitle: eventSubtitle,
+    eventState: approvalStateFunction(execution),
+    eventId: execution.rootEvent?.id,
+  };
+
+  return [eventSection];
 }
 
 function getComponentSubtitle(

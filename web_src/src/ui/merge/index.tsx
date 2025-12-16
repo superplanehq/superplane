@@ -34,15 +34,13 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
   const eventSections: EventSection[] = [];
   if (lastEvent) {
     eventSections.push({
-      title: "Last Event",
       ...lastEvent,
     });
   }
   if (nextInQueue) {
     eventSections.push({
-      title: "Next In Queue",
       eventTitle: nextInQueue.title,
-      eventState: "neutral",
+      eventState: "queued",
       handleComponent: nextInQueue.subtitle ? (
         <div className="mt-2 text-right text-xs text-gray-500">{nextInQueue.subtitle}</div>
       ) : undefined,
@@ -53,7 +51,6 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
     <ComponentBase
       title={title}
       iconSlug="git-merge"
-      headerColor="bg-blue-100"
       eventSections={eventSections}
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}
@@ -67,6 +64,7 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
       onToggleView={onToggleView}
       onDelete={onDelete}
       isCompactView={isCompactView}
+      includeEmptyState={!lastEvent}
     />
   );
 };

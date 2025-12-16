@@ -1,10 +1,11 @@
 import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
-import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
+import { getColorClass } from "@/utils/colors";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { getNextCronExecution } from "@/utils/cron";
 import { TriggerRenderer, CustomFieldRenderer } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import React from "react";
+import { formatTimeAgo } from "@/utils/date";
 
 type ScheduleConfigurationType = "minutes" | "hours" | "days" | "weeks" | "months" | "cron";
 
@@ -309,23 +310,38 @@ function formatNextTrigger(configuration: ScheduleConfiguration, metadata?: { ne
  */
 export const scheduleTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+    const eventDate = new Date(event.createdAt!);
+    const formattedDate = eventDate.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZoneName: "short",
+    });
+
     return {
-      title: "Event emitted by schedule",
-      subtitle: event.id!,
+      title: `Schedule: ${formattedDate}`,
+      subtitle: formatTimeAgo(eventDate),
     };
   },
 
-  getRootEventValues: (): Record<string, string> => {
-    return {};
+  getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
+    return {
+      Result: "emitted",
+      "Readable date/time": (event.data?.["Readable date"] as string) || "n/a",
+      Timestamp: (event.data?.["timestamp"] as string) || "n/a",
+    };
   },
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent?: WorkflowsWorkflowEvent) => {
     const props: TriggerProps = {
       title: node.name!,
       iconSlug: trigger.icon,
-      iconColor: getColorClass(trigger.color),
-      headerColor: getBackgroundColorClass(trigger.color),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass("black"),
+      headerColor: "bg-white",
+      collapsedBackground: "bg-white",
       metadata: [
         {
           icon: "calendar-cog",
@@ -336,15 +352,26 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
           label: formatNextTrigger(node.configuration as unknown as ScheduleConfiguration, node.metadata),
         },
       ],
-      zeroStateText: "This schedule has not been triggered yet.",
     };
 
     if (lastEvent) {
+      const eventDate = new Date(lastEvent.createdAt!);
+      const formattedDate = eventDate.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        timeZoneName: "short",
+      });
+
       props.lastEventData = {
-        title: "Event emitted by schedule",
-        subtitle: lastEvent.id,
+        title: `Schedule: ${formattedDate}`,
+        subtitle: formatTimeAgo(new Date(lastEvent.createdAt!)),
         receivedAt: new Date(lastEvent.createdAt!),
-        state: "processed",
+        state: "triggered",
+        eventId: lastEvent.id,
       };
     }
 

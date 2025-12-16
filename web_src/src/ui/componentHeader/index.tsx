@@ -11,7 +11,6 @@ export interface ComponentHeaderProps extends ComponentActionsProps {
   iconColor?: string;
   headerColor: string;
   title: string;
-  description?: string;
   onDoubleClick?: () => void;
   hideActionsButton?: boolean;
 }
@@ -23,7 +22,6 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   iconColor,
   headerColor,
   title,
-  description,
   onDoubleClick,
   onRun,
   runDisabled,
@@ -45,7 +43,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
     <div
       data-testid={toTestId(`node-${title}-header`)}
       className={
-        "canvas-node-drag-handle text-left text-lg w-full px-2 flex flex-col border-b p-2 rounded-t-md items-center relative " +
+        "canvas-node-drag-handle text-left text-lg w-full px-2 flex flex-col border-b-2 border-slate-300 p-2 rounded-t-md items-center relative " +
         headerColor
       }
       onDoubleClick={onDoubleClick}
@@ -79,7 +77,6 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
           </div>
         )}
       </div>
-      {description && <p className="w-full text-base text-gray-900/60 px-8">{description}</p>}
     </div>
   );
 };

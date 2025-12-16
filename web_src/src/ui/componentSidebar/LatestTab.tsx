@@ -15,6 +15,7 @@ interface LatestTabProps {
   onEventClick?: (event: SidebarEvent) => void;
   onSeeFullHistory?: () => void;
   onSeeQueue?: () => void;
+  onSeeExecutionChain?: (eventId: string, triggerEvent?: SidebarEvent) => void;
   getTabData?: (event: SidebarEvent) => TabData | undefined;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
@@ -43,6 +44,7 @@ export const LatestTab = ({
   onEventClick,
   onSeeFullHistory,
   onSeeQueue,
+  onSeeExecutionChain,
   getTabData,
   onCancelQueueItem,
   onCancelExecution,
@@ -60,25 +62,33 @@ export const LatestTab = ({
     onSeeFullHistory?.();
   };
 
+  const handleTriggerNavigate = (event: SidebarEvent) => {
+    const eventId = event.triggerEventId || event.id;
+    onSeeExecutionChain?.(eventId, event);
+  };
+
   return (
     <>
       <div className="px-3 py-1 border-b-1 border-border pb-3 text-left">
-        <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Latest events</h2>
-        <div className="flex flex-col gap-2">
+        <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Latest</h2>
+        <div className="flex flex-col">
           {latestEvents.length === 0 ? (
             <div className="text-center py-4 text-gray-500 text-sm">No events found</div>
           ) : (
             <>
               {latestEvents.slice(0, 5).map((event, index) => {
+                const totalItems = Math.min(latestEvents.length, 5);
                 return (
                   <SidebarEventItem
                     key={event.id}
                     event={event}
                     index={index}
+                    totalItems={totalItems}
                     variant="latest"
                     isOpen={openEventIds.has(event.id) || event.isOpen}
                     onToggleOpen={onToggleOpen}
                     onEventClick={onEventClick}
+                    onTriggerNavigate={handleTriggerNavigate}
                     tabData={getTabData?.(event)}
                     onPushThrough={onPushThrough}
                     onCancelExecution={onCancelExecution}
@@ -104,26 +114,30 @@ export const LatestTab = ({
       </div>
       {!hideQueueEvents && (
         <div className="px-3 py-1 pb-3 text-left">
-          <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Next in queue</h2>
-          <div className="flex flex-col gap-2">
+          <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Queued</h2>
+          <div className="flex flex-col">
             {nextInQueueEvents.length === 0 ? (
               <div className="text-center py-4 text-gray-500 text-sm">Queue is empty</div>
             ) : (
               <>
                 {nextInQueueEvents.slice(0, 5).map((event, index) => {
+                  const totalItems = Math.min(nextInQueueEvents.length, 5);
                   return (
                     <SidebarEventItem
                       key={event.id}
                       event={event}
                       index={index}
+                      totalItems={totalItems}
                       variant="queue"
                       isOpen={openEventIds.has(event.id) || event.isOpen}
                       onToggleOpen={onToggleOpen}
                       onEventClick={onEventClick}
+                      onTriggerNavigate={handleTriggerNavigate}
                       tabData={getTabData?.(event)}
                       onCancelQueueItem={onCancelQueueItem}
                       onPushThrough={onPushThrough}
                       supportsPushThrough={supportsPushThrough}
+                      onReEmit={onReEmit}
                       loadExecutionChain={loadExecutionChain}
                       getExecutionState={getExecutionState}
                     />

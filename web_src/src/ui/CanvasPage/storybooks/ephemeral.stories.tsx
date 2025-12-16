@@ -47,7 +47,7 @@ const ephemeralNodes: Node[] = [
         lastEventData: {
           title: "feat: arrange pets by cuteness",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 5), // 5 minutes ago
-          state: "processed",
+          state: "triggered",
         },
         collapsed: false,
       },
@@ -75,7 +75,7 @@ const ephemeralNodes: Node[] = [
         lastEventData: {
           title: "Deprovision env-pr-4498",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 45), // 45 minutes ago
-          state: "processed",
+          state: "triggered",
         },
         collapsed: false,
       },
@@ -296,7 +296,7 @@ const ephemeralNodes: Node[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 120), // 2 hours ago
           childEventsInfo: {
             count: 2,
-            state: "processed",
+            state: "triggered",
             waitingInfos: [],
           },
           state: "success",

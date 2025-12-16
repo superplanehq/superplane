@@ -34,7 +34,7 @@ const GithubProps: TriggerProps = createTriggerProps({
     title: "refactor: update README.md",
     subtitle: "ef53adfa",
     receivedAt: new Date(),
-    state: "processed",
+    state: "triggered",
   },
 });
 
@@ -68,7 +68,7 @@ const DockerHubProps: TriggerProps = createTriggerProps({
     title: "v3.18.217",
     subtitle: "978.3 MB",
     receivedAt: new Date(),
-    state: "processed",
+    state: "triggered",
   },
 });
 
@@ -100,7 +100,6 @@ export const GitHubNoEvents: Story = {
   args: {
     ...GithubProps,
     lastEventData: undefined,
-    zeroStateText: "Waiting for the first push...",
   },
 };
 
@@ -108,6 +107,5 @@ export const DockerHubNoEvents: Story = {
   args: {
     ...DockerHubProps,
     lastEventData: undefined,
-    zeroStateText: "No images pushed yet...",
   },
 };

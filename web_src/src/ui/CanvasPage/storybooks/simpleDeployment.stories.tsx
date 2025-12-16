@@ -52,7 +52,7 @@ const sampleNodes: CanvasNode[] = [
           title: "refactor: update README.md",
           subtitle: "ef53adfa",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 45), // 45 minutes ago
-          state: "processed",
+          state: "triggered",
         },
       },
     },
@@ -64,7 +64,7 @@ const sampleNodes: CanvasNode[] = [
           title: commit.message,
           subtitle: commit.sha,
           receivedAt: new Date(),
-          state: "processed",
+          state: "triggered",
         };
 
         update("data.trigger.lastEventData", event);
@@ -92,7 +92,7 @@ const sampleNodes: CanvasNode[] = [
           title: "v3.18.217",
           subtitle: "972.5 MB",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 3), // 3 hours ago
-          state: "processed",
+          state: "triggered",
         },
       },
     },
@@ -104,7 +104,7 @@ const sampleNodes: CanvasNode[] = [
           title: commit.message,
           subtitle: commit.size,
           receivedAt: new Date(),
-          state: "processed",
+          state: "triggered",
         };
 
         update("data.trigger.lastEventData", event);
@@ -258,7 +258,7 @@ const sampleNodes: CanvasNode[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 5), // 5 hours ago
           childEventsInfo: {
             count: 2,
-            state: "processed",
+            state: "triggered",
             waitingInfos: [],
           },
           state: "success",
@@ -418,7 +418,7 @@ const sampleNodes: CanvasNode[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 12), // 12 hours ago
           childEventsInfo: {
             count: 1,
-            state: "processed",
+            state: "triggered",
             waitingInfos: [],
           },
           state: "fail",
