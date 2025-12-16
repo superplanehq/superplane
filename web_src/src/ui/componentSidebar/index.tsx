@@ -116,8 +116,6 @@ export const ComponentSidebar = ({
   nodeId,
   iconSrc,
   iconSlug,
-  iconColor,
-  iconBackground,
   onEventClick,
   onClose,
   latestEvents,
@@ -405,18 +403,14 @@ export const ComponentSidebar = ({
       </div>
       <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-border bg-gray-50">
         <div className="flex flex-col items-start gap-3 w-full mt-2">
-          <div
-            className={`w-7 h-7 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
-          >
-            {iconSrc ? (
-              <img src={iconSrc} alt={nodeName} className="w-6 h-6" />
-            ) : (
-              <Icon size={16} className={iconColor} />
-            )}
-          </div>
           <div className="flex justify-between gap-3 w-full">
             <div className="flex flex-col gap-1">
-              <h2 className="text-xl font-semibold">{isTemplateNode ? newNodeData.nodeName : nodeName}</h2>
+              <div className="flex items-center gap-2">
+                <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
+                  {iconSrc ? <img src={iconSrc} alt={nodeName} className="w-6 h-6" /> : <Icon size={16} />}
+                </div>
+                <h2 className="text-xl font-semibold">{isTemplateNode ? newNodeData.nodeName : nodeName}</h2>
+              </div>
               {nodeId && !isTemplateNode && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500 font-mono">{nodeId}</span>

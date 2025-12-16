@@ -28,6 +28,7 @@ export interface TabData {
 interface SidebarEventItemProps {
   event: SidebarEvent;
   index: number;
+  totalItems?: number;
   variant?: "latest" | "queue";
   isOpen: boolean;
   onToggleOpen: (eventId: string) => void;
@@ -53,6 +54,7 @@ interface SidebarEventItemProps {
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   event,
   index,
+  totalItems,
   isOpen,
   onToggleOpen,
   onEventClick,
@@ -313,51 +315,62 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
   const EventBackground = eventStateStyle.backgroundColor;
   const EventBadgeColor = eventStateStyle.badgeColor;
-  const titleColor = eventStateStyle.textColor;
 
   return (
     <div
       key={event.title + index}
-      className={`flex flex-col items-center justify-between gap-1 px-2 py-1.5 rounded-md ${EventBackground}`}
+      className={
+        `cursor-pointer px-4 pt-2 pb-3 relative rounded-lg border-1 border-slate-300 ${EventBackground}` +
+        (totalItems && index < totalItems - 1 ? " mb-3" : "")
+      }
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggleOpen(event.id);
+        onEventClick?.(event);
+      }}
     >
-      <div className="flex items-center gap-3 rounded-md w-full min-w-0">
+      {/* First row: Badge and subtitle */}
+      <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
         <div
-          className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleOpen(event.id);
-            onEventClick?.(event);
-          }}
+          className={`uppercase text-sm py-[1px] px-[6px] font-semibold rounded flex items-center justify-center text-white ${EventBadgeColor}`}
         >
-          <div
-            className={`uppercase text-sm py-[1px] px-[6px] font-semibold rounded flex items-center justify-center text-white ${EventBadgeColor}`}
-          >
-            <span>{event.state || "neutral"}</span>
-          </div>
-          <span className={`truncate text-sm ${titleColor}`}>{event.title}</span>
+          <span>{event.state || "neutral"}</span>
         </div>
         {event.subtitle && (
-          <span className="text-xs text-black/50 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
+          <span className="text-sm truncate flex-shrink-0 max-w-[40%] text-gray-500">{event.subtitle}</span>
         )}
+      </div>
 
-        <SidebarEventActionsMenu
-          eventId={event.id}
-          executionId={event.executionId}
-          onCancelQueueItem={onCancelQueueItem}
-          onCancelExecution={onCancelExecution}
-          onPushThrough={onPushThrough}
-          supportsPushThrough={supportsPushThrough}
-          eventState={event.state}
-          kind={event.kind || "execution"}
-          onReEmit={() => {
-            if (["queue", "execution"].includes(event.kind || "")) return;
-            onReEmit?.(event.nodeId || "", event.id);
-          }}
-        />
+      {/* Second row: Event ID and title with actions */}
+      <div className="flex items-center mt-2 gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
+          {event.id && <span className="text-sm text-zinc-600 font-mono">#{event.id?.slice(0, 4)}</span>}
+          <span className="text-sm text-zinc-700 font-inter truncate text-md min-w-0 font-semibold">{event.title}</span>
+        </div>
+
+        <div onClick={(e) => e.stopPropagation()}>
+          <SidebarEventActionsMenu
+            eventId={event.id}
+            executionId={event.executionId}
+            onCancelQueueItem={onCancelQueueItem}
+            onCancelExecution={onCancelExecution}
+            onPushThrough={onPushThrough}
+            supportsPushThrough={supportsPushThrough}
+            eventState={event.state}
+            kind={event.kind || "execution"}
+            onReEmit={() => {
+              if (["queue", "execution"].includes(event.kind || "")) return;
+              onReEmit?.(event.nodeId || "", event.id);
+            }}
+          />
+        </div>
       </div>
 
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
-        <div className="rounded-sm bg-white outline outline-black/15 text-gray-500 w-full mb-0.5">
+        <div
+          className="mt-3 rounded-sm bg-white outline outline-black/15 text-gray-500 w-full mb-0.5"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Tab Navigation */}
           {tabData && (
             <div className="flex justify-between items-center border-b-1 border-gray-200">
