@@ -278,11 +278,11 @@ func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int)
 }
 
 func (s *CanvasPageSteps) assertQueuedItemsVisibleInSidebar() {
-	s.session.AssertText("Next in queue")
+	s.session.AssertText("Queued")
 }
 
 func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
-	s.session.Click(q.Locator("h2:has-text('Next in queue') ~ div button[aria-label='Open actions']"))
+	s.session.Click(q.Locator("h2:has-text('Queued') ~ div button[aria-label='Open actions']"))
 	s.session.TakeScreenshot()
 	s.session.Sleep(300)
 	s.session.Click(q.TestID("cancel-queue-item"))
@@ -291,7 +291,7 @@ func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
 }
 
 func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
-	s.session.Click(q.Locator("h2:has-text('Latest events') ~ div button[aria-label='Open actions']"))
+	s.session.Click(q.Locator("h2:has-text('Latest') ~ div button[aria-label='Open actions']"))
 	s.session.TakeScreenshot()
 	s.session.Sleep(300)
 	s.session.Click(q.TestID("cancel-queue-item"))

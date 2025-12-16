@@ -17,7 +17,7 @@ export const Default: Story = {
   args: {
     childEventsInfo: {
       count: 3,
-      state: "processed",
+      state: "triggered",
       waitingInfos: [],
     },
     onExpandChildEvents: () => console.log("Expand child events"),
@@ -69,7 +69,7 @@ export const ProcessingState: Story = {
   args: {
     childEventsInfo: {
       count: 8,
-      state: "processed",
+      state: "triggered",
       waitingInfos: [
         {
           icon: "check",
@@ -99,7 +99,7 @@ export const NoActions: Story = {
   args: {
     childEventsInfo: {
       count: 4,
-      state: "processed",
+      state: "triggered",
       waitingInfos: [],
     },
   },

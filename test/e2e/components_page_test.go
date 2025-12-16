@@ -105,6 +105,14 @@ func (s *CustomComponentsSteps) GivenACanvasWithComponentExists() {
 	s.canvas.Visit()
 	s.canvas.AddManualTrigger("Start", models.Position{X: 500, Y: 250})
 
+	// Open the building blocks sidebar before dragging
+	openButton := q.TestID("open-sidebar-button")
+	loc := openButton.Run(s.session)
+	if isVisible, _ := loc.IsVisible(); isVisible {
+		s.session.Click(openButton)
+		s.session.Sleep(300)
+	}
+
 	source2 := q.TestID("building-block-e2e-deployment-component")
 	target2 := q.TestID("rf__wrapper")
 	s.session.DragAndDrop(source2, target2, 900, 250)

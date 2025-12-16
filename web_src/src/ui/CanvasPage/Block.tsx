@@ -138,6 +138,11 @@ function LeftHandle({ data, nodeId }: BlockProps) {
 }
 
 function RightHandle({ data, nodeId }: BlockProps) {
+  // Hide right handle for template nodes and pending connection nodes
+  const isTemplate = (data as any).isTemplate;
+  const isPendingConnection = (data as any).isPendingConnection;
+  if (isTemplate || isPendingConnection) return null;
+
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "trigger" && data.trigger?.collapsed) ||

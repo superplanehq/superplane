@@ -10,7 +10,7 @@ interface EmptyStateProps {
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
   icon: Icon = Rabbit,
-  title = "Waiting for the first run",
+  title = "Waiting for the first run...",
   description,
   className = "",
 }) => {

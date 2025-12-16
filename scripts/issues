@@ -1,0 +1,10 @@
+#!/bin/bash
+
+count() {
+  gh issue list --repo superplanehq/superplane --limit 100 --search "is:open label:$1" --json title --template '{{range .}}{{.title}}{{"\n"}}{{end}}' | wc -l
+}
+
+echo "Bugs:             $(count bug)"
+echo "Papercut:         $(count papercut)"
+echo "Stability:        $(count stability)"
+echo "Dev Productivity: $(count dev-productivity)"

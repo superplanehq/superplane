@@ -55,7 +55,7 @@ const incidentResponseNodes: Node[] = [
           title: "Database Latency",
           subtitle: "Alert • monitor_id 12345",
           receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 48), // 2 days ago
-          state: "processed",
+          state: "triggered",
         },
         collapsed: true,
       },
@@ -90,7 +90,7 @@ const incidentResponseNodes: Node[] = [
           subtitle: "incident PAB128 • triggered",
           sizeInMB: 0.08,
           receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-          state: "processed",
+          state: "triggered",
         },
         collapsed: true,
       },
@@ -121,7 +121,7 @@ const incidentResponseNodes: Node[] = [
           title: "TypeError: Cannot read property 'status' of undefined",
           subtitle: "release checkout@2025.10.27.4 • 150 users",
           receivedAt: new Date(Date.now() - 1000 * 60 * 25), // 25 minutes ago
-          state: "processed",
+          state: "triggered",
         },
         collapsed: true,
       },
@@ -156,7 +156,7 @@ const incidentResponseNodes: Node[] = [
           subtitle: "critical • 92 percent CPU • node-12",
           sizeInMB: 0.04,
           receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5), // 5 days ago
-          state: "processed",
+          state: "triggered",
         },
         collapsed: true,
       },

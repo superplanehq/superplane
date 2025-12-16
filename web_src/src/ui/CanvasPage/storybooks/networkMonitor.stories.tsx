@@ -56,7 +56,7 @@ const sampleNodes: Node[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 6), // 6 minutes ago
           childEventsInfo: {
             count: 3,
-            state: "processed",
+            state: "triggered",
             waitingInfos: [],
           },
           state: "success",
@@ -98,7 +98,7 @@ const sampleNodes: Node[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 8), // 8 minutes ago
           childEventsInfo: {
             count: 2,
-            state: "processed",
+            state: "triggered",
             waitingInfos: [],
           },
           state: "failure",
@@ -140,7 +140,7 @@ const sampleNodes: Node[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 15), // 15 minutes ago
           childEventsInfo: {
             count: 3,
-            state: "processed",
+            state: "triggered",
             waitingInfos: [],
           },
           state: "success",
