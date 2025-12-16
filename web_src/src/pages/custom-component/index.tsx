@@ -189,12 +189,7 @@ export const CustomComponent = () => {
   useEffect(() => {
     if (!blueprint || components.length === 0) return;
 
-    console.log('[USEEFFECT] Blueprint changed, syncing nodes');
-    console.log('[USEEFFECT] convertedTemplateIdsRef contains:', Array.from(convertedTemplateIdsRef.current));
-
     setNodes((currentNodes) => {
-      console.log('[USEEFFECT] currentNodes:', currentNodes.map(n => ({ id: n.id, isTemplate: (n.data as any).isTemplate, isPending: (n.data as any).isPendingConnection })));
-
       // Preserve pending connection nodes and template nodes
       // But exclude template nodes that have been converted to real nodes
       const localOnlyNodes = currentNodes.filter((node) => {
@@ -207,14 +202,11 @@ export const CustomComponent = () => {
         // Preserve template nodes UNLESS they've been converted to real nodes
         if (isTemplate) {
           const shouldPreserve = !convertedTemplateIdsRef.current.has(node.id);
-          console.log('[USEEFFECT] Template node', node.id, '- shouldPreserve:', shouldPreserve);
           if (shouldPreserve) return true;
         }
 
         return false;
       });
-
-      console.log('[USEEFFECT] localOnlyNodes to preserve:', localOnlyNodes.map(n => ({ id: n.id, isTemplate: (n.data as any).isTemplate, isPending: (n.data as any).isPendingConnection })));
 
       const allNodes: Node[] = (blueprint.nodes || [])
         .map((node: ComponentsNode) => {
@@ -454,16 +446,10 @@ export const CustomComponent = () => {
 
   const handleNodeConfigurationSave = useCallback(
     async (nodeId: string, configuration: Record<string, any>, nodeName: string) => {
-      console.log('[HANDLE SAVE] Called with nodeId:', nodeId);
-      console.log('[HANDLE SAVE] templateNodeId:', templateNodeId);
-      console.log('[HANDLE SAVE] newNodeData:', newNodeData);
-      console.log('[HANDLE SAVE] newNodeData.sourceConnection:', (newNodeData as any)?.sourceConnection);
-
       saveSnapshot();
 
       // Check if this is a template node with sourceConnection (needs to be converted to real node)
       if (templateNodeId && newNodeData && (newNodeData as any).sourceConnection) {
-        console.log('[HANDLE SAVE] Entering template-to-real-node conversion path');
         // This is a template node created from dragging edge - convert to real node
         const component = componentsRef.current.find(
           (c: ComponentsComponent) => c.name === newNodeData.buildingBlock.name,
@@ -685,7 +671,6 @@ export const CustomComponent = () => {
 
       // Only mark the template being saved, not all templates
       if (savedTemplateId) {
-        console.log('[HANDLE NODE ADD] Marking template as converted:', savedTemplateId);
         convertedTemplateIdsRef.current.add(savedTemplateId);
       }
 
@@ -707,7 +692,6 @@ export const CustomComponent = () => {
       // Handle edge creation if there's a sourceConnection
       let updatedEdges = edges;
       if (newNodeData.sourceConnection) {
-        console.log('[HANDLE NODE ADD] Creating edge from sourceConnection:', newNodeData.sourceConnection);
         const newEdge = {
           id: `${newNodeData.sourceConnection.nodeId}--${newNodeId}--${newNodeData.sourceConnection.handleId || "default"}`,
           source: newNodeData.sourceConnection.nodeId,
@@ -873,12 +857,10 @@ export const CustomComponent = () => {
   // Handle clicking on a pending connection node
   const handlePendingConnectionNodeClick = useCallback(
     (nodeId: string) => {
-      console.log('[PARENT handlePendingConnectionNodeClick] Called with nodeId:', nodeId);
       setTemplateNodeId(nodeId);
       setIsBuildingBlocksSidebarOpen(true);
       // Clear any existing template configuration (close ComponentSidebar)
       setNewNodeData(null);
-      console.log('[PARENT handlePendingConnectionNodeClick] Set templateNodeId, cleared newNodeData, and opened BuildingBlocksSidebar');
     },
     [],
   );
@@ -886,15 +868,10 @@ export const CustomComponent = () => {
   // Handle clicking on a template node (already configured, re-opening for editing)
   const handleTemplateNodeClick = useCallback(
     (nodeId: string) => {
-      console.log('[PARENT handleTemplateNodeClick] Called with nodeId:', nodeId);
       const templateNode = nodes.find((n) => n.id === nodeId);
-      if (!templateNode) {
-        console.log('[PARENT handleTemplateNodeClick] Template node not found');
-        return;
-      }
+      if (!templateNode) return;
 
       const buildingBlock = (templateNode.data as any).buildingBlock;
-      console.log('[PARENT handleTemplateNodeClick] Found template node with buildingBlock:', buildingBlock?.name);
 
       setTemplateNodeId(nodeId);
       setNewNodeData({
@@ -905,7 +882,6 @@ export const CustomComponent = () => {
         position: templateNode.position,
         sourceConnection: (templateNode.data as any).sourceConnection as { nodeId: string; handleId: string | null } | undefined,
       });
-      console.log('[PARENT handleTemplateNodeClick] Set newNodeData for template:', nodeId);
     },
     [nodes],
   );
@@ -913,22 +889,14 @@ export const CustomComponent = () => {
   // Handle selecting a building block for a pending connection node
   const handleBuildingBlockClick = useCallback(
     (block: any) => {
-      console.log('[PARENT handleBuildingBlockClick] Called with block:', block.name, 'templateNodeId:', templateNodeId);
-      if (!templateNodeId) {
-        console.log('[PARENT handleBuildingBlockClick] No templateNodeId, returning');
-        return;
-      }
+      if (!templateNodeId) return;
 
       saveSnapshot();
 
       // Find the pending node first to get its data
       const pendingNode = nodes.find((n) => n.id === templateNodeId && (n.data as any).isPendingConnection);
-      console.log('[PARENT handleBuildingBlockClick] Found pending node:', pendingNode?.id);
 
-      if (!pendingNode) {
-        console.log('[PARENT handleBuildingBlockClick] No pending node found');
-        return;
-      }
+      if (!pendingNode) return;
 
       const pendingNodePosition = pendingNode.position;
       const pendingNodeSourceConnection = (pendingNode.data as any).sourceConnection;
@@ -968,7 +936,6 @@ export const CustomComponent = () => {
       );
 
       // Set newNodeData with the pending node's data
-      console.log('[PARENT handleBuildingBlockClick] Setting newNodeData with sourceConnection:', pendingNodeSourceConnection);
       setNewNodeData({
         buildingBlock: block,
         nodeName: block.name || "",
@@ -986,9 +953,7 @@ export const CustomComponent = () => {
 
   // Handle canceling template creation
   const handleCancelTemplate = useCallback(() => {
-    console.log('[PARENT handleCancelTemplate] Called with templateNodeId:', templateNodeId);
     if (templateNodeId) {
-      console.log('[PARENT handleCancelTemplate] Clearing template state');
       setTemplateNodeId(null);
       setNewNodeData(null);
     }

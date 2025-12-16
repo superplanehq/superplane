@@ -369,13 +369,10 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
 
   // In delegated mode, open the ComponentSidebar when newNodeData is set, close when cleared
   useEffect(() => {
-    console.log('[USEEFFECT SIDEBAR] templateNodeId:', props.templateNodeId, 'newNodeData:', props.newNodeData, 'local templateNodeId:', templateNodeId);
     if (props.templateNodeId !== undefined && props.newNodeData && templateNodeId) {
-      console.log('[USEEFFECT SIDEBAR] Opening ComponentSidebar for template:', templateNodeId);
       setIsNodeSidebarOpen(true);
       setSelectedNodeId(templateNodeId);
     } else if (props.newNodeData === null) {
-      console.log('[USEEFFECT SIDEBAR] Closing ComponentSidebar - newNodeData is null');
       setIsNodeSidebarOpen(false);
       setSelectedNodeId(null);
     }
@@ -600,36 +597,28 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
 
   const handleNodeClick = useCallback(
     (nodeId: string) => {
-      console.log('[CHILD handleNodeClick] Called with nodeId:', nodeId);
       // Check if this is a pending connection node
       const clickedNode = props.nodes.find((n) => n.id === nodeId);
       const isPendingConnection = (clickedNode?.data as any)?.isPendingConnection;
       const isTemplateNode = (clickedNode?.data as any)?.isTemplate && !isPendingConnection;
-      const nodeLabel = (clickedNode?.data as any)?.label || (clickedNode?.data as any)?.buildingBlock?.name;
-      console.log('[CHILD handleNodeClick] Node label:', nodeLabel, 'isPendingConnection:', isPendingConnection, 'isTemplateNode:', isTemplateNode);
 
       // Check if the current template is a configured template (not just pending connection)
       const currentTemplateNode = templateNodeId ? props.nodes.find((n) => n.id === templateNodeId) : null;
       const isCurrentTemplateConfigured = (currentTemplateNode?.data as any)?.isTemplate && !(currentTemplateNode?.data as any)?.isPendingConnection;
-      console.log('[CHILD handleNodeClick] currentTemplateId:', templateNodeId, 'isCurrentTemplateConfigured:', isCurrentTemplateConfigured);
 
       // Allow switching to pending connection nodes or other template nodes even if there's a configured template
       // But block switching to other regular/real nodes
       if (isCurrentTemplateConfigured && nodeId !== templateNodeId && !isPendingConnection && !isTemplateNode) {
-        console.log('[CHILD handleNodeClick] BLOCKING - configured template exists and trying to click non-template/non-pending node');
         return;
       }
 
       if (isPendingConnection && props.onPendingConnectionNodeClick) {
-        console.log('[CHILD handleNodeClick] Calling onPendingConnectionNodeClick');
         // Notify parent that a pending connection node was clicked
         props.onPendingConnectionNodeClick(nodeId);
       } else if (isTemplateNode && props.onTemplateNodeClick) {
-        console.log('[CHILD handleNodeClick] Calling onTemplateNodeClick');
         // Notify parent to restore template state
         props.onTemplateNodeClick(nodeId);
       } else {
-        console.log('[CHILD handleNodeClick] Regular node click or no handlers');
         // Regular node click - only in non-delegated mode
         if (props.templateNodeId === undefined) {
           setIsNodeSidebarOpen(true);
@@ -756,15 +745,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
 
   // Add hovered edge and connecting state to nodes
   const nodesWithHoveredEdge = useMemo(
-    () => {
-      console.log('[NODES UPDATE] All nodes:', props.nodes.map(n => ({
-        id: n.id,
-        label: (n.data as any)?.label || (n.data as any)?.buildingBlock?.name,
-        isPending: (n.data as any)?.isPendingConnection,
-        isTemplate: (n.data as any)?.isTemplate,
-        position: n.position
-      })));
-      return props.nodes.map((node) => ({
+    () =>
+      props.nodes.map((node) => ({
         ...node,
         data: {
           ...node.data,
@@ -773,8 +755,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           _allEdges: props.edges,
           _callbacksRef: callbacksRef,
         },
-      }));
-    },
+      })),
     [props.nodes, hoveredEdge, connectingFrom, props.edges],
   );
 
