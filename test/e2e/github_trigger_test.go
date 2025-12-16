@@ -96,7 +96,7 @@ func (s *GithubTriggerSteps) givenACanvasExists() {
 
 func (s *GithubTriggerSteps) addGithubTriggerNode() {
 	// Open the building blocks sidebar before dragging
-	openButton := q.Locator(`button[aria-label="Open sidebar"]`)
+	openButton := q.TestID("open-sidebar-button")
 	loc := openButton.Run(s.session)
 	if isVisible, _ := loc.IsVisible(); isVisible {
 		s.session.Click(openButton)

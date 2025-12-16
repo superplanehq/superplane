@@ -46,7 +46,7 @@ func (s *CanvasSteps) Visit() {
 func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 	// Try to open the sidebar if it's not already open
 	// The button only appears when sidebar is closed
-	openButton := q.Locator(`button[aria-label="Open sidebar"]`)
+	openButton := q.TestID("open-sidebar-button")
 	loc := openButton.Run(s.session)
 
 	// Check if the button is visible (sidebar is closed)

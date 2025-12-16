@@ -106,7 +106,7 @@ func (s *CustomComponentsSteps) GivenACanvasWithComponentExists() {
 	s.canvas.AddManualTrigger("Start", models.Position{X: 500, Y: 250})
 
 	// Open the building blocks sidebar before dragging
-	openButton := q.Locator(`button[aria-label="Open sidebar"]`)
+	openButton := q.TestID("open-sidebar-button")
 	loc := openButton.Run(s.session)
 	if isVisible, _ := loc.IsVisible(); isVisible {
 		s.session.Click(openButton)
