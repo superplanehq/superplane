@@ -14,6 +14,9 @@
       "name": "Organizations"
     },
     {
+      "name": "Applications"
+    },
+    {
       "name": "Secrets"
     },
     {
@@ -55,6 +58,30 @@
     "application/json"
   ],
   "paths": {
+    "/api/v1/applications": {
+      "get": {
+        "summary": "List available applications",
+        "description": "List available applications",
+        "operationId": "Applications_ListApplications",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneApplicationsListApplicationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Application"
+        ]
+      }
+    },
     "/api/v1/blueprints": {
       "get": {
         "summary": "List blueprints",
@@ -992,6 +1019,194 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/OrganizationsUpdateOrganizationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/api/v1/organizations/{id}/applications": {
+      "get": {
+        "summary": "List applications in an organization",
+        "description": "Returns a list of applications in an organization",
+        "operationId": "Organizations_ListApplications",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneOrganizationsListApplicationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "post": {
+        "summary": "Install application on organization",
+        "description": "Install an application on an organization",
+        "operationId": "Organizations_InstallApplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsInstallApplicationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsInstallApplicationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/api/v1/organizations/{id}/applications/{installationId}": {
+      "get": {
+        "summary": "Describe an application in an organization",
+        "description": "Returns details of a specific application in an organization",
+        "operationId": "Organizations_DescribeApplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsDescribeApplicationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "installationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "delete": {
+        "summary": "Uninstall application",
+        "description": "Uninstalls an application from an organization",
+        "operationId": "Organizations_UninstallApplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUninstallApplicationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "installationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "patch": {
+        "summary": "Update application installation",
+        "description": "Updates the configuration of an installed application",
+        "operationId": "Organizations_UpdateApplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateApplicationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "installationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateApplicationBody"
             }
           }
         ],
@@ -2463,6 +2678,61 @@
     }
   },
   "definitions": {
+    "AppInstallationNodeRef": {
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string"
+        },
+        "workflowName": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "nodeName": {
+          "type": "string"
+        }
+      }
+    },
+    "ApplicationsApplicationDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationField"
+          }
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsComponent"
+          }
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/TriggersTrigger"
+          }
+        }
+      }
+    },
     "AuthToken": {
       "type": "object",
       "properties": {
@@ -2829,8 +3099,10 @@
           }
         },
         "placeholder": {
-          "type": "string",
-          "title": "Optional placeholder text for UI inputs"
+          "type": "string"
+        },
+        "sensitive": {
+          "type": "boolean"
         }
       }
     },
@@ -3412,6 +3684,94 @@
         }
       }
     },
+    "OrganizationsAppInstallation": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/OrganizationsAppInstallationMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/OrganizationsAppInstallationSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/OrganizationsAppInstallationStatus"
+        }
+      }
+    },
+    "OrganizationsAppInstallationMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "OrganizationsAppInstallationSpec": {
+      "type": "object",
+      "properties": {
+        "appName": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "OrganizationsAppInstallationStatus": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string"
+        },
+        "stateDescription": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "browserAction": {
+          "$ref": "#/definitions/OrganizationsBrowserAction"
+        },
+        "usedIn": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AppInstallationNodeRef"
+          }
+        }
+      }
+    },
+    "OrganizationsBrowserAction": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "formFields": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
     "OrganizationsCreateInvitationBody": {
       "type": "object",
       "properties": {
@@ -3431,11 +3791,41 @@
     "OrganizationsDeleteOrganizationResponse": {
       "type": "object"
     },
+    "OrganizationsDescribeApplicationResponse": {
+      "type": "object",
+      "properties": {
+        "installation": {
+          "$ref": "#/definitions/OrganizationsAppInstallation"
+        }
+      }
+    },
     "OrganizationsDescribeOrganizationResponse": {
       "type": "object",
       "properties": {
         "organization": {
           "$ref": "#/definitions/OrganizationsOrganization"
+        }
+      }
+    },
+    "OrganizationsInstallApplicationBody": {
+      "type": "object",
+      "properties": {
+        "appName": {
+          "type": "string"
+        },
+        "installationName": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "OrganizationsInstallApplicationResponse": {
+      "type": "object",
+      "properties": {
+        "installation": {
+          "$ref": "#/definitions/OrganizationsAppInstallation"
         }
       }
     },
@@ -3507,6 +3897,25 @@
     },
     "OrganizationsRemoveUserResponse": {
       "type": "object"
+    },
+    "OrganizationsUninstallApplicationResponse": {
+      "type": "object"
+    },
+    "OrganizationsUpdateApplicationBody": {
+      "type": "object",
+      "properties": {
+        "configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "OrganizationsUpdateApplicationResponse": {
+      "type": "object",
+      "properties": {
+        "installation": {
+          "$ref": "#/definitions/OrganizationsAppInstallation"
+        }
+      }
     },
     "OrganizationsUpdateOrganizationBody": {
       "type": "object",
@@ -3795,6 +4204,18 @@
         }
       }
     },
+    "SuperplaneApplicationsListApplicationsResponse": {
+      "type": "object",
+      "properties": {
+        "applications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ApplicationsApplicationDefinition"
+          }
+        }
+      }
+    },
     "SuperplaneBlueprintsOutputChannel": {
       "type": "object",
       "properties": {
@@ -3852,6 +4273,18 @@
         },
         "hasToken": {
           "type": "boolean"
+        }
+      }
+    },
+    "SuperplaneOrganizationsListApplicationsResponse": {
+      "type": "object",
+      "properties": {
+        "applications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/OrganizationsAppInstallation"
+          }
         }
       }
     },

@@ -2,13 +2,14 @@ package merge
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -29,8 +30,8 @@ func (m *Merge) Description() string { return "Merge multiple upstream inputs an
 func (m *Merge) Icon() string        { return "arrow-right-from-line" }
 func (m *Merge) Color() string       { return "gray" }
 
-func (m *Merge) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{components.DefaultOutputChannel}
+func (m *Merge) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 type Spec struct {
@@ -92,17 +93,17 @@ func (m *Merge) Configuration() []configuration.Field {
 	}
 }
 
-func (m *Merge) Actions() []components.Action {
-	return []components.Action{
+func (m *Merge) Actions() []core.Action {
+	return []core.Action{
 		{Name: "timeoutReached"},
 	}
 }
 
-func (m *Merge) Setup(ctx components.SetupContext) error {
+func (m *Merge) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
+func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
 	mergeGroup := ctx.RootEventID
 
 	execID, err := m.findOrCreateExecution(ctx, mergeGroup)
@@ -162,14 +163,14 @@ func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) (*models.Wo
 
 	if len(md.Sources) >= incoming {
 		return ctx.PassExecution(execID, map[string][]any{
-			components.DefaultOutputChannel.Name: {md},
+			core.DefaultOutputChannel.Name: {md},
 		})
 	}
 
 	return nil, nil
 }
 
-func (m *Merge) findOrCreateExecution(ctx components.ProcessQueueContext, mergeGroup string) (uuid.UUID, error) {
+func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup string) (uuid.UUID, error) {
 	execID, found, err := ctx.FindExecutionIDByKV("merge_group", mergeGroup)
 	if err != nil {
 		return uuid.Nil, err
@@ -203,7 +204,7 @@ func (m *Merge) findOrCreateExecution(ctx components.ProcessQueueContext, mergeG
 	return execID, nil
 }
 
-func (m *Merge) addEventToMetadata(ctx components.ProcessQueueContext, execID uuid.UUID) (*ExecutionMetadata, error) {
+func (m *Merge) addEventToMetadata(ctx core.ProcessQueueContext, execID uuid.UUID) (*ExecutionMetadata, error) {
 	md := &ExecutionMetadata{}
 
 	rawMeta, err := ctx.GetExecutionMetadata(execID)
@@ -239,7 +240,7 @@ func (m *Merge) addEventToMetadata(ctx components.ProcessQueueContext, execID uu
 	return md, nil
 }
 
-func (m *Merge) HandleAction(ctx components.ActionContext) error {
+func (m *Merge) HandleAction(ctx core.ActionContext) error {
 	switch ctx.Name {
 	case "timeoutReached":
 		return m.HandleTimeout(ctx)
@@ -248,7 +249,7 @@ func (m *Merge) HandleAction(ctx components.ActionContext) error {
 	}
 }
 
-func (m *Merge) HandleTimeout(ctx components.ActionContext) error {
+func (m *Merge) HandleTimeout(ctx core.ActionContext) error {
 	if ctx.ExecutionStateContext.IsFinished() {
 		return nil
 	}
@@ -256,7 +257,7 @@ func (m *Merge) HandleTimeout(ctx components.ActionContext) error {
 	return ctx.ExecutionStateContext.Fail("timeoutReached", "Execution timed out waiting for other inputs")
 }
 
-func (m *Merge) Execute(ctx components.ExecutionContext) error {
+func (m *Merge) Execute(ctx core.ExecutionContext) error {
 	spec := &Spec{}
 
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
@@ -271,8 +272,12 @@ func (m *Merge) Execute(ctx components.ExecutionContext) error {
 	return nil
 }
 
-func (m *Merge) Cancel(ctx components.ExecutionContext) error {
+func (m *Merge) Cancel(ctx core.ExecutionContext) error {
 	return nil
+}
+
+func (m *Merge) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }
 
 func durationFrom(value int, unit string) time.Duration {

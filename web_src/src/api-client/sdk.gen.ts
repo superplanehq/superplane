@@ -2,6 +2,9 @@
 
 import type { Options as ClientOptions, TDataShape, Client } from "@hey-api/client-fetch";
 import type {
+  ApplicationsListApplicationsData,
+  ApplicationsListApplicationsResponse,
+  ApplicationsListApplicationsError,
   BlueprintsListBlueprintsData,
   BlueprintsListBlueprintsResponse2,
   BlueprintsListBlueprintsError,
@@ -80,6 +83,21 @@ import type {
   OrganizationsUpdateOrganizationData,
   OrganizationsUpdateOrganizationResponse2,
   OrganizationsUpdateOrganizationError,
+  OrganizationsListApplicationsData,
+  OrganizationsListApplicationsResponse,
+  OrganizationsListApplicationsError,
+  OrganizationsInstallApplicationData,
+  OrganizationsInstallApplicationResponse2,
+  OrganizationsInstallApplicationError,
+  OrganizationsUninstallApplicationData,
+  OrganizationsUninstallApplicationResponse2,
+  OrganizationsUninstallApplicationError,
+  OrganizationsDescribeApplicationData,
+  OrganizationsDescribeApplicationResponse2,
+  OrganizationsDescribeApplicationError,
+  OrganizationsUpdateApplicationData,
+  OrganizationsUpdateApplicationResponse2,
+  OrganizationsUpdateApplicationError,
   OrganizationsListInvitationsData,
   OrganizationsListInvitationsResponse2,
   OrganizationsListInvitationsError,
@@ -203,6 +221,23 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
    * used to access values that aren't defined as part of the SDK function.
    */
   meta?: Record<string, unknown>;
+};
+
+/**
+ * List available applications
+ * List available applications
+ */
+export const applicationsListApplications = <ThrowOnError extends boolean = true>(
+  options?: Options<ApplicationsListApplicationsData, ThrowOnError>,
+) => {
+  return (options?.client ?? _heyApiClient).get<
+    ApplicationsListApplicationsResponse,
+    ApplicationsListApplicationsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/applications",
+    ...options,
+  });
 };
 
 /**
@@ -639,6 +674,99 @@ export const organizationsUpdateOrganization = <ThrowOnError extends boolean = t
     ThrowOnError
   >({
     url: "/api/v1/organizations/{id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * List applications in an organization
+ * Returns a list of applications in an organization
+ */
+export const organizationsListApplications = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsListApplicationsData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    OrganizationsListApplicationsResponse,
+    OrganizationsListApplicationsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/applications",
+    ...options,
+  });
+};
+
+/**
+ * Install application on organization
+ * Install an application on an organization
+ */
+export const organizationsInstallApplication = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsInstallApplicationData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).post<
+    OrganizationsInstallApplicationResponse2,
+    OrganizationsInstallApplicationError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/applications",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * Uninstall application
+ * Uninstalls an application from an organization
+ */
+export const organizationsUninstallApplication = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsUninstallApplicationData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).delete<
+    OrganizationsUninstallApplicationResponse2,
+    OrganizationsUninstallApplicationError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/applications/{installationId}",
+    ...options,
+  });
+};
+
+/**
+ * Describe an application in an organization
+ * Returns details of a specific application in an organization
+ */
+export const organizationsDescribeApplication = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsDescribeApplicationData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    OrganizationsDescribeApplicationResponse2,
+    OrganizationsDescribeApplicationError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/applications/{installationId}",
+    ...options,
+  });
+};
+
+/**
+ * Update application installation
+ * Updates the configuration of an installed application
+ */
+export const organizationsUpdateApplication = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsUpdateApplicationData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).patch<
+    OrganizationsUpdateApplicationResponse2,
+    OrganizationsUpdateApplicationError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/applications/{installationId}",
     ...options,
     headers: {
       "Content-Type": "application/json",

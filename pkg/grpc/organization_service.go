@@ -6,14 +6,23 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 type OrganizationService struct {
 	authorizationService authorization.Authorization
+	registry             *registry.Registry
+	baseURL              string
 }
 
-func NewOrganizationService(authorizationService authorization.Authorization) *OrganizationService {
+func NewOrganizationService(
+	authorizationService authorization.Authorization,
+	registry *registry.Registry,
+	baseURL string,
+) *OrganizationService {
 	return &OrganizationService{
+		registry:             registry,
+		baseURL:              baseURL,
 		authorizationService: authorizationService,
 	}
 }
@@ -51,4 +60,44 @@ func (s *OrganizationService) ListInvitations(ctx context.Context, req *pb.ListI
 func (s *OrganizationService) RemoveInvitation(ctx context.Context, req *pb.RemoveInvitationRequest) (*pb.RemoveInvitationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.RemoveInvitation(ctx, s.authorizationService, orgID, req.InvitationId)
+}
+
+func (s *OrganizationService) ListApplications(ctx context.Context, req *pb.ListApplicationsRequest) (*pb.ListApplicationsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListApplications(ctx, s.registry, orgID)
+}
+
+func (s *OrganizationService) DescribeApplication(ctx context.Context, req *pb.DescribeApplicationRequest) (*pb.DescribeApplicationResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DescribeApplication(ctx, s.registry, orgID, req.InstallationId)
+}
+
+func (s *OrganizationService) InstallApplication(ctx context.Context, req *pb.InstallApplicationRequest) (*pb.InstallApplicationResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.InstallApplication(
+		ctx,
+		s.registry,
+		s.baseURL,
+		orgID,
+		req.AppName,
+		req.InstallationName,
+		req.Configuration,
+	)
+}
+
+func (s *OrganizationService) UpdateApplication(ctx context.Context, req *pb.UpdateApplicationRequest) (*pb.UpdateApplicationResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateApplication(
+		ctx,
+		s.registry,
+		s.baseURL,
+		orgID,
+		req.InstallationId,
+		req.Configuration.AsMap(),
+	)
+}
+
+func (s *OrganizationService) UninstallApplication(ctx context.Context, req *pb.UninstallApplicationRequest) (*pb.UninstallApplicationResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UninstallApplication(ctx, orgID, req.InstallationId)
 }

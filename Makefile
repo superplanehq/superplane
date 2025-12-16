@@ -50,6 +50,9 @@ test.e2e.setup:
 test.e2e:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --packages="$(E2E_TEST_PACKAGES)" -- -p 1
 
+test.e2e.single:
+	bash ./scripts/vscode_run_tests.sh $(FILE) $(LINE)
+
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
 
@@ -177,8 +180,8 @@ gen:
 	$(MAKE) format.go
 	$(MAKE) format.js
 
-MODULES := authorization,organizations,secrets,integrations,users,groups,roles,me,configuration,components,triggers,blueprints,workflows
-REST_API_MODULES := authorization,organizations,secrets,integrations,users,groups,roles,me,configuration,components,triggers,blueprints,workflows
+MODULES := authorization,organizations,applications,secrets,integrations,users,groups,roles,me,configuration,components,triggers,blueprints,workflows
+REST_API_MODULES := authorization,organizations,applications,secrets,integrations,users,groups,roles,me,configuration,components,triggers,blueprints,workflows
 pb.gen:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)

@@ -110,9 +110,9 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	}
 }
 
-func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
+func startInternalAPI(baseURL string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(encryptor, authService, registry, lookupInternalAPIPort())
+	grpc.RunServer(baseURL, encryptor, authService, registry, lookupInternalAPIPort())
 }
 
 func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
@@ -281,7 +281,7 @@ func Start() {
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(encryptorInstance, authService, registry)
+		go startInternalAPI(baseURL, encryptorInstance, authService, registry)
 	}
 
 	startWorkers(jwtSigner, encryptorInstance, registry, baseURL, authService)

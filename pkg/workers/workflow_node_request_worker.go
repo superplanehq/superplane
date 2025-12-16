@@ -10,13 +10,12 @@ import (
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/triggers"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
@@ -125,7 +124,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Wor
 		return fmt.Errorf("action '%s' not found for trigger '%s'", actionName, trigger.Name())
 	}
 
-	actionCtx := triggers.TriggerActionContext{
+	actionCtx := core.TriggerActionContext{
 		Name:            actionName,
 		Parameters:      spec.InvokeAction.Parameters,
 		Configuration:   node.Configuration.Data(),
@@ -182,7 +181,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
 	}
 
-	actionCtx := components.ActionContext{
+	actionCtx := core.ActionContext{
 		Name:                  actionName,
 		Configuration:         node.Configuration.Data(),
 		Parameters:            spec.InvokeAction.Parameters,
@@ -243,7 +242,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
 	}
 
-	actionCtx := components.ActionContext{
+	actionCtx := core.ActionContext{
 		Name:                  actionName,
 		Configuration:         childNode.Configuration,
 		Parameters:            spec.InvokeAction.Parameters,
@@ -270,7 +269,7 @@ func (w *NodeRequestWorker) log(format string, v ...any) {
 	log.Printf("[NodeRequestWorker] "+format, v...)
 }
 
-func findAction(actions []components.Action, actionName string) *components.Action {
+func findAction(actions []core.Action, actionName string) *core.Action {
 	for _, action := range actions {
 		if action.Name == actionName {
 			return &action

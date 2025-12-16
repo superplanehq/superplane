@@ -1,4 +1,4 @@
-package components
+package core
 
 import (
 	"time"
@@ -90,6 +90,11 @@ type Component interface {
 	HandleAction(ctx ActionContext) error
 
 	/*
+	 * Handler for webhooks.
+	 */
+	HandleWebhook(ctx WebhookRequestContext) (int, error)
+
+	/*
 	 * Cancel allows components to handle cancellation of executions.
 	 * Default behavior does nothing. Components can override to perform
 	 * cleanup or cancel external resources.
@@ -108,15 +113,17 @@ type OutputChannel struct {
  * to control the state and metadata of each execution of it.
  */
 type ExecutionContext struct {
-	ID                    string
-	WorkflowID            string
-	Data                  any
-	Configuration         any
-	MetadataContext       MetadataContext
-	ExecutionStateContext ExecutionStateContext
-	RequestContext        RequestContext
-	AuthContext           AuthContext
-	IntegrationContext    IntegrationContext
+	ID                     string
+	WorkflowID             string
+	Data                   any
+	Configuration          any
+	MetadataContext        MetadataContext
+	NodeMetadataContext    MetadataContext
+	ExecutionStateContext  ExecutionStateContext
+	RequestContext         RequestContext
+	AuthContext            AuthContext
+	IntegrationContext     IntegrationContext
+	AppInstallationContext AppInstallationContext
 }
 
 /*
@@ -124,11 +131,12 @@ type ExecutionContext struct {
  * to control the state and metadata of each execution of it.
  */
 type SetupContext struct {
-	Configuration      any
-	MetadataContext    MetadataContext
-	RequestContext     RequestContext
-	AuthContext        AuthContext
-	IntegrationContext IntegrationContext
+	Configuration          any
+	MetadataContext        MetadataContext
+	RequestContext         RequestContext
+	AuthContext            AuthContext
+	IntegrationContext     IntegrationContext
+	AppInstallationContext AppInstallationContext
 }
 
 /*
@@ -136,6 +144,11 @@ type SetupContext struct {
  */
 type IntegrationContext interface {
 	GetIntegration(ID string) (integrations.ResourceManager, error)
+}
+
+type Webhook struct {
+	ID            uuid.UUID
+	Configuration any
 }
 
 /*
@@ -154,6 +167,7 @@ type ExecutionStateContext interface {
 	IsFinished() bool
 	Pass(outputs map[string][]any) error
 	Fail(reason, message string) error
+	SetKV(key, value string) error
 }
 
 /*
@@ -183,14 +197,15 @@ type Action struct {
  * and control the state and metadata of each execution of it.
  */
 type ActionContext struct {
-	Name                  string
-	Configuration         any
-	Parameters            map[string]any
-	MetadataContext       MetadataContext
-	ExecutionStateContext ExecutionStateContext
-	AuthContext           AuthContext
-	RequestContext        RequestContext
-	IntegrationContext    IntegrationContext
+	Name                   string
+	Configuration          any
+	Parameters             map[string]any
+	MetadataContext        MetadataContext
+	ExecutionStateContext  ExecutionStateContext
+	AuthContext            AuthContext
+	RequestContext         RequestContext
+	IntegrationContext     IntegrationContext
+	AppInstallationContext AppInstallationContext
 }
 
 /*

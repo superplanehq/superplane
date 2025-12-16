@@ -6,11 +6,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type MockExecutionStateContext struct {
 	mock.Mock
+}
+
+func (m *MockExecutionStateContext) SetKV(key, value string) error {
+	args := m.Called(key, value)
+	return args.Error(0)
 }
 
 func (m *MockExecutionStateContext) Pass(outputs map[string][]any) error {
@@ -70,7 +75,7 @@ func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 
 			mockExecStateCtx.On("Pass", tt.expectedOutputs).Return(nil)
 
-			ctx := components.ExecutionContext{
+			ctx := core.ExecutionContext{
 				Data:                  tt.inputData,
 				Configuration:         tt.configuration,
 				ExecutionStateContext: mockExecStateCtx,
@@ -90,7 +95,7 @@ func TestFilter_Execute_InvalidExpression_ShouldReturnError(t *testing.T) {
 
 	mockExecStateCtx := &MockExecutionStateContext{}
 
-	ctx := components.ExecutionContext{
+	ctx := core.ExecutionContext{
 		Data:                  map[string]any{"test": "value"},
 		Configuration:         map[string]any{"expression": "invalid expression syntax +++"},
 		ExecutionStateContext: mockExecStateCtx,
@@ -106,7 +111,7 @@ func TestFilter_Execute_NonBooleanResult_ShouldReturnError(t *testing.T) {
 
 	mockExecStateCtx := &MockExecutionStateContext{}
 
-	ctx := components.ExecutionContext{
+	ctx := core.ExecutionContext{
 		Data:                  map[string]any{"test": "value"},
 		Configuration:         map[string]any{"expression": "$.test"},
 		ExecutionStateContext: mockExecStateCtx,

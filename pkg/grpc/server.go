@@ -11,6 +11,7 @@ import (
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	apppb "github.com/superplanehq/superplane/pkg/protos/applications"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -50,7 +51,7 @@ func sentryRecoveryHandler(p any) error {
 	return status.Errorf(codes.Internal, "internal server error")
 }
 
-func RunServer(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, port int) {
+func RunServer(baseURL string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, port int) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)
 	lis, err := net.Listen("tcp", endpoint)
 
@@ -84,7 +85,7 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 	//
 	// Initialize services exposed by this server.
 	//
-	organizationService := NewOrganizationService(authService)
+	organizationService := NewOrganizationService(authService, registry, baseURL)
 	organizationPb.RegisterOrganizationsServer(grpcServer, organizationService)
 
 	userService := NewUsersService(authService)
@@ -116,6 +117,9 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 
 	workflowService := NewWorkflowService(authService, registry, encryptor)
 	pbWorkflows.RegisterWorkflowsServer(grpcServer, workflowService)
+
+	applicationService := NewApplicationService(encryptor, registry)
+	apppb.RegisterApplicationsServer(grpcServer, applicationService)
 
 	reflection.Register(grpcServer)
 
