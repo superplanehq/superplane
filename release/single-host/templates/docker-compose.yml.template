@@ -1,0 +1,105 @@
+version: "3.9"
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: always
+    command: tunnel --no-autoupdate --url http://app:8000
+    depends_on:
+      - app
+
+  app:
+    image: __SUPERPLANE_IMAGE__
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      DB_NAME: "superplane_dev"
+      DB_USERNAME: "postgres"
+      DB_POOL_SIZE: "2"
+      POSTGRES_DB_SSL: "false"
+      APP_ENV: development
+      APPLICATION_NAME: "superplane"
+      DB_PASSWORD: ${DB_PASSWORD}
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+      SWAGGER_BASE_PATH: "/app/api/swagger"
+      RBAC_MODEL_PATH: "/app/rbac/rbac_model.conf"
+      RBAC_ORG_POLICY_PATH: "/app/rbac/rbac_org_policy.csv"
+      GOCACHE: "/app/tmp/go-build"
+      XDG_CACHE_HOME: "/app/tmp"
+      PLAYWRIGHT_BROWSERS_PATH: "/app/tmp/ms-playwright"
+      START_PUBLIC_API: "yes"
+      START_INTERNAL_API: "yes"
+      START_GRPC_GATEWAY: "yes"
+      START_CONSUMERS: "yes"
+      PUBLIC_API_BASE_PATH: /api/v1
+      START_WEB_SERVER: "yes"
+      START_EVENT_DISTRIBUTER: "yes"
+      START_WORKFLOW_EVENT_ROUTER: "yes"
+      START_WORKFLOW_NODE_EXECUTOR: "yes"
+      START_WORKFLOW_NODE_QUEUE_WORKER: "yes"
+      START_NODE_REQUEST_WORKER: "yes"
+      START_WEBHOOK_PROVISIONER: "yes"
+      START_WEBHOOK_CLEANUP_WORKER: "yes"
+      START_WORKFLOW_CLEANUP_WORKER: "yes"
+      WEB_BASE_PATH: ""
+      SENTRY_DSN: ""
+      SENTRY_ENVIRONMENT: "development"
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      NO_ENCRYPTION: "yes"
+      SESSION_SECRET: ${SESSION_SECRET}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      BASE_URL: ${BASE_URL}
+      TEMPLATE_DIR: "/app/templates"
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS}
+      BLOCK_SIGNUP: ${BLOCK_SIGNUP}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - superplane-media:/app/media
+      - superplane-tmp:/app/tmp
+
+  db:
+    image: postgres:17.5
+    restart: "on-failure"
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.8.17-management-alpine
+    container_name: "rabbitmq"
+    restart: "on-failure"
+    ports:
+      - 5672:5672
+      - 15672:15672
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  superplane-media:
+    driver: local
+  superplane-tmp:
+    driver: local
+  postgres-data:
+    driver: local

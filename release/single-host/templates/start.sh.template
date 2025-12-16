@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BLUE="\033[0;34m"
+LBLUE="\033[1;34m"
+CLEAR="\033[0m"
+
+echo -e ""
+echo -e "${BLUE}   =====${LBLUE} Superplane Local Trial ${BLUE}===== ${CLEAR}"
+echo -e ""
+echo -e "This script will prepare and start a Docker Compose setup for running Superplane"
+echo -e "on a single machine, exposed to the internet via a Cloudflare quick tunnel."
+echo -e ""
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker is required but not installed. Aborting."
+  exit 1
+fi
+
+if ! command -v docker compose >/dev/null 2>&1 && ! docker-compose version >/dev/null 2>&1; then
+  echo "docker compose or docker-compose is required but not installed. Aborting."
+  exit 1
+fi
+
+echo ""
+echo "Generating secrets..."
+
+DB_PASSWORD=$(openssl rand -hex 24)
+ENCRYPTION_KEY=$(openssl rand -hex 32 | cut -c1-32)
+JWT_SECRET=$(openssl rand -hex 32 | cut -c1-32)
+SESSION_SECRET=$(openssl rand -hex 32 | cut -c1-32)
+GITHUB_CLIENT_ID=""
+GITHUB_CLIENT_SECRET=""
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+
+BASE_URL="http://localhost:8000"
+
+cat > superplane.env <<EOF
+DB_PASSWORD="${DB_PASSWORD}"
+ENCRYPTION_KEY="${ENCRYPTION_KEY}"
+JWT_SECRET="${JWT_SECRET}"
+SESSION_SECRET="${SESSION_SECRET}"
+
+GITHUB_CLIENT_ID="${GITHUB_CLIENT_ID}"
+GITHUB_CLIENT_SECRET="${GITHUB_CLIENT_SECRET}"
+GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}"
+GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}"
+
+BASE_URL="${BASE_URL}"
+EOF
+
+echo ""
+echo "Environment written to superplane.env"
+echo ""
+echo "Starting Superplane with Docker Compose..."
+echo ""
+docker compose --env-file superplane.env up -d
+
+echo ""
+echo "Superplane is starting."
+echo "- Local access: ${BASE_URL}"
+
+echo ""
+echo "Waiting for Cloudflare tunnel URL..."
+
+CONTAINER_ID=$(docker compose ps -q cloudflared || true)
+
+if [ -z "${CONTAINER_ID}" ]; then
+  echo "Could not find cloudflared container. Check 'docker compose ps'."
+  exit 1
+fi
+
+URL=""
+
+for i in {1..30}; do
+  URL=$(docker logs "${CONTAINER_ID}" 2>&1 | grep -Eo 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' | head -n 1 || true)
+  if [ -n "${URL}" ]; then
+    break
+  fi
+  sleep 2
+done
+
+if [ -n "${URL}" ]; then
+  echo ""
+  echo "Cloudflare tunnel URL:"
+  echo "  ${URL}"
+  echo ""
+
+  # Update BASE_URL in superplane.env to use the tunnel URL
+  if [ -f superplane.env ]; then
+    if grep -q "^BASE_URL=" superplane.env; then
+      # macOS/BSD-compatible in-place sed
+      sed -i '' "s#^BASE_URL=.*#BASE_URL=\"${URL}\"#" superplane.env
+    else
+      echo "BASE_URL=\"${URL}\"" >> superplane.env
+    fi
+  fi
+
+  echo "Updated BASE_URL in superplane.env to:"
+  echo "  ${URL}"
+else
+  echo ""
+  echo "Cloudflare tunnel URL not detected yet. You can check it manually with:"
+  echo "  docker logs ${CONTAINER_ID}"
+fi
