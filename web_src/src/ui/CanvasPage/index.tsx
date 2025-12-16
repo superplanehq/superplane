@@ -392,9 +392,13 @@ function CanvasPage(props: CanvasPageProps) {
       // Add the new node first
       state.setNodes((nodes) => [...nodes, placeholderNode]);
 
-      // Only select and set as template if there isn't already a templateNodeId
-      // This prevents overwriting the active template when creating multiple pending nodes
-      if (!templateNodeId) {
+      // Check if current template is a configured template (not just pending connection)
+      const currentTemplateNode = templateNodeId ? state.nodes.find((n) => n.id === templateNodeId) : null;
+      const isCurrentTemplateConfigured = currentTemplateNode?.data?.isTemplate && !currentTemplateNode?.data?.isPendingConnection;
+
+      // Only select and set as template if there isn't a configured template being created
+      // Allow switching between pending nodes, but prevent overwriting configured templates
+      if (!isCurrentTemplateConfigured) {
         // Then update all nodes to set selection (deselect others, select the new one)
         // This needs to happen in a separate setNodes call to ensure ReactFlow processes the selection
         setTimeout(() => {
@@ -409,7 +413,7 @@ function CanvasPage(props: CanvasPageProps) {
         console.log('[DEBUG] Setting templateNodeId to:', pendingNodeId);
         setTemplateNodeId(pendingNodeId);
       } else {
-        console.log('[DEBUG] Skipping selection/template update, templateNodeId already set to:', templateNodeId);
+        console.log('[DEBUG] Skipping selection/template update, configured template in progress:', templateNodeId);
       }
 
       // Create edge locally (not via parent) - it will be preserved by useCanvasState
@@ -440,8 +444,34 @@ function CanvasPage(props: CanvasPageProps) {
       setTemplateNodeId(nodeId);
       // Open the BuildingBlocksSidebar so user can select a component
       setIsBuildingBlocksSidebarOpen(true);
+      // Close ComponentSidebar since pending nodes don't have configuration yet
+      state.componentSidebar.close();
     },
-    [setTemplateNodeId, setIsBuildingBlocksSidebarOpen],
+    [setTemplateNodeId, setIsBuildingBlocksSidebarOpen, state.componentSidebar],
+  );
+
+  const handleTemplateNodeClick = useCallback(
+    (nodeId: string) => {
+      console.log('[DEBUG] handleTemplateNodeClick called with nodeId:', nodeId);
+      const templateNode = state.nodes.find((n) => n.id === nodeId);
+      if (!templateNode) return;
+
+      const buildingBlock = templateNode.data.buildingBlock as BuildingBlock;
+
+      // Restore template state from the node - including sourceConnection and position
+      setTemplateNodeId(nodeId);
+      setNewNodeData({
+        buildingBlock: buildingBlock,
+        nodeName: (templateNode.data.nodeName || buildingBlock?.name || 'New Component') as string,
+        icon: (templateNode.data.icon || buildingBlock?.icon || 'Box') as string,
+        configuration: templateNode.data.configuration || {},
+        position: templateNode.position,
+        sourceConnection: templateNode.data.sourceConnection as { nodeId: string; handleId: string | null } | undefined,
+      });
+      // Open ComponentSidebar for configuration
+      state.componentSidebar.open(nodeId);
+    },
+    [state, setTemplateNodeId, setNewNodeData],
   );
 
   const handleBuildingBlockClick = useCallback(
@@ -477,6 +507,10 @@ function CanvasPage(props: CanvasPageProps) {
                   buildingBlock: block,
                   tempConfiguration: {},
                   tempNodeName: block.name || "",
+                  sourceConnection: pendingNode.data.sourceConnection, // Preserve sourceConnection for later
+                  configuration: {},
+                  nodeName: block.name || "",
+                  icon: block.icon,
                 },
               }
             : n,
@@ -570,49 +604,69 @@ function CanvasPage(props: CanvasPageProps) {
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, any>, nodeName: string) => {
       if (templateNodeId && newNodeData) {
-        // This is a template node being saved
-        handleSaveNewNode(configuration, nodeName);
+        // Check if this template was created from a pending connection (should create real node)
+        // vs just editing an existing template (should update in place)
+        const hasSourceConnection = !!newNodeData.sourceConnection;
+
+        if (hasSourceConnection) {
+          // This template was created from dragging an edge - convert to real node
+          // Remove the template node first
+          state.setNodes((nodes) => nodes.filter((node) => node.id !== templateNodeId));
+
+          // Remove edges connected to the template node (they'll be recreated by parent if needed)
+          state.setEdges(state.edges.filter((edge) => edge.source !== templateNodeId && edge.target !== templateNodeId));
+
+          // Create the real node through the normal flow
+          if (props.onNodeAdd) {
+            props.onNodeAdd({
+              buildingBlock: newNodeData.buildingBlock,
+              nodeName,
+              configuration,
+              position: newNodeData.position,
+              sourceConnection: newNodeData.sourceConnection,
+            });
+          }
+
+          // Clear template state
+          setTemplateNodeId(null);
+          setNewNodeData(null);
+
+          // Close sidebar and reset tab
+          state.componentSidebar.close();
+          setCurrentTab("latest");
+        } else {
+          // This is an existing template being edited - just update in place
+          state.setNodes((nodes) =>
+            nodes.map((node) =>
+              node.id === templateNodeId
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      configuration,
+                      nodeName,
+                    },
+                  }
+                : node,
+            ),
+          );
+          // Clear template state and close sidebar
+          setTemplateNodeId(null);
+          setNewNodeData(null);
+          state.componentSidebar.close();
+          setCurrentTab("latest");
+        }
       } else if (editingNodeData && props.onNodeConfigurationSave) {
         props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName);
       }
     },
-    [templateNodeId, newNodeData, editingNodeData, props],
-  );
-
-  const handleSaveNewNode = useCallback(
-    (configuration: Record<string, any>, nodeName: string) => {
-      if (newNodeData && props.onNodeAdd && templateNodeId) {
-        // Remove the template node first
-        state.setNodes((nodes) => nodes.filter((node) => node.id !== templateNodeId));
-
-        // Remove edges connected to the template node (they'll be recreated by parent if needed)
-        state.setEdges(state.edges.filter((edge) => edge.source !== templateNodeId && edge.target !== templateNodeId));
-
-        // Create the real node through the normal flow
-        props.onNodeAdd({
-          buildingBlock: newNodeData.buildingBlock,
-          nodeName,
-          configuration,
-          position: newNodeData.position,
-          sourceConnection: newNodeData.sourceConnection,
-        });
-
-        // Clear template state
-        setTemplateNodeId(null);
-        setNewNodeData(null);
-
-        // Close sidebar and reset tab
-        state.componentSidebar.close();
-        setCurrentTab("latest");
-      }
-    },
-    [newNodeData, props, templateNodeId, state],
+    [templateNodeId, newNodeData, editingNodeData, props, state, setTemplateNodeId, setNewNodeData, setCurrentTab],
   );
 
   const handleCancelTemplate = useCallback(() => {
     if (templateNodeId) {
-      state.setNodes((nodes) => nodes.filter((node) => node.id !== templateNodeId));
-
+      // Just close the sidebar and clear template state
+      // The node remains as a configured template so user can click it again to continue configuring
       setTemplateNodeId(null);
       setNewNodeData(null);
 
@@ -726,6 +780,7 @@ function CanvasPage(props: CanvasPageProps) {
               onBuildingBlocksSidebarToggle={handleSidebarToggle}
               onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
               onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
+              onTemplateNodeClick={handleTemplateNodeClick}
               onZoomChange={setCanvasZoom}
               hasFitToViewRef={hasFitToViewRef}
               viewportRefProp={props.viewportRef}
@@ -1130,6 +1185,7 @@ function CanvasContent({
   runDisabled,
   runDisabledTooltip,
   onPendingConnectionNodeClick,
+  onTemplateNodeClick,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1157,6 +1213,7 @@ function CanvasContent({
   runDisabled?: boolean;
   runDisabledTooltip?: string;
   onPendingConnectionNodeClick?: (nodeId: string) => void;
+  onTemplateNodeClick?: (nodeId: string) => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1188,33 +1245,43 @@ function CanvasContent({
     (nodeId: string) => {
       console.log('[DEBUG] handleNodeClick called with nodeId:', nodeId, 'current templateNodeId:', templateNodeId);
 
+      // Check if this is a pending connection node
+      const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
+      const isPendingConnection = clickedNode?.data?.isPendingConnection;
+      console.log('[DEBUG] clicked node isPendingConnection:', isPendingConnection);
+
       // Check if the current template is a configured template (not just pending connection)
       const currentTemplateNode = templateNodeId ? stateRef.current.nodes?.find((n) => n.id === templateNodeId) : null;
       const isCurrentTemplateConfigured = currentTemplateNode?.data?.isTemplate && !currentTemplateNode?.data?.isPendingConnection;
       console.log('[DEBUG] current template node:', currentTemplateNode?.id, 'isConfigured:', isCurrentTemplateConfigured);
 
-      // Don't allow switching nodes if there's a configured template being created
-      if (isCurrentTemplateConfigured && nodeId !== templateNodeId) {
-        console.log('[DEBUG] BLOCKING click - configured template in progress');
+      // Allow switching to pending connection nodes even if there's a configured template
+      // But block switching to other regular/configured nodes
+      if (isCurrentTemplateConfigured && nodeId !== templateNodeId && !isPendingConnection) {
+        console.log('[DEBUG] BLOCKING click - configured template in progress, can only switch to pending nodes');
         return;
       }
-
-      // Check if this is a pending connection node
-      const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
-      const isPendingConnection = clickedNode?.data?.isPendingConnection;
-      console.log('[DEBUG] clicked node isPendingConnection:', isPendingConnection);
 
       if (isPendingConnection && onPendingConnectionNodeClick) {
         console.log('[DEBUG] Calling onPendingConnectionNodeClick with', nodeId);
         // Notify parent that a pending connection node was clicked
         onPendingConnectionNodeClick(nodeId);
       } else {
-        // Regular node click
-        stateRef.current.componentSidebar.open(nodeId);
+        // Check if this is a template node
+        const isTemplateNode = clickedNode?.data?.isTemplate && !clickedNode?.data?.isPendingConnection;
 
-        // Close building blocks sidebar when clicking on a regular node
-        if (onBuildingBlocksSidebarToggle) {
-          onBuildingBlocksSidebarToggle(false);
+        if (isTemplateNode && onTemplateNodeClick) {
+          console.log('[DEBUG] Clicked on template node, calling onTemplateNodeClick');
+          // Notify parent to restore template state
+          onTemplateNodeClick(nodeId);
+        } else {
+          // Regular node click
+          stateRef.current.componentSidebar.open(nodeId);
+
+          // Close building blocks sidebar when clicking on a regular node
+          if (onBuildingBlocksSidebarToggle) {
+            onBuildingBlocksSidebarToggle(false);
+          }
         }
       }
 
@@ -1225,7 +1292,7 @@ function CanvasContent({
         })),
       );
     },
-    [templateNodeId, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick],
+    [templateNodeId, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, onTemplateNodeClick],
   );
 
   const onRunRef = useRef(onRun);
