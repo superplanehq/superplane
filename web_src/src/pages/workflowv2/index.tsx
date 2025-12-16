@@ -32,7 +32,6 @@ import {
   workflowKeys,
 } from "@/hooks/useWorkflowData";
 import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
-import { flattenObject } from "@/lib/utils";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 import {
   CANVAS_SIDEBAR_STORAGE_KEY,

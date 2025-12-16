@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef } from "react";
 import { resolveIcon, flattenObject } from "@/lib/utils";
-import { ChainItem, type ChainItemData, type ChildExecution } from "../../chainItem";
+import { ChainItem, type ChainItemData } from "../../chainItem";
 import { SidebarEventItem } from "../SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "../types";
 import {
@@ -12,6 +12,7 @@ import {
   BlueprintsBlueprint,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../../componentBase";
+import { ChildExecution } from "@/ui/chainItem/ChainItem";
 function buildExecutionTabData(
   execution: WorkflowsWorkflowNodeExecution,
   _workflowNode: ComponentsNode,
