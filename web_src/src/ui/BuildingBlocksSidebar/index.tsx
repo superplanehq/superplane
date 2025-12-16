@@ -4,10 +4,11 @@ import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { resolveIcon } from "@/lib/utils";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { ChevronRight, GripVerticalIcon, Menu, PanelLeftClose, Settings2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ChevronRight, GripVerticalIcon, Menu, Settings2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { createNodeDragPreview } from "./createNodeDragPreview";
+import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 
 export interface BuildingBlock {
   name: string;
@@ -48,7 +49,7 @@ export function BuildingBlocksSidebar({
         variant="outline"
         onClick={() => onToggle(true)}
         aria-label="Open sidebar"
-        className="absolute top-4 left-4 z-10"
+        className="absolute top-4 right-4 z-10"
       >
         <Menu size={16} />
         Components
@@ -58,6 +59,13 @@ export function BuildingBlocksSidebar({
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
+    return saved ? parseInt(saved, 10) : 450;
+  });
+  const [isResizing, setIsResizing] = useState(false);
 
   // Initialize showWip from localStorage
   const [showWip, setShowWip] = useState(() => {
@@ -72,6 +80,77 @@ export function BuildingBlocksSidebar({
   useEffect(() => {
     localStorage.setItem("buildingBlocksShowWip", JSON.stringify(showWip));
   }, [showWip]);
+
+  // Close sidebar when clicking outside (for clicks in header, etc.)
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Don't close if we're dragging or resizing
+      if (isDraggingRef.current || isResizing) {
+        return;
+      }
+
+      // Don't close if clicking on the toggle button (it has its own handler)
+      const target = event.target as HTMLElement;
+      if (target.closest('[aria-label="Open sidebar"]')) {
+        return;
+      }
+
+      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+        onToggle(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen, onToggle, isResizing]);
+
+  // Save sidebar width to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  // Handle resize mouse events
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+
+      const newWidth = window.innerWidth - e.clientX;
+      // Set min width to 320px and max width to 600px
+      const clampedWidth = Math.max(320, Math.min(600, newWidth));
+      setSidebarWidth(clampedWidth);
+    },
+    [isResizing],
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "ew-resize";
+      document.body.style.userSelect = "none";
+
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+    }
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
   const categoryOrder: Record<string, number> = {
     Primitives: 0,
@@ -92,10 +171,42 @@ export function BuildingBlocksSidebar({
 
   return (
     <div
-      className="absolute left-0 top-0 z-20 w-[360px] h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col shadow-2xl"
+      ref={sidebarRef}
+      className="absolute right-0 top-0 z-20 h-full bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 flex flex-col shadow-2xl"
+      style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
       data-testid="building-blocks-sidebar"
     >
-      <div className="flex items-center gap-2 px-4 py-4 relative">
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleMouseDown}
+        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-blue-50 transition-colors flex items-center justify-center group ${
+          isResizing ? "bg-blue-50" : ""
+        }`}
+        style={{ marginLeft: "-8px" }}
+      >
+        <div
+          className={`w-1 h-12 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
+            isResizing ? "bg-blue-500" : ""
+          }`}
+        />
+      </div>
+
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-border bg-gray-50">
+        <div className="flex flex-col items-start gap-3 w-full mt-2">
+          <div className="flex justify-between gap-3 w-full">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-semibold">New Component</h2>
+            </div>
+          </div>
+          <div onClick={() => onToggle(false)} className="flex items-center justify-center absolute top-6 right-3 cursor-pointer">
+            <X size={18} />
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Settings */}
+      <div className="flex items-center gap-2 px-3 py-3 border-b-1 border-border">
         <div className="flex-1">
           <input
             type="text"
@@ -105,26 +216,21 @@ export function BuildingBlocksSidebar({
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-3 pb-0">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsConfigOpen((v) => !v)}
-            aria-haspopup="menu"
-            aria-expanded={isConfigOpen}
-            aria-label="Configure"
-          >
-            <Settings2 size={20} />
-          </Button>
-          <Button variant="outline" size="icon" onClick={() => onToggle(false)} aria-label="Close sidebar">
-            <PanelLeftClose size={24} />
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setIsConfigOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={isConfigOpen}
+          aria-label="Configure"
+        >
+          <Settings2 size={20} />
+        </Button>
 
         {isConfigOpen && (
           <div
             role="menu"
-            className="absolute right-4 top-12 z-40 w-60 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg"
+            className="absolute right-4 top-24 z-40 w-60 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg"
           >
             <button
               className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
@@ -147,6 +253,7 @@ export function BuildingBlocksSidebar({
             canvasZoom={canvasZoom}
             showWip={showWip}
             searchTerm={searchTerm}
+            isDraggingRef={isDraggingRef}
           />
         ))}
 
@@ -156,7 +263,7 @@ export function BuildingBlocksSidebar({
             <TooltipTrigger asChild>
               <div className="absolute inset-0 bg-white/60 dark:bg-zinc-900/60 z-30 cursor-not-allowed" />
             </TooltipTrigger>
-            <TooltipContent side="right" sideOffset={10}>
+            <TooltipContent side="left" sideOffset={10}>
               <p>Finish configuring the selected component first</p>
             </TooltipContent>
           </Tooltip>
@@ -171,9 +278,10 @@ interface CategorySectionProps {
   canvasZoom: number;
   searchTerm?: string;
   showWip?: boolean;
+  isDraggingRef: React.RefObject<boolean>;
 }
 
-function CategorySection({ category, canvasZoom, searchTerm = "", showWip = false }: CategorySectionProps) {
+function CategorySection({ category, canvasZoom, searchTerm = "", showWip = false, isDraggingRef }: CategorySectionProps) {
   const query = searchTerm.trim().toLowerCase();
   const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
 
@@ -216,7 +324,11 @@ function CategorySection({ category, canvasZoom, searchTerm = "", showWip = fals
                   e.preventDefault();
                   return;
                 }
+                isDraggingRef.current = true;
                 createNodeDragPreview(e, block, colorClass, backgroundColorClass, canvasZoom);
+              }}
+              onDragEnd={() => {
+                isDraggingRef.current = false;
               }}
               aria-disabled={!isLive}
               title={isLive ? undefined : "Coming soon"}

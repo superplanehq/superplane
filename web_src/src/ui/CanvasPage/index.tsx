@@ -284,6 +284,8 @@ function CanvasPage(props: CanvasPageProps) {
       // Open the sidebar for this node (data will be automatically available via useMemo)
       if (!state.componentSidebar.isOpen || state.componentSidebar.selectedNodeId !== nodeId) {
         state.componentSidebar.open(nodeId);
+        // Close building blocks sidebar when component sidebar opens
+        setIsBuildingBlocksSidebarOpen(false);
       }
 
       // Switch to settings tab when edit is called
@@ -393,6 +395,8 @@ function CanvasPage(props: CanvasPageProps) {
 
       state.componentSidebar.open(newTemplateId);
       setCurrentTab("settings");
+      // Close building blocks sidebar when dropping a new component
+      setIsBuildingBlocksSidebarOpen(false);
     },
     [templateNodeId, state, setCurrentTab],
   );
@@ -549,6 +553,7 @@ function CanvasPage(props: CanvasPageProps) {
               runDisabled={props.runDisabled}
               runDisabledTooltip={props.runDisabledTooltip}
               onBuildingBlockDrop={handleBuildingBlockDrop}
+              onBuildingBlocksSidebarToggle={handleSidebarToggle}
               onZoomChange={setCanvasZoom}
               hasFitToViewRef={hasFitToViewRef}
               viewportRefProp={props.viewportRef}
@@ -944,6 +949,7 @@ function CanvasContent({
   onToggleView,
   onToggleCollapse,
   onBuildingBlockDrop,
+  onBuildingBlocksSidebarToggle,
   onZoomChange,
   hasFitToViewRef,
   viewportRefProp,
@@ -965,6 +971,7 @@ function CanvasContent({
   onToggleCollapse?: () => void;
   onDelete?: (nodeId: string) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
+  onBuildingBlocksSidebarToggle?: (open: boolean) => void;
   onZoomChange?: (zoom: number) => void;
   hasFitToViewRef: React.MutableRefObject<boolean>;
   viewportRefProp?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
@@ -1007,6 +1014,11 @@ function CanvasContent({
 
       stateRef.current.componentSidebar.open(nodeId);
 
+      // Close building blocks sidebar when clicking on a node
+      if (onBuildingBlocksSidebarToggle) {
+        onBuildingBlocksSidebarToggle(false);
+      }
+
       stateRef.current.setNodes((nodes) =>
         nodes.map((node) => ({
           ...node,
@@ -1014,7 +1026,7 @@ function CanvasContent({
         })),
       );
     },
-    [templateNodeId],
+    [templateNodeId, onBuildingBlocksSidebarToggle],
   );
 
   const onRunRef = useRef(onRun);
@@ -1116,6 +1128,11 @@ function CanvasContent({
 
     stateRef.current.componentSidebar.close();
 
+    // Also close building blocks sidebar when clicking on canvas
+    if (onBuildingBlocksSidebarToggle) {
+      onBuildingBlocksSidebarToggle(false);
+    }
+
     // Clear ReactFlow's selection state
     stateRef.current.setNodes((nodes) =>
       nodes.map((node) => ({
@@ -1123,7 +1140,7 @@ function CanvasContent({
         selected: false,
       })),
     );
-  }, [templateNodeId]);
+  }, [templateNodeId, onBuildingBlocksSidebarToggle]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
