@@ -48,7 +48,7 @@ function main() {
   const startOutput = path.join(bundlePath, "start.sh");
   const readmeOutput = path.join(bundlePath, "README.md");
 
-  const superplaneImage = `superplane/superplane:${version}`;
+  const superplaneImage = `us-east4-docker.pkg.dev/superplane-production/superplane-production/superplane:${version}`;
 
   renderTemplateWithVars(composeTemplate, composeOutput, {
     SUPERPLANE_IMAGE: superplaneImage,
