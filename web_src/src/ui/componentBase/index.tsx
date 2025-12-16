@@ -110,7 +110,7 @@ export interface ComponentBaseSpec {
   value?: any;
 }
 
-export type EventState = "success" | "failed" | "neutral" | "next-in-queue" | "running" | string;
+export type EventState = "success" | "failed" | "neutral" | "queued" | "running" | string;
 
 export interface EventStateStyle {
   icon: string;
@@ -122,33 +122,39 @@ export interface EventStateStyle {
 export type EventStateMap = Record<EventState, EventStateStyle>;
 
 export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
+  triggered: {
+    icon: "circle",
+    textColor: "text-black",
+    backgroundColor: "bg-violet-100",
+    badgeColor: "bg-violet-400",
+  },
   success: {
     icon: "circle-check",
-    textColor: "text-green-700",
+    textColor: "text-black",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   failed: {
     icon: "circle-x",
-    textColor: "text-red-700",
+    textColor: "text-black",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
   neutral: {
     icon: "circle",
-    textColor: "text-gray-500",
+    textColor: "text-black",
     backgroundColor: "bg-gray-50",
     badgeColor: "bg-gray-400",
   },
-  "next-in-queue": {
+  queued: {
     icon: "circle-dashed",
-    textColor: "text-gray-500",
-    backgroundColor: "bg-gray-50",
-    badgeColor: "bg-gray-400",
+    textColor: "text-black",
+    backgroundColor: "bg-orange-100",
+    badgeColor: "bg-yellow-600",
   },
   running: {
     icon: "refresh-cw",
-    textColor: "text-blue-800",
+    textColor: "text-black",
     backgroundColor: "bg-sky-100",
     badgeColor: "bg-blue-500",
   },

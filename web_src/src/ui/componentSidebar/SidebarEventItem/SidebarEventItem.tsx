@@ -86,15 +86,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const eventStateStyle: EventStateStyle = useMemo(() => {
     if (!getExecutionState) return DEFAULT_EVENT_STATE_MAP["neutral"];
 
-    if (event.kind === "queue") return DEFAULT_EVENT_STATE_MAP["next-in-queue"];
+    if (event.kind === "queue") return DEFAULT_EVENT_STATE_MAP["queued"];
 
     if (event.kind === "trigger") {
-      const triggerState = {
-        processed: "success",
-        discarded: "failed",
-      };
-      const state = triggerState[event.state as "processed" | "discarded"];
-      return DEFAULT_EVENT_STATE_MAP[state as EventState];
+      return DEFAULT_EVENT_STATE_MAP[event.state as EventState];
     }
 
     const { map, state } = getExecutionState(

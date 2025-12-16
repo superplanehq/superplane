@@ -32,7 +32,7 @@ export interface SidebarEvent {
   id: string;
   title: string;
   subtitle?: string | React.ReactNode;
-  state: "processed" | "discarded" | "waiting" | "running";
+  state: string;
   isOpen: boolean;
   receivedAt?: Date;
   values?: Record<string, string>;

@@ -311,27 +311,27 @@ function formatNextTrigger(configuration: ScheduleConfiguration, metadata?: { ne
 export const scheduleTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
     const eventDate = new Date(event.createdAt!);
-    const formattedDate = eventDate.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      timeZoneName: 'short'
+    const formattedDate = eventDate.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZoneName: "short",
     });
 
     return {
       title: `Schedule: ${formattedDate}`,
-      subtitle: event.id!,
+      subtitle: formatTimeAgo(eventDate),
     };
   },
 
   getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
     return {
-      "Result": "emitted",
-      "Readable date/time": event.data?.["Readable date"] as string || "n/a",
-      "Timestamp": event.data?.["timestamp"] as string || "n/a",
+      Result: "emitted",
+      "Readable date/time": (event.data?.["Readable date"] as string) || "n/a",
+      Timestamp: (event.data?.["timestamp"] as string) || "n/a",
     };
   },
 
@@ -356,21 +356,21 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventDate = new Date(lastEvent.createdAt!);
-      const formattedDate = eventDate.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        second: '2-digit',
-        timeZoneName: 'short'
+      const formattedDate = eventDate.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        timeZoneName: "short",
       });
 
       props.lastEventData = {
         title: `Schedule: ${formattedDate}`,
         subtitle: formatTimeAgo(new Date(lastEvent.createdAt!)),
         receivedAt: new Date(lastEvent.createdAt!),
-        state: "processed",
+        state: "triggered",
         eventId: lastEvent.id,
       };
     }

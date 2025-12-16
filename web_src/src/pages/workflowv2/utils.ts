@@ -6,7 +6,7 @@ import {
 } from "@/api-client";
 import { SidebarEvent } from "@/ui/CanvasPage";
 import { formatTimeAgo } from "@/utils/date";
-import { getComponentBaseMapper, getTriggerRenderer } from "./mappers";
+import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
 
 export function mapTriggerEventsToSidebarEvents(
   events: WorkflowsWorkflowEvent[],
@@ -23,7 +23,7 @@ export function mapTriggerEventsToSidebarEvents(
       id: event.id!,
       title,
       subtitle: subtitle || formatTimeAgo(new Date(event.createdAt!)),
-      state: "processed" as const,
+      state: "triggered" as const,
       isOpen: false,
       receivedAt: event.createdAt ? new Date(event.createdAt) : undefined,
       values,
@@ -42,20 +42,13 @@ export function mapExecutionsToSidebarEvents(
   additionalData?: unknown,
 ): SidebarEvent[] {
   const executionsToMap = limit ? executions.slice(0, limit) : executions;
-  return executionsToMap.map((execution) => {
-    const state =
-      execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
-        ? ("processed" as const)
-        : execution.state === "STATE_FINISHED" &&
-            (execution.result === "RESULT_FAILED" || execution.result === "RESULT_CANCELLED")
-          ? ("discarded" as const)
-          : execution.state === "STATE_STARTED"
-            ? ("running" as const)
-            : ("waiting" as const);
 
+  return executionsToMap.map((execution) => {
+    const currentComponentNode = nodes.find((n) => n.id === execution.nodeId);
+    const stateResolver = getState(currentComponentNode?.component?.name || "");
+    const state = stateResolver(execution);
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-    const currentComponentNode = nodes.find((n) => n.id === execution.nodeId);
 
     const componentSubtitle = getComponentBaseMapper(currentComponentNode?.component?.name || "").subtitle?.(
       currentComponentNode as ComponentsNode,
@@ -142,7 +135,7 @@ export function mapQueueItemsToSidebarEvents(
       id: item.id!,
       title,
       subtitle: subtitle || formatTimeAgo(new Date(item.createdAt!)),
-      state: "waiting" as const,
+      state: "queued" as const,
       isOpen: false,
       receivedAt: item.createdAt ? new Date(item.createdAt) : undefined,
       kind: "queue",

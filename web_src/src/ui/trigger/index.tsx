@@ -2,7 +2,7 @@ import React from "react";
 import { ComponentBase, type ComponentBaseProps, type EventSection } from "../componentBase";
 import { type MetadataItem } from "../metadataList";
 
-type LastEventState = "processed" | "discarded";
+type LastEventState = string;
 
 interface TriggerLastEventData {
   title: string;
@@ -21,12 +21,10 @@ export const Trigger: React.FC<TriggerProps> = ({ lastEventData, ...componentBas
   const eventSections: EventSection[] = React.useMemo(() => {
     if (!lastEventData) return [];
 
-    const eventState = lastEventData.state === "processed" ? "success" : "failed";
-
     return [
       {
         receivedAt: lastEventData.receivedAt,
-        eventState,
+        eventState: lastEventData.state,
         eventTitle: lastEventData.title,
         eventSubtitle: lastEventData.subtitle,
         eventId: lastEventData.eventId,

@@ -36,33 +36,33 @@ type ApprovalItem = {
 
 export const APPROVAL_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
-  "next-in-queue": {
+  waiting: {
     icon: "clock",
-    textColor: "text-amber-700",
-    backgroundColor: "bg-amber-100",
-    badgeColor: "bg-amber-500",
+    textColor: "text-black",
+    backgroundColor: "bg-orange-100",
+    badgeColor: "bg-yellow-600",
   },
-  success: {
+  approved: {
     icon: "circle-check",
-    textColor: "text-green-700",
+    textColor: "text-black",
     backgroundColor: "bg-green-200",
     badgeColor: "bg-emerald-500",
   },
-  failed: {
+  rejected: {
     icon: "circle-x",
-    textColor: "text-red-700",
+    textColor: "text-black",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
   error: {
     icon: "triangle-alert",
-    textColor: "text-red-700",
+    textColor: "text-black",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
   running: {
     icon: "clock",
-    textColor: "text-amber-700",
+    textColor: "text-black",
     backgroundColor: "bg-amber-100",
     badgeColor: "bg-amber-500",
   },
@@ -74,31 +74,31 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
 export const approvalStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
   // Error state - component could not evaluate or apply approval logic
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED") {
-    return "error"; // Using neutral for error state with triangle-alert icon
+    return "error";
   }
 
   // Waiting state - some or all required actors have not yet responded
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
-    return "next-in-queue"; // Using next-in-queue for waiting state with clock icon
+    return "waiting";
   }
 
   // Check execution outputs for approval/rejection decision
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
     const metadata = execution.metadata as Record<string, any> | undefined;
     if (metadata?.result === "approved") {
-      return "success";
+      return "approved";
     }
 
     if (metadata?.result === "rejected") {
-      return "failed";
+      return "rejected";
     }
 
     // Default to success if finished and passed but no specific result
-    return "success";
+    return "approved";
   }
 
   // Default fallback
-  return "failed";
+  return "error";
 };
 
 /**
