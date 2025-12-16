@@ -4,11 +4,11 @@ import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { resolveIcon } from "@/lib/utils";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { ChevronRight, GripVerticalIcon, Menu, X } from "lucide-react";
+import { ChevronRight, GripVerticalIcon, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
-import { createNodeDragPreview } from "./createNodeDragPreview";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
+import { ComponentBase } from "../componentBase";
 
 export interface BuildingBlock {
   name: string;
@@ -51,7 +51,7 @@ export function BuildingBlocksSidebar({
         aria-label="Open sidebar"
         className="absolute top-4 right-4 z-10"
       >
-        <Menu size={16} />
+        <Plus size={16} />
         Components
       </Button>
     );
@@ -65,6 +65,8 @@ export function BuildingBlocksSidebar({
     return saved ? parseInt(saved, 10) : 450;
   });
   const [isResizing, setIsResizing] = useState(false);
+  const [hoveredBlock, setHoveredBlock] = useState<BuildingBlock | null>(null);
+  const dragPreviewRef = useRef<HTMLDivElement>(null);
 
   // Close sidebar when clicking outside (for clicks in header, etc.)
   useEffect(() => {
@@ -211,6 +213,8 @@ export function BuildingBlocksSidebar({
             canvasZoom={canvasZoom}
             searchTerm={searchTerm}
             isDraggingRef={isDraggingRef}
+            setHoveredBlock={setHoveredBlock}
+            dragPreviewRef={dragPreviewRef}
           />
         ))}
 
@@ -226,6 +230,30 @@ export function BuildingBlocksSidebar({
           </Tooltip>
         )}
       </div>
+
+      {/* Hidden drag preview - pre-rendered and ready for drag */}
+      <div
+        ref={dragPreviewRef}
+        style={{
+          position: "absolute",
+          top: "-10000px",
+          left: "-10000px",
+          pointerEvents: "none",
+        }}
+      >
+        {hoveredBlock && (
+          <ComponentBase
+            title={hoveredBlock.label || hoveredBlock.name || "New Component"}
+            headerColor="bg-gray-50"
+            iconSlug={hoveredBlock.icon}
+            iconColor={getColorClass(hoveredBlock.color)}
+            collapsedBackground={getBackgroundColorClass("white")}
+            hideActionsButton={true}
+            includeEmptyState={true}
+            collapsed={false}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -235,9 +263,18 @@ interface CategorySectionProps {
   canvasZoom: number;
   searchTerm?: string;
   isDraggingRef: React.RefObject<boolean>;
+  setHoveredBlock: (block: BuildingBlock | null) => void;
+  dragPreviewRef: React.RefObject<HTMLDivElement | null>;
 }
 
-function CategorySection({ category, canvasZoom, searchTerm = "", isDraggingRef }: CategorySectionProps) {
+function CategorySection({
+  category,
+  canvasZoom,
+  searchTerm = "",
+  isDraggingRef,
+  setHoveredBlock,
+  dragPreviewRef,
+}: CategorySectionProps) {
   const query = searchTerm.trim().toLowerCase();
   const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
 
@@ -268,7 +305,6 @@ function CategorySection({ category, canvasZoom, searchTerm = "", isDraggingRef 
           const iconSlug = block.icon || "zap";
           const IconComponent = resolveIcon(iconSlug);
           const colorClass = getColorClass(block.color);
-          const backgroundColorClass = getBackgroundColorClass(block.color);
 
           const isLive = !!block.isLive;
           return (
@@ -276,16 +312,63 @@ function CategorySection({ category, canvasZoom, searchTerm = "", isDraggingRef 
               data-testid={toTestId(`building-block-${block.name}`)}
               key={`${block.type}-${block.name}`}
               draggable={isLive}
+              onMouseEnter={() => {
+                if (isLive) {
+                  setHoveredBlock(block);
+                }
+              }}
+              onMouseLeave={() => {
+                setHoveredBlock(null);
+              }}
               onDragStart={(e) => {
                 if (!isLive) {
                   e.preventDefault();
                   return;
                 }
                 isDraggingRef.current = true;
-                createNodeDragPreview(e, block, colorClass, backgroundColorClass, canvasZoom);
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("application/reactflow", JSON.stringify(block));
+
+                // Use the pre-rendered drag preview
+                const previewElement = dragPreviewRef.current?.firstChild as HTMLElement;
+                if (previewElement) {
+                  // Clone the pre-rendered element
+                  const clone = previewElement.cloneNode(true) as HTMLElement;
+
+                  // Create a container div to hold the scaled element
+                  const container = document.createElement("div");
+                  container.style.cssText = `
+                    position: absolute;
+                    top: -10000px;
+                    left: -10000px;
+                    pointer-events: none;
+                  `;
+
+                  // Apply zoom and opacity to the clone
+                  clone.style.transform = `scale(${canvasZoom})`;
+                  clone.style.transformOrigin = "top left";
+                  clone.style.opacity = "0.85";
+
+                  container.appendChild(clone);
+                  document.body.appendChild(container);
+
+                  // Get dimensions for centering
+                  const rect = previewElement.getBoundingClientRect();
+                  const offsetX = (rect.width / 2) * canvasZoom;
+                  const offsetY = 30 * canvasZoom;
+                  e.dataTransfer.setDragImage(container, offsetX, offsetY);
+
+                  // Cleanup after drag starts
+                  setTimeout(() => {
+                    if (document.body.contains(container)) {
+                      document.body.removeChild(container);
+                    }
+                  }, 0);
+                }
               }}
               onDragEnd={() => {
                 isDraggingRef.current = false;
+                setHoveredBlock(null);
               }}
               aria-disabled={!isLive}
               title={isLive ? undefined : "Coming soon"}
