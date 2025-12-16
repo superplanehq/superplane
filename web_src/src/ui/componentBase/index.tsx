@@ -8,6 +8,7 @@ import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
 import { MetadataItem, MetadataList } from "../metadataList";
 import { EmptyState } from "../emptyState";
+import { ChildEvents, type ChildEventsInfo } from "../childEvents";
 
 interface EventSectionDisplayProps {
   section: EventSection;
@@ -81,6 +82,14 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
           {section.eventTitle}
         </span>
       </div>
+      {section.childEventsInfo && (
+        <ChildEvents
+          childEventsInfo={section.childEventsInfo}
+          onExpandChildEvents={section.onExpandChildEvents}
+          onReRunChildEvents={section.onReRunChildEvents}
+          showItems={false}
+        />
+      )}
     </div>
   );
 };
@@ -168,6 +177,9 @@ export interface EventSection {
   eventTitle?: string;
   eventSubtitle?: string | React.ReactNode;
   handleComponent?: React.ReactNode;
+  childEventsInfo?: ChildEventsInfo;
+  onExpandChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
+  onReRunChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
 }
 
 export interface ComponentBaseProps extends ComponentActionsProps {

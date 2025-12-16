@@ -1537,6 +1537,7 @@ function prepareCompositeNode(
     (canvasNode.data.composite as CompositeProps).lastRunItem = {
       title: title,
       subtitle: subtitle,
+      id: execution.rootEvent?.id,
       receivedAt: new Date(execution.createdAt!),
       state: getRunItemState(execution),
       values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),

@@ -1,14 +1,25 @@
-import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import React from "react";
-import { ComponentHeader } from "../componentHeader";
-import { CollapsedComponent } from "../collapsedComponent";
-import { MetadataList, type MetadataItem } from "../metadataList";
-import { ChildEvents, type ChildEventsInfo } from "../childEvents";
-import { SelectionWrapper } from "../selectionWrapper";
+import { ComponentBase, type EventSection, type EventState } from "../componentBase";
 import { ComponentActionsProps } from "../types/componentActions";
+import { type MetadataItem } from "../metadataList";
+import { type ChildEventsInfo } from "../childEvents";
 
 export type LastRunState = "success" | "failed" | "running";
 export type ChildEventsState = "processed" | "discarded" | "waiting" | "running" | string;
+
+// Map LastRunState to EventState
+const mapLastRunStateToEventState = (state: LastRunState): EventState => {
+  switch (state) {
+    case "success":
+      return "success";
+    case "failed":
+      return "failed";
+    case "running":
+      return "running";
+    default:
+      return "neutral";
+  }
+};
 
 export interface WaitingInfo {
   icon: string;
@@ -26,6 +37,7 @@ export interface LastRunItem extends QueueItem {
   childEventsInfo?: ChildEventsInfo;
   state: LastRunState;
   values: Record<string, string>;
+  id?: string;
 }
 
 export interface ParameterGroup {
@@ -107,251 +119,119 @@ export const Composite: React.FC<CompositeProps> = ({
     return Math.max(0, eventsToDisplay.length - maxVisibleEvents);
   }, [eventsToDisplay.length, maxVisibleEvents]);
 
-  const getEventIcon = React.useCallback((state: LastRunState) => {
-    if (state === "success") {
-      return resolveIcon("circle-check");
-    } else if (state === "running") {
-      return resolveIcon("refresh-cw");
-    } else {
-      return resolveIcon("circle-x");
+  // Convert events to EventSection format for ComponentBase
+  const eventSections: EventSection[] = React.useMemo(() => {
+    const sections: EventSection[] = [];
+
+    // Add visible events
+    visibleEvents.forEach((event) => {
+      sections.push({
+        eventId: event.id?.slice(0, 4),
+        eventState: mapLastRunStateToEventState(event.state),
+        eventTitle: event.title,
+        eventSubtitle: event.subtitle,
+        receivedAt: event.receivedAt,
+        showAutomaticTime: true,
+        childEventsInfo: event.childEventsInfo,
+        onExpandChildEvents,
+        onReRunChildEvents,
+      });
+    });
+
+    // Add "View More" section if there are hidden events
+    if (hiddenEventsCount > 0) {
+      sections.push({
+        eventState: "neutral",
+        eventTitle: `+${hiddenEventsCount} more`,
+        handleComponent: (
+          <div
+            onClick={onViewMoreEvents}
+            className="cursor-pointer hover:bg-gray-200 transition-colors px-2 py-1 rounded"
+          >
+            Click to view more events
+          </div>
+        ),
+      });
     }
-  }, []);
 
-  const getEventColor = React.useCallback((state: LastRunState) => {
-    if (state === "success") {
-      return "text-green-700";
-    } else if (state === "running") {
-      return "text-blue-800";
-    } else {
-      return "text-red-700";
+    // Add next in queue if provided
+    if (nextInQueue) {
+      sections.push({
+        eventState: "queued",
+        eventTitle: nextInQueue.title,
+        eventSubtitle: nextInQueue.subtitle,
+      });
     }
-  }, []);
 
-  const getEventBackground = React.useCallback((state: LastRunState) => {
-    if (state === "success") {
-      return "bg-green-200";
-    } else if (state === "running") {
-      return "bg-sky-100";
-    } else {
-      return "bg-red-200";
-    }
-  }, []);
+    return sections;
+  }, [visibleEvents, hiddenEventsCount, nextInQueue, onExpandChildEvents, onReRunChildEvents, onViewMoreEvents]);
 
-  const getEventIconBackground = React.useCallback((state: LastRunState) => {
-    if (state === "success") {
-      return "bg-none ";
-    } else if (state === "running") {
-      return "bg-none animate-spin";
-    } else {
-      return "bg-none";
-    }
-  }, []);
+  // Convert parameters to specs format
+  const specs = React.useMemo(() => {
+    if (parameters.length === 0) return undefined;
 
-  const getEventIconColor = React.useCallback((state: LastRunState) => {
-    if (state === "success") {
-      return "text-green-600";
-    } else if (state === "running") {
-      return "text-blue-800";
-    } else {
-      return "text-red-600";
-    }
-  }, []);
+    return parameters.map((group) => ({
+      title: Object.keys(group.items).join(", "),
+      iconSlug: group.icon,
+      values: Object.entries(group.items).map(([key, value]) => ({
+        badges: [
+          {
+            label: `${key}: ${value}`,
+            bgColor: "bg-gray-100",
+            textColor: "text-gray-700",
+          },
+        ],
+      })),
+    }));
+  }, [parameters]);
 
-  const NextInQueueIcon = React.useMemo(() => {
-    return resolveIcon("circle-dashed");
-  }, []);
-
-  // Now safe to do early return after all hooks are called
-  if (collapsed) {
-    return (
-      <SelectionWrapper selected={selected}>
-        <CollapsedComponent
-          iconSrc={iconSrc}
-          iconSlug={iconSlug}
-          iconColor={iconColor}
-          iconBackground={iconBackground}
-          title={title}
-          collapsedBackground={collapsedBackground}
-          shape="rounded"
-          onDoubleClick={onToggleCollapse}
-          onRun={onRun}
-          runDisabled={runDisabled}
-          runDisabledTooltip={runDisabledTooltip}
-          onEdit={onEdit}
-          onConfigure={onConfigure}
-          onDuplicate={onDuplicate}
-          onDeactivate={onDeactivate}
-          onToggleView={onToggleView}
-          onDelete={onDelete}
-          isCompactView={isCompactView}
-        >
-          {parameters.length > 0 && (
-            <div className="flex flex-col gap-1 text-gray-500 mt-1">
-              {parameters.map((group, groupIndex) => (
-                <React.Fragment key={groupIndex}>
-                  {Object.entries(group.items).map(([key, value]) => (
-                    <div key={key} className="flex items-center gap-2">
-                      <div className="flex-shrink-0">{React.createElement(resolveIcon(group.icon), { size: 16 })}</div>
-                      <span className="text-xs font-medium flex-shrink-0">{key}:</span>
-                      <span title={value} className="text-xs truncate max-w-[150px]">
-                        {value}
-                      </span>
-                    </div>
-                  ))}
-                </React.Fragment>
-              ))}
-            </div>
-          )}
-        </CollapsedComponent>
-      </SelectionWrapper>
-    );
-  }
+  // Handle missing state with custom component
+  const customField = isMissing ? (
+    <div className="px-3 py-2 bg-amber-50 border-t border-amber-200 flex items-center gap-2">
+      <div className="flex-shrink-0">
+        <svg className="h-4 w-4 text-amber-700" fill="currentColor" viewBox="0 0 20 20">
+          <path
+            fillRule="evenodd"
+            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </div>
+      <div className="text-sm text-amber-700">
+        <span className="font-medium">Component deleted:</span> This component no longer exists and needs to be removed
+        or replaced.
+      </div>
+    </div>
+  ) : undefined;
 
   return (
-    <SelectionWrapper selected={selected}>
-      <div className="flex flex-col outline outline-black-15 rounded-md w-[23rem] bg-white">
-        <ComponentHeader
-          iconSrc={iconSrc}
-          iconSlug={iconSlug}
-          iconBackground={iconBackground}
-          iconColor={iconColor}
-          headerColor={headerColor}
-          title={title}
-          onDoubleClick={onToggleCollapse}
-          onRun={onRun}
-          runDisabled={runDisabled}
-          runDisabledTooltip={runDisabledTooltip}
-          onEdit={onEdit}
-          onConfigure={onConfigure}
-          onDuplicate={onDuplicate}
-          onDeactivate={onDeactivate}
-          onToggleView={onToggleView}
-          onDelete={onDelete}
-          isCompactView={isCompactView}
-        />
-
-        {isMissing && (
-          <div className="px-3 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
-            <div className="flex-shrink-0">
-              {React.createElement(resolveIcon("alert-triangle"), { className: "h-4 w-4 text-amber-700" })}
-            </div>
-            <div className="text-sm text-amber-700">
-              <span className="font-medium">Component deleted:</span> This component no longer exists and needs to be
-              removed or replaced.
-            </div>
-          </div>
-        )}
-
-        {parameters.length > 0 && (
-          <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-1.5">
-            {parameters.map((group, groupIndex) => (
-              <React.Fragment key={groupIndex}>
-                {Object.entries(group.items).map(([key, value]) => (
-                  <div key={key} className="flex items-center gap-2">
-                    <div className="flex-shrink-0">{React.createElement(resolveIcon(group.icon), { size: 16 })}</div>
-                    <span className="text-sm font-medium flex-shrink-0">{key}:</span>
-                    <span className="text-sm truncate">{value}</span>
-                  </div>
-                ))}
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-
-        {metadata && metadata.length > 0 && (
-          <MetadataList
-            items={metadata}
-            className="px-2 py-3 border-b text-gray-500 flex flex-col gap-1.5"
-            iconSize={16}
-          />
-        )}
-
-        <div className="px-4 py-3 border-b">
-          <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-            <span className="uppercase text-xs font-semibold tracking-wide">Last Run</span>
-          </div>
-
-          {eventsToDisplay.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              {visibleEvents.map((event, index) => {
-                const EventIcon = getEventIcon(event.state);
-                const eventColor = getEventColor(event.state);
-                const eventBackground = getEventBackground(event.state);
-                const eventIconBackground = getEventIconBackground(event.state);
-                const eventIconColor = getEventIconColor(event.state);
-                const now = new Date();
-                const diff = now.getTime() - new Date(event.receivedAt).getTime();
-                const timeAgo = calcRelativeTimeFromDiff(diff);
-
-                return (
-                  <div key={index}>
-                    <div
-                      className={`flex items-center justify-between gap-1 px-2 py-2 rounded-md ${eventBackground} ${eventColor}`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div
-                          className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${eventIconBackground}`}
-                        >
-                          <EventIcon size={16} className={`${eventIconColor}`} />
-                        </div>
-                        <span className="truncate text-sm">{event.title}</span>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {event.subtitle && (
-                          <span className="text-sm text-gray-500 truncate max-w-[100px]">{event.subtitle}</span>
-                        )}
-                        <span className="text-xs text-gray-500">{timeAgo}</span>
-                      </div>
-                    </div>
-                    {event.childEventsInfo && (
-                      <ChildEvents
-                        childEventsInfo={event.childEventsInfo}
-                        onExpandChildEvents={onExpandChildEvents}
-                        onReRunChildEvents={onReRunChildEvents}
-                        showItems={false}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-              {hiddenEventsCount > 0 && (
-                <div
-                  onClick={onViewMoreEvents}
-                  className="flex items-center justify-center px-2 py-2 rounded-md bg-gray-100 text-gray-600 cursor-pointer hover:bg-gray-200 transition-colors"
-                >
-                  <span className="text-sm font-medium">+{hiddenEventsCount} more</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 px-2 py-2 rounded-md bg-gray-100 text-gray-500">
-              <div className="w-5 h-5 rounded-full flex items-center justify-center bg-gray-400">
-                <div className="w-2 h-2 rounded-full bg-white"></div>
-              </div>
-              <span className="text-sm">No executions received yet</span>
-            </div>
-          )}
-        </div>
-
-        {nextInQueue && (
-          <div className="px-4 pt-3 pb-6">
-            <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-              <span className="uppercase text-xs font-semibold tracking-wide">Next In Queue</span>
-            </div>
-            <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100 min-w-0`}>
-              <div className="flex items-center gap-2 text-gray-500 min-w-0 flex-1">
-                <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center`}>
-                  <NextInQueueIcon size={20} className="text-gray-500" />
-                </div>
-                <span className="truncate text-sm">{nextInQueue.title}</span>
-              </div>
-              {nextInQueue.subtitle && (
-                <span className="text-sm truncate text-gray-500 flex-shrink-0 max-w-[40%]">{nextInQueue.subtitle}</span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </SelectionWrapper>
+    <ComponentBase
+      iconSrc={iconSrc}
+      iconSlug={iconSlug}
+      iconColor={iconColor}
+      iconBackground={iconBackground}
+      headerColor={headerColor}
+      title={title}
+      metadata={metadata}
+      specs={specs}
+      eventSections={eventSections}
+      collapsed={collapsed}
+      collapsedBackground={collapsedBackground}
+      selected={selected}
+      onToggleCollapse={onToggleCollapse}
+      onRun={onRun}
+      runDisabled={runDisabled}
+      runDisabledTooltip={runDisabledTooltip}
+      onEdit={onEdit}
+      onConfigure={onConfigure}
+      onDuplicate={onDuplicate}
+      onDeactivate={onDeactivate}
+      onToggleView={onToggleView}
+      onDelete={onDelete}
+      isCompactView={isCompactView}
+      includeEmptyState={eventsToDisplay.length === 0}
+      emptyStateTitle="No executions received yet"
+      customField={customField}
+    />
   );
 };
