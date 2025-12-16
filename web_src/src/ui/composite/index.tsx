@@ -8,7 +8,7 @@ import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
 
 export type LastRunState = "success" | "failed" | "running";
-export type ChildEventsState = "processed" | "discarded" | "waiting" | "running";
+export type ChildEventsState = "processed" | "discarded" | "waiting" | "running" | string;
 
 export interface WaitingInfo {
   icon: string;
