@@ -15,6 +15,7 @@ interface LatestTabProps {
   onEventClick?: (event: SidebarEvent) => void;
   onSeeFullHistory?: () => void;
   onSeeQueue?: () => void;
+  onSeeExecutionChain?: (eventId: string) => void;
   getTabData?: (event: SidebarEvent) => TabData | undefined;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
@@ -43,6 +44,7 @@ export const LatestTab = ({
   onEventClick,
   onSeeFullHistory,
   onSeeQueue,
+  onSeeExecutionChain,
   getTabData,
   onCancelQueueItem,
   onCancelExecution,
@@ -52,12 +54,18 @@ export const LatestTab = ({
   loadExecutionChain,
   getExecutionState,
 }: LatestTabProps) => {
+
   const handleSeeQueue = () => {
     onSeeQueue?.();
   };
 
   const handleSeeFullHistory = () => {
     onSeeFullHistory?.();
+  };
+
+  const handleTriggerNavigate = (event: SidebarEvent) => {
+    const eventId = event.triggerEventId || event.id;
+    onSeeExecutionChain?.(eventId);
   };
 
   return (
@@ -81,6 +89,7 @@ export const LatestTab = ({
                     isOpen={openEventIds.has(event.id) || event.isOpen}
                     onToggleOpen={onToggleOpen}
                     onEventClick={onEventClick}
+                    onTriggerNavigate={handleTriggerNavigate}
                     tabData={getTabData?.(event)}
                     onPushThrough={onPushThrough}
                     onCancelExecution={onCancelExecution}
@@ -124,6 +133,7 @@ export const LatestTab = ({
                       isOpen={openEventIds.has(event.id) || event.isOpen}
                       onToggleOpen={onToggleOpen}
                       onEventClick={onEventClick}
+                      onTriggerNavigate={handleTriggerNavigate}
                       tabData={getTabData?.(event)}
                       onCancelQueueItem={onCancelQueueItem}
                       onPushThrough={onPushThrough}

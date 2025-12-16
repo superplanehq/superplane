@@ -33,6 +33,7 @@ interface SidebarEventItemProps {
   isOpen: boolean;
   onToggleOpen: (eventId: string) => void;
   onEventClick?: (event: SidebarEvent) => void;
+  onTriggerNavigate?: (event: SidebarEvent) => void;
   tabData?: TabData;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
@@ -58,6 +59,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   isOpen,
   onToggleOpen,
   onEventClick,
+  onTriggerNavigate,
   tabData,
   onCancelQueueItem,
   onCancelExecution,
@@ -325,7 +327,12 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       }
       onClick={(e) => {
         e.stopPropagation();
-        onToggleOpen(event.id);
+        // For trigger events, navigate to execution chain instead of toggling inline
+        if (event.kind === "trigger" && onTriggerNavigate) {
+          onTriggerNavigate(event);
+        } else {
+          onToggleOpen(event.id);
+        }
         onEventClick?.(event);
       }}
     >
