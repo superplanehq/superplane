@@ -64,7 +64,7 @@ func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {
 	}
 
 	if len(nodes) > 0 {
-		log.Printf("Webhook %s has other nodes associated with it: %v", webhook.ID.String(), nodes)
+		log.Printf("Webhook %s has %d other nodes associated with it", webhook.ID.String(), len(nodes))
 		return nil
 	}
 

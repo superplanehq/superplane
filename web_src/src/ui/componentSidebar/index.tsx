@@ -446,7 +446,7 @@ export const ComponentSidebar = ({
         style={{ marginLeft: "-8px" }}
       >
         <div
-          className={`w-1 h-12 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
+          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
             isResizing ? "bg-blue-500" : ""
           }`}
         />
@@ -475,24 +475,26 @@ export const ComponentSidebar = ({
               )}
             </div>
             {!templateNodeId && (
-              <SidebarActionsDropdown
-                onRun={onRun}
-                runDisabled={runDisabled}
-                runDisabledTooltip={runDisabledTooltip}
-                onDuplicate={onDuplicate}
-                onDocs={onDocs}
-                onEdit={onEdit}
-                onConfigure={onConfigure}
-                onDeactivate={onDeactivate}
-                onToggleView={onToggleView}
-                onDelete={onDelete}
-                isCompactView={isCompactView}
-              />
+              <div className="absolute top-14 right-[0.8rem]">
+                <SidebarActionsDropdown
+                  onRun={onRun}
+                  runDisabled={runDisabled}
+                  runDisabledTooltip={runDisabledTooltip}
+                  onDuplicate={onDuplicate}
+                  onDocs={onDocs}
+                  onEdit={onEdit}
+                  onConfigure={onConfigure}
+                  onDeactivate={onDeactivate}
+                  onToggleView={onToggleView}
+                  onDelete={onDelete}
+                  isCompactView={isCompactView}
+                />
+              </div>
             )}
           </div>
           <div
             onClick={() => onClose?.()}
-            className="flex items-center justify-center absolute top-6 right-3 cursor-pointer"
+            className="flex items-center justify-center absolute top-5 right-3 cursor-pointer"
           >
             <X size={18} />
           </div>

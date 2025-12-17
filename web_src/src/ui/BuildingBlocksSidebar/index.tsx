@@ -164,7 +164,7 @@ export function BuildingBlocksSidebar({
   return (
     <div
       ref={sidebarRef}
-      className="absolute right-0 top-0 z-20 h-full bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 flex flex-col shadow-2xl"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
       data-testid="building-blocks-sidebar"
     >
@@ -177,7 +177,7 @@ export function BuildingBlocksSidebar({
         style={{ marginLeft: "-8px" }}
       >
         <div
-          className={`w-1 h-12 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
+          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
             isResizing ? "bg-blue-500" : ""
           }`}
         />
@@ -213,7 +213,7 @@ export function BuildingBlocksSidebar({
         </div>
       </div>
 
-      <div className="flex-1 gap-2 py-3 relative">
+      <div className="gap-2 py-3">
         {sortedCategories.map((category) => (
           <CategorySection
             key={category.name}

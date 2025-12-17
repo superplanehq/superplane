@@ -126,12 +126,12 @@ func (c *AppInstallationContext) GetConfig(name string) ([]byte, error) {
 		return []byte(s), nil
 	}
 
-	b64, err := c.encryptor.Decrypt(context.Background(), []byte(s), []byte(c.appInstallation.ID.String()))
+	decoded, err := base64.StdEncoding.DecodeString(string(s))
 	if err != nil {
 		return nil, err
 	}
 
-	return base64.StdEncoding.DecodeString(string(b64))
+	return c.encryptor.Decrypt(context.Background(), []byte(decoded), []byte(c.appInstallation.ID.String()))
 }
 
 func findConfigDef(configs []configuration.Field, name string) (configuration.Field, error) {

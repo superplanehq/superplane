@@ -542,6 +542,7 @@ function CanvasPage(props: CanvasPageProps) {
         configuration: {},
         position: pendingNode.position,
         sourceConnection: pendingNode.data.sourceConnection as { nodeId: string; handleId: string | null } | undefined,
+        appName: block.appName,
       });
 
       setIsBuildingBlocksSidebarOpen(false);

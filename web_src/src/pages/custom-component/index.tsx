@@ -3,12 +3,13 @@ import { Connection, Edge, Node, addEdge, applyEdgeChanges, applyNodeChanges } f
 import "@xyflow/react/dist/style.css";
 import ELK from "elkjs/lib/elk.bundled.js";
 import { AlertCircle } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ComponentsComponent, ComponentsNode } from "../../api-client";
+import { ComponentsComponent, ComponentsNode, ComponentsAppInstallationRef } from "../../api-client";
 import { Heading } from "../../components/Heading/heading";
 import { Button } from "../../components/ui/button";
 import { useBlueprint, useComponents, useUpdateBlueprint } from "../../hooks/useBlueprintData";
+import { useAvailableApplications, useInstalledApplications } from "../../hooks/useApplications";
 import { BlockData } from "../../ui/CanvasPage/Block";
 import type { BreadcrumbItem, NewNodeData } from "../../ui/CustomComponentBuilderPage";
 import { CustomComponentBuilderPage } from "../../ui/CustomComponentBuilderPage";
@@ -103,6 +104,8 @@ export const CustomComponent = () => {
   // Fetch blueprint and components
   const { data: blueprint, isLoading: blueprintLoading } = useBlueprint(organizationId || "", blueprintId || "");
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
+  const { data: availableApplications = [], isLoading: applicationsLoading } = useAvailableApplications();
+  const { data: installedApplications = [] } = useInstalledApplications(organizationId!);
   const updateBlueprintMutation = useUpdateBlueprint(organizationId!, blueprintId!);
 
   usePageTitle([blueprint?.name || "Custom Component"]);
@@ -120,6 +123,17 @@ export const CustomComponent = () => {
 
   // Revert functionality - track initial blueprint snapshot
   const [initialBlueprintSnapshot, setInitialBlueprintSnapshot] = useState<any>(null);
+
+  // Merge components from applications into the main components array
+  const allComponents = useMemo(() => {
+    const merged = [...components];
+    availableApplications.forEach((app) => {
+      if (app.components) {
+        merged.push(...app.components);
+      }
+    });
+    return merged;
+  }, [components, availableApplications]);
 
   // Save initial blueprint snapshot for revert functionality
   const saveSnapshot = useCallback(() => {
@@ -187,7 +201,7 @@ export const CustomComponent = () => {
 
   // Update nodes and edges when blueprint or components data changes
   useEffect(() => {
-    if (!blueprint || components.length === 0) return;
+    if (!blueprint || allComponents.length === 0) return;
 
     setNodes((currentNodes) => {
       // Preserve pending connection nodes and template nodes
@@ -211,7 +225,7 @@ export const CustomComponent = () => {
       const allNodes: Node[] = (blueprint.nodes || [])
         .map((node: ComponentsNode) => {
           // Handle component nodes
-          const component = components.find((p: any) => p.name === node.component?.name);
+          const component = allComponents.find((p: any) => p.name === node.component?.name);
           const blockData = createBlockData(node, component);
 
           // Find if this node exists in current state to preserve selection
@@ -224,6 +238,7 @@ export const CustomComponent = () => {
               ...blockData,
               _originalComponent: node.component?.name,
               _originalConfiguration: node.configuration || {},
+              _appInstallationRef: node.appInstallation,
             },
             position: node.position || { x: 0, y: 0 },
             selected: existingNode?.selected ?? false, // Preserve selection
@@ -282,11 +297,11 @@ export const CustomComponent = () => {
 
       return [...loadedEdges, ...localOnlyEdges];
     });
-  }, [blueprint, components]);
+  }, [blueprint, allComponents]);
 
   // Use refs to access latest values without causing re-renders
   const nodesRef = useRef(nodes);
-  const componentsRef = useRef(components);
+  const componentsRef = useRef(allComponents);
 
   // Keep refs updated
   useEffect(() => {
@@ -294,8 +309,8 @@ export const CustomComponent = () => {
   }, [nodes]);
 
   useEffect(() => {
-    componentsRef.current = components;
-  }, [components]);
+    componentsRef.current = allComponents;
+  }, [allComponents]);
 
   // Warn user before leaving page with unsaved changes
   useEffect(() => {
@@ -373,6 +388,7 @@ export const CustomComponent = () => {
                 name: nodeData._originalComponent as string,
               },
               configuration: nodeData._originalConfiguration || {},
+              appInstallation: nodeData._appInstallationRef,
               position: {
                 x: Math.round(node.position.x),
                 y: Math.round(node.position.y),
@@ -431,28 +447,47 @@ export const CustomComponent = () => {
     ],
   );
 
-  const getNodeEditData = useCallback((nodeId: string) => {
-    const node = (nodesRef.current || []).find((n) => n.id === nodeId);
-    if (!node) return null;
+  const getNodeEditData = useCallback(
+    (nodeId: string) => {
+      const node = (nodesRef.current || []).find((n) => n.id === nodeId);
+      if (!node) return null;
 
-    const component = componentsRef.current.find((p: any) => p.name === (node.data as any)._originalComponent);
-    if (!component) return null;
+      const component = componentsRef.current.find((p: any) => p.name === (node.data as any)._originalComponent);
+      if (!component) return null;
 
-    return {
-      nodeId: node.id,
-      nodeName: (node.data as any).label as string,
-      displayLabel: component.label || ((node.data as any).label as string),
-      configuration: (node.data as any)._originalConfiguration || {},
-      configurationFields: component.configuration || [],
-    };
-  }, []);
+      // Check if this component is from an application
+      let appName: string | undefined;
+      const componentApp = availableApplications.find((app) =>
+        app.components?.some((c) => c.name === (node.data as any)._originalComponent),
+      );
+      if (componentApp) {
+        appName = componentApp.name;
+      }
+
+      return {
+        nodeId: node.id,
+        nodeName: (node.data as any).label as string,
+        displayLabel: component.label || ((node.data as any).label as string),
+        configuration: (node.data as any)._originalConfiguration || {},
+        configurationFields: component.configuration || [],
+        appName,
+        appInstallationRef: (node.data as any)._appInstallationRef,
+      };
+    },
+    [availableApplications],
+  );
 
   const handleNodeConfigurationSave = useCallback(
-    async (nodeId: string, configuration: Record<string, any>, nodeName: string) => {
+    async (
+      nodeId: string,
+      configuration: Record<string, any>,
+      nodeName: string,
+      appInstallationRef?: ComponentsAppInstallationRef,
+    ) => {
       saveSnapshot();
 
       // Check if this is a template node with sourceConnection (needs to be converted to real node)
-      if (templateNodeId && newNodeData && (newNodeData as any).sourceConnection) {
+      if (templateNodeId && newNodeData && newNodeData.sourceConnection) {
         // This is a template node created from dragging edge - convert to real node
         const component = componentsRef.current.find(
           (c: ComponentsComponent) => c.name === newNodeData.buildingBlock.name,
@@ -487,6 +522,7 @@ export const CustomComponent = () => {
             ...blockData,
             _originalComponent: component.name,
             _originalConfiguration: filteredConfiguration,
+            _appInstallationRef: appInstallationRef,
           },
           selected: true,
         };
@@ -498,7 +534,7 @@ export const CustomComponent = () => {
         const updatedNodes = [...nodesWithoutTemplate, newNode];
 
         // Calculate updated edges synchronously
-        const sourceConnection = (newNodeData as any).sourceConnection;
+        const sourceConnection = newNodeData.sourceConnection;
         let updatedEdges = edges;
 
         if (sourceConnection) {
@@ -592,6 +628,7 @@ export const CustomComponent = () => {
           ...nodeData,
           label: nodeName.trim(),
           _originalConfiguration: filteredConfiguration,
+          _appInstallationRef: appInstallationRef,
         };
 
         if (nodeData.component) {
@@ -668,6 +705,7 @@ export const CustomComponent = () => {
           ...blockData,
           _originalComponent: component.name,
           _originalConfiguration: filteredConfiguration,
+          _appInstallationRef: newNodeData.appInstallationRef,
         },
         selected: true,
       };
@@ -891,6 +929,7 @@ export const CustomComponent = () => {
         sourceConnection: (templateNode.data as any).sourceConnection as
           | { nodeId: string; handleId: string | null }
           | undefined,
+        appName: buildingBlock?.appName,
       });
     },
     [nodes],
@@ -919,6 +958,7 @@ export const CustomComponent = () => {
           configuration: {},
           position: templateNode.position,
           sourceConnection: (templateNode.data as any).sourceConnection,
+          appName: block.appName,
         });
         setIsBuildingBlocksSidebarOpen(false);
         return;
@@ -972,6 +1012,7 @@ export const CustomComponent = () => {
         configuration: {},
         position: pendingNodePosition,
         sourceConnection: pendingNodeSourceConnection,
+        appName: block.appName,
       });
 
       setIsBuildingBlocksSidebarOpen(false);
@@ -1010,7 +1051,7 @@ export const CustomComponent = () => {
     return handleSaveBlueprint();
   }, [handleSaveBlueprint]);
 
-  if (blueprintLoading || componentsLoading) {
+  if (blueprintLoading || componentsLoading || applicationsLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -1087,12 +1128,15 @@ export const CustomComponent = () => {
               configuration: {},
               position: templateNode.position,
               sourceConnection: (templateNode.data as any).sourceConnection,
+              appName: buildingBlock.appName,
             });
           }
         }}
         onRemoveTemplateNode={(nodeId) => setNodes((nds) => nds.filter((n) => n.id !== nodeId))}
         organizationId={organizationId}
         components={components}
+        availableApplications={availableApplications}
+        installedApplications={installedApplications}
         onSave={handleSave}
         isSaving={updateBlueprintMutation.isPending}
         unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}

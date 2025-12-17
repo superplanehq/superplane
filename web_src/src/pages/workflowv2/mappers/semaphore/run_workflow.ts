@@ -22,6 +22,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     const componentName = componentDefinition.name || "semaphore";
 
     return {
+      title: node.name!,
       iconSrc: SemaphoreLogo,
       iconSlug: componentDefinition.icon || "workflow",
       headerColor: getBackgroundColorClass(componentDefinition?.color || "gray"),
@@ -29,8 +30,8 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       iconBackground: getBackgroundColorClass(componentDefinition?.color || "gray"),
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      title: node.name!,
-      eventSections: getSemaphoreEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName),
+      eventSections: runWorkflowEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName),
+      includeEmptyState: !hasExecutionOrQueueItems(lastExecutions[0], nodeQueueItems),
       metadata: runWorkflowMetadataList(node),
       specs: runWorkflowSpecs(node),
       eventStateMap: getStateMap(componentName),
@@ -103,25 +104,32 @@ interface ExecutionMetadata {
   };
 }
 
-function getSemaphoreEventSections(
+function hasExecutionOrQueueItems(
+  execution: WorkflowsWorkflowNodeExecution,
+  nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+): boolean {
+  return !!execution || (nodeQueueItems && nodeQueueItems.length > 0);
+}
+
+function runWorkflowEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution,
   nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   componentName?: string,
-): EventSection[] {
+): EventSection[] | undefined {
+  if (!hasExecutionOrQueueItems(execution, nodeQueueItems)) {
+    return undefined;
+  }
+
   const sections: EventSection[] = [];
 
-  // Add Last Run section
-  if (!execution) {
-    sections.push({
-      eventTitle: "No executions received yet",
-      eventState: "neutral" as const,
-    });
-  } else {
+  //
+  // If there is an execution, add section for execution.
+  //
+  if (execution) {
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
-
     sections.push({
       showAutomaticTime: true,
       receivedAt: new Date(execution.createdAt!),
@@ -130,7 +138,9 @@ function getSemaphoreEventSections(
     });
   }
 
-  // Add Next in Queue section if there are queued items
+  //
+  // If there are queue items, add section for next in queue.
+  //
   if (nodeQueueItems && nodeQueueItems.length > 0) {
     const queueItem = nodeQueueItems[nodeQueueItems.length - 1];
     const rootTriggerNode = nodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
