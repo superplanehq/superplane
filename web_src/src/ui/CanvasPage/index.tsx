@@ -10,6 +10,7 @@ import {
 
 import { Loader2, Puzzle, ScanLine, ScanText } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
+import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1404,6 +1405,20 @@ function CanvasContent({
     onToggleCollapse?.();
   }, [state.toggleCollapse, onToggleCollapse]);
 
+  // Add keyboard shortcut for toggling collapse/expand
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle collapse: Ctrl/Cmd + E
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "e") {
+        e.preventDefault();
+        handleToggleCollapse();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleToggleCollapse]);
+
   const handlePaneClick = useCallback(() => {
     // do not close sidebar while we are creating a new component
     if (templateNodeId) return;
@@ -1640,9 +1655,25 @@ function CanvasContent({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {state.isCollapsed ? "Switch components to Detailed view" : "Switch components to Compact view"}
+                  {state.isCollapsed
+                    ? "Switch components to Detailed view (Ctrl/Cmd + E)"
+                    : "Switch components to Compact view (Ctrl/Cmd + E)"}
                 </TooltipContent>
               </Tooltip>
+              <NodeSearch
+                onSearch={(searchString) => {
+                  const query = searchString.toLowerCase();
+                  return state.nodes.filter((node) => {
+                    const label = ((node.data?.label as string) || "").toLowerCase();
+                    const nodeName = ((node.data as any)?.nodeName || "").toLowerCase();
+                    const id = (node.id || "").toLowerCase();
+                    return label.includes(query) || nodeName.includes(query) || id.includes(query);
+                  });
+                }}
+                onSelectNode={(node) => {
+                  state.componentSidebar.open(node.id);
+                }}
+              />
             </ZoomSlider>
           </ReactFlow>
         </div>

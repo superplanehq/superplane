@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Maximize, Minus, Plus } from "lucide-react";
 
 import { Panel, useViewport, useStore, useReactFlow, type PanelProps } from "@xyflow/react";
@@ -24,6 +24,35 @@ export function ZoomSlider({
   const minZoom = useStore((state) => state.minZoom);
   const maxZoom = useStore((state) => state.maxZoom);
 
+  // Add keyboard shortcuts for zoom controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Zoom in: Ctrl/Cmd + = or Ctrl/Cmd + Plus
+      if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+")) {
+        e.preventDefault();
+        zoomIn({ duration: 300 });
+      }
+      // Zoom out: Ctrl/Cmd + - or Ctrl/Cmd + Minus
+      else if ((e.ctrlKey || e.metaKey) && e.key === "-") {
+        e.preventDefault();
+        zoomOut({ duration: 300 });
+      }
+      // Reset zoom: Ctrl/Cmd + 0
+      else if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+        e.preventDefault();
+        zoomTo(1, { duration: 300 });
+      }
+      // Fit view: Ctrl/Cmd + 1
+      else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "1") {
+        e.preventDefault();
+        fitView({ duration: 300 });
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [zoomIn, zoomOut, zoomTo, fitView]);
+
   return (
     <TooltipProvider delayDuration={300}>
       <Panel
@@ -41,7 +70,7 @@ export function ZoomSlider({
                 <Minus className="h-3 w-3" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Zoom out</TooltipContent>
+            <TooltipContent>Zoom out (Ctrl/Cmd + -)</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -65,7 +94,7 @@ export function ZoomSlider({
                 <Plus className="h-3 w-3" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Zoom in</TooltipContent>
+            <TooltipContent>Zoom in (Ctrl/Cmd + +)</TooltipContent>
           </Tooltip>
         </div>
         <Tooltip>
@@ -81,7 +110,7 @@ export function ZoomSlider({
               {(100 * zoom).toFixed(0)}%
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Reset zoom to 100%</TooltipContent>
+          <TooltipContent>Reset zoom to 100% (Ctrl/Cmd + 0)</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -89,7 +118,7 @@ export function ZoomSlider({
               <Maximize className="h-3 w-3" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Fit all nodes in view</TooltipContent>
+          <TooltipContent>Fit all nodes in view (Ctrl/Cmd + 1)</TooltipContent>
         </Tooltip>
         {children}
       </Panel>
