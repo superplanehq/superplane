@@ -34,20 +34,7 @@ import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 import { getBackgroundColorClass } from "@/utils/colors";
-
-export interface SidebarEvent {
-  id: string;
-  title: string;
-  subtitle?: string | React.ReactNode;
-  state: string;
-  isOpen: boolean;
-  receivedAt?: Date;
-  values?: Record<string, string>;
-  // Optional specific identifiers to avoid overloading `id`
-  executionId?: string;
-  triggerEventId?: string;
-  kind?: "execution" | "trigger" | "queue";
-}
+import { SidebarEvent } from "../componentSidebar/types";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -1045,9 +1032,7 @@ function Sidebar({
       totalInHistoryCount={sidebarData.totalInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
       getTabData={
-        getTabData && state.componentSidebar.selectedNodeId
-          ? (event) => getTabData(state.componentSidebar.selectedNodeId!, event)
-          : undefined
+        getTabData && state.componentSidebar.selectedNodeId ? (event) => getTabData(event.nodeId!, event) : undefined
       }
       onCancelQueueItem={onCancelQueueItem}
       onPushThrough={onPushThrough}

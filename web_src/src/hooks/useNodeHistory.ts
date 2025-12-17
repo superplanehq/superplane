@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useInfiniteNodeEvents, useInfiniteNodeExecutions } from "./useWorkflowData";
-import { SidebarEvent } from "@/ui/CanvasPage";
+import { SidebarEvent } from "@/ui/componentSidebar/types";
 import {
   ComponentsComponent,
   ComponentsNode,

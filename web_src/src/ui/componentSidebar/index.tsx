@@ -23,6 +23,7 @@ import { EventState, EventStateMap } from "../componentBase";
 import { NewNodeData } from "../CustomComponentBuilderPage";
 import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
+import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
 const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
   { value: "processed", label: "Processed" },
@@ -198,6 +199,7 @@ export const ComponentSidebar = ({
   const [previousPage, setPreviousPage] = useState<"overview" | "history" | "queue">("overview");
   const [executionChainEventId, setExecutionChainEventId] = useState<string | null>(null);
   const [executionChainTriggerEvent, setExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   // For template nodes, force settings tab and block latest tab
   const isTemplateNode = !!templateNodeId && !!newNodeData;
   const activeTab = isTemplateNode ? "settings" : currentTab || "latest";
@@ -304,13 +306,15 @@ export const ComponentSidebar = ({
     setStatusFilter("all");
     setExecutionChainEventId(null);
     setExecutionChainTriggerEvent(null);
+    setSelectedExecutionId(null);
   }, [page, previousPage]);
 
   const handleSeeExecutionChain = useCallback(
-    (eventId: string, triggerEvent?: SidebarEvent) => {
+    (eventId: string, triggerEvent?: SidebarEvent, selectedExecId?: string) => {
       setPreviousPage(page as "overview" | "history" | "queue");
       setExecutionChainEventId(eventId);
       setExecutionChainTriggerEvent(triggerEvent || null);
+      setSelectedExecutionId(selectedExecId || null);
       setPage("execution-chain");
     },
     [page],
@@ -507,6 +511,7 @@ export const ComponentSidebar = ({
               <ExecutionChainPage
                 eventId={executionChainEventId}
                 triggerEvent={executionChainTriggerEvent || undefined}
+                selectedExecutionId={selectedExecutionId}
                 loadExecutionChain={loadExecutionChain}
                 openEventIds={openEventIds}
                 onToggleOpen={handleToggleOpen}
@@ -525,7 +530,23 @@ export const ComponentSidebar = ({
                 openEventIds={openEventIds}
                 onToggleOpen={handleToggleOpen}
                 onEventClick={onEventClick}
-                onTriggerNavigate={(event) => handleSeeExecutionChain(event.triggerEventId || event.id, event)}
+                onTriggerNavigate={(event) => {
+                  if (event.kind === "trigger") {
+                    const eventId = event.triggerEventId || event.id;
+                    handleSeeExecutionChain(eventId, event);
+                  } else if (event.kind === "execution") {
+                    const node = workflowNodes?.find((n) => n.id === event.originalExecution?.rootEvent?.nodeId);
+
+                    const rootEventId = event.originalExecution?.rootEvent?.id;
+                    if (rootEventId && node && event.originalExecution?.rootEvent) {
+                      const triggerEvent = mapTriggerEventToSidebarEvent(event.originalExecution?.rootEvent, node);
+                      handleSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
+                    } else {
+                      const eventId = event.triggerEventId || event.id;
+                      handleSeeExecutionChain(eventId, event, event.executionId);
+                    }
+                  }
+                }}
                 getTabData={getTabData}
                 onPushThrough={onPushThrough}
                 onCancelExecution={onCancelExecution}
@@ -600,6 +621,8 @@ export const ComponentSidebar = ({
                 onReEmit={onReEmit}
                 loadExecutionChain={loadExecutionChain}
                 getExecutionState={getExecutionState}
+                workflowNodes={workflowNodes}
+                components={components}
               />
             </TabsContent>
 

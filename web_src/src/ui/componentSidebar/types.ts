@@ -1,4 +1,4 @@
-import { WorkflowsWorkflowEvent } from "@/api-client";
+import { WorkflowsWorkflowEvent, WorkflowsWorkflowNodeExecution } from "@/api-client";
 import { ChildEventsState } from "../composite";
 
 export interface SidebarEvent {
@@ -11,7 +11,7 @@ export interface SidebarEvent {
   receivedAt?: Date;
   values?: Record<string, string>;
   originalEvent?: WorkflowsWorkflowEvent;
-  originalExecution?: WorkflowsWorkflowEvent;
+  originalExecution?: WorkflowsWorkflowNodeExecution;
 
   // Optional specific identifiers to avoid overloading `id`
   // Present for execution items

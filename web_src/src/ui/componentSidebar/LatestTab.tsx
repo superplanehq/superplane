@@ -2,8 +2,9 @@ import { TextAlignStart } from "lucide-react";
 import { SidebarEventItem } from "./SidebarEventItem";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
-import { WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { ComponentsComponent, ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
+import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
 interface LatestTabProps {
   latestEvents: SidebarEvent[];
@@ -15,7 +16,7 @@ interface LatestTabProps {
   onEventClick?: (event: SidebarEvent) => void;
   onSeeFullHistory?: () => void;
   onSeeQueue?: () => void;
-  onSeeExecutionChain?: (eventId: string, triggerEvent?: SidebarEvent) => void;
+  onSeeExecutionChain?: (eventId: string, triggerEvent?: SidebarEvent, selectedExecutionId?: string) => void;
   getTabData?: (event: SidebarEvent) => TabData | undefined;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
@@ -32,6 +33,8 @@ interface LatestTabProps {
     nodeId: string,
     execution: WorkflowsWorkflowNodeExecution,
   ) => { map: EventStateMap; state: EventState };
+  workflowNodes?: ComponentsNode[]; // Workflow spec nodes for metadata lookup
+  components?: ComponentsComponent[]; // Component metadata
 }
 
 export const LatestTab = ({
@@ -53,6 +56,7 @@ export const LatestTab = ({
   onReEmit,
   loadExecutionChain,
   getExecutionState,
+  workflowNodes,
 }: LatestTabProps) => {
   const handleSeeQueue = () => {
     onSeeQueue?.();
@@ -63,8 +67,21 @@ export const LatestTab = ({
   };
 
   const handleTriggerNavigate = (event: SidebarEvent) => {
-    const eventId = event.triggerEventId || event.id;
-    onSeeExecutionChain?.(eventId, event);
+    if (event.kind === "trigger") {
+      const eventId = event.triggerEventId || event.id;
+      onSeeExecutionChain?.(eventId, event);
+    } else if (event.kind === "execution") {
+      const node = workflowNodes?.find((n) => n.id === event.originalExecution?.rootEvent?.nodeId);
+
+      const rootEventId = event.originalExecution?.rootEvent?.id;
+      if (rootEventId && node && event.originalExecution?.rootEvent && onSeeExecutionChain) {
+        const triggerEvent = mapTriggerEventToSidebarEvent(event.originalExecution?.rootEvent, node);
+        onSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
+      } else {
+        const eventId = event.triggerEventId || event.id;
+        onSeeExecutionChain?.(eventId, event, event.executionId);
+      }
+    }
   };
 
   return (
@@ -85,7 +102,7 @@ export const LatestTab = ({
                     index={index}
                     totalItems={totalItems}
                     variant="latest"
-                    isOpen={openEventIds.has(event.id) || event.isOpen}
+                    isOpen={false}
                     onToggleOpen={onToggleOpen}
                     onEventClick={onEventClick}
                     onTriggerNavigate={handleTriggerNavigate}
