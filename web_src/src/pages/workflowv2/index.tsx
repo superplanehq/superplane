@@ -1,6 +1,7 @@
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
+import debounce from "lodash.debounce";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -223,6 +224,33 @@ export function WorkflowPageV2() {
       setHasNonPositionalUnsavedChanges(false);
     }
   }, [initialWorkflowSnapshot, organizationId, workflowId, queryClient]);
+
+  /**
+   * Debounced auto-save function for node position changes.
+   * Waits 1 second after the last position change before saving.
+   * Position changes don't trigger the unsaved state, so auto-save happens silently.
+   */
+  const debouncedAutoSave = useMemo(
+    () =>
+      debounce(async (workflowToSave: WorkflowsWorkflow) => {
+        if (!organizationId || !workflowId) return;
+
+        try {
+          await updateWorkflowMutation.mutateAsync({
+            name: workflowToSave.metadata?.name!,
+            description: workflowToSave.metadata?.description,
+            nodes: workflowToSave.spec?.nodes,
+            edges: workflowToSave.spec?.edges,
+          });
+
+          // Auto-save completed silently (no toast or state changes)
+        } catch (error: any) {
+          console.error("Failed to auto-save canvas changes:", error);
+          // Don't show error toast for auto-save failures to avoid being intrusive
+        }
+      }, 1000),
+    [organizationId, workflowId, updateWorkflowMutation],
+  );
 
   const handleNodeWebsocketEvent = useCallback(
     (nodeId: string, event: string) => {
@@ -834,9 +862,6 @@ export function WorkflowPageV2() {
     (nodeId: string, position: { x: number; y: number }) => {
       if (!workflow || !organizationId || !workflowId) return;
 
-      // Save snapshot before making changes
-      saveWorkflowSnapshot(workflow);
-
       const updatedNodes = workflow.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
@@ -858,9 +883,11 @@ export function WorkflowPageV2() {
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      markUnsavedChange("position");
+
+      // Trigger auto-save with debounce (no unsaved changes notification)
+      debouncedAutoSave(updatedWorkflow);
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+    [workflow, organizationId, workflowId, queryClient, debouncedAutoSave],
   );
 
   const handleNodeCollapseChange = useCallback(
