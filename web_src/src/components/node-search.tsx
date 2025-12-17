@@ -25,12 +25,7 @@ export interface NodeSearchProps extends Omit<PanelProps, "children"> {
   onOpenChange?: (open: boolean) => void;
 }
 
-export function NodeSearchInternal({
-  onSearch,
-  onSelectNode,
-  open,
-  onOpenChange,
-}: NodeSearchProps) {
+export function NodeSearchInternal({ onSearch, onSelectNode, open, onOpenChange }: NodeSearchProps) {
   const [searchResults, setSearchResults] = useState<Node[]>([]);
   const [searchString, setSearchString] = useState<string>("");
   const { getNodes, fitView, setNodes } = useReactFlow<Node, BuiltInEdge>();
@@ -134,12 +129,7 @@ export function NodeSearch({ onSearch, onSelectNode }: NodeSearchProps) {
         <TooltipContent>Search nodes (Ctrl+K)</TooltipContent>
       </Tooltip>
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <NodeSearchInternal
-          onSearch={onSearch}
-          onSelectNode={onSelectNode}
-          open={open}
-          onOpenChange={setOpen}
-        />
+        <NodeSearchInternal onSearch={onSearch} onSelectNode={onSelectNode} open={open} onOpenChange={setOpen} />
       </CommandDialog>
     </>
   );
@@ -149,20 +139,10 @@ export interface NodeSearchDialogProps extends NodeSearchProps {
   title?: string;
 }
 
-export function NodeSearchDialog({
-  onSearch,
-  onSelectNode,
-  open,
-  onOpenChange,
-}: NodeSearchDialogProps) {
+export function NodeSearchDialog({ onSearch, onSelectNode, open, onOpenChange }: NodeSearchDialogProps) {
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <NodeSearchInternal
-        onSearch={onSearch}
-        onSelectNode={onSelectNode}
-        open={open}
-        onOpenChange={onOpenChange}
-      />
+      <NodeSearchInternal onSearch={onSearch} onSelectNode={onSelectNode} open={open} onOpenChange={onOpenChange} />
     </CommandDialog>
   );
 }

@@ -1409,14 +1409,14 @@ function CanvasContent({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Toggle collapse: Ctrl/Cmd + E
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'e') {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "e") {
         e.preventDefault();
         handleToggleCollapse();
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleToggleCollapse]);
 
   const handlePaneClick = useCallback(() => {
@@ -1655,7 +1655,9 @@ function CanvasContent({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {state.isCollapsed ? "Switch components to Detailed view (Ctrl/Cmd + E)" : "Switch components to Compact view (Ctrl/Cmd + E)"}
+                  {state.isCollapsed
+                    ? "Switch components to Detailed view (Ctrl/Cmd + E)"
+                    : "Switch components to Compact view (Ctrl/Cmd + E)"}
                 </TooltipContent>
               </Tooltip>
               <NodeSearch

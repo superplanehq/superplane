@@ -28,29 +28,29 @@ export function ZoomSlider({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Zoom in: Ctrl/Cmd + = or Ctrl/Cmd + Plus
-      if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+")) {
         e.preventDefault();
         zoomIn({ duration: 300 });
       }
       // Zoom out: Ctrl/Cmd + - or Ctrl/Cmd + Minus
-      else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+      else if ((e.ctrlKey || e.metaKey) && e.key === "-") {
         e.preventDefault();
         zoomOut({ duration: 300 });
       }
       // Reset zoom: Ctrl/Cmd + 0
-      else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+      else if ((e.ctrlKey || e.metaKey) && e.key === "0") {
         e.preventDefault();
         zoomTo(1, { duration: 300 });
       }
       // Fit view: Ctrl/Cmd + 1
-      else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === '1') {
+      else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "1") {
         e.preventDefault();
         fitView({ duration: 300 });
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [zoomIn, zoomOut, zoomTo, fitView]);
 
   return (
