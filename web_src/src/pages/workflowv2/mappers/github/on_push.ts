@@ -12,8 +12,15 @@ interface GitHubMetadata {
   };
 }
 
+type PredicateType = "equals" | "notEquals" | "matches";
+
+interface Predicate {
+  type: PredicateType;
+  value: string;
+}
+
 interface GithubConfiguration {
-  branch: string;
+  refs: Predicate[];
 }
 
 interface PushEventData {
@@ -63,10 +70,22 @@ export const onPushTriggerRenderer: TriggerRenderer = {
       });
     }
 
-    if (configuration?.branch) {
+    if (configuration?.refs) {
       metadataItems.push({
         icon: "funnel",
-        label: configuration.branch,
+        label: configuration.refs
+          .map((ref) => {
+            if (ref.type === "equals") {
+              return `=${ref.value}`;
+            }
+            if (ref.type === "notEquals") {
+              return `!=${ref.value}`;
+            }
+            if (ref.type === "matches") {
+              return `~${ref.value}`;
+            }
+          })
+          .join(", "),
       });
     }
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/robfig/cron/v3"
 )
 
@@ -196,6 +197,48 @@ func validateList(field Field, value any) error {
 			if err != nil {
 				return fmt.Errorf("item at index %d: %w", i, err)
 			}
+		}
+	}
+
+	return nil
+}
+
+func validateAnyPredicateList(field Field, value any) error {
+	var predicates []Predicate
+	err := mapstructure.Decode(value, &predicates)
+	if err != nil {
+		return fmt.Errorf("must be a list of predicates")
+	}
+
+	if field.Required && len(predicates) == 0 {
+		return fmt.Errorf("must contain at least one predicate")
+	}
+
+	// Get valid operators if defined
+	var validOperators []string
+	if field.TypeOptions != nil && field.TypeOptions.AnyPredicateList != nil {
+		for _, op := range field.TypeOptions.AnyPredicateList.Operators {
+			validOperators = append(validOperators, op.Value)
+		}
+	}
+
+	for i, predicate := range predicates {
+		// Validate type field
+		if predicate.Type == "" {
+			return fmt.Errorf("predicate at index %d: 'type' must be a non-empty string", i)
+		}
+
+		// Validate operator is valid if operators are defined
+		if len(validOperators) > 0 {
+			valid := slices.Contains(validOperators, predicate.Type)
+			if !valid {
+				return fmt.Errorf("predicate at index %d: '%s' is not a valid operator. Must be one of: %s", i, predicate.Type, strings.Join(validOperators, ", "))
+			}
+		}
+
+		// Validate value field
+		if predicate.Value == "" {
+			return fmt.Errorf("predicate at index %d: 'value' must be a non-empty string", i)
 		}
 	}
 
@@ -395,6 +438,9 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeList:
 		return validateList(field, value)
+
+	case FieldTypeAnyPredicateList:
+		return validateAnyPredicateList(field, value)
 
 	case FieldTypeObject:
 		return validateObject(field, value)

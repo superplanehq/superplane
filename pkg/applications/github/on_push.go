@@ -13,8 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
-const MaxEventSize = 64 * 1024
-
 type OnPush struct{}
 
 type OnPushMetadata struct {
@@ -28,8 +26,8 @@ type Repository struct {
 }
 
 type OnPushConfiguration struct {
-	Repository string `json:"repository"`
-	Branch     string `json:"branch"`
+	Repository string                    `json:"repository"`
+	Refs       []configuration.Predicate `json:"refs"`
 }
 
 func (p *OnPush) Name() string {
@@ -61,11 +59,21 @@ func (p *OnPush) Configuration() []configuration.Field {
 			Required: true,
 		},
 		{
-			Name:     "branch",
-			Label:    "Branch",
-			Type:     configuration.FieldTypeString,
+			Name:     "refs",
+			Label:    "Refs",
+			Type:     configuration.FieldTypeAnyPredicateList,
 			Required: true,
-			Default:  "main",
+			Default: []map[string]any{
+				{
+					"type":  configuration.PredicateTypeEquals,
+					"value": "refs/heads/main",
+				},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
+				},
+			},
 		},
 	}
 }
@@ -186,7 +194,7 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("invalid ref")
 	}
 
-	if "refs/heads/"+config.Branch != r {
+	if !configuration.MatchesAnyPredicate(config.Refs, r) {
 		return http.StatusOK, nil
 	}
 

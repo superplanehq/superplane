@@ -1,27 +1,33 @@
 package configuration
 
 const (
-	FieldTypeString              = "string"
-	FieldTypeNumber              = "number"
-	FieldTypeBool                = "boolean"
-	FieldTypeSelect              = "select"
-	FieldTypeMultiSelect         = "multi-select"
+	/*
+	 * Basic field types
+	 */
+	FieldTypeString      = "string"
+	FieldTypeNumber      = "number"
+	FieldTypeBool        = "boolean"
+	FieldTypeSelect      = "select"
+	FieldTypeMultiSelect = "multi-select"
+	FieldTypeList        = "list"
+	FieldTypeObject      = "object"
+	FieldTypeTime        = "time"
+	FieldTypeDate        = "date"
+	FieldTypeDateTime    = "datetime"
+	FieldTypeTimezone    = "timezone"
+
+	/*
+	 * Special field types
+	 */
+	FieldTypeDayInYear           = "day-in-year"
+	FieldTypeCron                = "cron"
+	FieldTypeUser                = "user"
+	FieldTypeRole                = "role"
+	FieldTypeGroup               = "group"
 	FieldTypeIntegration         = "integration"
 	FieldTypeIntegrationResource = "integration-resource"
-	// FieldTypeGitRef is a semantic string for Git references (e.g., refs/heads/main, refs/tags/v1.0.0)
-	// It behaves like a string in validation, but allows the UI to render a specialized control.
-	FieldTypeGitRef    = "git-ref"
-	FieldTypeList      = "list"
-	FieldTypeObject    = "object"
-	FieldTypeTime      = "time"
-	FieldTypeDate      = "date"
-	FieldTypeDateTime  = "datetime"
-	FieldTypeDayInYear = "day-in-year"
-	FieldTypeCron      = "cron"
-	FieldTypeUser      = "user"
-	FieldTypeRole      = "role"
-	FieldTypeGroup     = "group"
-	FieldTypeTimezone  = "timezone"
+	FieldTypeAnyPredicateList    = "any-predicate-list"
+	FieldTypeGitRef              = "git-ref"
 )
 
 type Field struct {
@@ -41,17 +47,7 @@ type Field struct {
 	Placeholder string `json:"placeholder,omitempty"`
 
 	/*
-	 * Type of the field. Supported types are:
-	 * - string
-	 * - number
-	 * - boolean
-	 * - select
-	 * - multi_select
-	 * - integration
-	 * - date
-	 * - url
-	 * - list
-	 * - object
+	 * Type of the field. Supported types are defined by FieldType* constants above.
 	 */
 	Type        string `json:"type"`
 	Description string `json:"description"`
@@ -92,19 +88,20 @@ type Field struct {
  * TypeOptions contains type-specific configuration for fields.
  */
 type TypeOptions struct {
-	Number      *NumberTypeOptions      `json:"number,omitempty"`
-	Select      *SelectTypeOptions      `json:"select,omitempty"`
-	MultiSelect *MultiSelectTypeOptions `json:"multi_select,omitempty"`
-	Integration *IntegrationTypeOptions `json:"integration,omitempty"`
-	Resource    *ResourceTypeOptions    `json:"resource,omitempty"`
-	List        *ListTypeOptions        `json:"list,omitempty"`
-	Object      *ObjectTypeOptions      `json:"object,omitempty"`
-	Time        *TimeTypeOptions        `json:"time,omitempty"`
-	Date        *DateTypeOptions        `json:"date,omitempty"`
-	DateTime    *DateTimeTypeOptions    `json:"datetime,omitempty"`
-	DayInYear   *DayInYearTypeOptions   `json:"day_in_year,omitempty"`
-	Cron        *CronTypeOptions        `json:"cron,omitempty"`
-	Timezone    *TimezoneTypeOptions    `json:"timezone,omitempty"`
+	Number           *NumberTypeOptions           `json:"number,omitempty"`
+	Select           *SelectTypeOptions           `json:"select,omitempty"`
+	MultiSelect      *MultiSelectTypeOptions      `json:"multi_select,omitempty"`
+	Integration      *IntegrationTypeOptions      `json:"integration,omitempty"`
+	Resource         *ResourceTypeOptions         `json:"resource,omitempty"`
+	List             *ListTypeOptions             `json:"list,omitempty"`
+	AnyPredicateList *AnyPredicateListTypeOptions `json:"any_predicate_list,omitempty"`
+	Object           *ObjectTypeOptions           `json:"object,omitempty"`
+	Time             *TimeTypeOptions             `json:"time,omitempty"`
+	Date             *DateTypeOptions             `json:"date,omitempty"`
+	DateTime         *DateTimeTypeOptions         `json:"datetime,omitempty"`
+	DayInYear        *DayInYearTypeOptions        `json:"day_in_year,omitempty"`
+	Cron             *CronTypeOptions             `json:"cron,omitempty"`
+	Timezone         *TimezoneTypeOptions         `json:"timezone,omitempty"`
 }
 
 /*

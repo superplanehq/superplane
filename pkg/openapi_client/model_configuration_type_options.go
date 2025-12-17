@@ -20,16 +20,17 @@ var _ MappedNullable = &ConfigurationTypeOptions{}
 
 // ConfigurationTypeOptions struct for ConfigurationTypeOptions
 type ConfigurationTypeOptions struct {
-	Number      *ConfigurationNumberTypeOptions      `json:"number,omitempty"`
-	Select      *ConfigurationSelectTypeOptions      `json:"select,omitempty"`
-	MultiSelect *ConfigurationMultiSelectTypeOptions `json:"multiSelect,omitempty"`
-	Integration *ConfigurationIntegrationTypeOptions `json:"integration,omitempty"`
-	List        *ConfigurationListTypeOptions        `json:"list,omitempty"`
-	Object      *ConfigurationObjectTypeOptions      `json:"object,omitempty"`
-	Resource    *ConfigurationResourceTypeOptions    `json:"resource,omitempty"`
-	Time        *ConfigurationTimeTypeOptions        `json:"time,omitempty"`
-	Date        *ConfigurationDateTypeOptions        `json:"date,omitempty"`
-	Datetime    *ConfigurationDateTimeTypeOptions    `json:"datetime,omitempty"`
+	Number           *ConfigurationNumberTypeOptions           `json:"number,omitempty"`
+	Select           *ConfigurationSelectTypeOptions           `json:"select,omitempty"`
+	MultiSelect      *ConfigurationMultiSelectTypeOptions      `json:"multiSelect,omitempty"`
+	Integration      *ConfigurationIntegrationTypeOptions      `json:"integration,omitempty"`
+	List             *ConfigurationListTypeOptions             `json:"list,omitempty"`
+	Object           *ConfigurationObjectTypeOptions           `json:"object,omitempty"`
+	Resource         *ConfigurationResourceTypeOptions         `json:"resource,omitempty"`
+	Time             *ConfigurationTimeTypeOptions             `json:"time,omitempty"`
+	Date             *ConfigurationDateTypeOptions             `json:"date,omitempty"`
+	Datetime         *ConfigurationDateTimeTypeOptions         `json:"datetime,omitempty"`
+	AnyPredicateList *ConfigurationAnyPredicateListTypeOptions `json:"anyPredicateList,omitempty"`
 }
 
 // NewConfigurationTypeOptions instantiates a new ConfigurationTypeOptions object
@@ -369,6 +370,38 @@ func (o *ConfigurationTypeOptions) SetDatetime(v ConfigurationDateTimeTypeOption
 	o.Datetime = &v
 }
 
+// GetAnyPredicateList returns the AnyPredicateList field value if set, zero value otherwise.
+func (o *ConfigurationTypeOptions) GetAnyPredicateList() ConfigurationAnyPredicateListTypeOptions {
+	if o == nil || IsNil(o.AnyPredicateList) {
+		var ret ConfigurationAnyPredicateListTypeOptions
+		return ret
+	}
+	return *o.AnyPredicateList
+}
+
+// GetAnyPredicateListOk returns a tuple with the AnyPredicateList field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationTypeOptions) GetAnyPredicateListOk() (*ConfigurationAnyPredicateListTypeOptions, bool) {
+	if o == nil || IsNil(o.AnyPredicateList) {
+		return nil, false
+	}
+	return o.AnyPredicateList, true
+}
+
+// HasAnyPredicateList returns a boolean if a field has been set.
+func (o *ConfigurationTypeOptions) HasAnyPredicateList() bool {
+	if o != nil && !IsNil(o.AnyPredicateList) {
+		return true
+	}
+
+	return false
+}
+
+// SetAnyPredicateList gets a reference to the given ConfigurationAnyPredicateListTypeOptions and assigns it to the AnyPredicateList field.
+func (o *ConfigurationTypeOptions) SetAnyPredicateList(v ConfigurationAnyPredicateListTypeOptions) {
+	o.AnyPredicateList = &v
+}
+
 func (o ConfigurationTypeOptions) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -408,6 +441,9 @@ func (o ConfigurationTypeOptions) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Datetime) {
 		toSerialize["datetime"] = o.Datetime
+	}
+	if !IsNil(o.AnyPredicateList) {
+		toSerialize["anyPredicateList"] = o.AnyPredicateList
 	}
 	return toSerialize, nil
 }
