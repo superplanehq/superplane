@@ -29,7 +29,7 @@ func UpdateApplication(ctx context.Context, registry *registry.Registry, baseURL
 	}
 
 	existingConfig := appInstallation.Configuration.Data()
-	configuration, err = encryptConfigurationIfNeeded(ctx, registry, app, configuration, orgID, existingConfig)
+	configuration, err = encryptConfigurationIfNeeded(ctx, registry, app, configuration, appInstallation.ID, existingConfig)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to encrypt sensitive configuration: %v", err)
 	}

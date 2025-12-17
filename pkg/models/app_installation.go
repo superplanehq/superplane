@@ -48,9 +48,10 @@ type BrowserAction struct {
 	Description string
 }
 
-func CreateAppInstallation(orgID uuid.UUID, appName string, installationName string, config map[string]any) (*AppInstallation, error) {
+func CreateAppInstallation(id, orgID uuid.UUID, appName string, installationName string, config map[string]any) (*AppInstallation, error) {
 	now := time.Now()
 	appInstallation := AppInstallation{
+		ID:               id,
 		OrganizationID:   orgID,
 		AppName:          appName,
 		InstallationName: installationName,
