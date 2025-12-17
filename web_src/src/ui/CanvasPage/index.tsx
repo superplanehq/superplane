@@ -734,7 +734,7 @@ function CanvasPage(props: CanvasPageProps) {
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
-      <div className="relative z-20">
+      <div className="relative z-30">
         <CanvasContentHeader
           state={state}
           onSave={props.onSave}
