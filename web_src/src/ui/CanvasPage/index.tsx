@@ -11,6 +11,7 @@ import {
 import { Loader2, Puzzle, ScanLine, ScanText } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -1632,14 +1633,18 @@ function CanvasContent({
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
             <ZoomSlider position="bottom-left" orientation="horizontal">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleToggleCollapse}
-                title={state.isCollapsed ? "Expand view" : "Collapse view"}
-              >
-                {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={handleToggleCollapse}
+                  >
+                    {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{state.isCollapsed ? "Switch components to Detailed view" : "Switch components to Compact view"}</TooltipContent>
+              </Tooltip>
             </ZoomSlider>
           </ReactFlow>
         </div>
