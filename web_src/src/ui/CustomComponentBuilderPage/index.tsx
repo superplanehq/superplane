@@ -17,6 +17,9 @@ import {
   ConfigurationField,
   SuperplaneBlueprintsOutputChannel,
   AuthorizationDomainType,
+  ApplicationsApplicationDefinition,
+  OrganizationsAppInstallation,
+  ComponentsAppInstallationRef,
 } from "@/api-client";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { Block, BlockData } from "../CanvasPage/Block";
@@ -40,6 +43,8 @@ export interface NodeEditData {
   displayLabel?: string;
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
+  appName?: string;
+  appInstallationRef?: any;
 }
 
 export interface NewNodeData {
@@ -50,6 +55,8 @@ export interface NewNodeData {
   configuration: Record<string, any>;
   position?: { x: number; y: number };
   sourceConnection?: { nodeId: string; handleId: string | null };
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
 }
 
 export interface CustomComponentBuilderPageProps {
@@ -86,6 +93,8 @@ export interface CustomComponentBuilderPageProps {
 
   // Building blocks
   components: ComponentsComponent[];
+  availableApplications?: ApplicationsApplicationDefinition[];
+  installedApplications?: OrganizationsAppInstallation[];
 
   // Template node helpers
   onAddTemplateNode?: (node: Node) => void;
@@ -531,6 +540,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           displayLabel: block.label || block.name || "",
           configuration: {},
           position,
+          appName: block.appName,
         });
 
         // Open sidebar in non-delegated mode
@@ -549,19 +559,19 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   );
 
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, any>, nodeName: string) => {
+    (configuration: Record<string, any>, nodeName: string, appInstallationRef?: any) => {
       if (templateNodeId && newNodeData) {
         // This is a template node being saved
-        handleSaveNewNode(configuration, nodeName);
+        handleSaveNewNode(configuration, nodeName, appInstallationRef);
       } else if (editingNodeData && props.onNodeConfigurationSave) {
-        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName);
+        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
       }
     },
     [templateNodeId, newNodeData, editingNodeData, props],
   );
 
   const handleSaveNewNode = useCallback(
-    (configuration: Record<string, any>, nodeName: string) => {
+    (configuration: Record<string, any>, nodeName: string, appInstallationRef?: any) => {
       if (newNodeData && props.onNodeAdd && templateNodeId) {
         // Remove the template node first
         if (props.onRemoveTemplateNode) {
@@ -573,6 +583,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           buildingBlock: newNodeData.buildingBlock,
           nodeName,
           configuration,
+          appInstallationRef,
           position: newNodeData.position,
           sourceConnection: newNodeData.sourceConnection,
         });
@@ -620,9 +631,17 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   }, [templateNodeId, props]);
 
   // Use shared builder (merge mocks + live components)
+  // Filter out triggers from applications since triggers can't be used in custom components
+  const availableApplicationsWithoutTriggers = useMemo(() => {
+    return (props.availableApplications || []).map((app) => ({
+      ...app,
+      triggers: undefined, // Remove triggers from applications
+    }));
+  }, [props.availableApplications]);
+
   const buildingBlockCategories = useMemo<BuildingBlockCategory[]>(
-    () => buildBuildingBlockCategories([], props.components, [], []),
-    [props.components],
+    () => buildBuildingBlockCategories([], props.components, [], availableApplicationsWithoutTriggers),
+    [props.components, availableApplicationsWithoutTriggers],
   );
 
   const handleNodeClick = useCallback(
@@ -901,6 +920,9 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             domainId={props.organizationId}
             domainType={"DOMAIN_TYPE_ORGANIZATION" as AuthorizationDomainType}
             customField={undefined}
+            appName={editingNodeData?.appName}
+            appInstallationRef={editingNodeData?.appInstallationRef}
+            installedApplications={props.installedApplications}
           />
         )}
       </div>

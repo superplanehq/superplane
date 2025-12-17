@@ -33,14 +33,15 @@ func expandNodes(organizationID string, nodes []models.Node) ([]models.Node, err
 
 		for _, bn := range b.Nodes {
 			internal := models.Node{
-				ID:            n.ID + ":" + bn.ID,
-				Name:          bn.Name,
-				Type:          bn.Type,
-				Ref:           bn.Ref,
-				Configuration: bn.Configuration,
-				Metadata:      cloneMetadata(bn.Metadata),
-				Position:      bn.Position,
-				IsCollapsed:   bn.IsCollapsed,
+				ID:                n.ID + ":" + bn.ID,
+				Name:              bn.Name,
+				Type:              bn.Type,
+				Ref:               bn.Ref,
+				Configuration:     bn.Configuration,
+				Metadata:          cloneMetadata(bn.Metadata),
+				Position:          bn.Position,
+				IsCollapsed:       bn.IsCollapsed,
+				AppInstallationID: bn.AppInstallationID,
 			}
 
 			expanded = append(expanded, internal)
