@@ -10,6 +10,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ZoomSlider } from "@/components/zoom-slider";
+import { NodeSearch } from "@/components/node-search";
 import "./blueprint-canvas-reset.css";
 
 import {
@@ -364,7 +365,9 @@ function CanvasContent({
       elementsSelectable={true}
     >
       <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
-      <ZoomSlider position="bottom-left" orientation="horizontal" />
+      <ZoomSlider position="bottom-left" orientation="horizontal">
+        <NodeSearch />
+      </ZoomSlider>
     </ReactFlow>
   );
 }
