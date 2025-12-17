@@ -226,21 +226,62 @@ export function WorkflowPageV2() {
   }, [initialWorkflowSnapshot, organizationId, workflowId, queryClient]);
 
   /**
+   * Ref to track pending position updates that need to be auto-saved.
+   * Maps node ID to its updated position.
+   */
+  const pendingPositionUpdatesRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+
+  /**
    * Debounced auto-save function for node position changes.
    * Waits 1 second after the last position change before saving.
-   * Position changes don't trigger the unsaved state, so auto-save happens silently.
+   * Only saves position changes, not structural modifications (deletions, additions, etc).
+   * If there are unsaved structural changes, position auto-save is skipped.
    */
   const debouncedAutoSave = useMemo(
     () =>
-      debounce(async (workflowToSave: WorkflowsWorkflow) => {
+      debounce(async () => {
         if (!organizationId || !workflowId) return;
 
+        const positionUpdates = new Map(pendingPositionUpdatesRef.current);
+        if (positionUpdates.size === 0) return;
+
+        // Clear pending updates immediately to avoid duplicate saves
+        pendingPositionUpdatesRef.current.clear();
+
         try {
+          // Check if there are unsaved structural changes
+          // If so, skip auto-save to avoid saving those changes accidentally
+          if (hasNonPositionalUnsavedChanges) {
+            console.log("Skipping position auto-save due to unsaved structural changes");
+            return;
+          }
+
+          // Fetch the latest workflow from the cache
+          const latestWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
+            workflowKeys.detail(organizationId, workflowId),
+          );
+
+          if (!latestWorkflow?.spec?.nodes) return;
+
+          // Apply only position updates to the current state
+          const updatedNodes = latestWorkflow.spec.nodes.map((node) => {
+            if (!node.id) return node;
+
+            const positionUpdate = positionUpdates.get(node.id);
+            if (positionUpdate) {
+              return {
+                ...node,
+                position: positionUpdate,
+              };
+            }
+            return node;
+          });
+
           await updateWorkflowMutation.mutateAsync({
-            name: workflowToSave.metadata?.name!,
-            description: workflowToSave.metadata?.description,
-            nodes: workflowToSave.spec?.nodes,
-            edges: workflowToSave.spec?.edges,
+            name: latestWorkflow.metadata?.name!,
+            description: latestWorkflow.metadata?.description,
+            nodes: updatedNodes,
+            edges: latestWorkflow.spec?.edges,
           });
 
           // Auto-save completed silently (no toast or state changes)
@@ -249,7 +290,7 @@ export function WorkflowPageV2() {
           // Don't show error toast for auto-save failures to avoid being intrusive
         }
       }, 1000),
-    [organizationId, workflowId, updateWorkflowMutation],
+    [organizationId, workflowId, updateWorkflowMutation, queryClient, hasNonPositionalUnsavedChanges],
   );
 
   const handleNodeWebsocketEvent = useCallback(
@@ -862,14 +903,16 @@ export function WorkflowPageV2() {
     (nodeId: string, position: { x: number; y: number }) => {
       if (!workflow || !organizationId || !workflowId) return;
 
+      const roundedPosition = {
+        x: Math.round(position.x),
+        y: Math.round(position.y),
+      };
+
       const updatedNodes = workflow.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
               ...node,
-              position: {
-                x: Math.round(position.x),
-                y: Math.round(position.y),
-              },
+              position: roundedPosition,
             }
           : node,
       );
@@ -884,8 +927,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
+      // Track position update for auto-save
+      pendingPositionUpdatesRef.current.set(nodeId, roundedPosition);
+
       // Trigger auto-save with debounce (no unsaved changes notification)
-      debouncedAutoSave(updatedWorkflow);
+      debouncedAutoSave();
     },
     [workflow, organizationId, workflowId, queryClient, debouncedAutoSave],
   );
