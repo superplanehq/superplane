@@ -1,7 +1,6 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
-import { Avatar } from "@/components/Avatar/avatar";
+// import { Avatar } from "@/components/Avatar/avatar";
 import { Icon } from "@/components/Icon";
-import { Text } from "@/components/Text/text";
 import { useAccount } from "@/contexts/AccountContext";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { resolveIcon } from "@/lib/utils";
@@ -44,7 +43,7 @@ export function Header({
 }: HeaderProps) {
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId || "");
-  const forceSidebarVisible = true;
+  const forceSidebarVisible = false;
   const [isSidebarOpen, setIsSidebarOpen] = useState(forceSidebarVisible);
   const sidebarTimeoutRef = useRef<number | null>(null);
 
@@ -97,16 +96,15 @@ export function Header({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const accountInitials = account?.name
-    ? account.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-    : "?";
+  // const accountInitials = account?.name
+  //   ? account.name
+  //       .split(" ")
+  //       .map((n) => n[0])
+  //       .join("")
+  //       .toUpperCase()
+  //   : "?";
 
   const organizationName = organization?.metadata?.name || "Organization";
-  const organizationInitial = organizationName.charAt(0).toUpperCase();
 
   const sidebarUserLinks = [
     {
@@ -265,7 +263,7 @@ export function Header({
               </div>
             </div>
 
-            <div class="p-4 border-b border-t border-gray-300">
+            <div className="p-4 border-b border-t border-gray-300">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Organization</p>
               <div className="mt-2 flex items-center gap-3">
                 {/* <Avatar
@@ -291,7 +289,7 @@ export function Header({
               </div>
             </div>
 
-            <div class="p-4">
+            <div className="p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">You</p>
               <div className="mt-2 flex items-center gap-3">
                 {/* <Avatar
