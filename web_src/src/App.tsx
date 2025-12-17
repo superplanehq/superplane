@@ -2,8 +2,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { Toaster } from "sonner";
 import "./App.css";
 
 // Import pages
@@ -67,19 +66,7 @@ function App() {
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
-        <ToastContainer
-          position="bottom-center"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick={true}
-          rtl={false}
-          pauseOnFocusLoss={true}
-          draggable={true}
-          pauseOnHover={true}
-          closeButton={false}
-          theme="auto"
-        />
+        <Toaster position="bottom-center" richColors closeButton />
       </AccountProvider>
     </QueryClientProvider>
   );
