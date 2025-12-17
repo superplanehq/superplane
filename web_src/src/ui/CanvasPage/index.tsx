@@ -12,6 +12,8 @@ import { Loader2, Puzzle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  ComponentsAppInstallationRef,
+  OrganizationsAppInstallation,
   ConfigurationField,
   WorkflowsWorkflowNodeExecution,
   ComponentsNode,
@@ -90,6 +92,8 @@ export interface NodeEditData {
   displayLabel?: string;
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
 }
 
 export interface NewNodeData {
@@ -99,6 +103,8 @@ export interface NewNodeData {
   displayLabel?: string;
   configuration: Record<string, any>;
   position?: { x: number; y: number };
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
   sourceConnection?: {
     nodeId: string;
     handleId: string | null;
@@ -128,9 +134,15 @@ export interface CanvasPageProps {
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
+  onNodeConfigurationSave?: (
+    nodeId: string,
+    configuration: Record<string, any>,
+    nodeName: string,
+    appInstallationRef?: ComponentsAppInstallationRef,
+  ) => void;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
-  onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
   onSave?: (nodes: CanvasNode[]) => void;
+  installedApplications?: OrganizationsAppInstallation[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
@@ -530,6 +542,7 @@ function CanvasPage(props: CanvasPageProps) {
         configuration: {},
         position: pendingNode.position,
         sourceConnection: pendingNode.data.sourceConnection as { nodeId: string; handleId: string | null } | undefined,
+        appName: block.appName,
       });
 
       setIsBuildingBlocksSidebarOpen(false);
@@ -586,6 +599,7 @@ function CanvasPage(props: CanvasPageProps) {
         displayLabel: block.label || block.name || "",
         configuration: {},
         position,
+        appName: block.appName,
       });
 
       state.componentSidebar.open(newTemplateId);
@@ -609,7 +623,7 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, any>, nodeName: string) => {
+    (configuration: Record<string, any>, nodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => {
       if (templateNodeId && newNodeData) {
         // Template nodes should always be converted to real nodes
         // Remove the template node first
@@ -625,6 +639,8 @@ function CanvasPage(props: CanvasPageProps) {
             nodeName,
             configuration,
             position: newNodeData.position,
+            appName: newNodeData.appName,
+            appInstallationRef,
             sourceConnection: newNodeData.sourceConnection, // Will be undefined for dropped components
           });
         }
@@ -637,7 +653,7 @@ function CanvasPage(props: CanvasPageProps) {
         state.componentSidebar.close();
         setCurrentTab("latest");
       } else if (editingNodeData && props.onNodeConfigurationSave) {
-        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName);
+        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
       }
     },
     [templateNodeId, newNodeData, editingNodeData, props, state, setTemplateNodeId, setNewNodeData, setCurrentTab],
@@ -790,6 +806,7 @@ function CanvasPage(props: CanvasPageProps) {
             onDocs={props.onDocs}
             onConfigure={props.onConfigure}
             onDeactivate={props.onDeactivate}
+            onToggleView={handleToggleView}
             onDelete={handleNodeDelete}
             runDisabled={props.runDisabled}
             runDisabledTooltip={props.runDisabledTooltip}
@@ -815,6 +832,7 @@ function CanvasPage(props: CanvasPageProps) {
             newNodeData={newNodeData}
             organizationId={props.organizationId}
             getCustomField={props.getCustomField}
+            installedApplications={props.installedApplications}
             workflowNodes={props.workflowNodes}
             components={props.components}
             triggers={props.triggers}
@@ -912,6 +930,7 @@ function Sidebar({
   newNodeData,
   organizationId,
   getCustomField,
+  installedApplications,
   workflowNodes,
   components,
   triggers,
@@ -959,6 +978,7 @@ function Sidebar({
   newNodeData: NewNodeData | null;
   organizationId?: string;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
+  installedApplications?: OrganizationsAppInstallation[];
   workflowNodes?: ComponentsNode[];
   components?: ComponentsComponent[];
   triggers?: TriggersTrigger[];
@@ -1096,6 +1116,9 @@ function Sidebar({
             ? getCustomField(state.componentSidebar.selectedNodeId) || undefined
             : undefined
       }
+      appName={editingNodeData?.appName}
+      appInstallationRef={editingNodeData?.appInstallationRef}
+      installedApplications={installedApplications}
       currentTab={currentTab}
       onTabChange={onTabChange}
       templateNodeId={templateNodeId}

@@ -12,6 +12,8 @@ import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import {
   AuthorizationDomainType,
+  ComponentsAppInstallationRef,
+  OrganizationsAppInstallation,
   ConfigurationField,
   WorkflowsWorkflowNodeExecution,
   ComponentsNode,
@@ -20,7 +22,7 @@ import {
   BlueprintsBlueprint,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
-import { NewNodeData } from "../CustomComponentBuilderPage";
+import { NewNodeData } from "../CanvasPage";
 import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 
@@ -110,11 +112,18 @@ interface ComponentSidebarProps {
   nodeLabel?: string;
   nodeConfiguration?: Record<string, unknown>;
   nodeConfigurationFields?: ConfigurationField[];
-  onNodeConfigSave?: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string) => void;
+  onNodeConfigSave?: (
+    updatedConfiguration: Record<string, unknown>,
+    updatedNodeName: string,
+    appInstallationRef?: ComponentsAppInstallationRef,
+  ) => void;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
+  installedApplications?: OrganizationsAppInstallation[];
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
@@ -180,6 +189,9 @@ export const ComponentSidebar = ({
   domainId,
   domainType,
   customField,
+  appName,
+  appInstallationRef,
+  installedApplications,
   workflowNodes = [],
   components = [],
   triggers = [],
@@ -620,6 +632,9 @@ export const ComponentSidebar = ({
                   domainId={domainId}
                   domainType={domainType}
                   customField={customField}
+                  appName={isTemplateNode ? newNodeData.appName : appName}
+                  appInstallationRef={isTemplateNode ? newNodeData.appInstallationRef : appInstallationRef}
+                  installedApplications={installedApplications}
                 />
               </TabsContent>
             )}

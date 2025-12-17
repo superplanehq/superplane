@@ -11,7 +11,11 @@ import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule
 import { noopMapper } from "./noop";
 import { ifMapper } from "./if";
 import { httpMapper } from "./http";
-import { semaphoreMapper } from "./semaphore";
+import { semaphoreMapper as oldSemaphoreMapper } from "./semaphore";
+import {
+  componentMappers as semaphoreComponentMappers,
+  triggerRenderers as semaphoreTriggerRenderers,
+} from "./semaphore/index";
 import { timeGateMapper } from "./timegate";
 import { filterMapper } from "./filter";
 import { waitMapper } from "./wait";
@@ -31,11 +35,19 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
   if: ifMapper,
   http: httpMapper,
-  semaphore: semaphoreMapper,
+  semaphore: oldSemaphoreMapper,
   time_gate: timeGateMapper,
   filter: filterMapper,
   wait: waitMapper,
   approval: approvalMapper,
+};
+
+const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
+  semaphore: semaphoreComponentMappers,
+};
+
+const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
+  semaphore: semaphoreTriggerRenderers,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -54,16 +66,40 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
  * Get the appropriate renderer for a trigger type.
  * Falls back to the default renderer if no specific renderer is registered.
  */
-export function getTriggerRenderer(triggerName: string): TriggerRenderer {
-  return triggerRenderers[triggerName] || defaultTriggerRenderer;
+export function getTriggerRenderer(name: string): TriggerRenderer {
+  const parts = name.split(".");
+  if (parts.length == 1) {
+    return triggerRenderers[name] || defaultTriggerRenderer;
+  }
+
+  const appName = parts[0];
+  const appTriggers = appTriggerRenderers[appName];
+  if (!appTriggers) {
+    return defaultTriggerRenderer;
+  }
+
+  const triggerName = parts[1];
+  return appTriggers[triggerName] || defaultTriggerRenderer;
 }
 
 /**
- * Get the appropriate renderer for a trigger type.
- * Falls back to the default renderer if no specific renderer is registered.
+ * Get the appropriate mapper for a component.
+ * Falls back to the noop mapper if no specific mapper is registered.
  */
-export function getComponentBaseMapper(componentName: string): ComponentBaseMapper {
-  return componentBaseMappers[componentName] || noopMapper;
+export function getComponentBaseMapper(name: string): ComponentBaseMapper {
+  const parts = name.split(".");
+  if (parts.length == 1) {
+    return componentBaseMappers[name] || noopMapper;
+  }
+
+  const appName = parts[0];
+  const appMapper = appMappers[appName];
+  if (!appMapper) {
+    return noopMapper;
+  }
+
+  const componentName = parts[1];
+  return appMapper[componentName] || noopMapper;
 }
 
 /**

@@ -88,8 +88,13 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		return nil, err
 	}
 
+	protoWorkflow, err := SerializeWorkflow(existingWorkflow, true)
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.UpdateWorkflowResponse{
-		Workflow: SerializeWorkflow(existingWorkflow, true),
+		Workflow: protoWorkflow,
 	}, nil
 }
 
@@ -105,6 +110,15 @@ func findNode(nodes []models.WorkflowNode, nodeID string) *models.WorkflowNode {
 func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.Node, workflowID uuid.UUID) (*models.WorkflowNode, error) {
 	now := time.Now()
 
+	var appInstallationID *uuid.UUID
+	if node.AppInstallationID != nil && *node.AppInstallationID != "" {
+		parsedID, err := uuid.Parse(*node.AppInstallationID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid app installation ID: %v", err)
+		}
+		appInstallationID = &parsedID
+	}
+
 	//
 	// Node exists, just update it
 	//
@@ -116,7 +130,8 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		existingNode.Configuration = datatypes.NewJSONType(node.Configuration)
 		existingNode.Position = datatypes.NewJSONType(node.Position)
 		existingNode.IsCollapsed = node.IsCollapsed
-		existingNode.Metadata = datatypes.NewJSONType(node.Metadata)
+		existingNode.AppInstallationID = appInstallationID
+
 		// Set parent if internal namespaced id
 		if idx := strings.Index(node.ID, ":"); idx != -1 {
 			parent := node.ID[:idx]
@@ -124,6 +139,7 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		} else {
 			existingNode.ParentNodeID = nil
 		}
+
 		existingNode.UpdatedAt = &now
 		err := tx.Save(&existingNode).Error
 		if err != nil {
@@ -144,19 +160,20 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 	}
 
 	workflowNode := models.WorkflowNode{
-		WorkflowID:    workflowID,
-		NodeID:        node.ID,
-		ParentNodeID:  parentNodeID,
-		Name:          node.Name,
-		State:         models.WorkflowNodeStateReady,
-		Type:          node.Type,
-		Ref:           datatypes.NewJSONType(node.Ref),
-		Configuration: datatypes.NewJSONType(node.Configuration),
-		Position:      datatypes.NewJSONType(node.Position),
-		IsCollapsed:   node.IsCollapsed,
-		Metadata:      datatypes.NewJSONType(node.Metadata),
-		CreatedAt:     &now,
-		UpdatedAt:     &now,
+		WorkflowID:        workflowID,
+		NodeID:            node.ID,
+		ParentNodeID:      parentNodeID,
+		Name:              node.Name,
+		State:             models.WorkflowNodeStateReady,
+		Type:              node.Type,
+		Ref:               datatypes.NewJSONType(node.Ref),
+		Configuration:     datatypes.NewJSONType(node.Configuration),
+		Position:          datatypes.NewJSONType(node.Position),
+		IsCollapsed:       node.IsCollapsed,
+		Metadata:          datatypes.NewJSONType(node.Metadata),
+		AppInstallationID: appInstallationID,
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
 	}
 
 	err := tx.Create(&workflowNode).Error
@@ -172,7 +189,7 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 	case models.NodeTypeTrigger:
 		return setupTrigger(ctx, tx, encryptor, registry, node)
 	case models.NodeTypeComponent:
-		return setupComponent(tx, registry, node)
+		return setupComponent(tx, encryptor, registry, node)
 	}
 
 	return nil
@@ -185,15 +202,31 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		return err
 	}
 
-	err = trigger.Setup(core.TriggerContext{
+	triggerCtx := core.TriggerContext{
 		Configuration:      node.Configuration.Data(),
 		MetadataContext:    contexts.NewNodeMetadataContext(&node),
 		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
 		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
 		EventContext:       contexts.NewEventContext(tx, &node),
 		WebhookContext:     contexts.NewWebhookContext(ctx, tx, encryptor, &node),
-	})
+	}
 
+	if node.AppInstallationID != nil {
+		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			return fmt.Errorf("failed to find app installation: %v", err)
+		}
+
+		triggerCtx.AppInstallationContext = contexts.NewAppInstallationContext(
+			tx,
+			&node,
+			appInstallation,
+			encryptor,
+			registry,
+		)
+	}
+
+	err = trigger.Setup(triggerCtx)
 	if err != nil {
 		return fmt.Errorf("error setting up node %s: %v", node.NodeID, err)
 	}
@@ -201,20 +234,36 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 	return tx.Save(&node).Error
 }
 
-func setupComponent(tx *gorm.DB, registry *registry.Registry, node models.WorkflowNode) error {
+func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode) error {
 	ref := node.Ref.Data()
 	component, err := registry.GetComponent(ref.Component.Name)
 	if err != nil {
 		return err
 	}
 
-	err = component.Setup(core.SetupContext{
+	setupCtx := core.SetupContext{
 		Configuration:      node.Configuration.Data(),
 		MetadataContext:    contexts.NewNodeMetadataContext(&node),
 		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
 		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
-	})
+	}
 
+	if node.AppInstallationID != nil {
+		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			return fmt.Errorf("failed to find app installation: %v", err)
+		}
+
+		setupCtx.AppInstallationContext = contexts.NewAppInstallationContext(
+			tx,
+			&node,
+			appInstallation,
+			encryptor,
+			registry,
+		)
+	}
+
+	err = component.Setup(setupCtx)
 	if err != nil {
 		return fmt.Errorf("error setting up node %s: %v", node.NodeID, err)
 	}

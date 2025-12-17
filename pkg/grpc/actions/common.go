@@ -253,6 +253,7 @@ func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
 		Type:        field.Type,
 		Description: field.Description,
 		Required:    field.Required,
+		Sensitive:   &field.Sensitive,
 		TypeOptions: typeOptionsToProto(field.TypeOptions),
 	}
 
@@ -520,14 +521,20 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 	result := make([]models.Node, len(nodes))
 	for i, node := range nodes {
+		var appInstallationID *string
+		if node.AppInstallation != nil && node.AppInstallation.Id != "" {
+			appInstallationID = &node.AppInstallation.Id
+		}
+
 		result[i] = models.Node{
-			ID:            node.Id,
-			Name:          node.Name,
-			Type:          ProtoToNodeType(node.Type),
-			Ref:           ProtoToNodeRef(node),
-			Configuration: node.Configuration.AsMap(),
-			Position:      ProtoToPosition(node.Position),
-			IsCollapsed:   node.IsCollapsed,
+			ID:                node.Id,
+			Name:              node.Name,
+			Type:              ProtoToNodeType(node.Type),
+			Ref:               ProtoToNodeRef(node),
+			Configuration:     node.Configuration.AsMap(),
+			Position:          ProtoToPosition(node.Position),
+			IsCollapsed:       node.IsCollapsed,
+			AppInstallationID: appInstallationID,
 		}
 	}
 	return result
@@ -568,6 +575,12 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 
 		if node.Metadata != nil {
 			result[i].Metadata, _ = structpb.NewStruct(node.Metadata)
+		}
+
+		if node.AppInstallationID != nil && *node.AppInstallationID != "" {
+			result[i].AppInstallation = &componentpb.AppInstallationRef{
+				Id: *node.AppInstallationID,
+			}
 		}
 	}
 

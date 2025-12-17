@@ -31,6 +31,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbApplications "github.com/superplanehq/superplane/pkg/protos/applications"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -69,6 +70,7 @@ type Server struct {
 	upgrader              *websocket.Upgrader
 	Router                *mux.Router
 	BasePath              string
+	BaseURL               string
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
 	isDev                 bool
@@ -85,6 +87,7 @@ func NewServer(
 	jwtSigner *jwt.Signer,
 	oidcVerifier *crypto.OIDCVerifier,
 	basePath string,
+	baseURL string,
 	appEnv string,
 	templateDir string,
 	authorizationService authorization.Authorization,
@@ -98,6 +101,7 @@ func NewServer(
 	authHandler.InitializeProviders(providers)
 
 	server := &Server{
+		BaseURL:               baseURL,
 		BasePath:              basePath,
 		wsHub:                 ws.NewHub(),
 		authHandler:           authHandler,
@@ -186,6 +190,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbApplications.RegisterApplicationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	err = pbSecret.RegisterSecretsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
@@ -231,6 +240,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/applications").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/components").Handler(protectedGRPCHandler)
@@ -371,6 +381,13 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
+	//
+	// HTTP endpoints for app installations
+	// Match all paths under /apps/{installationID}/ including subpaths
+	//
+	r.PathPrefix(s.BasePath+"/apps/{installationID}").HandlerFunc(s.HandleAppInstallationRequest).
+		Methods("GET", "POST")
+
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
@@ -384,6 +401,49 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	}
 
 	s.Router = r
+}
+
+func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	installationIDFromRequest := vars["installationID"]
+	installationID, err := uuid.Parse(installationIDFromRequest)
+	if err != nil {
+		http.Error(w, "installation not found", http.StatusNotFound)
+		return
+	}
+
+	appInstallation, err := models.FindUnscopedAppInstallation(installationID)
+	if err != nil {
+		http.Error(w, "installation not found", http.StatusNotFound)
+		return
+	}
+
+	app, err := s.registry.GetApplication(appInstallation.AppName)
+	if err != nil {
+		http.Error(w, "app not found", http.StatusNotFound)
+		return
+	}
+
+	app.HandleRequest(core.HTTPRequestContext{
+		Request:        r,
+		Response:       &w,
+		BaseURL:        s.BaseURL,
+		OrganizationID: appInstallation.OrganizationID.String(),
+		AppInstallation: contexts.NewAppInstallationContext(
+			database.Conn(),
+			nil,
+			appInstallation,
+			s.encryptor,
+			s.registry,
+		),
+	})
+
+	err = database.Conn().Save(&appInstallation).Error
+	if err != nil {
+		http.Error(w, "installation not found", http.StatusNotFound)
+		return
+	}
 }
 
 type OrganizationCreationRequest struct {
@@ -618,10 +678,14 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
-	if node.Type != models.NodeTypeTrigger {
-		return http.StatusOK, nil
+	if node.Type == models.NodeTypeTrigger {
+		return s.executeTriggerNode(ctx, body, headers, node)
 	}
 
+	return s.executeComponenteNode(ctx, body, headers, node)
+}
+
+func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
 	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -632,19 +696,47 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 	return trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:           body,
 		Headers:        headers,
+		WorkflowID:     node.WorkflowID.String(),
+		NodeID:         node.NodeID,
 		Configuration:  node.Configuration.Data(),
 		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node),
 		EventContext:   contexts.NewEventContext(tx, &node),
 	})
 }
 
-func parseHeaders(headers *http.Header) ([]byte, error) {
-	parsedHeaders := make(map[string]string, len(*headers))
-	for key, value := range *headers {
-		parsedHeaders[key] = value[0]
+func (s *Server) executeComponenteNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
+	ref := node.Ref.Data()
+	component, err := s.registry.GetComponent(ref.Component.Name)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("component not found: %w", err)
 	}
 
-	return json.Marshal(parsedHeaders)
+	tx := database.Conn()
+	return component.HandleWebhook(core.WebhookRequestContext{
+		Body:           body,
+		Headers:        headers,
+		WorkflowID:     node.WorkflowID.String(),
+		NodeID:         node.NodeID,
+		Configuration:  node.Configuration.Data(),
+		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node),
+		EventContext:   contexts.NewEventContext(tx, &node),
+		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
+			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
+			if err != nil {
+				return nil, err
+			}
+
+			return &core.ExecutionContext{
+				ID:                    execution.ID.String(),
+				WorkflowID:            execution.WorkflowID.String(),
+				Configuration:         execution.Configuration.Data(),
+				MetadataContext:       contexts.NewExecutionMetadataContext(execution),
+				NodeMetadataContext:   contexts.NewNodeMetadataContext(&node),
+				ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
+				RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
+			}, nil
+		},
+	})
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {

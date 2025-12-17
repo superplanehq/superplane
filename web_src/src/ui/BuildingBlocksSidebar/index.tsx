@@ -21,6 +21,8 @@ export interface BuildingBlock {
   color?: string;
   id?: string; // for blueprints
   isLive?: boolean; // marks items that actually work now
+  appName?: string; // for components/triggers from applications
+  deprecated?: boolean; // marks items that are deprecated
 }
 
 export type BuildingBlockCategory = {
@@ -393,7 +395,14 @@ function CategorySection({
               </ItemMedia>
 
               <ItemContent>
-                <ItemTitle className="text-xs font-normal">{block.label || block.name}</ItemTitle>
+                <div className="flex items-center gap-2">
+                  <ItemTitle className="text-xs font-normal">{block.label || block.name}</ItemTitle>
+                  {block.deprecated && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 rounded whitespace-nowrap">
+                      Deprecated
+                    </span>
+                  )}
+                </div>
               </ItemContent>
 
               <GripVerticalIcon className="text-zinc-500 hover:text-zinc-800" size={14} />

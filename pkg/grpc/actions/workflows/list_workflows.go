@@ -18,7 +18,12 @@ func ListWorkflows(ctx context.Context, registry *registry.Registry, organizatio
 
 	protoWorkflows := make([]*pb.Workflow, len(workflows))
 	for i, workflow := range workflows {
-		protoWorkflows[i] = SerializeWorkflow(&workflow, false)
+		protoWorkflow, err := SerializeWorkflow(&workflow, false)
+		if err != nil {
+			return nil, err
+		}
+
+		protoWorkflows[i] = protoWorkflow
 	}
 
 	return &pb.ListWorkflowsResponse{

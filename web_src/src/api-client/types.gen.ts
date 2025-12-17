@@ -73,6 +73,11 @@ export type BlueprintsUpdateBlueprintResponse = {
   blueprint?: BlueprintsBlueprint;
 };
 
+export type ComponentsAppInstallationRef = {
+  id?: string;
+  name?: string;
+};
+
 export type ComponentsComponent = {
   name?: string;
   label?: string;
@@ -122,6 +127,7 @@ export type ComponentsNode = {
   blueprint?: NodeBlueprintRef;
   trigger?: NodeTriggerRef;
   isCollapsed?: boolean;
+  appInstallation?: ComponentsAppInstallationRef;
 };
 
 export type ComponentsNodeType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER";
