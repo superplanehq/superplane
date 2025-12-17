@@ -142,13 +142,25 @@ func (s *CanvasPageSteps) assertCantRunNode(nodeName string) {
 }
 
 func (s *CanvasPageSteps) assertIsNodeCollapsed(nodeName string) {
+	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.Sleep(100)
+
 	s.session.AssertVisible(q.TestID("node", nodeName, "header-dropdown"))
 	s.session.AssertText("Detailed view")
+
+	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.Sleep(100)
 }
 
 func (s *CanvasPageSteps) assertIsNodeExpanded(nodeName string) {
+	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.Sleep(100)
+
 	s.session.AssertVisible(q.TestID("node", nodeName, "header-dropdown"))
 	s.session.AssertText("Compact view")
+
+	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.Sleep(100)
 }
 
 func (s *CanvasPageSteps) assertExplainationIsShownWhenHoverOverRun() {
