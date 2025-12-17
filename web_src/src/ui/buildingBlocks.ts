@@ -27,7 +27,7 @@ export function buildBuildingBlockCategories(
           icon: t.icon,
           color: t.color,
           isLive: true,
-          deprecated: t.name === "github" || t.name === "semaphore",
+          deprecated: t.name === "semaphore",
         }),
       ),
     },
