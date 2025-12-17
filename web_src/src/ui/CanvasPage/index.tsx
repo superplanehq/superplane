@@ -8,7 +8,9 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { Loader2, Puzzle } from "lucide-react";
+import { Loader2, Puzzle, ScanLine, ScanText } from "lucide-react";
+import { ZoomSlider } from "@/components/zoom-slider";
+import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -27,7 +29,6 @@ import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../
 import { ComponentSidebar } from "../componentSidebar";
 import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
-import { ViewToggle } from "../ViewToggle";
 import { ComponentBaseProps, EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
@@ -1594,11 +1595,6 @@ function CanvasContent({
       {/* Header */}
       {!hideHeader && <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} />}
 
-      {/* Toggle button */}
-      <div className={`absolute ${hideHeader ? "bottom-3" : "top-14"} left-1/2 transform -translate-x-1/2 z-10`}>
-        <ViewToggle isCollapsed={state.isCollapsed} onToggle={handleToggleCollapse} />
-      </div>
-
       <div className={hideHeader ? "h-full" : "pt-12 h-full"}>
         <div className="h-full w-full">
           <ReactFlow
@@ -1635,6 +1631,16 @@ function CanvasContent({
             style={{ opacity: isInitialized ? 1 : 0 }}
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
+            <ZoomSlider position="bottom-left" orientation="horizontal">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleToggleCollapse}
+                title={state.isCollapsed ? "Expand view" : "Collapse view"}
+              >
+                {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
+              </Button>
+            </ZoomSlider>
           </ReactFlow>
         </div>
       </div>
