@@ -114,7 +114,6 @@ function getSemaphoreEventSections(
   // Add Last Run section
   if (!execution) {
     sections.push({
-      title: "Last Run",
       eventTitle: "No executions received yet",
       eventState: "neutral" as const,
     });
@@ -124,7 +123,6 @@ function getSemaphoreEventSections(
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
     sections.push({
-      title: "Last Run",
       showAutomaticTime: true,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
@@ -141,7 +139,6 @@ function getSemaphoreEventSections(
     if (queueItem.rootEvent) {
       const { title } = rootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent);
       sections.push({
-        title: "Next in Queue",
         receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
         eventTitle: title,
         eventState: "next-in-queue" as const,
