@@ -242,7 +242,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 }) => {
   if (collapsed) {
     return (
-      <SelectionWrapper selected={selected}>
+      <SelectionWrapper selected={selected} fullRounded>
         <CollapsedComponent
           iconSrc={iconSrc}
           iconSlug={iconSlug}
