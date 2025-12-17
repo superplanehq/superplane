@@ -87,7 +87,12 @@ export interface CustomComponentBuilderPageProps {
 
   // Node configuration
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
-  onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
+  onNodeConfigurationSave?: (
+    nodeId: string,
+    configuration: Record<string, any>,
+    nodeName: string,
+    appInstallationRef?: ComponentsAppInstallationRef,
+  ) => void;
   onNodeAdd?: (newNodeData: NewNodeData) => void;
   organizationId?: string;
 
