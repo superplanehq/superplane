@@ -327,8 +327,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       }
       onClick={(e) => {
         e.stopPropagation();
-        // For trigger events, navigate to execution chain instead of toggling inline
-        if (event.kind === "trigger" && onTriggerNavigate) {
+        // For trigger events and component executions, navigate to execution chain instead of toggling inline
+        if ((event.kind === "trigger" || event.kind === "execution") && onTriggerNavigate) {
           onTriggerNavigate(event);
         } else {
           onToggleOpen(event.id);

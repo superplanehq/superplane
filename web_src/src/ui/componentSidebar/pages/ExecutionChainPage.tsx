@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { resolveIcon, flattenObject } from "@/lib/utils";
 import { ChainItem, type ChainItemData } from "../../chainItem";
 import { SidebarEventItem } from "../SidebarEventItem/SidebarEventItem";
@@ -59,6 +59,7 @@ function buildExecutionTabData(
 interface ExecutionChainPageProps {
   eventId: string | null;
   triggerEvent?: SidebarEvent;
+  selectedExecutionId?: string | null;
   loadExecutionChain?: (
     eventId: string,
     nodeId?: string,
@@ -82,6 +83,7 @@ interface ExecutionChainPageProps {
 export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   eventId,
   triggerEvent,
+  selectedExecutionId,
   loadExecutionChain,
   openEventIds,
   onToggleOpen,
@@ -98,7 +100,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Load execution chain data function
-  const loadChainData = async () => {
+  const loadChainData = useCallback(async () => {
     if (!eventId || !loadExecutionChain) {
       setLoading(false);
       return;
@@ -217,12 +219,12 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId, loadExecutionChain, workflowNodes, components, triggers, blueprints]);
 
   // Load execution chain data
   useEffect(() => {
     loadChainData();
-  }, [eventId, loadExecutionChain, workflowNodes, components, triggers, blueprints]);
+  }, [loadChainData]);
 
   // Use ref to track current values without causing re-renders
   const pollingRef = useRef<{
@@ -321,7 +323,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
             item={item}
             index={index}
             totalItems={chainItems.length}
-            isOpen={openEventIds.has(item.id)}
+            isOpen={openEventIds.has(item.id) || item.executionId === selectedExecutionId}
             onToggleOpen={onToggleOpen}
             getExecutionState={getExecutionState}
           />

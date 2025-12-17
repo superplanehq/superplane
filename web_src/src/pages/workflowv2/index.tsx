@@ -44,7 +44,6 @@ import {
   NewNodeData,
   NodeEditData,
   SidebarData,
-  SidebarEvent,
 } from "@/ui/CanvasPage";
 import { EventState, EventStateMap } from "@/ui/componentBase";
 import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
@@ -70,6 +69,7 @@ import {
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
 } from "./utils";
+import { SidebarEvent } from "@/ui/componentSidebar/types";
 
 type UnsavedChangeKind = "position" | "structural";
 

@@ -76,7 +76,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
               event={event}
               index={index}
               variant={page === "history" ? "latest" : "queue"}
-              isOpen={openEventIds.has(event.id) || event.isOpen}
+              isOpen={page !== "history" ? openEventIds.has(event.id) || event.isOpen : false}
               onToggleOpen={onToggleOpen}
               onEventClick={onEventClick}
               onTriggerNavigate={onTriggerNavigate}
