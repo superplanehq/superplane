@@ -124,10 +124,10 @@ func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error)
 }
 
 type PipelineResponse struct {
-	Pipeline *PipelineX `json:"pipeline"`
+	Pipeline *Pipeline `json:"pipeline"`
 }
 
-type PipelineX struct {
+type Pipeline struct {
 	PipelineName string `json:"name"`
 	PipelineID   string `json:"ppl_id"`
 	WorkflowID   string `json:"wf_id"`
@@ -135,7 +135,7 @@ type PipelineX struct {
 	Result       string `json:"result"`
 }
 
-func (c *Client) GetPipeline(id string) (*PipelineX, error) {
+func (c *Client) GetPipeline(id string) (*Pipeline, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/pipelines/%s", c.OrgURL, id)
 	responseBody, err := c.execRequest(http.MethodGet, URL, nil)
 	if err != nil {

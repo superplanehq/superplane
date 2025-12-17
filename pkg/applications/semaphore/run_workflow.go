@@ -27,17 +27,17 @@ type RunWorkflowNodeMetadata struct {
 }
 
 type RunWorkflowExecutionMetadata struct {
-	Workflow *Workflow      `json:"workflow" mapstructure:"workflow"`
-	Pipeline *Pipeline      `json:"pipeline" mapstructure:"pipeline"`
-	Data     map[string]any `json:"data,omitempty" mapstructure:"data,omitempty"`
+	Workflow *WorkflowMetadata `json:"workflow" mapstructure:"workflow"`
+	Pipeline *PipelineMetadata `json:"pipeline" mapstructure:"pipeline"`
+	Data     map[string]any    `json:"data,omitempty" mapstructure:"data,omitempty"`
 }
 
-type Workflow struct {
+type WorkflowMetadata struct {
 	ID  string `json:"id"`
 	URL string `json:"url"`
 }
 
-type Pipeline struct {
+type PipelineMetadata struct {
 	ID     string `json:"id"`
 	State  string `json:"state"`
 	Result string `json:"result"`
@@ -239,11 +239,11 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	}
 
 	ctx.MetadataContext.Set(RunWorkflowExecutionMetadata{
-		Workflow: &Workflow{
+		Workflow: &WorkflowMetadata{
 			ID:  response.WorkflowID,
 			URL: fmt.Sprintf("%s/workflows/%s", string(client.OrgURL), response.WorkflowID),
 		},
-		Pipeline: &Pipeline{
+		Pipeline: &PipelineMetadata{
 			ID: response.PipelineID,
 		},
 	})

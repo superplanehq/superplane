@@ -12,8 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
-const MaxEventSize = 64 * 1024
-
 type OnPipelineDone struct{}
 
 type OnPipelineDoneMetadata struct {
