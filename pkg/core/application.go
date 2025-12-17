@@ -105,7 +105,7 @@ type AppInstallationContext interface {
 	// Control the state of the app installation
 	//
 	GetState() string
-	SetState(string)
+	SetState(state, stateDescription string)
 
 	//
 	// Control the browser action of the app installation

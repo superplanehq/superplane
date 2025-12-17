@@ -22,12 +22,17 @@ const (
 	GitHubAppClientSecret  = "clientSecret"
 	GitHubAppWebhookSecret = "webhookSecret"
 
-	appInstallationDescription = `
+	appBootstrappDescription = `
 To complete the GitHub app setup:
 
 1. The "**Continue**" button/link will take you to GitHub with the app manifest pre-filled.
 2. **Create GitHub App**: Give the new app a name, and click the "Create" button.
 3. **Install GitHub App**: Install the new GitHub app in the user/organization.
+`
+
+	appInstallationDescription = `
+To complete the GitHub app setup:
+1. **Install GitHub App**: Install the new GitHub app in the user/organization.
 `
 )
 
@@ -120,7 +125,7 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	}
 
 	ctx.AppInstallation.NewBrowserAction(core.BrowserAction{
-		Description: appInstallationDescription,
+		Description: appBootstrappDescription,
 		URL:         g.browserActionURL(config.Organization),
 		Method:      "POST",
 		FormFields: map[string]string{
@@ -163,90 +168,86 @@ func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext, metadata Metadata) {
-	signature := ctx.Request.Header.Get("X-Hub-Signature-256")
-	if signature == "" {
-		logrus.Error("Missing X-Hub-Signature-256 header")
-		return
-	}
-
-	signature = strings.TrimPrefix(signature, "sha256=")
-	if signature == "" {
-		logrus.Error("Missing signature")
-		return
-	}
-
-	eventType := ctx.Request.Header.Get("X-GitHub-Event")
-	if eventType == "" {
-		logrus.Error("missing X-GitHub-Event header")
-		return
-	}
-
-	if eventType != "installation" && eventType != "installation_repositories" {
-		logrus.Infof("ignoring event type: %s", eventType)
-		return
-	}
-
 	webhookSecret, err := findSecret(ctx.AppInstallation, GitHubAppWebhookSecret)
 	if err != nil {
 		logrus.Errorf("Error finding webhook secret: %v", err)
 		return
 	}
 
-	body, err := io.ReadAll(ctx.Request.Body)
+	payload, err := github.ValidatePayload(ctx.Request, []byte(webhookSecret))
 	if err != nil {
-		logrus.Errorf("Error reading request body: %v", err)
 		return
 	}
 
-	err = crypto.VerifySignature([]byte(webhookSecret), body, signature)
+	eventType := github.WebHookType(ctx.Request)
+	event, err := github.ParseWebHook(eventType, payload)
 	if err != nil {
-		logrus.Info("invalid signature")
 		return
 	}
 
-	data := map[string]any{}
-	err = json.Unmarshal(body, &data)
-	if err != nil {
-		logrus.Errorf("error parsing request body: %v", err)
-		return
-	}
+	switch event := event.(type) {
+	case *github.InstallationEvent:
+		g.handleInstallationEvent(ctx, metadata, event)
 
-	action, ok := data["action"]
-	if !ok {
-		logrus.Error("missing action")
-		return
-	}
+	//
+	// We don't actually use the repositories_added and repositories_removed fields in the events.
+	// When we receive an installation_repositories event, we always reload the list of repositories using the API.
+	//
+	case *github.InstallationRepositoriesEvent:
+		g.handleInstallationRepositoriesEvent(ctx, metadata)
 
-	actionStr, ok := action.(string)
-	if !ok {
-		logrus.Error("invalid action")
-		return
-	}
-
-	switch eventType {
-	case "installation":
-		g.handleInstallationEvent(ctx, metadata, data, actionStr)
-	case "installation_repositories":
-		g.handleInstallationRepositoriesEvent(ctx, metadata, data, actionStr)
-	}
-}
-
-func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata Metadata, data map[string]any, action string) {
-	switch action {
-	case "created":
-		logrus.Infof("installation created: %v", data)
-	case "deleted":
-		logrus.Infof("installation deleted: %v", data)
-	case "suspend":
-		logrus.Infof("installation suspended: %v", data)
-	case "unsuspend":
-		logrus.Infof("installation unsuspended: %v", data)
 	default:
-		logrus.Infof("ignoring action: %s", action)
+		logrus.Infof("ignoring eventType %s", eventType)
 	}
 }
 
-func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext, metadata Metadata, data map[string]any, action string) {
+func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata Metadata, event *github.InstallationEvent) {
+	switch *event.Action {
+
+	//
+	// This is handled by the setup_url, so no need to do anything here.
+	//
+	case "created":
+		return
+
+	case "suspend":
+		logrus.Infof("installation %s suspended", metadata.InstallationID)
+		ctx.AppInstallation.SetState("error", "app installation was suspended")
+
+	case "unsuspend":
+		logrus.Infof("installation %s unsuspended", metadata.InstallationID)
+		ctx.AppInstallation.SetState("ready", "")
+
+	//
+	// When the app installation is deleted,
+	// we need to prompt the user to re-install it.
+	//
+	case "deleted":
+		logrus.Infof("installation %s deleted", metadata.InstallationID)
+
+		state, err := crypto.Base64String(32)
+		if err != nil {
+			logrus.Errorf("Failed to generate GitHub App state: %v", err)
+		}
+
+		metadata.InstallationID = ""
+		metadata.Repositories = []Repository{}
+		metadata.State = state
+
+		ctx.AppInstallation.SetMetadata(metadata)
+		ctx.AppInstallation.SetState("error", "app was uninstalled")
+		ctx.AppInstallation.NewBrowserAction(core.BrowserAction{
+			Description: appInstallationDescription,
+			URL:         fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", metadata.GitHubApp.Slug, state),
+			Method:      "GET",
+		})
+
+	default:
+		logrus.Infof("ignoring action: %s", *event.Action)
+	}
+}
+
+func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext, metadata Metadata) {
 	client, err := NewClient(ctx.AppInstallation, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		logrus.Errorf("failed to create client: %v", err)
@@ -440,10 +441,24 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata
 }
 
 func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Metadata) {
+	//
+	// App installation has already been set up.
+	// Just redirect to the Superplane app installation page.
+	//
+	if metadata.InstallationID != "" {
+		http.Redirect(
+			*ctx.Response,
+			ctx.Request,
+			fmt.Sprintf(
+				"%s/%s/settings/applications/%s", ctx.BaseURL, ctx.OrganizationID, ctx.AppInstallation.ID().String(),
+			),
+			http.StatusSeeOther,
+		)
+	}
+
 	installationID := ctx.Request.URL.Query().Get("installation_id")
 	setupAction := ctx.Request.URL.Query().Get("setup_action")
 	state := ctx.Request.URL.Query().Get("state")
-
 	if installationID == "" || state != metadata.State {
 		return
 	}
@@ -492,7 +507,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 
 	ctx.AppInstallation.SetMetadata(metadata)
 	ctx.AppInstallation.RemoveBrowserAction()
-	ctx.AppInstallation.SetState("ready")
+	ctx.AppInstallation.SetState("ready", "")
 
 	http.Redirect(
 		*ctx.Response,
@@ -528,9 +543,6 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 		"redirect_url": fmt.Sprintf(`%s/api/v1/apps/%s/redirect`, ctx.BaseURL, ctx.InstallationID),
 		"hook_attributes": map[string]any{
 			"url": fmt.Sprintf(`%s/api/v1/apps/%s/webhook`, ctx.BaseURL, ctx.InstallationID),
-		},
-		"callback_urls": []string{
-			fmt.Sprintf("%s/%s/settings/applications/%s", ctx.BaseURL, ctx.OrganizationID, ctx.InstallationID),
 		},
 	}
 
