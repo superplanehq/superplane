@@ -447,35 +447,43 @@ export const CustomComponent = () => {
     ],
   );
 
-  const getNodeEditData = useCallback((nodeId: string) => {
-    const node = (nodesRef.current || []).find((n) => n.id === nodeId);
-    if (!node) return null;
+  const getNodeEditData = useCallback(
+    (nodeId: string) => {
+      const node = (nodesRef.current || []).find((n) => n.id === nodeId);
+      if (!node) return null;
 
-    const component = componentsRef.current.find((p: any) => p.name === (node.data as any)._originalComponent);
-    if (!component) return null;
+      const component = componentsRef.current.find((p: any) => p.name === (node.data as any)._originalComponent);
+      if (!component) return null;
 
-    // Check if this component is from an application
-    let appName: string | undefined;
-    const componentApp = availableApplications.find((app) =>
-      app.components?.some((c) => c.name === (node.data as any)._originalComponent),
-    );
-    if (componentApp) {
-      appName = componentApp.name;
-    }
+      // Check if this component is from an application
+      let appName: string | undefined;
+      const componentApp = availableApplications.find((app) =>
+        app.components?.some((c) => c.name === (node.data as any)._originalComponent),
+      );
+      if (componentApp) {
+        appName = componentApp.name;
+      }
 
-    return {
-      nodeId: node.id,
-      nodeName: (node.data as any).label as string,
-      displayLabel: component.label || ((node.data as any).label as string),
-      configuration: (node.data as any)._originalConfiguration || {},
-      configurationFields: component.configuration || [],
-      appName,
-      appInstallationRef: (node.data as any)._appInstallationRef,
-    };
-  }, [availableApplications]);
+      return {
+        nodeId: node.id,
+        nodeName: (node.data as any).label as string,
+        displayLabel: component.label || ((node.data as any).label as string),
+        configuration: (node.data as any)._originalConfiguration || {},
+        configurationFields: component.configuration || [],
+        appName,
+        appInstallationRef: (node.data as any)._appInstallationRef,
+      };
+    },
+    [availableApplications],
+  );
 
   const handleNodeConfigurationSave = useCallback(
-    async (nodeId: string, configuration: Record<string, any>, nodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => {
+    async (
+      nodeId: string,
+      configuration: Record<string, any>,
+      nodeName: string,
+      appInstallationRef?: ComponentsAppInstallationRef,
+    ) => {
       saveSnapshot();
 
       // Check if this is a template node with sourceConnection (needs to be converted to real node)
