@@ -446,7 +446,7 @@ export const ComponentSidebar = ({
         style={{ marginLeft: "-8px" }}
       >
         <div
-          className={`w-1 h-12 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
+          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
             isResizing ? "bg-blue-500" : ""
           }`}
         />
