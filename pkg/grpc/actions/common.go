@@ -227,22 +227,40 @@ func dateTimeTypeOptionsToProto(opts *configuration.DateTimeTypeOptions) *config
 	return pbOpts
 }
 
+func anyPredicateListTypeOptionsToProto(opts *configuration.AnyPredicateListTypeOptions) *configpb.AnyPredicateListTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.AnyPredicateListTypeOptions{
+		Operators: make([]*configpb.SelectOption, len(opts.Operators)),
+	}
+	for i, opt := range opts.Operators {
+		pbOpts.Operators[i] = &configpb.SelectOption{
+			Label: opt.Label,
+			Value: opt.Value,
+		}
+	}
+	return pbOpts
+}
+
 func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 	if opts == nil {
 		return nil
 	}
 
 	return &configpb.TypeOptions{
-		Number:      numberTypeOptionsToProto(opts.Number),
-		Select:      selectTypeOptionsToProto(opts.Select),
-		MultiSelect: multiSelectTypeOptionsToProto(opts.MultiSelect),
-		Integration: integrationTypeOptionsToProto(opts.Integration),
-		Resource:    resourceTypeOptionsToProto(opts.Resource),
-		List:        listTypeOptionsToProto(opts.List),
-		Object:      objectTypeOptionsToProto(opts.Object),
-		Time:        timeTypeOptionsToProto(opts.Time),
-		Date:        dateTypeOptionsToProto(opts.Date),
-		Datetime:    dateTimeTypeOptionsToProto(opts.DateTime),
+		Number:           numberTypeOptionsToProto(opts.Number),
+		Select:           selectTypeOptionsToProto(opts.Select),
+		MultiSelect:      multiSelectTypeOptionsToProto(opts.MultiSelect),
+		Integration:      integrationTypeOptionsToProto(opts.Integration),
+		Resource:         resourceTypeOptionsToProto(opts.Resource),
+		List:             listTypeOptionsToProto(opts.List),
+		AnyPredicateList: anyPredicateListTypeOptionsToProto(opts.AnyPredicateList),
+		Object:           objectTypeOptionsToProto(opts.Object),
+		Time:             timeTypeOptionsToProto(opts.Time),
+		Date:             dateTypeOptionsToProto(opts.Date),
+		Datetime:         dateTimeTypeOptionsToProto(opts.DateTime),
 	}
 }
 
@@ -445,22 +463,40 @@ func protoToDateTimeTypeOptions(pbOpts *configpb.DateTimeTypeOptions) *configura
 	return opts
 }
 
+func protoToAnyPredicateListTypeOptions(pbOpts *configpb.AnyPredicateListTypeOptions) *configuration.AnyPredicateListTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.AnyPredicateListTypeOptions{
+		Operators: make([]configuration.FieldOption, len(pbOpts.Operators)),
+	}
+	for i, pbOpt := range pbOpts.Operators {
+		opts.Operators[i] = configuration.FieldOption{
+			Label: pbOpt.Label,
+			Value: pbOpt.Value,
+		}
+	}
+	return opts
+}
+
 func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
 	return &configuration.TypeOptions{
-		Number:      protoToNumberTypeOptions(pbOpts.Number),
-		Select:      protoToSelectTypeOptions(pbOpts.Select),
-		MultiSelect: protoToMultiSelectTypeOptions(pbOpts.MultiSelect),
-		Integration: protoToIntegrationTypeOptions(pbOpts.Integration),
-		Resource:    protoToResourceTypeOptions(pbOpts.Resource),
-		List:        protoToListTypeOptions(pbOpts.List),
-		Object:      protoToObjectTypeOptions(pbOpts.Object),
-		Time:        protoToTimeTypeOptions(pbOpts.Time),
-		Date:        protoToDateTypeOptions(pbOpts.Date),
-		DateTime:    protoToDateTimeTypeOptions(pbOpts.Datetime),
+		Number:           protoToNumberTypeOptions(pbOpts.Number),
+		Select:           protoToSelectTypeOptions(pbOpts.Select),
+		MultiSelect:      protoToMultiSelectTypeOptions(pbOpts.MultiSelect),
+		Integration:      protoToIntegrationTypeOptions(pbOpts.Integration),
+		Resource:         protoToResourceTypeOptions(pbOpts.Resource),
+		List:             protoToListTypeOptions(pbOpts.List),
+		AnyPredicateList: protoToAnyPredicateListTypeOptions(pbOpts.AnyPredicateList),
+		Object:           protoToObjectTypeOptions(pbOpts.Object),
+		Time:             protoToTimeTypeOptions(pbOpts.Time),
+		Date:             protoToDateTypeOptions(pbOpts.Date),
+		DateTime:         protoToDateTimeTypeOptions(pbOpts.Datetime),
 	}
 }
 
@@ -793,6 +829,8 @@ func defaultValueFromProto(fieldType, defaultValue string) any {
 	case configuration.FieldTypeMultiSelect:
 		fallthrough
 	case configuration.FieldTypeList:
+		fallthrough
+	case configuration.FieldTypeAnyPredicateList:
 		fallthrough
 	case configuration.FieldTypeObject:
 		// Complex/collection types: decode JSON into structured values.

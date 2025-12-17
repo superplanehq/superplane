@@ -534,7 +534,8 @@ export function parseDefaultValues(configurationFields: ConfigurationField[]): R
                 break;
               }
               case "multi-select":
-              case "list": {
+              case "list":
+              case "any-predicate-list": {
                 try {
                   parsedValue = JSON.parse(defaultValue);
                 } catch {

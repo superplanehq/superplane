@@ -3051,6 +3051,18 @@
         }
       }
     },
+    "ConfigurationAnyPredicateListTypeOptions": {
+      "type": "object",
+      "properties": {
+        "operators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationSelectOption"
+          }
+        }
+      }
+    },
     "ConfigurationDateTimeTypeOptions": {
       "type": "object",
       "properties": {
@@ -3276,6 +3288,9 @@
         },
         "datetime": {
           "$ref": "#/definitions/ConfigurationDateTimeTypeOptions"
+        },
+        "anyPredicateList": {
+          "$ref": "#/definitions/ConfigurationAnyPredicateListTypeOptions"
         }
       }
     },

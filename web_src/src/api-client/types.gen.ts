@@ -137,6 +137,10 @@ export type ComponentsPosition = {
   y?: number;
 };
 
+export type ConfigurationAnyPredicateListTypeOptions = {
+  operators?: Array<ConfigurationSelectOption>;
+};
+
 export type ConfigurationDateTimeTypeOptions = {
   format?: string;
 };
@@ -220,6 +224,7 @@ export type ConfigurationTypeOptions = {
   time?: ConfigurationTimeTypeOptions;
   date?: ConfigurationDateTypeOptions;
   datetime?: ConfigurationDateTimeTypeOptions;
+  anyPredicateList?: ConfigurationAnyPredicateListTypeOptions;
 };
 
 export type ConfigurationValidationRule = {

@@ -167,8 +167,9 @@ func (c *AppInstallationContext) GetState() string {
 	return c.appInstallation.State
 }
 
-func (c *AppInstallationContext) SetState(value string) {
-	c.appInstallation.State = value
+func (c *AppInstallationContext) SetState(state, stateDescription string) {
+	c.appInstallation.State = state
+	c.appInstallation.StateDescription = stateDescription
 }
 
 func (c *AppInstallationContext) SetSecret(name string, value []byte) error {

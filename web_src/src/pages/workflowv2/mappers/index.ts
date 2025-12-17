@@ -16,6 +16,7 @@ import {
   componentMappers as semaphoreComponentMappers,
   triggerRenderers as semaphoreTriggerRenderers,
 } from "./semaphore/index";
+import { componentMappers as githubComponentMappers, triggerRenderers as githubTriggerRenderers } from "./github/index";
 import { timeGateMapper } from "./timegate";
 import { filterMapper } from "./filter";
 import { waitMapper } from "./wait";
@@ -44,10 +45,12 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   semaphore: semaphoreComponentMappers,
+  github: githubComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   semaphore: semaphoreTriggerRenderers,
+  github: githubTriggerRenderers,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

@@ -46,3 +46,10 @@ func ForQueueItem(logger *log.Entry, queueItem models.WorkflowNodeQueueItem) *lo
 		"root_event":    queueItem.RootEventID,
 	})
 }
+
+func ForAppInstallation(appInstallation models.AppInstallation) *log.Entry {
+	return log.WithFields(log.Fields{
+		"app_name":        appInstallation.AppName,
+		"installation_id": appInstallation.ID,
+	})
+}

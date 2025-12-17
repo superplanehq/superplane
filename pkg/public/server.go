@@ -23,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
@@ -426,8 +427,9 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	app.HandleRequest(core.HTTPRequestContext{
+		Logger:         logging.ForAppInstallation(*appInstallation),
 		Request:        r,
-		Response:       &w,
+		Response:       w,
 		BaseURL:        s.BaseURL,
 		OrganizationID: appInstallation.OrganizationID.String(),
 		AppInstallation: contexts.NewAppInstallationContext(
