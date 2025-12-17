@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
@@ -156,8 +157,9 @@ type BrowserAction struct {
 }
 
 type HTTPRequestContext struct {
+	Logger          *logrus.Entry
 	Request         *http.Request
-	Response        *http.ResponseWriter
+	Response        http.ResponseWriter
 	OrganizationID  string
 	BaseURL         string
 	AppInstallation AppInstallationContext

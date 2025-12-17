@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/go-github/v74/github"
 	"github.com/mitchellh/mapstructure"
-	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -164,24 +163,30 @@ func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	logrus.Infof("unknown path: %s", ctx.Request.URL.Path)
+	ctx.Logger.Warnf("unknown path: %s", ctx.Request.URL.Path)
+	ctx.Response.WriteHeader(http.StatusNotFound)
 }
 
 func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext, metadata Metadata) {
 	webhookSecret, err := findSecret(ctx.AppInstallation, GitHubAppWebhookSecret)
 	if err != nil {
-		logrus.Errorf("Error finding webhook secret: %v", err)
+		ctx.Logger.Errorf("Error finding webhook secret: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	payload, err := github.ValidatePayload(ctx.Request, []byte(webhookSecret))
 	if err != nil {
+		ctx.Logger.Errorf("Error validating webhook payload: %v", err)
+		http.Error(ctx.Response, "invalid webhook payload", http.StatusBadRequest)
 		return
 	}
 
 	eventType := github.WebHookType(ctx.Request)
 	event, err := github.ParseWebHook(eventType, payload)
 	if err != nil {
+		ctx.Logger.Errorf("Error parsing webhook payload: %v", err)
+		http.Error(ctx.Response, "invalid webhook payload", http.StatusBadRequest)
 		return
 	}
 
@@ -197,7 +202,7 @@ func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext, metadata Metadata) {
 		g.handleInstallationRepositoriesEvent(ctx, metadata)
 
 	default:
-		logrus.Infof("ignoring eventType %s", eventType)
+		ctx.Logger.Warnf("ignoring eventType %s", eventType)
 	}
 }
 
@@ -208,26 +213,31 @@ func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata M
 	// This is handled by the setup_url, so no need to do anything here.
 	//
 	case "created":
+		ctx.Logger.Infof("installation %s created", metadata.InstallationID)
 		return
 
 	case "suspend":
-		logrus.Infof("installation %s suspended", metadata.InstallationID)
+		ctx.Logger.Infof("installation %s suspended", metadata.InstallationID)
 		ctx.AppInstallation.SetState("error", "app installation was suspended")
+		return
 
 	case "unsuspend":
-		logrus.Infof("installation %s unsuspended", metadata.InstallationID)
+		ctx.Logger.Infof("installation %s unsuspended", metadata.InstallationID)
 		ctx.AppInstallation.SetState("ready", "")
+		return
 
 	//
 	// When the app installation is deleted,
 	// we need to prompt the user to re-install it.
 	//
 	case "deleted":
-		logrus.Infof("installation %s deleted", metadata.InstallationID)
+		ctx.Logger.Infof("installation %s deleted", metadata.InstallationID)
 
 		state, err := crypto.Base64String(32)
 		if err != nil {
-			logrus.Errorf("Failed to generate GitHub App state: %v", err)
+			ctx.Logger.Errorf("Failed to generate GitHub App state: %v", err)
+			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+			return
 		}
 
 		metadata.InstallationID = ""
@@ -243,20 +253,22 @@ func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata M
 		})
 
 	default:
-		logrus.Infof("ignoring action: %s", *event.Action)
+		ctx.Logger.Warnf("ignoring action: %s", *event.Action)
 	}
 }
 
 func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext, metadata Metadata) {
 	client, err := NewClient(ctx.AppInstallation, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
-		logrus.Errorf("failed to create client: %v", err)
+		ctx.Logger.Errorf("failed to create client: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	response, _, err := client.Apps.ListRepos(context.Background(), &github.ListOptions{})
 	if err != nil {
-		logrus.Errorf("failed to list repos: %v", err)
+		ctx.Logger.Errorf("failed to list repos: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -268,6 +280,8 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 			URL:  r.GetHTMLURL(),
 		})
 	}
+
+	ctx.Logger.Infof("Updated repositories: %v", repos)
 
 	metadata.Repositories = repos
 	ctx.AppInstallation.SetMetadata(metadata)
@@ -384,12 +398,15 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata
 	state := ctx.Request.URL.Query().Get("state")
 
 	if code == "" || state == "" {
+		ctx.Logger.Errorf("missing code or state")
+		http.Error(ctx.Response, "missing code or state", http.StatusBadRequest)
 		return
 	}
 
 	appData, err := g.createAppFromManifest(code)
 	if err != nil {
-		logrus.Errorf("failed to create app from manifest: %v", err)
+		ctx.Logger.Errorf("failed to create app from manifest: %v", err)
+		http.Error(ctx.Response, "failed to create app from manifest", http.StatusInternalServerError)
 		return
 	}
 
@@ -409,27 +426,32 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata
 	//
 	err = ctx.AppInstallation.SetSecret(GitHubAppClientSecret, []byte(appData.ClientSecret))
 	if err != nil {
-		logrus.Errorf("failed to save client secret: %v", err)
+		ctx.Logger.Errorf("failed to save client secret: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	err = ctx.AppInstallation.SetSecret(GitHubAppWebhookSecret, []byte(appData.WebhookSecret))
 	if err != nil {
-		logrus.Errorf("failed to save webhook secret: %v", err)
+		ctx.Logger.Errorf("failed to save webhook secret: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	err = ctx.AppInstallation.SetSecret(GitHubAppPEM, []byte(appData.PEM))
 	if err != nil {
-		logrus.Errorf("failed to save PEM: %v", err)
+		ctx.Logger.Errorf("failed to save PEM: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
+
+	ctx.Logger.Infof("Successfully created GitHub App %s - %d", metadata.GitHubApp.Slug, metadata.GitHubApp.ID)
 
 	//
 	// Redirect to app installation page
 	//
 	http.Redirect(
-		*ctx.Response,
+		ctx.Response,
 		ctx.Request,
 		fmt.Sprintf(
 			"https://github.com/apps/%s/installations/new?state=%s",
@@ -446,8 +468,9 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 	// Just redirect to the Superplane app installation page.
 	//
 	if metadata.InstallationID != "" {
+		ctx.Logger.Infof("app installation %s already set up", metadata.InstallationID)
 		http.Redirect(
-			*ctx.Response,
+			ctx.Response,
 			ctx.Request,
 			fmt.Sprintf(
 				"%s/%s/settings/applications/%s", ctx.BaseURL, ctx.OrganizationID, ctx.AppInstallation.ID().String(),
@@ -460,6 +483,8 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 	setupAction := ctx.Request.URL.Query().Get("setup_action")
 	state := ctx.Request.URL.Query().Get("state")
 	if installationID == "" || state != metadata.State {
+		ctx.Logger.Errorf("invalid installation ID or state")
+		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
 		return
 	}
 
@@ -467,20 +492,23 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 	// Installation updates are handled through the webhook events.
 	//
 	if setupAction != "install" {
+		ctx.Logger.Infof("Ignoring setup action %s for GitHub App installation %s", setupAction, installationID)
 		return
 	}
 
 	metadata.InstallationID = installationID
 	client, err := NewClient(ctx.AppInstallation, metadata.GitHubApp.ID, installationID)
 	if err != nil {
-		logrus.Errorf("failed to create client: %v", err)
+		ctx.Logger.Errorf("failed to create client: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	if metadata.Owner == "" {
 		ghApp, _, err := client.Apps.Get(context.Background(), metadata.GitHubApp.Slug)
 		if err != nil {
-			logrus.Errorf("failed to get app: %v", err)
+			ctx.Logger.Errorf("failed to get app: %v", err)
+			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 			return
 		}
 
@@ -489,7 +517,8 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 
 	response, _, err := client.Apps.ListRepos(context.Background(), &github.ListOptions{})
 	if err != nil {
-		logrus.Errorf("failed to list repos: %v", err)
+		ctx.Logger.Errorf("failed to list repos: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -509,8 +538,11 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 	ctx.AppInstallation.RemoveBrowserAction()
 	ctx.AppInstallation.SetState("ready", "")
 
+	ctx.Logger.Infof("Successfully installed GitHub App %s - installation=%s", metadata.GitHubApp.Slug, metadata.InstallationID)
+	ctx.Logger.Infof("Repositories: %v", metadata.Repositories)
+
 	http.Redirect(
-		*ctx.Response,
+		ctx.Response,
 		ctx.Request,
 		fmt.Sprintf(
 			"%s/%s/settings/applications/%s", ctx.BaseURL, ctx.OrganizationID, ctx.AppInstallation.ID().String(),
