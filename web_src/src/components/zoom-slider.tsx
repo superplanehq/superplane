@@ -3,13 +3,7 @@
 import React from "react";
 import { Maximize, Minus, Plus } from "lucide-react";
 
-import {
-  Panel,
-  useViewport,
-  useStore,
-  useReactFlow,
-  type PanelProps,
-} from "@xyflow/react";
+import { Panel, useViewport, useStore, useReactFlow, type PanelProps } from "@xyflow/react";
 
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -40,19 +34,10 @@ export function ZoomSlider({
         )}
         {...props}
       >
-        <div
-          className={cn(
-            "flex gap-0.5",
-            orientation === "horizontal" ? "flex-row" : "flex-col-reverse",
-          )}
-        >
+        <div className={cn("flex gap-0.5", orientation === "horizontal" ? "flex-row" : "flex-col-reverse")}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => zoomOut({ duration: 300 })}
-              >
+              <Button variant="ghost" size="icon-sm" onClick={() => zoomOut({ duration: 300 })}>
                 <Minus className="h-3 w-3" />
               </Button>
             </TooltipTrigger>
@@ -76,11 +61,7 @@ export function ZoomSlider({
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => zoomIn({ duration: 300 })}
-              >
+              <Button variant="ghost" size="icon-sm" onClick={() => zoomIn({ duration: 300 })}>
                 <Plus className="h-3 w-3" />
               </Button>
             </TooltipTrigger>
@@ -92,9 +73,7 @@ export function ZoomSlider({
             <Button
               className={cn(
                 "tabular-nums text-xs",
-                orientation === "horizontal"
-                  ? "w-[50px] min-w-[50px] h-8"
-                  : "h-[40px] w-[40px]",
+                orientation === "horizontal" ? "w-[50px] min-w-[50px] h-8" : "h-[40px] w-[40px]",
               )}
               variant="ghost"
               onClick={() => zoomTo(1, { duration: 300 })}
@@ -106,11 +85,7 @@ export function ZoomSlider({
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => fitView({ duration: 300 })}
-            >
+            <Button variant="ghost" size="icon-sm" onClick={() => fitView({ duration: 300 })}>
               <Maximize className="h-3 w-3" />
             </Button>
           </TooltipTrigger>

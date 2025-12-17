@@ -1635,15 +1635,13 @@ function CanvasContent({
             <ZoomSlider position="bottom-left" orientation="horizontal">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={handleToggleCollapse}
-                  >
+                  <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
                     {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>{state.isCollapsed ? "Switch components to Detailed view" : "Switch components to Compact view"}</TooltipContent>
+                <TooltipContent>
+                  {state.isCollapsed ? "Switch components to Detailed view" : "Switch components to Compact view"}
+                </TooltipContent>
               </Tooltip>
             </ZoomSlider>
           </ReactFlow>
