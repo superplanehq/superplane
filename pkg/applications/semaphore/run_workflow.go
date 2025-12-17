@@ -16,6 +16,9 @@ import (
 
 const PassedOutputChannel = "passed"
 const FailedOutputChannel = "failed"
+const PipelineStateDone = "done"
+const PipelineResultPassed = "passed"
+const PollInterval = 5 * time.Minute
 
 type RunWorkflow struct{}
 
@@ -257,9 +260,8 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	//
 	// We still set up the poller to check for pipeline finishing,
 	// just in case something wrong happens with the update through the webhook.
-	// TODO: increase this to 5min.
 	//
-	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, time.Minute)
+	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 }
 
 func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
@@ -319,7 +321,7 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	//
 	// Already finished, do not do anything.
 	//
-	if metadata.Pipeline.State == "done" {
+	if metadata.Pipeline.State == PipelineStateDone {
 		return http.StatusOK, nil
 	}
 
@@ -327,7 +329,7 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	metadata.Pipeline.Result = hook.Pipeline.Result
 	executionCtx.MetadataContext.Set(metadata)
 
-	if metadata.Pipeline.Result == "passed" {
+	if metadata.Pipeline.Result == PipelineResultPassed {
 		err = executionCtx.ExecutionStateContext.Pass(map[string][]any{
 			PassedOutputChannel: {metadata},
 		})
@@ -337,17 +339,10 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		})
 	}
 
-	//
-	// TODO: not sure if returning an error here is the right thing.
-	//
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
 
-	//
-	// TODO: remove request for polling
-	// TODO: remove KV record
-	//
 	return http.StatusOK, nil
 }
 
@@ -403,7 +398,7 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 	//
 	// If the pipeline already finished, we don't need to do anything.
 	//
-	if metadata.Pipeline.State == "done" {
+	if metadata.Pipeline.State == PipelineStateDone {
 		return nil
 	}
 
@@ -420,15 +415,15 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 	//
 	// If not finished, poll again in 1min.
 	//
-	if pipeline.State != "done" {
-		return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
+	if pipeline.State != PipelineStateDone {
+		return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
 
 	metadata.Pipeline.State = pipeline.State
 	metadata.Pipeline.Result = pipeline.Result
 	ctx.MetadataContext.Set(metadata)
 
-	if pipeline.Result == "passed" {
+	if pipeline.Result == PipelineResultPassed {
 		return ctx.ExecutionStateContext.Pass(map[string][]any{
 			PassedOutputChannel: {metadata},
 		})
@@ -446,7 +441,7 @@ func (r *RunWorkflow) finish(ctx core.ActionContext) error {
 		return err
 	}
 
-	if metadata.Pipeline.State == "done" {
+	if metadata.Pipeline.State == PipelineStateDone {
 		return fmt.Errorf("pipeline already finished")
 	}
 
