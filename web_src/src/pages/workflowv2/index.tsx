@@ -245,9 +245,6 @@ export function WorkflowPageV2() {
         const positionUpdates = new Map(pendingPositionUpdatesRef.current);
         if (positionUpdates.size === 0) return;
 
-        // Clear pending updates immediately to avoid duplicate saves
-        pendingPositionUpdatesRef.current.clear();
-
         try {
           // Check if there are unsaved structural changes
           // If so, skip auto-save to avoid saving those changes accidentally
@@ -277,12 +274,50 @@ export function WorkflowPageV2() {
             return node;
           });
 
+          // Save the workflow with updated positions
           await updateWorkflowMutation.mutateAsync({
             name: latestWorkflow.metadata?.name!,
             description: latestWorkflow.metadata?.description,
             nodes: updatedNodes,
             edges: latestWorkflow.spec?.edges,
           });
+
+          // Clear the saved position updates after successful save
+          // Keep any new updates that came in during the save
+          positionUpdates.forEach((_, nodeId) => {
+            if (pendingPositionUpdatesRef.current.get(nodeId) === positionUpdates.get(nodeId)) {
+              pendingPositionUpdatesRef.current.delete(nodeId);
+            }
+          });
+
+          // After save, merge any new pending updates into the cache
+          // This prevents the server response from overwriting newer local changes
+          const currentWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
+            workflowKeys.detail(organizationId, workflowId),
+          );
+
+          if (currentWorkflow?.spec?.nodes && pendingPositionUpdatesRef.current.size > 0) {
+            const mergedNodes = currentWorkflow.spec.nodes.map((node) => {
+              if (!node.id) return node;
+
+              const pendingUpdate = pendingPositionUpdatesRef.current.get(node.id);
+              if (pendingUpdate) {
+                return {
+                  ...node,
+                  position: pendingUpdate,
+                };
+              }
+              return node;
+            });
+
+            queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), {
+              ...currentWorkflow,
+              spec: {
+                ...currentWorkflow.spec,
+                nodes: mergedNodes,
+              },
+            });
+          }
 
           // Auto-save completed silently (no toast or state changes)
         } catch (error: any) {
