@@ -66,7 +66,7 @@ function App() {
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
-        <Toaster position="bottom-center" richColors closeButton />
+        <Toaster position="bottom-center" closeButton />
       </AccountProvider>
     </QueryClientProvider>
   );
