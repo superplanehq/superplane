@@ -463,24 +463,26 @@ export const ComponentSidebar = ({
               )}
             </div>
             {!templateNodeId && (
-              <SidebarActionsDropdown
-                onRun={onRun}
-                runDisabled={runDisabled}
-                runDisabledTooltip={runDisabledTooltip}
-                onDuplicate={onDuplicate}
-                onDocs={onDocs}
-                onEdit={onEdit}
-                onConfigure={onConfigure}
-                onDeactivate={onDeactivate}
-                onToggleView={onToggleView}
-                onDelete={onDelete}
-                isCompactView={isCompactView}
-              />
+              <div className="absolute top-14 right-[0.8rem]">
+                <SidebarActionsDropdown
+                  onRun={onRun}
+                  runDisabled={runDisabled}
+                  runDisabledTooltip={runDisabledTooltip}
+                  onDuplicate={onDuplicate}
+                  onDocs={onDocs}
+                  onEdit={onEdit}
+                  onConfigure={onConfigure}
+                  onDeactivate={onDeactivate}
+                  onToggleView={onToggleView}
+                  onDelete={onDelete}
+                  isCompactView={isCompactView}
+                />
+              </div>
             )}
           </div>
           <div
             onClick={() => onClose?.()}
-            className="flex items-center justify-center absolute top-6 right-3 cursor-pointer"
+            className="flex items-center justify-center absolute top-5 right-3 cursor-pointer"
           >
             <X size={18} />
           </div>
