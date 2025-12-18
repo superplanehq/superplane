@@ -4,14 +4,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type mockExecutionStateContext struct {
-	finished bool
-	passed   bool
-	failed   bool
+	finished   bool
+	passed     bool
+	failed     bool
+	passedData map[string][]any
 }
 
 func (m *mockExecutionStateContext) SetKV(key, value string) error {
@@ -22,6 +24,7 @@ func (m *mockExecutionStateContext) IsFinished() bool { return m.finished }
 func (m *mockExecutionStateContext) Pass(outputs map[string][]any) error {
 	m.passed = true
 	m.finished = true
+	m.passedData = outputs
 	return nil
 }
 func (m *mockExecutionStateContext) Fail(reason, message string) error {
@@ -34,10 +37,14 @@ func TestWait_HandleAction_PushThrough(t *testing.T) {
 	w := &Wait{}
 
 	mockState := &mockExecutionStateContext{}
+	mockMetadata := &mockMetadataContext{}
+	mockAuth := &mockAuthContext{}
+
 	ctx := core.ActionContext{
 		Name:                  "pushThrough",
 		ExecutionStateContext: mockState,
-		MetadataContext:       nil,
+		MetadataContext:       mockMetadata,
+		AuthContext:           mockAuth,
 		Configuration:         nil,
 		Parameters:            map[string]any{},
 	}
@@ -52,9 +59,12 @@ func TestWait_HandleAction_TimeReached(t *testing.T) {
 	w := &Wait{}
 
 	mockState := &mockExecutionStateContext{}
+	mockMetadata := &mockMetadataContext{}
+
 	ctx := core.ActionContext{
 		Name:                  "timeReached",
 		ExecutionStateContext: mockState,
+		MetadataContext:       mockMetadata,
 		Parameters:            map[string]any{},
 	}
 
@@ -68,9 +78,12 @@ func TestWait_HandleAction_Unknown(t *testing.T) {
 	w := &Wait{}
 
 	mockState := &mockExecutionStateContext{}
+	mockMetadata := &mockMetadataContext{}
+
 	ctx := core.ActionContext{
 		Name:                  "unknown",
 		ExecutionStateContext: mockState,
+		MetadataContext:       mockMetadata,
 		Parameters:            map[string]any{},
 	}
 
@@ -91,6 +104,40 @@ func (m *mockRequestContext) ScheduleActionCall(action string, params map[string
 	m.scheduledParams = params
 	m.scheduledDuration = duration
 	return nil
+}
+
+// mockMetadataContext implements core.MetadataContext for tests
+type mockMetadataContext struct {
+	data any
+}
+
+func (m *mockMetadataContext) Get() any {
+	return m.data
+}
+
+func (m *mockMetadataContext) Set(data any) {
+	m.data = data
+}
+
+// mockAuthContext implements core.AuthContext for tests
+type mockAuthContext struct {
+	user *core.User
+}
+
+func (m *mockAuthContext) AuthenticatedUser() *core.User {
+	return m.user
+}
+
+func (m *mockAuthContext) GetUser(id uuid.UUID) (*core.User, error) {
+	return nil, nil
+}
+
+func (m *mockAuthContext) HasRole(role string) (bool, error) {
+	return false, nil
+}
+
+func (m *mockAuthContext) InGroup(group string) (bool, error) {
+	return false, nil
 }
 
 func TestEvaluateIntegerExpression(t *testing.T) {
@@ -342,10 +389,12 @@ func TestWait_Execute_IntervalMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			mockMetadata := &mockMetadataContext{}
 			ctx := core.ExecutionContext{
-				Configuration:  tt.config,
-				Data:           tt.data,
-				RequestContext: mockRequest,
+				Configuration:   tt.config,
+				Data:            tt.data,
+				RequestContext:  mockRequest,
+				MetadataContext: mockMetadata,
 			}
 
 			err := w.Execute(ctx)
@@ -416,10 +465,12 @@ func TestWait_Execute_CountdownMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			mockMetadata := &mockMetadataContext{}
 			ctx := core.ExecutionContext{
-				Configuration:  tt.config,
-				Data:           tt.data,
-				RequestContext: mockRequest,
+				Configuration:   tt.config,
+				Data:            tt.data,
+				RequestContext:  mockRequest,
+				MetadataContext: mockMetadata,
 			}
 
 			err := w.Execute(ctx)
@@ -479,9 +530,11 @@ func TestWait_Execute_InvalidConfiguration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			mockMetadata := &mockMetadataContext{}
 			ctx := core.ExecutionContext{
-				Configuration:  tt.config,
-				RequestContext: mockRequest,
+				Configuration:   tt.config,
+				RequestContext:  mockRequest,
+				MetadataContext: mockMetadata,
 			}
 
 			err := w.Execute(ctx)
@@ -489,4 +542,123 @@ func TestWait_Execute_InvalidConfiguration(t *testing.T) {
 			assert.Contains(t, err.Error(), tt.errMsg)
 		})
 	}
+}
+
+func TestWait_HandleTimeReached_CompletionOutput(t *testing.T) {
+	w := &Wait{}
+
+	mockState := &mockExecutionStateContext{}
+	mockMetadata := &mockMetadataContext{}
+	// Set up metadata with start time
+	mockMetadata.Set(ExecutionMetadata{StartTime: "2025-12-10T09:02:43.651Z"})
+
+	ctx := core.ActionContext{
+		Name:                  "timeReached",
+		ExecutionStateContext: mockState,
+		MetadataContext:       mockMetadata,
+	}
+
+	err := w.HandleAction(ctx)
+	assert.NoError(t, err)
+	assert.True(t, mockState.passed)
+	assert.True(t, mockState.finished)
+
+	// Check completion output structure
+	assert.Contains(t, mockState.passedData, core.DefaultOutputChannel.Name)
+	outputs := mockState.passedData[core.DefaultOutputChannel.Name]
+	assert.Len(t, outputs, 1)
+
+	output := outputs[0].(map[string]any)
+	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["timestamp_started"])
+	assert.Equal(t, "completed", output["result"])
+	assert.Equal(t, "timeout", output["reason"])
+	assert.Nil(t, output["actor"])
+	assert.Contains(t, output, "timestamp_finished")
+}
+
+func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
+	w := &Wait{}
+
+	mockState := &mockExecutionStateContext{}
+	mockMetadata := &mockMetadataContext{}
+	mockAuth := &mockAuthContext{
+		user: &core.User{
+			Email: "alex@company.com",
+			Name:  "Aleksandar Mitrović",
+		},
+	}
+	// Set up metadata with start time
+	mockMetadata.Set(ExecutionMetadata{StartTime: "2025-12-10T09:02:43.651Z"})
+
+	ctx := core.ActionContext{
+		Name:                  "pushThrough",
+		ExecutionStateContext: mockState,
+		MetadataContext:       mockMetadata,
+		AuthContext:           mockAuth,
+	}
+
+	err := w.HandleAction(ctx)
+	assert.NoError(t, err)
+	assert.True(t, mockState.passed)
+	assert.True(t, mockState.finished)
+
+	// Check completion output structure
+	assert.Contains(t, mockState.passedData, core.DefaultOutputChannel.Name)
+	outputs := mockState.passedData[core.DefaultOutputChannel.Name]
+	assert.Len(t, outputs, 1)
+
+	output := outputs[0].(map[string]any)
+	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["timestamp_started"])
+	assert.Equal(t, "completed", output["result"])
+	assert.Equal(t, "manual_override", output["reason"])
+	assert.Contains(t, output, "timestamp_finished")
+
+	// Check actor information
+	assert.NotNil(t, output["actor"])
+	actor := output["actor"].(map[string]any)
+	assert.Equal(t, "alex@company.com", actor["email"])
+	assert.Equal(t, "Aleksandar Mitrović", actor["display_name"])
+}
+
+func TestWait_Cancel_CompletionOutput(t *testing.T) {
+	w := &Wait{}
+
+	mockState := &mockExecutionStateContext{}
+	mockMetadata := &mockMetadataContext{}
+	mockAuth := &mockAuthContext{
+		user: &core.User{
+			Email: "alex@company.com",
+			Name:  "Aleksandar Mitrović",
+		},
+	}
+	// Set up metadata with start time
+	mockMetadata.Set(ExecutionMetadata{StartTime: "2025-12-10T09:02:43.651Z"})
+
+	ctx := core.ExecutionContext{
+		ExecutionStateContext: mockState,
+		MetadataContext:       mockMetadata,
+		AuthContext:           mockAuth,
+	}
+
+	err := w.Cancel(ctx)
+	assert.NoError(t, err)
+	assert.True(t, mockState.passed)
+	assert.True(t, mockState.finished)
+
+	// Check completion output structure
+	assert.Contains(t, mockState.passedData, core.DefaultOutputChannel.Name)
+	outputs := mockState.passedData[core.DefaultOutputChannel.Name]
+	assert.Len(t, outputs, 1)
+
+	output := outputs[0].(map[string]any)
+	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["timestamp_started"])
+	assert.Equal(t, "cancelled", output["result"])
+	assert.Equal(t, "user_cancel", output["reason"])
+	assert.Contains(t, output, "timestamp_finished")
+
+	// Check actor information
+	assert.NotNil(t, output["actor"])
+	actor := output["actor"].(map[string]any)
+	assert.Equal(t, "alex@company.com", actor["email"])
+	assert.Equal(t, "Aleksandar Mitrović", actor["display_name"])
 }

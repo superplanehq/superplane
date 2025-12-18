@@ -27,6 +27,10 @@ type Spec struct {
 	WaitUntil *string `json:"waitUntil"`
 }
 
+type ExecutionMetadata struct {
+	StartTime string `json:"start_time"`
+}
+
 const (
 	ModeInterval  = "interval"
 	ModeCountdown = "countdown"
@@ -235,12 +239,45 @@ func calculateIntervalDuration(value int, unit string) (time.Duration, error) {
 	}
 }
 
+func createCompletionOutput(startTime, finishTime, result, reason string, actor *core.User) map[string]any {
+	output := map[string]any{
+		"timestamp_started":  startTime,
+		"timestamp_finished": finishTime,
+		"result":             result,
+		"reason":             reason,
+		"actor":              nil,
+	}
+
+	if actor != nil {
+		output["actor"] = map[string]any{
+			"email":        actor.Email,
+			"display_name": actor.Name,
+		}
+	}
+
+	return output
+}
+
+func getStartTimeFromMetadata(metadataCtx core.MetadataContext) string {
+	metadata := ExecutionMetadata{}
+	if err := mapstructure.Decode(metadataCtx.Get(), &metadata); err == nil && metadata.StartTime != "" {
+		return metadata.StartTime
+	}
+	// Fallback to current time if no start time found
+	return time.Now().Format(time.RFC3339)
+}
+
 func (w *Wait) Execute(ctx core.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
 		return err
 	}
+
+	// Store start time in metadata
+	startTime := time.Now().Format(time.RFC3339)
+	metadata := ExecutionMetadata{StartTime: startTime}
+	ctx.MetadataContext.Set(metadata)
 
 	var interval time.Duration
 
@@ -313,23 +350,31 @@ func (w *Wait) HandleAction(ctx core.ActionContext) error {
 
 func (w *Wait) HandleTimeReached(ctx core.ActionContext) error {
 	if ctx.ExecutionStateContext.IsFinished() {
-
 		return nil
 	}
 
+	startTime := getStartTimeFromMetadata(ctx.MetadataContext)
+	finishTime := time.Now().Format(time.RFC3339)
+	completionOutput := createCompletionOutput(startTime, finishTime, "completed", "timeout", nil)
+
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {map[string]any{}},
+		core.DefaultOutputChannel.Name: {completionOutput},
 	})
 }
 
 func (w *Wait) HandlePushThrough(ctx core.ActionContext) error {
 	if ctx.ExecutionStateContext.IsFinished() {
-
 		return nil
 	}
 
+	// Create completion output for manual override
+	startTime := getStartTimeFromMetadata(ctx.MetadataContext)
+	finishTime := time.Now().Format(time.RFC3339)
+	actor := ctx.AuthContext.AuthenticatedUser()
+	completionOutput := createCompletionOutput(startTime, finishTime, "completed", "manual_override", actor)
+
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {map[string]any{}},
+		core.DefaultOutputChannel.Name: {completionOutput},
 	})
 }
 
@@ -346,5 +391,12 @@ func (w *Wait) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowN
 }
 
 func (w *Wait) Cancel(ctx core.ExecutionContext) error {
-	return nil
+	startTime := getStartTimeFromMetadata(ctx.MetadataContext)
+	finishTime := time.Now().Format(time.RFC3339)
+	actor := ctx.AuthContext.AuthenticatedUser()
+	completionOutput := createCompletionOutput(startTime, finishTime, "cancelled", "user_cancel", actor)
+
+	return ctx.ExecutionStateContext.Pass(map[string][]any{
+		core.DefaultOutputChannel.Name: {completionOutput},
+	})
 }
