@@ -85,7 +85,7 @@ export const LatestTab = ({
   };
 
   return (
-    <>
+    <div className="overflow-y-auto pb-20" style={{ maxHeight: "85vh" }}>
       <div className="px-3 py-1 border-b-1 border-border pb-3 text-left">
         <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Latest</h2>
         <div className="flex flex-col">
@@ -174,6 +174,6 @@ export const LatestTab = ({
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };

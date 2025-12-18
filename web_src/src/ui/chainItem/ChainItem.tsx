@@ -65,7 +65,6 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
   const [payloadCopied, setPayloadCopied] = useState(false);
-  console.log("item", item);
   const state = useMemo(() => {
     if (!getExecutionState || !item.originalExecution) return item.state;
     const { state } = getExecutionState(item.nodeId || "", item.originalExecution);

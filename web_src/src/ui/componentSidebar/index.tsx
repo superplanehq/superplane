@@ -438,7 +438,7 @@ export const ComponentSidebar = ({
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white shadow-2xl"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize handle */}
@@ -518,7 +518,7 @@ export const ComponentSidebar = ({
             extraStatusOptions={extraStatusOptions}
           />
 
-          <div className="px-3 py-1 pb-3">
+          <div className="py-1 pb-3">
             {page === "execution-chain" ? (
               <ExecutionChainPage
                 eventId={executionChainEventId}
@@ -613,7 +613,11 @@ export const ComponentSidebar = ({
               </div>
             )}
 
-            <TabsContent value="latest" className={!showSettingsTab ? "" : "mt-0"}>
+            <TabsContent
+              value="latest"
+              className={!showSettingsTab ? "overflow-y-auto" : "mt-0"}
+              style={!showSettingsTab ? { maxHeight: "40vh" } : undefined}
+            >
               <LatestTab
                 latestEvents={latestEvents}
                 nextInQueueEvents={nextInQueueEvents}

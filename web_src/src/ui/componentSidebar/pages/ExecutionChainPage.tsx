@@ -134,7 +134,6 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   onToggleOpen,
   getExecutionState,
   getTabData,
-  _onEventClick,
   workflowNodes = [],
   components = [],
   triggers = [],
@@ -143,6 +142,9 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   const [chainItems, setChainItems] = useState<ChainItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Ref for the scrollable executions container
+  const executionsScrollRef = useRef<HTMLDivElement>(null);
 
   // Calculate summary information for the header
   const summaryInfo = useMemo(() => {
@@ -333,6 +335,23 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
     };
   }, []);
 
+  // Auto-scroll to selected execution
+  useEffect(() => {
+    if (selectedExecutionId && executionsScrollRef.current && chainItems.length > 0) {
+      const selectedElement = executionsScrollRef.current.querySelector(
+        `[data-execution-id="${selectedExecutionId}"]`,
+      ) as HTMLElement;
+
+      if (selectedElement && !pollingRef.current.startedPolling) {
+        selectedElement.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "nearest",
+        });
+      }
+    }
+  }, [selectedExecutionId, chainItems.length]);
+
   if (loading && !pollingRef.current.startedPolling) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -375,10 +394,10 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-0">
-      {/* Header Section */}
+    <div className="flex flex-col h-full pt-1">
+      {/* Fixed Header Section */}
       {triggerEvent && (
-        <div className="mb-1 pb-4 border-b border-gray-200">
+        <div className="px-3 flex-shrink-0 mb-1 pb-4 border-b border-gray-200">
           <h2 className="text-md font-semibold text-gray-900 mb-1">{triggerEvent.title || "Execution Chain"}</h2>
           {summaryInfo && (
             <div className="text-sm text-gray-500">
@@ -396,9 +415,9 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
         </div>
       )}
 
-      {/* Event Section */}
+      {/* Fixed Event Section */}
       {triggerEvent && (
-        <div className="mb-6 mt-2">
+        <div className="px-3 flex-shrink-0 mb-6 mt-2">
           <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-1">Event</h2>
           <ChainItem
             item={convertSidebarEventToChainItem(triggerEvent, workflowNodes, components, triggers, getTabData)}
@@ -413,22 +432,27 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
       )}
 
       {/* Executions Section */}
-      <div>
-        <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-1">
+      <div className="flex-1 flex flex-col min-h-0">
+        <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-4 flex-shrink-0">
           {chainItems.length} Execution{chainItems.length === 1 ? "" : "s"}
         </h2>
-        {chainItems.map((item, index) => (
-          <ChainItem
-            key={item.id}
-            item={item}
-            index={index}
-            totalItems={chainItems.length}
-            isOpen={openEventIds.has(item.id) || item.executionId === selectedExecutionId}
-            isSelected={item.executionId === selectedExecutionId}
-            onToggleOpen={onToggleOpen}
-            getExecutionState={getExecutionState}
-          />
-        ))}
+        <div ref={executionsScrollRef} className="flex-1 overflow-y-auto max-h-96 px-3 ">
+          <div className="pb-15">
+            {chainItems.map((item, index) => (
+              <div key={item.id} data-execution-id={item.executionId}>
+                <ChainItem
+                  item={item}
+                  index={index}
+                  totalItems={chainItems.length}
+                  isOpen={openEventIds.has(item.id) || item.executionId === selectedExecutionId}
+                  isSelected={item.executionId === selectedExecutionId}
+                  onToggleOpen={onToggleOpen}
+                  getExecutionState={getExecutionState}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
