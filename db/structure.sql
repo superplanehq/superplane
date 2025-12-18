@@ -744,6 +744,13 @@ CREATE INDEX idx_app_installations_deleted_at ON public.app_installations USING 
 
 
 --
+-- Name: idx_app_installations_org_name_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_app_installations_org_name_unique ON public.app_installations USING btree (organization_id, installation_name);
+
+
+--
 -- Name: idx_app_installations_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1255,7 +1262,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251216132817	f
+20251218100000	f
 \.
 
 

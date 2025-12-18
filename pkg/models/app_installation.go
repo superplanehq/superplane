@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -175,6 +176,21 @@ func FindAppInstallation(orgID, installationID uuid.UUID) (*AppInstallation, err
 	return &appInstallation, nil
 }
 
+func FindAppInstallationByName(orgID uuid.UUID, installationName string) (*AppInstallation, error) {
+	var appInstallation AppInstallation
+	err := database.Conn().
+		Where("organization_id = ?", orgID).
+		Where("installation_name = ?", installationName).
+		First(&appInstallation).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &appInstallation, nil
+}
+
 func ListDeletedAppInstallations() ([]AppInstallation, error) {
 	var installations []AppInstallation
 	err := database.Conn().Unscoped().
@@ -203,4 +219,19 @@ func LockAppInstallation(tx *gorm.DB, ID uuid.UUID) (*AppInstallation, error) {
 	}
 
 	return &installation, nil
+}
+
+func (a *AppInstallation) SoftDelete() error {
+	return a.SoftDeleteInTransaction(database.Conn())
+}
+
+func (a *AppInstallation) SoftDeleteInTransaction(tx *gorm.DB) error {
+	now := time.Now()
+	timestamp := now.Unix()
+
+	newName := fmt.Sprintf("%s (deleted-%d)", a.InstallationName, timestamp)
+	return tx.Model(a).Updates(map[string]interface{}{
+		"deleted_at":        now,
+		"installation_name": newName,
+	}).Error
 }
