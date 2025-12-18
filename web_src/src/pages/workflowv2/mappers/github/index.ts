@@ -3,6 +3,7 @@ import { onPushTriggerRenderer } from "./on_push";
 import { onPullRequestTriggerRenderer } from "./on_pull_request";
 import { onIssueTriggerRenderer } from "./on_issue";
 import { onReleaseTriggerRenderer } from "./on_release";
+import { onPackageTriggerRenderer } from "./on_package";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {};
 
@@ -11,4 +12,5 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   onPullRequest: onPullRequestTriggerRenderer,
   onIssue: onIssueTriggerRenderer,
   onRelease: onReleaseTriggerRenderer,
+  onPackage: onPackageTriggerRenderer,
 };

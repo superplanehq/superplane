@@ -97,6 +97,7 @@ func (g *GitHub) Triggers() []core.Trigger {
 		&OnPullRequest{},
 		&OnIssue{},
 		&OnRelease{},
+		&OnPackage{},
 	}
 }
 
