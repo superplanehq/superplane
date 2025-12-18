@@ -17,10 +17,12 @@ spin_chars=(
 )
 spin_index=0
 SPINNER_PID=""
+SPINNER_MESSAGE=""
 
 start_spinner() {
   local message="$1"
   local spin_index=0
+  SPINNER_MESSAGE="$message"
 
   (
       while true; do
@@ -39,6 +41,7 @@ stop_spinner() {
   kill $SPINNER_PID >/dev/null 2>&1
   # Use printf to clear the line completely (ANSI escape code \033[K)
   printf "\r\033[K"
+  echo "⠸ $SPINNER_MESSAGE"
   trap - EXIT
 }
 
