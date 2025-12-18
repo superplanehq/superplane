@@ -620,6 +620,165 @@ func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
 	assert.Equal(t, "Aleksandar Mitrović", actor["display_name"])
 }
 
+func TestWait_Execute_CountdownMode_ExpressionSyntax(t *testing.T) {
+	w := &Wait{}
+	mockRequest := &mockRequestContext{}
+
+	tests := []struct {
+		name      string
+		config    map[string]any
+		data      map[string]any
+		expectErr bool
+		errMsg    string
+	}{
+		{
+			name: "valid ISO 8601 string expression",
+			config: map[string]any{
+				"mode":      ModeCountdown,
+				"waitUntil": "\"2025-12-20T15:30:00Z\"",
+			},
+			data:      map[string]any{},
+			expectErr: false,
+		},
+		{
+			name: "data field with valid date",
+			config: map[string]any{
+				"mode":      ModeCountdown,
+				"waitUntil": "$.scheduled_time",
+			},
+			data: map[string]any{
+				"scheduled_time": "2025-12-20T15:30:00Z",
+			},
+			expectErr: false,
+		},
+		{
+			name: "invalid template syntax like ${{ date() }}",
+			config: map[string]any{
+				"mode":      ModeCountdown,
+				"waitUntil": "${{ date(\"2025-08-14 00:00:00\").In(timezone(\"Europe/Zurich\")).Format(\"2006-01-02T15:04:05 -070000\") }}",
+			},
+			data:      map[string]any{},
+			expectErr: true,
+			errMsg:    "expression compilation failed",
+		},
+		{
+			name: "date() function - surprisingly works but date is in past",
+			config: map[string]any{
+				"mode":      ModeCountdown,
+				"waitUntil": "date(\"2025-08-14 00:00:00\")",
+			},
+			data:      map[string]any{},
+			expectErr: true,
+			errMsg:    "in the past", // The expression actually works but date is past
+		},
+		{
+			name: "simple string concatenation (results in invalid date)",
+			config: map[string]any{
+				"mode":      ModeCountdown,
+				"waitUntil": "\"2025-12-\" + \"20T15:30:00Z\"",
+			},
+			data:      map[string]any{},
+			expectErr: false, // Expression compiles but may fail at runtime
+		},
+		{
+			name: "conditional expression with valid dates",
+			config: map[string]any{
+				"mode":      ModeCountdown,
+				"waitUntil": "$.urgent == true ? \"2025-12-18T16:00:00Z\" : \"2025-12-20T09:00:00Z\"",
+			},
+			data: map[string]any{
+				"urgent": false,
+			},
+			expectErr: false,
+		},
+		{
+			name: "data field interpolation",
+			config: map[string]any{
+				"mode":      ModeCountdown,
+				"waitUntil": "$.year + \"-12-20T15:30:00Z\"",
+			},
+			data: map[string]any{
+				"year": "2025",
+			},
+			expectErr: false,
+		},
+		{
+			name: "missing data field",
+			config: map[string]any{
+				"mode":      ModeCountdown,
+				"waitUntil": "$.nonexistent_date",
+			},
+			data:      map[string]any{},
+			expectErr: true,
+			errMsg:    "expression must evaluate to date/time, got <nil>",
+		},
+		{
+			name: "empty expression",
+			config: map[string]any{
+				"mode":      ModeCountdown,
+				"waitUntil": "",
+			},
+			data:      map[string]any{},
+			expectErr: true,
+			errMsg:    "expression compilation failed: unexpected token EOF",
+		},
+		{
+			name: "alternative date format",
+			config: map[string]any{
+				"mode":      ModeCountdown,
+				"waitUntil": "\"2025-12-20 15:30:00\"",
+			},
+			data:      map[string]any{},
+			expectErr: false, // Should be parsed by fallback formats
+		},
+		{
+			name: "date() function with future date - correct syntax",
+			config: map[string]any{
+				"mode":      ModeCountdown,
+				"waitUntil": "date(\"2025-12-25 15:30:00\")",
+			},
+			data:      map[string]any{},
+			expectErr: false, // This should work since date() function exists
+		},
+		{
+			name: "exploring available date manipulation functions",
+			config: map[string]any{
+				"mode":      ModeCountdown,
+				"waitUntil": "date(\"2025-12-25 15:30:00\").Format(\"2006-01-02T15:04:05Z07:00\")",
+			},
+			data:      map[string]any{},
+			expectErr: false, // Test if format method exists
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockMetadata := &mockMetadataContext{}
+			ctx := core.ExecutionContext{
+				Configuration:   tt.config,
+				Data:            tt.data,
+				RequestContext:  mockRequest,
+				MetadataContext: mockMetadata,
+			}
+
+			err := w.Execute(ctx)
+			if tt.expectErr {
+				assert.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Contains(t, err.Error(), tt.errMsg)
+				}
+			} else {
+				// For valid expressions, we might still get an error if the resulting date is in the past
+				// That's expected behavior, not a syntax error
+				if err != nil {
+					// If there's an error, it should be about the date being in the past, not syntax
+					assert.Contains(t, err.Error(), "in the past")
+				}
+			}
+		})
+	}
+}
+
 func TestWait_Cancel_CompletionOutput(t *testing.T) {
 	w := &Wait{}
 
