@@ -107,6 +107,8 @@ func (s *WaitSteps) openSidebarForNode(node string) {
 }
 
 func (s *WaitSteps) pushThroughFirstItemFromSidebar() {
+	eventItem := q.Locator("h2:has-text('Latest') ~ div")
+	s.session.HoverOver(eventItem)
 	s.session.Click(q.Locator("h2:has-text('Latest') ~ div button[aria-label='Open actions']"))
 	s.session.Click(q.TestID("push-through-item"))
 	s.canvas.WaitForExecution("Output", models.WorkflowNodeExecutionStateFinished, 15*time.Second)
