@@ -57,9 +57,7 @@ const OwnerSetup: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-zinc-900 dark:to-zinc-800 px-4">
       <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-            Set up owner account
-          </h2>
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Set up owner account</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

@@ -60,8 +60,7 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		organizationName := req.FirstName + "'s organization"
-		organization, err = models.CreateOrganizationInTransaction(tx, organizationName, "")
+		organization, err = models.CreateOrganizationInTransaction(tx, "Demo", "")
 		if err != nil {
 			return err
 		}
@@ -111,4 +110,3 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		OrganizationID: organization.ID.String(),
 	})
 }
-
