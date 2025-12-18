@@ -3,7 +3,6 @@ package github
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -22,24 +21,11 @@ func NewClient(ctx core.AppInstallationContext, ghAppID int64, installationID st
 		return nil, fmt.Errorf("failed to find PEM: %v", err)
 	}
 
-	f, err := os.CreateTemp("", "github-app.pem")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file: %v", err)
-	}
-
-	defer f.Close()
-	defer os.Remove(f.Name())
-
-	_, err = f.Write([]byte(pem))
-	if err != nil {
-		return nil, fmt.Errorf("failed to write temp file: %v", err)
-	}
-
-	itr, err := ghinstallation.NewKeyFromFile(
+	itr, err := ghinstallation.New(
 		http.DefaultTransport,
 		ghAppID,
 		int64(ID),
-		f.Name(),
+		[]byte(pem),
 	)
 
 	if err != nil {
