@@ -44,6 +44,7 @@ interface ChainItemProps {
   index: number;
   totalItems?: number;
   isOpen: boolean;
+  isSelected?: boolean;
   onToggleOpen: (itemId: string) => void;
   getExecutionState?: (
     nodeId: string,
@@ -56,6 +57,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   index,
   totalItems,
   isOpen,
+  isSelected = false,
   onToggleOpen,
   getExecutionState,
 }) => {
@@ -114,8 +116,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
       <div
         key={item.id + index}
         className={
-          `cursor-pointer px-4 pt-2 pb-2 relative rounded-lg border-1 border-slate-300 ${EventBackground}` +
-          (showConnectingLine ? " mb-3" : "")
+          `cursor-pointer px-4 pt-2 pb-2 relative rounded-lg border-1 ${
+            isSelected ? "border-blue-200 border-3" : "border-slate-300"
+          } ${EventBackground}` + (showConnectingLine ? " mb-3" : "")
         }
         onClick={(e) => {
           e.stopPropagation();
