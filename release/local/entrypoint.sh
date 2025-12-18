@@ -23,6 +23,7 @@ IFS=$'\n\t'
 : "${PUBLIC_API_BASE_PATH:=/api/v1}"
 
 : "${OWNER_SETUP_ENABLED:=yes}"
+: "${CLOUDFLARE_QUICK_TUNNEL:=1}"
 
 : "${START_PUBLIC_API:=yes}"
 : "${START_INTERNAL_API:=yes}"
@@ -45,7 +46,7 @@ IFS=$'\n\t'
 : "${NO_ENCRYPTION:=yes}"
 
 export DB_HOST DB_PORT DB_NAME DB_USERNAME DB_PASSWORD POSTGRES_DB_SSL APPLICATION_NAME \
-  BASE_URL WEB_BASE_PATH PUBLIC_API_BASE_PATH OWNER_SETUP_ENABLED \
+  BASE_URL WEB_BASE_PATH PUBLIC_API_BASE_PATH OWNER_SETUP_ENABLED CLOUDFLARE_QUICK_TUNNEL \
   RABBITMQ_URL SWAGGER_BASE_PATH RBAC_MODEL_PATH RBAC_ORG_POLICY_PATH TEMPLATE_DIR \
   START_PUBLIC_API START_INTERNAL_API START_GRPC_GATEWAY START_CONSUMERS \
   START_WEB_SERVER START_EVENT_DISTRIBUTER START_WORKFLOW_EVENT_ROUTER \
@@ -89,6 +90,26 @@ for i in {1..30}; do
   fi
   sleep 1
 done
+
+if [ "${CLOUDFLARE_QUICK_TUNNEL}" = "1" ]; then
+  echo "Starting Cloudflare quick tunnel..."
+  mkdir -p /var/log/cloudflared
+  cloudflared tunnel --no-autoupdate --url "http://127.0.0.1:8000" > /var/log/cloudflared/cloudflared.log 2>&1 &
+
+  (
+    echo "Waiting for Cloudflare tunnel URL..."
+    for i in {1..30}; do
+      if [ -f /var/log/cloudflared/cloudflared.log ]; then
+        URL=$(grep -Eo 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' /var/log/cloudflared/cloudflared.log | head -n 1 || true)
+        if [ -n "${URL}" ]; then
+          echo "Cloudflare tunnel URL: ${URL}"
+          break
+        fi
+      fi
+      sleep 2
+    done
+  ) &
+fi
 
 echo "Running Superplane migrations and starting server..."
 
