@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { resolveIcon, flattenObject } from "@/lib/utils";
 import { ChainItem, type ChainItemData } from "../../chainItem";
-import { SidebarEventItem } from "../SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "../types";
 import {
   WorkflowsWorkflowNodeExecution,
@@ -56,6 +55,51 @@ function buildExecutionTabData(
   return tabData;
 }
 
+function convertSidebarEventToChainItem(
+  triggerEvent: SidebarEvent,
+  workflowNodes: ComponentsNode[] = [],
+  _components: ComponentsComponent[] = [],
+  triggers: TriggersTrigger[] = [],
+  getTabData?: (event: SidebarEvent) => any,
+): ChainItemData {
+  // Find the workflow node for this trigger event
+  const workflowNode = workflowNodes.find((node) => node.id === triggerEvent.nodeId);
+
+  // Get metadata based on node type
+  let nodeDisplayName = triggerEvent.title || "Trigger Event";
+  let nodeIconSlug = "play";
+
+  if (workflowNode) {
+    nodeDisplayName = workflowNode.name || nodeDisplayName;
+
+    // Get icon based on node type
+    if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.trigger?.name) {
+      const triggerMeta = triggers.find((t) => t.name === workflowNode.trigger!.name);
+      nodeIconSlug = triggerMeta?.icon || "play";
+    }
+  }
+
+  return {
+    id: triggerEvent.id,
+    nodeId: triggerEvent.nodeId || "",
+    componentName: triggerEvent.title || "Trigger Event",
+    nodeName: triggerEvent.title,
+    nodeDisplayName,
+    nodeIcon: "play",
+    nodeIconSlug,
+    state: triggerEvent.state || "neutral",
+    executionId: undefined, // Trigger events don't have execution IDs
+    originalExecution: undefined,
+    originalEvent: triggerEvent.originalEvent,
+    childExecutions: undefined,
+    workflowNode,
+    tabData: getTabData?.(triggerEvent) || {
+      current: triggerEvent.values || {},
+      payload: triggerEvent.originalEvent || {},
+    },
+  };
+}
+
 interface ExecutionChainPageProps {
   eventId: string | null;
   triggerEvent?: SidebarEvent;
@@ -89,7 +133,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   onToggleOpen,
   getExecutionState,
   getTabData,
-  onEventClick,
+  _onEventClick,
   workflowNodes = [],
   components = [],
   triggers = [],
@@ -299,15 +343,14 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
       {triggerEvent && (
         <div className="mb-6 mt-2">
           <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-1">Event</h2>
-          <SidebarEventItem
-            event={triggerEvent}
-            index={0}
+          <ChainItem
+            item={convertSidebarEventToChainItem(triggerEvent, workflowNodes, components, triggers, getTabData)}
+            index={-1}
+            totalItems={undefined}
             isOpen={openEventIds.has(triggerEvent.id)}
+            isSelected={false}
             onToggleOpen={onToggleOpen}
-            onEventClick={onEventClick}
-            tabData={getTabData?.(triggerEvent)}
             getExecutionState={getExecutionState}
-            variant="latest"
           />
         </div>
       )}

@@ -2,7 +2,7 @@
 import { resolveIcon, isUrl, calcRelativeTimeFromDiff } from "@/lib/utils";
 import React, { useCallback, useMemo, useState } from "react";
 import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
-import { WorkflowsWorkflowNodeExecution, ComponentsNode } from "@/api-client";
+import { WorkflowsWorkflowNodeExecution, ComponentsNode, WorkflowsWorkflowEvent } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { formatTimeAgo } from "@/utils/date";
@@ -29,6 +29,7 @@ export interface ChainItemData {
   state?: string; // Make state optional since it will be calculated
   executionId?: string;
   originalExecution?: WorkflowsWorkflowNodeExecution; // Add execution data
+  originalEvent?: WorkflowsWorkflowEvent; // Add event data for trigger events
   childExecutions?: ChildExecution[]; // Add child executions for composite components
   workflowNode?: ComponentsNode; // Add workflow node for subtitle generation
   additionalData?: unknown; // Add additional data for subtitle generation
@@ -62,7 +63,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
   const [payloadCopied, setPayloadCopied] = useState(false);
-
+  console.log("item", item);
   const state = useMemo(() => {
     if (!getExecutionState || !item.originalExecution) return item.state;
     const { state } = getExecutionState(item.nodeId || "", item.originalExecution);
@@ -151,7 +152,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         {/* Second row: Time ago and duration */}
         <div className="flex items-center mt-0 ml-8 gap-2">
           <span className="text-sm text-gray-500">
-            {formatTimeAgo(new Date(item.originalExecution?.createdAt || ""))}
+            {formatTimeAgo(new Date(item.originalExecution?.createdAt || item.originalEvent?.createdAt || ""))}
             {item.originalExecution?.state === "STATE_FINISHED" &&
               item.originalExecution?.createdAt &&
               item.originalExecution?.updatedAt && (
