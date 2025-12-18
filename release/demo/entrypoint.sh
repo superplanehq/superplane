@@ -7,7 +7,7 @@ IFS=$'\n\t'
 : "${PGDATA:=/var/lib/postgresql/data}"
 : "${DB_HOST:=127.0.0.1}"
 : "${DB_PORT:=5432}"
-: "${DB_NAME:=superplane_trial}"
+: "${DB_NAME:=superplane_demo}"
 : "${DB_USERNAME:=postgres}"
 : "${DB_PASSWORD:=postgres}"
 : "${POSTGRES_DB_SSL:=false}"
@@ -55,7 +55,7 @@ export DB_HOST DB_PORT DB_NAME DB_USERNAME DB_PASSWORD POSTGRES_DB_SSL APPLICATI
   START_WORKFLOW_CLEANUP_WORKER \
   ENCRYPTION_KEY JWT_SECRET SESSION_SECRET NO_ENCRYPTION
 
-echo "Starting embedded PostgreSQL for trial..."
+echo "Starting embedded PostgreSQL for demo..."
 
 # Initialize cluster if needed
 if [ ! -s "${PGDATA}/PG_VERSION" ]; then
