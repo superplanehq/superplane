@@ -58,32 +58,32 @@ RUN npm install
 RUN VITE_BASE_URL=$BASE_URL npm run build
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Trial runner: single-container image with embedded Postgres.
+# Demo runner: single-container image with embedded Postgres and RabbitMQ.
 # ----------------------------------------------------------------------------------------------------------------------
 
-FROM ${RUNNER_IMAGE} AS trial
+FROM ${RUNNER_IMAGE} AS demo
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-      postgresql \
-      postgresql-contrib \
-      rabbitmq-server \
-      ca-certificates \
-      curl && \
-    # Ensure PostgreSQL server binaries (initdb, pg_ctl, psql, etc.) are on PATH
-    ln -s /usr/lib/postgresql/*/bin/* /usr/local/bin/ && \
-    # Install cloudflared binary for quick tunnels
-    arch="$(dpkg --print-architecture)" && \
-    if [ "$arch" = "arm64" ]; then \
-      cf_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"; \
-    else \
-      cf_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"; \
-    fi && \
-    curl -L "$cf_url" -o /usr/local/bin/cloudflared && \
-    chmod +x /usr/local/bin/cloudflared && \
-    rm -rf /var/lib/apt/lists/*
+  apt-get install -y --no-install-recommends \
+  postgresql \
+  postgresql-contrib \
+  rabbitmq-server \
+  ca-certificates \
+  curl && \
+  # Ensure PostgreSQL server binaries (initdb, pg_ctl, psql, etc.) are on PATH
+  ln -s /usr/lib/postgresql/*/bin/* /usr/local/bin/ && \
+  # Install cloudflared binary for quick tunnels
+  arch="$(dpkg --print-architecture)" && \
+  if [ "$arch" = "arm64" ]; then \
+  cf_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"; \
+  else \
+  cf_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"; \
+  fi && \
+  curl -L "$cf_url" -o /usr/local/bin/cloudflared && \
+  chmod +x /usr/local/bin/cloudflared && \
+  rm -rf /var/lib/apt/lists/*
 
 # We still need the PostgreSQL client tools (createdb/migrate) as in the main runner.
 COPY scripts/docker/install-postgresql-client.sh /tmp/install-postgresql-client.sh
