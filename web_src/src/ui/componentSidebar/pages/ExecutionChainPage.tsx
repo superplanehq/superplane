@@ -324,6 +324,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
             index={index}
             totalItems={chainItems.length}
             isOpen={openEventIds.has(item.id) || item.executionId === selectedExecutionId}
+            isSelected={item.executionId === selectedExecutionId}
             onToggleOpen={onToggleOpen}
             getExecutionState={getExecutionState}
           />
