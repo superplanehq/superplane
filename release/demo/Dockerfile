@@ -103,7 +103,7 @@ COPY --from=builder /app/rbac /app/rbac
 COPY --from=builder /app/templates /app/templates
 
 # Trial entrypoint that runs embedded Postgres and RabbitMQ and then Superplane.
-COPY release/local/entrypoint.sh /app/entrypoint.sh
+COPY release/demo/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh /app/docker-entrypoint.sh
 
 EXPOSE 8000
