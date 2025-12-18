@@ -46,7 +46,7 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
     const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";
 
     return {
-      title: `${releaseName} (${assetCount} asset${assetCount !== 1 ? 's' : ''})`,
+      title: `${releaseName} (${assetCount} asset${assetCount !== 1 ? "s" : ""})`,
       subtitle: eventData?.action || "",
     };
   },
@@ -103,7 +103,7 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
       const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";
 
       props.lastEventData = {
-        title: `${releaseName} (${assetCount} asset${assetCount !== 1 ? 's' : ''})`,
+        title: `${releaseName} (${assetCount} asset${assetCount !== 1 ? "s" : ""})`,
         subtitle: eventData?.action || "",
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
