@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { resolveIcon, flattenObject } from "@/lib/utils";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { resolveIcon, flattenObject, calcRelativeTimeFromDiff } from "@/lib/utils";
 import { ChainItem, type ChainItemData } from "../../chainItem";
 import { SidebarEvent } from "../types";
+import { formatTimeAgo } from "@/utils/date";
 import {
   WorkflowsWorkflowNodeExecution,
   ComponentsNode,
@@ -142,6 +143,42 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   const [chainItems, setChainItems] = useState<ChainItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Calculate summary information for the header
+  const summaryInfo = useMemo(() => {
+    if (!triggerEvent || chainItems.length === 0) return null;
+
+    const triggerStartTime = triggerEvent.originalEvent?.createdAt || triggerEvent.receivedAt;
+    if (!triggerStartTime) return null;
+
+    // Find the latest execution end time
+    const lastExecution = chainItems
+      .filter((item) => item.originalExecution?.updatedAt)
+      .sort(
+        (a, b) =>
+          new Date(b.originalExecution!.updatedAt!).getTime() - new Date(a.originalExecution!.updatedAt!).getTime(),
+      )[0];
+
+    const endTime = lastExecution?.originalExecution?.updatedAt;
+
+    const startDate = new Date(triggerStartTime);
+    const timeAgo = formatTimeAgo(startDate);
+
+    let duration = "";
+    if (endTime) {
+      const endDate = new Date(endTime);
+      const durationMs = endDate.getTime() - startDate.getTime();
+      duration = calcRelativeTimeFromDiff(durationMs);
+    }
+
+    const stepCount = chainItems.length;
+
+    return {
+      timeAgo,
+      duration,
+      stepCount,
+    };
+  }, [triggerEvent, chainItems]);
 
   // Load execution chain data function
   const loadChainData = useCallback(async () => {
@@ -339,6 +376,26 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
 
   return (
     <div className="flex flex-col gap-0">
+      {/* Header Section */}
+      {triggerEvent && (
+        <div className="mb-1 pb-4 border-b border-gray-200">
+          <h2 className="text-md font-semibold text-gray-900 mb-1">{triggerEvent.title || "Execution Chain"}</h2>
+          {summaryInfo && (
+            <div className="text-sm text-gray-500">
+              {summaryInfo.timeAgo}
+              {summaryInfo.duration && (
+                <>
+                  <span className="mx-1">•</span>
+                  Duration: {summaryInfo.duration}
+                </>
+              )}
+              <span className="mx-1">•</span>
+              {summaryInfo.stepCount} step{summaryInfo.stepCount !== 1 ? "s" : ""}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Event Section */}
       {triggerEvent && (
         <div className="mb-6 mt-2">
