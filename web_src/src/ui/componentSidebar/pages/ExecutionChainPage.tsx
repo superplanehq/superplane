@@ -434,7 +434,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           <h2 className="text-md font-semibold text-gray-900 mb-1">{triggerEvent.title || "Execution Chain"}</h2>
           {summaryInfo && (
             <div className="text-sm text-gray-500">
-              {summaryInfo.timeAgo}
+              {summaryInfo.timeAgo} ago
               {summaryInfo.duration && (
                 <>
                   <span className="mx-1">•</span>
@@ -448,42 +448,49 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
         </div>
       )}
 
-      {/* Fixed Event Section */}
-      {triggerEvent && (
-        <div className="px-3 flex-shrink-0 mb-6 mt-2">
-          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-1">Event</h2>
-          <ChainItem
-            item={convertSidebarEventToChainItem(triggerEvent, workflowNodes, components, triggers, getTabData)}
-            index={-1}
-            totalItems={undefined}
-            isOpen={openEventIds.has(triggerEvent.id)}
-            isSelected={false}
-            onToggleOpen={onToggleOpen}
-            getExecutionState={getExecutionState}
-          />
-        </div>
-      )}
-
-      {/* Executions Section */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-4 flex-shrink-0">
-          {chainItems.length} Execution{chainItems.length === 1 ? "" : "s"}
-        </h2>
-        <div ref={executionsScrollRef} className="flex-1 overflow-y-auto max-h-96 px-3 ">
+      {/* Scrollable Section with Event and Executions */}
+      <div className="flex-1 flex flex-col min-h-0 mt-2">
+        <div ref={executionsScrollRef} className="flex-1 overflow-y-auto px-3">
           <div className="pb-15">
-            {chainItems.map((item, index) => (
-              <div key={item.id} data-execution-id={item.executionId}>
+            {/* Event Section (now scrollable) */}
+            {triggerEvent && (
+              <div className="mb-6">
+                <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-1">Triggered</h2>
                 <ChainItem
-                  item={item}
-                  index={index}
-                  totalItems={chainItems.length}
-                  isOpen={openEventIds.has(item.id) || item.executionId === selectedExecutionId}
-                  isSelected={item.executionId === selectedExecutionId}
+                  item={convertSidebarEventToChainItem(triggerEvent, workflowNodes, components, triggers, getTabData)}
+                  index={-1}
+                  totalItems={undefined}
+                  isOpen={openEventIds.has(triggerEvent.id)}
+                  isSelected={false}
                   onToggleOpen={onToggleOpen}
                   getExecutionState={getExecutionState}
                 />
               </div>
-            ))}
+            )}
+
+            {/* Executions Section */}
+            {chainItems.length > 0 && (
+              <div>
+                <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-1">
+                  {chainItems.length} Step{chainItems.length === 1 ? "" : "s"}
+                </h2>
+                <div>
+                  {chainItems.map((item, index) => (
+                    <div key={item.id} data-execution-id={item.executionId}>
+                      <ChainItem
+                        item={item}
+                        index={index}
+                        totalItems={chainItems.length}
+                        isOpen={openEventIds.has(item.id) || item.executionId === selectedExecutionId}
+                        isSelected={item.executionId === selectedExecutionId}
+                        onToggleOpen={onToggleOpen}
+                        getExecutionState={getExecutionState}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

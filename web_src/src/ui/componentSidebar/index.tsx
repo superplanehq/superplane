@@ -458,7 +458,7 @@ export const ComponentSidebar = ({
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white shadow-2xl"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white shadow-2xl flex flex-col"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize handle */}
@@ -525,7 +525,7 @@ export const ComponentSidebar = ({
         </div>
       </div>
       {page !== "overview" ? (
-        <>
+        <div className="flex flex-col flex-1 min-h-0">
           <PageHeader
             page={page as "history" | "queue" | "execution-chain"}
             onBackToOverview={handleBackToOverview}
@@ -538,7 +538,7 @@ export const ComponentSidebar = ({
             extraStatusOptions={extraStatusOptions}
           />
 
-          <div className="py-1 pb-3">
+          <div className={`${page === "execution-chain" ? "flex flex-col flex-1 min-h-0" : "py-2 px-2 pb-3"}`}>
             {page === "execution-chain" ? (
               <ExecutionChainPage
                 eventId={executionChainEventId}
@@ -596,7 +596,7 @@ export const ComponentSidebar = ({
               />
             )}
           </div>
-        </>
+        </div>
       ) : (
         <>
           <Tabs
