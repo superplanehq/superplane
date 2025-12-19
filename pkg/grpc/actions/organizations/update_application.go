@@ -18,7 +18,12 @@ import (
 )
 
 func UpdateApplication(ctx context.Context, registry *registry.Registry, baseURL string, orgID string, installationID string, configuration map[string]any) (*pb.UpdateApplicationResponse, error) {
-	appInstallation, err := models.FindUnscopedAppInstallation(uuid.MustParse(installationID))
+	installation, err := uuid.Parse(installationID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid installation ID: %v", err)
+	}
+
+	appInstallation, err := models.FindUnscopedAppInstallation(installation)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "application installation not found: %v", err)
 	}
