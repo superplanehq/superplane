@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/expr-lang/expr"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -21,10 +20,10 @@ func init() {
 type Wait struct{}
 
 type Spec struct {
-	Mode      string  `json:"mode"`
-	WaitFor   *string `json:"waitFor"`
+	Mode      string `json:"mode"`
+	WaitFor   any    `json:"waitFor"`
 	Unit      *string `json:"unit"`
-	WaitUntil *string `json:"waitUntil"`
+	WaitUntil any    `json:"waitUntil"`
 }
 
 type ExecutionMetadata struct {
@@ -141,25 +140,8 @@ func (w *Wait) Configuration() []configuration.Field {
 	}
 }
 
-func evaluateIntegerExpression(expression string, data any) (int, error) {
-	env := map[string]any{
-		"$": data,
-	}
-
-	vm, err := expr.Compile(expression, []expr.Option{
-		expr.Env(env),
-		expr.WithContext("ctx"),
-	}...)
-	if err != nil {
-		return 0, fmt.Errorf("expression compilation failed: %w", err)
-	}
-
-	output, err := expr.Run(vm, env)
-	if err != nil {
-		return 0, fmt.Errorf("expression evaluation failed: %w", err)
-	}
-
-	switch v := output.(type) {
+func parseIntegerValue(value any) (int, error) {
+	switch v := value.(type) {
 	case int:
 		return v, nil
 	case int64:
@@ -167,40 +149,20 @@ func evaluateIntegerExpression(expression string, data any) (int, error) {
 	case float64:
 		return int(v), nil
 	case string:
-
 		if parsed, parseErr := strconv.Atoi(v); parseErr == nil {
 			return parsed, nil
 		}
-		return 0, fmt.Errorf("expression result is not a valid integer: %s", v)
+		return 0, fmt.Errorf("value is not a valid integer: %s", v)
 	default:
-		return 0, fmt.Errorf("expression must evaluate to integer, got %T", output)
+		return 0, fmt.Errorf("value must be an integer, got %T", value)
 	}
 }
 
-func evaluateDateExpression(expression string, data any) (time.Time, error) {
-	env := map[string]any{
-		"$": data,
-	}
-
-	vm, err := expr.Compile(expression, []expr.Option{
-		expr.Env(env),
-		expr.WithContext("ctx"),
-		expr.Timezone(time.UTC.String()),
-	}...)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("expression compilation failed: %w", err)
-	}
-
-	output, err := expr.Run(vm, env)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("expression evaluation failed: %w", err)
-	}
-
-	switch v := output.(type) {
+func parseDateValue(value any) (time.Time, error) {
+	switch v := value.(type) {
 	case time.Time:
 		return v, nil
 	case string:
-
 		if parsed, parseErr := time.Parse(time.RFC3339, v); parseErr == nil {
 			return parsed, nil
 		}
@@ -216,9 +178,9 @@ func evaluateDateExpression(expression string, data any) (time.Time, error) {
 				return parsed, nil
 			}
 		}
-		return time.Time{}, fmt.Errorf("expression result is not a valid date format: %s", v)
+		return time.Time{}, fmt.Errorf("value is not a valid date format: %s", v)
 	default:
-		return time.Time{}, fmt.Errorf("expression must evaluate to date/time, got %T", output)
+		return time.Time{}, fmt.Errorf("value must be a date/time, got %T", value)
 	}
 }
 
@@ -288,9 +250,9 @@ func (w *Wait) Execute(ctx core.ExecutionContext) error {
 			return fmt.Errorf("waitFor and unit are required for interval mode")
 		}
 
-		value, err := evaluateIntegerExpression(*spec.WaitFor, ctx.Data)
+		value, err := parseIntegerValue(spec.WaitFor)
 		if err != nil {
-			return fmt.Errorf("failed to evaluate waitFor expression: %w", err)
+			return fmt.Errorf("failed to parse waitFor value: %w", err)
 		}
 
 		interval, err = calculateIntervalDuration(value, *spec.Unit)
@@ -304,9 +266,9 @@ func (w *Wait) Execute(ctx core.ExecutionContext) error {
 			return fmt.Errorf("waitUntil is required for countdown mode")
 		}
 
-		targetTime, err := evaluateDateExpression(*spec.WaitUntil, ctx.Data)
+		targetTime, err := parseDateValue(spec.WaitUntil)
 		if err != nil {
-			return fmt.Errorf("failed to evaluate waitUntil expression: %w", err)
+			return fmt.Errorf("failed to parse waitUntil value: %w", err)
 		}
 
 		now := time.Now()
