@@ -434,7 +434,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           <h2 className="text-md font-semibold text-gray-900 mb-1">{triggerEvent.title || "Execution Chain"}</h2>
           {summaryInfo && (
             <div className="text-sm text-gray-500">
-              {summaryInfo.timeAgo} ago
+              {summaryInfo.timeAgo}
               {summaryInfo.duration && (
                 <>
                   <span className="mx-1">•</span>
