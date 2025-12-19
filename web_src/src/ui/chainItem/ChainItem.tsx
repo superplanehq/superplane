@@ -222,17 +222,18 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Tab Navigation */}
-            <div className="flex justify-between items-center border-b-1 border-gray-200">
+            <div className="flex items-center border-b-1 border-gray-200">
               <div className="flex">
                 {item.tabData.current && (
                   <button
                     onClick={() => setActiveTab("current")}
-                    className={`px-5 py-1 text-sm font-medium rounded-tl-md  ${
+                    className={`px-3 py-1 text-sm font-medium rounded-tr-md flex items-center gap-1  ${
                       activeTab === "current"
                         ? "text-black border-b-1 border-black"
                         : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                     }`}
                   >
+                    {React.createElement(resolveIcon("notepad-text"), { size: 16 })}
                     Details
                   </button>
                 )}

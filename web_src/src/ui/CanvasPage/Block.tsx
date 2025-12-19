@@ -66,11 +66,18 @@ export function Block(props: BlockProps) {
     onDismiss: () => {},
   };
 
+  // Check if this node is highlighted (from execution chain)
+  const isHighlighted = (data as any)._isHighlighted || false;
+  const hasHighlightedNodes = (data as any)._hasHighlightedNodes || false;
+
+  // Apply opacity to non-highlighted nodes when there are highlighted nodes
+  const shouldDim = hasHighlightedNodes && !isHighlighted;
+
   return (
     <>
       <AiPopup {...ai} />
 
-      <div className="relative w-fit" onClick={props.onClick}>
+      <div className={`relative w-fit ${shouldDim ? "opacity-50" : ""}`} onClick={props.onClick}>
         <LeftHandle data={data} nodeId={props.nodeId} />
         <BlockContent {...props} />
         <RightHandle data={data} nodeId={props.nodeId} />

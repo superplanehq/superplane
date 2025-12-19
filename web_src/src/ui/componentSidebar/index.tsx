@@ -131,6 +131,9 @@ interface ComponentSidebarProps {
   components?: ComponentsComponent[];
   triggers?: TriggersTrigger[];
   blueprints?: BlueprintsBlueprint[];
+
+  // Highlighting callback for execution chain nodes
+  onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
 }
 
 export const ComponentSidebar = ({
@@ -197,6 +200,7 @@ export const ComponentSidebar = ({
   components = [],
   triggers = [],
   blueprints = [],
+  onHighlightedNodesChange,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -311,6 +315,8 @@ export const ComponentSidebar = ({
     if (page === "execution-chain") {
       // When coming back from execution chain, go to the previous page
       setPage(previousPage);
+      // Clear highlights when leaving execution chain
+      onHighlightedNodesChange?.(new Set());
     } else {
       setPage("overview");
     }
@@ -319,7 +325,7 @@ export const ComponentSidebar = ({
     setExecutionChainEventId(null);
     setExecutionChainTriggerEvent(null);
     setSelectedExecutionId(null);
-  }, [page, previousPage]);
+  }, [page, previousPage, onHighlightedNodesChange]);
 
   const handleSeeExecutionChain = useCallback(
     (eventId: string, triggerEvent?: SidebarEvent, selectedExecId?: string) => {
@@ -433,12 +439,26 @@ export const ComponentSidebar = ({
     [statusOptions],
   );
 
+  // Clear highlights when sidebar closes or when leaving execution chain page
+  useEffect(() => {
+    if (!isOpen && onHighlightedNodesChange) {
+      onHighlightedNodesChange(new Set());
+    }
+  }, [isOpen, onHighlightedNodesChange]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      onHighlightedNodesChange?.(new Set());
+    };
+  }, [onHighlightedNodesChange]);
+
   if (!isOpen) return null;
 
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white shadow-2xl"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white shadow-2xl flex flex-col"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize handle */}
@@ -505,7 +525,7 @@ export const ComponentSidebar = ({
         </div>
       </div>
       {page !== "overview" ? (
-        <>
+        <div className="flex flex-col flex-1 min-h-0">
           <PageHeader
             page={page as "history" | "queue" | "execution-chain"}
             onBackToOverview={handleBackToOverview}
@@ -518,7 +538,7 @@ export const ComponentSidebar = ({
             extraStatusOptions={extraStatusOptions}
           />
 
-          <div className="py-1 pb-3">
+          <div className={`${page === "execution-chain" ? "flex flex-col flex-1 min-h-0" : "py-2 px-2 pb-3"}`}>
             {page === "execution-chain" ? (
               <ExecutionChainPage
                 eventId={executionChainEventId}
@@ -534,6 +554,7 @@ export const ComponentSidebar = ({
                 components={components}
                 triggers={triggers}
                 blueprints={blueprints}
+                onHighlightedNodesChange={onHighlightedNodesChange}
               />
             ) : (
               <HistoryQueuePage
@@ -575,7 +596,7 @@ export const ComponentSidebar = ({
               />
             )}
           </div>
-        </>
+        </div>
       ) : (
         <>
           <Tabs
