@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Text } from "../../components/Text/text";
 import { Button } from "../../ui/button";
+import { Input, InputGroup } from "../../components/Input/input";
 
 const OwnerSetup: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -55,9 +56,12 @@ const OwnerSetup: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-zinc-900 dark:to-zinc-800 px-4">
-      <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-2xl shadow-xl p-8">
+      <div className="max-w-lg w-full bg-white dark:bg-zinc-900 rounded-lg shadow-xl p-8">
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Set up owner account</h2>
+          <h4 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Set up owner account</h4>
+          <Text className="text-gray-600 dark:text-gray-400">
+            Create the first owner account for this Superplane instance.
+          </Text>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -68,55 +72,63 @@ const OwnerSetup: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
               Email <span className="text-red-500">*</span>
             </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-800 dark:text-white"
-            />
+            <InputGroup>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="you@example.com"
+              />
+            </InputGroup>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
               First Name <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-800 dark:text-white"
-            />
+            <InputGroup>
+              <Input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+                placeholder="First name"
+              />
+            </InputGroup>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
               Last Name <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-800 dark:text-white"
-            />
+            <InputGroup>
+              <Input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+                placeholder="Last name"
+              />
+            </InputGroup>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
               Password <span className="text-red-500">*</span>
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-800 dark:text-white"
-            />
+            <InputGroup>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="Password"
+              />
+            </InputGroup>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               8+ characters, at least 1 number and 1 capital letter
             </p>
