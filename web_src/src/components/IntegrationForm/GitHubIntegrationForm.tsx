@@ -50,14 +50,14 @@ export function GitHubIntegrationForm({
           className="w-full"
         />
         {errors.orgUrl && <ErrorMessage>{errors.orgUrl}</ErrorMessage>}
-        <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
           <span className="font-semibold">Note:</span> Enter your GitHub organization or username (e.g.,{" "}
           <span className="font-mono">superplanehq</span> from{" "}
           <span className="font-mono">github.com/superplanehq/my_repo</span>).
         </div>
       </Field>
 
-      <div className="rounded-md border border-gray-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-4">
+      <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex-shrink-0">
             <img src={githubIcon} alt="GitHub" className="w-6 h-6" />
@@ -66,7 +66,7 @@ export function GitHubIntegrationForm({
             <div className="text-sm font-medium text-gray-900 dark:text-white">
               Connect GitHub with a Personal Access Token (PAT)
             </div>
-            <p className="text-sm text-zinc-700 dark:text-zinc-300 mt-1">
+            <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
               To connect GitHub, create a fine-grained Personal Access Token (PAT) and paste it below. You remain in
               full control - you can limit access and revoke it anytime.
             </p>
@@ -79,7 +79,7 @@ export function GitHubIntegrationForm({
               {showGitHubPatInfo ? "Hide steps" : "Show steps to create your token"}
             </button>
             {showGitHubPatInfo && (
-              <div className="mt-3 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <div className="mt-3 space-y-2 text-sm text-gray-700 dark:text-gray-300">
                 <ol className="list-decimal ml-5 mt-1 space-y-1">
                   <li>
                     <a
@@ -112,7 +112,7 @@ export function GitHubIntegrationForm({
                     Click <strong>Generate token</strong>, then copy and paste it here
                   </li>
                 </ol>
-                <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-2">
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
                   Tip: You can manage, rotate, or revoke tokens anytime in your{" "}
                   <a
                     className="text-blue-600 dark:text-blue-400 underline!"

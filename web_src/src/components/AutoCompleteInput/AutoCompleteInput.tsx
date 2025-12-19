@@ -289,7 +289,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             "before:absolute before:inset-px before:rounded-[calc(var(--radius-lg)-1px)] before:bg-white before:shadow-sm",
             "dark:before:hidden",
             "after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-transparent after:ring-inset sm:focus-within:after:ring-2 sm:focus-within:after:ring-blue-500",
-            "has-data-disabled:opacity-50 has-data-disabled:before:bg-zinc-950/5 has-data-disabled:before:shadow-none",
+            "has-data-disabled:opacity-50 has-data-disabled:before:bg-gray-950/5 has-data-disabled:before:shadow-none",
             "has-data-invalid:before:shadow-red-500/10",
             className,
           ])}
@@ -317,12 +317,12 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             placeholder={placeholder}
             disabled={disabled}
             className={twMerge([
-              "relative block w-full appearance-none rounded-lg border border-zinc-950/10 hover:border-zinc-950/20 dark:border-white/10 dark:hover:border-white/20",
+              "relative block w-full appearance-none rounded-lg border border-gray-950/10 hover:border-gray-950/20 dark:border-white/10 dark:hover:border-white/20",
               "bg-transparent dark:bg-white/5",
-              "text-zinc-950 placeholder:text-zinc-500 dark:text-white",
+              "text-gray-950 placeholder:text-gray-500 dark:text-white",
               "focus:outline-none",
               "invalid:border-red-500 dark:invalid:border-red-500",
-              "disabled:border-zinc-950/20 dark:disabled:border-white/15 dark:disabled:bg-white/2.5",
+              "disabled:border-gray-950/20 dark:disabled:border-white/15 dark:disabled:bg-white/2.5",
               // Size variants
               inputSize === "xs" && "px-2 py-1 text-xs",
               inputSize === "sm" && "px-2 py-1.5 text-sm",
@@ -341,12 +341,12 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           (highlightedValue === null || (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue))) && (
             <div
               className={twMerge([
-                "absolute z-50 w-full bottom-full mb-1 bg-white border border-zinc-200 rounded-lg shadow-lg p-3",
-                "dark:bg-zinc-800 dark:border-zinc-700",
+                "absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3",
+                "dark:bg-gray-800 dark:border-gray-700",
               ])}
             >
-              <div className="text-xs text-zinc-600 dark:text-zinc-300 mb-1">Value Preview:</div>
-              <div className="text-sm text-zinc-950 dark:text-white font-mono break-all">
+              <div className="text-xs text-gray-600 dark:text-gray-300 mb-1">Value Preview:</div>
+              <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
                 {highlightedValue === null
                   ? "null"
                   : typeof highlightedValue === "string"
@@ -361,8 +361,8 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           <div
             ref={suggestionsRef}
             className={twMerge([
-              "absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-lg shadow-lg max-h-60 overflow-auto",
-              "dark:bg-zinc-800 dark:border-zinc-700",
+              "absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto",
+              "dark:bg-gray-800 dark:border-gray-700",
             ])}
           >
             {suggestions.map((suggestionItem, index) => (
@@ -370,9 +370,9 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
                 key={suggestionItem.suggestion}
                 className={twMerge([
                   "px-3 py-2 cursor-pointer text-sm flex justify-between items-center",
-                  "hover:bg-zinc-100 dark:hover:bg-zinc-700",
-                  "text-zinc-950 dark:text-white",
-                  highlightedIndex === index && "bg-zinc-100 dark:bg-zinc-700",
+                  "hover:bg-gray-100 dark:hover:bg-gray-700",
+                  "text-gray-950 dark:text-white",
+                  highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
                 ])}
                 onClick={() => handleSuggestionClick(suggestionItem)}
                 onMouseEnter={() => {
@@ -385,7 +385,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
                 }}
               >
                 <span>{suggestionItem.suggestion}</span>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-2">{suggestionItem.type}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">{suggestionItem.type}</span>
               </div>
             ))}
           </div>
@@ -395,11 +395,11 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
         {isOpen && suggestions.length === 0 && inputValue && (
           <div
             className={twMerge([
-              "absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-lg shadow-lg",
-              "dark:bg-zinc-800 dark:border-zinc-700",
+              "absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg",
+              "dark:bg-gray-800 dark:border-gray-700",
             ])}
           >
-            <div className="px-3 py-2 text-sm text-zinc-500 dark:text-zinc-400">
+            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
               {!exampleObj ? noExampleObjectText : "No suggestions found"}
             </div>
           </div>

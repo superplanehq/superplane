@@ -124,7 +124,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
     return (
       <div
-        className={`bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 ${className}`}
+        className={`bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6 ${className}`}
       >
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -134,7 +134,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
         <div className="flex items-center justify-between mb-4">
           <div>
-            <Text className="font-semibold text-zinc-900 dark:text-white mb-1">Add members</Text>
+            <Text className="font-semibold text-gray-900 dark:text-white mb-1">Add members</Text>
           </div>
         </div>
 
@@ -176,24 +176,24 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
           {loadingMembers ? (
             <div className="flex justify-center items-center h-32">
-              <p className="text-zinc-500 dark:text-zinc-400">Loading members...</p>
+              <p className="text-gray-500 dark:text-gray-400">Loading members...</p>
             </div>
           ) : (
-            <div className="max-h-96 overflow-y-auto border border-zinc-200 dark:border-zinc-700 rounded-lg">
+            <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg">
               {getFilteredExistingMembers().length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-zinc-500 dark:text-zinc-400">
+                  <p className="text-gray-500 dark:text-gray-400">
                     {memberSearchTerm
                       ? "No members found matching your search"
                       : "All organization members are already in this group"}
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
                   {getFilteredExistingMembers().map((member) => (
                     <div
                       key={member.metadata!.id!}
-                      className="p-3 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                      className="p-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800"
                     >
                       <Checkbox
                         checked={selectedMembers.has(member.metadata!.id!)}
@@ -215,10 +215,10 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                         className="size-8"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
                           {member.spec?.displayName || member.metadata!.id!}
                         </div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {member.metadata?.email || `${member.metadata!.id!}@email.placeholder`}
                         </div>
                       </div>

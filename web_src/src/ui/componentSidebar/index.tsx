@@ -585,11 +585,11 @@ export const ComponentSidebar = ({
           >
             {showSettingsTab && (
               <div className="px-3">
-                <div className="flex border-gray-200 dark:border-zinc-700">
+                <div className="flex border-gray-200 dark:border-gray-700">
                   <button
                     onClick={() => !isTemplateNode && onTabChange?.("latest")}
                     disabled={isTemplateNode}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    className={`px-4 py-2 text-sm font-medium border-b transition-colors ${
                       isTemplateNode
                         ? "border-transparent text-gray-300 cursor-not-allowed dark:text-gray-600"
                         : activeTab === "latest"
@@ -601,7 +601,7 @@ export const ComponentSidebar = ({
                   </button>
                   <button
                     onClick={() => onTabChange?.("settings")}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    className={`px-4 py-2 text-sm font-medium border-b transition-colors ${
                       activeTab === "settings"
                         ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
                         : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"

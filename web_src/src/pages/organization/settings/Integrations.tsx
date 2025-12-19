@@ -62,7 +62,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       <div className="pt-6">
         <h1 className="text-2xl font-semibold mb-6">Integrations</h1>
         <div className="flex justify-center items-center h-32">
-          <p className="text-zinc-500 dark:text-zinc-400">Loading integrations...</p>
+          <p className="text-gray-500 dark:text-gray-400">Loading integrations...</p>
         </div>
       </div>
     );
@@ -73,7 +73,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       <div className="flex justify-between items-start mb-6">
         <div>
           <h1 className="text-2xl font-semibold">Integrations</h1>
-          <p className="text-zinc-600 dark:text-zinc-400 mt-2">Manage integrations for your organization</p>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Manage integrations for your organization</p>
         </div>
       </div>
 
@@ -101,13 +101,13 @@ export function Integrations({ organizationId }: IntegrationsProps) {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
         <div className="p-6">
           {integrations.length === 0 ? (
             <div className="text-center py-12">
-              <Icon name="integration_instructions" size="lg" className="text-zinc-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-2">No integrations yet</h3>
-              <p className="text-zinc-600 dark:text-zinc-400 mb-6">
+              <Icon name="integration_instructions" size="lg" className="text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No integrations yet</h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Connect external services to streamline your workflow
               </p>
               <Button onClick={handleAddIntegrationClick} className="flex items-center gap-2">
@@ -129,7 +129,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                 {integrations.map((integration) => (
                   <div
                     key={integration.metadata?.id}
-                    className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4"
+                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -141,8 +141,8 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                           />
                         </div>
                         <div>
-                          <h3 className="font-medium text-zinc-900 dark:text-zinc-100">{integration.metadata?.name}</h3>
-                          <p className="text-sm text-zinc-600 dark:text-zinc-400">{integration.spec?.url}</p>
+                          <h3 className="font-medium text-gray-900 dark:text-gray-100">{integration.metadata?.name}</h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">{integration.spec?.url}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -152,7 +152,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         <button
                           data-testid={`edit-integration-${integration.metadata?.name || ""}`}
                           onClick={() => handleEditIntegration(integration)}
-                          className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded"
+                          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
                           title="Edit integration"
                         >
                           <Icon name="edit" size="sm" />
@@ -170,13 +170,13 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       {/* Integration Type Selector */}
       {isIntegrationSelectorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-800 max-w-md w-full mx-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-800 max-w-md w-full mx-4">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Select Integration Type</h3>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select Integration Type</h3>
                 <button
                   onClick={() => setIsIntegrationSelectorOpen(false)}
-                  className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 >
                   <Icon name="close" size="sm" />
                 </button>
@@ -186,14 +186,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                   <button
                     key={type.id}
                     onClick={() => handleCreateIntegration(type.id)}
-                    className="w-full flex items-center gap-3 p-4 text-left border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                    className="w-full flex items-center gap-3 p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                   >
                     <div className="flex-shrink-0">
                       <img src={type.icon} alt={type.name} className="w-5" />
                     </div>
                     <div>
-                      <h4 className="font-medium text-zinc-900 dark:text-zinc-100">{type.name}</h4>
-                      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                      <h4 className="font-medium text-gray-900 dark:text-gray-100">{type.name}</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
                         {type.id === "github" ? "Connect to GitHub repositories" : "Connect to Semaphore CI/CD"}
                       </p>
                     </div>

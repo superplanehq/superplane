@@ -71,7 +71,7 @@ export function OutputChannelConfigurationModal({
           <DialogDescription>Configure the blueprint output channel</DialogDescription>
         </VisuallyHidden>
         <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">
             {outputChannel ? "Edit Output Channel" : "Add Output Channel"}
           </h3>
 
@@ -91,7 +91,7 @@ export function OutputChannelConfigurationModal({
                 placeholder="e.g., success, error, default"
                 autoFocus
               />
-              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">The name of this output channel</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">The name of this output channel</p>
             </div>
 
             {/* Node Selection */}
@@ -121,7 +121,7 @@ export function OutputChannelConfigurationModal({
                     ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Select which node's output to use for this channel
               </p>
             </div>
@@ -150,7 +150,7 @@ export function OutputChannelConfigurationModal({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Select which output channel from the node to expose
                 </p>
               </div>

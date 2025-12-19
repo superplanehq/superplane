@@ -231,7 +231,7 @@ export function GroupMembersPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-zinc-500 dark:text-zinc-400">Loading group...</p>
+        <p className="text-gray-500 dark:text-gray-400">Loading group...</p>
       </div>
     );
   }
@@ -280,7 +280,7 @@ export function GroupMembersPage() {
         />
       </div>
 
-      <div className="bg-zinc-100 dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 space-y-6">
+      <div className="bg-gray-100 dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6 space-y-6">
         {/* Group header */}
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3">
@@ -298,7 +298,7 @@ export function GroupMembersPage() {
                       type="text"
                       value={editedGroupName}
                       onChange={(e) => setEditedGroupName(e.target.value)}
-                      className="text-2xl font-semibold bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600"
+                      className="text-2xl font-semibold bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleSaveGroupName();
                         if (e.key === "Escape") handleCancelGroupName();
@@ -326,14 +326,14 @@ export function GroupMembersPage() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white">
+                    <Heading level={2} className="text-2xl font-semibold text-gray-900 dark:text-white">
                       {group?.spec?.displayName}
                     </Heading>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={handleEditGroupName}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                     >
                       <Icon name="edit" size="sm" />
                     </Button>
@@ -349,7 +349,7 @@ export function GroupMembersPage() {
                       type="text"
                       value={editedGroupDescription}
                       onChange={(e) => setEditedGroupDescription(e.target.value)}
-                      className="text-lg bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600"
+                      className="text-lg bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleSaveGroupDescription();
                         if (e.key === "Escape") handleCancelGroupDescription();
@@ -377,14 +377,14 @@ export function GroupMembersPage() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Subheading level={3} className="text-lg !font-normal text-zinc-600 dark:text-zinc-400">
+                    <Subheading level={3} className="text-lg !font-normal text-gray-600 dark:text-gray-400">
                       {group?.spec?.description || "No description"}
                     </Subheading>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={handleEditGroupDescription}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                     >
                       <Icon name="edit" size="sm" />
                     </Button>
@@ -434,7 +434,7 @@ export function GroupMembersPage() {
         />
 
         {/* Group members table */}
-        <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+        <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
           <div className="px-6 pt-6 pb-4">
             <div className="flex items-center justify-between">
               <InputGroup>
@@ -454,21 +454,21 @@ export function GroupMembersPage() {
               <TableHead>
                 <TableRow>
                   <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("name")}
                   >
                     <div className="flex items-center gap-2">
                       Name
-                      <Icon name={getSortIcon("name")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("name")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("email")}
                   >
                     <div className="flex items-center gap-2">
                       Email
-                      <Icon name={getSortIcon("email")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("email")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -485,10 +485,10 @@ export function GroupMembersPage() {
                           className="size-8"
                         />
                         <div>
-                          <div className="text-sm font-medium text-zinc-900 dark:text-white">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
                             {member.spec?.displayName}
                           </div>
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
                             Member since {new Date().toLocaleDateString()}
                           </div>
                         </div>

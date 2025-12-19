@@ -75,7 +75,7 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit }: 
             Emit Event
           </DialogTitle>
 
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
             Manually emit an output event for node: <strong>{nodeName}</strong>
           </div>
 
@@ -96,7 +96,7 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit }: 
               </Select>
             </div>
 
-            <div className="border border-zinc-200 dark:border-zinc-700 rounded-md overflow-hidden">
+            <div className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
               <Editor
                 height="300px"
                 defaultLanguage="json"

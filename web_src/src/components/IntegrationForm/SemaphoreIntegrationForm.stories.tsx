@@ -12,7 +12,7 @@ const meta: Meta<typeof SemaphoreIntegrationForm> = {
   tags: ["autodocs"],
   decorators: [
     (Story) => (
-      <div className="w-[600px] p-6 bg-white dark:bg-zinc-900 rounded-lg">
+      <div className="w-[600px] p-6 bg-white dark:bg-gray-900 rounded-lg">
         <Story />
       </div>
     ),

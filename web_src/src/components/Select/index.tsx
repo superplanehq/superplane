@@ -139,11 +139,11 @@ export function Select({
         onClick={handleTriggerClick}
         onKeyDown={handleKeyDown}
         className={twMerge(
-          "relative flex items-center justify-between w-full px-3 py-2 text-sm bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100",
+          "relative flex items-center justify-between w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100",
           "border rounded-md cursor-pointer focus:outline-none focus:ring-2",
           error
             ? "border-red-300 dark:border-red-600 focus:ring-red-500"
-            : "border-zinc-300 dark:border-zinc-600 focus:ring-blue-500",
+            : "border-gray-300 dark:border-gray-600 focus:ring-blue-500",
           disabled && "opacity-50 cursor-not-allowed",
           className,
         )}
@@ -157,14 +157,14 @@ export function Select({
               {selectedOption?.icon && !selectedOption?.image && <Icon name={selectedOption.icon} size="sm" />}
             </div>
           )}
-          <span className={twMerge("block truncate", !selectedOption && "text-zinc-500 dark:text-zinc-400")}>
+          <span className={twMerge("block truncate", !selectedOption && "text-gray-500 dark:text-gray-400")}>
             {selectedOption ? selectedOption.label : placeholder}
           </span>
         </div>
         <Icon
           name={isOpen ? "expand_less" : "expand_more"}
           size="sm"
-          className="ml-2 text-zinc-400 dark:text-zinc-500 flex-shrink-0"
+          className="ml-2 text-gray-400 dark:text-gray-500 flex-shrink-0"
         />
       </div>
 
@@ -173,11 +173,11 @@ export function Select({
           ref={refs.setFloating}
           style={floatingStyles}
           role="listbox"
-          className="z-50 max-h-60 overflow-auto rounded-md bg-white dark:bg-zinc-800 shadow-lg border border-zinc-200 dark:border-zinc-700 focus:outline-none"
+          className="z-50 max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 focus:outline-none"
         >
           <div ref={listRef}>
             {options.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-zinc-500 dark:text-zinc-400">No options available</div>
+              <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No options available</div>
             ) : (
               options.map((option) => {
                 const isSelected = option.value === value;
@@ -186,7 +186,7 @@ export function Select({
                     key={option.value}
                     role="option"
                     aria-selected={isSelected}
-                    className="relative cursor-pointer select-none px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 text-zinc-900 dark:text-zinc-100 transition-colors duration-150"
+                    className="relative cursor-pointer select-none px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-900 dark:text-gray-100 transition-colors duration-150"
                     onClick={(e) => {
                       e.preventDefault();
                       handleOptionSelect(option.value);
@@ -211,7 +211,7 @@ export function Select({
                             {option.label}
                           </span>
                           {option.description && (
-                            <span className="block truncate text-xs text-zinc-500 dark:text-zinc-400">
+                            <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
                               {option.description}
                             </span>
                           )}

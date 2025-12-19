@@ -5,7 +5,7 @@ export const getColorClass = (color?: string): string => {
     case "gray":
       return "text-gray-600 dark:text-gray-400";
     case "zinc":
-      return "text-zinc-600 dark:text-zinc-400";
+      return "text-gray-600 dark:text-gray-400";
     case "neutral":
       return "text-neutral-600 dark:text-neutral-400";
     case "stone":
@@ -60,7 +60,7 @@ export const getBackgroundColorClass = (color?: string): string => {
     case "gray":
       return "bg-gray-100";
     case "zinc":
-      return "bg-zinc-100";
+      return "bg-gray-100";
     case "neutral":
       return "bg-neutral-100";
     case "stone":

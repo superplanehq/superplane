@@ -404,7 +404,7 @@ export const scheduleCustomFieldRenderer: CustomFieldRenderer = {
           ),
           React.createElement(
             "div",
-            { className: "text-sm text-gray-900 dark:text-gray-100 mt-1 border-1 p-2 bg-zinc-100" },
+            { className: "text-sm text-gray-900 dark:text-gray-100 mt-1 border-1 p-2 bg-gray-100" },
             scheduleDescription || "Schedule not configured",
           ),
         ),
@@ -418,7 +418,7 @@ export const scheduleCustomFieldRenderer: CustomFieldRenderer = {
           ),
           React.createElement(
             "div",
-            { className: "text-sm text-gray-900 dark:text-gray-100 mt-1 border-1 p-2 bg-zinc-100" },
+            { className: "text-sm text-gray-900 dark:text-gray-100 mt-1 border-1 p-2 bg-gray-100" },
             nextTrigger,
           ),
         ),

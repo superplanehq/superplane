@@ -51,8 +51,8 @@ const OrganizationCreate: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-zinc-900 dark:to-zinc-800 px-4">
-      <div className="max-w-lg w-full bg-white dark:bg-zinc-900 rounded-lg shadow-xl p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4">
+      <div className="max-w-lg w-full bg-white dark:bg-gray-900 rounded-lg shadow-xl p-8">
         <div className="text-center mb-8">
           <div className="text-4xl mb-4">🏢</div>
           <h4 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Create Organization</h4>
@@ -76,7 +76,7 @@ const OrganizationCreate: React.FC = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-800 dark:text-white"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
               placeholder="Acme Corporation"
             />
           </div>

@@ -31,7 +31,7 @@ const Wrapper = ({ field, initialValue }: { field: ComponentsConfigurationField;
   return (
     <div className="space-y-4">
       <ConfigurationFieldRenderer field={field} value={value} onChange={setValue} />
-      <div className="mt-4 p-4 bg-gray-100 dark:bg-zinc-800 rounded-md">
+      <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-md">
         <p className="text-xs font-mono">Current value:</p>
         <pre className="text-xs">{JSON.stringify(value, null, 2)}</pre>
       </div>
@@ -413,7 +413,7 @@ export const ComplexForm: Story = {
             allValues={values}
           />
         ))}
-        <div className="mt-4 p-4 bg-gray-100 dark:bg-zinc-800 rounded-md">
+        <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-md">
           <p className="text-xs font-mono mb-2">Form Values:</p>
           <pre className="text-xs">{JSON.stringify(values, null, 2)}</pre>
         </div>

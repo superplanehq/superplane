@@ -322,7 +322,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     <div
       key={event.title + index}
       className={
-        `cursor-pointer px-4 pt-2 pb-3 relative rounded-lg border-1 border-slate-300 ${EventBackground}` +
+        `cursor-pointer px-4 pt-2 pb-3 relative rounded-lg border-1 border-slate-400 ${EventBackground}` +
         (totalItems && index < totalItems - 1 ? " mb-3" : "")
       }
       onClick={(e) => {
@@ -351,8 +351,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       {/* Second row: Event ID and title with actions */}
       <div className="flex items-center mt-2 gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
-          {event.id && <span className="text-sm text-zinc-600 font-mono">#{event.id?.slice(0, 4)}</span>}
-          <span className="text-sm text-zinc-700 font-inter truncate text-md min-w-0 font-semibold">{event.title}</span>
+          {event.id && <span className="text-[13px] text-gray-950/50 font-mono">#{event.id?.slice(0, 4)}</span>}
+          <span className="text-sm text-gray-700 font-inter truncate text-md min-w-0 font-semibold">{event.title}</span>
         </div>
 
         <div onClick={(e) => e.stopPropagation()}>

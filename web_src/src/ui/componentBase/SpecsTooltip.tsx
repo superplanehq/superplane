@@ -15,21 +15,21 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle, hi
   return (
     <Tippy
       render={() => (
-        <div className="bg-white border-2 border-gray-200 rounded-md max-w-[700px]">
-          <div className="flex items-center  border-b-2 p-2">
-            <span className="font-medium text-gray-500 text-sm">
+        <div className="bg-white outline-1 outline-slate-300 shadow-md rounded-md max-w-[700px]">
+          <div className="flex items-center border-b border-slate-300">
+            <span className="font-medium text-gray-500 text-[13px] px-3 py-1.5">
               {!hideCount ? specValues.length : ""} {tooltipTitle || specTitle}
             </span>
           </div>
           {specValues.map((value, index) => (
             <div
               key={index}
-              className={`flex max-w-[700px] items-center gap-2 p-2 ${index === specValues.length - 1 ? "border-b-0" : "border-b-2"}`}
+              className={`flex max-w-[700px] items-center gap-2 p-2 ${index === specValues.length - 1 ? "border-b-0" : "border-b"}`}
             >
               {value.badges.map((badge, badgeIndex) => (
                 <span
                   key={badgeIndex}
-                  className={`px-2 py-1 rounded-md text-sm font-mono font-medium whitespace-nowrap ${badge.bgColor} ${badge.textColor}`}
+                  className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap ${badge.bgColor} ${badge.textColor}`}
                 >
                   {badge.label}
                 </span>

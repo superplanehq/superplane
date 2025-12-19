@@ -47,7 +47,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
         <div key={index} className="flex gap-2 items-center">
           <div className="flex-1">
             {itemDefinition?.type === "object" && itemDefinition.schema ? (
-              <div className="border border-gray-300 dark:border-zinc-700 rounded-md p-4 space-y-4">
+              <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
                 {itemDefinition.schema.map((schemaField) => {
                   const nestedFieldPath = `${fieldPath}[${index}].${schemaField.name}`;
                   const hasNestedError = (() => {

@@ -237,7 +237,7 @@ export function SettingsTab({
 
         {/* App Installation section */}
         {appName && (
-          <div className="border-t border-gray-200 dark:border-zinc-700 pt-6">
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
             {availableInstallations.length === 0 ? (
               // Warning when no installations available
               <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
@@ -304,7 +304,7 @@ export function SettingsTab({
 
         {/* Configuration section */}
         {configurationFields && configurationFields.length > 0 && (!appName || availableInstallations.length > 0) && (
-          <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
             {configurationFields.map((field) => {
               if (!field.name) return null;
               const fieldName = field.name;
@@ -348,7 +348,7 @@ export function SettingsTab({
             className={
               configurationFields && configurationFields.length > 0
                 ? ""
-                : "border-t border-gray-200 dark:border-zinc-700 pt-6"
+                : "border-t border-gray-200 dark:border-gray-700 pt-6"
             }
           >
             {customField(nodeConfiguration)}
@@ -356,7 +356,7 @@ export function SettingsTab({
         )}
       </div>
 
-      <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-zinc-700">
+      <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
         {mode === "create" && (
           <Button data-testid="cancel-node-add-button" variant="outline" onClick={handleCancel}>
             Cancel

@@ -306,7 +306,7 @@ export function Members({ organizationId }: MembersProps) {
   return (
     <div className="space-y-6 pt-6">
       <div className="flex items-center justify-between">
-        <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white">
+        <Heading level={2} className="text-2xl font-semibold text-gray-900 dark:text-white">
           Members
         </Heading>
       </div>
@@ -318,11 +318,11 @@ export function Members({ organizationId }: MembersProps) {
       )}
 
       {/* Send Invitations Section */}
-      <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <Text className="text-left font-semibold text-zinc-900 dark:text-white mb-1">Invite new members</Text>
-            <Text className="text-sm text-zinc-500 dark:text-zinc-400">
+            <Text className="text-left font-semibold text-gray-900 dark:text-white mb-1">Invite new members</Text>
+            <Text className="text-sm text-gray-500 dark:text-gray-400">
               Add people to your organization by sending them an invitation
             </Text>
           </div>
@@ -358,18 +358,18 @@ export function Members({ organizationId }: MembersProps) {
       </div>
 
       {/* Members List */}
-      <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4">
               {/* Tab Navigation */}
-              <div className="flex border border-zinc-200 dark:border-zinc-700 rounded-lg p-1">
+              <div className="flex border border-gray-200 dark:border-gray-700 rounded-lg p-1">
                 <button
                   onClick={() => setActiveTab("all")}
                   className={`px-3 py-1 text-sm rounded-md transition-colors ${
                     activeTab === "all"
-                      ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                      ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
                   All ({totalCount})
@@ -378,8 +378,8 @@ export function Members({ organizationId }: MembersProps) {
                   onClick={() => setActiveTab("active")}
                   className={`px-3 py-1 text-sm rounded-md transition-colors ${
                     activeTab === "active"
-                      ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                      ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
                   Active ({activeCount})
@@ -388,8 +388,8 @@ export function Members({ organizationId }: MembersProps) {
                   onClick={() => setActiveTab("invited")}
                   className={`px-3 py-1 text-sm rounded-md transition-colors ${
                     activeTab === "invited"
-                      ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                      ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
                   Invited ({invitedCount})
@@ -413,46 +413,46 @@ export function Members({ organizationId }: MembersProps) {
         <div className="px-6 pb-6">
           {loadingMembers || loadingInvitations ? (
             <div className="flex justify-center items-center h-32">
-              <p className="text-zinc-500 dark:text-zinc-400">Loading...</p>
+              <p className="text-gray-500 dark:text-gray-400">Loading...</p>
             </div>
           ) : (
             <Table dense>
               <TableHead>
                 <TableRow>
                   <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("name")}
                   >
                     <div className="flex items-center gap-2">
                       Name
-                      <Icon name={getSortIcon("name")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("name")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("email")}
                   >
                     <div className="flex items-center gap-2">
                       Email
-                      <Icon name={getSortIcon("email")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("email")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("role")}
                   >
                     <div className="flex items-center gap-2">
                       Role
-                      <Icon name={getSortIcon("role")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("status")}
                   >
                     <div className="flex items-center gap-2">
                       Status
-                      <Icon name={getSortIcon("status")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("status")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -469,9 +469,9 @@ export function Members({ organizationId }: MembersProps) {
                           className="size-8"
                         />
                         <div>
-                          <div className="text-sm font-medium text-zinc-900 dark:text-white">{member.name}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{member.name}</div>
                           {member.type === "invitation" && (
-                            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
                               Invited {formatDate(member.createdAt)}
                             </div>
                           )}
@@ -507,7 +507,7 @@ export function Members({ organizationId }: MembersProps) {
                           </DropdownMenu>
                         </Dropdown>
                       ) : (
-                        <span className="text-sm text-zinc-500 dark:text-zinc-400">-</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">-</span>
                       )}
                     </TableCell>
                     <TableCell>{getStateBadge(member)}</TableCell>
@@ -531,9 +531,9 @@ export function Members({ organizationId }: MembersProps) {
                 {getFilteredMembers().length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8">
-                      <div className="text-zinc-500 dark:text-zinc-400">
-                        <Icon name="search" className="h-12 w-12 mx-auto mb-4 text-zinc-300" />
-                        <p className="text-lg font-medium text-zinc-900 dark:text-white mb-2">
+                      <div className="text-gray-500 dark:text-gray-400">
+                        <Icon name="search" className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <p className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                           {searchTerm ? "No members found" : "No members yet"}
                         </p>
                         <p className="text-sm">

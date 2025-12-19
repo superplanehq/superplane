@@ -78,7 +78,7 @@ function getWaitEventSections(
 
   if (executionState === "success" || executionState === "failed") {
     if (execution.updatedAt) {
-      eventSubtitle = `Done at: ${formatTimestamp(new Date(execution.updatedAt))} `;
+      eventSubtitle = `Done at ${formatTimestamp(new Date(execution.updatedAt))} `;
     } else {
       eventSubtitle = "Done";
     }

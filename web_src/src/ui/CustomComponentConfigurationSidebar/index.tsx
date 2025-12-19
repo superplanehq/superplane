@@ -82,20 +82,20 @@ export function CustomComponentConfigurationSidebar({
   };
 
   return (
-    <div className="w-96 bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 flex flex-col z-50">
+    <div className="w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col z-50">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-0">
-        <h2 className="text-md font-semibold text-gray-900 dark:text-zinc-100">Component Settings</h2>
+        <h2 className="text-md font-semibold text-gray-900 dark:text-gray-100">Component Settings</h2>
         <Button variant="outline" size="icon" onClick={() => onToggle(false)} aria-label="Close settings">
           <PanelLeftClose size={24} className="rotate-180" />
         </Button>
       </div>
 
       {/* Blueprint Metadata */}
-      <div className="px-4 py-4 border-b border-zinc-200 dark:border-zinc-800">
+      <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-800">
         <div className="space-y-3">
           <div>
-            <Label htmlFor="blueprint-name" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+            <Label htmlFor="blueprint-name" className="text-xs font-medium text-gray-700 dark:text-gray-300">
               Name
             </Label>
             <Input
@@ -107,7 +107,7 @@ export function CustomComponentConfigurationSidebar({
             />
           </div>
           <div>
-            <Label htmlFor="blueprint-description" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+            <Label htmlFor="blueprint-description" className="text-xs font-medium text-gray-700 dark:text-gray-300">
               Description
             </Label>
             <Input
@@ -120,7 +120,7 @@ export function CustomComponentConfigurationSidebar({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="blueprint-icon" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+              <Label htmlFor="blueprint-icon" className="text-xs font-medium text-gray-700 dark:text-gray-300">
                 Icon
               </Label>
               <Input
@@ -132,7 +132,7 @@ export function CustomComponentConfigurationSidebar({
               />
             </div>
             <div>
-              <Label htmlFor="blueprint-color" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+              <Label htmlFor="blueprint-color" className="text-xs font-medium text-gray-700 dark:text-gray-300">
                 Color
               </Label>
               <Input
@@ -157,7 +157,7 @@ export function CustomComponentConfigurationSidebar({
         {/* Configuration Tab */}
         <TabsContent value="configuration" className="flex-1 overflow-y-auto mt-0">
           <div className="text-left p-4 space-y-6">
-            <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
+            <div className="!text-xs text-gray-500 dark:text-gray-400 mb-3">
               Add configuration fields that can be used in your component nodes
             </div>
 
@@ -167,31 +167,31 @@ export function CustomComponentConfigurationSidebar({
                 {configurationFields.map((field: any, index: number) => (
                   <div
                     key={index}
-                    className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3 cursor-pointer hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
+                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 cursor-pointer hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
                     onClick={() => onEditConfigField(index)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="font-medium text-sm text-gray-900 dark:text-zinc-100">
+                        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
                           {field.label || field.name}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Type: {field.type} {field.required && "(required)"}
                         </p>
                         {field.description && (
-                          <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">{field.description}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{field.description}</p>
                         )}
                         {field.type === "select" &&
                           field.typeOptions?.select?.options &&
                           field.typeOptions.select.options.length > 0 && (
-                            <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                               Options: {field.typeOptions.select.options.map((opt: any) => opt.label).join(", ")}
                             </p>
                           )}
                         {field.type === "multi_select" &&
                           field.typeOptions?.multiSelect?.options &&
                           field.typeOptions.multiSelect.options.length > 0 && (
-                            <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                               Options: {field.typeOptions.multiSelect.options.map((opt: any) => opt.label).join(", ")}
                             </p>
                           )}
@@ -222,7 +222,7 @@ export function CustomComponentConfigurationSidebar({
         {/* Output Channels Tab */}
         <TabsContent value="outputChannels" className="flex-1 overflow-y-auto mt-0">
           <div className="text-left p-4 space-y-6">
-            <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
+            <div className="!text-xs text-gray-500 dark:text-gray-400 mb-3">
               Define output channels for this blueprint by selecting which node and channel should be exposed
             </div>
 
@@ -232,17 +232,17 @@ export function CustomComponentConfigurationSidebar({
                 {outputChannels.map((outputChannel: any, index: number) => (
                   <div
                     key={index}
-                    className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3 cursor-pointer hover:border-green-400 dark:hover:border-green-600 transition-colors"
+                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 cursor-pointer hover:border-green-400 dark:hover:border-green-600 transition-colors"
                     onClick={() => onEditOutputChannel(index)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <ArrowUpRight className="text-green-600 dark:text-green-400" />
-                          <p className="font-medium text-sm text-gray-900 dark:text-zinc-100">{outputChannel.name}</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{outputChannel.name}</p>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-2">Node: {outputChannel.nodeId}</p>
-                        <p className="text-xs text-gray-500 dark:text-zinc-400">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Node: {outputChannel.nodeId}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
                           Channel: {outputChannel.nodeOutputChannel || "default"}
                         </p>
                       </div>

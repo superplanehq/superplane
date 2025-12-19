@@ -15,7 +15,7 @@ export function JsonTooltip({ children, title, value }: JsonTooltipProps) {
     <Tippy
       render={() => (
         <div className="bg-white border-2 border-gray-200 rounded-md max-w-[500px] max-h-[400px] overflow-auto text-left">
-          <div className="flex items-center border-b-2 p-2">
+          <div className="flex items-center border-b p-2">
             <span className="font-medium text-gray-500 text-sm">{title}</span>
           </div>
           <div className="p-2">

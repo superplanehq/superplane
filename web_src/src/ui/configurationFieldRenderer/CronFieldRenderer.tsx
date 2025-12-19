@@ -21,21 +21,21 @@ export const CronFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
         spellCheck={false}
       />
 
-      <div className="text-xs text-gray-500 dark:text-zinc-400">
+      <div className="text-xs text-gray-500 dark:text-gray-400">
         <div className="space-y-1">
           <p className="font-medium">Wildcards:</p>
           <div className="ml-2 space-y-0.5">
             <div>
-              <code className="bg-gray-100 dark:bg-zinc-800 px-1 rounded">*</code> any value
+              <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">*</code> any value
             </div>
             <div>
-              <code className="bg-gray-100 dark:bg-zinc-800 px-1 rounded">,</code> value list separator
+              <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">,</code> value list separator
             </div>
             <div>
-              <code className="bg-gray-100 dark:bg-zinc-800 px-1 rounded">-</code> range of values
+              <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">-</code> range of values
             </div>
             <div>
-              <code className="bg-gray-100 dark:bg-zinc-800 px-1 rounded">/</code> step values
+              <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">/</code> step values
             </div>
           </div>
           <p className="mt-2">

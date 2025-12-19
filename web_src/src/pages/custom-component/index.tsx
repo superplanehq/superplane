@@ -984,7 +984,7 @@ export const CustomComponent = () => {
                     title: block.label || block.name || "New Component",
                     headerColor: "#e5e7eb",
                     iconSlug: block.icon,
-                    iconColor: "text-indigo-700",
+                    iconColor: "text-gray-800",
                     collapsedBackground: "bg-white",
                     hideActionsButton: true,
                     includeEmptyState: true,
@@ -1054,7 +1054,7 @@ export const CustomComponent = () => {
   if (blueprintLoading || componentsLoading || applicationsLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
         <p className="ml-3 text-gray-500">Loading blueprint...</p>
       </div>
     );

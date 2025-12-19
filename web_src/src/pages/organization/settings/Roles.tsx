@@ -127,7 +127,7 @@ export function Roles({ organizationId }: RolesProps) {
     <div className="space-y-6 pt-6">
       <div className="flex items-center justify-between">
         <div>
-          <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white mb-1">
+          <Heading level={2} className="text-2xl font-semibold text-gray-900 dark:text-white mb-1">
             Roles
           </Heading>
         </div>
@@ -138,7 +138,7 @@ export function Roles({ organizationId }: RolesProps) {
         </div>
       )}
 
-      <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
         <div className="px-6 pt-6 pb-4 flex items-center justify-between">
           <InputGroup>
             <Input
@@ -157,28 +157,28 @@ export function Roles({ organizationId }: RolesProps) {
         <div className="px-6 pb-6">
           {loadingRoles ? (
             <div className="flex justify-center items-center h-32">
-              <p className="text-zinc-500 dark:text-zinc-400">Loading roles...</p>
+              <p className="text-gray-500 dark:text-gray-400">Loading roles...</p>
             </div>
           ) : (
             <Table dense>
               <TableHead>
                 <TableRow>
                   <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("name")}
                   >
                     <div className="flex items-center gap-2">
                       Role name
-                      <Icon name={getSortIcon("name")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("name")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("permissions")}
                   >
                     <div className="flex items-center gap-2">
                       Permissions
-                      <Icon name={getSortIcon("permissions")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("permissions")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -187,7 +187,7 @@ export function Roles({ organizationId }: RolesProps) {
               <TableBody>
                 {filteredAndSortedRoles.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                    <TableCell colSpan={3} className="text-center py-8 text-gray-500 dark:text-gray-400">
                       No roles found
                     </TableCell>
                   </TableRow>
@@ -201,7 +201,7 @@ export function Roles({ organizationId }: RolesProps) {
                         <TableCell>
                           <div className="flex justify-end">
                             {isDefault ? (
-                              <span className="text-xs text-zinc-500 dark:text-zinc-400 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded">
+                              <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">
                                 Default Role
                               </span>
                             ) : (

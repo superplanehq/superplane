@@ -43,24 +43,24 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
     <div
       data-testid={toTestId(`node-${title}-header`)}
       className={
-        "canvas-node-drag-handle text-left text-lg w-full px-2 flex flex-col border-b-2 border-slate-300 p-2 rounded-t-md items-center relative " +
+        "canvas-node-drag-handle text-left text-lg w-full px-2 py-1.5 flex items-center flex-col border-b border-slate-400 rounded-t-md items-center relative " +
         headerColor
       }
       onDoubleClick={onDoubleClick}
     >
       <div className="w-full flex items-center">
         <div
-          className={`w-6 h-6 rounded-full overflow-hidden flex items-center justify-center mr-2 ${iconBackground || ""}`}
+          className={`w-4 h-4 rounded-full overflow-hidden flex items-center justify-center mr-2 ${iconBackground || ""}`}
         >
           {iconSrc ? (
             <img src={iconSrc} alt={title} className="max-w-5 max-h-5 object-contain" />
           ) : (
-            <Icon size={20} className={iconColor} />
+            <Icon size={16} className={iconColor} />
           )}
         </div>
-        <h2 className="font-semibold">{title}</h2>
+        <h2 className="font-semibold text-sm">{title}</h2>
         {!hideActionsButton && (
-          <div className="absolute top-2 right-2 rounded-sm flex items-center justify-center hover:bg-gray-950/10 nodrag">
+          <div className="absolute top-1 right-1 w-6 rounded flex items-center justify-center hover:bg-slate-950/5 nodrag">
             <SidebarActionsDropdown
               dataTestId={toTestId(`node-${title}-header-dropdown`)}
               onRun={onRun}

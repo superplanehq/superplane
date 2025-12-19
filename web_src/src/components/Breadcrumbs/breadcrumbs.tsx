@@ -24,15 +24,15 @@ export function Breadcrumbs({ items, className, separator = "/", showDivider = t
   return (
     <nav className={clsx("flex items-center space-x-2 text-sm", className)} aria-label="Breadcrumb">
       {/* Divider line */}
-      {showDivider && <div className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mr-4" />}
+      {showDivider && <div className="h-5 w-px bg-gray-300 dark:bg-gray-600 mr-4" />}
 
       {items.map((item, index) => (
         <React.Fragment key={index}>
           <div className="flex items-center">
             {item.current ? (
               // Current page (not clickable)
-              <span className="text-zinc-900 dark:text-zinc-100 font-medium flex items-center" aria-current="page">
-                {item.icon && <Icon name={item.icon} className="text-zinc-700 dark:text-zinc-300 mr-1" size="sm" />}
+              <span className="text-gray-900 dark:text-gray-100 font-medium flex items-center" aria-current="page">
+                {item.icon && <Icon name={item.icon} className="text-gray-700 dark:text-gray-300 mr-1" size="sm" />}
                 {item.label}
               </span>
             ) : item.href ? (
@@ -55,8 +55,8 @@ export function Breadcrumbs({ items, className, separator = "/", showDivider = t
               </button>
             ) : (
               // Non-clickable item
-              <span className="text-zinc-600 dark:text-zinc-400 flex items-center">
-                {item.icon && <Icon name={item.icon} className="text-zinc-600 dark:text-zinc-400 mr-1" size="sm" />}
+              <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                {item.icon && <Icon name={item.icon} className="text-gray-600 dark:text-gray-400 mr-1" size="sm" />}
                 {item.label}
               </span>
             )}
@@ -64,7 +64,7 @@ export function Breadcrumbs({ items, className, separator = "/", showDivider = t
 
           {/* Separator */}
           {index < items.length - 1 && (
-            <span className="text-zinc-400" aria-hidden="true">
+            <span className="text-gray-400" aria-hidden="true">
               {separator}
             </span>
           )}

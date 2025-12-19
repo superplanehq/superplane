@@ -512,7 +512,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             title: block.label || block.name || "New Component",
             headerColor: "#e5e7eb",
             iconSlug: block.icon,
-            iconColor: "text-indigo-700",
+            iconColor: "text-gray-800",
             collapsedBackground: getBackgroundColorClass("white"),
             hideActionsButton: true,
             includeEmptyState: true,

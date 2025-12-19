@@ -113,7 +113,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
       <div
         key={item.id + index}
         className={
-          `cursor-pointer px-4 pt-2 pb-2 relative rounded-lg border-1 border-slate-300 ${EventBackground}` +
+          `cursor-pointer px-4 pt-2 pb-2 relative rounded-lg border-1 border-slate-400 ${EventBackground}` +
           (showConnectingLine ? " mb-3" : "")
         }
         onClick={(e) => {
@@ -133,7 +133,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                 })}
               </div>
             )}
-            <span className="text-lg text-zinc-700 font-inter truncate min-w-0 font-semibold">
+            <span className="text-lg text-gray-700 font-inter truncate min-w-0 font-semibold">
               {item.nodeDisplayName || item.nodeName || item.componentName}
             </span>
           </div>
