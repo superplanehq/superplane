@@ -1,6 +1,7 @@
 package wait
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -30,7 +31,7 @@ func (m *mockExecutionStateContext) Pass(outputs map[string][]any) error {
 func (m *mockExecutionStateContext) Fail(reason, message string) error {
 	m.failed = true
 	m.finished = true
-	return nil
+	return fmt.Errorf("execution failed: %s - %s", reason, message)
 }
 
 func TestWait_HandleAction_PushThrough(t *testing.T) {
@@ -384,11 +385,13 @@ func TestWait_Execute_IntervalMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMetadata := &mockMetadataContext{}
+			mockState := &mockExecutionStateContext{}
 			ctx := core.ExecutionContext{
-				Configuration:   tt.config,
-				Data:            tt.data,
-				RequestContext:  mockRequest,
-				MetadataContext: mockMetadata,
+				Configuration:         tt.config,
+				Data:                  tt.data,
+				RequestContext:        mockRequest,
+				MetadataContext:       mockMetadata,
+				ExecutionStateContext: mockState,
 			}
 
 			err := w.Execute(ctx)
@@ -460,11 +463,13 @@ func TestWait_Execute_CountdownMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMetadata := &mockMetadataContext{}
+			mockState := &mockExecutionStateContext{}
 			ctx := core.ExecutionContext{
-				Configuration:   tt.config,
-				Data:            tt.data,
-				RequestContext:  mockRequest,
-				MetadataContext: mockMetadata,
+				Configuration:         tt.config,
+				Data:                  tt.data,
+				RequestContext:        mockRequest,
+				MetadataContext:       mockMetadata,
+				ExecutionStateContext: mockState,
 			}
 
 			err := w.Execute(ctx)
@@ -496,14 +501,14 @@ func TestWait_Execute_InvalidConfiguration(t *testing.T) {
 		{
 			name:   "empty configuration",
 			config: map[string]any{},
-			errMsg: "invalid mode",
+			errMsg: "Invalid mode:",
 		},
 		{
 			name: "invalid mode",
 			config: map[string]any{
 				"mode": "invalid",
 			},
-			errMsg: "invalid mode",
+			errMsg: "Invalid mode:",
 		},
 		{
 			name: "missing waitFor in interval mode",
@@ -525,10 +530,12 @@ func TestWait_Execute_InvalidConfiguration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMetadata := &mockMetadataContext{}
+			mockState := &mockExecutionStateContext{}
 			ctx := core.ExecutionContext{
-				Configuration:   tt.config,
-				RequestContext:  mockRequest,
-				MetadataContext: mockMetadata,
+				Configuration:         tt.config,
+				RequestContext:        mockRequest,
+				MetadataContext:       mockMetadata,
+				ExecutionStateContext: mockState,
 			}
 
 			err := w.Execute(ctx)
@@ -650,7 +657,7 @@ func TestWait_Execute_CountdownMode_ResolvedValues(t *testing.T) {
 				"waitUntil": "not-a-date",
 			},
 			expectErr: true,
-			errMsg:    "failed to parse waitUntil value",
+			errMsg:    "Failed to parse waitUntil value",
 		},
 		{
 			name: "empty string",
@@ -659,17 +666,19 @@ func TestWait_Execute_CountdownMode_ResolvedValues(t *testing.T) {
 				"waitUntil": "",
 			},
 			expectErr: true,
-			errMsg:    "failed to parse waitUntil value",
+			errMsg:    "Failed to parse waitUntil value",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMetadata := &mockMetadataContext{}
+			mockState := &mockExecutionStateContext{}
 			ctx := core.ExecutionContext{
-				Configuration:   tt.config,
-				RequestContext:  mockRequest,
-				MetadataContext: mockMetadata,
+				Configuration:         tt.config,
+				RequestContext:        mockRequest,
+				MetadataContext:       mockMetadata,
+				ExecutionStateContext: mockState,
 			}
 
 			err := w.Execute(ctx)
