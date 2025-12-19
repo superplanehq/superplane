@@ -68,20 +68,6 @@ func (s *ApprovalSteps) verifyApprovalSavedToDB(nodeName string) {
 	require.NotNil(s.t, node, "approval node not found in DB")
 }
 
-func (s *ApprovalSteps) configureApprovalForCurrentUser() {
-	s.canvas.StartEditingNode("ReleaseApproval")
-
-	s.session.Click(q.Locator(`button:has-text("Add Item")`))
-	s.session.Click(q.Locator(`button:has-text("Select Type")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("User")`))
-
-	s.session.Click(q.Locator(`button:has-text("Select user")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
-
-	s.session.Click(q.TestID("add-node-button"))
-	s.session.Sleep(300)
-}
-
 func (s *ApprovalSteps) verifyApprovalConfigurationPersisted() {
 	node := s.canvas.GetNodeFromDB("ReleaseApproval")
 	require.NotNil(s.t, node, "approval node not found in DB")
