@@ -66,8 +66,8 @@ FROM ${RUNNER_IMAGE} AS demo
 ENV DEBIAN_FRONTEND=noninteractive
 
 LABEL org.opencontainers.image.title="superplane-demo" \
-  org.opencontainers.image.description="Superplane demo image with embedded PostgreSQL and RabbitMQ for local trials." \
-  org.opencontainers.image.vendor="Superplane" \
+  org.opencontainers.image.description="SuperPlane demo image with embedded PostgreSQL and RabbitMQ for local trials." \
+  org.opencontainers.image.vendor="SuperPlane" \
   org.opencontainers.image.source="https://github.com/superplanehq/superplane" \
   org.opencontainers.image.url="https://superplane.com" \
   org.opencontainers.image.documentation="https://docs.superplane.com"
