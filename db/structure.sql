@@ -416,7 +416,8 @@ CREATE TABLE public.workflow_nodes (
     is_collapsed boolean DEFAULT false NOT NULL,
     parent_node_id character varying(128),
     deleted_at timestamp with time zone,
-    app_installation_id uuid
+    app_installation_id uuid,
+    state_reason character varying(255) DEFAULT NULL::character varying
 );
 
 
@@ -1262,7 +1263,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251218100000	f
+20251219105910	f
 \.
 
 

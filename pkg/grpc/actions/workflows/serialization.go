@@ -36,6 +36,11 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 			appInstallationID = &idStr
 		}
 
+		var errorMessage *string
+		if wn.State == models.WorkflowNodeStateError && wn.StateReason != nil {
+			errorMessage = wn.StateReason
+		}
+
 		nodes = append(nodes, models.Node{
 			ID:                wn.NodeID,
 			Name:              wn.Name,
@@ -46,6 +51,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 			Position:          wn.Position.Data(),
 			IsCollapsed:       wn.IsCollapsed,
 			AppInstallationID: appInstallationID,
+			ErrorMessage:      errorMessage,
 		})
 	}
 
@@ -162,6 +168,8 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 	}
 
 	nodeIDs := make(map[string]bool)
+	nodeValidationErrors := make(map[string]string)
+
 	for i, node := range workflow.Spec.Nodes {
 		if node.Id == "" {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "node %d: id is required", i)
@@ -178,7 +186,7 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 		nodeIDs[node.Id] = true
 
 		if err := validateNodeRef(registry, orgID, node); err != nil {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node '%s' (%s): %v", node.Name, node.Id, err)
+			nodeValidationErrors[node.Id] = err.Error()
 		}
 	}
 
@@ -200,7 +208,17 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 		return nil, nil, err
 	}
 
-	return actions.ProtoToNodes(workflow.Spec.Nodes), actions.ProtoToEdges(workflow.Spec.Edges), nil
+	// Convert proto nodes to models, adding validation errors where applicable
+	nodes := actions.ProtoToNodes(workflow.Spec.Nodes)
+	for i := range nodes {
+		if errorMsg, hasError := nodeValidationErrors[nodes[i].ID]; hasError {
+			nodes[i].ErrorMessage = &errorMsg
+		} else {
+			nodes[i].ErrorMessage = nil
+		}
+	}
+
+	return nodes, actions.ProtoToEdges(workflow.Spec.Edges), nil
 }
 
 func validateNodeRef(registry *registry.Registry, organizationID string, node *compb.Node) error {
@@ -230,12 +248,12 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 			return fmt.Errorf("blueprint ID is required")
 		}
 
-		_, err := models.FindBlueprint(organizationID, node.Blueprint.Id)
+		blueprint, err := models.FindBlueprint(organizationID, node.Blueprint.Id)
 		if err != nil {
 			return fmt.Errorf("blueprint %s not found", node.Blueprint.Id)
 		}
 
-		return nil
+		return configuration.ValidateConfiguration(blueprint.Configuration, node.Configuration.AsMap())
 
 	case compb.Node_TYPE_TRIGGER:
 		if node.Trigger == nil {

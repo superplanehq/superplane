@@ -128,6 +128,7 @@ export type ComponentsNode = {
   trigger?: NodeTriggerRef;
   isCollapsed?: boolean;
   appInstallation?: ComponentsAppInstallationRef;
+  errorMessage?: string;
 };
 
 export type ComponentsNodeType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER";

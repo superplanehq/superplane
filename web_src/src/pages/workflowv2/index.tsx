@@ -894,7 +894,7 @@ export function WorkflowPageV2() {
       // Parse edge IDs to extract sourceId, targetId, and channel
       // Edge IDs are formatted as: `${sourceId}--${targetId}--${channel}`
       const edgesToRemove = edgeIds.map((edgeId) => {
-        const parts = edgeId.split("--");
+        const parts = edgeId?.split("--");
         return {
           sourceId: parts[0],
           targetId: parts[1],
@@ -1526,6 +1526,7 @@ function prepareTriggerNode(
       trigger: {
         ...triggerProps,
         collapsed: node.isCollapsed,
+        error: node.errorMessage,
       },
     },
   };
@@ -1570,6 +1571,7 @@ function prepareCompositeNode(
         title: displayLabel,
         description: blueprintMetadata?.description,
         isMissing: isMissing,
+        error: node.errorMessage,
         parameters:
           Object.keys(node.configuration!).length > 0
             ? [
@@ -1773,6 +1775,15 @@ function prepareComponentBaseNode(
     organizationId,
   );
 
+  const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props(
+    nodes,
+    node,
+    componentDef!,
+    executions,
+    nodeQueueItems,
+    additionalData,
+  );
+
   return {
     id: node.id!,
     position: { x: node.position?.x || 0, y: node.position?.y || 0 },
@@ -1781,14 +1792,10 @@ function prepareComponentBaseNode(
       label: displayLabel,
       state: "pending" as const,
       outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
-      component: getComponentBaseMapper(node.component?.name || "").props(
-        nodes,
-        node,
-        componentDef!,
-        executions,
-        nodeQueueItems,
-        additionalData,
-      ),
+      component: {
+        ...componentBaseProps,
+        error: node.errorMessage,
+      },
     },
   };
 }

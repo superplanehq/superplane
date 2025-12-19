@@ -198,11 +198,8 @@ export function SettingsTab({
   }, [mode, availableInstallations, selectedAppInstallation]);
 
   const handleSave = () => {
-    const isValidForm = validateNow();
-
-    if (isValidForm) {
-      onSave(nodeConfiguration, currentNodeName, selectedAppInstallation);
-    }
+    validateNow();
+    onSave(nodeConfiguration, currentNodeName, selectedAppInstallation);
   };
 
   const handleCancel = () => {

@@ -33,7 +33,7 @@ export function OrganizationSettings() {
   const { data: organization, isLoading: loading, error } = useOrganization(organizationId || "");
 
   // Extract current section from the URL
-  const currentSection = location.pathname.split("/").pop() || "general";
+  const currentSection = location.pathname?.split("/").pop() || "general";
 
   if (userLoading) {
     return (
