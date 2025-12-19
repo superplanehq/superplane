@@ -11,6 +11,41 @@ import { getTriggerRenderer, getState, getStateMap } from ".";
 import { TimeLeftCountdown } from "@/ui/timeLeftCountdown";
 import { formatTimestamp } from "@/lib/utils";
 import { MetadataItem } from "@/ui/metadataList";
+import Tippy from "@tippyjs/react/headless";
+import "tippy.js/dist/tippy.css";
+
+// Helper function to detect if a value contains expressions
+function hasExpressions(value: string): boolean {
+  return typeof value === "string" && value.includes("{{") && value.includes("}}");
+}
+
+// Expression tooltip component with white background
+const ExpressionTooltip: React.FC<{ expression: string; children: React.ReactElement }> = ({
+  expression,
+  children,
+}) => {
+  return (
+    <Tippy
+      render={() => (
+        <div className="bg-white border-2 border-gray-200 rounded-md shadow-lg">
+          <div className="flex items-center border-b-2 p-2">
+            <span className="font-medium text-gray-500 text-sm">Expression</span>
+          </div>
+          <div className="p-2 max-w-xs">
+            <span className="px-2 py-1 rounded-md text-sm font-mono font-medium bg-purple-100 text-purple-700 break-all">
+              {expression}
+            </span>
+          </div>
+        </div>
+      )}
+      placement="top"
+      interactive={true}
+      delay={200}
+    >
+      {children}
+    </Tippy>
+  );
+};
 
 export const waitMapper: ComponentBaseMapper = {
   props(
@@ -47,21 +82,45 @@ function getWaitMetadataList(node: ComponentsNode): MetadataItem[] {
   // Handle new mode-based configuration
   if (configuration?.mode) {
     const mode = configuration.mode as string;
-    let waitText = "Wait";
+    let waitLabel: string | React.ReactNode = "Wait";
 
     if (mode === "interval") {
       const waitFor = configuration.waitFor as string;
       const unit = configuration.unit as string;
-      waitText = `Wait for ${waitFor}${unit ? ` ${unit}` : ""}`;
+
+      if (hasExpressions(waitFor)) {
+        waitLabel = (
+          <span>
+            Wait for{" "}
+            <ExpressionTooltip expression={waitFor}>
+              <span className="underline decoration-dotted cursor-help">Internal Expression</span>
+            </ExpressionTooltip>
+          </span>
+        );
+      } else {
+        waitLabel = `Wait for ${waitFor}${unit ? ` ${unit}` : ""}`;
+      }
     } else if (mode === "countdown") {
       const waitUntil = configuration.waitUntil as string;
-      waitText = `Wait until ${waitUntil}`;
+
+      if (hasExpressions(waitUntil)) {
+        waitLabel = (
+          <span>
+            Wait until{" "}
+            <ExpressionTooltip expression={waitUntil}>
+              <span className="underline decoration-dotted cursor-help">Internal Expression</span>
+            </ExpressionTooltip>
+          </span>
+        );
+      } else {
+        waitLabel = `Wait until: ${waitUntil}`;
+      }
     }
 
     return [
       {
         icon: "loader",
-        label: waitText,
+        label: waitLabel,
       },
     ];
   }
@@ -72,7 +131,7 @@ function getWaitMetadataList(node: ComponentsNode): MetadataItem[] {
     return [
       {
         icon: "loader",
-        label: `Wait for ${duration.value} ${duration.unit}`,
+        label: `Wait for: ${duration.value} ${duration.unit}`,
       },
     ];
   }
@@ -155,10 +214,7 @@ function getWaitEventSections(
   }
 
   if (executionState === "running" && execution.createdAt && expectedDuration) {
-    eventSubtitle = React.createElement(TimeLeftCountdown, {
-      createdAt: new Date(execution.createdAt),
-      expectedDuration: expectedDuration,
-    });
+    eventSubtitle = <TimeLeftCountdown createdAt={new Date(execution.createdAt)} expectedDuration={expectedDuration} />;
   }
 
   if (executionState === "success" || executionState === "failed") {
@@ -197,9 +253,10 @@ export const waitCustomFieldRenderer: CustomFieldRenderer = {
 Supports expressions and expects integer.
 
 Example expressions:
-{{$.wait_time}}
-{{$.wait_time + 5}}
-{{$.status == "urgent" ? 0 : 30}}
+{{ $.wait_time }}
+{{ $.wait_time + 5 }}
+{{ $.status == "urgent" ? 0 : 30 }}
+{{ int($.delay_seconds) }}
 
 Check Docs for more details on selecting data from payloads and expressions.`;
     } else if (mode === "countdown") {
@@ -209,9 +266,11 @@ Check Docs for more details on selecting data from payloads and expressions.`;
 Supports expressions and expects date in ISO 8601 format.
 
 Example expressions:
-{{$.run_time}}
-{{$.run_time.In(timezone("UTC"))}}
-{{$.run_time + duration("48h")}}
+{{ $.run_time }}
+{{ date($.date_string) }}
+{{ date($.date).Add(duration("1h")).Format("2006-01-02T15:04:05Z") }}
+{{ now().Add(duration("24h")).Format("2006-01-02") }}
+{{ date("2023-08-14 00:00:00").In(timezone("Europe/Zurich")) }}
 
 Check Docs for more details on selecting data from payloads and expressions.`;
     } else {
@@ -219,27 +278,17 @@ Check Docs for more details on selecting data from payloads and expressions.`;
       content = "Configure the wait mode to see more details.";
     }
 
-    return React.createElement(
-      "div",
-      { className: "border-t-1 border-gray-200" },
-      React.createElement(
-        "div",
-        { className: "space-y-3" },
-        React.createElement(
-          "div",
-          null,
-          React.createElement(
-            "span",
-            { className: "text-sm font-medium text-gray-700 dark:text-gray-300" },
-            title + ":",
-          ),
-          React.createElement(
-            "div",
-            { className: "text-sm text-gray-900 dark:text-gray-100 mt-1 border-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-md font-mono whitespace-pre-line" },
-            content,
-          ),
-        ),
-      ),
+    return (
+      <div className="border-t-1 border-gray-200">
+        <div className="space-y-3">
+          <div>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{title}:</span>
+            <div className="text-sm text-gray-900 dark:text-gray-100 mt-1 border-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-md font-mono whitespace-pre-line">
+              {content}
+            </div>
+          </div>
+        </div>
+      </div>
     );
   },
 };
