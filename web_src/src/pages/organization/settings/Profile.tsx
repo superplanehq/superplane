@@ -58,7 +58,7 @@ export function Profile() {
     return (
       <div className="pt-6">
         <div className="flex items-center justify-center py-8">
-          <Text className="text-zinc-500 dark:text-zinc-400">Loading profile...</Text>
+          <Text className="text-gray-500 dark:text-gray-400">Loading profile...</Text>
         </div>
       </div>
     );
@@ -78,7 +78,7 @@ export function Profile() {
     return (
       <div className="pt-6">
         <div className="flex items-center justify-center py-8">
-          <Text className="text-zinc-500 dark:text-zinc-400">No user data available</Text>
+          <Text className="text-gray-500 dark:text-gray-400">No user data available</Text>
         </div>
       </div>
     );
@@ -86,12 +86,12 @@ export function Profile() {
 
   return (
     <div className="pt-6 max-w-none">
-      <Heading level={2} className="text-lg font-medium text-left text-zinc-900 dark:text-white mb-4">
+      <Heading level={2} className="text-lg font-medium text-left text-gray-900 dark:text-white mb-4">
         Profile Information
       </Heading>
       <div className="space-y-6">
         {/* Profile Section */}
-        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-700 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="space-y-6">
             {/* User Avatar and Basic Info */}
             <div className="flex items-center space-x-4">
@@ -101,7 +101,7 @@ export function Profile() {
                 className="w-16 h-16"
               />
               <div>
-                <Heading level={3} className="text-lg font-medium text-zinc-900 dark:text-white">
+                <Heading level={3} className="text-lg font-medium text-gray-900 dark:text-white">
                   {user.email}
                 </Heading>
               </div>
@@ -110,21 +110,21 @@ export function Profile() {
             {/* User Information */}
             <div className="space-y-4">
               <div>
-                <Text className="text-sm text-left font-medium text-zinc-700 dark:text-zinc-300 mb-2">User ID</Text>
-                <Text className="text-left text-zinc-500 dark:text-zinc-400">{user.id}</Text>
+                <Text className="text-sm text-left font-medium text-gray-700 dark:text-gray-300 mb-2">User ID</Text>
+                <Text className="text-left text-gray-500 dark:text-gray-400">{user.id}</Text>
               </div>
               <div>
-                <Text className="text-sm text-left font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                <Text className="text-sm text-left font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Email Address
                 </Text>
-                <Text className="text-left text-zinc-500 dark:text-zinc-400">{user.email}</Text>
+                <Text className="text-left text-gray-500 dark:text-gray-400">{user.email}</Text>
               </div>
 
               <div>
-                <Text className="text-sm text-left font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                <Text className="text-sm text-left font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Member Since
                 </Text>
-                <Text className="text-left text-zinc-500 dark:text-zinc-400">
+                <Text className="text-left text-gray-500 dark:text-gray-400">
                   {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Not available"}
                 </Text>
               </div>
@@ -132,22 +132,22 @@ export function Profile() {
           </div>
         </div>
 
-        <Heading level={2} className="text-lg text-left font-medium text-zinc-900 dark:text-white mb-4">
+        <Heading level={2} className="text-lg text-left font-medium text-gray-900 dark:text-white mb-4">
           API Token
         </Heading>
-        <Text className="text-zinc-600 text-left dark:text-zinc-400 text-sm">
+        <Text className="text-gray-600 text-left dark:text-gray-400 text-sm">
           Use this token to authenticate API requests to Superplane. Keep your token secure and do not share it.
         </Text>
 
         {/* API Token Section */}
-        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-700 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="space-y-4">
             {/* Token Status */}
             <div className="flex items-center gap-2">
               {!user.hasToken && (
                 <>
-                  <Icon name="error" className="text-zinc-500 dark:text-zinc-400 text-lg" />
-                  <Text className="text-sm font-medium text-zinc-600 dark:text-zinc-400">No API token generated</Text>
+                  <Icon name="error" className="text-gray-500 dark:text-gray-400 text-lg" />
+                  <Text className="text-sm font-medium text-gray-600 dark:text-gray-400">No API token generated</Text>
                 </>
               )}
             </div>
@@ -159,7 +159,7 @@ export function Profile() {
               </Button>
 
               {user.hasToken && !token && (
-                <Text className="text-zinc-500 dark:text-zinc-400 text-sm">
+                <Text className="text-gray-500 dark:text-gray-400 text-sm">
                   Your current token is hidden for security. Generate a new token to view it.
                 </Text>
               )}
@@ -167,13 +167,13 @@ export function Profile() {
 
             {token && (
               <div className="space-y-3">
-                <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">New API Token</Text>
+                <Text className="text-sm font-medium text-gray-700 dark:text-gray-300">New API Token</Text>
                 <div className="flex items-center gap-2">
                   <Input
                     type={tokenVisible ? "text" : "password"}
                     value={token}
                     readOnly
-                    className="flex-1 font-mono text-sm bg-zinc-50 dark:bg-zinc-900"
+                    className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-900"
                   />
                   <Button
                     variant="secondary"

@@ -15,7 +15,7 @@ export interface MetadataListProps {
 
 export const MetadataList: React.FC<MetadataListProps> = ({
   items,
-  className = "px-2 py-3 border-b-2 border-slate-300 text-gray-500 flex flex-col gap-1.5",
+  className = "px-2 py-1.5 border-b border-slate-400 text-gray-500 flex flex-col gap-1",
   iconSize = 16,
   underlined = false,
 }) => {
@@ -28,11 +28,13 @@ export const MetadataList: React.FC<MetadataListProps> = ({
       {items.map((item, index) => {
         const Icon = resolveIcon(item.icon);
         return (
-          <div key={index} className="flex items-center gap-2 min-w-0">
-            <Icon size={iconSize} className="flex-shrink-0" />
+          <div key={index} className="flex items-center min-w-0">
+            <div className="w-4 h-4 mr-2">
+              <Icon size={iconSize} className="flex-shrink-0" />
+            </div>
             <span
               className={
-                "text-sm font-medium font-inter truncate" +
+                "text-[13px] font-medium font-inter truncate" +
                 (underlined ? " underline underline-offset-3 decoration-dotted decoration-1" : "")
               }
             >

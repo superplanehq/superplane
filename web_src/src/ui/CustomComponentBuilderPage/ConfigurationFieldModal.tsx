@@ -138,7 +138,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
           <DialogDescription>Configure the blueprint configuration field</DialogDescription>
         </VisuallyHidden>
         <div className="p-1 max-h-[calc(100vh-5rem)] overflow-y-auto">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">
             {field ? "Edit Configuration Field" : "Add Configuration Field"}
           </h3>
 
@@ -155,7 +155,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                 className="shadow-none"
                 data-testid="config-field-name-input"
               />
-              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 This is the internal name used in templates (e.g., $config.threshold_expression)
               </p>
             </div>
@@ -176,7 +176,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                 className="shadow-none"
                 data-testid="config-field-label-input"
               />
-              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Display name shown in the UI</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Display name shown in the UI</p>
             </div>
 
             {/* Field Type */}
@@ -235,7 +235,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                 <Label className="block text-sm font-medium">Number Constraints</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="block text-xs font-medium mb-1 text-gray-600 dark:text-zinc-400">
+                    <Label className="block text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">
                       Minimum Value
                     </Label>
                     <Input
@@ -258,7 +258,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                     />
                   </div>
                   <div>
-                    <Label className="block text-xs font-medium mb-1 text-gray-600 dark:text-zinc-400">
+                    <Label className="block text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">
                       Maximum Value
                     </Label>
                     <Input
@@ -281,7 +281,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                     />
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-zinc-400">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   At least one constraint is required for number fields
                 </p>
               </div>
@@ -289,7 +289,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
 
             {/* Options Section (for select and multi_select types) */}
             {(configFieldForm.type === "select" || configFieldForm.type === "multi_select") && (
-              <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3">
+              <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <Label className="block text-sm font-medium">Options *</Label>
                   <Button
@@ -350,7 +350,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-500 dark:text-zinc-400">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     No options added yet. Click "Add Option" to add options.
                   </p>
                 )}
@@ -459,7 +459,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                     data-testid="config-field-default-value-input"
                   />
                 )}
-                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Default value is required when field is not required
                 </p>
               </div>
@@ -477,7 +477,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                     defaultValue: e.target.checked ? "" : configFieldForm.defaultValue,
                   })
                 }
-                className="h-4 w-4 rounded border-gray-300 dark:border-zinc-700"
+                className="h-4 w-4 rounded border-gray-300 dark:border-gray-700"
                 id="required-checkbox"
               />
               <Label htmlFor="required-checkbox" className="cursor-pointer">

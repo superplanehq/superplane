@@ -292,7 +292,7 @@ export const ConfigurationFieldRenderer = ({
 
       {/* Display type-specific help text */}
       {field.typeOptions?.number?.min !== undefined && field.typeOptions?.number?.max !== undefined && (
-        <p className="text-xs text-gray-500 dark:text-zinc-400 text-left">
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-left">
           Range: {field.typeOptions.number.min} - {field.typeOptions.number.max}
         </p>
       )}

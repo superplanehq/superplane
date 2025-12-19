@@ -110,7 +110,7 @@ const HomePage = () => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-40">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
         <p className="ml-3 text-gray-500">Loading...</p>
       </div>
     );
@@ -135,9 +135,9 @@ const HomePage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-900 pt-10">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 pt-10">
       <main className="w-full h-full flex flex-column flex-grow-1">
-        <div className="bg-zinc-50 dark:bg-zinc-900 w-full flex-grow-1 p-6">
+        <div className="bg-gray-50 dark:bg-gray-900 w-full flex-grow-1 p-6">
           <div className="p-4">
             <PageHeader activeTab={activeTab} onNewClick={onNewClick} />
 
@@ -190,13 +190,13 @@ interface TabsProps {
 
 function Tabs({ activeTab, setActiveTab, blueprints, workflows }: TabsProps) {
   return (
-    <div className="flex border-b border-zinc-200 dark:border-zinc-700 mb-6">
+    <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
       <button
         onClick={() => setActiveTab("canvases")}
-        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+        className={`px-4 py-2 text-sm font-medium border-b transition-colors ${
           activeTab === "canvases"
             ? "border-blue-600 text-blue-600"
-            : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+            : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
         }`}
       >
         Canvases ({workflows.length})
@@ -204,10 +204,10 @@ function Tabs({ activeTab, setActiveTab, blueprints, workflows }: TabsProps) {
 
       <button
         onClick={() => setActiveTab("custom-components")}
-        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+        className={`px-4 py-2 text-sm font-medium border-b transition-colors ${
           activeTab === "custom-components"
             ? "border-blue-600 text-blue-600"
-            : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+            : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
         }`}
       >
         Components ({blueprints.length})
@@ -252,8 +252,8 @@ interface SearchBarProps {
 
 function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
   const inputStyle = cn(
-    "h-9 w-full pl-10 pr-4 py-2 border border-zinc-200 dark:border-zinc-700",
-    "rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-500",
+    "h-9 w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700",
+    "rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500",
     "focus:ring-2 focus:ring-blue-500 focus:border-transparent",
   );
 
@@ -263,7 +263,7 @@ function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
     <div className="flex items-center gap-2">
       <div className="flex-1 w-100">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400" size={18} />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
             placeholder={searchPlaceholder}
@@ -296,7 +296,7 @@ function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
         <Heading level={2} className="!text-2xl mb-2">
           {heading}
         </Heading>
-        <Text className="text-zinc-600 dark:text-zinc-400">{description}</Text>
+        <Text className="text-gray-600 dark:text-gray-400">{description}</Text>
       </div>
 
       <Button className="flex items-center bg-blue-700 text-white hover:bg-blue-600" onClick={onNewClick}>
@@ -310,7 +310,7 @@ function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
 function LoadingState({ activeTab }: { activeTab: TabType }) {
   return (
     <div className="flex justify-center items-center h-40">
-      <Text className="text-zinc-500">Loading {activeTab}...</Text>
+      <Text className="text-gray-500">Loading {activeTab}...</Text>
     </div>
   );
 }
@@ -366,11 +366,11 @@ function Content({
 function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
   return (
     <div className="text-center py-12">
-      <Box className="mx-auto text-zinc-400 mb-4" size={48} />
-      <Heading level={3} className="text-lg text-zinc-900 dark:text-white mb-2">
+      <Box className="mx-auto text-gray-400 mb-4" size={48} />
+      <Heading level={3} className="text-lg text-gray-900 dark:text-white mb-2">
         {searchQuery ? "No components found" : "No components yet"}
       </Heading>
-      <Text className="text-zinc-600 dark:text-zinc-400 mb-6">
+      <Text className="text-gray-600 dark:text-gray-400 mb-6">
         {searchQuery ? "Try adjusting your search criteria." : "Get started by creating your first component."}
       </Text>
     </div>
@@ -380,11 +380,11 @@ function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
 function CanvasesEmptyState({ searchQuery }: { searchQuery: string }) {
   return (
     <div className="text-center py-12">
-      <GitBranch className="mx-auto text-zinc-400 mb-4" size={48} />
-      <Heading level={3} className="text-lg text-zinc-900 dark:text-white mb-2">
+      <GitBranch className="mx-auto text-gray-400 mb-4" size={48} />
+      <Heading level={3} className="text-lg text-gray-900 dark:text-white mb-2">
         {searchQuery ? "No canvases found" : "No canvases yet"}
       </Heading>
-      <Text className="text-zinc-600 dark:text-zinc-400 mb-6">
+      <Text className="text-gray-600 dark:text-gray-400 mb-6">
         {searchQuery ? "Try adjusting your search criteria." : "Get started by creating your first canvas."}
       </Text>
     </div>
@@ -435,7 +435,7 @@ function WorkflowCard({ workflow, organizationId, navigate }: WorkflowCardProps)
   return (
     <div
       key={workflow.id}
-      className="max-h-45 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow"
+      className="max-h-45 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow"
     >
       <div className="p-6 flex flex-col justify-between h-full">
         <div>
@@ -447,7 +447,7 @@ function WorkflowCard({ workflow, organizationId, navigate }: WorkflowCardProps)
               >
                 <Heading
                   level={3}
-                  className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                  className="!text-md font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
                 >
                   {workflow.name}
                 </Heading>
@@ -457,20 +457,20 @@ function WorkflowCard({ workflow, organizationId, navigate }: WorkflowCardProps)
           </div>
 
           <div className="mb-4">
-            <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
+            <Text className="text-sm text-left text-gray-600 dark:text-gray-400 line-clamp-2 mt-2">
               {workflow.description || "No description"}
             </Text>
           </div>
         </div>
 
         <div className="flex justify-between items-center">
-          <div className="text-zinc-500 text-left">
+          <div className="text-gray-500 text-left">
             {workflow.createdBy?.name && (
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none mb-1">
+              <p className="text-xs text-gray-600 dark:text-gray-400 leading-none mb-1">
                 Created by <strong>{workflow.createdBy.name}</strong>
               </p>
             )}
-            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">Created at {workflow.createdAt}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 leading-none">Created at {workflow.createdAt}</p>
           </div>
         </div>
       </div>
@@ -482,7 +482,7 @@ function WorkflowListItem({ workflow, organizationId, navigate }: WorkflowCardPr
   return (
     <div
       key={workflow.id}
-      className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-sm transition-shadow p-4"
+      className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 hover:shadow-sm transition-shadow p-4"
     >
       <div className="flex items-start justify-between gap-3">
         <button
@@ -491,12 +491,12 @@ function WorkflowListItem({ workflow, organizationId, navigate }: WorkflowCardPr
         >
           <Heading
             level={3}
-            className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
+            className="!text-md font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
           >
             {workflow.name}
           </Heading>
-          <Text className="text-sm text-zinc-600 dark:text-zinc-400">{workflow.description || "No description"}</Text>
-          <Text className="text-xs text-zinc-500 mt-2">
+          <Text className="text-sm text-gray-600 dark:text-gray-400">{workflow.description || "No description"}</Text>
+          <Text className="text-xs text-gray-500 mt-2">
             {workflow.createdBy?.name ? (
               <>
                 Created by <strong>{workflow.createdBy.name}</strong> · {workflow.createdAt}
@@ -547,7 +547,7 @@ function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuPr
       <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
         <Dropdown>
           <DropdownButton
-            className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
+            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
             aria-label="Canvas actions"
             onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}
             disabled={deleteWorkflowMutation.isPending}
@@ -567,12 +567,12 @@ function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuPr
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
         <DialogTitle className="text-red-900 dark:text-red-100">Delete canvas</DialogTitle>
-        <DialogDescription className="text-sm text-zinc-600 dark:text-zinc-400">
+        <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
           This action cannot be undone. Are you sure you want to delete this canvas?
         </DialogDescription>
         <DialogBody>
-          <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-            Deleting <span className="font-medium text-zinc-900 dark:text-zinc-100">{workflow.name}</span> will remove
+          <Text className="text-sm text-gray-600 dark:text-gray-400">
+            Deleting <span className="font-medium text-gray-900 dark:text-gray-100">{workflow.name}</span> will remove
             its automations and history.
           </Text>
         </DialogBody>
@@ -629,7 +629,7 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
       <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
         <Dropdown>
           <DropdownButton
-            className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
+            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
             aria-label="Component actions"
             onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}
             disabled={deleteBlueprintMutation.isPending}
@@ -649,12 +649,12 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
         <DialogTitle className="text-red-900 dark:text-red-100">Delete component</DialogTitle>
-        <DialogDescription className="text-sm text-zinc-600 dark:text-zinc-400">
+        <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
           This action cannot be undone. Are you sure you want to delete this component?
         </DialogDescription>
         <DialogBody>
-          <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-            Deleting <span className="font-medium text-zinc-900 dark:text-zinc-100">{blueprint.name}</span> will
+          <Text className="text-sm text-gray-600 dark:text-gray-400">
+            Deleting <span className="font-medium text-gray-900 dark:text-gray-100">{blueprint.name}</span> will
             permanently remove it.
           </Text>
         </DialogBody>
@@ -692,7 +692,7 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
         return (
           <div
             key={blueprint.id}
-            className="max-h-45 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow"
+            className="max-h-45 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow"
           >
             <div className="p-6 flex flex-col justify-between h-full">
               <div>
@@ -706,7 +706,7 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
                       >
                         <Heading
                           level={3}
-                          className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                          className="!text-md font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
                         >
                           {blueprint.name}
                         </Heading>
@@ -717,20 +717,20 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
                 </div>
 
                 <div className="mb-4">
-                  <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
+                  <Text className="text-sm text-left text-gray-600 dark:text-gray-400 line-clamp-2 mt-2">
                     {blueprint.description || "No description"}
                   </Text>
                 </div>
               </div>
 
               <div className="flex justify-between items-center">
-                <div className="text-zinc-500 text-left">
+                <div className="text-gray-500 text-left">
                   {blueprint.createdBy?.name && (
-                    <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none mb-1">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 leading-none mb-1">
                       Created by <strong>{blueprint.createdBy.name}</strong>
                     </p>
                   )}
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 leading-none">
                     Created at {blueprint.createdAt}
                   </p>
                 </div>
@@ -753,7 +753,7 @@ function BlueprintListView({ filteredBlueprints, organizationId }: BlueprintGrid
         return (
           <div
             key={blueprint.id}
-            className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-sm transition-shadow p-4"
+            className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 hover:shadow-sm transition-shadow p-4"
           >
             <div className="flex items-start justify-between gap-3">
               <button
@@ -765,14 +765,14 @@ function BlueprintListView({ filteredBlueprints, organizationId }: BlueprintGrid
                   <div className="flex-1">
                     <Heading
                       level={3}
-                      className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
+                      className="!text-md font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
                     >
                       {blueprint.name}
                     </Heading>
-                    <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                    <Text className="text-sm text-gray-600 dark:text-gray-400">
                       {blueprint.description || "No description"}
                     </Text>
-                    <Text className="text-xs text-zinc-500 mt-2">
+                    <Text className="text-xs text-gray-500 mt-2">
                       {blueprint.createdBy?.name ? (
                         <>
                           Created by <strong>{blueprint.createdBy.name}</strong> · {blueprint.createdAt}

@@ -79,7 +79,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
       <div className="pt-6">
         <h1 className="text-2xl font-semibold mb-6">Applications</h1>
         <div className="flex justify-center items-center h-32">
-          <p className="text-zinc-500 dark:text-zinc-400">Loading applications...</p>
+          <p className="text-gray-500 dark:text-gray-400">Loading applications...</p>
         </div>
       </div>
     );
@@ -97,25 +97,25 @@ export function Applications({ organizationId }: ApplicationsProps) {
       {installedApps.length > 0 && (
         <div className="mb-8">
           <h2 className="text-lg font-medium mb-4">Installed</h2>
-          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
             <table className="w-full table-fixed">
-              <thead className="bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
+              <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <tr>
-                  <th className="px-3 py-2 w-80 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  <th className="px-3 py-2 w-80 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     ID
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Name
                   </th>
-                  <th className="px-3 py-2 w-24 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  <th className="px-3 py-2 w-24 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     State
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Application
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700">
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {[...installedApps]
                   .sort((a, b) => (a.spec?.appName || "").localeCompare(b.spec?.appName || ""))
                   .map((app) => {
@@ -127,13 +127,13 @@ export function Applications({ organizationId }: ApplicationsProps) {
                       <tr
                         key={app.metadata?.id}
                         onClick={() => navigate(`/${organizationId}/settings/applications/${app.metadata?.id}`)}
-                        className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer"
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
                       >
-                        <td className="px-3 py-2 text-xs font-mono text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
+                        <td className="px-3 py-2 text-xs font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
                           {app.metadata?.id}
                         </td>
                         <td className="px-3 py-2 truncate">
-                          <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                             {app.metadata?.name}
                           </div>
                         </td>
@@ -152,7 +152,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                               : "Unknown"}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 truncate">
+                        <td className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 truncate">
                           <div className="flex items-center gap-2">
                             <AppIcon className="w-4 h-4" />
                             <span>{appLabel}</span>
@@ -170,13 +170,13 @@ export function Applications({ organizationId }: ApplicationsProps) {
       {/* Available Applications */}
       <div>
         <h2 className="text-lg font-medium mb-4">Available</h2>
-        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
           <div className="p-6">
             {availableApps.length === 0 ? (
               <div className="text-center py-12">
-                <AppWindow className="w-12 h-12 text-zinc-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-2">No applications available</h3>
-                <p className="text-zinc-600 dark:text-zinc-400">
+                <AppWindow className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No applications available</h3>
+                <p className="text-gray-600 dark:text-gray-400">
                   There are currently no applications available to install
                 </p>
               </div>
@@ -187,19 +187,19 @@ export function Applications({ organizationId }: ApplicationsProps) {
                   return (
                     <div
                       key={app.name}
-                      className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 hover:shadow-md transition-shadow"
+                      className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:shadow-md transition-shadow"
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <Icon className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
-                          <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          <Icon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
                             {app.label || app.name}
                           </h3>
                         </div>
                       </div>
 
                       {app.description && (
-                        <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3 line-clamp-2">{app.description}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{app.description}</p>
                       )}
 
                       <Button color="blue" onClick={() => handleInstallClick(app)} className="w-full text-sm py-1.5">
@@ -221,18 +221,18 @@ export function Applications({ organizationId }: ApplicationsProps) {
           const ModalIcon = resolveIcon(selectedApplication.icon);
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-800 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+              <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-800 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                      <ModalIcon className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
-                      <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+                      <ModalIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                         Install {selectedApplication.label || selectedApplication.name}
                       </h3>
                     </div>
                     <button
                       onClick={handleCloseModal}
-                      className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                       disabled={installMutation.isPending}
                     >
                       <X className="w-6 h-6" />
@@ -242,18 +242,18 @@ export function Applications({ organizationId }: ApplicationsProps) {
                   <div className="space-y-4">
                     {/* Installation Name Field */}
                     <div>
-                      <label className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
+                      <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                         Installation Name
                         <span className="text-red-500 ml-1">*</span>
                       </label>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                         A unique name for this installation
                       </p>
                       <input
                         type="text"
                         value={installationName}
                         onChange={(e) => setInstallationName(e.target.value)}
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="e.g., my-app-integration"
                         required
                       />
@@ -261,7 +261,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
 
                     {/* Configuration Fields */}
                     {selectedApplication.configuration && selectedApplication.configuration.length > 0 && (
-                      <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
+                      <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
                         {selectedApplication.configuration.map((field) => {
                           if (!field.name) return null;
                           return (

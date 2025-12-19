@@ -19,7 +19,7 @@ const meta: Meta = {
   decorators: [
     (Story) => (
       <MemoryRouter>
-        <div className="w-[700px] p-8 bg-white dark:bg-zinc-900 rounded-lg">
+        <div className="w-[700px] p-8 bg-white dark:bg-gray-900 rounded-lg">
           <Story />
         </div>
       </MemoryRouter>
@@ -79,9 +79,9 @@ export const GitHubIntegrationFlow: Story = {
 
     return (
       <div className="space-y-6">
-        <div className="border-b border-zinc-200 dark:border-zinc-700 pb-4">
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">New GitHub Integration</h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+        <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">New GitHub Integration</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             This story demonstrates the complete integration creation flow.
           </p>
         </div>
@@ -108,7 +108,7 @@ export const GitHubIntegrationFlow: Story = {
           orgUrlRef={orgUrlRef}
         />
 
-        <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+        <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
           <Button
             onClick={() => {
               resetForm();
@@ -135,7 +135,7 @@ export const GitHubIntegrationFlow: Story = {
           </Button>
         </div>
 
-        {submitResult && <div className="p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-sm">{submitResult}</div>}
+        {submitResult && <div className="p-4 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm">{submitResult}</div>}
 
         <div className="mt-8 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-sm">
           <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-2">📋 Form State (for debugging)</h3>
@@ -202,9 +202,9 @@ export const SemaphoreIntegrationFlow: Story = {
 
     return (
       <div className="space-y-6">
-        <div className="border-b border-zinc-200 dark:border-zinc-700 pb-4">
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">New Semaphore Integration</h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+        <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">New Semaphore Integration</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             This story demonstrates the complete integration creation flow.
           </p>
         </div>
@@ -231,7 +231,7 @@ export const SemaphoreIntegrationFlow: Story = {
           orgUrlRef={orgUrlRef}
         />
 
-        <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+        <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
           <Button
             onClick={() => {
               resetForm();
@@ -258,7 +258,7 @@ export const SemaphoreIntegrationFlow: Story = {
           </Button>
         </div>
 
-        {submitResult && <div className="p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-sm">{submitResult}</div>}
+        {submitResult && <div className="p-4 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm">{submitResult}</div>}
       </div>
     );
   },
@@ -303,9 +303,9 @@ export const EditIntegrationFlow: Story = {
 
     return (
       <div className="space-y-6">
-        <div className="border-b border-zinc-200 dark:border-zinc-700 pb-4">
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Edit GitHub Integration</h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+        <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Edit GitHub Integration</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             This story demonstrates editing an existing integration.
           </p>
         </div>
@@ -333,7 +333,7 @@ export const EditIntegrationFlow: Story = {
           isEditMode={true}
         />
 
-        <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+        <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
           <Button disabled={isSubmitting}>
             <Icon name="close" size="sm" />
             Cancel
@@ -354,7 +354,7 @@ export const EditIntegrationFlow: Story = {
           </Button>
         </div>
 
-        {submitResult && <div className="p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-sm">{submitResult}</div>}
+        {submitResult && <div className="p-4 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm">{submitResult}</div>}
       </div>
     );
   },

@@ -76,7 +76,7 @@ export const IntegrationResourceFieldRenderer = ({
   }
 
   if (isLoadingResources) {
-    return <div className="text-sm text-gray-500 dark:text-zinc-400">Loading {resourceType} resources...</div>;
+    return <div className="text-sm text-gray-500 dark:text-gray-400">Loading {resourceType} resources...</div>;
   }
 
   if (resourcesError) {
@@ -91,7 +91,7 @@ export const IntegrationResourceFieldRenderer = ({
             <SelectValue placeholder="No resources available" />
           </SelectTrigger>
         </Select>
-        <p className="text-xs text-gray-500 dark:text-zinc-400">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           No {resourceType} resources found in {selectedIntegration?.metadata?.name}
         </p>
       </div>

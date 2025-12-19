@@ -18,7 +18,7 @@ export function Badge({ children, color = "gray", className = "", icon, truncate
     red: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400",
     green: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400",
     yellow: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400",
-    zinc: "bg-zinc-600/10 text-zinc-700 hover:bg-zinc-600/30 transition-colors dark:bg-white/5 dark:text-zinc-400 dark:hover:bg-white/20",
+    zinc: "bg-gray-600/10 text-gray-700 hover:bg-gray-600/30 transition-colors dark:bg-white/5 dark:text-gray-400 dark:hover:bg-white/20",
   };
 
   return (

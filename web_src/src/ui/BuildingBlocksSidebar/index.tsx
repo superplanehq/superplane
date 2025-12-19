@@ -206,7 +206,7 @@ export function BuildingBlocksSidebar({
           <input
             type="text"
             placeholder="Filter components..."
-            className="w-full px-3 py-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-500 dark:placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -231,7 +231,7 @@ export function BuildingBlocksSidebar({
         {disabled && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="absolute inset-0 bg-white/60 dark:bg-zinc-900/60 z-30 cursor-not-allowed" />
+              <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
             </TooltipTrigger>
             <TooltipContent side="left" sideOffset={10}>
               <p>Finish configuring the selected component first</p>
@@ -255,7 +255,7 @@ export function BuildingBlocksSidebar({
             title={hoveredBlock.label || hoveredBlock.name || "New Component"}
             headerColor="bg-gray-50"
             iconSlug={hoveredBlock.icon}
-            iconColor="text-indigo-700"
+            iconColor="text-gray-800"
             collapsedBackground={getBackgroundColorClass("white")}
             hideActionsButton={true}
             includeEmptyState={true}
@@ -306,7 +306,7 @@ function CategorySection({
 
   return (
     <details className="flex-1 px-5 mb-4" open>
-      <summary className="cursor-pointer hover:text-zinc-600 dark:hover:text-zinc-300 mb-1 flex items-center gap-1 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
+      <summary className="cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 mb-1 flex items-center gap-1 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
         <ChevronRight className="h-3 w-3 transition-transform [[details[open]]>&]:rotate-90" />
         <span className="text-sm font-medium pl-1">{category.name}</span>
       </summary>
@@ -387,11 +387,11 @@ function CategorySection({
               }}
               aria-disabled={!isLive}
               title={isLive ? undefined : "Coming soon"}
-              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-zinc-50 dark:hover:bg-zinc-800/50`}
+              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-gray-50 dark:hover:bg-gray-800/50`}
               size="sm"
             >
               <ItemMedia>
-                <IconComponent size={14} className="text-indigo-700" />
+                <IconComponent size={14} className="text-gray-800" />
               </ItemMedia>
 
               <ItemContent>
@@ -405,7 +405,7 @@ function CategorySection({
                 </div>
               </ItemContent>
 
-              <GripVerticalIcon className="text-zinc-500 hover:text-zinc-800" size={14} />
+              <GripVerticalIcon className="text-gray-500 hover:text-gray-800" size={14} />
             </Item>
           );
         })}

@@ -321,7 +321,7 @@ export function CreateRolePage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 pt-4 text-left">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-4 text-left">
       <div className="max-w-8xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -343,10 +343,10 @@ export function CreateRolePage() {
 
           <div className="flex items-center text-left">
             <div>
-              <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white mb-2">
+              <Heading level={2} className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
                 {isEditMode ? "Edit Organization Role" : "Create New Organization Role"}
               </Heading>
-              <Text className="text-zinc-600 dark:text-zinc-400">
+              <Text className="text-gray-600 dark:text-gray-400">
                 {isEditMode
                   ? "Update the role with specific organization permissions."
                   : "Define a custom role with specific organization permissions."}
@@ -358,13 +358,13 @@ export function CreateRolePage() {
         {/* Role Form */}
         <div className="space-y-6">
           {isLoading ? (
-            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+            <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
               <div className="flex justify-center items-center h-32">
-                <p className="text-zinc-500 dark:text-zinc-400">Loading role data...</p>
+                <p className="text-gray-500 dark:text-gray-400">Loading role data...</p>
               </div>
             </div>
           ) : (
-            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+            <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
               {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
                   <p className="text-sm">{error instanceof Error ? error.message : "Failed to load role data"}</p>
@@ -374,7 +374,7 @@ export function CreateRolePage() {
               <div className="space-y-6">
                 {/* Role Name */}
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Role Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Role Name *</label>
                   <Input
                     type="text"
                     placeholder="Enter role name"
@@ -390,7 +390,7 @@ export function CreateRolePage() {
                     disabled={isEditMode}
                   />
                   {isEditMode && (
-                    <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    <Text className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Role name cannot be changed when editing
                     </Text>
                   )}
@@ -398,20 +398,20 @@ export function CreateRolePage() {
 
                 {/* Role Description */}
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Description</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
                   <textarea
                     placeholder="Describe what this role can do"
                     value={roleDescription}
                     onChange={(e) => setRoleDescription(e.target.value)}
-                    className="max-w-lg w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-800 dark:text-white resize-none"
+                    className="max-w-lg w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white resize-none"
                     rows={3}
                   />
                 </div>
 
                 {/* Permissions */}
                 <div className="pt-4 mb-4">
-                  <h2 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">Organization Permissions</h2>
-                  <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Organization Permissions</h2>
+                  <Text className="text-sm text-gray-600 dark:text-gray-400">
                     Select the permissions this role should have within the organization.
                   </Text>
                 </div>
@@ -420,7 +420,7 @@ export function CreateRolePage() {
                   {ORGANIZATION_PERMISSIONS.map((category) => (
                     <div key={category.category} className="space-y-4">
                       <div className="flex items-center mb-3">
-                        <h3 className="text-md font-semibold text-zinc-900 dark:text-white">{category.category}</h3>
+                        <h3 className="text-md font-semibold text-gray-900 dark:text-white">{category.category}</h3>
                         <button
                           type="button"
                           className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 ml-3 bg-transparent border-none cursor-pointer"

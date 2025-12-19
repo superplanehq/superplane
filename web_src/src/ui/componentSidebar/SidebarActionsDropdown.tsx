@@ -142,8 +142,8 @@ export const SidebarActionsDropdown = ({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 w-53 bg-white border border-gray-200 rounded-md shadow-lg z-50">
-          <div className="py-1">
+        <div className="absolute right-0 top-full mt-1 w-53 bg-white outline-1 outline-slate-300 rounded-md shadow-md z-50">
+          <div className="py-2">
             {availableActions.length > 0 &&
               availableActions.map((action) => {
                 const Icon = resolveIcon(action.icon);
@@ -169,7 +169,7 @@ export const SidebarActionsDropdown = ({
                       }}
                       disabled={disabled}
                       aria-disabled={disabled}
-                      className={`w-full px-3 py-2 text-left flex items-center rounded-md gap-2 text-sm transition-colors ${
+                      className={`w-full px-2 py-1.5 text-left flex items-center rounded gap-2 text-sm transition-colors ${
                         action.hoverBackground || ""
                       } ${action.hoverColor || ""} ${
                         disabled

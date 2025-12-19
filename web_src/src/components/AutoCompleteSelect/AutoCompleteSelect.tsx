@@ -140,11 +140,11 @@ export function AutoCompleteSelect({
       <div
         ref={refs.setReference}
         className={twMerge(
-          "relative flex items-center w-full px-3 py-2 text-sm bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100",
+          "relative flex items-center w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100",
           "border rounded-md focus-within:outline-none focus-within:ring-2 cursor-pointer",
           error
             ? "border-red-300 dark:border-red-600 focus-within:ring-red-500"
-            : "border-zinc-300 dark:border-zinc-600 focus-within:ring-blue-500",
+            : "border-gray-300 dark:border-gray-600 focus-within:ring-blue-500",
           disabled && "opacity-50 cursor-not-allowed",
           className,
         )}
@@ -156,7 +156,7 @@ export function AutoCompleteSelect({
           role="combobox"
           aria-expanded={isOpen}
           aria-haspopup="listbox"
-          className="flex-1 bg-transparent border-none outline-none placeholder:text-zinc-500"
+          className="flex-1 bg-transparent border-none outline-none placeholder:text-gray-500"
           placeholder={selectedOption ? selectedOption.label : placeholder}
           value={query}
           onChange={handleInputChange}
@@ -175,7 +175,7 @@ export function AutoCompleteSelect({
           <Icon
             name={isOpen ? "expand_less" : "expand_more"}
             size="sm"
-            className="ml-2 text-zinc-400 dark:text-zinc-500 flex-shrink-0"
+            className="ml-2 text-gray-400 dark:text-gray-500 flex-shrink-0"
           />
         </div>
       </div>
@@ -185,18 +185,18 @@ export function AutoCompleteSelect({
           ref={refs.setFloating}
           style={floatingStyles}
           role="listbox"
-          className="z-50 max-h-60 overflow-auto rounded-md bg-white dark:bg-zinc-800 shadow-lg border border-zinc-200 dark:border-zinc-700 focus:outline-none"
+          className="z-50 max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 focus:outline-none"
         >
           <div ref={listRef}>
             {filteredOptions.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
                 {query !== "" ? "No options found" : "No connections available"}
               </div>
             ) : (
               Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
                 <div key={groupName}>
                   {Object.keys(groupedOptions).length > 1 && (
-                    <div className="px-3 py-1 text-xs font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-700">
+                    <div className="px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                       {groupName}
                     </div>
                   )}
@@ -207,7 +207,7 @@ export function AutoCompleteSelect({
                         key={option.value}
                         role="option"
                         aria-selected={isSelected}
-                        className="relative cursor-pointer select-none px-3 py-2 text-sm hover:bg-blue-500 hover:text-white text-zinc-900 dark:text-zinc-100"
+                        className="relative cursor-pointer select-none px-3 py-2 text-sm hover:bg-blue-500 hover:text-white text-gray-900 dark:text-gray-100"
                         onClick={(e) => {
                           e.preventDefault(); // Prevent blur from firing
                           handleOptionSelect(option.value);

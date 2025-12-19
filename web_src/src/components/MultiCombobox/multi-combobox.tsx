@@ -187,7 +187,7 @@ export function MultiCombobox<T extends { id: string }>({
             "before:absolute before:inset-px before:rounded-[calc(var(--radius-lg)-1px)] before:bg-white before:shadow-sm",
             "dark:before:hidden",
             "after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-transparent after:ring-inset sm:focus-within:after:ring-2 sm:focus-within:after:ring-blue-500",
-            "has-data-disabled:opacity-50 has-data-disabled:before:bg-zinc-950/5 has-data-disabled:before:shadow-none",
+            "has-data-disabled:opacity-50 has-data-disabled:before:bg-gray-950/5 has-data-disabled:before:shadow-none",
             "has-data-invalid:before:shadow-red-500/10",
           ])}
         >
@@ -195,12 +195,12 @@ export function MultiCombobox<T extends { id: string }>({
             className={clsx([
               "relative flex flex-wrap items-center gap-1 w-full appearance-none rounded-lg py-[calc(--spacing(2.5)-1px)] sm:py-[calc(--spacing(1.5)-1px)]",
               "pr-[calc(--spacing(10)-1px)] pl-[calc(--spacing(3.5)-1px)] sm:pr-[calc(--spacing(9)-1px)] sm:pl-[calc(--spacing(3)-1px)]",
-              "text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white",
-              "border border-zinc-950/10 hover:border-zinc-950/20 dark:border-white/10 dark:hover:border-white/20",
+              "text-base/6 text-gray-950 sm:text-sm/6 dark:text-white",
+              "border border-gray-950/10 hover:border-gray-950/20 dark:border-white/10 dark:hover:border-white/20",
               "bg-transparent dark:bg-white/5",
               "focus-within:border-blue-500 dark:focus-within:border-blue-400",
               "data-invalid:border-red-500 data-invalid:hover:border-red-500 dark:data-invalid:border-red-500 dark:data-invalid:hover:border-red-500",
-              "data-disabled:border-zinc-950/20 dark:data-disabled:border-white/15 dark:data-disabled:bg-white/2.5",
+              "data-disabled:border-gray-950/20 dark:data-disabled:border-white/15 dark:data-disabled:bg-white/2.5",
               "dark:scheme-dark",
               "cursor-text",
             ])}
@@ -216,7 +216,7 @@ export function MultiCombobox<T extends { id: string }>({
                     className={clsx(
                       "inline-flex items-center gap-1 px-1 rounded-md text-xs",
                       isValid
-                        ? "bg-zinc-50 text-zinc-700 border border-zinc-200 dark:bg-zinc-800/20 dark:text-zinc-300 dark:border-zinc-800"
+                        ? "bg-gray-50 text-gray-700 border border-gray-200 dark:bg-gray-800/20 dark:text-gray-300 dark:border-gray-800"
                         : "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800",
                     )}
                   >
@@ -229,7 +229,7 @@ export function MultiCombobox<T extends { id: string }>({
                         e.stopPropagation();
                         handleRemove(option);
                       }}
-                      className="ml-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 rounded transition-colors"
+                      className="ml-1 hover:bg-gray-50 dark:hover:bg-gray-800/30 rounded transition-colors"
                     >
                       <Icon name="close" size="sm" />
                     </button>
@@ -257,7 +257,7 @@ export function MultiCombobox<T extends { id: string }>({
               placeholder={value.length === 0 ? placeholder : ""}
               className={clsx([
                 "flex-grow-1 min-w-[120px] border-none outline-none bg-transparent",
-                "text-base/6 text-zinc-950 placeholder:text-zinc-500 sm:text-sm/6 dark:text-white dark:placeholder:text-zinc-400",
+                "text-base/6 text-gray-950 placeholder:text-gray-500 sm:text-sm/6 dark:text-white dark:placeholder:text-gray-400",
               ])}
             />
           </div>
@@ -276,8 +276,8 @@ export function MultiCombobox<T extends { id: string }>({
               "scroll-py-1 rounded-xl p-1 select-none empty:invisible w-full",
               "outline outline-transparent focus:outline-hidden",
               "max-h-60 overflow-y-auto overscroll-contain",
-              "bg-white dark:bg-zinc-800",
-              "shadow-lg ring-1 ring-zinc-950/10 dark:ring-white/10",
+              "bg-white dark:bg-gray-800",
+              "shadow-lg ring-1 ring-gray-950/10 dark:ring-white/10",
               "transition-opacity duration-100 ease-in",
             )}
           >
@@ -306,7 +306,7 @@ export function MultiComboboxOption<T>({
   const sharedClasses = clsx(
     "flex min-w-0 items-center",
     "*:data-[slot=icon]:size-5 *:data-[slot=icon]:shrink-0 sm:*:data-[slot=icon]:size-4",
-    "*:data-[slot=icon]:text-zinc-500 group-data-focus/option:*:data-[slot=icon]:text-white dark:*:data-[slot=icon]:text-zinc-400",
+    "*:data-[slot=icon]:text-gray-500 group-data-focus/option:*:data-[slot=icon]:text-white dark:*:data-[slot=icon]:text-gray-400",
     "forced-colors:*:data-[slot=icon]:text-[CanvasText] forced-colors:group-data-focus/option:*:data-[slot=icon]:text-[Canvas]",
     "*:data-[slot=avatar]:-mx-0.5 *:data-[slot=avatar]:size-6 sm:*:data-[slot=avatar]:size-5",
   );
@@ -316,7 +316,7 @@ export function MultiComboboxOption<T>({
       {...props}
       className={clsx(
         "group/option grid w-full cursor-default grid-cols-[1fr_--spacing(5)] items-baseline gap-x-2 rounded-lg py-2.5 pr-2 pl-3.5 sm:grid-cols-[1fr_--spacing(4)] sm:py-1.5 sm:pr-2 sm:pl-3",
-        "text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white forced-colors:text-[CanvasText]",
+        "text-base/6 text-gray-950 sm:text-sm/6 dark:text-white forced-colors:text-[CanvasText]",
         "outline-hidden data-focus:bg-blue-500 data-focus:text-white",
         "forced-color-adjust-none forced-colors:data-focus:bg-[Highlight] forced-colors:data-focus:text-[HighlightText]",
         "data-disabled:opacity-50",
@@ -337,7 +337,7 @@ export function MultiComboboxDescription({ className, children, ...props }: Reac
       {...props}
       className={clsx(
         className,
-        "flex flex-1 overflow-hidden text-zinc-500 group-data-focus/option:text-white before:w-2 before:min-w-0 before:shrink dark:text-zinc-400",
+        "flex flex-1 overflow-hidden text-gray-500 group-data-focus/option:text-white before:w-2 before:min-w-0 before:shrink dark:text-gray-400",
       )}
     >
       <span className="flex-1 truncate">{children}</span>

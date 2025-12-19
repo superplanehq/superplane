@@ -24,7 +24,7 @@ const Navigation: React.FC = () => {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { data: organization } = useOrganization(organizationId || "");
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 border-b">
+    <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 border-b">
       <div className="flex items-center justify-between h-12 px-6">
         <Link href={`/${organizationId}`} className="flex items-center flex-shrink-0 text-decoration-none">
           <img src={SuperplaneLogo} alt="SuperPlane" className="w-8 h-8" />
@@ -72,7 +72,7 @@ const Navigation: React.FC = () => {
                   />
                   <div className="flex-1 min-w-0">
                     <Text className="font-medium truncate">{account?.name || "Loading..."}</Text>
-                    <Text className="text-sm text-zinc-500 truncate">{account?.email || "Loading..."}</Text>
+                    <Text className="text-sm text-gray-500 truncate">{account?.email || "Loading..."}</Text>
                   </div>
                 </div>
               </DropdownHeader>

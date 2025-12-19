@@ -38,7 +38,7 @@ export function OrganizationSettings() {
   if (userLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-zinc-500 dark:text-zinc-400">Loading user...</p>
+        <p className="text-gray-500 dark:text-gray-400">Loading user...</p>
       </div>
     );
   }
@@ -46,7 +46,7 @@ export function OrganizationSettings() {
   if (!organizationId) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-zinc-500 dark:text-zinc-400">Organization not found</p>
+        <p className="text-gray-500 dark:text-gray-400">Organization not found</p>
       </div>
     );
   }
@@ -54,7 +54,7 @@ export function OrganizationSettings() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-zinc-500 dark:text-zinc-400">Loading organization...</p>
+        <p className="text-gray-500 dark:text-gray-400">Loading organization...</p>
       </div>
     );
   }
@@ -62,7 +62,7 @@ export function OrganizationSettings() {
   if (error || (!loading && !organization)) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-zinc-500 dark:text-zinc-400">
+        <p className="text-gray-500 dark:text-gray-400">
           {error instanceof Error ? error.message : "Organization not found"}
         </p>
       </div>
@@ -81,11 +81,11 @@ export function OrganizationSettings() {
 
   return (
     <div
-      className="flex flex-col bg-zinc-50 dark:bg-zinc-950"
+      className="flex flex-col bg-gray-50 dark:bg-gray-950"
       style={{ height: "calc(100vh - 3rem)", marginTop: "3rem" }}
     >
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar className="w-70 bg-white dark:bg-zinc-950 border-r bw-1 border-zinc-200 dark:border-zinc-800">
+        <Sidebar className="w-70 bg-white dark:bg-gray-950 border-r bw-1 border-gray-200 dark:border-gray-800">
           <SidebarBody>
             <SidebarSection>
               <div className="flex items-center gap-3 text-sm font-bold py-3">
@@ -103,10 +103,10 @@ export function OrganizationSettings() {
                   }
                   alt={user?.name || "My Account"}
                 />
-                <SidebarLabel className="text-zinc-900 dark:text-white">{user?.name || "My Account"}</SidebarLabel>
+                <SidebarLabel className="text-gray-900 dark:text-white">{user?.name || "My Account"}</SidebarLabel>
               </div>
               <SidebarItem
-                className={`${currentSection === "profile" ? "bg-zinc-100 dark:bg-zinc-800 rounded-md" : ""}`}
+                className={`${currentSection === "profile" ? "bg-gray-100 dark:bg-gray-800 rounded-md" : ""}`}
                 onClick={() => navigate(`/${organizationId}/settings/profile`)}
               >
                 <span className="px-7">
@@ -114,7 +114,7 @@ export function OrganizationSettings() {
                 </span>
               </SidebarItem>
             </SidebarSection>
-            <SidebarDivider className="dark:border-zinc-800" />
+            <SidebarDivider className="dark:border-gray-800" />
             <SidebarSection>
               <div className="flex items-center gap-3 text-sm font-bold py-3">
                 <Avatar
@@ -125,7 +125,7 @@ export function OrganizationSettings() {
                     .toUpperCase()}
                   alt={organization?.metadata?.name || organization?.metadata?.name || "Organization"}
                 />
-                <SidebarLabel className="text-zinc-900 dark:text-white">
+                <SidebarLabel className="text-gray-900 dark:text-white">
                   {organization?.metadata?.name || organization?.metadata?.name || "Organization"}
                 </SidebarLabel>
               </div>
@@ -135,7 +135,7 @@ export function OrganizationSettings() {
                   <SidebarItem
                     key={tab.id}
                     onClick={() => navigate(`/${organizationId}/settings/${tab.id}`)}
-                    className={`${currentSection === tab.id ? "bg-zinc-100 dark:bg-zinc-800 rounded-md" : ""}`}
+                    className={`${currentSection === tab.id ? "bg-gray-100 dark:bg-gray-800 rounded-md" : ""}`}
                   >
                     <span className={`px-7 ${currentSection === tab.id ? "font-semibold" : "font-normal"}`}>
                       <SidebarLabel>{tab.label}</SidebarLabel>
@@ -146,7 +146,7 @@ export function OrganizationSettings() {
           </SidebarBody>
         </Sidebar>
 
-        <div className="flex-1 overflow-auto bg-zinc-50 dark:bg-zinc-900">
+        <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900">
           <div className="px-8 pb-8">
             <Routes>
               <Route path="" element={<Navigate to="general" replace />} />
@@ -157,7 +157,7 @@ export function OrganizationSettings() {
                     <General organization={organization} />
                   ) : (
                     <div className="flex justify-center items-center h-32">
-                      <p className="text-zinc-500 dark:text-zinc-400">Loading...</p>
+                      <p className="text-gray-500 dark:text-gray-400">Loading...</p>
                     </div>
                   )
                 }

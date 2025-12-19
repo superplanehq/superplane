@@ -45,18 +45,18 @@ export function General({ organization }: GeneralProps) {
   };
   return (
     <div className="space-y-6 pt-6 text-left">
-      <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white">
+      <Heading level={2} className="text-2xl font-semibold text-gray-900 dark:text-white">
         General
       </Heading>
-      <Fieldset className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 space-y-6 max-w-xl">
+      <Fieldset className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6 space-y-6 max-w-xl">
         <Field>
-          <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Organization Name</Label>
+          <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Organization Name</Label>
           <Input type="text" value={name} onChange={(e) => setName(e.target.value)} className="max-w-lg" />
         </Field>
         <Field>
-          <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Description</Label>
+          <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</Label>
           <Textarea
-            className="bg-white dark:bg-zinc-950 rounded-lg dark:border-zinc-800 max-w-xl"
+            className="bg-white dark:bg-gray-950 rounded-lg dark:border-gray-800 max-w-xl"
             placeholder="Enter organization description"
             value={organizationDescription}
             onChange={(e) => setOrganizationDescription(e.target.value)}
