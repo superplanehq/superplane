@@ -324,7 +324,7 @@ export function WorkflowPageV2() {
           console.error("Failed to auto-save canvas changes:", error);
           // Don't show error toast for auto-save failures to avoid being intrusive
         }
-      }, 1000),
+      }, 300),
     [organizationId, workflowId, updateWorkflowMutation, queryClient, hasNonPositionalUnsavedChanges],
   );
 

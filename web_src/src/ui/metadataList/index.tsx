@@ -3,7 +3,7 @@ import React from "react";
 
 export interface MetadataItem {
   icon: string;
-  label: string;
+  label: string | React.ReactNode;
 }
 
 export interface MetadataListProps {

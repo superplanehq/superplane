@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -70,17 +71,14 @@ func (s *WaitSteps) addWaitWithDuration(value int, unit string) {
 	s.canvas.AddWait(s.currentNodeName, models.Position{X: 500, Y: 250}, value, unit)
 }
 
-func (s *WaitSteps) saveCanvas() {
-	s.canvas.Save()
-}
-
 func (s *WaitSteps) assertWaitSavedToDB(value int, unit string) {
 	node := s.canvas.GetNodeFromDB("Wait")
 
-	duration := node.Configuration.Data()["duration"].(map[string]any)
+	config := node.Configuration.Data()
 
-	assert.Equal(s.t, float64(value), duration["value"])
-	assert.Equal(s.t, unit, duration["unit"])
+	assert.Equal(s.t, "interval", config["mode"])
+	assert.Equal(s.t, strconv.Itoa(value), config["waitFor"])
+	assert.Equal(s.t, unit, config["unit"])
 }
 
 func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
@@ -107,6 +105,8 @@ func (s *WaitSteps) openSidebarForNode(node string) {
 }
 
 func (s *WaitSteps) pushThroughFirstItemFromSidebar() {
+	eventItem := q.Locator("h2:has-text('Latest') ~ div")
+	s.session.HoverOver(eventItem)
 	s.session.Click(q.Locator("h2:has-text('Latest') ~ div button[aria-label='Open actions']"))
 	s.session.Click(q.TestID("push-through-item"))
 	s.canvas.WaitForExecution("Output", models.WorkflowNodeExecutionStateFinished, 15*time.Second)

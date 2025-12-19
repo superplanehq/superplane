@@ -10,6 +10,7 @@ import { Button } from "@/ui/button";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { ApplicationsApplicationDefinition } from "../../../api-client/types.gen";
 import { resolveIcon } from "@/lib/utils";
+import { getApiErrorMessage } from "@/utils/errors";
 
 interface ApplicationsProps {
   organizationId: string;
@@ -70,6 +71,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
     setSelectedApplication(null);
     setInstallationName("");
     setConfiguration({});
+    installMutation.reset();
   };
 
   if (isLoading) {
@@ -302,7 +304,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                   {installMutation.isError && (
                     <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
                       <p className="text-sm text-red-800 dark:text-red-200">
-                        Failed to install application. Please try again.
+                        Failed to install application: {getApiErrorMessage(installMutation.error)}
                       </p>
                     </div>
                   )}

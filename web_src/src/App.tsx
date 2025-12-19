@@ -11,6 +11,7 @@ import Navigation from "./components/Navigation";
 import { AccountProvider } from "./contexts/AccountContext";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
+import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CustomComponent } from "./pages/custom-component";
 import HomePage from "./pages/home";
 import NodeRunPage from "./pages/node-run";
@@ -61,6 +62,7 @@ function App() {
               <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
               {/* Organization selection and creation */}
               <Route path="create" element={<OrganizationCreate />} />
+              <Route path="setup" element={<OwnerSetup />} />
               <Route path="" element={<OrganizationSelect />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>

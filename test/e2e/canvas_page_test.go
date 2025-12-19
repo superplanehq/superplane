@@ -132,15 +132,6 @@ func (s *CanvasPageSteps) assertUnsavedChangesNoteIsVisible() {
 	s.session.AssertText("You have unsaved changes")
 }
 
-func (s *CanvasPageSteps) assertCantRunNode(nodeName string) {
-	dropdown := q.TestID("node", nodeName, "header-dropdown")
-	runOption := q.Locator("button:has-text('Run')")
-
-	s.session.Click(dropdown)
-	s.session.AssertVisible(runOption)
-	s.session.AssertDisabled(runOption)
-}
-
 func (s *CanvasPageSteps) assertIsNodeCollapsed(nodeName string) {
 	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
 	s.session.Sleep(100)
@@ -161,13 +152,6 @@ func (s *CanvasPageSteps) assertIsNodeExpanded(nodeName string) {
 
 	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
 	s.session.Sleep(100)
-}
-
-func (s *CanvasPageSteps) assertExplainationIsShownWhenHoverOverRun() {
-	runOption := q.Locator("button:has-text('Run')")
-
-	s.session.HoverOver(runOption)
-	s.session.AssertText("Save canvas changes before running")
 }
 
 func (s *CanvasPageSteps) saveCanvas() {
@@ -321,6 +305,8 @@ func (s *CanvasPageSteps) assertQueuedItemsVisibleInSidebar() {
 }
 
 func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
+	eventItem := q.Locator("h2:has-text('Queued') ~ div")
+	s.session.HoverOver(eventItem)
 	s.session.Click(q.Locator("h2:has-text('Queued') ~ div button[aria-label='Open actions']"))
 	s.session.TakeScreenshot()
 	s.session.Sleep(300)
@@ -330,6 +316,8 @@ func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
 }
 
 func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
+	eventItem := q.Locator("h2:has-text('Latest') ~ div")
+	s.session.HoverOver(eventItem)
 	s.session.Click(q.Locator("h2:has-text('Latest') ~ div button[aria-label='Open actions']"))
 	s.session.TakeScreenshot()
 	s.session.Sleep(300)

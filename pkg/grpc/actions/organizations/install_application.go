@@ -24,6 +24,19 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, baseUR
 		return nil, status.Errorf(codes.InvalidArgument, "application %s not found", appName)
 	}
 
+	org, err := uuid.Parse(orgID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid organization")
+	}
+
+	//
+	// Check if an installation with this name already exists in the organization
+	//
+	_, err = models.FindAppInstallationByName(org, installationName)
+	if err == nil {
+		return nil, status.Errorf(codes.AlreadyExists, "an installation with the name %s already exists in this organization", installationName)
+	}
+
 	//
 	// We must encrypt the sensitive configuration fields before storing
 	//

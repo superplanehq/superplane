@@ -86,6 +86,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const [payloadCopied, setPayloadCopied] = useState(false);
   const [executionChainData, setExecutionChainData] = useState<ExecutionChainItem[] | null>(null);
   const [executionChainLoading, setExecutionChainLoading] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const eventStateStyle: EventStateStyle = useMemo(() => {
     if (!getExecutionState) return DEFAULT_EVENT_STATE_MAP["neutral"];
@@ -318,6 +320,18 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const EventBackground = eventStateStyle.backgroundColor;
   const EventBadgeColor = eventStateStyle.badgeColor;
 
+  // Determine if actions menu should be shown (same logic as in SidebarEventActionsMenu)
+  const isProcessed = event.state === "triggered";
+  const isDiscarded = event.state === "discarded";
+  const isWaiting = event.state === "waiting";
+  const isQueued = event.state === "queued";
+  const isRunning = event.state === "running";
+
+  const showPushThrough = supportsPushThrough && !!event.executionId && isRunning;
+  const showCancel = (event.kind === "queue" && isQueued) || (event.kind === "execution" && (isRunning || isWaiting));
+  const showReEmit = (isProcessed || isDiscarded) && event.kind === "trigger";
+  const showActionsMenu = showPushThrough || showCancel || showReEmit;
+
   return (
     <div
       key={event.title + index}
@@ -335,6 +349,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         }
         onEventClick?.(event);
       }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* First row: Badge and subtitle */}
       <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
@@ -354,24 +370,33 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           {event.id && <span className="text-[13px] text-gray-950/50 font-mono">#{event.id?.slice(0, 4)}</span>}
           <span className="text-sm text-gray-700 font-inter truncate text-md min-w-0 font-semibold">{event.title}</span>
         </div>
-
-        <div onClick={(e) => e.stopPropagation()}>
-          <SidebarEventActionsMenu
-            eventId={event.id}
-            executionId={event.executionId}
-            onCancelQueueItem={onCancelQueueItem}
-            onCancelExecution={onCancelExecution}
-            onPushThrough={onPushThrough}
-            supportsPushThrough={supportsPushThrough}
-            eventState={event.state}
-            kind={event.kind || "execution"}
-            onReEmit={() => {
-              if (["queue", "execution"].includes(event.kind || "")) return;
-              onReEmit?.(event.nodeId || "", event.id);
-            }}
-          />
-        </div>
       </div>
+
+      {/* Hover overlay with dropdown menu */}
+      {showActionsMenu && (isHovered || isDropdownOpen) && (
+        <div className="absolute top-0 right-0 h-full flex items-center bg-transparent">
+          <div
+            className="h-full bg-white/50 backdrop-blur-[3px] rounded-r-md shadow-sm p-1 pt-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <SidebarEventActionsMenu
+              eventId={event.id}
+              executionId={event.executionId}
+              onCancelQueueItem={onCancelQueueItem}
+              onCancelExecution={onCancelExecution}
+              onPushThrough={onPushThrough}
+              supportsPushThrough={supportsPushThrough}
+              eventState={event.state}
+              kind={event.kind || "execution"}
+              onReEmit={() => {
+                if (["queue", "execution"].includes(event.kind || "")) return;
+                onReEmit?.(event.nodeId || "", event.id);
+              }}
+              onOpenChange={setIsDropdownOpen}
+            />
+          </div>
+        </div>
+      )}
 
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
         <div

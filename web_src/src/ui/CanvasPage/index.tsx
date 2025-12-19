@@ -262,6 +262,7 @@ function CanvasPage(props: CanvasPageProps) {
   const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
   const [currentTab, setCurrentTab] = useState<"latest" | "settings">("latest");
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
+  const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
 
   // Use refs from props if provided, otherwise create local ones
   const hasFitToViewRef = props.hasFitToViewRef || useRef(false);
@@ -771,6 +772,7 @@ function CanvasPage(props: CanvasPageProps) {
               hasFitToViewRef={hasFitToViewRef}
               viewportRefProp={props.viewportRef}
               templateNodeId={templateNodeId}
+              highlightedNodeIds={highlightedNodeIds}
             />
           </ReactFlowProvider>
 
@@ -827,6 +829,7 @@ function CanvasPage(props: CanvasPageProps) {
             components={props.components}
             triggers={props.triggers}
             blueprints={props.blueprints}
+            onHighlightedNodesChange={setHighlightedNodeIds}
           />
         </div>
       </div>
@@ -925,6 +928,7 @@ function Sidebar({
   components,
   triggers,
   blueprints,
+  onHighlightedNodesChange,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -973,6 +977,7 @@ function Sidebar({
   components?: ComponentsComponent[];
   triggers?: TriggersTrigger[];
   blueprints?: BlueprintsBlueprint[];
+  onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
 }) {
   const sidebarData = useMemo(() => {
     if (templateNodeId && newNodeData) {
@@ -1116,6 +1121,7 @@ function Sidebar({
       components={components}
       triggers={triggers}
       blueprints={blueprints}
+      onHighlightedNodesChange={onHighlightedNodesChange}
     />
   );
 }
@@ -1193,6 +1199,7 @@ function CanvasContent({
   runDisabledTooltip,
   onPendingConnectionNodeClick,
   onTemplateNodeClick,
+  highlightedNodeIds,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1221,6 +1228,7 @@ function CanvasContent({
   runDisabledTooltip?: string;
   onPendingConnectionNodeClick?: (nodeId: string) => void;
   onTemplateNodeClick?: (nodeId: string) => void;
+  highlightedNodeIds: Set<string>;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1562,6 +1570,7 @@ function CanvasContent({
   }, [hoveredEdgeId, state.edges]);
 
   const nodesWithCallbacks = useMemo(() => {
+    const hasHighlightedNodes = highlightedNodeIds.size > 0;
     return state.nodes.map((node) => ({
       ...node,
       data: {
@@ -1570,9 +1579,11 @@ function CanvasContent({
         _hoveredEdge: hoveredEdge,
         _connectingFrom: connectingFrom,
         _allEdges: state.edges,
+        _isHighlighted: highlightedNodeIds.has(node.id),
+        _hasHighlightedNodes: hasHighlightedNodes,
       },
     }));
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges]);
+  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds]);
 
   const edgeTypes = useMemo(
     () => ({

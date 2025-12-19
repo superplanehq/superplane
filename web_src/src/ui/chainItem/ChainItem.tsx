@@ -2,7 +2,7 @@
 import { resolveIcon, isUrl, calcRelativeTimeFromDiff } from "@/lib/utils";
 import React, { useCallback, useMemo, useState } from "react";
 import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
-import { WorkflowsWorkflowNodeExecution, ComponentsNode } from "@/api-client";
+import { WorkflowsWorkflowNodeExecution, ComponentsNode, WorkflowsWorkflowEvent } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { formatTimeAgo } from "@/utils/date";
@@ -29,6 +29,7 @@ export interface ChainItemData {
   state?: string; // Make state optional since it will be calculated
   executionId?: string;
   originalExecution?: WorkflowsWorkflowNodeExecution; // Add execution data
+  originalEvent?: WorkflowsWorkflowEvent; // Add event data for trigger events
   childExecutions?: ChildExecution[]; // Add child executions for composite components
   workflowNode?: ComponentsNode; // Add workflow node for subtitle generation
   additionalData?: unknown; // Add additional data for subtitle generation
@@ -43,6 +44,7 @@ interface ChainItemProps {
   index: number;
   totalItems?: number;
   isOpen: boolean;
+  isSelected?: boolean;
   onToggleOpen: (itemId: string) => void;
   getExecutionState?: (
     nodeId: string,
@@ -55,6 +57,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   index,
   totalItems,
   isOpen,
+  isSelected = false,
   onToggleOpen,
   getExecutionState,
 }) => {
@@ -62,7 +65,6 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
   const [payloadCopied, setPayloadCopied] = useState(false);
-
   const state = useMemo(() => {
     if (!getExecutionState || !item.originalExecution) return item.state;
     const { state } = getExecutionState(item.nodeId || "", item.originalExecution);
@@ -113,8 +115,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
       <div
         key={item.id + index}
         className={
-          `cursor-pointer px-4 pt-2 pb-2 relative rounded-lg border-1 border-slate-400 ${EventBackground}` +
-          (showConnectingLine ? " mb-3" : "")
+          `cursor-pointer px-4 pt-2 pb-2 relative rounded-lg border-1 ${
+            isSelected ? "border-blue-200 border-3" : "border-slate-300"
+          } ${EventBackground}` + (showConnectingLine ? " mb-3" : "")
         }
         onClick={(e) => {
           e.stopPropagation();
@@ -133,7 +136,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                 })}
               </div>
             )}
-            <span className="text-lg text-gray-700 font-inter truncate min-w-0 font-semibold">
+            <span className="text-lg text-zinc-700 font-inter truncate min-w-0 font-semibold">
               {item.nodeDisplayName || item.nodeName || item.componentName}
             </span>
           </div>
@@ -151,7 +154,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         {/* Second row: Time ago and duration */}
         <div className="flex items-center mt-0 ml-8 gap-2">
           <span className="text-sm text-gray-500">
-            {formatTimeAgo(new Date(item.originalExecution?.createdAt || ""))}
+            {formatTimeAgo(new Date(item.originalExecution?.createdAt || item.originalEvent?.createdAt || ""))}
             {item.originalExecution?.state === "STATE_FINISHED" &&
               item.originalExecution?.createdAt &&
               item.originalExecution?.updatedAt && (
@@ -219,17 +222,18 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Tab Navigation */}
-            <div className="flex justify-between items-center border-b-1 border-gray-200">
+            <div className="flex items-center border-b-1 border-gray-200">
               <div className="flex">
                 {item.tabData.current && (
                   <button
                     onClick={() => setActiveTab("current")}
-                    className={`px-5 py-1 text-sm font-medium rounded-tl-md  ${
+                    className={`px-3 py-1 text-sm font-medium rounded-tr-md flex items-center gap-1  ${
                       activeTab === "current"
                         ? "text-black border-b-1 border-black"
                         : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                     }`}
                   >
+                    {React.createElement(resolveIcon("notepad-text"), { size: 16 })}
                     Details
                   </button>
                 )}

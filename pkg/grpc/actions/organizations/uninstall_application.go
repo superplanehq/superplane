@@ -49,7 +49,7 @@ func UninstallApplication(ctx context.Context, orgID string, ID string) (*pb.Uni
 			}
 		}
 
-		err = tx.Delete(appInstallation).Error
+		err = appInstallation.SoftDeleteInTransaction(tx)
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to delete application installation: %v", err)
 		}
