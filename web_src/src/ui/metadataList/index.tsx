@@ -29,7 +29,7 @@ export const MetadataList: React.FC<MetadataListProps> = ({
         const Icon = resolveIcon(item.icon);
         return (
           <div key={index} className="flex items-center min-w-0">
-            <div class="w-4 h-4 mr-2">
+            <div className="w-4 h-4 mr-2">
               <Icon size={iconSize} className="flex-shrink-0" />
             </div>
             <span
