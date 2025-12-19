@@ -13,8 +13,13 @@ const OwnerSetup: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!email.trim() || !firstName.trim() || !lastName.trim() || !password) {
+      setError("All fields are required.");
+      return;
+    }
+
     setLoading(true);
-    setError(null);
 
     try {
       const response = await fetch("/api/v1/setup-owner", {
@@ -59,9 +64,7 @@ const OwnerSetup: React.FC = () => {
       <div className="max-w-lg w-full bg-white dark:bg-zinc-900 rounded-lg shadow-xl p-8">
         <div className="text-center mb-8">
           <h4 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Set up owner account</h4>
-          <Text className="text-gray-600 dark:text-gray-400">
-            Create the first owner account for this Superplane instance.
-          </Text>
+          <Text className="text-gray-600 dark:text-gray-400">Create an account for this SuperPlane instance.</Text>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -80,7 +83,6 @@ const OwnerSetup: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
                 placeholder="you@example.com"
               />
             </InputGroup>
@@ -95,7 +97,6 @@ const OwnerSetup: React.FC = () => {
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                required
                 placeholder="First name"
               />
             </InputGroup>
@@ -110,7 +111,6 @@ const OwnerSetup: React.FC = () => {
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                required
                 placeholder="Last name"
               />
             </InputGroup>
@@ -125,7 +125,6 @@ const OwnerSetup: React.FC = () => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
                 placeholder="Password"
               />
             </InputGroup>
