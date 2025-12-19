@@ -82,7 +82,7 @@ function getWaitMetadataList(node: ComponentsNode): MetadataItem[] {
   // Handle new mode-based configuration
   if (configuration?.mode) {
     const mode = configuration.mode as string;
-    let waitLabel: string | React.ReactNode = "Wait";
+    let waitLabel: string | React.ReactNode = "Wait not configured";
 
     if (mode === "interval") {
       const waitFor = configuration.waitFor as string;
@@ -97,7 +97,7 @@ function getWaitMetadataList(node: ComponentsNode): MetadataItem[] {
             </ExpressionTooltip>
           </span>
         );
-      } else {
+      } else if (waitFor && unit) {
         waitLabel = `Wait for ${waitFor}${unit ? ` ${unit}` : ""}`;
       }
     } else if (mode === "countdown") {
@@ -112,7 +112,7 @@ function getWaitMetadataList(node: ComponentsNode): MetadataItem[] {
             </ExpressionTooltip>
           </span>
         );
-      } else {
+      } else if (waitUntil) {
         waitLabel = `Wait until: ${waitUntil}`;
       }
     }
@@ -140,7 +140,7 @@ function getWaitMetadataList(node: ComponentsNode): MetadataItem[] {
   return [
     {
       icon: "loader",
-      label: "Wait configured",
+      label: "Wait not configured",
     },
   ];
 }

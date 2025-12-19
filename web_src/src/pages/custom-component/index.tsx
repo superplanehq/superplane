@@ -78,12 +78,17 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
   const blockType = getBlockType(componentName);
   const channels = component?.outputChannels?.map((channel: any) => channel.name) || ["default"];
 
+  const componentBaseProps = getComponentBaseMapper(component?.name!).props([], node, component!, [], undefined);
+
   const baseData: BlockData = {
     label: node.name,
     state: "pending",
     type: blockType,
     outputChannels: channels,
-    component: getComponentBaseMapper(component?.name!).props([], node, component!, [], undefined),
+    component: {
+      ...componentBaseProps,
+      error: node.errorMessage,
+    },
   };
 
   return baseData;

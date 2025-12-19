@@ -34,10 +34,7 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		return nil, err
 	}
 
-	err = ValidateNodeConfigurations(nodes, registry)
-	if err != nil {
-		return nil, err
-	}
+	nodes = validateAndMarkNodeErrors(nodes, registry)
 
 	configuration, err := ProtoToConfiguration(blueprint.Configuration)
 	if err != nil {
