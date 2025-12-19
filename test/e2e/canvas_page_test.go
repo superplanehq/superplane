@@ -132,15 +132,6 @@ func (s *CanvasPageSteps) assertUnsavedChangesNoteIsVisible() {
 	s.session.AssertText("You have unsaved changes")
 }
 
-func (s *CanvasPageSteps) assertCantRunNode(nodeName string) {
-	dropdown := q.TestID("node", nodeName, "header-dropdown")
-	runOption := q.Locator("button:has-text('Run')")
-
-	s.session.Click(dropdown)
-	s.session.AssertVisible(runOption)
-	s.session.AssertDisabled(runOption)
-}
-
 func (s *CanvasPageSteps) assertIsNodeCollapsed(nodeName string) {
 	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
 	s.session.Sleep(100)
@@ -161,13 +152,6 @@ func (s *CanvasPageSteps) assertIsNodeExpanded(nodeName string) {
 
 	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
 	s.session.Sleep(100)
-}
-
-func (s *CanvasPageSteps) assertExplainationIsShownWhenHoverOverRun() {
-	runOption := q.Locator("button:has-text('Run')")
-
-	s.session.HoverOver(runOption)
-	s.session.AssertText("Save canvas changes before running")
 }
 
 func (s *CanvasPageSteps) saveCanvas() {

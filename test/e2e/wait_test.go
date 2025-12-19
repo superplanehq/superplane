@@ -71,10 +71,6 @@ func (s *WaitSteps) addWaitWithDuration(value int, unit string) {
 	s.canvas.AddWait(s.currentNodeName, models.Position{X: 500, Y: 250}, value, unit)
 }
 
-func (s *WaitSteps) saveCanvas() {
-	s.canvas.Save()
-}
-
 func (s *WaitSteps) assertWaitSavedToDB(value int, unit string) {
 	node := s.canvas.GetNodeFromDB("Wait")
 
