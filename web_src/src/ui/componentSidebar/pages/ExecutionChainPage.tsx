@@ -348,11 +348,12 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
         const elementRect = selectedElement.getBoundingClientRect();
 
         // Calculate the scroll position to center the element in the container
-        const scrollTop = container.scrollTop + elementRect.top - containerRect.top - (containerRect.height / 2) + (elementRect.height / 2);
+        const scrollTop =
+          container.scrollTop + elementRect.top - containerRect.top - containerRect.height / 2 + elementRect.height / 2;
 
         container.scrollTo({
           top: scrollTop,
-          behavior: "smooth"
+          behavior: "smooth",
         });
       }
     }
