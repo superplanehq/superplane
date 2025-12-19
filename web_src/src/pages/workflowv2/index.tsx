@@ -894,7 +894,7 @@ export function WorkflowPageV2() {
       // Parse edge IDs to extract sourceId, targetId, and channel
       // Edge IDs are formatted as: `${sourceId}--${targetId}--${channel}`
       const edgesToRemove = edgeIds.map((edgeId) => {
-        const parts = edgeId.split("--");
+        const parts = edgeId?.split("--");
         return {
           sourceId: parts[0],
           targetId: parts[1],

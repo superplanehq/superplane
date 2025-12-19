@@ -71,8 +71,8 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
  * Falls back to the default renderer if no specific renderer is registered.
  */
 export function getTriggerRenderer(name: string): TriggerRenderer {
-  const parts = name.split(".");
-  if (parts.length == 1) {
+  const parts = name?.split(".");
+  if (parts?.length == 1) {
     return triggerRenderers[name] || defaultTriggerRenderer;
   }
 
@@ -91,8 +91,8 @@ export function getTriggerRenderer(name: string): TriggerRenderer {
  * Falls back to the noop mapper if no specific mapper is registered.
  */
 export function getComponentBaseMapper(name: string): ComponentBaseMapper {
-  const parts = name.split(".");
-  if (parts.length == 1) {
+  const parts = name?.split(".");
+  if (parts?.length == 1) {
     return componentBaseMappers[name] || noopMapper;
   }
 
