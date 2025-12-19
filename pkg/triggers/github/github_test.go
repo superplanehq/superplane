@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/superplanehq/superplane/pkg/core"
+	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func Test__HandleWebhook(t *testing.T) {
@@ -29,8 +30,8 @@ func Test__HandleWebhook(t *testing.T) {
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:        headers,
-			EventContext:   &DummyEventContext{},
-			WebhookContext: &DummyWebhookContext{},
+			EventContext:   &contexts.EventContext{},
+			WebhookContext: &contexts.WebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -42,12 +43,12 @@ func Test__HandleWebhook(t *testing.T) {
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 		headers.Set("X-GitHub-Event", "pull_request")
 
-		eventContext := &DummyEventContext{}
+		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:        headers,
 			Configuration:  Configuration{EventType: "push"},
 			EventContext:   eventContext,
-			WebhookContext: &DummyWebhookContext{},
+			WebhookContext: &contexts.WebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -66,8 +67,8 @@ func Test__HandleWebhook(t *testing.T) {
 			Body:           []byte(`{"ref":"refs/heads/main"}`),
 			Headers:        headers,
 			Configuration:  Configuration{EventType: "push"},
-			WebhookContext: &DummyWebhookContext{Secret: secret},
-			EventContext:   &DummyEventContext{},
+			WebhookContext: &contexts.WebhookContext{Secret: secret},
+			EventContext:   &contexts.EventContext{},
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -86,12 +87,12 @@ func Test__HandleWebhook(t *testing.T) {
 		headers.Set("X-Hub-Signature-256", "sha256="+signature)
 		headers.Set("X-GitHub-Event", "push")
 
-		eventContext := &DummyEventContext{}
+		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:           body,
 			Headers:        headers,
 			Configuration:  Configuration{EventType: "push"},
-			WebhookContext: &DummyWebhookContext{Secret: secret},
+			WebhookContext: &contexts.WebhookContext{Secret: secret},
 			EventContext:   eventContext,
 		})
 
@@ -112,12 +113,12 @@ func Test__HandleWebhook(t *testing.T) {
 		headers.Set("X-Hub-Signature-256", "sha256="+signature)
 		headers.Set("X-GitHub-Event", "push")
 
-		eventContext := &DummyEventContext{}
+		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:           body,
 			Headers:        headers,
 			Configuration:  Configuration{EventType: "push"},
-			WebhookContext: &DummyWebhookContext{Secret: secret},
+			WebhookContext: &contexts.WebhookContext{Secret: secret},
 			EventContext:   eventContext,
 		})
 
@@ -125,31 +126,6 @@ func Test__HandleWebhook(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, eventContext.Count(), 1)
 	})
-}
-
-type DummyWebhookContext struct {
-	Secret string
-}
-
-func (w *DummyWebhookContext) GetSecret() ([]byte, error) {
-	return []byte(w.Secret), nil
-}
-
-func (w *DummyWebhookContext) Setup(options *core.WebhookSetupOptions) error {
-	return nil
-}
-
-type DummyEventContext struct {
-	EmittedEvents []any
-}
-
-func (e *DummyEventContext) Emit(event any) error {
-	e.EmittedEvents = append(e.EmittedEvents, event)
-	return nil
-}
-
-func (e *DummyEventContext) Count() int {
-	return len(e.EmittedEvents)
 }
 
 func Test__IsBranchDeletionEvent(t *testing.T) {

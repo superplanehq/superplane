@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
 type OnPush struct{}
@@ -134,41 +132,15 @@ func (p *OnPush) HandleAction(ctx core.TriggerActionContext) error {
 }
 
 func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	signature := ctx.Headers.Get("X-Hub-Signature-256")
-	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
-	}
-
-	eventType := ctx.Headers.Get("X-GitHub-Event")
-	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
-	}
-
 	config := OnPushConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	//
-	// If event is not a push event, we ignore it.
-	//
-	if eventType != "push" {
-		return http.StatusOK, nil
-	}
-
-	signature = strings.TrimPrefix(signature, "sha256=")
-	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
-	}
-
-	secret, err := ctx.WebhookContext.GetSecret()
+	code, err := verifySignature(ctx, "push")
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
-	}
-
-	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-		return http.StatusForbidden, err
+		return code, err
 	}
 
 	data := map[string]any{}

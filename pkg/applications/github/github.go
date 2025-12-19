@@ -21,7 +21,7 @@ const (
 	GitHubAppClientSecret  = "clientSecret"
 	GitHubAppWebhookSecret = "webhookSecret"
 
-	appBootstrappDescription = `
+	appBootstrapDescription = `
 To complete the GitHub app setup:
 
 1. The "**Continue**" button/link will take you to GitHub with the app manifest pre-filled.
@@ -126,7 +126,7 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	}
 
 	ctx.AppInstallation.NewBrowserAction(core.BrowserAction{
-		Description: appBootstrappDescription,
+		Description: appBootstrapDescription,
 		URL:         g.browserActionURL(config.Organization),
 		Method:      "POST",
 		FormFields: map[string]string{

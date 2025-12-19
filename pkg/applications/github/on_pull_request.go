@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
 type OnPullRequest struct{}
@@ -132,41 +130,15 @@ func (p *OnPullRequest) HandleAction(ctx core.TriggerActionContext) error {
 }
 
 func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	signature := ctx.Headers.Get("X-Hub-Signature-256")
-	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
-	}
-
-	eventType := ctx.Headers.Get("X-GitHub-Event")
-	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
-	}
-
 	config := OnPullRequestConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	//
-	// If event is not a pull_request event, we ignore it.
-	//
-	if eventType != "pull_request" {
-		return http.StatusOK, nil
-	}
-
-	signature = strings.TrimPrefix(signature, "sha256=")
-	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
-	}
-
-	secret, err := ctx.WebhookContext.GetSecret()
+	code, err := verifySignature(ctx, "pull_request")
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
-	}
-
-	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-		return http.StatusForbidden, err
+		return code, err
 	}
 
 	data := map[string]any{}
@@ -175,12 +147,7 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	action, ok := data["action"]
-	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("missing action")
-	}
-
-	if !slices.Contains(config.Actions, action.(string)) {
+	if !whitelistedAction(data, config.Actions) {
 		return http.StatusOK, nil
 	}
 
@@ -190,4 +157,13 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 	}
 
 	return http.StatusOK, nil
+}
+
+func whitelistedAction(data map[string]any, allowed []string) bool {
+	action, ok := data["action"]
+	if !ok {
+		return false
+	}
+
+	return slices.Contains(allowed, action.(string))
 }

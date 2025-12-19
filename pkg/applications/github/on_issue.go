@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
 type OnIssue struct{}
@@ -140,41 +138,15 @@ func (i *OnIssue) HandleAction(ctx core.TriggerActionContext) error {
 }
 
 func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	signature := ctx.Headers.Get("X-Hub-Signature-256")
-	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
-	}
-
-	eventType := ctx.Headers.Get("X-GitHub-Event")
-	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
-	}
-
 	config := OnIssueConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	//
-	// If event is not an issues event, we ignore it.
-	//
-	if eventType != "issues" {
-		return http.StatusOK, nil
-	}
-
-	signature = strings.TrimPrefix(signature, "sha256=")
-	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
-	}
-
-	secret, err := ctx.WebhookContext.GetSecret()
+	code, err := verifySignature(ctx, "issue")
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
-	}
-
-	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-		return http.StatusForbidden, err
+		return code, err
 	}
 
 	data := map[string]any{}
@@ -183,12 +155,7 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	action, ok := data["action"]
-	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("missing action")
-	}
-
-	if !slices.Contains(config.Actions, action.(string)) {
+	if !whitelistedAction(data, config.Actions) {
 		return http.StatusOK, nil
 	}
 
