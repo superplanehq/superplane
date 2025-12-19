@@ -60,7 +60,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
         </div>
         <h2 className="font-semibold text-sm">{title}</h2>
         {!hideActionsButton && (
-          <div className="absolute top-1 right-1 w-6 rounded flex items-center justify-center hover:bg-slate-950/5 nodrag">
+          <div className="absolute top-1 right-1 rounded flex items-center justify-center hover:bg-slate-950/5 h-6 w-6 leading-none nodrag">
             <SidebarActionsDropdown
               dataTestId={toTestId(`node-${title}-header-dropdown`)}
               onRun={onRun}

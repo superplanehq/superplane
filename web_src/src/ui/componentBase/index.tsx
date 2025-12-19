@@ -59,7 +59,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
     <div
       key={index}
       className={
-        `px-3 pt-2 relative ${lastSection ? "rounded-b-md" : ""} ${LastEventBackground}` +
+        `px-2 pt-2 relative ${lastSection ? "rounded-b-md" : ""} ${LastEventBackground}` +
         (index < totalSections - 1 ? " border-b border-slate-400" : "") +
         ` ${className}`
       }
@@ -315,17 +315,19 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         {!hideMetadataList && metadata && metadata.length > 0 && <MetadataList items={metadata} />}
 
         {specs && specs.length > 0 && (
-          <div className="px-2 py-1.5 border-b border-slate-400 text-gray-500 flex flex-col gap-2">
+          <div className="px-2 py-1.5 border-b border-slate-400 text-gray-500 flex flex-col gap-1.5">
             {specs.map((spec, index) => (
-              <div key={index} className="flex items-center gap-1 text-md text-gray-500">
-                {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 18 })}
+              <div key={index} className="flex items-center text-md text-gray-500">
+                <div className="w-4 h-4 mr-2">
+                  {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 16 })}
+                </div>
                 {spec.values ? (
                   <SpecsTooltip
                     specTitle={spec.tooltipTitle || spec.title}
                     specValues={spec.values}
                     hideCount={hideCount}
                   >
-                    <span className="text-[13px] underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 px-2 rounded-md font-inter font-medium cursor-help">
+                    <span className="text-[13px] underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 rounded-md font-inter font-medium cursor-help">
                       {hideCount ? "" : spec.values.length}{" "}
                       {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
                     </span>
