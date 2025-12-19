@@ -343,10 +343,17 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
       ) as HTMLElement;
 
       if (selectedElement && !pollingRef.current.startedPolling) {
-        selectedElement.scrollIntoView({
+        const container = executionsScrollRef.current;
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = selectedElement.getBoundingClientRect();
+
+        // Calculate the scroll position to center the element in the container
+        const scrollTop =
+          container.scrollTop + elementRect.top - containerRect.top - containerRect.height / 2 + elementRect.height / 2;
+
+        container.scrollTo({
+          top: scrollTop,
           behavior: "smooth",
-          block: "center",
-          inline: "nearest",
         });
       }
     }

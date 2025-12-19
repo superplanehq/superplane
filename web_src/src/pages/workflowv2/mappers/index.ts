@@ -19,7 +19,7 @@ import {
 import { componentMappers as githubComponentMappers, triggerRenderers as githubTriggerRenderers } from "./github/index";
 import { timeGateMapper } from "./timegate";
 import { filterMapper } from "./filter";
-import { waitMapper } from "./wait";
+import { waitCustomFieldRenderer, waitMapper } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 
@@ -63,6 +63,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {
   schedule: scheduleCustomFieldRenderer,
+  wait: waitCustomFieldRenderer,
 };
 
 /**

@@ -120,7 +120,11 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Sleep(300)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
-	valueInput := q.Locator(`label:has-text("How long should I wait?") + div input[type="number"]`)
+	modeSelector := q.Locator(`label:has-text("Wait Mode") + div button`)
+	s.session.Click(modeSelector)
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Interval")`))
+
+	valueInput := q.Locator(`label:has-text("Wait for...") + div input`)
 	s.session.FillIn(valueInput, strconv.Itoa(duration))
 
 	unitTrigger := q.Locator(`label:has-text("Unit") + div button`)

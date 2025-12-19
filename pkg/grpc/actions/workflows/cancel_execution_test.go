@@ -35,7 +35,7 @@ func Test__CancelExecution__CancelsExecutionSuccessfully(t *testing.T) {
 	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
 	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
 
-	response, err := CancelExecution(context.Background(), r.Organization.ID.String(), r.Registry, workflow.ID, execution.ID)
+	response, err := CancelExecution(context.Background(), r.AuthService, r.Organization.ID.String(), r.Registry, workflow.ID, execution.ID)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
@@ -66,7 +66,7 @@ func Test__CancelExecution__ReturnsNotFoundForNonExistentExecution(t *testing.T)
 	)
 
 	nonExistentID := uuid.New()
-	_, err := CancelExecution(context.Background(), r.Organization.ID.String(), r.Registry, workflow.ID, nonExistentID)
+	_, err := CancelExecution(context.Background(), r.AuthService, r.Organization.ID.String(), r.Registry, workflow.ID, nonExistentID)
 	require.Error(t, err)
 }
 
@@ -96,7 +96,7 @@ func Test__CancelExecution__ReturnsErrorWhenCancellingChild(t *testing.T) {
 	childEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "child-node-1", "default", nil)
 	childExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, "child-node-1", rootEvent.ID, childEvent.ID, &parentExecution.ID)
 
-	_, err := CancelExecution(context.Background(), r.Organization.ID.String(), r.Registry, workflow.ID, childExecution.ID)
+	_, err := CancelExecution(context.Background(), r.AuthService, r.Organization.ID.String(), r.Registry, workflow.ID, childExecution.ID)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot cancel child execution directly")
 
@@ -140,7 +140,7 @@ func Test__CancelExecution__CancelsAllChildrenWhenCancellingParent(t *testing.T)
 	childExecution1 := support.CreateWorkflowNodeExecution(t, workflow.ID, "child-node-1", rootEvent.ID, childEvent1.ID, &parentExecution.ID)
 	childExecution2 := support.CreateWorkflowNodeExecution(t, workflow.ID, "child-node-2", rootEvent.ID, childEvent2.ID, &parentExecution.ID)
 
-	response, err := CancelExecution(context.Background(), r.Organization.ID.String(), r.Registry, workflow.ID, parentExecution.ID)
+	response, err := CancelExecution(context.Background(), r.AuthService, r.Organization.ID.String(), r.Registry, workflow.ID, parentExecution.ID)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
