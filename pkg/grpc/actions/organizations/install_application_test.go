@@ -2,11 +2,14 @@ package organizations
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -19,18 +22,17 @@ import (
 func Test__InstallApplication(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	baseURL := "http://localhost"
 
 	t.Run("duplicate installation name -> error", func(t *testing.T) {
-		installationName := "my-github-app"
-		appConfig, err := structpb.NewStruct(map[string]interface{}{
-			"organization": "test-org",
-		})
+		installationName := support.RandomName("gh")
+		appConfig, err := structpb.NewStruct(map[string]any{"organization": "test-org"})
 		require.NoError(t, err)
 
 		//
 		// Create first installation
 		//
-		response, err := InstallApplication(ctx, r.Registry, "http://localhost", r.Organization.ID.String(), "github", installationName, appConfig)
+		response, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Installation)
@@ -39,25 +41,23 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Try to create second installation with the same name
 		//
-		_, err = InstallApplication(ctx, r.Registry, "http://localhost", r.Organization.ID.String(), "github", installationName, appConfig)
+		_, err = InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.AlreadyExists, s.Code())
-		assert.Contains(t, s.Message(), "an installation with the name my-github-app already exists")
+		assert.Contains(t, s.Message(), fmt.Sprintf("an installation with the name %s already exists", installationName))
 	})
 
 	t.Run("reuse installation name after deletion -> success", func(t *testing.T) {
-		installationName := "reusable-github-app"
-		appConfig, err := structpb.NewStruct(map[string]interface{}{
-			"organization": "test-org",
-		})
+		installationName := support.RandomName("gh")
+		appConfig, err := structpb.NewStruct(map[string]any{"organization": "test-org"})
 		require.NoError(t, err)
 
 		//
 		// Create first installation
 		//
-		response, err := InstallApplication(ctx, r.Registry, "http://localhost", r.Organization.ID.String(), "github", installationName, appConfig)
+		response, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		installationID := response.Installation.Metadata.Id
@@ -94,7 +94,7 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Create a new installation with the same name
 		//
-		response2, err := InstallApplication(ctx, r.Registry, "http://localhost", r.Organization.ID.String(), "github", installationName, appConfig)
+		response2, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response2)
 		assert.Equal(t, installationName, response2.Installation.Metadata.Name)
@@ -116,16 +116,14 @@ func Test__InstallApplication(t *testing.T) {
 		org2, err := models.CreateOrganization("org-2", "")
 		require.NoError(t, err)
 
-		installationName := "shared-name"
-		appConfig, err := structpb.NewStruct(map[string]interface{}{
-			"organization": "test-org",
-		})
+		installationName := support.RandomName("gh")
+		appConfig, err := structpb.NewStruct(map[string]any{"organization": "test-org"})
 		require.NoError(t, err)
 
 		//
 		// Create installation in first organization
 		//
-		response1, err := InstallApplication(ctx, r.Registry, "http://localhost", r.Organization.ID.String(), "github", installationName, appConfig)
+		response1, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response1)
 		assert.Equal(t, installationName, response1.Installation.Metadata.Name)
@@ -133,7 +131,7 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Create installation with same name in second organization
 		//
-		response2, err := InstallApplication(ctx, r.Registry, "http://localhost", org2.ID.String(), "github", installationName, appConfig)
+		response2, err := InstallApplication(ctx, r.Registry, baseURL, org2.ID.String(), "github", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response2)
 		assert.Equal(t, installationName, response2.Installation.Metadata.Name)
@@ -149,5 +147,103 @@ func Test__InstallApplication(t *testing.T) {
 		installation2, err := models.FindAppInstallationByName(org2.ID, installationName)
 		require.NoError(t, err)
 		assert.Equal(t, response2.Installation.Metadata.Id, installation2.ID.String())
+	})
+
+	t.Run("application does not exist -> error", func(t *testing.T) {
+		installationName := support.RandomName("installation")
+		appConfig, err := structpb.NewStruct(map[string]any{})
+		require.NoError(t, err)
+
+		//
+		// Try to install an application that doesn't exist
+		//
+		_, err = InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "nonexistent-app", installationName, appConfig)
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Contains(t, s.Message(), "application nonexistent-app not found")
+	})
+
+	t.Run("sync fails -> installation created in error state", func(t *testing.T) {
+		//
+		// Register a test application that always fails on Sync
+		//
+		r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
+			return errors.New("oops")
+		})
+
+		installationName := support.RandomName("installation")
+		appConfig, err := structpb.NewStruct(map[string]interface{}{})
+		require.NoError(t, err)
+
+		//
+		// Install the application
+		//
+		response, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Installation)
+
+		//
+		// Verify installation was created
+		//
+		installation, err := models.FindAppInstallationByName(r.Organization.ID, installationName)
+		require.NoError(t, err)
+		assert.Equal(t, installationName, installation.InstallationName)
+
+		//
+		// Verify installation is in error state with the error message
+		//
+		assert.Equal(t, models.AppInstallationStateError, installation.State)
+		assert.Equal(t, "oops", installation.StateDescription)
+
+		//
+		// Verify the response also reflects the error state
+		//
+		assert.Equal(t, models.AppInstallationStateError, response.Installation.Status.State)
+		assert.Equal(t, "oops", response.Installation.Status.StateDescription)
+	})
+
+	t.Run("successful installation -> installation created in ready state", func(t *testing.T) {
+		//
+		// Register a test application that succeeds on Sync
+		//
+		r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
+			ctx.AppInstallation.SetState("ready", "")
+			return nil
+		})
+
+		installationName := support.RandomName("installation")
+		appConfig, err := structpb.NewStruct(map[string]any{})
+		require.NoError(t, err)
+
+		//
+		// Install the application
+		//
+		response, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Installation)
+
+		//
+		// Verify installation was created
+		//
+		installation, err := models.FindAppInstallationByName(r.Organization.ID, installationName)
+		require.NoError(t, err)
+		assert.Equal(t, installationName, installation.InstallationName)
+		assert.Equal(t, "dummy", installation.AppName)
+
+		//
+		// Verify installation is not in error state
+		//
+		assert.Equal(t, models.AppInstallationStateReady, installation.State)
+		assert.Empty(t, installation.StateDescription)
+
+		//
+		// Verify the response reflects successful installation
+		//
+		assert.Equal(t, models.AppInstallationStateReady, response.Installation.Status.State)
+		assert.Empty(t, response.Installation.Status.StateDescription)
 	})
 }
