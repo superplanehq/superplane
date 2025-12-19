@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
+	"sync"
 
 	"github.com/gorilla/mux"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -19,9 +22,74 @@ type contextKey string
 const AccountContextKey contextKey = "account"
 const UserContextKey contextKey = "user"
 
+var ownerSetupEnabled = os.Getenv("OWNER_SETUP_ENABLED") == "yes"
+
+var (
+	ownerSetupMu          sync.RWMutex
+	ownerSetupNeededCache *bool
+)
+
+func OwnerSetupEnabled() bool {
+	return ownerSetupEnabled
+}
+
+func IsOwnerSetupRequired() bool {
+	if !ownerSetupEnabled {
+		return false
+	}
+
+	ownerSetupMu.RLock()
+	if ownerSetupNeededCache != nil {
+		val := *ownerSetupNeededCache
+		ownerSetupMu.RUnlock()
+		return val
+	}
+	ownerSetupMu.RUnlock()
+
+	var count int64
+
+	err := database.Conn().
+		Model(&models.User{}).
+		Limit(1).
+		Count(&count).
+		Error
+
+	needed := err == nil && count == 0
+
+	ownerSetupMu.Lock()
+	ownerSetupNeededCache = &needed
+	ownerSetupMu.Unlock()
+
+	return needed
+}
+
+func MarkOwnerSetupCompleted() {
+	if !ownerSetupEnabled {
+		return
+	}
+
+	ownerSetupMu.Lock()
+	val := false
+	ownerSetupNeededCache = &val
+	ownerSetupMu.Unlock()
+}
+
 func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if IsOwnerSetupRequired() {
+				path := r.URL.Path
+
+				// Allow the setup flow and static assets through without auth
+				if path == "/setup" || strings.HasPrefix(path, "/assets") {
+					next.ServeHTTP(w, r)
+					return
+				}
+
+				http.Redirect(w, r, "/setup", http.StatusTemporaryRedirect)
+				return
+			}
+
 			accountID, err := getAccountFromCookie(r, jwtSigner)
 			if err != nil {
 				authentication.ClearAccountCookie(w, r)

@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useRef } from "react";
-import { resolveIcon, flattenObject } from "@/lib/utils";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { resolveIcon, flattenObject, calcRelativeTimeFromDiff } from "@/lib/utils";
 import { ChainItem, type ChainItemData } from "../../chainItem";
-import { SidebarEventItem } from "../SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "../types";
+import { formatTimeAgo } from "@/utils/date";
 import {
   WorkflowsWorkflowNodeExecution,
   ComponentsNode,
@@ -56,9 +56,55 @@ function buildExecutionTabData(
   return tabData;
 }
 
+function convertSidebarEventToChainItem(
+  triggerEvent: SidebarEvent,
+  workflowNodes: ComponentsNode[] = [],
+  _components: ComponentsComponent[] = [],
+  triggers: TriggersTrigger[] = [],
+  getTabData?: (event: SidebarEvent) => any,
+): ChainItemData {
+  // Find the workflow node for this trigger event
+  const workflowNode = workflowNodes.find((node) => node.id === triggerEvent.nodeId);
+
+  // Get metadata based on node type
+  let nodeDisplayName = triggerEvent.title || "Trigger Event";
+  let nodeIconSlug = "play";
+
+  if (workflowNode) {
+    nodeDisplayName = workflowNode.name || nodeDisplayName;
+
+    // Get icon based on node type
+    if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.trigger?.name) {
+      const triggerMeta = triggers.find((t) => t.name === workflowNode.trigger!.name);
+      nodeIconSlug = triggerMeta?.icon || "play";
+    }
+  }
+
+  return {
+    id: triggerEvent.id,
+    nodeId: triggerEvent.nodeId || "",
+    componentName: triggerEvent.title || "Trigger Event",
+    nodeName: triggerEvent.title,
+    nodeDisplayName,
+    nodeIcon: "play",
+    nodeIconSlug,
+    state: triggerEvent.state || "neutral",
+    executionId: undefined, // Trigger events don't have execution IDs
+    originalExecution: undefined,
+    originalEvent: triggerEvent.originalEvent,
+    childExecutions: undefined,
+    workflowNode,
+    tabData: getTabData?.(triggerEvent) || {
+      current: triggerEvent.values || {},
+      payload: triggerEvent.originalEvent || {},
+    },
+  };
+}
+
 interface ExecutionChainPageProps {
   eventId: string | null;
   triggerEvent?: SidebarEvent;
+  selectedExecutionId?: string | null;
   loadExecutionChain?: (
     eventId: string,
     nodeId?: string,
@@ -82,12 +128,12 @@ interface ExecutionChainPageProps {
 export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   eventId,
   triggerEvent,
+  selectedExecutionId,
   loadExecutionChain,
   openEventIds,
   onToggleOpen,
   getExecutionState,
   getTabData,
-  onEventClick,
   workflowNodes = [],
   components = [],
   triggers = [],
@@ -97,8 +143,47 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Ref for the scrollable executions container
+  const executionsScrollRef = useRef<HTMLDivElement>(null);
+
+  // Calculate summary information for the header
+  const summaryInfo = useMemo(() => {
+    if (!triggerEvent || chainItems.length === 0) return null;
+
+    const triggerStartTime = triggerEvent.originalEvent?.createdAt || triggerEvent.receivedAt;
+    if (!triggerStartTime) return null;
+
+    // Find the latest execution end time
+    const lastExecution = chainItems
+      .filter((item) => item.originalExecution?.updatedAt)
+      .sort(
+        (a, b) =>
+          new Date(b.originalExecution!.updatedAt!).getTime() - new Date(a.originalExecution!.updatedAt!).getTime(),
+      )[0];
+
+    const endTime = lastExecution?.originalExecution?.updatedAt;
+
+    const startDate = new Date(triggerStartTime);
+    const timeAgo = formatTimeAgo(startDate);
+
+    let duration = "";
+    if (endTime) {
+      const endDate = new Date(endTime);
+      const durationMs = endDate.getTime() - startDate.getTime();
+      duration = calcRelativeTimeFromDiff(durationMs);
+    }
+
+    const stepCount = chainItems.length;
+
+    return {
+      timeAgo,
+      duration,
+      stepCount,
+    };
+  }, [triggerEvent, chainItems]);
+
   // Load execution chain data function
-  const loadChainData = async () => {
+  const loadChainData = useCallback(async () => {
     if (!eventId || !loadExecutionChain) {
       setLoading(false);
       return;
@@ -217,12 +302,12 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId, loadExecutionChain, workflowNodes, components, triggers, blueprints]);
 
   // Load execution chain data
   useEffect(() => {
     loadChainData();
-  }, [eventId, loadExecutionChain, workflowNodes, components, triggers, blueprints]);
+  }, [loadChainData]);
 
   // Use ref to track current values without causing re-renders
   const pollingRef = useRef<{
@@ -249,6 +334,23 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
       clearInterval(pollInterval);
     };
   }, []);
+
+  // Auto-scroll to selected execution
+  useEffect(() => {
+    if (selectedExecutionId && executionsScrollRef.current && chainItems.length > 0) {
+      const selectedElement = executionsScrollRef.current.querySelector(
+        `[data-execution-id="${selectedExecutionId}"]`,
+      ) as HTMLElement;
+
+      if (selectedElement && !pollingRef.current.startedPolling) {
+        selectedElement.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "nearest",
+        });
+      }
+    }
+  }, [selectedExecutionId, chainItems.length]);
 
   if (loading && !pollingRef.current.startedPolling) {
     return (
@@ -292,40 +394,65 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-0">
-      {/* Event Section */}
+    <div className="flex flex-col h-full pt-1">
+      {/* Fixed Header Section */}
       {triggerEvent && (
-        <div className="mb-6 mt-2">
+        <div className="px-3 flex-shrink-0 mb-1 pb-4 border-b border-gray-200">
+          <h2 className="text-md font-semibold text-gray-900 mb-1">{triggerEvent.title || "Execution Chain"}</h2>
+          {summaryInfo && (
+            <div className="text-sm text-gray-500">
+              {summaryInfo.timeAgo}
+              {summaryInfo.duration && (
+                <>
+                  <span className="mx-1">•</span>
+                  Duration: {summaryInfo.duration}
+                </>
+              )}
+              <span className="mx-1">•</span>
+              {summaryInfo.stepCount} step{summaryInfo.stepCount !== 1 ? "s" : ""}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fixed Event Section */}
+      {triggerEvent && (
+        <div className="px-3 flex-shrink-0 mb-6 mt-2">
           <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-1">Event</h2>
-          <SidebarEventItem
-            event={triggerEvent}
-            index={0}
+          <ChainItem
+            item={convertSidebarEventToChainItem(triggerEvent, workflowNodes, components, triggers, getTabData)}
+            index={-1}
+            totalItems={undefined}
             isOpen={openEventIds.has(triggerEvent.id)}
+            isSelected={false}
             onToggleOpen={onToggleOpen}
-            onEventClick={onEventClick}
-            tabData={getTabData?.(triggerEvent)}
             getExecutionState={getExecutionState}
-            variant="latest"
           />
         </div>
       )}
 
       {/* Executions Section */}
-      <div>
-        <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-1">
+      <div className="flex-1 flex flex-col min-h-0">
+        <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-4 flex-shrink-0">
           {chainItems.length} Execution{chainItems.length === 1 ? "" : "s"}
         </h2>
-        {chainItems.map((item, index) => (
-          <ChainItem
-            key={item.id}
-            item={item}
-            index={index}
-            totalItems={chainItems.length}
-            isOpen={openEventIds.has(item.id)}
-            onToggleOpen={onToggleOpen}
-            getExecutionState={getExecutionState}
-          />
-        ))}
+        <div ref={executionsScrollRef} className="flex-1 overflow-y-auto max-h-96 px-3 ">
+          <div className="pb-15">
+            {chainItems.map((item, index) => (
+              <div key={item.id} data-execution-id={item.executionId}>
+                <ChainItem
+                  item={item}
+                  index={index}
+                  totalItems={chainItems.length}
+                  isOpen={openEventIds.has(item.id) || item.executionId === selectedExecutionId}
+                  isSelected={item.executionId === selectedExecutionId}
+                  onToggleOpen={onToggleOpen}
+                  getExecutionState={getExecutionState}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

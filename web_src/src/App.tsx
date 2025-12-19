@@ -2,8 +2,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { Toaster } from "sonner";
 import "./App.css";
 
 // Import pages
@@ -12,6 +11,7 @@ import Navigation from "./components/Navigation";
 import { AccountProvider } from "./contexts/AccountContext";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
+import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CustomComponent } from "./pages/custom-component";
 import HomePage from "./pages/home";
 import NodeRunPage from "./pages/node-run";
@@ -62,24 +62,13 @@ function App() {
               <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
               {/* Organization selection and creation */}
               <Route path="create" element={<OrganizationCreate />} />
+              <Route path="setup" element={<OwnerSetup />} />
               <Route path="" element={<OrganizationSelect />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
-        <ToastContainer
-          position="bottom-center"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick={true}
-          rtl={false}
-          pauseOnFocusLoss={true}
-          draggable={true}
-          pauseOnHover={true}
-          closeButton={false}
-          theme="auto"
-        />
+        <Toaster position="bottom-center" closeButton />
       </AccountProvider>
     </QueryClientProvider>
   );

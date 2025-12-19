@@ -2,6 +2,7 @@ import React from "react";
 import { resolveIcon } from "@/lib/utils";
 import { SidebarActionsDropdown } from "../componentSidebar/SidebarActionsDropdown";
 import { ComponentActionsProps } from "../types/componentActions";
+import { toTestId } from "@/utils/testID";
 
 export interface CollapsedComponentProps extends ComponentActionsProps {
   iconSrc?: string;
@@ -71,6 +72,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
             onToggleView={onToggleView}
             onDelete={onDelete}
             isCompactView={true}
+            dataTestId={toTestId(`node-${title}-header-dropdown`)}
           />
         </div>
       )}

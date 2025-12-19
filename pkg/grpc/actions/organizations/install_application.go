@@ -24,15 +24,29 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, baseUR
 		return nil, status.Errorf(codes.InvalidArgument, "application %s not found", appName)
 	}
 
+	org, err := uuid.Parse(orgID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid organization")
+	}
+
+	//
+	// Check if an installation with this name already exists in the organization
+	//
+	_, err = models.FindAppInstallationByName(org, installationName)
+	if err == nil {
+		return nil, status.Errorf(codes.AlreadyExists, "an installation with the name %s already exists in this organization", installationName)
+	}
+
 	//
 	// We must encrypt the sensitive configuration fields before storing
 	//
-	configuration, err := encryptConfigurationIfNeeded(ctx, registry, app, appConfig.AsMap(), orgID, nil)
+	installationID := uuid.New()
+	configuration, err := encryptConfigurationIfNeeded(ctx, registry, app, appConfig.AsMap(), installationID, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to encrypt sensitive configuration: %v", err)
 	}
 
-	appInstallation, err := models.CreateAppInstallation(uuid.MustParse(orgID), appName, installationName, configuration)
+	appInstallation, err := models.CreateAppInstallation(installationID, uuid.MustParse(orgID), appName, installationName, configuration)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create application installation: %v", err)
 	}
@@ -135,7 +149,7 @@ func serializeAppInstallation(registry *registry.Registry, appInstallation *mode
 	return proto, nil
 }
 
-func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Registry, app core.Application, config map[string]any, orgID string, existingConfig map[string]any) (map[string]any, error) {
+func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Registry, app core.Application, config map[string]any, installationID uuid.UUID, existingConfig map[string]any) (map[string]any, error) {
 	result := maps.Clone(config)
 
 	for _, field := range app.Configuration() {
@@ -157,7 +171,7 @@ func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Regist
 		// If the value is not <redacted>, encrypt it, since it's new.
 		//
 		if s != "<redacted>" {
-			encrypted, err := registry.Encryptor.Encrypt(ctx, []byte(s), []byte(orgID))
+			encrypted, err := registry.Encryptor.Encrypt(ctx, []byte(s), []byte(installationID.String()))
 			if err != nil {
 				return nil, fmt.Errorf("failed to encrypt field %s: %v", field.Name, err)
 			}

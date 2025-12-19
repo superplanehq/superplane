@@ -1,6 +1,5 @@
 import {
   Background,
-  Controls,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -10,6 +9,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ZoomSlider } from "@/components/zoom-slider";
+import { NodeSearch } from "@/components/node-search";
 import "./blueprint-canvas-reset.css";
 
 import {
@@ -17,6 +18,9 @@ import {
   ConfigurationField,
   SuperplaneBlueprintsOutputChannel,
   AuthorizationDomainType,
+  ApplicationsApplicationDefinition,
+  OrganizationsAppInstallation,
+  ComponentsAppInstallationRef,
 } from "@/api-client";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { Block, BlockData } from "../CanvasPage/Block";
@@ -40,6 +44,8 @@ export interface NodeEditData {
   displayLabel?: string;
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
+  appName?: string;
+  appInstallationRef?: any;
 }
 
 export interface NewNodeData {
@@ -50,6 +56,8 @@ export interface NewNodeData {
   configuration: Record<string, any>;
   position?: { x: number; y: number };
   sourceConnection?: { nodeId: string; handleId: string | null };
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
 }
 
 export interface CustomComponentBuilderPageProps {
@@ -80,12 +88,19 @@ export interface CustomComponentBuilderPageProps {
 
   // Node configuration
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
-  onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
+  onNodeConfigurationSave?: (
+    nodeId: string,
+    configuration: Record<string, any>,
+    nodeName: string,
+    appInstallationRef?: ComponentsAppInstallationRef,
+  ) => void;
   onNodeAdd?: (newNodeData: NewNodeData) => void;
   organizationId?: string;
 
   // Building blocks
   components: ComponentsComponent[];
+  availableApplications?: ApplicationsApplicationDefinition[];
+  installedApplications?: OrganizationsAppInstallation[];
 
   // Template node helpers
   onAddTemplateNode?: (node: Node) => void;
@@ -350,7 +365,9 @@ function CanvasContent({
       elementsSelectable={true}
     >
       <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
-      <Controls />
+      <ZoomSlider position="bottom-left" orientation="horizontal">
+        <NodeSearch />
+      </ZoomSlider>
     </ReactFlow>
   );
 }
@@ -531,6 +548,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           displayLabel: block.label || block.name || "",
           configuration: {},
           position,
+          appName: block.appName,
         });
 
         // Open sidebar in non-delegated mode
@@ -549,19 +567,19 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   );
 
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, any>, nodeName: string) => {
+    (configuration: Record<string, any>, nodeName: string, appInstallationRef?: any) => {
       if (templateNodeId && newNodeData) {
         // This is a template node being saved
-        handleSaveNewNode(configuration, nodeName);
+        handleSaveNewNode(configuration, nodeName, appInstallationRef);
       } else if (editingNodeData && props.onNodeConfigurationSave) {
-        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName);
+        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
       }
     },
     [templateNodeId, newNodeData, editingNodeData, props],
   );
 
   const handleSaveNewNode = useCallback(
-    (configuration: Record<string, any>, nodeName: string) => {
+    (configuration: Record<string, any>, nodeName: string, appInstallationRef?: any) => {
       if (newNodeData && props.onNodeAdd && templateNodeId) {
         // Remove the template node first
         if (props.onRemoveTemplateNode) {
@@ -573,6 +591,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           buildingBlock: newNodeData.buildingBlock,
           nodeName,
           configuration,
+          appInstallationRef,
           position: newNodeData.position,
           sourceConnection: newNodeData.sourceConnection,
         });
@@ -620,9 +639,17 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   }, [templateNodeId, props]);
 
   // Use shared builder (merge mocks + live components)
+  // Filter out triggers from applications since triggers can't be used in custom components
+  const availableApplicationsWithoutTriggers = useMemo(() => {
+    return (props.availableApplications || []).map((app) => ({
+      ...app,
+      triggers: undefined, // Remove triggers from applications
+    }));
+  }, [props.availableApplications]);
+
   const buildingBlockCategories = useMemo<BuildingBlockCategory[]>(
-    () => buildBuildingBlockCategories([], props.components, []),
-    [props.components],
+    () => buildBuildingBlockCategories([], props.components, [], availableApplicationsWithoutTriggers),
+    [props.components, availableApplicationsWithoutTriggers],
   );
 
   const handleNodeClick = useCallback(
@@ -901,6 +928,9 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             domainId={props.organizationId}
             domainType={"DOMAIN_TYPE_ORGANIZATION" as AuthorizationDomainType}
             customField={undefined}
+            appName={editingNodeData?.appName}
+            appInstallationRef={editingNodeData?.appInstallationRef}
+            installedApplications={props.installedApplications}
           />
         )}
       </div>

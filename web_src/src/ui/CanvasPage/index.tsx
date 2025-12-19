@@ -8,10 +8,16 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { Loader2, Puzzle } from "lucide-react";
+import { Loader2, Puzzle, ScanLine, ScanText } from "lucide-react";
+import { ZoomSlider } from "@/components/zoom-slider";
+import { NodeSearch } from "@/components/node-search";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  ComponentsAppInstallationRef,
+  OrganizationsAppInstallation,
   ConfigurationField,
   WorkflowsWorkflowNodeExecution,
   ComponentsNode,
@@ -25,7 +31,6 @@ import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../
 import { ComponentSidebar } from "../componentSidebar";
 import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
-import { ViewToggle } from "../ViewToggle";
 import { ComponentBaseProps, EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
@@ -34,20 +39,7 @@ import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 import { getBackgroundColorClass } from "@/utils/colors";
-
-export interface SidebarEvent {
-  id: string;
-  title: string;
-  subtitle?: string | React.ReactNode;
-  state: string;
-  isOpen: boolean;
-  receivedAt?: Date;
-  values?: Record<string, string>;
-  // Optional specific identifiers to avoid overloading `id`
-  executionId?: string;
-  triggerEventId?: string;
-  kind?: "execution" | "trigger" | "queue";
-}
+import { SidebarEvent } from "../componentSidebar/types";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -90,6 +82,8 @@ export interface NodeEditData {
   displayLabel?: string;
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
 }
 
 export interface NewNodeData {
@@ -99,6 +93,8 @@ export interface NewNodeData {
   displayLabel?: string;
   configuration: Record<string, any>;
   position?: { x: number; y: number };
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
   sourceConnection?: {
     nodeId: string;
     handleId: string | null;
@@ -128,9 +124,15 @@ export interface CanvasPageProps {
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
+  onNodeConfigurationSave?: (
+    nodeId: string,
+    configuration: Record<string, any>,
+    nodeName: string,
+    appInstallationRef?: ComponentsAppInstallationRef,
+  ) => void;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
-  onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
   onSave?: (nodes: CanvasNode[]) => void;
+  installedApplications?: OrganizationsAppInstallation[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
@@ -530,6 +532,7 @@ function CanvasPage(props: CanvasPageProps) {
         configuration: {},
         position: pendingNode.position,
         sourceConnection: pendingNode.data.sourceConnection as { nodeId: string; handleId: string | null } | undefined,
+        appName: block.appName,
       });
 
       setIsBuildingBlocksSidebarOpen(false);
@@ -586,6 +589,7 @@ function CanvasPage(props: CanvasPageProps) {
         displayLabel: block.label || block.name || "",
         configuration: {},
         position,
+        appName: block.appName,
       });
 
       state.componentSidebar.open(newTemplateId);
@@ -609,7 +613,7 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, any>, nodeName: string) => {
+    (configuration: Record<string, any>, nodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => {
       if (templateNodeId && newNodeData) {
         // Template nodes should always be converted to real nodes
         // Remove the template node first
@@ -625,6 +629,8 @@ function CanvasPage(props: CanvasPageProps) {
             nodeName,
             configuration,
             position: newNodeData.position,
+            appName: newNodeData.appName,
+            appInstallationRef,
             sourceConnection: newNodeData.sourceConnection, // Will be undefined for dropped components
           });
         }
@@ -637,7 +643,7 @@ function CanvasPage(props: CanvasPageProps) {
         state.componentSidebar.close();
         setCurrentTab("latest");
       } else if (editingNodeData && props.onNodeConfigurationSave) {
-        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName);
+        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
       }
     },
     [templateNodeId, newNodeData, editingNodeData, props, state, setTemplateNodeId, setNewNodeData, setCurrentTab],
@@ -715,7 +721,7 @@ function CanvasPage(props: CanvasPageProps) {
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
-      <div className="relative z-20">
+      <div className="relative z-30">
         <CanvasContentHeader
           state={state}
           onSave={props.onSave}
@@ -790,6 +796,7 @@ function CanvasPage(props: CanvasPageProps) {
             onDocs={props.onDocs}
             onConfigure={props.onConfigure}
             onDeactivate={props.onDeactivate}
+            onToggleView={handleToggleView}
             onDelete={handleNodeDelete}
             runDisabled={props.runDisabled}
             runDisabledTooltip={props.runDisabledTooltip}
@@ -815,6 +822,7 @@ function CanvasPage(props: CanvasPageProps) {
             newNodeData={newNodeData}
             organizationId={props.organizationId}
             getCustomField={props.getCustomField}
+            installedApplications={props.installedApplications}
             workflowNodes={props.workflowNodes}
             components={props.components}
             triggers={props.triggers}
@@ -912,6 +920,7 @@ function Sidebar({
   newNodeData,
   organizationId,
   getCustomField,
+  installedApplications,
   workflowNodes,
   components,
   triggers,
@@ -959,6 +968,7 @@ function Sidebar({
   newNodeData: NewNodeData | null;
   organizationId?: string;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
+  installedApplications?: OrganizationsAppInstallation[];
   workflowNodes?: ComponentsNode[];
   components?: ComponentsComponent[];
   triggers?: TriggersTrigger[];
@@ -1045,9 +1055,7 @@ function Sidebar({
       totalInHistoryCount={sidebarData.totalInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
       getTabData={
-        getTabData && state.componentSidebar.selectedNodeId
-          ? (event) => getTabData(state.componentSidebar.selectedNodeId!, event)
-          : undefined
+        getTabData && state.componentSidebar.selectedNodeId ? (event) => getTabData(event.nodeId!, event) : undefined
       }
       onCancelQueueItem={onCancelQueueItem}
       onPushThrough={onPushThrough}
@@ -1096,6 +1104,9 @@ function Sidebar({
             ? getCustomField(state.componentSidebar.selectedNodeId) || undefined
             : undefined
       }
+      appName={editingNodeData?.appName}
+      appInstallationRef={editingNodeData?.appInstallationRef}
+      installedApplications={installedApplications}
       currentTab={currentTab}
       onTabChange={onTabChange}
       templateNodeId={templateNodeId}
@@ -1379,6 +1390,20 @@ function CanvasContent({
     onToggleCollapse?.();
   }, [state.toggleCollapse, onToggleCollapse]);
 
+  // Add keyboard shortcut for toggling collapse/expand
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle collapse: Ctrl/Cmd + E
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "e") {
+        e.preventDefault();
+        handleToggleCollapse();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleToggleCollapse]);
+
   const handlePaneClick = useCallback(() => {
     // do not close sidebar while we are creating a new component
     if (templateNodeId) return;
@@ -1571,11 +1596,6 @@ function CanvasContent({
       {/* Header */}
       {!hideHeader && <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} />}
 
-      {/* Toggle button */}
-      <div className={`absolute ${hideHeader ? "bottom-3" : "top-14"} left-1/2 transform -translate-x-1/2 z-10`}>
-        <ViewToggle isCollapsed={state.isCollapsed} onToggle={handleToggleCollapse} />
-      </div>
-
       <div className={hideHeader ? "h-full" : "pt-12 h-full"}>
         <div className="h-full w-full">
           <ReactFlow
@@ -1612,6 +1632,34 @@ function CanvasContent({
             style={{ opacity: isInitialized ? 1 : 0 }}
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
+            <ZoomSlider position="bottom-left" orientation="horizontal">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
+                    {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {state.isCollapsed
+                    ? "Switch components to Detailed view (Ctrl/Cmd + E)"
+                    : "Switch components to Compact view (Ctrl/Cmd + E)"}
+                </TooltipContent>
+              </Tooltip>
+              <NodeSearch
+                onSearch={(searchString) => {
+                  const query = searchString.toLowerCase();
+                  return state.nodes.filter((node) => {
+                    const label = ((node.data?.label as string) || "").toLowerCase();
+                    const nodeName = ((node.data as any)?.nodeName || "").toLowerCase();
+                    const id = (node.id || "").toLowerCase();
+                    return label.includes(query) || nodeName.includes(query) || id.includes(query);
+                  });
+                }}
+                onSelectNode={(node) => {
+                  state.componentSidebar.open(node.id);
+                }}
+              />
+            </ZoomSlider>
           </ReactFlow>
         </div>
       </div>

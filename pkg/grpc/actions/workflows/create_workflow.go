@@ -95,7 +95,12 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		return nil, err
 	}
 
+	proto, err := SerializeWorkflow(&workflow, false)
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.CreateWorkflowResponse{
-		Workflow: SerializeWorkflow(&workflow, false),
+		Workflow: proto,
 	}, nil
 }

@@ -1,5 +1,10 @@
 import { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
-import { TriggersTrigger, ComponentsComponent, BlueprintsBlueprint } from "@/api-client";
+import {
+  TriggersTrigger,
+  ComponentsComponent,
+  BlueprintsBlueprint,
+  ApplicationsApplicationDefinition,
+} from "@/api-client";
 import { mockBuildingBlockCategories } from "@/ui/CanvasPage/storybooks/buildingBlocks";
 
 // Build categories of building blocks from live data and merge with mocks (deduped)
@@ -7,6 +12,7 @@ export function buildBuildingBlockCategories(
   triggers: TriggersTrigger[],
   components: ComponentsComponent[],
   blueprints: BlueprintsBlueprint[],
+  availableApplications: ApplicationsApplicationDefinition[],
 ): BuildingBlockCategory[] {
   const liveCategories: BuildingBlockCategory[] = [
     {
@@ -21,6 +27,7 @@ export function buildBuildingBlockCategories(
           icon: t.icon,
           color: t.color,
           isLive: true,
+          deprecated: t.name === "github" || t.name === "semaphore",
         }),
       ),
     },
@@ -37,6 +44,7 @@ export function buildBuildingBlockCategories(
           icon: c.icon,
           color: c.color,
           isLive: true,
+          deprecated: c.name === "semaphore",
         }),
       ),
     },
@@ -57,6 +65,54 @@ export function buildBuildingBlockCategories(
       ),
     },
   ];
+
+  // Add a category for each available application with its components and triggers
+  availableApplications.forEach((app) => {
+    const blocks: BuildingBlock[] = [];
+
+    // Add triggers from this application
+    if (app.triggers) {
+      app.triggers.forEach((t) => {
+        blocks.push({
+          name: t.name!,
+          label: t.label,
+          description: t.description,
+          type: "trigger",
+          configuration: t.configuration,
+          icon: t.icon,
+          color: t.color,
+          isLive: true,
+          appName: app.name,
+        });
+      });
+    }
+
+    // Add components from this application
+    if (app.components) {
+      app.components.forEach((c) => {
+        blocks.push({
+          name: c.name!,
+          label: c.label,
+          description: c.description,
+          type: "component",
+          outputChannels: c.outputChannels,
+          configuration: c.configuration,
+          icon: c.icon,
+          color: c.color,
+          isLive: true,
+          appName: app.name,
+        });
+      });
+    }
+
+    // Only add the category if there are blocks
+    if (blocks.length > 0) {
+      liveCategories.push({
+        name: app.label || "Unknown Application",
+        blocks,
+      });
+    }
+  });
 
   // Merge mock building blocks with live ones while avoiding duplicates
   // Dedupe key: `${type}:${name}`

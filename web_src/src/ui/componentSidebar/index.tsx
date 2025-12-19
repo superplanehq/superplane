@@ -12,6 +12,8 @@ import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import {
   AuthorizationDomainType,
+  ComponentsAppInstallationRef,
+  OrganizationsAppInstallation,
   ConfigurationField,
   WorkflowsWorkflowNodeExecution,
   ComponentsNode,
@@ -20,9 +22,10 @@ import {
   BlueprintsBlueprint,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
-import { NewNodeData } from "../CustomComponentBuilderPage";
+import { NewNodeData } from "../CanvasPage";
 import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
+import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
 const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
   { value: "processed", label: "Processed" },
@@ -110,11 +113,18 @@ interface ComponentSidebarProps {
   nodeLabel?: string;
   nodeConfiguration?: Record<string, unknown>;
   nodeConfigurationFields?: ConfigurationField[];
-  onNodeConfigSave?: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string) => void;
+  onNodeConfigSave?: (
+    updatedConfiguration: Record<string, unknown>,
+    updatedNodeName: string,
+    appInstallationRef?: ComponentsAppInstallationRef,
+  ) => void;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
+  appName?: string;
+  appInstallationRef?: ComponentsAppInstallationRef;
+  installedApplications?: OrganizationsAppInstallation[];
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
@@ -180,6 +190,9 @@ export const ComponentSidebar = ({
   domainId,
   domainType,
   customField,
+  appName,
+  appInstallationRef,
+  installedApplications,
   workflowNodes = [],
   components = [],
   triggers = [],
@@ -198,6 +211,7 @@ export const ComponentSidebar = ({
   const [previousPage, setPreviousPage] = useState<"overview" | "history" | "queue">("overview");
   const [executionChainEventId, setExecutionChainEventId] = useState<string | null>(null);
   const [executionChainTriggerEvent, setExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   // For template nodes, force settings tab and block latest tab
   const isTemplateNode = !!templateNodeId && !!newNodeData;
   const activeTab = isTemplateNode ? "settings" : currentTab || "latest";
@@ -304,13 +318,15 @@ export const ComponentSidebar = ({
     setStatusFilter("all");
     setExecutionChainEventId(null);
     setExecutionChainTriggerEvent(null);
+    setSelectedExecutionId(null);
   }, [page, previousPage]);
 
   const handleSeeExecutionChain = useCallback(
-    (eventId: string, triggerEvent?: SidebarEvent) => {
+    (eventId: string, triggerEvent?: SidebarEvent, selectedExecId?: string) => {
       setPreviousPage(page as "overview" | "history" | "queue");
       setExecutionChainEventId(eventId);
       setExecutionChainTriggerEvent(triggerEvent || null);
+      setSelectedExecutionId(selectedExecId || null);
       setPage("execution-chain");
     },
     [page],
@@ -422,7 +438,7 @@ export const ComponentSidebar = ({
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white shadow-2xl"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize handle */}
@@ -434,7 +450,7 @@ export const ComponentSidebar = ({
         style={{ marginLeft: "-8px" }}
       >
         <div
-          className={`w-1 h-12 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
+          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
             isResizing ? "bg-blue-500" : ""
           }`}
         />
@@ -502,11 +518,12 @@ export const ComponentSidebar = ({
             extraStatusOptions={extraStatusOptions}
           />
 
-          <div className="px-3 py-1 pb-3">
+          <div className="py-1 pb-3">
             {page === "execution-chain" ? (
               <ExecutionChainPage
                 eventId={executionChainEventId}
                 triggerEvent={executionChainTriggerEvent || undefined}
+                selectedExecutionId={selectedExecutionId}
                 loadExecutionChain={loadExecutionChain}
                 openEventIds={openEventIds}
                 onToggleOpen={handleToggleOpen}
@@ -525,7 +542,23 @@ export const ComponentSidebar = ({
                 openEventIds={openEventIds}
                 onToggleOpen={handleToggleOpen}
                 onEventClick={onEventClick}
-                onTriggerNavigate={(event) => handleSeeExecutionChain(event.triggerEventId || event.id, event)}
+                onTriggerNavigate={(event) => {
+                  if (event.kind === "trigger") {
+                    const eventId = event.triggerEventId || event.id;
+                    handleSeeExecutionChain(eventId, event);
+                  } else if (event.kind === "execution") {
+                    const node = workflowNodes?.find((n) => n.id === event.originalExecution?.rootEvent?.nodeId);
+
+                    const rootEventId = event.originalExecution?.rootEvent?.id;
+                    if (rootEventId && node && event.originalExecution?.rootEvent) {
+                      const triggerEvent = mapTriggerEventToSidebarEvent(event.originalExecution?.rootEvent, node);
+                      handleSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
+                    } else {
+                      const eventId = event.triggerEventId || event.id;
+                      handleSeeExecutionChain(eventId, event, event.executionId);
+                    }
+                  }
+                }}
                 getTabData={getTabData}
                 onPushThrough={onPushThrough}
                 onCancelExecution={onCancelExecution}
@@ -580,7 +613,11 @@ export const ComponentSidebar = ({
               </div>
             )}
 
-            <TabsContent value="latest" className={!showSettingsTab ? "" : "mt-0"}>
+            <TabsContent
+              value="latest"
+              className={!showSettingsTab ? "overflow-y-auto" : "mt-0"}
+              style={!showSettingsTab ? { maxHeight: "40vh" } : undefined}
+            >
               <LatestTab
                 latestEvents={latestEvents}
                 nextInQueueEvents={nextInQueueEvents}
@@ -600,6 +637,8 @@ export const ComponentSidebar = ({
                 onReEmit={onReEmit}
                 loadExecutionChain={loadExecutionChain}
                 getExecutionState={getExecutionState}
+                workflowNodes={workflowNodes}
+                components={components}
               />
             </TabsContent>
 
@@ -620,6 +659,9 @@ export const ComponentSidebar = ({
                   domainId={domainId}
                   domainType={domainType}
                   customField={customField}
+                  appName={isTemplateNode ? newNodeData.appName : appName}
+                  appInstallationRef={isTemplateNode ? newNodeData.appInstallationRef : appInstallationRef}
+                  installedApplications={installedApplications}
                 />
               </TabsContent>
             )}

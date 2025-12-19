@@ -119,14 +119,15 @@ func FindUnscopedBlueprintInTransaction(tx *gorm.DB, id string) (*Blueprint, err
 }
 
 type Node struct {
-	ID            string         `json:"id"`
-	Name          string         `json:"name"`
-	Type          string         `json:"type"`
-	Ref           NodeRef        `json:"ref"`
-	Configuration map[string]any `json:"configuration"`
-	Metadata      map[string]any `json:"metadata"`
-	Position      Position       `json:"position"`
-	IsCollapsed   bool           `json:"isCollapsed"`
+	ID                string         `json:"id"`
+	Name              string         `json:"name"`
+	Type              string         `json:"type"`
+	Ref               NodeRef        `json:"ref"`
+	Configuration     map[string]any `json:"configuration"`
+	Metadata          map[string]any `json:"metadata"`
+	Position          Position       `json:"position"`
+	IsCollapsed       bool           `json:"isCollapsed"`
+	AppInstallationID *string        `json:"appInstallationId,omitempty"`
 }
 
 type Position struct {

@@ -2882,6 +2882,17 @@
         }
       }
     },
+    "ComponentsAppInstallationRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "ComponentsComponent": {
       "type": "object",
       "properties": {
@@ -3012,6 +3023,9 @@
         },
         "isCollapsed": {
           "type": "boolean"
+        },
+        "appInstallation": {
+          "$ref": "#/definitions/ComponentsAppInstallationRef"
         }
       }
     },
@@ -3034,6 +3048,18 @@
         "y": {
           "type": "integer",
           "format": "int32"
+        }
+      }
+    },
+    "ConfigurationAnyPredicateListTypeOptions": {
+      "type": "object",
+      "properties": {
+        "operators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationSelectOption"
+          }
         }
       }
     },
@@ -3262,6 +3288,9 @@
         },
         "datetime": {
           "$ref": "#/definitions/ConfigurationDateTimeTypeOptions"
+        },
+        "anyPredicateList": {
+          "$ref": "#/definitions/ConfigurationAnyPredicateListTypeOptions"
         }
       }
     },

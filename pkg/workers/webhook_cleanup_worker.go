@@ -8,20 +8,25 @@ import (
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 type WebhookCleanupWorker struct {
 	semaphore *semaphore.Weighted
 	registry  *registry.Registry
+	encryptor crypto.Encryptor
 }
 
-func NewWebhookCleanupWorker(registry *registry.Registry) *WebhookCleanupWorker {
+func NewWebhookCleanupWorker(encryptor crypto.Encryptor, registry *registry.Registry) *WebhookCleanupWorker {
 	return &WebhookCleanupWorker{
 		registry:  registry,
+		encryptor: encryptor,
 		semaphore: semaphore.NewWeighted(25),
 	}
 }
@@ -72,10 +77,42 @@ func (w *WebhookCleanupWorker) LockAndProcessWebhook(webhook models.Webhook) err
 }
 
 func (w *WebhookCleanupWorker) processWebhook(tx *gorm.DB, webhook *models.Webhook) error {
-	if webhook.IntegrationID == nil {
-		return tx.Unscoped().Delete(webhook).Error
+	if webhook.AppInstallationID != nil {
+		return w.processAppInstallationWebhook(tx, webhook)
 	}
 
+	if webhook.IntegrationID != nil {
+		return w.processIntegrationWebhook(tx, webhook)
+	}
+
+	return tx.Unscoped().Delete(webhook).Error
+}
+
+func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhook *models.Webhook) error {
+	appInstallation, err := models.FindMaybeDeletedInstallationInTransaction(tx, *webhook.AppInstallationID)
+	if err != nil {
+		return err
+	}
+
+	app, err := w.registry.GetApplication(appInstallation.AppName)
+	if err != nil {
+		return err
+	}
+
+	ctx := contexts.NewAppInstallationContext(tx, nil, appInstallation, w.encryptor, w.registry)
+	err = app.CleanupWebhook(ctx, core.WebhookOptions{
+		Configuration: webhook.Configuration.Data(),
+		Metadata:      webhook.Metadata.Data(),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return tx.Unscoped().Delete(webhook).Error
+}
+
+func (w *WebhookCleanupWorker) processIntegrationWebhook(tx *gorm.DB, webhook *models.Webhook) error {
 	integration, err := models.FindIntegrationByIDInTransaction(tx, *webhook.IntegrationID)
 	if err != nil {
 		return err

@@ -127,62 +127,6 @@
   color: #888;
 }
 
-.custom-toast {
-  max-width: 600px;
-  background-color: white !important;
-  color: #374151 !important;
-  border-radius: 0.5rem !important;
-  font-size: 0.875rem !important;
-  padding: 1rem 1.25rem !important;
-  min-height: 3.5rem !important;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-}
-
-.custom-toast.Toastify__toast--info {
-  border-left: 4px solid var(--blue) !important;
-}
-
-.Toastify__toast-container {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  width: fit-content !important;
-}
-
-.Toastify__toast {
-  width: fit-content !important;
-  font-family: "Inter", sans-serif;
-}
-
-/* Progress bar colors using your CSS variables */
-.custom-toast .Toastify__progress-bar--error {
-  background: var(--red) !important;
-}
-
-.custom-toast .Toastify__progress-bar--success {
-  background: var(--green) !important;
-}
-
-.custom-toast .Toastify__progress-bar--warning {
-  background: var(--orange) !important;
-}
-
-.custom-toast .Toastify__progress-bar--info {
-  background: var(--blue) !important;
-}
-
-
-.Toastify__progress-bar--success {
-  background: var(--green) !important;
-}
-.Toastify__progress-bar--warning {
-  background: var(--orange) !important;
-}
-.Toastify__progress-bar--error {
-  background: var(--red) !important;
-}
-
 @import "tailwindcss";
 
 @import "tw-animate-css";

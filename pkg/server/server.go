@@ -18,7 +18,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers"
 
-	// Import components and triggers to register them via init()
+	// Import integrations, components and triggers to register them via init()
+	_ "github.com/superplanehq/superplane/pkg/applications/github"
+	_ "github.com/superplanehq/superplane/pkg/applications/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
@@ -68,14 +70,14 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" {
 		log.Println("Starting Pending Node Execution Worker")
 
-		w := workers.NewWorkflowNodeExecutor(registry)
+		w := workers.NewWorkflowNodeExecutor(encryptor, registry)
 		go w.Start(context.Background())
 	}
 
 	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
 		log.Println("Starting Node Request Worker")
 
-		w := workers.NewNodeRequestWorker(registry)
+		w := workers.NewNodeRequestWorker(encryptor, registry)
 		go w.Start(context.Background())
 	}
 
@@ -98,7 +100,14 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	if os.Getenv("START_WEBHOOK_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Webhook Cleanup Worker")
 
-		w := workers.NewWebhookCleanupWorker(registry)
+		w := workers.NewWebhookCleanupWorker(encryptor, registry)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_INSTALLATION_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting App Installation Cleanup Worker")
+
+		w := workers.NewInstallationCleanupWorker()
 		go w.Start(context.Background())
 	}
 
@@ -115,7 +124,7 @@ func startInternalAPI(baseURL string, encryptor crypto.Encryptor, authService au
 	grpc.RunServer(baseURL, encryptor, authService, registry, lookupInternalAPIPort())
 }
 
-func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
+func startPublicAPI(baseURL string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	basePath := os.Getenv("PUBLIC_API_BASE_PATH")
@@ -127,7 +136,7 @@ func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwt
 	templateDir := os.Getenv("TEMPLATE_DIR")
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
 
-	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, appEnv, templateDir, authService, blockSignup)
+	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, baseURL, appEnv, templateDir, authService, blockSignup)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}
@@ -277,7 +286,7 @@ func Start() {
 	registry := registry.NewRegistry(encryptorInstance)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
+		go startPublicAPI(baseURL, encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {

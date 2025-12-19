@@ -4,11 +4,11 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { SidebarEvent } from "@/ui/CanvasPage";
 import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { flattenObject } from "@/lib/utils";
 import { formatTimeAgo } from "@/utils/date";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
+import { SidebarEvent } from "@/ui/componentSidebar/types";
 
 export function mapTriggerEventsToSidebarEvents(
   events: WorkflowsWorkflowEvent[],
@@ -16,25 +16,27 @@ export function mapTriggerEventsToSidebarEvents(
   limit?: number,
 ): SidebarEvent[] {
   const eventsToMap = limit ? events.slice(0, limit) : events;
-  return eventsToMap.map((event) => {
-    const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
-    const { title, subtitle } = triggerRenderer.getTitleAndSubtitle(event);
-    const values = triggerRenderer.getRootEventValues(event);
+  return eventsToMap.map((event) => mapTriggerEventToSidebarEvent(event, node));
+}
 
-    return {
-      id: event.id!,
-      title,
-      subtitle: subtitle || formatTimeAgo(new Date(event.createdAt!)),
-      state: "triggered" as const,
-      isOpen: false,
-      receivedAt: event.createdAt ? new Date(event.createdAt) : undefined,
-      values,
-      triggerEventId: event.id!,
-      kind: "trigger",
-      nodeId: node.id,
-      originalEvent: event,
-    };
-  });
+export function mapTriggerEventToSidebarEvent(event: WorkflowsWorkflowEvent, node: ComponentsNode): SidebarEvent {
+  const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
+  const { title, subtitle } = triggerRenderer.getTitleAndSubtitle(event);
+  const values = triggerRenderer.getRootEventValues(event);
+
+  return {
+    id: event.id!,
+    title,
+    subtitle: subtitle || formatTimeAgo(new Date(event.createdAt!)),
+    state: "triggered" as const,
+    isOpen: false,
+    receivedAt: event.createdAt ? new Date(event.createdAt) : undefined,
+    values,
+    triggerEventId: event.id!,
+    kind: "trigger",
+    nodeId: node.id,
+    originalEvent: event,
+  };
 }
 
 export function mapExecutionsToSidebarEvents(

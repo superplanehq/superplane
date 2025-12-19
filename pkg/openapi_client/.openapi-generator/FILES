@@ -35,6 +35,7 @@ docs/BlueprintsListBlueprintsResponse.md
 docs/BlueprintsUpdateBlueprintBody.md
 docs/BlueprintsUpdateBlueprintResponse.md
 docs/ComponentAPI.md
+docs/ComponentsAppInstallationRef.md
 docs/ComponentsComponent.md
 docs/ComponentsComponentAction.md
 docs/ComponentsDescribeComponentResponse.md
@@ -44,6 +45,7 @@ docs/ComponentsListComponentsResponse.md
 docs/ComponentsNode.md
 docs/ComponentsNodeType.md
 docs/ComponentsPosition.md
+docs/ConfigurationAnyPredicateListTypeOptions.md
 docs/ConfigurationDateTimeTypeOptions.md
 docs/ConfigurationDateTypeOptions.md
 docs/ConfigurationField.md
@@ -205,6 +207,7 @@ model_blueprints_describe_blueprint_response.go
 model_blueprints_list_blueprints_response.go
 model_blueprints_update_blueprint_body.go
 model_blueprints_update_blueprint_response.go
+model_components_app_installation_ref.go
 model_components_component.go
 model_components_component_action.go
 model_components_describe_component_response.go
@@ -214,6 +217,7 @@ model_components_list_components_response.go
 model_components_node.go
 model_components_node_type.go
 model_components_position.go
+model_configuration_any_predicate_list_type_options.go
 model_configuration_date_time_type_options.go
 model_configuration_date_type_options.go
 model_configuration_field.go

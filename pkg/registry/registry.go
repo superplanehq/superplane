@@ -92,7 +92,7 @@ func (r *Registry) Init() {
 	}
 
 	//
-	// Copy registered components and triggers
+	// Copy registered integrations, components and triggers
 	//
 	mu.RLock()
 	defer mu.RUnlock()

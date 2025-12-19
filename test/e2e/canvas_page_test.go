@@ -34,6 +34,17 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertNodeDuplicatedInDB("Hello previous", "Hello")
 	})
 
+	t.Run("collapsing and expanding a node on canvas", func(t *testing.T) {
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addNoop("Hello")
+		steps.assertIsNodeExpanded("Hello")
+		steps.toggleNodeViewOnCanvas("Hello")
+		steps.assertIsNodeCollapsed("Hello")
+		steps.toggleNodeViewOnCanvas("Hello")
+		steps.assertIsNodeExpanded("Hello")
+	})
+
 	t.Run("deleting a node from a canvas", func(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExistsWithANoopNode()
@@ -130,6 +141,28 @@ func (s *CanvasPageSteps) assertCantRunNode(nodeName string) {
 	s.session.AssertDisabled(runOption)
 }
 
+func (s *CanvasPageSteps) assertIsNodeCollapsed(nodeName string) {
+	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.Sleep(100)
+
+	s.session.AssertVisible(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.AssertText("Detailed view")
+
+	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.Sleep(100)
+}
+
+func (s *CanvasPageSteps) assertIsNodeExpanded(nodeName string) {
+	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.Sleep(100)
+
+	s.session.AssertVisible(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.AssertText("Compact view")
+
+	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.Sleep(100)
+}
+
 func (s *CanvasPageSteps) assertExplainationIsShownWhenHoverOverRun() {
 	runOption := q.Locator("button:has-text('Run')")
 
@@ -156,6 +189,12 @@ func (s *CanvasPageSteps) givenACanvasExistsWithANoopNode() {
 func (s *CanvasPageSteps) duplicateNodeOnCanvas(nodeName string) {
 	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
 	s.session.Click(q.TestID("node-action-duplicate"))
+}
+
+func (s *CanvasPageSteps) toggleNodeViewOnCanvas(nodeName string) {
+	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
+	s.session.Click(q.TestID("node-action-toggle-view"))
+	s.session.Sleep(300)
 }
 
 func (s *CanvasPageSteps) deleteNodeFromCanvas(nodeName string) {
@@ -282,6 +321,8 @@ func (s *CanvasPageSteps) assertQueuedItemsVisibleInSidebar() {
 }
 
 func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
+	eventItem := q.Locator("h2:has-text('Queued') ~ div")
+	s.session.HoverOver(eventItem)
 	s.session.Click(q.Locator("h2:has-text('Queued') ~ div button[aria-label='Open actions']"))
 	s.session.TakeScreenshot()
 	s.session.Sleep(300)
@@ -291,6 +332,8 @@ func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
 }
 
 func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
+	eventItem := q.Locator("h2:has-text('Latest') ~ div")
+	s.session.HoverOver(eventItem)
 	s.session.Click(q.Locator("h2:has-text('Latest') ~ div button[aria-label='Open actions']"))
 	s.session.TakeScreenshot()
 	s.session.Sleep(300)

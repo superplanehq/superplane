@@ -9,6 +9,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 func UninstallApplication(ctx context.Context, orgID string, ID string) (*pb.UninstallApplicationResponse, error) {
@@ -27,11 +28,34 @@ func UninstallApplication(ctx context.Context, orgID string, ID string) (*pb.Uni
 		return nil, status.Errorf(codes.NotFound, "application installation not found: %v", err)
 	}
 
-	// Delete the application installation
-	err = database.Conn().Delete(appInstallation).Error
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to delete application installation: %v", err)
-	}
+	//
+	// NOTE: this performs a soft deletion of the app installation.
+	// The reason for a soft deletion here is to ensure we deprovision
+	// and delete its webhooks before we delete the app installation itself.
+	//
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		webhooks, err := models.ListAppInstallationWebhooks(tx, appInstallation.ID)
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to list application installation webhooks: %v", err)
+		}
+
+		//
+		// We soft-delete all the webhooks associated with the installation as well.
+		//
+		for _, webhook := range webhooks {
+			err = tx.Delete(&webhook).Error
+			if err != nil {
+				return status.Errorf(codes.Internal, "failed to delete webhook: %v", err)
+			}
+		}
+
+		err = appInstallation.SoftDeleteInTransaction(tx)
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to delete application installation: %v", err)
+		}
+
+		return nil
+	})
 
 	return &pb.UninstallApplicationResponse{}, nil
 }

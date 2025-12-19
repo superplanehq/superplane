@@ -21,6 +21,7 @@ import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
+import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
 import { isFieldVisible, isFieldRequired, validateFieldForSubmission } from "../../utils/components";
 import { ValidationError } from "./types";
 import { AuthorizationDomainType } from "@/api-client";
@@ -244,6 +245,9 @@ export const ConfigurationFieldRenderer = ({
             fieldPath={fieldPath || field.name}
           />
         );
+
+      case "any-predicate-list":
+        return <AnyPredicateListFieldRenderer {...commonProps} />;
 
       case "object":
         return <ObjectFieldRenderer {...commonProps} domainId={domainId} domainType={domainType} />;

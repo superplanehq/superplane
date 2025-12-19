@@ -5,7 +5,7 @@ import { FieldRendererProps } from "./types";
 export const StringFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
   return (
     <Input
-      type="text"
+      type={field.sensitive ? "password" : "text"}
       value={(value as string) ?? (field.defaultValue as string) ?? ""}
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder={field.placeholder || ""}

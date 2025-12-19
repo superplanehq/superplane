@@ -30,6 +30,7 @@ message TypeOptions {
   optional TimeTypeOptions time = 8;
   optional DateTypeOptions date = 9;
   optional DateTimeTypeOptions datetime = 10;
+  optional AnyPredicateListTypeOptions any_predicate_list = 11;
 }
 
 message NumberTypeOptions {
@@ -98,4 +99,8 @@ message ValidationRule {
   string type = 1;
   string compare_with = 2;
   optional string message = 3;
+}
+
+message AnyPredicateListTypeOptions {
+  repeated SelectOption operators = 1;
 }

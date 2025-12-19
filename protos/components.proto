@@ -133,6 +133,7 @@ message Node {
   BlueprintRef blueprint = 8;
   TriggerRef trigger = 9;
   bool is_collapsed = 10;
+  AppInstallationRef app_installation = 11;
 }
 
 message Position {
@@ -144,4 +145,9 @@ message Edge {
   string source_id = 1;
   string target_id = 2;
   string channel = 3;
+}
+
+message AppInstallationRef {
+  string id = 1;
+  string name = 2;
 }

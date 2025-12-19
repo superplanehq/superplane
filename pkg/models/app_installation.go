@@ -1,12 +1,14 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -27,6 +29,7 @@ type AppInstallation struct {
 	BrowserAction    *datatypes.JSONType[BrowserAction]
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
+	DeletedAt        gorm.DeletedAt `gorm:"index"`
 }
 
 type AppInstallationSecret struct {
@@ -46,9 +49,10 @@ type BrowserAction struct {
 	Description string
 }
 
-func CreateAppInstallation(orgID uuid.UUID, appName string, installationName string, config map[string]any) (*AppInstallation, error) {
+func CreateAppInstallation(id, orgID uuid.UUID, appName string, installationName string, config map[string]any) (*AppInstallation, error) {
 	now := time.Now()
 	appInstallation := AppInstallation{
+		ID:               id,
 		OrganizationID:   orgID,
 		AppName:          appName,
 		InstallationName: installationName,
@@ -78,6 +82,19 @@ func ListAppInstallations(orgID uuid.UUID) ([]AppInstallation, error) {
 func ListAppInstallationWebhooks(tx *gorm.DB, installationID uuid.UUID) ([]Webhook, error) {
 	var webhooks []Webhook
 	err := tx.
+		Where("app_installation_id = ?", installationID).
+		Find(&webhooks).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+	return webhooks, nil
+}
+
+func ListUnscopedAppInstallationWebhooks(tx *gorm.DB, installationID uuid.UUID) ([]Webhook, error) {
+	var webhooks []Webhook
+	err := tx.Unscoped().
 		Where("app_installation_id = ?", installationID).
 		Find(&webhooks).
 		Error
@@ -130,6 +147,20 @@ func FindUnscopedAppInstallationInTransaction(tx *gorm.DB, installationID uuid.U
 	return &appInstallation, nil
 }
 
+func FindMaybeDeletedInstallationInTransaction(tx *gorm.DB, installationID uuid.UUID) (*AppInstallation, error) {
+	var appInstallation AppInstallation
+	err := tx.Unscoped().
+		Where("id = ?", installationID).
+		First(&appInstallation).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &appInstallation, nil
+}
+
 func FindAppInstallation(orgID, installationID uuid.UUID) (*AppInstallation, error) {
 	var appInstallation AppInstallation
 	err := database.Conn().
@@ -143,4 +174,64 @@ func FindAppInstallation(orgID, installationID uuid.UUID) (*AppInstallation, err
 	}
 
 	return &appInstallation, nil
+}
+
+func FindAppInstallationByName(orgID uuid.UUID, installationName string) (*AppInstallation, error) {
+	var appInstallation AppInstallation
+	err := database.Conn().
+		Where("organization_id = ?", orgID).
+		Where("installation_name = ?", installationName).
+		First(&appInstallation).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &appInstallation, nil
+}
+
+func ListDeletedAppInstallations() ([]AppInstallation, error) {
+	var installations []AppInstallation
+	err := database.Conn().Unscoped().
+		Where("deleted_at IS NOT NULL").
+		Find(&installations).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return installations, nil
+}
+
+func LockAppInstallation(tx *gorm.DB, ID uuid.UUID) (*AppInstallation, error) {
+	var installation AppInstallation
+
+	err := tx.Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ?", ID).
+		First(&installation).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &installation, nil
+}
+
+func (a *AppInstallation) SoftDelete() error {
+	return a.SoftDeleteInTransaction(database.Conn())
+}
+
+func (a *AppInstallation) SoftDeleteInTransaction(tx *gorm.DB) error {
+	now := time.Now()
+	timestamp := now.Unix()
+
+	newName := fmt.Sprintf("%s (deleted-%d)", a.InstallationName, timestamp)
+	return tx.Model(a).Updates(map[string]interface{}{
+		"deleted_at":        now,
+		"installation_name": newName,
+	}).Error
 }

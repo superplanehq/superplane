@@ -20,6 +20,8 @@ import { useAccount } from "../../../contexts/AccountContext";
 import { useParams } from "react-router-dom";
 import { Members } from "./Members";
 import { Integrations } from "./Integrations";
+import { Applications } from "./Applications";
+import { ApplicationDetails } from "./ApplicationDetails";
 
 export function OrganizationSettings() {
   const navigate = useNavigate();
@@ -74,6 +76,7 @@ export function OrganizationSettings() {
     { id: "groups", label: "Groups", icon: "group" },
     { id: "roles", label: "Roles", icon: "admin_panel_settings" },
     { id: "integrations", label: "Integrations", icon: "integration_instructions" },
+    { id: "applications", label: "Applications", icon: "apps" },
   ];
 
   return (
@@ -163,6 +166,11 @@ export function OrganizationSettings() {
               <Route path="groups" element={<Groups organizationId={organizationId || ""} />} />
               <Route path="roles" element={<Roles organizationId={organizationId || ""} />} />
               <Route path="integrations" element={<Integrations organizationId={organizationId || ""} />} />
+              <Route path="applications" element={<Applications organizationId={organizationId || ""} />} />
+              <Route
+                path="applications/:installationId"
+                element={<ApplicationDetails organizationId={organizationId || ""} />}
+              />
               <Route path="groups/:groupName/members" element={<GroupMembersPage />} />
               <Route path="create-group" element={<CreateGroupPage />} />
               <Route path="create-role" element={<CreateRolePage />} />

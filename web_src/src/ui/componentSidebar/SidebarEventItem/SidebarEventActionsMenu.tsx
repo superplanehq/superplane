@@ -14,6 +14,7 @@ interface SidebarEventActionsMenuProps {
   eventState: ChildEventsState;
   onReEmit?: () => void;
   kind: "queue" | "execution" | "trigger";
+  onOpenChange?: (open: boolean) => void;
 }
 
 export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = ({
@@ -26,6 +27,7 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   eventState,
   onReEmit,
   kind,
+  onOpenChange,
 }) => {
   const isProcessed = eventState === "triggered";
   const isDiscarded = eventState === "discarded";
@@ -92,10 +94,10 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   if (!showDropdown) return null;
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
-          className="h-6 w-6 flex items-center justify-center rounded hover:bg-black/5 text-gray-600"
+          className="h-6 w-6 flex items-center justify-center rounded text-gray-600"
           aria-label="Open actions"
           onClick={(e) => e.stopPropagation()}
         >

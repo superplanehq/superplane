@@ -18,7 +18,7 @@ import (
 func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Registry)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
@@ -145,12 +145,12 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	// Create two workers and have them try to process the request concurrently.
 	//
 	go func() {
-		worker1 := NewNodeRequestWorker(r.Registry)
+		worker1 := NewNodeRequestWorker(r.Encryptor, r.Registry)
 		results <- worker1.LockAndProcessRequest(request)
 	}()
 
 	go func() {
-		worker2 := NewNodeRequestWorker(r.Registry)
+		worker2 := NewNodeRequestWorker(r.Encryptor, r.Registry)
 		results <- worker2.LockAndProcessRequest(request)
 	}()
 
@@ -182,7 +182,7 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Registry)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
@@ -239,7 +239,7 @@ func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Registry)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
@@ -296,7 +296,7 @@ func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Registry)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
@@ -352,7 +352,7 @@ func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Registry)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)

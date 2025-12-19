@@ -1,12 +1,14 @@
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
+import debounce from "lodash.debounce";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import {
   BlueprintsBlueprint,
+  ComponentsAppInstallationRef,
   ComponentsComponent,
   ComponentsEdge,
   ComponentsNode,
@@ -24,6 +26,7 @@ import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
+import { useAvailableApplications, useInstalledApplications } from "@/hooks/useApplications";
 import {
   eventExecutionsQueryOptions,
   useTriggers,
@@ -41,7 +44,6 @@ import {
   NewNodeData,
   NodeEditData,
   SidebarData,
-  SidebarEvent,
 } from "@/ui/CanvasPage";
 import { EventState, EventStateMap } from "@/ui/componentBase";
 import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
@@ -67,6 +69,7 @@ import {
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
 } from "./utils";
+import { SidebarEvent } from "@/ui/componentSidebar/types";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -83,6 +86,8 @@ export function WorkflowPageV2() {
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
+  const { data: availableApplications = [], isLoading: applicationsLoading } = useAvailableApplications();
+  const { data: installedApplications = [] } = useInstalledApplications(organizationId!);
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
 
   usePageTitle([workflow?.metadata?.name || "Canvas"]);
@@ -220,6 +225,109 @@ export function WorkflowPageV2() {
     }
   }, [initialWorkflowSnapshot, organizationId, workflowId, queryClient]);
 
+  /**
+   * Ref to track pending position updates that need to be auto-saved.
+   * Maps node ID to its updated position.
+   */
+  const pendingPositionUpdatesRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+
+  /**
+   * Debounced auto-save function for node position changes.
+   * Waits 1 second after the last position change before saving.
+   * Only saves position changes, not structural modifications (deletions, additions, etc).
+   * If there are unsaved structural changes, position auto-save is skipped.
+   */
+  const debouncedAutoSave = useMemo(
+    () =>
+      debounce(async () => {
+        if (!organizationId || !workflowId) return;
+
+        const positionUpdates = new Map(pendingPositionUpdatesRef.current);
+        if (positionUpdates.size === 0) return;
+
+        try {
+          // Check if there are unsaved structural changes
+          // If so, skip auto-save to avoid saving those changes accidentally
+          if (hasNonPositionalUnsavedChanges) {
+            console.log("Skipping position auto-save due to unsaved structural changes");
+            return;
+          }
+
+          // Fetch the latest workflow from the cache
+          const latestWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
+            workflowKeys.detail(organizationId, workflowId),
+          );
+
+          if (!latestWorkflow?.spec?.nodes) return;
+
+          // Apply only position updates to the current state
+          const updatedNodes = latestWorkflow.spec.nodes.map((node) => {
+            if (!node.id) return node;
+
+            const positionUpdate = positionUpdates.get(node.id);
+            if (positionUpdate) {
+              return {
+                ...node,
+                position: positionUpdate,
+              };
+            }
+            return node;
+          });
+
+          // Save the workflow with updated positions
+          await updateWorkflowMutation.mutateAsync({
+            name: latestWorkflow.metadata?.name!,
+            description: latestWorkflow.metadata?.description,
+            nodes: updatedNodes,
+            edges: latestWorkflow.spec?.edges,
+          });
+
+          // Clear the saved position updates after successful save
+          // Keep any new updates that came in during the save
+          positionUpdates.forEach((_, nodeId) => {
+            if (pendingPositionUpdatesRef.current.get(nodeId) === positionUpdates.get(nodeId)) {
+              pendingPositionUpdatesRef.current.delete(nodeId);
+            }
+          });
+
+          // After save, merge any new pending updates into the cache
+          // This prevents the server response from overwriting newer local changes
+          const currentWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
+            workflowKeys.detail(organizationId, workflowId),
+          );
+
+          if (currentWorkflow?.spec?.nodes && pendingPositionUpdatesRef.current.size > 0) {
+            const mergedNodes = currentWorkflow.spec.nodes.map((node) => {
+              if (!node.id) return node;
+
+              const pendingUpdate = pendingPositionUpdatesRef.current.get(node.id);
+              if (pendingUpdate) {
+                return {
+                  ...node,
+                  position: pendingUpdate,
+                };
+              }
+              return node;
+            });
+
+            queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), {
+              ...currentWorkflow,
+              spec: {
+                ...currentWorkflow.spec,
+                nodes: mergedNodes,
+              },
+            });
+          }
+
+          // Auto-save completed silently (no toast or state changes)
+        } catch (error: any) {
+          console.error("Failed to auto-save canvas changes:", error);
+          // Don't show error toast for auto-save failures to avoid being intrusive
+        }
+      }, 1000),
+    [organizationId, workflowId, updateWorkflowMutation, queryClient, hasNonPositionalUnsavedChanges],
+  );
+
   const handleNodeWebsocketEvent = useCallback(
     (nodeId: string, event: string) => {
       if (event.startsWith("event_created")) {
@@ -258,21 +366,50 @@ export function WorkflowPageV2() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
+  // Merge triggers and components from applications into the main arrays
+  const allTriggers = useMemo(() => {
+    const merged = [...triggers];
+    availableApplications.forEach((app) => {
+      if (app.triggers) {
+        merged.push(...app.triggers);
+      }
+    });
+    return merged;
+  }, [triggers, availableApplications]);
+
+  const allComponents = useMemo(() => {
+    const merged = [...components];
+    availableApplications.forEach((app) => {
+      if (app.components) {
+        merged.push(...app.components);
+      }
+    });
+    return merged;
+  }, [components, availableApplications]);
+
   const buildingBlocks = useMemo(
-    () => buildBuildingBlockCategories(triggers, components, blueprints),
-    [triggers, components, blueprints],
+    () => buildBuildingBlockCategories(triggers, components, blueprints, availableApplications),
+    [triggers, components, blueprints, availableApplications],
   );
 
   const { nodes, edges } = useMemo(() => {
     // Don't prepare data until everything is loaded
-    if (!workflow || workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
+    if (
+      !workflow ||
+      workflowLoading ||
+      triggersLoading ||
+      blueprintsLoading ||
+      componentsLoading ||
+      applicationsLoading
+    ) {
       return { nodes: [], edges: [] };
     }
+
     return prepareData(
       workflow,
-      triggers,
+      allTriggers,
       blueprints,
-      components,
+      allComponents,
       nodeEventsMap,
       nodeExecutionsMap,
       nodeQueueItemsMap,
@@ -282,9 +419,9 @@ export function WorkflowPageV2() {
     );
   }, [
     workflow,
-    triggers,
+    allTriggers,
     blueprints,
-    components,
+    allComponents,
     nodeEventsMap,
     nodeExecutionsMap,
     nodeQueueItemsMap,
@@ -294,6 +431,7 @@ export function WorkflowPageV2() {
     triggersLoading,
     blueprintsLoading,
     componentsLoading,
+    applicationsLoading,
     organizationId,
   ]);
 
@@ -317,8 +455,8 @@ export function WorkflowPageV2() {
         node,
         workflow?.spec?.nodes || [],
         blueprints,
-        components,
-        triggers,
+        allComponents,
+        allTriggers,
         executionsMap,
         queueItemsMap,
         eventsMapForSidebar,
@@ -335,7 +473,7 @@ export function WorkflowPageV2() {
         isLoading: nodeData.isLoading,
       };
     },
-    [workflow, workflowId, blueprints, components, triggers, nodeEventsMap, getNodeData, queryClient],
+    [workflow, workflowId, blueprints, allComponents, allTriggers, nodeEventsMap, getNodeData, queryClient],
   );
 
   // Trigger data loading when sidebar opens for a node
@@ -513,19 +651,36 @@ export function WorkflowPageV2() {
       // Get configuration fields from metadata based on node type
       let configurationFields: ComponentsComponent["configuration"] = [];
       let displayLabel: string | undefined = node.name || undefined;
+      let appName: string | undefined;
 
       if (node.type === "TYPE_BLUEPRINT") {
         const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
         configurationFields = blueprintMetadata?.configuration || [];
         displayLabel = blueprintMetadata?.name || displayLabel;
       } else if (node.type === "TYPE_COMPONENT") {
-        const componentMetadata = components.find((c) => c.name === node.component?.name);
+        const componentMetadata = allComponents.find((c) => c.name === node.component?.name);
         configurationFields = componentMetadata?.configuration || [];
         displayLabel = componentMetadata?.label || displayLabel;
+
+        // Check if this component is from an application
+        const componentApp = availableApplications.find((app) =>
+          app.components?.some((c) => c.name === node.component?.name),
+        );
+        if (componentApp) {
+          appName = componentApp.name;
+        }
       } else if (node.type === "TYPE_TRIGGER") {
-        const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
+        const triggerMetadata = allTriggers.find((t) => t.name === node.trigger?.name);
         configurationFields = triggerMetadata?.configuration || [];
         displayLabel = triggerMetadata?.label || displayLabel;
+
+        // Check if this trigger is from an application
+        const triggerApp = availableApplications.find((app) =>
+          app.triggers?.some((t) => t.name === node.trigger?.name),
+        );
+        if (triggerApp) {
+          appName = triggerApp.name;
+        }
       }
 
       return {
@@ -534,25 +689,33 @@ export function WorkflowPageV2() {
         displayLabel,
         configuration: node.configuration || {},
         configurationFields,
+        appName,
+        appInstallationRef: node.appInstallation,
       };
     },
-    [workflow, blueprints, components, triggers],
+    [workflow, blueprints, allComponents, allTriggers, availableApplications],
   );
 
   const handleNodeConfigurationSave = useCallback(
-    async (nodeId: string, updatedConfiguration: Record<string, any>, updatedNodeName: string) => {
+    async (
+      nodeId: string,
+      updatedConfiguration: Record<string, any>,
+      updatedNodeName: string,
+      appInstallationRef?: ComponentsAppInstallationRef,
+    ) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
 
-      // Update the node's configuration and name
+      // Update the node's configuration, name, and app installation ref in local cache only
       const updatedNodes = workflow?.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
               ...node,
               configuration: updatedConfiguration,
               name: updatedNodeName,
+              appInstallation: appInstallationRef,
             }
           : node,
       );
@@ -588,7 +751,7 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
 
-      const { buildingBlock, nodeName, configuration, position, sourceConnection } = newNodeData;
+      const { buildingBlock, nodeName, configuration, position, sourceConnection, appInstallationRef } = newNodeData;
 
       // Filter configuration to only include visible fields
       const filteredConfiguration = filterVisibleConfiguration(configuration, buildingBlock.configuration || []);
@@ -607,6 +770,7 @@ export function WorkflowPageV2() {
               ? "TYPE_BLUEPRINT"
               : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
+        appInstallation: appInstallationRef,
         position: position
           ? {
               x: Math.round(position.x),
@@ -774,17 +938,16 @@ export function WorkflowPageV2() {
     (nodeId: string, position: { x: number; y: number }) => {
       if (!workflow || !organizationId || !workflowId) return;
 
-      // Save snapshot before making changes
-      saveWorkflowSnapshot(workflow);
+      const roundedPosition = {
+        x: Math.round(position.x),
+        y: Math.round(position.y),
+      };
 
       const updatedNodes = workflow.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
               ...node,
-              position: {
-                x: Math.round(position.x),
-                y: Math.round(position.y),
-              },
+              position: roundedPosition,
             }
           : node,
       );
@@ -798,9 +961,14 @@ export function WorkflowPageV2() {
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      markUnsavedChange("position");
+
+      // Track position update for auto-save
+      pendingPositionUpdatesRef.current.set(nodeId, roundedPosition);
+
+      // Trigger auto-save with debounce (no unsaved changes notification)
+      debouncedAutoSave();
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+    [workflow, organizationId, workflowId, queryClient, debouncedAutoSave],
   );
 
   const handleNodeCollapseChange = useCallback(
@@ -1143,6 +1311,7 @@ export function WorkflowPageV2() {
       onConfigure={handleConfigure}
       buildingBlocks={buildingBlocks}
       onNodeAdd={handleNodeAdd}
+      installedApplications={installedApplications}
       hasFitToViewRef={hasFitToViewRef}
       hasUserToggledSidebarRef={hasUserToggledSidebarRef}
       isSidebarOpenRef={isSidebarOpenRef}
@@ -1531,7 +1700,10 @@ function prepareComponentNode(
   queryClient: QueryClient,
   organizationId?: string,
 ): CanvasNode {
-  switch (node.component?.name) {
+  const componentNameParts = node.component?.name?.split(".") || [];
+  const componentName = componentNameParts[0];
+
+  switch (componentName) {
     case "approval":
     case "noop":
     case "http":

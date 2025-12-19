@@ -1,6 +1,7 @@
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { IntegrationsIntegration } from "../../../api-client/types.gen";
 import { Icon } from "../../../components/Icon";
 import { IntegrationModal } from "../../../components/IntegrationZeroState/IntegrationModal";
@@ -12,6 +13,7 @@ interface IntegrationsProps {
 }
 
 export function Integrations({ organizationId }: IntegrationsProps) {
+  const navigate = useNavigate();
   const [selectedIntegrationType, setSelectedIntegrationType] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isIntegrationSelectorOpen, setIsIntegrationSelectorOpen] = useState(false);
@@ -72,6 +74,30 @@ export function Integrations({ organizationId }: IntegrationsProps) {
         <div>
           <h1 className="text-2xl font-semibold">Integrations</h1>
           <p className="text-zinc-600 dark:text-zinc-400 mt-2">Manage integrations for your organization</p>
+        </div>
+      </div>
+
+      {/* Deprecation Warning */}
+      <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <Icon name="warning" size="sm" className="text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-1">
+              Integrations are deprecated
+            </h3>
+            <p className="text-sm text-amber-800 dark:text-amber-300 mb-3">
+              The integrations system has been replaced with Applications, which provide enhanced functionality and
+              better integration with external systems. Please migrate to Applications for new connections.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/${organizationId}/settings/applications`)}
+              className="text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+            >
+              Go to Applications
+            </Button>
+          </div>
         </div>
       </div>
 
