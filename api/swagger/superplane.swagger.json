@@ -3026,6 +3026,9 @@
         },
         "appInstallation": {
           "$ref": "#/definitions/ComponentsAppInstallationRef"
+        },
+        "errorMessage": {
+          "type": "string"
         }
       }
     },
