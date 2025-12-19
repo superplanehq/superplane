@@ -37,7 +37,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
     return (
       <div className="flex flex-col gap-2">
         <div
-          className={`border rounded-md overflow-hidden ${hasError ? "border-red-500 border-2" : "border-gray-300 dark:border-zinc-700"}`}
+          className={`border rounded-md overflow-hidden ${hasError ? "border-red-500 border-2" : "border-gray-300 dark:border-gray-700"}`}
           style={{ height: "200px" }}
         >
           <Editor
@@ -77,7 +77,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   const objValue = (value as Record<string, unknown>) ?? {};
 
   return (
-    <div className="border border-gray-300 dark:border-zinc-700 rounded-md p-4 space-y-4">
+    <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
       {schema.map((schemaField) => (
         <ConfigurationFieldRenderer
           key={schemaField.name}

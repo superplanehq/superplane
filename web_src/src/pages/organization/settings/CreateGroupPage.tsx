@@ -69,7 +69,7 @@ export function CreateGroupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 text-left">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-left">
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -93,7 +93,7 @@ export function CreateGroupPage() {
             <Heading level={2} className="mb-2">
               Create New Group
             </Heading>
-            <Text className="text-zinc-600 dark:text-zinc-400">
+            <Text className="text-gray-600 dark:text-gray-400">
               Create a group to organize members and assign roles
             </Text>
           </div>
@@ -101,7 +101,7 @@ export function CreateGroupPage() {
 
         {/* Create Group Form */}
         <div className="space-y-6">
-          <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+          <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
                 <p className="text-sm">{error}</p>
@@ -111,7 +111,7 @@ export function CreateGroupPage() {
             <div className="space-y-6">
               {/* Group Name */}
               <div>
-                <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-2">Group Name *</label>
+                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">Group Name *</label>
                 <Input
                   type="text"
                   placeholder="Enter group name"
@@ -124,24 +124,24 @@ export function CreateGroupPage() {
 
               {/* Group Description */}
               <div>
-                <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
                   Group Description
                 </label>
                 <textarea
                   placeholder="Describe the group's purpose and responsibilities..."
                   value={groupDescription}
                   onChange={(e) => setGroupDescription(e.target.value)}
-                  className="w-full max-w-lg px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-800 dark:text-white resize-none"
+                  className="w-full max-w-lg px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white resize-none"
                   rows={3}
                 />
               </div>
 
               {/* Role Selection */}
               <div>
-                <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-2">Role *</label>
+                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">Role *</label>
                 {loadingRoles ? (
                   <div className="flex justify-center items-center h-12">
-                    <p className="text-zinc-500 dark:text-zinc-400">Loading roles...</p>
+                    <p className="text-gray-500 dark:text-gray-400">Loading roles...</p>
                   </div>
                 ) : roles.length === 0 ? (
                   <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">

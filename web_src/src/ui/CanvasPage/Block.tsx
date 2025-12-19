@@ -77,7 +77,7 @@ export function Block(props: BlockProps) {
     <>
       <AiPopup {...ai} />
 
-      <div className={`relative w-fit ${shouldDim ? "opacity-50" : ""}`} onClick={props.onClick}>
+      <div className={`relative w-fit ${shouldDim ? "opacity-30" : ""}`} onClick={props.onClick}>
         <LeftHandle data={data} nodeId={props.nodeId} />
         <BlockContent {...props} />
         <RightHandle data={data} nodeId={props.nodeId} />

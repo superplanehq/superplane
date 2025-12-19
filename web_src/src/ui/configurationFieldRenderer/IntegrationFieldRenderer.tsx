@@ -38,7 +38,7 @@ export const IntegrationFieldRenderer = ({
   }
 
   if (isLoading) {
-    return <div className="text-sm text-gray-500 dark:text-zinc-400">Loading {integrationType} integrations...</div>;
+    return <div className="text-sm text-gray-500 dark:text-gray-400">Loading {integrationType} integrations...</div>;
   }
 
   if (filteredIntegrations.length === 0) {
@@ -49,7 +49,7 @@ export const IntegrationFieldRenderer = ({
             <SelectValue placeholder="No integrations available" />
           </SelectTrigger>
         </Select>
-        <p className="text-xs text-gray-500 dark:text-zinc-400">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           No {integrationType} integrations found. Please create one in the settings.
         </p>
       </div>

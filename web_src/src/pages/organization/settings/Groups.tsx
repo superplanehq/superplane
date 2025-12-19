@@ -150,7 +150,7 @@ export function Groups({ organizationId }: GroupsProps) {
   return (
     <div className="space-y-6 pt-6">
       <div className="flex items-center justify-between">
-        <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white">
+        <Heading level={2} className="text-2xl font-semibold text-gray-900 dark:text-white">
           Groups
         </Heading>
       </div>
@@ -161,7 +161,7 @@ export function Groups({ organizationId }: GroupsProps) {
         </div>
       )}
 
-      <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
         <div className="px-6 pt-6 pb-4 flex items-center justify-between">
           <InputGroup>
             <Input
@@ -180,46 +180,46 @@ export function Groups({ organizationId }: GroupsProps) {
         <div className="px-6 pb-6">
           {loadingGroups ? (
             <div className="flex justify-center items-center h-32">
-              <p className="text-zinc-500 dark:text-zinc-400">Loading groups...</p>
+              <p className="text-gray-500 dark:text-gray-400">Loading groups...</p>
             </div>
           ) : (
             <Table dense>
               <TableHead>
                 <TableRow>
                   <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("name")}
                   >
                     <div className="flex items-center gap-2">
                       Team name
-                      <Icon name={getSortIcon("name")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("name")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("created")}
                   >
                     <div className="flex items-center gap-2">
                       Created
-                      <Icon name={getSortIcon("created")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("created")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("members")}
                   >
                     <div className="flex items-center gap-2">
                       Members
-                      <Icon name={getSortIcon("members")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("members")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("role")}
                   >
                     <div className="flex items-center gap-2">
                       Role
-                      <Icon name={getSortIcon("role")} size="sm" className="text-zinc-400" />
+                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -228,7 +228,7 @@ export function Groups({ organizationId }: GroupsProps) {
               <TableBody>
                 {filteredAndSortedGroups.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                    <TableCell colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">
                       No groups found
                     </TableCell>
                   </TableRow>
@@ -249,18 +249,18 @@ export function Groups({ organizationId }: GroupsProps) {
                             >
                               {group.spec?.displayName}
                             </Link>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400">{group.spec?.description || ""}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{group.spec?.description || ""}</p>
                           </div>
                         </div>
                       </TableCell>
 
                       <TableCell>
-                        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
                           {formatRelativeTime(group.metadata?.createdAt)}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
                           {group.status?.membersCount || 0} member{group.status?.membersCount === 1 ? "" : "s"}
                         </span>
                       </TableCell>

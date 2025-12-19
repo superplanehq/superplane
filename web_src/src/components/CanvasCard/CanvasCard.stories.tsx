@@ -20,7 +20,7 @@ const meta: Meta<typeof CanvasCard> = {
   decorators: [
     (Story) => (
       <BrowserRouter>
-        <div className="bg-zinc-50 dark:bg-zinc-900 p-4">
+        <div className="bg-gray-50 dark:bg-gray-900 p-4">
           <Story />
         </div>
       </BrowserRouter>

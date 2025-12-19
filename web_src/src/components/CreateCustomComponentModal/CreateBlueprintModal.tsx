@@ -85,7 +85,7 @@ export function CreateCustomComponentModal({
         <div className="space-y-6">
           {/* Blueprint Name */}
           <Field>
-            <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Component name *</Label>
+            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Component name *</Label>
             <Input
               data-testid="component-name-input"
               type="text"
@@ -104,7 +104,7 @@ export function CreateCustomComponentModal({
               autoFocus
               maxLength={MAX_BLUEPRINT_NAME_LENGTH}
             />
-            <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {blueprintName.length}/{MAX_BLUEPRINT_NAME_LENGTH} characters
             </div>
             {nameError && <div className="text-xs text-red-600 mt-1">{nameError}</div>}
@@ -112,7 +112,7 @@ export function CreateCustomComponentModal({
 
           {/* Blueprint Description */}
           <Field>
-            <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Description</Label>
+            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</Label>
             <Textarea
               value={blueprintDescription}
               onChange={(e) => {
@@ -125,7 +125,7 @@ export function CreateCustomComponentModal({
               className="w-full"
               maxLength={MAX_BLUEPRINT_DESCRIPTION_LENGTH}
             />
-            <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {blueprintDescription.length}/{MAX_BLUEPRINT_DESCRIPTION_LENGTH} characters
             </div>
           </Field>

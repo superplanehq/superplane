@@ -16,10 +16,10 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   return (
     <div className={`flex flex-col justify-center items-center py-10 gap-3 ${className}`}>
-      <div className="flex justify-center align-center w-12 h-12 text-indigo-700 bg-blue-100 p-3 rounded-lg">
-        <Icon size={27} />
+      <div className="flex justify-center items-center w-12 h-12 text-yellow-700 bg-orange-100 p-3 rounded-md">
+        <Icon size={16} />
       </div>
-      <span className="text-lg text-gray-500">{title}</span>
+      <span className="text-sm text-gray-500">{title}</span>
       {description && <span className="text-sm text-gray-400 text-center max-w-xs">{description}</span>}
     </div>
   );

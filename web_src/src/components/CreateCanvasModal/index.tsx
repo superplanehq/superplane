@@ -78,7 +78,7 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
       <DialogBody>
         <div className="space-y-6">
           <Field>
-            <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Canvas name *</Label>
+            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Canvas name *</Label>
             <Input
               data-testid="canvas-name-input"
               type="text"
@@ -97,14 +97,14 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
               autoFocus
               maxLength={MAX_CANVAS_NAME_LENGTH}
             />
-            <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {name.length}/{MAX_CANVAS_NAME_LENGTH} characters
             </div>
             {nameError && <div className="text-xs text-red-600 mt-1">{nameError}</div>}
           </Field>
 
           <Field>
-            <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Description</Label>
+            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</Label>
             <Textarea
               value={description}
               onChange={(e) => {
@@ -117,7 +117,7 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
               className="w-full"
               maxLength={MAX_CANVAS_DESCRIPTION_LENGTH}
             />
-            <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {description.length}/{MAX_CANVAS_DESCRIPTION_LENGTH} characters
             </div>
           </Field>

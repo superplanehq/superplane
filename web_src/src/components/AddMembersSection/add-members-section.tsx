@@ -62,11 +62,11 @@ export function AddMembersSection({
   };
 
   return (
-    <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 text-left">
+    <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6 text-left">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <Text className="font-semibold text-zinc-900 dark:text-white mb-1">Add Members</Text>
-          <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+          <Text className="font-semibold text-gray-900 dark:text-white mb-1">Add Members</Text>
+          <Text className="text-sm text-gray-600 dark:text-gray-400">
             Search organization members, pending invites, or invite new users
           </Text>
         </div>
@@ -116,12 +116,12 @@ export function AddMembersSection({
               <div className="group w-full flex items-center">
                 {isCustomEmailSuggestion ? (
                   isSelected ? (
-                    <span className="material-symbols-outlined text-xs! text-zinc-600 dark:text-zinc-400 ml-1">
+                    <span className="material-symbols-outlined text-xs! text-gray-600 dark:text-gray-400 ml-1">
                       mail
                     </span>
                   ) : (
-                    <div className="flex items-center justify-center size-8 bg-zinc-100 dark:bg-zinc-800 rounded-full">
-                      <Icon name="mail" size="md" className="text-zinc-600 dark:text-zinc-400" />
+                    <div className="flex items-center justify-center size-8 bg-gray-100 dark:bg-gray-800 rounded-full">
+                      <Icon name="mail" size="md" className="text-gray-600 dark:text-gray-400" />
                     </div>
                   )
                 ) : (
@@ -135,14 +135,14 @@ export function AddMembersSection({
                       {isCustomEmailSuggestion ? (
                         <>
                           <span className="font-medium">{user.email}</span>
-                          <span className="text-sm text-zinc-600 dark:text-zinc-400 group-hover:text-white">
+                          <span className="text-sm text-gray-600 dark:text-gray-400 group-hover:text-white">
                             Invite to organization and add to canvas
                           </span>
                         </>
                       ) : (
                         <>
                           <span className="font-medium">{user.name || "Unknown"}</span>
-                          <span className="text-sm text-zinc-600 dark:text-zinc-400 group-hover:text-white">
+                          <span className="text-sm text-gray-600 dark:text-gray-400 group-hover:text-white">
                             {user.email}
                           </span>
                         </>

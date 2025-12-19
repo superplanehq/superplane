@@ -26,7 +26,7 @@ export const GroupFieldRenderer = ({ value, onChange, domainId }: GroupFieldRend
   }
 
   if (isLoading) {
-    return <div className="text-sm text-gray-500 dark:text-zinc-400">Loading groups...</div>;
+    return <div className="text-sm text-gray-500 dark:text-gray-400">Loading groups...</div>;
   }
 
   if (!groups || groups.length === 0) {
@@ -37,7 +37,7 @@ export const GroupFieldRenderer = ({ value, onChange, domainId }: GroupFieldRend
             <SelectValue placeholder="No groups available" />
           </SelectTrigger>
         </Select>
-        <p className="text-xs text-gray-500 dark:text-zinc-400">No groups found in this organization.</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">No groups found in this organization.</p>
       </div>
     );
   }

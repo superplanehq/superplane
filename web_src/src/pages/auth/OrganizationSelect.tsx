@@ -48,9 +48,9 @@ const OrganizationSelect: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-zinc-900 dark:to-zinc-800 p-8">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-8">
         <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
           <Text className="text-gray-600 dark:text-gray-400">Loading...</Text>
         </div>
       </div>
@@ -58,7 +58,7 @@ const OrganizationSelect: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-zinc-900 dark:to-zinc-800">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       <div className="p-8 pt-6">
         <div className="max-w-7xl w-full">
           <div className="mb-4">
@@ -89,7 +89,7 @@ const OrganizationSelect: React.FC = () => {
             {organizations.map((org) => (
               <div
                 key={org.id}
-                className="bg-white dark:bg-zinc-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer"
+                className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer"
                 onClick={() => handleOrganizationSelect(org)}
               >
                 <div className="flex items-center mb-2">

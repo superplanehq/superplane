@@ -25,7 +25,7 @@ const meta: Meta<typeof ApiTokenForm> = {
     (Story) => (
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <div className="w-[600px] p-6 bg-white dark:bg-zinc-900 rounded-lg">
+          <div className="w-[600px] p-6 bg-white dark:bg-gray-900 rounded-lg">
             <Story />
           </div>
         </MemoryRouter>

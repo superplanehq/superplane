@@ -61,26 +61,28 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
     <div
       key={index}
       className={
-        `px-4 pt-2 relative ${lastSection ? "rounded-b-md" : ""} ${LastEventBackground}` +
-        (index < totalSections - 1 ? " border-b-2 border-slate-300" : "") +
+        `px-2 pt-2 relative ${lastSection ? "rounded-b-md" : ""} ${LastEventBackground}` +
+        (index < totalSections - 1 ? " border-b border-slate-400" : "") +
         ` ${className}`
       }
     >
       <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
         <div
-          className={`uppercase text-sm py-[1px] px-[6px] font-semibold rounded flex items-center justify-center text-white ${LastEventStateColor}`}
+          className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${LastEventStateColor}`}
         >
           <span>{currentState}</span>
         </div>
         {section.eventSubtitle && (
-          <span className="text-sm truncate flex-shrink-0 max-w-[40%] text-gray-500">
+          <span className="text-[13px] font-medium truncate flex-shrink-0 max-w-[40%] text-gray-950/50">
             {section.showAutomaticTime && durationText ? durationText : section.eventSubtitle}
           </span>
         )}
       </div>
-      <div className="flex justify-left items-center mt-2 gap-2">
-        {section.eventId && <span className="text-sm text-zinc-600 font-mono">#{section.eventId?.slice(0, 4)}</span>}
-        <span className="text-sm text-zinc-700 font-inter truncate text-md min-w-0 font-semibold truncate">
+      <div className="flex justify-left items-center mt-1 gap-2">
+        {section.eventId && (
+          <span className="text-[13px] text-gray-950/50 font-mono">#{section.eventId?.slice(0, 4)}</span>
+        )}
+        <span className="text-sm text-gray-700 font-inter truncate text-md min-w-0 font-medium truncate">
           {section.eventTitle}
         </span>
       </div>
@@ -312,7 +314,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   return (
     <SelectionWrapper selected={selected}>
       <div
-        className={`relative flex flex-col outline-2 outline-slate-300 rounded-md w-[23rem] bg-white ${hasError ? "border-2 border-red-500" : ""}`}
+        className={`relative flex flex-col outline-1 outline-slate-400 rounded-md w-[23rem] bg-white ${hasError ? "border-2 border-red-500" : ""}`}
       >
         <ComponentHeader
           iconSrc={iconSrc}
@@ -338,17 +340,19 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         {!hideMetadataList && metadata && metadata.length > 0 && <MetadataList items={metadata} />}
 
         {specs && specs.length > 0 && (
-          <div className="px-2 py-2 border-b-2 border-slate-300 text-gray-500 flex flex-col gap-2">
+          <div className="px-2 py-1.5 border-b border-slate-400 text-gray-500 flex flex-col gap-1.5">
             {specs.map((spec, index) => (
-              <div key={index} className="flex items-center gap-1 text-md text-gray-500">
-                {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 18 })}
+              <div key={index} className="flex items-center text-md text-gray-500">
+                <div className="w-4 h-4 mr-2">
+                  {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 16 })}
+                </div>
                 {spec.values ? (
                   <SpecsTooltip
                     specTitle={spec.tooltipTitle || spec.title}
                     specValues={spec.values}
                     hideCount={hideCount}
                   >
-                    <span className="text-sm underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 px-2 rounded-md font-inter font-medium cursor-help">
+                    <span className="text-[13px] underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 rounded-md font-inter font-medium cursor-help">
                       {hideCount ? "" : spec.values.length}{" "}
                       {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
                     </span>
@@ -367,7 +371,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
         {eventSections?.map((section, index) => (
           <EventSectionDisplay
-            className={"pb-3" + (!!includeEmptyState || !!customField ? " border-b-2 border-slate-300" : "")}
+            className={"pb-3" + (!!includeEmptyState || !!customField ? " border-b border-slate-400" : "")}
             key={index}
             section={section}
             index={index}
