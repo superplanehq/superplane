@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -77,10 +78,11 @@ func (s *WaitSteps) saveCanvas() {
 func (s *WaitSteps) assertWaitSavedToDB(value int, unit string) {
 	node := s.canvas.GetNodeFromDB("Wait")
 
-	duration := node.Configuration.Data()["duration"].(map[string]any)
+	config := node.Configuration.Data()
 
-	assert.Equal(s.t, float64(value), duration["value"])
-	assert.Equal(s.t, unit, duration["unit"])
+	assert.Equal(s.t, "interval", config["mode"])
+	assert.Equal(s.t, strconv.Itoa(value), config["waitFor"])
+	assert.Equal(s.t, unit, config["unit"])
 }
 
 func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
