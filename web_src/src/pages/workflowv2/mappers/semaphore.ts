@@ -114,7 +114,9 @@ export const semaphoreMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
       title: node.name!,
-      eventSections: lastExecutions[0] ? getSemaphoreEventSections(nodes, lastExecutions[0], nodeQueueItems) : undefined,
+      eventSections: lastExecutions[0]
+        ? getSemaphoreEventSections(nodes, lastExecutions[0], nodeQueueItems)
+        : undefined,
       includeEmptyState: !lastExecutions[0],
       metadata: getSemaphoreMetadataList(node),
       specs: getSemaphoreSpecs(node),
