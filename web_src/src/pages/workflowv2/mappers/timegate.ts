@@ -61,6 +61,10 @@ function getTimeGateMetadataList(node: ComponentsNode): MetadataItem[] {
 }
 
 function getTimeGateModeLabel(mode: string): string {
+  if (!mode) {
+    return "Not configured";
+  }
+
   switch (mode) {
     case "include_range":
       return "Include Range";
@@ -79,19 +83,39 @@ function getTimeWindow(mode: string, configuration: Record<string, unknown>): st
   let startTime = "00:00";
   let endTime = "23:59";
 
+  // Handle undefined mode or configuration values
+  if (!mode) {
+    return "Not configured";
+  }
+
   if (mode === "include_specific" || mode === "exclude_specific") {
-    startTime = `${configuration.startDayInYear} ${configuration.startTime}`;
-    endTime = `${configuration.endDayInYear} ${configuration.endTime}`;
+    const startDay = configuration.startDayInYear || "Day 1";
+    const startTimeVal = configuration.startTime || "00:00";
+    const endDay = configuration.endDayInYear || "Day 365";
+    const endTimeVal = configuration.endTime || "23:59";
+    startTime = `${startDay} ${startTimeVal}`;
+    endTime = `${endDay} ${endTimeVal}`;
   } else {
-    startTime = `${configuration.startTime}`;
-    endTime = `${configuration.endTime}`;
+    startTime = `${configuration.startTime || "00:00"}`;
+    endTime = `${configuration.endTime || "23:59"}`;
   }
 
   return `${startTime} - ${endTime}`;
 }
 
 function getTimezoneDisplay(timezoneOffset: string): string {
+  // Handle undefined or invalid timezone
+  if (!timezoneOffset) {
+    return "Not configured";
+  }
+
   const offset = parseFloat(timezoneOffset);
+
+  // Handle invalid number
+  if (isNaN(offset)) {
+    return "Invalid timezone";
+  }
+
   if (offset === 0) return "GMT+0 (UTC)";
   if (offset > 0) return `GMT+${offset}`;
 

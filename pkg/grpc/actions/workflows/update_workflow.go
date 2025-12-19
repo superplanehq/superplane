@@ -75,9 +75,16 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 				return err
 			}
 
-			err = setupNode(ctx, tx, encryptor, registry, *workflowNode)
-			if err != nil {
-				return err
+			if workflowNode.State == models.WorkflowNodeStateReady {
+				err = setupNode(ctx, tx, encryptor, registry, *workflowNode)
+				if err != nil {
+					workflowNode.State = models.WorkflowNodeStateError
+					errorMsg := err.Error()
+					workflowNode.StateReason = &errorMsg
+					if saveErr := tx.Save(workflowNode).Error; saveErr != nil {
+						return saveErr
+					}
+				}
 			}
 		}
 
@@ -132,6 +139,14 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		existingNode.IsCollapsed = node.IsCollapsed
 		existingNode.AppInstallationID = appInstallationID
 
+		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
+			existingNode.State = models.WorkflowNodeStateError
+			existingNode.StateReason = node.ErrorMessage
+		} else if existingNode.State == models.WorkflowNodeStateError {
+			existingNode.State = models.WorkflowNodeStateReady
+			existingNode.StateReason = nil
+		}
+
 		// Set parent if internal namespaced id
 		if idx := strings.Index(node.ID, ":"); idx != -1 {
 			parent := node.ID[:idx]
@@ -159,12 +174,20 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		parentNodeID = &parent
 	}
 
+	initialState := models.WorkflowNodeStateReady
+	var stateReason *string
+	if node.ErrorMessage != nil && *node.ErrorMessage != "" {
+		initialState = models.WorkflowNodeStateError
+		stateReason = node.ErrorMessage
+	}
+
 	workflowNode := models.WorkflowNode{
 		WorkflowID:        workflowID,
 		NodeID:            node.ID,
 		ParentNodeID:      parentNodeID,
 		Name:              node.Name,
-		State:             models.WorkflowNodeStateReady,
+		State:             initialState,
+		StateReason:       stateReason,
 		Type:              node.Type,
 		Ref:               datatypes.NewJSONType(node.Ref),
 		Configuration:     datatypes.NewJSONType(node.Configuration),

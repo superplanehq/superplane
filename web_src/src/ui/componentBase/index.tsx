@@ -9,6 +9,8 @@ import { ComponentActionsProps } from "../types/componentActions";
 import { MetadataItem, MetadataList } from "../metadataList";
 import { EmptyState } from "../emptyState";
 import { ChildEvents, type ChildEventsInfo } from "../childEvents";
+import { AlertTriangle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface EventSectionDisplayProps {
   section: EventSection;
@@ -206,6 +208,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
     title?: string;
     description?: string;
   };
+  error?: string;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -239,58 +242,78 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   hideActionsButton,
   includeEmptyState = false,
   emptyStateProps,
+  error,
 }) => {
+  const hasError = error && error.trim() !== "";
   if (collapsed) {
     return (
       <SelectionWrapper selected={selected} fullRounded>
-        <CollapsedComponent
-          iconSrc={iconSrc}
-          iconSlug={iconSlug}
-          iconColor={iconColor}
-          iconBackground={iconBackground}
-          title={title}
-          collapsedBackground={collapsedBackground}
-          shape="circle"
-          onDoubleClick={onToggleCollapse}
-          onRun={onRun}
-          runDisabled={runDisabled}
-          runDisabledTooltip={runDisabledTooltip}
-          onEdit={onEdit}
-          onDuplicate={onDuplicate}
-          onConfigure={onConfigure}
-          onDeactivate={onDeactivate}
-          onToggleView={onToggleView}
-          onDelete={onDelete}
-          isCompactView={isCompactView}
-          hideActionsButton={hideActionsButton}
-        >
-          <div className="flex flex-col items-center gap-1">
-            {metadata?.map((item, index) => (
-              <div key={`metadata-${index}`} className="flex items-center gap-1 text-xs text-gray-500">
-                {React.createElement(resolveIcon(item.icon), { size: 12 })}
-                <span className="truncate max-w-[150px]">{item.label}</span>
-              </div>
-            ))}
-            {specs
-              ?.filter((spec) => spec.values)
-              .map((spec, index) => (
-                <div key={`spec-${index}`} className="flex items-center gap-1 text-xs text-gray-500">
-                  {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 12 })}
-                  <span>
-                    {!hideCount ? spec.values!.length : ""}{" "}
-                    {spec.title + (spec.values!.length > 1 && !hideCount ? "s" : "")}
-                  </span>
+        <div className={`relative ${hasError ? "border-2 border-red-500 rounded-full" : ""}`}>
+          <CollapsedComponent
+            iconSrc={iconSrc}
+            iconSlug={iconSlug}
+            iconColor={iconColor}
+            iconBackground={iconBackground}
+            title={title}
+            collapsedBackground={collapsedBackground}
+            shape="circle"
+            onDoubleClick={onToggleCollapse}
+            onRun={onRun}
+            runDisabled={runDisabled}
+            runDisabledTooltip={runDisabledTooltip}
+            onEdit={onEdit}
+            onDuplicate={onDuplicate}
+            onConfigure={onConfigure}
+            onDeactivate={onDeactivate}
+            onToggleView={onToggleView}
+            onDelete={onDelete}
+            isCompactView={isCompactView}
+            hideActionsButton={hideActionsButton}
+          >
+            <div className="flex flex-col items-center gap-1">
+              {metadata?.map((item, index) => (
+                <div key={`metadata-${index}`} className="flex items-center gap-1 text-xs text-gray-500">
+                  {React.createElement(resolveIcon(item.icon), { size: 12 })}
+                  <span className="truncate max-w-[150px]">{item.label}</span>
                 </div>
               ))}
-          </div>
-        </CollapsedComponent>
+              {specs
+                ?.filter((spec) => spec.values)
+                .map((spec, index) => (
+                  <div key={`spec-${index}`} className="flex items-center gap-1 text-xs text-gray-500">
+                    {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 12 })}
+                    <span>
+                      {!hideCount ? spec.values!.length : ""}{" "}
+                      {spec.title + (spec.values!.length > 1 && !hideCount ? "s" : "")}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </CollapsedComponent>
+          {hasError && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="absolute -top-1 -right-1 bg-red-500 rounded-full p-1 cursor-pointer">
+                    <AlertTriangle size={16} className="text-white" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs text-sm">{error}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
       </SelectionWrapper>
     );
   }
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col outline-2 outline-slate-300 rounded-md w-[23rem] bg-white">
+      <div
+        className={`relative flex flex-col outline-2 outline-slate-300 rounded-md w-[23rem] bg-white ${hasError ? "border-2 border-red-500" : ""}`}
+      >
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
@@ -357,6 +380,21 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         {includeEmptyState && <EmptyState {...emptyStateProps} />}
 
         {customField || null}
+
+        {hasError && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="absolute -top-3 -right-3 bg-red-500 rounded-full p-1 cursor-pointer">
+                  <AlertTriangle size={16} className="text-white" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="max-w-xs text-sm">{error}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
     </SelectionWrapper>
   );

@@ -149,6 +149,10 @@ func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, workflow *models.Wor
 			return nil, err
 		}
 
+		if targetNode.State == models.WorkflowNodeStateError {
+			continue
+		}
+
 		queueItem := models.WorkflowNodeQueueItem{
 			WorkflowID:  workflow.ID,
 			NodeID:      targetNode.NodeID,
@@ -184,6 +188,10 @@ func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, logger *log.Ent
 		targetNode, err := models.FindWorkflowNode(tx, workflow.ID, edge.TargetID)
 		if err != nil {
 			return nil, err
+		}
+
+		if targetNode.State == models.WorkflowNodeStateError {
+			continue
 		}
 
 		queueItem := models.WorkflowNodeQueueItem{
@@ -268,9 +276,14 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, logger *lo
 	for _, edge := range edges {
 		// Ensure target internal node exists as a workflow node
 		targetNodeID := parentNode.NodeID + ":" + edge.TargetID
-		if _, err := models.FindWorkflowNode(tx, workflow.ID, targetNodeID); err != nil {
+		targetNode, err := models.FindWorkflowNode(tx, workflow.ID, targetNodeID)
+		if err != nil {
 			logger.Errorf("Error finding target node: %v", err)
 			return nil, nil, err
+		}
+
+		if targetNode.State == models.WorkflowNodeStateError {
+			continue
 		}
 
 		queueItem := models.WorkflowNodeQueueItem{
