@@ -170,27 +170,27 @@ func parseDateValue(value any) (time.Time, error) {
 
 		formats := []string{
 			time.RFC3339Nano,
-			time.RFC822,         // "02 Jan 06 15:04 MST"
-			time.RFC822Z,        // "02 Jan 06 15:04 -0700"
-			time.RFC850,         // "Monday, 02-Jan-06 15:04:05 MST"
-			time.RFC1123,        // "Mon, 02 Jan 2006 15:04:05 MST"
-			time.RFC1123Z,       // "Mon, 02 Jan 2006 15:04:05 -0700"
+			time.RFC822,   // "02 Jan 06 15:04 MST"
+			time.RFC822Z,  // "02 Jan 06 15:04 -0700"
+			time.RFC850,   // "Monday, 02-Jan-06 15:04:05 MST"
+			time.RFC1123,  // "Mon, 02 Jan 2006 15:04:05 MST"
+			time.RFC1123Z, // "Mon, 02 Jan 2006 15:04:05 -0700"
 			"2006-01-02T15:04:05Z",
 			"2006-01-02T15:04:05.000Z",
 			"2006-01-02T15:04:05",
 			"2006-01-02 15:04:05",
-			"2006-01-02 15:04:05 -0700 MST",     // Format like "2027-08-14 02:00:00 +0200 CEST"
-			"2006-01-02 15:04:05 -0700",        // Format like "2027-08-14 02:00:00 +0200"
-			"2006-01-02 15:04:05 MST",          // Format like "2027-08-14 02:00:00 CEST"
-			"2006-01-02T15:04:05-07:00",        // ISO with timezone offset
-			"2006-01-02T15:04:05.000-07:00",    // ISO with milliseconds and timezone
+			"2006-01-02 15:04:05 -0700 MST", // Format like "2027-08-14 02:00:00 +0200 CEST"
+			"2006-01-02 15:04:05 -0700",     // Format like "2027-08-14 02:00:00 +0200"
+			"2006-01-02 15:04:05 MST",       // Format like "2027-08-14 02:00:00 CEST"
+			"2006-01-02T15:04:05-07:00",     // ISO with timezone offset
+			"2006-01-02T15:04:05.000-07:00", // ISO with milliseconds and timezone
 			"2006-01-02T15:04Z",
 			"2006-01-02T15:04",
 			"2006-01-02 15:04",
-			"2006-01-02",        // Simple date format like "2025-12-25"
-			"01/02/2006",        // US date format
-			"02/01/2006",        // European date format
-			"2006/01/02",        // ISO-like with slashes
+			"2006-01-02", // Simple date format like "2025-12-25"
+			"01/02/2006", // US date format
+			"02/01/2006", // European date format
+			"2006/01/02", // ISO-like with slashes
 		}
 		for _, format := range formats {
 			if parsed, parseErr := time.Parse(format, v); parseErr == nil {
