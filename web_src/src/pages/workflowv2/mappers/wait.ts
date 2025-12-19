@@ -5,7 +5,7 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseMapper } from "./types";
+import { ComponentBaseMapper, CustomFieldRenderer } from "./types";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { TimeLeftCountdown } from "@/ui/timeLeftCountdown";
@@ -179,3 +179,67 @@ function getWaitEventSections(
 
   return [eventSection];
 }
+
+/**
+ * Custom field renderer for wait component configuration
+ */
+export const waitCustomFieldRenderer: CustomFieldRenderer = {
+  render: (_node: ComponentsNode, configuration: Record<string, unknown>) => {
+    const mode = configuration?.mode as string;
+
+    let content: string;
+    let title: string;
+
+    if (mode === "interval") {
+      title = "Fixed Time Interval";
+      content = `Component will wait for a fixed amount of time before emitting the event forward.
+
+Supports expressions and expects integer.
+
+Example expressions:
+{{$.wait_time}}
+{{$.wait_time + 5}}
+{{$.status == "urgent" ? 0 : 30}}
+
+Check Docs for more details on selecting data from payloads and expressions.`;
+    } else if (mode === "countdown") {
+      title = "Countdown to Date/Time";
+      content = `Component will countdown until the provided date/time before emitting an event forward.
+
+Supports expressions and expects date in ISO 8601 format.
+
+Example expressions:
+{{$.run_time}}
+{{$.run_time.In(timezone("UTC"))}}
+{{$.run_time + duration("48h")}}
+
+Check Docs for more details on selecting data from payloads and expressions.`;
+    } else {
+      title = "Wait Component";
+      content = "Configure the wait mode to see more details.";
+    }
+
+    return React.createElement(
+      "div",
+      { className: "border-t-1 border-gray-200" },
+      React.createElement(
+        "div",
+        { className: "space-y-3" },
+        React.createElement(
+          "div",
+          null,
+          React.createElement(
+            "span",
+            { className: "text-sm font-medium text-gray-700 dark:text-gray-300" },
+            title + ":",
+          ),
+          React.createElement(
+            "div",
+            { className: "text-sm text-gray-900 dark:text-gray-100 mt-1 border-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-md font-mono whitespace-pre-line" },
+            content,
+          ),
+        ),
+      ),
+    );
+  },
+};
