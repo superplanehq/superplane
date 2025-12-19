@@ -131,6 +131,9 @@ interface ComponentSidebarProps {
   components?: ComponentsComponent[];
   triggers?: TriggersTrigger[];
   blueprints?: BlueprintsBlueprint[];
+
+  // Highlighting callback for execution chain nodes
+  onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
 }
 
 export const ComponentSidebar = ({
@@ -197,6 +200,7 @@ export const ComponentSidebar = ({
   components = [],
   triggers = [],
   blueprints = [],
+  onHighlightedNodesChange,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -311,6 +315,8 @@ export const ComponentSidebar = ({
     if (page === "execution-chain") {
       // When coming back from execution chain, go to the previous page
       setPage(previousPage);
+      // Clear highlights when leaving execution chain
+      onHighlightedNodesChange?.(new Set());
     } else {
       setPage("overview");
     }
@@ -319,7 +325,7 @@ export const ComponentSidebar = ({
     setExecutionChainEventId(null);
     setExecutionChainTriggerEvent(null);
     setSelectedExecutionId(null);
-  }, [page, previousPage]);
+  }, [page, previousPage, onHighlightedNodesChange]);
 
   const handleSeeExecutionChain = useCallback(
     (eventId: string, triggerEvent?: SidebarEvent, selectedExecId?: string) => {
@@ -433,6 +439,20 @@ export const ComponentSidebar = ({
     [statusOptions],
   );
 
+  // Clear highlights when sidebar closes or when leaving execution chain page
+  useEffect(() => {
+    if (!isOpen && onHighlightedNodesChange) {
+      onHighlightedNodesChange(new Set());
+    }
+  }, [isOpen, onHighlightedNodesChange]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      onHighlightedNodesChange?.(new Set());
+    };
+  }, [onHighlightedNodesChange]);
+
   if (!isOpen) return null;
 
   return (
@@ -534,6 +554,7 @@ export const ComponentSidebar = ({
                 components={components}
                 triggers={triggers}
                 blueprints={blueprints}
+                onHighlightedNodesChange={onHighlightedNodesChange}
               />
             ) : (
               <HistoryQueuePage

@@ -123,6 +123,7 @@ interface ExecutionChainPageProps {
   components?: ComponentsComponent[]; // Component metadata
   triggers?: TriggersTrigger[]; // Trigger metadata
   blueprints?: BlueprintsBlueprint[]; // Blueprint metadata
+  onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
 }
 
 export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
@@ -138,6 +139,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   components = [],
   triggers = [],
   blueprints = [],
+  onHighlightedNodesChange,
 }) => {
   const [chainItems, setChainItems] = useState<ChainItemData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -308,6 +310,30 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   useEffect(() => {
     loadChainData();
   }, [loadChainData]);
+
+  // Notify parent of all node IDs in the execution chain for highlighting
+  useEffect(() => {
+    if (onHighlightedNodesChange && chainItems.length > 0) {
+      const nodeIds = new Set<string>();
+
+      // Add trigger event node ID if available
+      if (triggerEvent?.nodeId) {
+        nodeIds.add(triggerEvent.nodeId);
+      }
+
+      // Add all execution node IDs
+      chainItems.forEach((item) => {
+        if (item.nodeId) {
+          nodeIds.add(item.nodeId);
+        }
+      });
+
+      onHighlightedNodesChange(nodeIds);
+    } else if (onHighlightedNodesChange && chainItems.length === 0) {
+      // Clear highlights when no items
+      onHighlightedNodesChange(new Set());
+    }
+  }, [chainItems, triggerEvent, onHighlightedNodesChange]);
 
   // Use ref to track current values without causing re-renders
   const pollingRef = useRef<{
