@@ -100,44 +100,58 @@ function getWaitEventSections(
 
   let eventSubtitle: string | React.ReactNode | undefined;
 
-  // Calculate expected duration based on mode
+  // Get expected duration from execution metadata (calculated interval)
   let expectedDuration: number | undefined;
 
-  if (configuration?.mode === "interval") {
-    const waitFor = configuration.waitFor as string;
-    const unit = configuration.unit as string;
+  if (execution.metadata) {
+    try {
+      const metadata = execution.metadata as { interval_duration?: number };
+      if (metadata.interval_duration && metadata.interval_duration > 0) {
+        expectedDuration = metadata.interval_duration;
+      }
+    } catch {
+      // If parsing metadata fails, fall back to configuration-based calculation
+    }
+  }
 
-    // Try to parse waitFor as a number (for simple cases)
-    const value = parseInt(waitFor, 10);
-    if (!isNaN(value) && unit) {
+  // Fallback to configuration-based calculation if metadata is not available
+  if (!expectedDuration) {
+    if (configuration?.mode === "interval") {
+      const waitFor = configuration.waitFor as string;
+      const unit = configuration.unit as string;
+
+      // Try to parse waitFor as a number (for simple cases)
+      const value = parseInt(waitFor, 10);
+      if (!isNaN(value) && unit) {
+        const multipliers = { seconds: 1000, minutes: 60000, hours: 3600000 };
+        expectedDuration = value * (multipliers[unit as keyof typeof multipliers] || 1000);
+      }
+    } else if (configuration?.mode === "countdown") {
+      const waitUntil = configuration.waitUntil as string;
+
+      // Try to parse countdown target date
+      if (waitUntil && execution.createdAt) {
+        try {
+          // For simple string dates, extract the date without evaluating expressions
+          const dateMatch = waitUntil.match(/["']([^"']+)["']/);
+          if (dateMatch) {
+            const targetDate = new Date(dateMatch[1]);
+            const createdDate = new Date(execution.createdAt);
+            if (!isNaN(targetDate.getTime()) && !isNaN(createdDate.getTime())) {
+              expectedDuration = targetDate.getTime() - createdDate.getTime();
+            }
+          }
+        } catch {
+          // If parsing fails, expectedDuration remains undefined
+        }
+      }
+    } else if (configuration?.duration) {
+      // Legacy duration format
+      const duration = configuration.duration as { value: number; unit: "seconds" | "minutes" | "hours" };
+      const { value, unit } = duration;
       const multipliers = { seconds: 1000, minutes: 60000, hours: 3600000 };
       expectedDuration = value * (multipliers[unit as keyof typeof multipliers] || 1000);
     }
-  } else if (configuration?.mode === "countdown") {
-    const waitUntil = configuration.waitUntil as string;
-
-    // Try to parse countdown target date
-    if (waitUntil && execution.createdAt) {
-      try {
-        // For simple string dates, extract the date without evaluating expressions
-        const dateMatch = waitUntil.match(/["']([^"']+)["']/);
-        if (dateMatch) {
-          const targetDate = new Date(dateMatch[1]);
-          const createdDate = new Date(execution.createdAt);
-          if (!isNaN(targetDate.getTime()) && !isNaN(createdDate.getTime())) {
-            expectedDuration = targetDate.getTime() - createdDate.getTime();
-          }
-        }
-      } catch (error) {
-        // If parsing fails, expectedDuration remains undefined
-      }
-    }
-  } else if (configuration?.duration) {
-    // Legacy duration format
-    const duration = configuration.duration as { value: number; unit: "seconds" | "minutes" | "hours" };
-    const { value, unit } = duration;
-    const multipliers = { seconds: 1000, minutes: 60000, hours: 3600000 };
-    expectedDuration = value * (multipliers[unit as keyof typeof multipliers] || 1000);
   }
 
   if (executionState === "running" && execution.createdAt && expectedDuration) {

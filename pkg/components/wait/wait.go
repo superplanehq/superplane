@@ -27,7 +27,8 @@ type Spec struct {
 }
 
 type ExecutionMetadata struct {
-	StartTime string `json:"start_time"`
+	StartTime        string `json:"start_time"`
+	IntervalDuration int64  `json:"interval_duration"` // Duration in milliseconds
 }
 
 const (
@@ -233,13 +234,11 @@ func (w *Wait) Execute(ctx core.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
-		return err
+		return ctx.ExecutionStateContext.Fail("configuration_error", fmt.Sprintf("Failed to decode configuration: %v", err))
 	}
 
 	// Store start time in metadata
 	startTime := time.Now().Format(time.RFC3339)
-	metadata := ExecutionMetadata{StartTime: startTime}
-	ctx.MetadataContext.Set(metadata)
 
 	var interval time.Duration
 
@@ -247,40 +246,47 @@ func (w *Wait) Execute(ctx core.ExecutionContext) error {
 	case ModeInterval:
 
 		if spec.WaitFor == nil || spec.Unit == nil {
-			return fmt.Errorf("waitFor and unit are required for interval mode")
+			return ctx.ExecutionStateContext.Fail("configuration_error", "waitFor and unit are required for interval mode")
 		}
 
 		value, err := parseIntegerValue(spec.WaitFor)
 		if err != nil {
-			return fmt.Errorf("failed to parse waitFor value: %w", err)
+			return ctx.ExecutionStateContext.Fail("parse_error", fmt.Sprintf("Failed to parse waitFor value: %v", err))
 		}
 
 		interval, err = calculateIntervalDuration(value, *spec.Unit)
 		if err != nil {
-			return err
+			return ctx.ExecutionStateContext.Fail("configuration_error", fmt.Sprintf("Invalid interval configuration: %v", err))
 		}
 
 	case ModeCountdown:
 
 		if spec.WaitUntil == nil {
-			return fmt.Errorf("waitUntil is required for countdown mode")
+			return ctx.ExecutionStateContext.Fail("configuration_error", "waitUntil is required for countdown mode")
 		}
 
 		targetTime, err := parseDateValue(spec.WaitUntil)
 		if err != nil {
-			return fmt.Errorf("failed to parse waitUntil value: %w", err)
+			return ctx.ExecutionStateContext.Fail("parse_error", fmt.Sprintf("Failed to parse waitUntil value: %v", err))
 		}
 
 		now := time.Now()
 		interval = targetTime.Sub(now)
 
 		if interval <= 0 {
-			return fmt.Errorf("target time %s is in the past", targetTime.Format(time.RFC3339))
+			return ctx.ExecutionStateContext.Fail("configuration_error", fmt.Sprintf("Target time %s is in the past", targetTime.Format(time.RFC3339)))
 		}
 
 	default:
-		return fmt.Errorf("invalid mode: %s. Must be either '%s' or '%s'", spec.Mode, ModeInterval, ModeCountdown)
+		return ctx.ExecutionStateContext.Fail("configuration_error", fmt.Sprintf("Invalid mode: %s. Must be either '%s' or '%s'", spec.Mode, ModeInterval, ModeCountdown))
 	}
+
+	// Store start time and calculated interval duration in metadata
+	metadata := ExecutionMetadata{
+		StartTime:        startTime,
+		IntervalDuration: interval.Milliseconds(),
+	}
+	ctx.MetadataContext.Set(metadata)
 
 	return ctx.RequestContext.ScheduleActionCall("timeReached", map[string]any{}, interval)
 }
