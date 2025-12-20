@@ -420,7 +420,9 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
             {triggerEvent && (
               <div className="mb-6 border-b-1 border-border pb-4">
                 <h2 className="text-sm font-medium text-gray-800 flex items-center gap-2">
-                  {triggerEvent.id && <span className="text-xs text-gray-500 font-mono">#{triggerEvent.id.slice(0, 4)}</span>}
+                  {triggerEvent.id && (
+                    <span className="text-xs text-gray-500 font-mono">#{triggerEvent.id.slice(0, 4)}</span>
+                  )}
                   {triggerEvent.title || "Execution Chain"}
                 </h2>
                 {summaryInfo && (

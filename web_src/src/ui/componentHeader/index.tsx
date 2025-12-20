@@ -49,9 +49,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
       onDoubleClick={onDoubleClick}
     >
       <div className="w-full flex items-center">
-        <div
-          className={`w-4 h-4 overflow-hidden flex items-center justify-center mr-2 ${iconBackground || ""}`}
-        >
+        <div className={`w-4 h-4 overflow-hidden flex items-center justify-center mr-2 ${iconBackground || ""}`}>
           {iconSrc ? (
             <img src={iconSrc} alt={title} className="max-w-5 max-h-5 object-contain" />
           ) : (

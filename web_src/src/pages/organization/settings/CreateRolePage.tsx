@@ -410,7 +410,9 @@ export function CreateRolePage() {
 
                 {/* Permissions */}
                 <div className="pt-4 mb-4">
-                  <h2 className="text-base font-semibold text-gray-800 dark:text-white mb-2">Organization Permissions</h2>
+                  <h2 className="text-base font-semibold text-gray-800 dark:text-white mb-2">
+                    Organization Permissions
+                  </h2>
                   <Text className="text-sm text-gray-600 dark:text-gray-400">
                     Select the permissions this role should have within the organization.
                   </Text>

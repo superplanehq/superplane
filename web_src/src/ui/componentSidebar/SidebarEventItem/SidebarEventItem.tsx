@@ -360,7 +360,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           <span>{event.state || "neutral"}</span>
         </div>
         {event.subtitle && (
-          <span className="text-[13px] font-medium truncate flex-shrink-0 max-w-[40%] text-gray-950/50">{event.subtitle}</span>
+          <span className="text-[13px] font-medium truncate flex-shrink-0 max-w-[40%] text-gray-950/50">
+            {event.subtitle}
+          </span>
         )}
       </div>
 
