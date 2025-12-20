@@ -622,7 +622,10 @@ export const ComponentSidebar = ({
                     page === "execution-chain" ? "-translate-x-full" : "translate-x-0"
                   } ${page === "execution-chain" ? "pointer-events-none" : "pointer-events-auto"}`}
                 >
-                  {(page === "history" || page === "queue" || previousPage === "history" || previousPage === "queue") && (
+                  {(page === "history" ||
+                    page === "queue" ||
+                    previousPage === "history" ||
+                    previousPage === "queue") && (
                     <HistoryQueuePage
                       page={(page === "execution-chain" ? previousPage : page) as "history" | "queue"}
                       filteredEvents={filteredHistoryEvents}
@@ -638,7 +641,10 @@ export const ComponentSidebar = ({
 
                           const rootEventId = event.originalExecution?.rootEvent?.id;
                           if (rootEventId && node && event.originalExecution?.rootEvent) {
-                            const triggerEvent = mapTriggerEventToSidebarEvent(event.originalExecution?.rootEvent, node);
+                            const triggerEvent = mapTriggerEventToSidebarEvent(
+                              event.originalExecution?.rootEvent,
+                              node,
+                            );
                             handleSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
                           } else {
                             const eventId = event.triggerEventId || event.id;
