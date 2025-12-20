@@ -453,6 +453,8 @@ export const ComponentSidebar = ({
     };
   }, [onHighlightedNodesChange]);
 
+  const isDetailView = page !== "overview";
+
   if (!isOpen) return null;
 
   return (
@@ -464,7 +466,7 @@ export const ComponentSidebar = ({
       {/* Resize handle */}
       <div
         onMouseDown={handleMouseDown}
-        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group ${
+        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group z-30 ${
           isResizing ? "bg-blue-50" : ""
         }`}
         style={{ marginLeft: "-8px" }}
@@ -524,81 +526,12 @@ export const ComponentSidebar = ({
           </div>
         </div>
       </div>
-      {page !== "overview" ? (
-        <div className="flex flex-col flex-1 min-h-0">
-          <PageHeader
-            page={page as "history" | "queue" | "execution-chain"}
-            onBackToOverview={handleBackToOverview}
-            previousPage={previousPage}
-            showSearchAndFilter={page !== "execution-chain"}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            statusFilter={statusFilter}
-            onStatusFilterChange={(value) => setStatusFilter(value as ChildEventsState | "all")}
-            extraStatusOptions={extraStatusOptions}
-          />
-
-          <div className={`${page === "execution-chain" ? "flex flex-col flex-1 min-h-0" : "py-2 px-2 pb-3"}`}>
-            {page === "execution-chain" ? (
-              <ExecutionChainPage
-                eventId={executionChainEventId}
-                triggerEvent={executionChainTriggerEvent || undefined}
-                selectedExecutionId={selectedExecutionId}
-                loadExecutionChain={loadExecutionChain}
-                openEventIds={openEventIds}
-                onToggleOpen={handleToggleOpen}
-                getExecutionState={getExecutionState}
-                getTabData={getTabData}
-                onEventClick={onEventClick}
-                workflowNodes={workflowNodes}
-                components={components}
-                triggers={triggers}
-                blueprints={blueprints}
-                onHighlightedNodesChange={onHighlightedNodesChange}
-              />
-            ) : (
-              <HistoryQueuePage
-                page={page as "history" | "queue"}
-                filteredEvents={filteredHistoryEvents}
-                openEventIds={openEventIds}
-                onToggleOpen={handleToggleOpen}
-                onEventClick={onEventClick}
-                onTriggerNavigate={(event) => {
-                  if (event.kind === "trigger") {
-                    const eventId = event.triggerEventId || event.id;
-                    handleSeeExecutionChain(eventId, event);
-                  } else if (event.kind === "execution") {
-                    const node = workflowNodes?.find((n) => n.id === event.originalExecution?.rootEvent?.nodeId);
-
-                    const rootEventId = event.originalExecution?.rootEvent?.id;
-                    if (rootEventId && node && event.originalExecution?.rootEvent) {
-                      const triggerEvent = mapTriggerEventToSidebarEvent(event.originalExecution?.rootEvent, node);
-                      handleSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
-                    } else {
-                      const eventId = event.triggerEventId || event.id;
-                      handleSeeExecutionChain(eventId, event, event.executionId);
-                    }
-                  }
-                }}
-                getTabData={getTabData}
-                onPushThrough={onPushThrough}
-                onCancelExecution={onCancelExecution}
-                supportsPushThrough={supportsPushThrough}
-                onReEmit={onReEmit}
-                loadExecutionChain={loadExecutionChain}
-                getExecutionState={getExecutionState}
-                hasMoreItems={hasMoreItems}
-                loadingMoreItems={loadingMoreItems}
-                showMoreCount={showMoreCount}
-                onLoadMoreItems={handleLoadMoreItems}
-                searchQuery={searchQuery}
-                statusFilter={statusFilter}
-              />
-            )}
-          </div>
-        </div>
-      ) : (
-        <>
+      <div className="relative flex-1 min-h-0 overflow-hidden">
+        <div
+          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${
+            isDetailView ? "-translate-x-full" : "translate-x-0"
+          } ${isDetailView ? "pointer-events-none" : "pointer-events-auto"}`}
+        >
           <Tabs
             value={activeTab}
             onValueChange={(value) => onTabChange?.(value as "latest" | "settings")}
@@ -687,8 +620,89 @@ export const ComponentSidebar = ({
               </TabsContent>
             )}
           </Tabs>
-        </>
-      )}
+        </div>
+
+        <div
+          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${
+            isDetailView ? "translate-x-0" : "translate-x-full"
+          } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
+        >
+          {page !== "overview" && (
+            <div className="flex flex-col flex-1 min-h-0 bg-white">
+              <PageHeader
+                page={page as "history" | "queue" | "execution-chain"}
+                onBackToOverview={handleBackToOverview}
+                previousPage={previousPage}
+                showSearchAndFilter={page !== "execution-chain"}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                statusFilter={statusFilter}
+                onStatusFilterChange={(value) => setStatusFilter(value as ChildEventsState | "all")}
+                extraStatusOptions={extraStatusOptions}
+              />
+
+              <div className={`${page === "execution-chain" ? "flex flex-col flex-1 min-h-0" : "py-2 px-2 pb-3"}`}>
+                {page === "execution-chain" ? (
+                  <ExecutionChainPage
+                    eventId={executionChainEventId}
+                    triggerEvent={executionChainTriggerEvent || undefined}
+                    selectedExecutionId={selectedExecutionId}
+                    loadExecutionChain={loadExecutionChain}
+                    openEventIds={openEventIds}
+                    onToggleOpen={handleToggleOpen}
+                    getExecutionState={getExecutionState}
+                    getTabData={getTabData}
+                    onEventClick={onEventClick}
+                    workflowNodes={workflowNodes}
+                    components={components}
+                    triggers={triggers}
+                    blueprints={blueprints}
+                    onHighlightedNodesChange={onHighlightedNodesChange}
+                  />
+                ) : (
+                  <HistoryQueuePage
+                    page={page as "history" | "queue"}
+                    filteredEvents={filteredHistoryEvents}
+                    openEventIds={openEventIds}
+                    onToggleOpen={handleToggleOpen}
+                    onEventClick={onEventClick}
+                    onTriggerNavigate={(event) => {
+                      if (event.kind === "trigger") {
+                        const eventId = event.triggerEventId || event.id;
+                        handleSeeExecutionChain(eventId, event);
+                      } else if (event.kind === "execution") {
+                        const node = workflowNodes?.find((n) => n.id === event.originalExecution?.rootEvent?.nodeId);
+
+                        const rootEventId = event.originalExecution?.rootEvent?.id;
+                        if (rootEventId && node && event.originalExecution?.rootEvent) {
+                          const triggerEvent = mapTriggerEventToSidebarEvent(event.originalExecution?.rootEvent, node);
+                          handleSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
+                        } else {
+                          const eventId = event.triggerEventId || event.id;
+                          handleSeeExecutionChain(eventId, event, event.executionId);
+                        }
+                      }
+                    }}
+                    getTabData={getTabData}
+                    onPushThrough={onPushThrough}
+                    onCancelExecution={onCancelExecution}
+                    supportsPushThrough={supportsPushThrough}
+                    onReEmit={onReEmit}
+                    loadExecutionChain={loadExecutionChain}
+                    getExecutionState={getExecutionState}
+                    hasMoreItems={hasMoreItems}
+                    loadingMoreItems={loadingMoreItems}
+                    showMoreCount={showMoreCount}
+                    onLoadMoreItems={handleLoadMoreItems}
+                    searchQuery={searchQuery}
+                    statusFilter={statusFilter}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

@@ -337,7 +337,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       key={event.title + index}
       className={
         `cursor-pointer p-2 relative rounded-md outline-1 outline-slate-400 hover:translate-x-1 transition-transform duration-200 ${EventBackground}` +
-        (totalItems && index < totalItems - 1 ? " mb-3" : "")
+        (totalItems && index < totalItems - 1 ? " mb-4" : "")
       }
       onClick={(e) => {
         e.stopPropagation();
