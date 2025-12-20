@@ -1031,7 +1031,7 @@ function Sidebar({
 
     return (
       <div
-        className="border-l-1 border-gray-200 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
+        className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white"
         style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
       >
         <div className="flex items-center justify-center h-full">
@@ -1413,24 +1413,17 @@ function CanvasContent({
   }, [handleToggleCollapse]);
 
   const handlePaneClick = useCallback(() => {
-    // do not close sidebar while we are creating a new component
+    // Do not close sidebar or reset state while creating a new component
     if (templateNodeId) return;
 
-    stateRef.current.componentSidebar.close();
-
-    // Also close building blocks sidebar when clicking on canvas
-    if (onBuildingBlocksSidebarToggle) {
-      onBuildingBlocksSidebarToggle(false);
-    }
-
-    // Clear ReactFlow's selection state
+    // Clear ReactFlow's selection state, but keep sidebars open
     stateRef.current.setNodes((nodes) =>
       nodes.map((node) => ({
         ...node,
         selected: false,
       })),
     );
-  }, [templateNodeId, onBuildingBlocksSidebarToggle]);
+  }, [templateNodeId]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(

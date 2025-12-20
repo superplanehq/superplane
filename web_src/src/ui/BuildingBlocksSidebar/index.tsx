@@ -73,34 +73,6 @@ export function BuildingBlocksSidebar({
   const [hoveredBlock, setHoveredBlock] = useState<BuildingBlock | null>(null);
   const dragPreviewRef = useRef<HTMLDivElement>(null);
 
-  // Close sidebar when clicking outside (for clicks in header, etc.)
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      // Don't close if we're dragging or resizing
-      if (isDraggingRef.current || isResizing) {
-        return;
-      }
-
-      // Don't close if clicking on the toggle button (it has its own handler)
-      const target = event.target as HTMLElement;
-      if (target.closest('[aria-label="Open sidebar"]')) {
-        return;
-      }
-
-      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
-        onToggle(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isOpen, onToggle, isResizing]);
-
   // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
