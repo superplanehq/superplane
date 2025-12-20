@@ -253,7 +253,7 @@ interface SearchBarProps {
 function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
   const inputStyle = cn(
     "h-9 w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700",
-    "rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500",
+    "rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-500",
     "focus:ring-2 focus:ring-blue-500 focus:border-transparent",
   );
 
@@ -367,7 +367,7 @@ function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
   return (
     <div className="text-center py-12">
       <Box className="mx-auto text-gray-400 mb-4" size={48} />
-      <Heading level={3} className="text-lg text-gray-900 dark:text-white mb-2">
+      <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
         {searchQuery ? "No components found" : "No components yet"}
       </Heading>
       <Text className="text-gray-600 dark:text-gray-400 mb-6">
@@ -381,7 +381,7 @@ function CanvasesEmptyState({ searchQuery }: { searchQuery: string }) {
   return (
     <div className="text-center py-12">
       <GitBranch className="mx-auto text-gray-400 mb-4" size={48} />
-      <Heading level={3} className="text-lg text-gray-900 dark:text-white mb-2">
+      <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
         {searchQuery ? "No canvases found" : "No canvases yet"}
       </Heading>
       <Text className="text-gray-600 dark:text-gray-400 mb-6">
@@ -447,7 +447,7 @@ function WorkflowCard({ workflow, organizationId, navigate }: WorkflowCardProps)
               >
                 <Heading
                   level={3}
-                  className="!text-md font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                  className="!text-md font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
                 >
                   {workflow.name}
                 </Heading>
@@ -491,7 +491,7 @@ function WorkflowListItem({ workflow, organizationId, navigate }: WorkflowCardPr
         >
           <Heading
             level={3}
-            className="!text-md font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
+            className="!text-md font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
           >
             {workflow.name}
           </Heading>
@@ -572,7 +572,7 @@ function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuPr
         </DialogDescription>
         <DialogBody>
           <Text className="text-sm text-gray-600 dark:text-gray-400">
-            Deleting <span className="font-medium text-gray-900 dark:text-gray-100">{workflow.name}</span> will remove
+            Deleting <span className="font-medium text-gray-800 dark:text-gray-100">{workflow.name}</span> will remove
             its automations and history.
           </Text>
         </DialogBody>
@@ -654,7 +654,7 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
         </DialogDescription>
         <DialogBody>
           <Text className="text-sm text-gray-600 dark:text-gray-400">
-            Deleting <span className="font-medium text-gray-900 dark:text-gray-100">{blueprint.name}</span> will
+            Deleting <span className="font-medium text-gray-800 dark:text-gray-100">{blueprint.name}</span> will
             permanently remove it.
           </Text>
         </DialogBody>
@@ -706,7 +706,7 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
                       >
                         <Heading
                           level={3}
-                          className="!text-md font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                          className="!text-md font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
                         >
                           {blueprint.name}
                         </Heading>
@@ -765,7 +765,7 @@ function BlueprintListView({ filteredBlueprints, organizationId }: BlueprintGrid
                   <div className="flex-1">
                     <Heading
                       level={3}
-                      className="!text-md font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
+                      className="!text-md font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
                     >
                       {blueprint.name}
                     </Heading>

@@ -306,7 +306,7 @@ export function Members({ organizationId }: MembersProps) {
   return (
     <div className="space-y-6 pt-6">
       <div className="flex items-center justify-between">
-        <Heading level={2} className="text-2xl font-semibold text-gray-900 dark:text-white">
+        <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white">
           Members
         </Heading>
       </div>
@@ -321,7 +321,7 @@ export function Members({ organizationId }: MembersProps) {
       <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <Text className="text-left font-semibold text-gray-900 dark:text-white mb-1">Invite new members</Text>
+            <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">Invite new members</Text>
             <Text className="text-sm text-gray-500 dark:text-gray-400">
               Add people to your organization by sending them an invitation
             </Text>
@@ -368,8 +368,8 @@ export function Members({ organizationId }: MembersProps) {
                   onClick={() => setActiveTab("all")}
                   className={`px-3 py-1 text-sm rounded-md transition-colors ${
                     activeTab === "all"
-                      ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                      ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-white"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
                   }`}
                 >
                   All ({totalCount})
@@ -378,8 +378,8 @@ export function Members({ organizationId }: MembersProps) {
                   onClick={() => setActiveTab("active")}
                   className={`px-3 py-1 text-sm rounded-md transition-colors ${
                     activeTab === "active"
-                      ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                      ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-white"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
                   }`}
                 >
                   Active ({activeCount})
@@ -388,8 +388,8 @@ export function Members({ organizationId }: MembersProps) {
                   onClick={() => setActiveTab("invited")}
                   className={`px-3 py-1 text-sm rounded-md transition-colors ${
                     activeTab === "invited"
-                      ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                      ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-white"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
                   }`}
                 >
                   Invited ({invitedCount})
@@ -469,7 +469,7 @@ export function Members({ organizationId }: MembersProps) {
                           className="size-8"
                         />
                         <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{member.name}</div>
+                          <div className="text-sm font-medium text-gray-800 dark:text-white">{member.name}</div>
                           {member.type === "invitation" && (
                             <div className="text-xs text-gray-500 dark:text-gray-400">
                               Invited {formatDate(member.createdAt)}
@@ -533,7 +533,7 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell colSpan={5} className="text-center py-8">
                       <div className="text-gray-500 dark:text-gray-400">
                         <Icon name="search" className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                        <p className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                        <p className="text-lg font-medium text-gray-800 dark:text-white mb-2">
                           {searchTerm ? "No members found" : "No members yet"}
                         </p>
                         <p className="text-sm">

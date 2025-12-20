@@ -111,7 +111,7 @@ export function CreateGroupPage() {
             <div className="space-y-6">
               {/* Group Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">Group Name *</label>
+                <label className="block text-sm font-medium text-gray-800 dark:text-white mb-2">Group Name *</label>
                 <Input
                   type="text"
                   placeholder="Enter group name"
@@ -124,7 +124,7 @@ export function CreateGroupPage() {
 
               {/* Group Description */}
               <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                <label className="block text-sm font-medium text-gray-800 dark:text-white mb-2">
                   Group Description
                 </label>
                 <textarea
@@ -138,7 +138,7 @@ export function CreateGroupPage() {
 
               {/* Role Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">Role *</label>
+                <label className="block text-sm font-medium text-gray-800 dark:text-white mb-2">Role *</label>
                 {loadingRoles ? (
                   <div className="flex justify-center items-center h-12">
                     <p className="text-gray-500 dark:text-gray-400">Loading roles...</p>

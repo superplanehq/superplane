@@ -30,7 +30,7 @@
 }
 
 .sp-canvas .react-flow__connectionline path {
-  stroke: #3B82F6 !important;
+  stroke: #73D4FF !important;
   stroke-width: 3 !important;
   stroke-dasharray: 8 4 !important;
 }
@@ -51,14 +51,14 @@
 }
 
 .sp-canvas .react-flow__handle:hover {
-  box-shadow: 0 0 0 4px #3B82F6, 0 0 0 12px rgba(59, 130, 246, 0.2);
-  border-color: #3B82F6 !important;
+  box-shadow: 0 0 0 4px #73D4FF, 0 0 0 12px rgba(115, 212, 255, 0.2);
+  border-color: #73D4FF !important;
   z-index: 10;
 }
 
 .sp-canvas .react-flow__handle.highlighted {
-  box-shadow: 0 0 0 7px rgba(59, 130, 246, 0.2);
-  border-color: #3B82F6 !important;
+  box-shadow: 0 0 0 7px rgba(115, 212, 255, 0.2);
+  border-color: #73D4FF !important;
 }
 
 .sp-canvas .edge-label {

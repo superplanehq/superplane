@@ -336,7 +336,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     <div
       key={event.title + index}
       className={
-        `cursor-pointer p-2 relative rounded-md outline-1 outline-slate-400 hover:translate-x-1 transition-transform duration-200 ${EventBackground}` +
+        `cursor-pointer p-2 relative rounded-md border-1 border-slate-950/20 hover:translate-x-1 transition-transform duration-200 ${EventBackground}` +
         (totalItems && index < totalItems - 1 ? " mb-4" : "")
       }
       onClick={(e) => {
@@ -469,7 +469,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
           {/* Tab Content */}
           {tabData && activeTab === "current" && tabData.current && (
-            <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
+            <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 pt-2 pb-3">
               {Object.entries(tabData.current).map(([key, value]) => {
                 const stringValue = String(value);
                 const isUrlValue = isUrl(stringValue);
@@ -506,7 +506,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           )}
 
           {tabData && activeTab === "root" && tabData.root && (
-            <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
+            <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 pt-2 pb-3">
               {Object.entries(tabData.root).map(([key, value]) => {
                 const stringValue = String(value);
                 const isUrlValue = isUrl(stringValue);
@@ -690,7 +690,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
           {/* Fallback to original values display if no tabData */}
           {!tabData && event.values && Object.entries(event.values).length > 0 && (
-            <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
+            <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 pt-2 pb-3">
               {Object.entries(event.values || {}).map(([key, value]) => {
                 const isUrlValue = isUrl(value);
 
@@ -732,7 +732,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">Payload</h3>
+              <h3 className="text-lg font-semibold text-gray-800">Payload</h3>
               <div className="flex items-center gap-2">
                 <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
                   <button

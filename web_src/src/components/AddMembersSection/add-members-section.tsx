@@ -65,7 +65,7 @@ export function AddMembersSection({
     <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6 text-left">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <Text className="font-semibold text-gray-900 dark:text-white mb-1">Add Members</Text>
+          <Text className="font-semibold text-gray-800 dark:text-white mb-1">Add Members</Text>
           <Text className="text-sm text-gray-600 dark:text-gray-400">
             Search organization members, pending invites, or invite new users
           </Text>

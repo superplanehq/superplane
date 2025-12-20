@@ -150,7 +150,7 @@ export function Groups({ organizationId }: GroupsProps) {
   return (
     <div className="space-y-6 pt-6">
       <div className="flex items-center justify-between">
-        <Heading level={2} className="text-2xl font-semibold text-gray-900 dark:text-white">
+        <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white">
           Groups
         </Heading>
       </div>

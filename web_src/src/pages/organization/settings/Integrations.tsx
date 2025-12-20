@@ -106,7 +106,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           {integrations.length === 0 ? (
             <div className="text-center py-12">
               <Icon name="integration_instructions" size="lg" className="text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No integrations yet</h3>
+              <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-2">No integrations yet</h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Connect external services to streamline your workflow
               </p>
@@ -141,7 +141,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                           />
                         </div>
                         <div>
-                          <h3 className="font-medium text-gray-900 dark:text-gray-100">{integration.metadata?.name}</h3>
+                          <h3 className="font-medium text-gray-800 dark:text-gray-100">{integration.metadata?.name}</h3>
                           <p className="text-sm text-gray-600 dark:text-gray-400">{integration.spec?.url}</p>
                         </div>
                       </div>
@@ -173,7 +173,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-800 max-w-md w-full mx-4">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select Integration Type</h3>
+                <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">Select Integration Type</h3>
                 <button
                   onClick={() => setIsIntegrationSelectorOpen(false)}
                   className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -192,7 +192,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       <img src={type.icon} alt={type.name} className="w-5" />
                     </div>
                     <div>
-                      <h4 className="font-medium text-gray-900 dark:text-gray-100">{type.name}</h4>
+                      <h4 className="font-medium text-gray-800 dark:text-gray-100">{type.name}</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
                         {type.id === "github" ? "Connect to GitHub repositories" : "Connect to Semaphore CI/CD"}
                       </p>

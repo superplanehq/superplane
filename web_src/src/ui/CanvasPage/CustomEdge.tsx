@@ -46,7 +46,7 @@ export function CustomEdge({
   // Update style based on selection and hover state
   const edgeStyle = {
     ...style,
-    stroke: selected || isHovered ? "#3B82F6" : style.stroke || "#C9D5E1",
+    stroke: selected || isHovered ? "#73D4FF" : style.stroke || "#DEF3FE",
     strokeWidth: selected ? 3 : style.strokeWidth || 3,
   };
   const isActive = selected || isHovered;

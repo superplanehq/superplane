@@ -326,7 +326,7 @@ export function GroupMembersPage() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Heading level={2} className="text-2xl font-semibold text-gray-900 dark:text-white">
+                    <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white">
                       {group?.spec?.displayName}
                     </Heading>
                     <Button
@@ -485,7 +485,7 @@ export function GroupMembersPage() {
                           className="size-8"
                         />
                         <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          <div className="text-sm font-medium text-gray-800 dark:text-white">
                             {member.spec?.displayName}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">

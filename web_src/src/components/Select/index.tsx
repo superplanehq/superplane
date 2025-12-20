@@ -139,7 +139,7 @@ export function Select({
         onClick={handleTriggerClick}
         onKeyDown={handleKeyDown}
         className={twMerge(
-          "relative flex items-center justify-between w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100",
+          "relative flex items-center justify-between w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100",
           "border rounded-md cursor-pointer focus:outline-none focus:ring-2",
           error
             ? "border-red-300 dark:border-red-600 focus:ring-red-500"
@@ -186,7 +186,7 @@ export function Select({
                     key={option.value}
                     role="option"
                     aria-selected={isSelected}
-                    className="relative cursor-pointer select-none px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-900 dark:text-gray-100 transition-colors duration-150"
+                    className="relative cursor-pointer select-none px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-800 dark:text-gray-100 transition-colors duration-150"
                     onClick={(e) => {
                       e.preventDefault();
                       handleOptionSelect(option.value);

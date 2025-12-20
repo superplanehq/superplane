@@ -186,7 +186,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
             <div className="flex flex-col gap-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <Label htmlFor="rejection-comment" className="text-sm font-semibold text-gray-900">
+                  <Label htmlFor="rejection-comment" className="text-sm font-semibold text-gray-800">
                     Comment
                   </Label>
                 </div>

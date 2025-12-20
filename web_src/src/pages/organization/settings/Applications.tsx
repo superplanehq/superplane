@@ -133,7 +133,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                           {app.metadata?.id}
                         </td>
                         <td className="px-3 py-2 truncate">
-                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <div className="text-sm font-medium text-gray-800 dark:text-gray-100">
                             {app.metadata?.name}
                           </div>
                         </td>
@@ -175,7 +175,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
             {availableApps.length === 0 ? (
               <div className="text-center py-12">
                 <AppWindow className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No applications available</h3>
+                <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-2">No applications available</h3>
                 <p className="text-gray-600 dark:text-gray-400">
                   There are currently no applications available to install
                 </p>
@@ -192,7 +192,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <Icon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">
                             {app.label || app.name}
                           </h3>
                         </div>
@@ -242,7 +242,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                   <div className="space-y-4">
                     {/* Installation Name Field */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                      <label className="block text-sm font-medium text-gray-800 dark:text-gray-100 mb-2">
                         Installation Name
                         <span className="text-red-500 ml-1">*</span>
                       </label>
@@ -253,7 +253,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                         type="text"
                         value={installationName}
                         onChange={(e) => setInstallationName(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="e.g., my-app-integration"
                         required
                       />

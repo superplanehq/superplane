@@ -127,7 +127,7 @@ export function Roles({ organizationId }: RolesProps) {
     <div className="space-y-6 pt-6">
       <div className="flex items-center justify-between">
         <div>
-          <Heading level={2} className="text-2xl font-semibold text-gray-900 dark:text-white mb-1">
+          <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white mb-1">
             Roles
           </Heading>
         </div>

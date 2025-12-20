@@ -244,7 +244,7 @@ Example expressions:
         <div className="space-y-3">
           <div>
             <span className="text-sm font-medium text-gray-700">{title}:</span>
-            <div className="text-sm text-gray-900 mt-1 border-1 p-3 bg-gray-50 rounded-md font-mono whitespace-pre-line">
+            <div className="text-sm text-gray-800 mt-1 border-1 p-3 bg-gray-50 rounded-md font-mono whitespace-pre-line">
               {content}
             </div>
           </div>

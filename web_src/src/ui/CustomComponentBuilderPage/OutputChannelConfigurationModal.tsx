@@ -71,7 +71,7 @@ export function OutputChannelConfigurationModal({
           <DialogDescription>Configure the blueprint output channel</DialogDescription>
         </VisuallyHidden>
         <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6">
             {outputChannel ? "Edit Output Channel" : "Add Output Channel"}
           </h3>
 

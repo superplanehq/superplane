@@ -141,7 +141,7 @@ export function Header({
                   </p>
                   <div className="flex items-center gap-3 mt-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 truncate">{organizationName}</p>
+                      <p className="font-semibold text-gray-800 truncate text-sm">{organizationName}</p>
                     </div>
                   </div>
                   <div className="mt-2 flex flex-col">
@@ -149,13 +149,13 @@ export function Header({
                       <a
                         key={link.label}
                         href={link.href}
-                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-blue-100 hover:text-gray-900"
+                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
                         onClick={() => setIsMenuOpen(false)}
                       >
                         <Icon
                           name={link.icon}
                           size="sm"
-                          className="text-gray-500 transition group-hover:text-gray-900"
+                          className="text-gray-500 transition group-hover:text-gray-800"
                         />
                         <span>{link.label}</span>
                       </a>
@@ -163,12 +163,12 @@ export function Header({
                   </div>
                 </div>
                 <div className="px-4 pt-3 pb-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-800 bg-purple-200 inline px-1 py-0.5 rounded">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-600 bg-purple-200 inline px-1 py-0.5 rounded">
                     You
                   </p>
                   <div className="flex items-center gap-3 mt-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 truncate">{account?.name || "Loading..."}</p>
+                      <p className="font-semibold text-gray-800 truncate text-sm">{account?.name || "Loading..."}</p>
                       <p className="text-[13px] text-gray-500 font-medium truncate">{account?.email || "Loading..."}</p>
                     </div>
                   </div>
@@ -178,13 +178,13 @@ export function Header({
                         <a
                           key={link.label}
                           href={link.href}
-                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-blue-100 hover:text-gray-900"
+                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
                           onClick={() => setIsMenuOpen(false)}
                         >
                           <Icon
                             name={link.icon}
                             size="sm"
-                            className="text-gray-500 transition group-hover:text-gray-900"
+                            className="text-gray-500 transition group-hover:text-gray-800"
                           />
                           <span>{link.label}</span>
                         </a>
@@ -193,12 +193,12 @@ export function Header({
                           key={link.label}
                           type="button"
                           onClick={link.onClick}
-                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-blue-100 hover:text-gray-900"
+                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-blue-100 hover:text-gray-800"
                         >
                           <Icon
                             name={link.icon}
                             size="sm"
-                            className="text-gray-500 transition group-hover:text-gray-900"
+                            className="text-gray-500 transition group-hover:text-gray-800"
                           />
                           <span>{link.label}</span>
                         </button>

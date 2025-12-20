@@ -17,7 +17,7 @@ export function ApiTokenForm({
 }: ApiTokenFormProps) {
   return (
     <div className="space-y-4">
-      <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center justify-between">
+      <div className="text-sm font-medium text-gray-800 dark:text-white flex items-center justify-between">
         API Token
       </div>
       <Field>

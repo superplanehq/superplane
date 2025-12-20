@@ -115,7 +115,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
       <div
         key={item.id + index}
         className={
-          `cursor-pointer p-2 relative rounded-md border-1 border-slate-400 ${
+          `cursor-pointer p-2 relative rounded-md border-1 border-slate-950/20 ${
             isSelected ? "ring-[3px] ring-sky-300 ring-offset-3" : ""
           } ${EventBackground}` + (showConnectingLine ? " mb-3" : "")
         }
@@ -218,7 +218,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         {/* Expandable content */}
         {isOpen && item.tabData && (
           <div
-            className="mt-3 ml-7 rounded-sm bg-white outline outline-black/20 text-gray-500 w-[calc(100%-2rem)] mb-1"
+            className="mt-3 ml-7 rounded-sm bg-white outline outline-slate-950/20 text-gray-500 w-[calc(100%-2rem)] mb-1"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Tab Navigation */}
@@ -255,7 +255,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
 
             {/* Tab Content */}
             {activeTab === "current" && item.tabData.current && (
-              <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 py-2">
+              <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 pt-2 pb-3">
                 {Object.entries(item.tabData.current).map(([key, value]) => {
                   const stringValue = String(value);
                   const isUrlValue = isUrl(stringValue);
@@ -344,7 +344,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
           <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
               <div className="flex items-center justify-between p-4 border-b">
-                <h3 className="text-lg font-semibold text-gray-900">Payload</h3>
+                <h3 className="text-lg font-semibold text-gray-800">Payload</h3>
                 <div className="flex items-center gap-2">
                   <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
                     <button

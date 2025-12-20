@@ -63,8 +63,13 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
   statusFilter,
 }) => {
   return (
-    <div className="overflow-y-auto px-3" style={{ maxHeight: "70vh" }}>
-      <div className="flex flex-col gap-2 pb-15">
+    <div className="flex-1 overflow-y-auto p-4 min-h-0">
+      <div className="flex flex-col gap-3 pb-15">
+        {page === "history" && (
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Run History</h2>
+          </div>
+        )}
         {filteredEvents.length === 0 ? (
           <div className="text-center py-8 text-gray-500 text-sm">
             {searchQuery || statusFilter !== "all" ? "No matching events found" : "No events found"}

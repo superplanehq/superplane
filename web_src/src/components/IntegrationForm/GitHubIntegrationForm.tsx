@@ -39,7 +39,7 @@ export function GitHubIntegrationForm({
   return (
     <>
       <Field>
-        <Label className="text-sm font-medium text-gray-900 dark:text-white">{githubConfig.orgUrlLabel}</Label>
+        <Label className="text-sm font-medium text-gray-800 dark:text-white">{githubConfig.orgUrlLabel}</Label>
         <Input
           ref={orgUrlRef}
           type="text"
@@ -63,7 +63,7 @@ export function GitHubIntegrationForm({
             <img src={githubIcon} alt="GitHub" className="w-6 h-6" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-medium text-gray-900 dark:text-white">
+            <div className="text-sm font-medium text-gray-800 dark:text-white">
               Connect GitHub with a Personal Access Token (PAT)
             </div>
             <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
