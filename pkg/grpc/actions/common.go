@@ -562,6 +562,11 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			appInstallationID = &node.AppInstallation.Id
 		}
 
+		var errorMessage *string
+		if node.ErrorMessage != "" {
+			errorMessage = &node.ErrorMessage
+		}
+
 		result[i] = models.Node{
 			ID:                node.Id,
 			Name:              node.Name,
@@ -571,6 +576,7 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			Position:          ProtoToPosition(node.Position),
 			IsCollapsed:       node.IsCollapsed,
 			AppInstallationID: appInstallationID,
+			ErrorMessage:      errorMessage,
 		}
 	}
 	return result
@@ -617,6 +623,10 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			result[i].AppInstallation = &componentpb.AppInstallationRef{
 				Id: *node.AppInstallationID,
 			}
+		}
+
+		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
+			result[i].ErrorMessage = *node.ErrorMessage
 		}
 	}
 

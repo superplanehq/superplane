@@ -134,6 +134,7 @@ message Node {
   TriggerRef trigger = 9;
   bool is_collapsed = 10;
   AppInstallationRef app_installation = 11;
+  string error_message = 12;
 }
 
 message Position {

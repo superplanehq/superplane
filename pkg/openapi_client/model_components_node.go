@@ -31,6 +31,7 @@ type ComponentsNode struct {
 	Trigger         *NodeTriggerRef               `json:"trigger,omitempty"`
 	IsCollapsed     *bool                         `json:"isCollapsed,omitempty"`
 	AppInstallation *ComponentsAppInstallationRef `json:"appInstallation,omitempty"`
+	ErrorMessage    *string                       `json:"errorMessage,omitempty"`
 }
 
 // NewComponentsNode instantiates a new ComponentsNode object
@@ -406,6 +407,38 @@ func (o *ComponentsNode) SetAppInstallation(v ComponentsAppInstallationRef) {
 	o.AppInstallation = &v
 }
 
+// GetErrorMessage returns the ErrorMessage field value if set, zero value otherwise.
+func (o *ComponentsNode) GetErrorMessage() string {
+	if o == nil || IsNil(o.ErrorMessage) {
+		var ret string
+		return ret
+	}
+	return *o.ErrorMessage
+}
+
+// GetErrorMessageOk returns a tuple with the ErrorMessage field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsNode) GetErrorMessageOk() (*string, bool) {
+	if o == nil || IsNil(o.ErrorMessage) {
+		return nil, false
+	}
+	return o.ErrorMessage, true
+}
+
+// HasErrorMessage returns a boolean if a field has been set.
+func (o *ComponentsNode) HasErrorMessage() bool {
+	if o != nil && !IsNil(o.ErrorMessage) {
+		return true
+	}
+
+	return false
+}
+
+// SetErrorMessage gets a reference to the given string and assigns it to the ErrorMessage field.
+func (o *ComponentsNode) SetErrorMessage(v string) {
+	o.ErrorMessage = &v
+}
+
 func (o ComponentsNode) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -448,6 +481,9 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.AppInstallation) {
 		toSerialize["appInstallation"] = o.AppInstallation
+	}
+	if !IsNil(o.ErrorMessage) {
+		toSerialize["errorMessage"] = o.ErrorMessage
 	}
 	return toSerialize, nil
 }

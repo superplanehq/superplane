@@ -35,10 +35,7 @@ func UpdateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		return nil, status.Errorf(codes.InvalidArgument, "invalid output channels: %v", err)
 	}
 
-	err = ValidateNodeConfigurations(nodes, registry)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid node configurations: %v", err)
-	}
+	nodes = validateAndMarkNodeErrors(nodes, registry)
 
 	configuration, err := ProtoToConfiguration(blueprint.Configuration)
 	if err != nil {

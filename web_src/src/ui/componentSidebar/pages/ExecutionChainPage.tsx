@@ -411,21 +411,6 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
     );
   }
 
-  if (chainItems.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="flex flex-col items-center gap-2 text-center">
-          {React.createElement(resolveIcon("layers"), {
-            size: 24,
-            className: "text-gray-400",
-          })}
-          <div className="text-sm font-medium text-gray-600">No Executions Found</div>
-          <div className="text-xs text-gray-500">This trigger event doesn't have any associated executions yet.</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full">
       {/* Scrollable Section with Event and Executions */}
@@ -470,11 +455,11 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
             )}
 
             {/* Executions Section */}
-            {chainItems.length > 0 && (
-              <div>
-                <h2 className="text-[13px] font-medium text-gray-500 mb-3">
-                  {chainItems.length} Step{chainItems.length === 1 ? "" : "s"}
-                </h2>
+            <div>
+              <h2 className="text-[13px] font-medium text-gray-500 mb-3">
+                {chainItems.length} Step{chainItems.length === 1 ? "" : "s"}
+              </h2>
+              {chainItems.length > 0 ? (
                 <div>
                   {chainItems.map((item, index) => (
                     <div key={item.id} data-execution-id={item.executionId}>
@@ -490,8 +475,21 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="flex items-center justify-center py-8">
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    {React.createElement(resolveIcon("layers"), {
+                      size: 24,
+                      className: "text-gray-400",
+                    })}
+                    <div className="text-sm font-medium text-gray-600">No Executions Found</div>
+                    <div className="text-xs text-gray-500">
+                      This trigger event doesn't have any associated executions yet.
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

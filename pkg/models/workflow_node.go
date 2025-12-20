@@ -14,6 +14,7 @@ import (
 const (
 	WorkflowNodeStateReady      = "ready"
 	WorkflowNodeStateProcessing = "processing"
+	WorkflowNodeStateError      = "error"
 
 	NodeTypeTrigger   = "trigger"
 	NodeTypeComponent = "component"
@@ -26,6 +27,7 @@ type WorkflowNode struct {
 	ParentNodeID      *string
 	Name              string
 	State             string
+	StateReason       *string
 	Type              string
 	Position          datatypes.JSONType[Position]
 	Ref               datatypes.JSONType[NodeRef]

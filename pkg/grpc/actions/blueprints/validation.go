@@ -20,6 +20,27 @@ func ValidateNodeConfigurations(nodes []models.Node, registry *registry.Registry
 	return nil
 }
 
+func validateAndMarkNodeErrors(nodes []models.Node, registry *registry.Registry) []models.Node {
+	result := make([]models.Node, len(nodes))
+
+	for i, node := range nodes {
+		result[i] = node
+
+		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
+			continue
+		}
+
+		if err := ValidateNodeConfiguration(node, registry); err != nil {
+			errorMsg := err.Error()
+			result[i].ErrorMessage = &errorMsg
+		} else {
+			result[i].ErrorMessage = nil
+		}
+	}
+
+	return result
+}
+
 func ValidateNodeConfiguration(node models.Node, registry *registry.Registry) error {
 	switch node.Type {
 	case models.NodeTypeComponent:
