@@ -360,11 +360,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Health check
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
-
-	// Owner setup endpoint (for first-run setup when enabled)
-	if middleware.OwnerSetupEnabled() {
-		publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
-	}
+	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
 
 	// Test endpoints
 	publicRoute.HandleFunc("/server1", func(w http.ResponseWriter, r *http.Request) {

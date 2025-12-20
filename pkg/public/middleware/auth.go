@@ -81,7 +81,7 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				path := r.URL.Path
 
 				// Allow the setup flow and static assets through without auth
-				if path == "/setup" || strings.HasPrefix(path, "/assets") {
+				if isOwnerSetupAllowedPath(path) {
 					next.ServeHTTP(w, r)
 					return
 				}
@@ -202,6 +202,26 @@ func GetAccountFromContext(ctx context.Context) (*models.Account, bool) {
 	return account, ok
 }
 
+func isOwnerSetupAllowedPath(path string) bool {
+	if path == "/setup" || strings.HasPrefix(path, "/assets") {
+		return true
+	}
+
+	// Allow Vite dev server and module paths when running the
+	// owner setup flow in development/e2e so that the SPA can
+	// load its JS bundles, HMR client, and dependencies.
+	if strings.HasPrefix(path, "/@") || strings.HasPrefix(path, "/src/") || strings.HasPrefix(path, "/node_modules/") {
+		return true
+	}
+
+	switch path {
+	case "/favicon.ico", "/robots.txt", "/manifest.webmanifest":
+		return true
+	}
+
+	return false
+}
+
 func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, error) {
 	cookie, err := r.Cookie("account_token")
 	if err != nil {
@@ -235,4 +255,12 @@ func redirectToLoginWithOriginalURL(w http.ResponseWriter, r *http.Request) {
 	redirectURL := url.QueryEscape(r.URL.RequestURI())
 	loginURL := fmt.Sprintf("/login?redirect=%s", redirectURL)
 	http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
+}
+
+func ResetOwnerSetupStateForTests() {
+	ownerSetupEnabled = true
+
+	ownerSetupMu.Lock()
+	ownerSetupNeededCache = nil
+	ownerSetupMu.Unlock()
 }

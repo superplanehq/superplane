@@ -53,6 +53,13 @@ func (s *TestSession) Start() {
 	s.setupUserAndOrganization()
 }
 
+// StartWithoutUser resets the database but does not seed any user or
+// organization records. This is useful for flows that expect an empty
+// instance, such as the first-run owner setup.
+func (s *TestSession) StartWithoutUser() {
+	s.resetDatabase()
+}
+
 func (s *TestSession) Close() {
 	if s.page != nil {
 		_ = s.page.Close()

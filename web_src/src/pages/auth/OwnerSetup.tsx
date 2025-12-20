@@ -1,7 +1,7 @@
 import React, { useState } from "react";
+import { Input, InputGroup } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
 import { Button } from "../../ui/button";
-import { Input, InputGroup } from "../../components/Input/input";
 
 const OwnerSetup: React.FC = () => {
   const [email, setEmail] = useState("");
