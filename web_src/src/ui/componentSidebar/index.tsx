@@ -634,12 +634,6 @@ export const ComponentSidebar = ({
                 page={page as "history" | "queue" | "execution-chain"}
                 onBackToOverview={handleBackToOverview}
                 previousPage={previousPage}
-                showSearchAndFilter={page !== "execution-chain"}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                statusFilter={statusFilter}
-                onStatusFilterChange={(value) => setStatusFilter(value as ChildEventsState | "all")}
-                extraStatusOptions={extraStatusOptions}
               />
 
               <div className="relative flex-1 min-h-0 overflow-hidden">
@@ -683,8 +677,6 @@ export const ComponentSidebar = ({
                       loadingMoreItems={loadingMoreItems}
                       showMoreCount={showMoreCount}
                       onLoadMoreItems={handleLoadMoreItems}
-                      searchQuery={searchQuery}
-                      statusFilter={statusFilter}
                     />
                   )}
                 </div>
