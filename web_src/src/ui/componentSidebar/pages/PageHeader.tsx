@@ -56,7 +56,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
         case "queue":
           return "Back to Queue";
         default:
-          return "Back to Overview";
+          return "All Runs";
       }
     }
     return "Back to Overview";
@@ -68,7 +68,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
       <div className="px-3 py-2 border-b-1 border-border">
         <button
           onClick={onBackToOverview}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 cursor-pointer"
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 font-medium cursor-pointer"
         >
           <ArrowLeft size={16} />
           {getBackButtonText()}
@@ -79,7 +79,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
       {showSearchAndFilter && (
         <div className={`px-3 py-3`}>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold uppercase text-gray-500">{getPageTitle()}</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500">{getPageTitle()}</h2>
           </div>
           <div className="flex gap-2">
             {/* Search Input */}

@@ -54,7 +54,7 @@ export function BuildingBlocksSidebar({
         onClick={() => onToggle(true)}
         aria-label="Open sidebar"
         data-testid="open-sidebar-button"
-        className="absolute top-4 right-16 z-10"
+        className="absolute top-4 right-4 z-10"
       >
         <Plus size={16} />
         Components
@@ -72,34 +72,6 @@ export function BuildingBlocksSidebar({
   const [isResizing, setIsResizing] = useState(false);
   const [hoveredBlock, setHoveredBlock] = useState<BuildingBlock | null>(null);
   const dragPreviewRef = useRef<HTMLDivElement>(null);
-
-  // Close sidebar when clicking outside (for clicks in header, etc.)
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      // Don't close if we're dragging or resizing
-      if (isDraggingRef.current || isResizing) {
-        return;
-      }
-
-      // Don't close if clicking on the toggle button (it has its own handler)
-      const target = event.target as HTMLElement;
-      if (target.closest('[aria-label="Open sidebar"]')) {
-        return;
-      }
-
-      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
-        onToggle(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isOpen, onToggle, isResizing]);
 
   // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
@@ -164,56 +136,56 @@ export function BuildingBlocksSidebar({
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
       data-testid="building-blocks-sidebar"
     >
       {/* Resize handle */}
       <div
         onMouseDown={handleMouseDown}
-        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-blue-50 transition-colors flex items-center justify-center group ${
+        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group ${
           isResizing ? "bg-blue-50" : ""
         }`}
         style={{ marginLeft: "-8px" }}
       >
         <div
-          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
+          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors ${
             isResizing ? "bg-blue-500" : ""
           }`}
         />
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-border bg-gray-50">
-        <div className="flex flex-col items-start gap-3 w-full mt-2">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 relative">
+        <div className="flex flex-col items-start gap-3 w-full">
           <div className="flex justify-between gap-3 w-full">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-xl font-semibold">New Component</h2>
+            <div className="flex flex-col gap-0.5">
+              <h2 className="text-base font-semibold">New Component</h2>
             </div>
           </div>
           <div
             onClick={() => onToggle(false)}
-            className="flex items-center justify-center absolute top-6 right-3 cursor-pointer"
+            className="absolute top-3 right-2 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
           >
-            <X size={18} />
+            <X size={16} />
           </div>
         </div>
       </div>
 
       {/* Search */}
-      <div className="flex items-center gap-2 px-3 py-3 border-b-1 border-border">
+      <div className="flex items-center gap-2 px-4">
         <div className="flex-1">
           <input
             type="text"
             placeholder="Filter components..."
-            className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-800 focus:border-transparent"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
-      <div className="gap-2 py-3">
+      <div className="gap-2 py-4">
         {sortedCategories.map((category) => (
           <CategorySection
             key={category.name}
@@ -305,10 +277,10 @@ function CategorySection({
   }
 
   return (
-    <details className="flex-1 px-5 mb-4" open>
-      <summary className="cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 mb-1 flex items-center gap-1 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
+    <details className="flex-1 px-4 mb-4" open>
+      <summary className="cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 mb-3 flex items-center gap-1 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
         <ChevronRight className="h-3 w-3 transition-transform [[details[open]]>&]:rotate-90" />
-        <span className="text-sm font-medium pl-1">{category.name}</span>
+        <span className="text-[13px] text-gray-500 font-medium pl-1">{category.name}</span>
       </summary>
 
       <ItemGroup>
@@ -387,18 +359,18 @@ function CategorySection({
               }}
               aria-disabled={!isLive}
               title={isLive ? undefined : "Coming soon"}
-              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-gray-50 dark:hover:bg-gray-800/50`}
+              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-sky-100`}
               size="sm"
             >
               <ItemMedia>
-                <IconComponent size={14} className="text-gray-800" />
+                <IconComponent size={14} className="text-gray-500" />
               </ItemMedia>
 
               <ItemContent>
                 <div className="flex items-center gap-2">
-                  <ItemTitle className="text-xs font-normal">{block.label || block.name}</ItemTitle>
+                  <ItemTitle className="text-sm font-medium">{block.label || block.name}</ItemTitle>
                   {block.deprecated && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 rounded whitespace-nowrap">
+                    <span className="px-1.5 py-0.5 text-[11px] font-medium bg-orange-100 text-amber-800 rounded whitespace-nowrap">
                       Deprecated
                     </span>
                   )}

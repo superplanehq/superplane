@@ -152,7 +152,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         <button
                           data-testid={`edit-integration-${integration.metadata?.name || ""}`}
                           onClick={() => handleEditIntegration(integration)}
-                          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+                          className="p-1 text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
                           title="Edit integration"
                         >
                           <Icon name="edit" size="sm" />
@@ -176,7 +176,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select Integration Type</h3>
                 <button
                   onClick={() => setIsIntegrationSelectorOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
                 >
                   <Icon name="close" size="sm" />
                 </button>

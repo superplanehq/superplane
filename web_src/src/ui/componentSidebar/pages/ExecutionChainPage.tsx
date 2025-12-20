@@ -412,35 +412,38 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full pt-1">
-      {/* Fixed Header Section */}
-      {triggerEvent && (
-        <div className="px-3 flex-shrink-0 mb-1 pb-4 border-b border-gray-200">
-          <h2 className="text-md font-semibold text-gray-900 mb-1">{triggerEvent.title || "Execution Chain"}</h2>
-          {summaryInfo && (
-            <div className="text-sm text-gray-500">
-              {summaryInfo.timeAgo}
-              {summaryInfo.duration && (
-                <>
-                  <span className="mx-1">•</span>
-                  Duration: {summaryInfo.duration}
-                </>
-              )}
-              <span className="mx-1">•</span>
-              {summaryInfo.stepCount} step{summaryInfo.stepCount !== 1 ? "s" : ""}
-            </div>
-          )}
-        </div>
-      )}
-
+    <div className="flex flex-col h-full">
       {/* Scrollable Section with Event and Executions */}
-      <div className="flex-1 flex flex-col min-h-0 mt-2">
-        <div ref={executionsScrollRef} className="flex-1 overflow-y-auto px-3">
+      <div className="flex-1 flex flex-col min-h-0">
+        <div ref={executionsScrollRef} className="flex-1 overflow-y-auto p-4">
           <div className="pb-15">
+            {triggerEvent && (
+              <div className="mb-6 border-b-1 border-border pb-4">
+                <h2 className="text-sm font-medium text-gray-800 flex items-center gap-2">
+                  {triggerEvent.id && (
+                    <span className="text-xs text-gray-500 font-mono">#{triggerEvent.id.slice(0, 4)}</span>
+                  )}
+                  {triggerEvent.title || "Execution Chain"}
+                </h2>
+                {summaryInfo && (
+                  <div className="text-[13px] text-gray-500">
+                    {summaryInfo.timeAgo}
+                    {summaryInfo.duration && (
+                      <>
+                        <span className="mx-1">·</span>
+                        Duration: {summaryInfo.duration}
+                      </>
+                    )}
+                    <span className="mx-1">·</span>
+                    {summaryInfo.stepCount} step{summaryInfo.stepCount !== 1 ? "s" : ""}
+                  </div>
+                )}
+              </div>
+            )}
             {/* Event Section (now scrollable) */}
             {triggerEvent && (
               <div className="mb-6">
-                <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-1">Triggered</h2>
+                <h2 className="text-[13px] font-medium text-gray-500 mb-3">This run was triggered by</h2>
                 <ChainItem
                   item={convertSidebarEventToChainItem(triggerEvent, workflowNodes, components, triggers, getTabData)}
                   index={-1}
@@ -455,8 +458,8 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
 
             {/* Executions Section */}
             <div>
-              <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 px-1">
-                {chainItems.length > 0 ? `${chainItems.length} Step${chainItems.length === 1 ? "" : "s"}` : "Steps"}
+              <h2 className="text-[13px] font-medium text-gray-500 mb-3">
+                {chainItems.length} Step{chainItems.length === 1 ? "" : "s"}
               </h2>
               {chainItems.length > 0 ? (
                 <div>

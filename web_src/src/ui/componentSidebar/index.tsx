@@ -453,44 +453,46 @@ export const ComponentSidebar = ({
     };
   }, [onHighlightedNodesChange]);
 
+  const isDetailView = page !== "overview";
+
   if (!isOpen) return null;
 
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white shadow-2xl flex flex-col"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white flex flex-col"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize handle */}
       <div
         onMouseDown={handleMouseDown}
-        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-blue-50 transition-colors flex items-center justify-center group ${
+        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group z-30 ${
           isResizing ? "bg-blue-50" : ""
         }`}
         style={{ marginLeft: "-8px" }}
       >
         <div
-          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
+          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors ${
             isResizing ? "bg-blue-500" : ""
           }`}
         />
       </div>
-      <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-border bg-gray-50">
-        <div className="flex flex-col items-start gap-3 w-full mt-2">
+      <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-8 relative border-b-1 border-border">
+        <div className="flex flex-col items-start gap-3 w-full">
           <div className="flex justify-between gap-3 w-full">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2">
                 <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
                   {iconSrc ? <img src={iconSrc} alt={nodeName} className="w-6 h-6" /> : <Icon size={16} />}
                 </div>
-                <h2 className="text-xl font-semibold">{isTemplateNode ? newNodeData.nodeName : nodeName}</h2>
+                <h2 className="text-base font-semibold">{isTemplateNode ? newNodeData.nodeName : nodeName}</h2>
               </div>
               {nodeId && !isTemplateNode && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500 font-mono">{nodeId}</span>
                   <button
                     onClick={handleCopyNodeId}
-                    className={"text-gray-400 hover:text-gray-600"}
+                    className={"text-gray-500 hover:text-gray-800"}
                     title={justCopied ? "Copied!" : "Copy Node ID"}
                   >
                     {justCopied ? <Check size={14} /> : <Copy size={14} />}
@@ -499,7 +501,7 @@ export const ComponentSidebar = ({
               )}
             </div>
             {!templateNodeId && (
-              <div className="absolute top-14 right-[0.8rem]">
+              <div className="absolute top-3 right-9 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none pt-0.5">
                 <SidebarActionsDropdown
                   onRun={onRun}
                   runDisabled={runDisabled}
@@ -518,99 +520,30 @@ export const ComponentSidebar = ({
           </div>
           <div
             onClick={() => onClose?.()}
-            className="flex items-center justify-center absolute top-5 right-3 cursor-pointer"
+            className="absolute top-3 right-2 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
           >
-            <X size={18} />
+            <X size={16} />
           </div>
         </div>
       </div>
-      {page !== "overview" ? (
-        <div className="flex flex-col flex-1 min-h-0">
-          <PageHeader
-            page={page as "history" | "queue" | "execution-chain"}
-            onBackToOverview={handleBackToOverview}
-            previousPage={previousPage}
-            showSearchAndFilter={page !== "execution-chain"}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            statusFilter={statusFilter}
-            onStatusFilterChange={(value) => setStatusFilter(value as ChildEventsState | "all")}
-            extraStatusOptions={extraStatusOptions}
-          />
-
-          <div className={`${page === "execution-chain" ? "flex flex-col flex-1 min-h-0" : "py-2 px-2 pb-3"}`}>
-            {page === "execution-chain" ? (
-              <ExecutionChainPage
-                eventId={executionChainEventId}
-                triggerEvent={executionChainTriggerEvent || undefined}
-                selectedExecutionId={selectedExecutionId}
-                loadExecutionChain={loadExecutionChain}
-                openEventIds={openEventIds}
-                onToggleOpen={handleToggleOpen}
-                getExecutionState={getExecutionState}
-                getTabData={getTabData}
-                onEventClick={onEventClick}
-                workflowNodes={workflowNodes}
-                components={components}
-                triggers={triggers}
-                blueprints={blueprints}
-                onHighlightedNodesChange={onHighlightedNodesChange}
-              />
-            ) : (
-              <HistoryQueuePage
-                page={page as "history" | "queue"}
-                filteredEvents={filteredHistoryEvents}
-                openEventIds={openEventIds}
-                onToggleOpen={handleToggleOpen}
-                onEventClick={onEventClick}
-                onTriggerNavigate={(event) => {
-                  if (event.kind === "trigger") {
-                    const eventId = event.triggerEventId || event.id;
-                    handleSeeExecutionChain(eventId, event);
-                  } else if (event.kind === "execution") {
-                    const node = workflowNodes?.find((n) => n.id === event.originalExecution?.rootEvent?.nodeId);
-
-                    const rootEventId = event.originalExecution?.rootEvent?.id;
-                    if (rootEventId && node && event.originalExecution?.rootEvent) {
-                      const triggerEvent = mapTriggerEventToSidebarEvent(event.originalExecution?.rootEvent, node);
-                      handleSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
-                    } else {
-                      const eventId = event.triggerEventId || event.id;
-                      handleSeeExecutionChain(eventId, event, event.executionId);
-                    }
-                  }
-                }}
-                getTabData={getTabData}
-                onPushThrough={onPushThrough}
-                onCancelExecution={onCancelExecution}
-                supportsPushThrough={supportsPushThrough}
-                onReEmit={onReEmit}
-                loadExecutionChain={loadExecutionChain}
-                getExecutionState={getExecutionState}
-                hasMoreItems={hasMoreItems}
-                loadingMoreItems={loadingMoreItems}
-                showMoreCount={showMoreCount}
-                onLoadMoreItems={handleLoadMoreItems}
-                searchQuery={searchQuery}
-                statusFilter={statusFilter}
-              />
-            )}
-          </div>
-        </div>
-      ) : (
-        <>
+      <div className="relative flex-1 min-h-0 overflow-hidden">
+        <div
+          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${
+            isDetailView ? "-translate-x-full" : "translate-x-0"
+          } ${isDetailView ? "pointer-events-none" : "pointer-events-auto"}`}
+        >
           <Tabs
             value={activeTab}
             onValueChange={(value) => onTabChange?.(value as "latest" | "settings")}
             className="flex-1"
           >
             {showSettingsTab && (
-              <div className="px-3">
-                <div className="flex border-gray-200 dark:border-gray-700">
+              <div className="border-gray-300 border-b-1">
+                <div className="flex px-4">
                   <button
                     onClick={() => !isTemplateNode && onTabChange?.("latest")}
                     disabled={isTemplateNode}
-                    className={`px-4 py-2 text-sm font-medium border-b transition-colors ${
+                    className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
                       isTemplateNode
                         ? "border-transparent text-gray-300 cursor-not-allowed dark:text-gray-600"
                         : activeTab === "latest"
@@ -618,17 +551,17 @@ export const ComponentSidebar = ({
                           : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                     }`}
                   >
-                    Latest
+                    Runs
                   </button>
                   <button
                     onClick={() => onTabChange?.("settings")}
-                    className={`px-4 py-2 text-sm font-medium border-b transition-colors ${
+                    className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
                       activeTab === "settings"
                         ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
                         : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                     }`}
                   >
-                    Settings
+                    Configuration
                   </button>
                 </div>
               </div>
@@ -687,8 +620,89 @@ export const ComponentSidebar = ({
               </TabsContent>
             )}
           </Tabs>
-        </>
-      )}
+        </div>
+
+        <div
+          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${
+            isDetailView ? "translate-x-0" : "translate-x-full"
+          } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
+        >
+          {page !== "overview" && (
+            <div className="flex flex-col flex-1 min-h-0 bg-white">
+              <PageHeader
+                page={page as "history" | "queue" | "execution-chain"}
+                onBackToOverview={handleBackToOverview}
+                previousPage={previousPage}
+                showSearchAndFilter={page !== "execution-chain"}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                statusFilter={statusFilter}
+                onStatusFilterChange={(value) => setStatusFilter(value as ChildEventsState | "all")}
+                extraStatusOptions={extraStatusOptions}
+              />
+
+              <div className={`${page === "execution-chain" ? "flex flex-col flex-1 min-h-0" : "py-2 px-2 pb-3"}`}>
+                {page === "execution-chain" ? (
+                  <ExecutionChainPage
+                    eventId={executionChainEventId}
+                    triggerEvent={executionChainTriggerEvent || undefined}
+                    selectedExecutionId={selectedExecutionId}
+                    loadExecutionChain={loadExecutionChain}
+                    openEventIds={openEventIds}
+                    onToggleOpen={handleToggleOpen}
+                    getExecutionState={getExecutionState}
+                    getTabData={getTabData}
+                    onEventClick={onEventClick}
+                    workflowNodes={workflowNodes}
+                    components={components}
+                    triggers={triggers}
+                    blueprints={blueprints}
+                    onHighlightedNodesChange={onHighlightedNodesChange}
+                  />
+                ) : (
+                  <HistoryQueuePage
+                    page={page as "history" | "queue"}
+                    filteredEvents={filteredHistoryEvents}
+                    openEventIds={openEventIds}
+                    onToggleOpen={handleToggleOpen}
+                    onEventClick={onEventClick}
+                    onTriggerNavigate={(event) => {
+                      if (event.kind === "trigger") {
+                        const eventId = event.triggerEventId || event.id;
+                        handleSeeExecutionChain(eventId, event);
+                      } else if (event.kind === "execution") {
+                        const node = workflowNodes?.find((n) => n.id === event.originalExecution?.rootEvent?.nodeId);
+
+                        const rootEventId = event.originalExecution?.rootEvent?.id;
+                        if (rootEventId && node && event.originalExecution?.rootEvent) {
+                          const triggerEvent = mapTriggerEventToSidebarEvent(event.originalExecution?.rootEvent, node);
+                          handleSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
+                        } else {
+                          const eventId = event.triggerEventId || event.id;
+                          handleSeeExecutionChain(eventId, event, event.executionId);
+                        }
+                      }
+                    }}
+                    getTabData={getTabData}
+                    onPushThrough={onPushThrough}
+                    onCancelExecution={onCancelExecution}
+                    supportsPushThrough={supportsPushThrough}
+                    onReEmit={onReEmit}
+                    loadExecutionChain={loadExecutionChain}
+                    getExecutionState={getExecutionState}
+                    hasMoreItems={hasMoreItems}
+                    loadingMoreItems={loadingMoreItems}
+                    showMoreCount={showMoreCount}
+                    onLoadMoreItems={handleLoadMoreItems}
+                    searchQuery={searchQuery}
+                    statusFilter={statusFilter}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

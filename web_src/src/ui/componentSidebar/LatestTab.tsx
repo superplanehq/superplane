@@ -86,8 +86,8 @@ export const LatestTab = ({
 
   return (
     <div className="overflow-y-auto pb-20" style={{ maxHeight: "85vh" }}>
-      <div className="px-3 py-1 border-b-1 border-border pb-3 text-left">
-        <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Latest</h2>
+      <div className="p-4 border-b-1 border-border text-left">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Latest</h2>
         <div className="flex flex-col">
           {latestEvents.length === 0 ? (
             <div className="text-center py-4 text-gray-500 text-sm">No events found</div>
@@ -119,7 +119,7 @@ export const LatestTab = ({
               {handleSeeFullHistory && (
                 <button
                   onClick={handleSeeFullHistory}
-                  className="text-sm text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
+                  className="text-sm text-gray-500 font-medium hover:text-gray-800 flex items-center gap-1 mt-4"
                 >
                   <TextAlignStart size={16} />
                   See full history
@@ -130,11 +130,11 @@ export const LatestTab = ({
         </div>
       </div>
       {!hideQueueEvents && (
-        <div className="px-3 py-1 pb-3 text-left">
-          <h2 className="text-xs font-semibold uppercase text-gray-500 my-2">Queued</h2>
+        <div className="p-4 text-left">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Queued</h2>
           <div className="flex flex-col">
             {nextInQueueEvents.length === 0 ? (
-              <div className="text-center py-4 text-gray-500 text-sm">Queue is empty</div>
+              <div className="text-center py-4 text-gray-500 text-sm font-medium">Queue is empty</div>
             ) : (
               <>
                 {nextInQueueEvents.slice(0, 5).map((event, index) => {

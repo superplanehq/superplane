@@ -4,7 +4,7 @@ import { Icon } from "@/components/Icon";
 import { useAccount } from "@/contexts/AccountContext";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { resolveIcon } from "@/lib/utils";
-import { Save, Undo2 } from "lucide-react";
+import { ChevronDown, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../button";
 
@@ -43,58 +43,30 @@ export function Header({
 }: HeaderProps) {
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId || "");
-  const forceSidebarVisible = false;
-  const [isSidebarOpen, setIsSidebarOpen] = useState(forceSidebarVisible);
-  const sidebarTimeoutRef = useRef<number | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const clearSidebarTimeout = () => {
-    if (sidebarTimeoutRef.current !== null) {
-      window.clearTimeout(sidebarTimeoutRef.current);
-      sidebarTimeoutRef.current = null;
+  const handleLogoButtonClick = () => {
+    if (!organizationId) {
+      onLogoClick?.();
+      return;
     }
-  };
 
-  const openSidebar = () => {
-    clearSidebarTimeout();
-    setIsSidebarOpen(true);
-  };
-
-  const scheduleSidebarClose = () => {
-    if (forceSidebarVisible) return;
-    clearSidebarTimeout();
-    sidebarTimeoutRef.current = window.setTimeout(() => {
-      setIsSidebarOpen(false);
-    }, 150);
-  };
-
-  const handleLogoMouseEnter = () => {
-    if (forceSidebarVisible) return;
-    if (!organizationId) return;
-    openSidebar();
-  };
-
-  const handleLogoMouseLeave = () => {
-    if (forceSidebarVisible) return;
-    if (!organizationId) return;
-    scheduleSidebarClose();
-  };
-
-  const handleSidebarMouseEnter = () => {
-    if (forceSidebarVisible) return;
-    if (!organizationId) return;
-    openSidebar();
-  };
-
-  const handleSidebarMouseLeave = () => {
-    if (forceSidebarVisible) return;
-    if (!organizationId) return;
-    scheduleSidebarClose();
+    setIsMenuOpen((prev) => !prev);
   };
 
   useEffect(() => {
-    return () => clearSidebarTimeout();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!isMenuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isMenuOpen]);
 
   // const accountInitials = account?.name
   //   ? account.name
@@ -137,21 +109,104 @@ export function Header({
   ];
 
   const handleSignOut = () => {
+    setIsMenuOpen(false);
     window.location.href = "/logout";
   };
 
   return (
     <>
       <header className="bg-white border-b border-border">
-        <div className="relative flex items-center justify-between h-12 px-4">
+        <div className="relative flex items-center justify-between h-12 px-3">
           {/* Logo */}
-          <div className="flex items-center" onMouseEnter={handleLogoMouseEnter} onMouseLeave={handleLogoMouseLeave}>
-            {onLogoClick ? (
-              <button onClick={onLogoClick} className="cursor-pointer" aria-label="Go to organization homepage">
-                <img src={SuperplaneLogo} alt="Logo" className="w-8 h-8" />
-              </button>
-            ) : (
-              <img src={SuperplaneLogo} alt="Logo" className="w-8 h-8" />
+          <div className="relative flex items-center" ref={menuRef}>
+            <button
+              onClick={handleLogoButtonClick}
+              className="flex items-center gap-1 cursor-pointer"
+              aria-label="Open organization menu"
+              aria-expanded={isMenuOpen}
+            >
+              <img src={SuperplaneLogo} alt="Logo" className="w-7 h-7" />
+              {organizationId && (
+                <ChevronDown
+                  size={16}
+                  className={`text-gray-400 transition-transform ${isMenuOpen ? "rotate-180" : ""}`}
+                />
+              )}
+            </button>
+            {organizationId && isMenuOpen && (
+              <div className="absolute left-0 top-13 z-50 w-60 rounded-md outline outline-slate-950/15 bg-white shadow-lg">
+                <div className="px-4 pt-3 pb-4 border-b border-gray-300">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-100 bg-gray-800 inline px-1 py-0.5 rounded">
+                    Org
+                  </p>
+                  <div className="flex items-center gap-3 mt-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{organizationName}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-col">
+                    {sidebarOrganizationLinks.map((link) => (
+                      <a
+                        key={link.label}
+                        href={link.href}
+                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-blue-100 hover:text-gray-900"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        <Icon
+                          name={link.icon}
+                          size="sm"
+                          className="text-gray-500 transition group-hover:text-gray-900"
+                        />
+                        <span>{link.label}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+                <div className="px-4 pt-3 pb-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-800 bg-purple-200 inline px-1 py-0.5 rounded">
+                    You
+                  </p>
+                  <div className="flex items-center gap-3 mt-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{account?.name || "Loading..."}</p>
+                      <p className="text-[13px] text-gray-500 font-medium truncate">{account?.email || "Loading..."}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-col">
+                    {sidebarUserLinks.map((link) =>
+                      link.href ? (
+                        <a
+                          key={link.label}
+                          href={link.href}
+                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-blue-100 hover:text-gray-900"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          <Icon
+                            name={link.icon}
+                            size="sm"
+                            className="text-gray-500 transition group-hover:text-gray-900"
+                          />
+                          <span>{link.label}</span>
+                        </a>
+                      ) : (
+                        <button
+                          key={link.label}
+                          type="button"
+                          onClick={link.onClick}
+                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-blue-100 hover:text-gray-900"
+                        >
+                          <Icon
+                            name={link.icon}
+                            size="sm"
+                            className="text-gray-500 transition group-hover:text-gray-900"
+                          />
+                          <span>{link.label}</span>
+                        </button>
+                      ),
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
@@ -241,96 +296,12 @@ export function Header({
                 variant={saveIsPrimary ? "default" : "outline"}
                 data-testid="save-canvas-button"
               >
-                <Save />
                 Save
               </Button>
             )}
           </div>
         </div>
       </header>
-      {organizationId && (
-        <div
-          className={`fixed inset-y-0 left-0 z-[60] w-60 border-r border-border bg-white shadow-lg transition-all duration-200 ease-in-out ${
-            isSidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0 pointer-events-none"
-          }`}
-          onMouseEnter={handleSidebarMouseEnter}
-          onMouseLeave={handleSidebarMouseLeave}
-        >
-          <div className="flex h-full flex-col overflow-y-auto bg-white">
-            <div>
-              <div className="flex items-center gap-3 h-12 px-4">
-                <img src={SuperplaneLogo} alt="Superplane" className="h-8 w-8" />
-              </div>
-            </div>
-
-            <div className="p-4 border-b border-t border-gray-300">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Organization</p>
-              <div className="mt-2 flex items-center gap-3">
-                {/* <Avatar
-                  initials={organizationInitial}
-                  alt={organizationName}
-                  className="size-8 bg-gray-900 text-gray-100 font-semibold"
-                /> */}
-                <div className="min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{organizationName}</p>
-                </div>
-              </div>
-              <div className="mt-2 flex flex-col">
-                {sidebarOrganizationLinks.map((link) => (
-                  <a
-                    key={link.label}
-                    href={link.href}
-                    className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-blue-100 hover:text-gray-900"
-                  >
-                    <Icon name={link.icon} size="sm" className="text-gray-500 transition group-hover:text-gray-900" />
-                    <span>{link.label}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">You</p>
-              <div className="mt-2 flex items-center gap-3">
-                {/* <Avatar
-                  src={account?.avatar_url}
-                  initials={accountInitials}
-                  alt={account?.name || "User"}
-                  className="size-8 bg-gray-900 text-gray-100"
-                /> */}
-                <div className="min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{account?.name || "Loading..."}</p>
-                  <p className="text-[13px] text-gray-500 font-medium truncate">{account?.email || "Loading..."}</p>
-                </div>
-              </div>
-              <div className="mt-2 flex flex-col">
-                {sidebarUserLinks.map((link) =>
-                  link.href ? (
-                    <a
-                      key={link.label}
-                      href={link.href}
-                      className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-blue-100 hover:text-gray-900"
-                    >
-                      <Icon name={link.icon} size="sm" className="text-gray-500 transition group-hover:text-gray-900" />
-                      <span>{link.label}</span>
-                    </a>
-                  ) : (
-                    <button
-                      key={link.label}
-                      type="button"
-                      onClick={link.onClick}
-                      className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-blue-100 hover:text-gray-900"
-                    >
-                      <Icon name={link.icon} size="sm" className="text-gray-500 transition group-hover:text-gray-900" />
-                      <span>{link.label}</span>
-                    </button>
-                  ),
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
