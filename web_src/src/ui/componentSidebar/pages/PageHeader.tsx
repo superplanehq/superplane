@@ -1,40 +1,13 @@
 import React from "react";
-import { ArrowLeft, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChildEventsState } from "../../composite";
-
-const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
-  { value: "processed", label: "Processed" },
-  { value: "discarded", label: "Failed" },
-  { value: "running", label: "Running" },
-];
+import { ArrowLeft } from "lucide-react";
 
 interface PageHeaderProps {
   page: "history" | "queue" | "execution-chain";
   onBackToOverview: () => void;
   previousPage?: "overview" | "history" | "queue";
-
-  // Search and filter props (only for history/queue)
-  showSearchAndFilter?: boolean;
-  searchQuery?: string;
-  onSearchChange?: (value: string) => void;
-  statusFilter?: string;
-  onStatusFilterChange?: (value: string) => void;
-  extraStatusOptions?: string[];
 }
 
-export const PageHeader: React.FC<PageHeaderProps> = ({
-  page,
-  onBackToOverview,
-  previousPage = "overview",
-  showSearchAndFilter = false,
-  searchQuery = "",
-  onSearchChange,
-  statusFilter = "all",
-  onStatusFilterChange,
-  extraStatusOptions = [],
-}) => {
+export const PageHeader: React.FC<PageHeaderProps> = ({ page, onBackToOverview, previousPage = "overview" }) => {
   const getBackButtonText = () => {
     if (page === "execution-chain") {
       switch (previousPage) {
