@@ -435,11 +435,6 @@ export const ComponentSidebar = ({
     return Array.from(statuses);
   }, [allEvents]);
 
-  const extraStatusOptions = React.useMemo(
-    () => statusOptions.filter((status) => !DEFAULT_STATUS_OPTIONS.some((option) => option.value === status)),
-    [statusOptions],
-  );
-
   // Clear highlights when sidebar closes or when leaving execution chain page
   useEffect(() => {
     if (!isOpen && onHighlightedNodesChange) {
@@ -677,6 +672,8 @@ export const ComponentSidebar = ({
                       loadingMoreItems={loadingMoreItems}
                       showMoreCount={showMoreCount}
                       onLoadMoreItems={handleLoadMoreItems}
+                      searchQuery={searchQuery}
+                      statusFilter={statusFilter}
                     />
                   )}
                 </div>
@@ -701,6 +698,8 @@ export const ComponentSidebar = ({
                       triggers={triggers}
                       blueprints={blueprints}
                       onHighlightedNodesChange={onHighlightedNodesChange}
+                      searchQuery={searchQuery}
+                      statusFilter={statusFilter}
                     />
                   )}
                 </div>
