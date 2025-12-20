@@ -81,7 +81,7 @@ stop_spinner() {
 : "${START_WEBHOOK_CLEANUP_WORKER:=yes}"
 : "${START_WORKFLOW_CLEANUP_WORKER:=yes}"
 
-# Reasonable defaults so the server can start without extra config.
+# Reasonable defaults so the demo server can start without extra config.
 : "${ENCRYPTION_KEY:=1234567890abcdefghijklmnopqrstuv}"
 : "${JWT_SECRET:=1234567890abcdefghijklmnopqrstuv}"
 : "${SESSION_SECRET:=1234567890abcdefghijklmnopqrstuv}"
@@ -162,15 +162,17 @@ if [ "${CLOUDFLARE_QUICK_TUNNEL}" = "1" ]; then
   cloudflared tunnel --no-autoupdate --url "http://127.0.0.1:8000" > /var/log/cloudflared/cloudflared.log 2>&1 &
 
   start_spinner "Creating a public URL via Cloudflare Tunnel"
-  for i in {1..30}; do
+  for i in {1..60}; do
     if [ -f /var/log/cloudflared/cloudflared.log ]; then
       URL=$(grep -Eo 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' /var/log/cloudflared/cloudflared.log | head -n 1 || true)
       if [ -n "${URL}" ]; then
+        BASE_URL="${URL}"
+        export BASE_URL
         stop_spinner
         break
       fi
     fi
-    sleep 2
+    sleep 1
   done
 fi
 
