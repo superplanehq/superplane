@@ -50,7 +50,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
     >
       <div className="w-full flex items-center">
         <div
-          className={`w-4 h-4 rounded-full overflow-hidden flex items-center justify-center mr-2 ${iconBackground || ""}`}
+          className={`w-4 h-4 overflow-hidden flex items-center justify-center mr-2 ${iconBackground || ""}`}
         >
           {iconSrc ? (
             <img src={iconSrc} alt={title} className="max-w-5 max-h-5 object-contain" />
@@ -60,7 +60,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
         </div>
         <h2 className="font-semibold text-sm">{title}</h2>
         {!hideActionsButton && (
-          <div className="absolute top-1 right-1 rounded flex items-center justify-center hover:bg-slate-950/5 h-6 w-6 leading-none nodrag">
+          <div className="absolute top-1 right-1 rounded flex items-center justify-center hover:bg-slate-950/5 h-6 w-6 leading-none pt-[1px] nodrag">
             <SidebarActionsDropdown
               dataTestId={toTestId(`node-${title}-header-dropdown`)}
               onRun={onRun}

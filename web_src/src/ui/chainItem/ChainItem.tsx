@@ -115,8 +115,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
       <div
         key={item.id + index}
         className={
-          `cursor-pointer px-4 pt-2 pb-2 relative rounded-lg border-1 ${
-            isSelected ? "border-blue-200 border-3" : "border-slate-300"
+          `cursor-pointer p-2 relative rounded-md border-1 border-slate-400 ${
+            isSelected ? "ring-[3px] ring-sky-300 ring-offset-3" : ""
           } ${EventBackground}` + (showConnectingLine ? " mb-3" : "")
         }
         onClick={(e) => {
@@ -129,14 +129,14 @@ export const ChainItem: React.FC<ChainItemProps> = ({
           <div className="flex items-center gap-2 min-w-0 flex-1">
             {/* Component Icon */}
             {(item.nodeIconSlug || item.nodeIcon) && (
-              <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+              <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
                 {React.createElement(resolveIcon(item.nodeIconSlug || item.nodeIcon), {
                   size: 16,
-                  className: "text-gray-600",
+                  className: "text-gray-800",
                 })}
               </div>
             )}
-            <span className="text-lg text-zinc-700 font-inter truncate min-w-0 font-semibold">
+            <span className="text-sm text-gray-800 truncate min-w-0 font-semibold">
               {item.nodeDisplayName || item.nodeName || item.componentName}
             </span>
           </div>
@@ -144,7 +144,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             {/* Component subtitle */}
             {componentSubtitle && <span className="text-sm text-gray-500 truncate">{componentSubtitle}</span>}
             <div
-              className={`uppercase text-sm py-[1px] px-[6px] font-semibold rounded flex items-center justify-center text-white ${EventBadgeColor}`}
+              className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${EventBadgeColor}`}
             >
               <span>{state}</span>
             </div>
@@ -152,14 +152,14 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         </div>
 
         {/* Second row: Time ago and duration */}
-        <div className="flex items-center mt-0 ml-8 gap-2">
-          <span className="text-sm text-gray-500">
+        <div className="flex items-center mt-0 ml-6 gap-2">
+          <span className="text-[13px] text-gray-950/60">
             {formatTimeAgo(new Date(item.originalExecution?.createdAt || item.originalEvent?.createdAt || ""))}
             {item.originalExecution?.state === "STATE_FINISHED" &&
               item.originalExecution?.createdAt &&
               item.originalExecution?.updatedAt && (
                 <>
-                  <span className="mx-1">•</span>
+                  <span className="mx-1">·</span>
                   <span>
                     Duration:{" "}
                     {calcRelativeTimeFromDiff(
@@ -218,22 +218,22 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         {/* Expandable content */}
         {isOpen && item.tabData && (
           <div
-            className="mt-3 ml-8 rounded-sm bg-white outline outline-black/15 text-gray-500 w-[calc(100%-2rem)] mb-0.5"
+            className="mt-3 ml-7 rounded-sm bg-white outline outline-black/20 text-gray-500 w-[calc(100%-2rem)] mb-1"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Tab Navigation */}
-            <div className="flex items-center border-b-1 border-gray-200">
+            <div className="flex items-center h-8 border-b-1 border-gray-300">
               <div className="flex">
                 {item.tabData.current && (
                   <button
                     onClick={() => setActiveTab("current")}
-                    className={`px-3 py-1 text-sm font-medium rounded-tr-md flex items-center gap-1  ${
+                    className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1  ${
                       activeTab === "current"
-                        ? "text-black border-b-1 border-black"
-                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        ? "text-gray-800 border-b-1 border-gray-800"
+                        : "text-gray-500 hover:text-gray-800"
                     }`}
                   >
-                    {React.createElement(resolveIcon("notepad-text"), { size: 16 })}
+                    {React.createElement(resolveIcon("Croissant"), { size: 16 })}
                     Details
                   </button>
                 )}
@@ -241,10 +241,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
               {item.tabData.payload && (
                 <button
                   onClick={() => setActiveTab("payload")}
-                  className={`px-3 py-1 text-sm font-medium rounded-tr-md flex items-center gap-1 ${
+                  className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1 ${
                     activeTab === "payload"
-                      ? "text-black border-b-1 border-black bg-gray-100"
-                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-l-1 border-gray-200"
+                      ? "text-gray-800 border-b-1 border-gray-800"
+                      : "text-gray-500 hover:text-gray-800"
                   }`}
                 >
                   {React.createElement(resolveIcon("code"), { size: 16 })}
@@ -262,7 +262,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
 
                   return (
                     <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                      <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                      <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
                         {key}:
                       </span>
                       {isUrlValue ? (
@@ -292,15 +292,15 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             )}
 
             {activeTab === "payload" && item.tabData.payload && (
-              <div className="w-full px-2 py-2">
+              <div className="w-full">
                 <div className="flex items-center justify-between mb-2 relative">
-                  <div className="flex items-center gap-1 absolute right-2 top-4">
+                  <div className="flex items-center gap-1 absolute right-1.5 top-1.5">
                     <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
                       <button
                         onClick={() => copyPayloadToClipboard(item.tabData!.payload)}
-                        className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                        className="p-1 rounded text-gray-500 hover:text-gray-800"
                       >
-                        {React.createElement(resolveIcon("copy"), { size: 16 })}
+                        {React.createElement(resolveIcon("copy"), { size: 14 })}
                       </button>
                     </SimpleTooltip>
                     <SimpleTooltip content="Payload">
@@ -309,14 +309,14 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                           setModalPayload(item.tabData!.payload);
                           setIsPayloadModalOpen(true);
                         }}
-                        className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                        className="p-1 text-gray-500 hover:text-gray-800"
                       >
-                        {React.createElement(resolveIcon("maximize-2"), { size: 16 })}
+                        {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
                       </button>
                     </SimpleTooltip>
                   </div>
                 </div>
-                <div className="h-50 overflow-auto border rounded bg-white">
+                <div className="h-50 overflow-auto rounded -mt-2">
                   <JsonView
                     value={
                       typeof item.tabData.payload === "string" ? JSON.parse(item.tabData.payload) : item.tabData.payload
@@ -360,7 +360,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                       setIsPayloadModalOpen(false);
                       setModalPayload(null);
                     }}
-                    className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                    className="p-1 text-gray-500 hover:text-gray-800"
                   >
                     {React.createElement(resolveIcon("x"), { size: 16 })}
                   </button>
@@ -389,7 +389,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
       </div>
 
       {/* Connecting line */}
-      {showConnectingLine && <div className="absolute left-5 -bottom-3 w-[1px] h-3 bg-gray-300 z-10" />}
+      {showConnectingLine && <div className="absolute left-5 -bottom-3 w-[1px] h-3 bg-slate-400 z-10" />}
     </div>
   );
 };

@@ -215,7 +215,7 @@ export function SettingsTab({
   };
 
   return (
-    <div className="px-3 py-3 overflow-y-auto pb-20" style={{ maxHeight: "80vh" }}>
+    <div className="p-4 overflow-y-auto pb-20" style={{ maxHeight: "80vh" }}>
       <div className="space-y-6">
         {/* Node identification section */}
         <div className="flex flex-col gap-2 h-[60px]">

@@ -333,7 +333,7 @@ export function GroupMembersPage() {
                       size="sm"
                       variant="ghost"
                       onClick={handleEditGroupName}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
                     >
                       <Icon name="edit" size="sm" />
                     </Button>
@@ -384,7 +384,7 @@ export function GroupMembersPage() {
                       variant="ghost"
                       size="sm"
                       onClick={handleEditGroupDescription}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
                     >
                       <Icon name="edit" size="sm" />
                     </Button>

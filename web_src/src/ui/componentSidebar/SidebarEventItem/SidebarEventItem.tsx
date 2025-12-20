@@ -336,7 +336,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     <div
       key={event.title + index}
       className={
-        `cursor-pointer px-4 pt-2 pb-3 relative rounded-lg border-1 border-slate-400 ${EventBackground}` +
+        `cursor-pointer p-2 relative rounded-md outline-1 outline-slate-400 hover:translate-x-1 transition-transform duration-200 ${EventBackground}` +
         (totalItems && index < totalItems - 1 ? " mb-3" : "")
       }
       onClick={(e) => {
@@ -355,20 +355,20 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       {/* First row: Badge and subtitle */}
       <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
         <div
-          className={`uppercase text-sm py-[1px] px-[6px] font-semibold rounded flex items-center justify-center text-white ${EventBadgeColor}`}
+          className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${EventBadgeColor}`}
         >
           <span>{event.state || "neutral"}</span>
         </div>
         {event.subtitle && (
-          <span className="text-sm truncate flex-shrink-0 max-w-[40%] text-gray-500">{event.subtitle}</span>
+          <span className="text-[13px] font-medium truncate flex-shrink-0 max-w-[40%] text-gray-950/50">{event.subtitle}</span>
         )}
       </div>
 
       {/* Second row: Event ID and title with actions */}
-      <div className="flex items-center mt-2 gap-2">
+      <div className="flex items-center mt-1 gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
           {event.id && <span className="text-[13px] text-gray-950/50 font-mono">#{event.id?.slice(0, 4)}</span>}
-          <span className="text-sm text-gray-700 font-inter truncate text-md min-w-0 font-semibold">{event.title}</span>
+          <span className="text-sm text-gray-800 font-inter truncate text-md min-w-0 font-medium">{event.title}</span>
         </div>
       </div>
 
@@ -474,7 +474,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
                 return (
                   <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                    <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
                       {key}:
                     </span>
                     {isUrlValue ? (
@@ -511,7 +511,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
                 return (
                   <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                    <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
                       {key}:
                     </span>
                     {isUrlValue ? (
@@ -547,7 +547,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                   <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
                     <button
                       onClick={() => copyPayloadToClipboard(tabData.payload)}
-                      className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                      className="p-1 text-gray-500 hover:text-gray-800"
                     >
                       {React.createElement(resolveIcon("copy"), { size: 16 })}
                     </button>
@@ -558,14 +558,14 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                         setModalPayload(tabData.payload);
                         setIsPayloadModalOpen(true);
                       }}
-                      className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                      className="p-1 text-gray-500 hover:text-gray-800"
                     >
                       {React.createElement(resolveIcon("maximize-2"), { size: 16 })}
                     </button>
                   </SimpleTooltip>
                 </div>
               </div>
-              <div className="h-50 overflow-auto border rounded bg-white">
+              <div className="h-50 overflow-auto rounded -mt-2">
                 <JsonView
                   value={typeof tabData.payload === "string" ? JSON.parse(tabData.payload) : tabData.payload}
                   style={{
@@ -694,7 +694,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
                 return (
                   <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0">
-                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                    <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
                       {key}:
                     </span>
                     {isUrlValue ? (
@@ -746,7 +746,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     setIsPayloadModalOpen(false);
                     setModalPayload(null);
                   }}
-                  className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                  className="p-1 hover:text-gray-700"
                 >
                   {React.createElement(resolveIcon("x"), { size: 16 })}
                 </button>

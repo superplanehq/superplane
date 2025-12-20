@@ -4,7 +4,7 @@ import { Icon } from "@/components/Icon";
 import { useAccount } from "@/contexts/AccountContext";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { resolveIcon } from "@/lib/utils";
-import { Save, Undo2 } from "lucide-react";
+import { Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../button";
 
@@ -241,7 +241,6 @@ export function Header({
                 variant={saveIsPrimary ? "default" : "outline"}
                 data-testid="save-canvas-button"
               >
-                <Save />
                 Save
               </Button>
             )}
