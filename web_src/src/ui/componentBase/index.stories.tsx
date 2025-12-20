@@ -4,7 +4,7 @@ import { ComponentBase, type ComponentBaseProps } from "./";
 const FilterComponentProps: ComponentBaseProps = {
   title: "Filter events based on branch",
   iconSlug: "filter",
-  headerColor: "bg-gray-50",
+  headerColor: "bg-white",
   specs: [
     {
       title: "filter",
@@ -50,7 +50,7 @@ const FilterComponentProps: ComponentBaseProps = {
 const IfComponentProps: ComponentBaseProps = {
   title: "If processed events",
   iconSlug: "split",
-  headerColor: "bg-gray-50",
+  headerColor: "bg-white",
   specs: [
     {
       title: "condition",
@@ -95,7 +95,7 @@ const IfComponentProps: ComponentBaseProps = {
 const NoopComponentProps: ComponentBaseProps = {
   title: "Don't do anything",
   iconSlug: "circle-off",
-  headerColor: "bg-gray-50",
+  headerColor: "bg-white",
   eventSections: [
     {
       receivedAt: new Date(),
@@ -110,7 +110,7 @@ const NoopComponentProps: ComponentBaseProps = {
 const EmptyStateComponentProps: ComponentBaseProps = {
   title: "New Component",
   iconSlug: "plus-circle",
-  headerColor: "bg-gray-50",
+  headerColor: "bg-white",
   includeEmptyState: true,
 };
 
@@ -138,7 +138,7 @@ const MetadataComponentProps: ComponentBaseProps = {
 const SwitchComponentProps: ComponentBaseProps = {
   title: "Branch processed events",
   iconSlug: "git-branch",
-  headerColor: "bg-gray-50",
+  headerColor: "bg-white",
   specs: [
     {
       title: "path",

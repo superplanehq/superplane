@@ -404,7 +404,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
             size: 24,
             className: "text-red-500",
           })}
-          <div className="text-sm font-medium text-gray-900">Failed to Load</div>
+          <div className="text-sm font-medium text-gray-800">Failed to Load</div>
           <div className="text-xs text-gray-500">{error}</div>
         </div>
       </div>
@@ -421,7 +421,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
               <div className="mb-6 border-b-1 border-border pb-4">
                 <h2 className="text-sm font-medium text-gray-800 flex items-center gap-2">
                   {triggerEvent.id && (
-                    <span className="text-xs text-gray-500 font-mono">#{triggerEvent.id.slice(0, 4)}</span>
+                    <span className="text-[13px] text-gray-500 font-mono">#{triggerEvent.id.slice(0, 4)}</span>
                   )}
                   {triggerEvent.title || "Execution Chain"}
                 </h2>

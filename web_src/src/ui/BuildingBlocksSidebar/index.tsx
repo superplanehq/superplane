@@ -225,7 +225,7 @@ export function BuildingBlocksSidebar({
         {hoveredBlock && (
           <ComponentBase
             title={hoveredBlock.label || hoveredBlock.name || "New Component"}
-            headerColor="bg-gray-50"
+            headerColor="bg-white"
             iconSlug={hoveredBlock.icon}
             iconColor="text-gray-800"
             collapsedBackground={getBackgroundColorClass("white")}

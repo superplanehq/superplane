@@ -134,7 +134,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
         <div className="flex items-center justify-between mb-4">
           <div>
-            <Text className="font-semibold text-gray-900 dark:text-white mb-1">Add members</Text>
+            <Text className="font-semibold text-gray-800 dark:text-white mb-1">Add members</Text>
           </div>
         </div>
 
@@ -215,7 +215,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                         className="size-8"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        <div className="text-sm font-medium text-gray-800 dark:text-white truncate">
                           {member.spec?.displayName || member.metadata!.id!}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 truncate">

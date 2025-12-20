@@ -19,7 +19,7 @@ const GithubProps: TriggerProps = createTriggerProps({
   title: "GitHub",
   iconSrc: githubIcon,
   iconBackground: "bg-black",
-  headerColor: "bg-gray-100",
+  headerColor: "bg-white",
   metadata: [
     {
       icon: "book",

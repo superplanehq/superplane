@@ -654,7 +654,7 @@ export const Provisioner = {
         component: {
           title: "NOOP 1",
           description: "NOOP 1",
-          headerColor: "bg-gray-50",
+          headerColor: "bg-white",
           collapsed: false,
           eventSections: [
             {
@@ -677,7 +677,7 @@ export const Provisioner = {
         component: {
           title: "NOOP 2",
           description: "NOOP 2",
-          headerColor: "bg-gray-50",
+          headerColor: "bg-white",
           collapsed: false,
           eventSections: [
             {
@@ -721,7 +721,7 @@ export const Desprovisioner = {
         component: {
           title: "NOOP 1",
           description: "NOOP 1",
-          headerColor: "bg-gray-50",
+          headerColor: "bg-white",
           collapsed: false,
           eventSections: [
             {
@@ -744,7 +744,7 @@ export const Desprovisioner = {
         component: {
           title: "NOOP 2",
           description: "NOOP 2",
-          headerColor: "bg-gray-50",
+          headerColor: "bg-white",
           collapsed: false,
           eventSections: [
             {

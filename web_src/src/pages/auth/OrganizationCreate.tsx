@@ -55,7 +55,7 @@ const OrganizationCreate: React.FC = () => {
       <div className="max-w-lg w-full bg-white dark:bg-gray-900 rounded-lg shadow-xl p-8">
         <div className="text-center mb-8">
           <div className="text-4xl mb-4">🏢</div>
-          <h4 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Create Organization</h4>
+          <h4 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Create Organization</h4>
           <Text className="text-gray-600 dark:text-gray-400">Set up a new organization</Text>
         </div>
 

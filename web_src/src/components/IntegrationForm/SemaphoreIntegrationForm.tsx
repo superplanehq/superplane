@@ -35,7 +35,7 @@ export function SemaphoreIntegrationForm({
   return (
     <>
       <Field>
-        <Label className="text-sm font-medium text-gray-900 dark:text-white">{semaphoreConfig.orgUrlLabel}</Label>
+        <Label className="text-sm font-medium text-gray-800 dark:text-white">{semaphoreConfig.orgUrlLabel}</Label>
         <Input
           ref={orgUrlRef}
           type="url"
@@ -54,7 +54,7 @@ export function SemaphoreIntegrationForm({
             <img src={SemaphoreLogo} alt="Semaphore" className="w-6" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-medium text-gray-900 dark:text-white">Connect Semaphore to SuperPlane</div>
+            <div className="text-sm font-medium text-gray-800 dark:text-white">Connect Semaphore to SuperPlane</div>
             <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
               Choose how you want to connect Semaphore to SuperPlane.
             </p>
@@ -62,7 +62,7 @@ export function SemaphoreIntegrationForm({
             <div className="mt-4 space-y-6">
               {/* Recommended: Service Account */}
               <section>
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                <div className="text-sm font-medium text-gray-800 dark:text-white">
                   Recommended: Connect using a Service Account
                 </div>
                 <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
@@ -102,7 +102,7 @@ export function SemaphoreIntegrationForm({
 
               {/* Alternative: Personal token */}
               <section>
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                <div className="text-sm font-medium text-gray-800 dark:text-white">
                   Alternative: Connect using your personal API Token
                 </div>
                 <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">

@@ -114,8 +114,8 @@ function TabItem({
       "text-blue-600 border-blue-500 dark:text-blue-400": variant === "default" && isActive,
 
       "px-3 py-2 rounded-md": variant === "pills",
-      "bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white": variant === "pills" && isActive,
-      "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white":
+      "bg-white text-gray-800 shadow-sm dark:bg-gray-700 dark:text-white": variant === "pills" && isActive,
+      "text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white":
         variant === "pills" && !isActive && !isDisabled,
 
       "px-3 py-3 relative": variant === "underline" || variant === "dark-underline",

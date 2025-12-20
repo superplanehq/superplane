@@ -31,7 +31,7 @@ export function Breadcrumbs({ items, className, separator = "/", showDivider = t
           <div className="flex items-center">
             {item.current ? (
               // Current page (not clickable)
-              <span className="text-gray-900 dark:text-gray-100 font-medium flex items-center" aria-current="page">
+              <span className="text-gray-800 dark:text-gray-100 font-medium flex items-center" aria-current="page">
                 {item.icon && <Icon name={item.icon} className="text-gray-700 dark:text-gray-300 mr-1" size="sm" />}
                 {item.label}
               </span>

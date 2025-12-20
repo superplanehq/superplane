@@ -489,7 +489,7 @@ export const ComponentSidebar = ({
               </div>
               {nodeId && !isTemplateNode && (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500 font-mono">{nodeId}</span>
+                  <span className="text-[13px] text-gray-500 font-mono">{nodeId}</span>
                   <button
                     onClick={handleCopyNodeId}
                     className={"text-gray-500 hover:text-gray-800"}
@@ -538,7 +538,7 @@ export const ComponentSidebar = ({
             className="flex-1"
           >
             {showSettingsTab && (
-              <div className="border-gray-300 border-b-1">
+              <div className="border-border border-b-1">
                 <div className="flex px-4">
                   <button
                     onClick={() => !isTemplateNode && onTabChange?.("latest")}
@@ -641,7 +641,7 @@ export const ComponentSidebar = ({
                 extraStatusOptions={extraStatusOptions}
               />
 
-              <div className={`${page === "execution-chain" ? "flex flex-col flex-1 min-h-0" : "py-2 px-2 pb-3"}`}>
+              <div className="flex flex-col flex-1 min-h-0">
                 {page === "execution-chain" ? (
                   <ExecutionChainPage
                     eventId={executionChainEventId}

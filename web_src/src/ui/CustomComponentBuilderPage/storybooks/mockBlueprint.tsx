@@ -14,7 +14,7 @@ export const mockNodes: Node[] = [
       component: {
         title: "Check Environment",
         iconSlug: "split",
-        headerColor: "bg-gray-50",
+        headerColor: "bg-white",
         specs: [
           {
             title: "condition",
@@ -94,7 +94,7 @@ export const mockNodes: Node[] = [
       component: {
         title: "Filter Services",
         iconSlug: "filter",
-        headerColor: "bg-gray-50",
+        headerColor: "bg-white",
         specs: [
           {
             title: "filter",
@@ -125,7 +125,7 @@ export const mockNodes: Node[] = [
       component: {
         title: "Skip Approval",
         iconSlug: "circle-off",
-        headerColor: "bg-gray-50",
+        headerColor: "bg-white",
         collapsed: false,
         eventSections: [
           {

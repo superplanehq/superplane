@@ -45,7 +45,7 @@ export function General({ organization }: GeneralProps) {
   };
   return (
     <div className="space-y-6 pt-6 text-left">
-      <Heading level={2} className="text-2xl font-semibold text-gray-900 dark:text-white">
+      <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white">
         General
       </Heading>
       <Fieldset className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6 space-y-6 max-w-xl">

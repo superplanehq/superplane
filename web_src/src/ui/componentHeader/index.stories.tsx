@@ -78,7 +78,7 @@ export const WithoutDescription: Story = {
     title: "Simple Header",
     iconSlug: "settings",
     iconColor: "text-gray-700",
-    headerColor: "bg-gray-100",
+    headerColor: "bg-white",
   }),
 };
 

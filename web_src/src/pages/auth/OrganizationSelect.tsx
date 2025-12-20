@@ -94,7 +94,7 @@ const OrganizationSelect: React.FC = () => {
               >
                 <div className="flex items-center mb-2">
                   <span className="text-md mr-2">🏢</span>
-                  <h4 className="text-md font-semibold text-gray-900 dark:text-white truncate">{org.name}</h4>
+                  <h4 className="text-md font-semibold text-gray-800 dark:text-white truncate">{org.name}</h4>
                 </div>
                 <Text className="text-sm text-left text-gray-600 dark:text-gray-400 truncate">{org.description}</Text>
               </div>

@@ -386,7 +386,7 @@ function CanvasPage(props: CanvasPageProps) {
           state: "neutral",
           component: {
             title: "New Component",
-            headerColor: "bg-gray-50",
+            headerColor: "bg-white",
             iconSlug: "puzzle",
             iconColor: "text-gray-800",
             collapsedBackground: getBackgroundColorClass("white"),

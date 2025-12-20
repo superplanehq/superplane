@@ -34,7 +34,7 @@ export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasC
                   <Link to={`/${organizationId}/canvas/${canvas.id}`} className="block text-left w-full">
                     <Heading
                       level={3}
-                      className="!text-md font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                      className="!text-md font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
                     >
                       {canvas.name}
                     </Heading>
@@ -81,7 +81,7 @@ export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasC
                 <Link to={`/${organizationId}/canvas/${canvas.id}`} className="block text-left">
                   <Heading
                     level={3}
-                    className="text-base font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate max-w-[40vw]"
+                    className="text-base font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate max-w-[40vw]"
                   >
                     {canvas.name}
                   </Heading>

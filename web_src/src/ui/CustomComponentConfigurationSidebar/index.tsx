@@ -85,7 +85,7 @@ export function CustomComponentConfigurationSidebar({
     <div className="w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col z-50">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-0">
-        <h2 className="text-md font-semibold text-gray-900 dark:text-gray-100">Component Settings</h2>
+        <h2 className="text-md font-semibold text-gray-800 dark:text-gray-100">Component Settings</h2>
         <Button variant="outline" size="icon" onClick={() => onToggle(false)} aria-label="Close settings">
           <PanelLeftClose size={24} className="rotate-180" />
         </Button>
@@ -172,7 +172,7 @@ export function CustomComponentConfigurationSidebar({
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                        <p className="font-medium text-sm text-gray-800 dark:text-gray-100">
                           {field.label || field.name}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -239,7 +239,7 @@ export function CustomComponentConfigurationSidebar({
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <ArrowUpRight className="text-green-600 dark:text-green-400" />
-                          <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{outputChannel.name}</p>
+                          <p className="font-medium text-sm text-gray-800 dark:text-gray-100">{outputChannel.name}</p>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Node: {outputChannel.nodeId}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">

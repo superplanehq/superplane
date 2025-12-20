@@ -86,7 +86,7 @@ export function Profile() {
 
   return (
     <div className="pt-6 max-w-none">
-      <Heading level={2} className="text-lg font-medium text-left text-gray-900 dark:text-white mb-4">
+      <Heading level={2} className="text-lg font-medium text-left text-gray-800 dark:text-white mb-4">
         Profile Information
       </Heading>
       <div className="space-y-6">
@@ -101,7 +101,7 @@ export function Profile() {
                 className="w-16 h-16"
               />
               <div>
-                <Heading level={3} className="text-lg font-medium text-gray-900 dark:text-white">
+                <Heading level={3} className="text-lg font-medium text-gray-800 dark:text-white">
                   {user.email}
                 </Heading>
               </div>
@@ -132,7 +132,7 @@ export function Profile() {
           </div>
         </div>
 
-        <Heading level={2} className="text-lg text-left font-medium text-gray-900 dark:text-white mb-4">
+        <Heading level={2} className="text-lg text-left font-medium text-gray-800 dark:text-white mb-4">
           API Token
         </Heading>
         <Text className="text-gray-600 text-left dark:text-gray-400 text-sm">

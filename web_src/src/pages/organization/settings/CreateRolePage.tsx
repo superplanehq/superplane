@@ -343,7 +343,7 @@ export function CreateRolePage() {
 
           <div className="flex items-center text-left">
             <div>
-              <Heading level={2} className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+              <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">
                 {isEditMode ? "Edit Organization Role" : "Create New Organization Role"}
               </Heading>
               <Text className="text-gray-600 dark:text-gray-400">
@@ -422,7 +422,7 @@ export function CreateRolePage() {
                   {ORGANIZATION_PERMISSIONS.map((category) => (
                     <div key={category.category} className="space-y-4">
                       <div className="flex items-center mb-3">
-                        <h3 className="text-md font-semibold text-gray-900 dark:text-white">{category.category}</h3>
+                        <h3 className="text-md font-semibold text-gray-800 dark:text-white">{category.category}</h3>
                         <button
                           type="button"
                           className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 ml-3 bg-transparent border-none cursor-pointer"

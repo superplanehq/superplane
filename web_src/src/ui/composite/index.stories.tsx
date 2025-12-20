@@ -144,7 +144,7 @@ const NoExecutionsZeroState: CompositeProps = createCompositeProps({
   description: "A freshly created pipeline stage awaiting its first execution",
   iconSlug: "play-circle",
   iconColor: "text-gray-600",
-  headerColor: "bg-gray-100",
+  headerColor: "bg-white",
   parameters: [{ icon: "settings", items: { environment: "production" } }],
   collapsed: false,
 });

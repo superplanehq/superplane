@@ -103,7 +103,7 @@ export function OrganizationSettings() {
                   }
                   alt={user?.name || "My Account"}
                 />
-                <SidebarLabel className="text-gray-900 dark:text-white">{user?.name || "My Account"}</SidebarLabel>
+                <SidebarLabel className="text-gray-800 dark:text-white">{user?.name || "My Account"}</SidebarLabel>
               </div>
               <SidebarItem
                 className={`${currentSection === "profile" ? "bg-gray-100 dark:bg-gray-800 rounded-md" : ""}`}
@@ -125,7 +125,7 @@ export function OrganizationSettings() {
                     .toUpperCase()}
                   alt={organization?.metadata?.name || organization?.metadata?.name || "Organization"}
                 />
-                <SidebarLabel className="text-gray-900 dark:text-white">
+                <SidebarLabel className="text-gray-800 dark:text-white">
                   {organization?.metadata?.name || organization?.metadata?.name || "Organization"}
                 </SidebarLabel>
               </div>
