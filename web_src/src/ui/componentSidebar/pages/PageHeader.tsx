@@ -39,7 +39,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     if (page === "execution-chain") {
       switch (previousPage) {
         case "history":
-          return "Back to History";
+          return "Back to Run History";
         case "queue":
           return "Back to Queue";
         default:

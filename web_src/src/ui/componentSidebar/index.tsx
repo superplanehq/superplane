@@ -338,10 +338,11 @@ export const ComponentSidebar = ({
     [page],
   );
 
+  const listPage = page === "execution-chain" ? previousPage : page;
   const allEvents = React.useMemo(() => {
-    if (page === "overview") return [];
+    if (listPage === "overview") return [];
 
-    switch (page) {
+    switch (listPage) {
       case "history":
         return getAllHistoryEvents?.() || [];
       case "queue":
@@ -349,12 +350,12 @@ export const ComponentSidebar = ({
       default:
         return [];
     }
-  }, [getAllHistoryEvents, getAllQueueEvents, page]);
+  }, [getAllHistoryEvents, getAllQueueEvents, listPage]);
 
   const hasMoreItems = React.useMemo(() => {
-    if (page === "overview") return false;
+    if (listPage === "overview") return false;
 
-    switch (page) {
+    switch (listPage) {
       case "history":
         return getHasMoreHistory?.() || false;
       case "queue":
@@ -362,12 +363,12 @@ export const ComponentSidebar = ({
       default:
         return false;
     }
-  }, [getHasMoreHistory, getHasMoreQueue, page]);
+  }, [getHasMoreHistory, getHasMoreQueue, listPage]);
 
   const loadingMoreItems = React.useMemo(() => {
-    if (page === "overview") return false;
+    if (listPage === "overview") return false;
 
-    switch (page) {
+    switch (listPage) {
       case "history":
         return getLoadingMoreHistory?.() || false;
       case "queue":
@@ -375,12 +376,12 @@ export const ComponentSidebar = ({
       default:
         return false;
     }
-  }, [getLoadingMoreHistory, getLoadingMoreQueue, page]);
+  }, [getLoadingMoreHistory, getLoadingMoreQueue, listPage]);
 
   const handleLoadMoreItems = React.useCallback(() => {
-    if (page === "overview") return;
+    if (listPage === "overview") return;
 
-    switch (page) {
+    switch (listPage) {
       case "history":
         return onLoadMoreHistory?.();
       case "queue":
@@ -388,12 +389,12 @@ export const ComponentSidebar = ({
       default:
         return;
     }
-  }, [onLoadMoreHistory, onLoadMoreQueue, page]);
+  }, [onLoadMoreHistory, onLoadMoreQueue, listPage]);
 
   const showMoreCount = React.useMemo(() => {
-    if (page === "overview") return 0;
+    if (listPage === "overview") return 0;
 
-    switch (page) {
+    switch (listPage) {
       case "history":
         return totalInHistoryCount - allEvents.length;
       case "queue":
@@ -401,7 +402,7 @@ export const ComponentSidebar = ({
       default:
         return 0;
     }
-  }, [allEvents, totalInHistoryCount, totalInQueueCount, page]);
+  }, [allEvents, totalInHistoryCount, totalInQueueCount, listPage]);
 
   const filteredHistoryEvents = React.useMemo(() => {
     if (!allEvents) return [];
@@ -641,63 +642,76 @@ export const ComponentSidebar = ({
                 extraStatusOptions={extraStatusOptions}
               />
 
-              <div className="flex flex-col flex-1 min-h-0">
-                {page === "execution-chain" ? (
-                  <ExecutionChainPage
-                    eventId={executionChainEventId}
-                    triggerEvent={executionChainTriggerEvent || undefined}
-                    selectedExecutionId={selectedExecutionId}
-                    loadExecutionChain={loadExecutionChain}
-                    openEventIds={openEventIds}
-                    onToggleOpen={handleToggleOpen}
-                    getExecutionState={getExecutionState}
-                    getTabData={getTabData}
-                    onEventClick={onEventClick}
-                    workflowNodes={workflowNodes}
-                    components={components}
-                    triggers={triggers}
-                    blueprints={blueprints}
-                    onHighlightedNodesChange={onHighlightedNodesChange}
-                  />
-                ) : (
-                  <HistoryQueuePage
-                    page={page as "history" | "queue"}
-                    filteredEvents={filteredHistoryEvents}
-                    openEventIds={openEventIds}
-                    onToggleOpen={handleToggleOpen}
-                    onEventClick={onEventClick}
-                    onTriggerNavigate={(event) => {
-                      if (event.kind === "trigger") {
-                        const eventId = event.triggerEventId || event.id;
-                        handleSeeExecutionChain(eventId, event);
-                      } else if (event.kind === "execution") {
-                        const node = workflowNodes?.find((n) => n.id === event.originalExecution?.rootEvent?.nodeId);
-
-                        const rootEventId = event.originalExecution?.rootEvent?.id;
-                        if (rootEventId && node && event.originalExecution?.rootEvent) {
-                          const triggerEvent = mapTriggerEventToSidebarEvent(event.originalExecution?.rootEvent, node);
-                          handleSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
-                        } else {
+              <div className="relative flex-1 min-h-0 overflow-hidden">
+                <div
+                  className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out ${
+                    page === "execution-chain" ? "-translate-x-full" : "translate-x-0"
+                  } ${page === "execution-chain" ? "pointer-events-none" : "pointer-events-auto"}`}
+                >
+                  {(page === "history" || page === "queue" || previousPage === "history" || previousPage === "queue") && (
+                    <HistoryQueuePage
+                      page={(page === "execution-chain" ? previousPage : page) as "history" | "queue"}
+                      filteredEvents={filteredHistoryEvents}
+                      openEventIds={openEventIds}
+                      onToggleOpen={handleToggleOpen}
+                      onEventClick={onEventClick}
+                      onTriggerNavigate={(event) => {
+                        if (event.kind === "trigger") {
                           const eventId = event.triggerEventId || event.id;
-                          handleSeeExecutionChain(eventId, event, event.executionId);
+                          handleSeeExecutionChain(eventId, event);
+                        } else if (event.kind === "execution") {
+                          const node = workflowNodes?.find((n) => n.id === event.originalExecution?.rootEvent?.nodeId);
+
+                          const rootEventId = event.originalExecution?.rootEvent?.id;
+                          if (rootEventId && node && event.originalExecution?.rootEvent) {
+                            const triggerEvent = mapTriggerEventToSidebarEvent(event.originalExecution?.rootEvent, node);
+                            handleSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
+                          } else {
+                            const eventId = event.triggerEventId || event.id;
+                            handleSeeExecutionChain(eventId, event, event.executionId);
+                          }
                         }
-                      }
-                    }}
-                    getTabData={getTabData}
-                    onPushThrough={onPushThrough}
-                    onCancelExecution={onCancelExecution}
-                    supportsPushThrough={supportsPushThrough}
-                    onReEmit={onReEmit}
-                    loadExecutionChain={loadExecutionChain}
-                    getExecutionState={getExecutionState}
-                    hasMoreItems={hasMoreItems}
-                    loadingMoreItems={loadingMoreItems}
-                    showMoreCount={showMoreCount}
-                    onLoadMoreItems={handleLoadMoreItems}
-                    searchQuery={searchQuery}
-                    statusFilter={statusFilter}
-                  />
-                )}
+                      }}
+                      getTabData={getTabData}
+                      onPushThrough={onPushThrough}
+                      onCancelExecution={onCancelExecution}
+                      supportsPushThrough={supportsPushThrough}
+                      onReEmit={onReEmit}
+                      loadExecutionChain={loadExecutionChain}
+                      getExecutionState={getExecutionState}
+                      hasMoreItems={hasMoreItems}
+                      loadingMoreItems={loadingMoreItems}
+                      showMoreCount={showMoreCount}
+                      onLoadMoreItems={handleLoadMoreItems}
+                      searchQuery={searchQuery}
+                      statusFilter={statusFilter}
+                    />
+                  )}
+                </div>
+                <div
+                  className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out ${
+                    page === "execution-chain" ? "translate-x-0" : "translate-x-full"
+                  } ${page === "execution-chain" ? "pointer-events-auto" : "pointer-events-none"}`}
+                >
+                  {page === "execution-chain" && (
+                    <ExecutionChainPage
+                      eventId={executionChainEventId}
+                      triggerEvent={executionChainTriggerEvent || undefined}
+                      selectedExecutionId={selectedExecutionId}
+                      loadExecutionChain={loadExecutionChain}
+                      openEventIds={openEventIds}
+                      onToggleOpen={handleToggleOpen}
+                      getExecutionState={getExecutionState}
+                      getTabData={getTabData}
+                      onEventClick={onEventClick}
+                      workflowNodes={workflowNodes}
+                      components={components}
+                      triggers={triggers}
+                      blueprints={blueprints}
+                      onHighlightedNodesChange={onHighlightedNodesChange}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           )}
