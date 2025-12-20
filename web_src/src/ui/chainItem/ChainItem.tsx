@@ -171,7 +171,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
               )}
             {(item.childExecutions?.length || 0) > 0 && (
               <>
-                <span className="mx-1">•</span>
+                <span className="mx-1">·</span>
                 <span>
                   {item.childExecutions?.length} execution{item.childExecutions!.length > 1 ? "s" : ""}
                 </span>

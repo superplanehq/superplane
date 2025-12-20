@@ -443,11 +443,11 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                     {summaryInfo.timeAgo}
                     {summaryInfo.duration && (
                       <>
-                        <span className="mx-1">•</span>
+                        <span className="mx-1">·</span>
                         Duration: {summaryInfo.duration}
                       </>
                     )}
-                    <span className="mx-1">•</span>
+                    <span className="mx-1">·</span>
                     {summaryInfo.stepCount} step{summaryInfo.stepCount !== 1 ? "s" : ""}
                   </div>
                 )}

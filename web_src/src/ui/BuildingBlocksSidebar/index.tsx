@@ -171,13 +171,13 @@ export function BuildingBlocksSidebar({
       {/* Resize handle */}
       <div
         onMouseDown={handleMouseDown}
-        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-blue-50 transition-colors flex items-center justify-center group ${
+        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group ${
           isResizing ? "bg-blue-50" : ""
         }`}
         style={{ marginLeft: "-8px" }}
       >
         <div
-          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
+          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors ${
             isResizing ? "bg-blue-500" : ""
           }`}
         />
@@ -391,12 +391,12 @@ function CategorySection({
               size="sm"
             >
               <ItemMedia>
-                <IconComponent size={14} className="text-gray-800" />
+                <IconComponent size={14} className="text-gray-500" />
               </ItemMedia>
 
               <ItemContent>
                 <div className="flex items-center gap-2">
-                  <ItemTitle className="text-sm font-normal">{block.label || block.name}</ItemTitle>
+                  <ItemTitle className="text-sm font-medium">{block.label || block.name}</ItemTitle>
                   {block.deprecated && (
                     <span className="px-1.5 py-0.5 text-[11px] font-medium bg-orange-100 text-amber-800 rounded whitespace-nowrap">
                       Deprecated
