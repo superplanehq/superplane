@@ -27,11 +27,6 @@ import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
-const DEFAULT_STATUS_OPTIONS: { value: ChildEventsState; label: string }[] = [
-  { value: "processed", label: "Processed" },
-  { value: "discarded", label: "Failed" },
-  { value: "running", label: "Running" },
-];
 interface ComponentSidebarProps {
   isOpen?: boolean;
   setIsOpen?: (isOpen: boolean) => void;
@@ -425,16 +420,6 @@ export const ComponentSidebar = ({
     return events;
   }, [allEvents, statusFilter, searchQuery]);
 
-  const statusOptions = React.useMemo(() => {
-    const statuses = new Set<ChildEventsState>();
-    allEvents.forEach((event) => {
-      if (event.state) {
-        statuses.add(event.state);
-      }
-    });
-    return Array.from(statuses);
-  }, [allEvents]);
-
   // Clear highlights when sidebar closes or when leaving execution chain page
   useEffect(() => {
     if (!isOpen && onHighlightedNodesChange) {
@@ -698,8 +683,6 @@ export const ComponentSidebar = ({
                       triggers={triggers}
                       blueprints={blueprints}
                       onHighlightedNodesChange={onHighlightedNodesChange}
-                      searchQuery={searchQuery}
-                      statusFilter={statusFilter}
                     />
                   )}
                 </div>
