@@ -11,8 +11,6 @@ const OwnerSetup: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  console.log("Rendering OwnerSetup component");
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 

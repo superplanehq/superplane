@@ -256,3 +256,11 @@ func redirectToLoginWithOriginalURL(w http.ResponseWriter, r *http.Request) {
 	loginURL := fmt.Sprintf("/login?redirect=%s", redirectURL)
 	http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
 }
+
+func ResetOwnerSetupStateForTests() {
+	ownerSetupEnabled = true
+
+	ownerSetupMu.Lock()
+	ownerSetupNeededCache = nil
+	ownerSetupMu.Unlock()
+}
