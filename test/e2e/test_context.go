@@ -54,6 +54,8 @@ func (s *TestContext) Start() {
 	os.Setenv("BASE_URL", "http://127.0.0.1:8001")
 	os.Setenv("WEBHOOKS_BASE_URL", "https://superplane.sxmoon.com")
 	os.Setenv("APP_ENV", "development")
+	// Enable first-run owner setup flow for tests
+	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 
 	s.startVite()
 	s.startAppServer()
@@ -188,16 +190,7 @@ func (s *TestContext) NewSession(t *testing.T) *session.TestSession {
 
 	p.OnConsole(func(m pw.ConsoleMessage) {
 		text := m.Text()
-
-		// Ignore noisy dev-time logs from Vite and React DevTools suggestions
-		if strings.Contains(text, "[vite] connecting") ||
-			strings.Contains(text, "[vite] connected") ||
-			strings.Contains(text, "React DevTools") ||
-			strings.Contains(text, "Download the React DevTools") {
-			return
-		}
-
-		t.Logf("[console.%s] %s", m.Type(), text)
+		t.Logf("DEBUG CONSOLE [%s] %s", m.Type(), text)
 	})
 
 	p.OnPageError(func(err error) {

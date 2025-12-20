@@ -81,7 +81,7 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				path := r.URL.Path
 
 				// Allow the setup flow and static assets through without auth
-				if path == "/setup" || strings.HasPrefix(path, "/assets") {
+				if isOwnerSetupAllowedPath(path) {
 					next.ServeHTTP(w, r)
 					return
 				}
@@ -200,6 +200,26 @@ func findOrganizationID(r *http.Request) string {
 func GetAccountFromContext(ctx context.Context) (*models.Account, bool) {
 	account, ok := ctx.Value(AccountContextKey).(*models.Account)
 	return account, ok
+}
+
+func isOwnerSetupAllowedPath(path string) bool {
+	if path == "/setup" || strings.HasPrefix(path, "/assets") {
+		return true
+	}
+
+	// Allow Vite dev server and module paths when running the
+	// owner setup flow in development/e2e so that the SPA can
+	// load its JS bundles, HMR client, and dependencies.
+	if strings.HasPrefix(path, "/@") || strings.HasPrefix(path, "/src/") || strings.HasPrefix(path, "/node_modules/") {
+		return true
+	}
+
+	switch path {
+	case "/favicon.ico", "/robots.txt", "/manifest.webmanifest":
+		return true
+	}
+
+	return false
 }
 
 func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, error) {

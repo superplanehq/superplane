@@ -360,11 +360,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Health check
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
-
-	// Owner setup endpoint (for first-run setup when enabled)
-	if middleware.OwnerSetupEnabled() {
-		publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
-	}
+	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
 
 	// Test endpoints
 	publicRoute.HandleFunc("/server1", func(w http.ResponseWriter, r *http.Request) {
@@ -826,6 +822,15 @@ func (s *Server) setupDevProxy(webBasePath string) {
 	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
 			return
+		}
+
+		// Ensure the owner setup flow is reachable via /setup in dev/e2e,
+		// just like in production. Vite serves the SPA entry point at "/",
+		// so we rewrite the upstream path while keeping the browser URL
+		// as /setup for React Router to handle.
+		if r.URL.Path == "/setup" {
+			r = r.Clone(r.Context())
+			r.URL.Path = "/"
 		}
 
 		proxy.ServeHTTP(w, r)

@@ -65,6 +65,7 @@ services:
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"
       OTEL_SERVICE_NAME: "superplane-dev"
+      OWNER_SETUP_ENABLED: "yes"
 
     ports:
       - 5173:5173

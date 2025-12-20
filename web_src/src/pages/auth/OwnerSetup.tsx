@@ -1,7 +1,7 @@
 import React, { useState } from "react";
+import { Input, InputGroup } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
 import { Button } from "../../ui/button";
-import { Input, InputGroup } from "../../components/Input/input";
 
 const OwnerSetup: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -10,6 +10,8 @@ const OwnerSetup: React.FC = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  console.log("Rendering OwnerSetup component");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
