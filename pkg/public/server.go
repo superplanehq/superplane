@@ -824,15 +824,6 @@ func (s *Server) setupDevProxy(webBasePath string) {
 			return
 		}
 
-		// Ensure the owner setup flow is reachable via /setup in dev/e2e,
-		// just like in production. Vite serves the SPA entry point at "/",
-		// so we rewrite the upstream path while keeping the browser URL
-		// as /setup for React Router to handle.
-		if r.URL.Path == "/setup" {
-			r = r.Clone(r.Context())
-			r.URL.Path = "/"
-		}
-
 		proxy.ServeHTTP(w, r)
 	})
 
