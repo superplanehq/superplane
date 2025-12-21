@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { CSSProperties, useCallback } from "react";
 import { BaseEdge, EdgeLabelRenderer, EdgeProps, getBezierPath, useReactFlow } from "@xyflow/react";
 import { CircleX } from "lucide-react";
 
@@ -37,7 +37,7 @@ export function CustomEdge({
   }, [id, onDeleteEdge, setEdges]);
 
   // Update style based on selection and hover state
-  const edgeStyle = {
+  const edgeStyle: CSSProperties = {
     ...style,
     stroke: selected || isHovered ? "#A1AEC0" : style.stroke || "#DEF3FE",
     strokeWidth: selected ? 3 : style.strokeWidth || 3,

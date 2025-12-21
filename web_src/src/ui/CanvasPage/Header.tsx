@@ -1,6 +1,5 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 // import { Avatar } from "@/components/Avatar/avatar";
-import { Icon } from "@/components/Icon";
 import { useAccount } from "@/contexts/AccountContext";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { resolveIcon } from "@/lib/utils";
