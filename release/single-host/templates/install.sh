@@ -22,9 +22,22 @@ ENV_FILE="superplane.env"
 echo "This script will generate ${ENV_FILE} for a single-host deployment."
 echo ""
 
-default_base_url="http://$(hostname -f 2>/dev/null || hostname):8000"
-read -rp "Base URL for Superplane [${default_base_url}]: " BASE_URL_INPUT
-BASE_URL="${BASE_URL_INPUT:-$default_base_url}"
+default_domain="$(hostname -f 2>/dev/null || hostname)"
+read -rp "Domain for Superplane (e.g. superplane.example.com) [${default_domain}]: " DOMAIN_INPUT
+DOMAIN="${DOMAIN_INPUT:-$default_domain}"
+
+echo ""
+read -rp "Use HTTPS for the generated BASE_URL? (y/N): " USE_HTTPS_INPUT
+USE_HTTPS_INPUT="${USE_HTTPS_INPUT:-n}"
+
+if [[ "${USE_HTTPS_INPUT}" =~ ^[Yy]$ ]]; then
+  SCHEME="https"
+else
+  SCHEME="http"
+fi
+
+SANITIZED_DOMAIN="$(echo "${DOMAIN}" | sed -E 's#^https?://##' | cut -d'/' -f1)"
+BASE_URL="${SCHEME}://${SANITIZED_DOMAIN}:8000"
 
 echo ""
 read -rp "Configure email invitations via Resend now? (y/N): " CONFIGURE_EMAIL
@@ -40,7 +53,7 @@ if [[ "${CONFIGURE_EMAIL}" =~ ^[Yy]$ ]]; then
   read -rp "Sender name [${EMAIL_FROM_NAME}]: " EMAIL_FROM_NAME_INPUT
   EMAIL_FROM_NAME="${EMAIL_FROM_NAME_INPUT:-$EMAIL_FROM_NAME}"
 
-  default_sender="noreply@notifications.$(echo "${BASE_URL}" | sed -E 's#^https?://##' | cut -d'/' -f1)"
+  default_sender="noreply@notifications.${SANITIZED_DOMAIN}"
   read -rp "Sender email [${default_sender}]: " EMAIL_FROM_ADDRESS_INPUT
   EMAIL_FROM_ADDRESS="${EMAIL_FROM_ADDRESS_INPUT:-$default_sender}"
 fi
@@ -149,4 +162,3 @@ echo "Next steps:"
 echo "  1) docker compose pull"
 echo "  2) docker compose up --wait --detach"
 echo ""
-

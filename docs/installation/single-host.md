@@ -27,7 +27,7 @@ Run the installer to generate `superplane.env`:
 
 The script will:
 
-- Ask for the public base URL of your instance
+- Ask for the domain of your instance (for example `superplane.example.com`) and whether to use HTTP or HTTPS
 - Optionally configure email invitations via Resend
 - Generate database credentials and application secrets
 - Write everything into `superplane.env`
@@ -43,5 +43,4 @@ docker compose pull
 docker compose up --wait --detach
 ```
 
-Superplane will then be available at the base URL you configured (by default `http://<your-host>:8000`). The owner setup flow will guide you through creating the first account.
-
+Superplane will then be available at the base URL derived from the domain you provided (by default `http://<your-domain>:8000`). The owner setup flow will guide you through creating the first account.
