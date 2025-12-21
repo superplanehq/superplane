@@ -90,6 +90,13 @@ RUN VITE_BASE_URL=$BASE_URL npm run build
 
 FROM ${RUNNER_IMAGE} AS runner
 
+LABEL org.opencontainers.image.title="superplane" \
+  org.opencontainers.image.description="SuperPlane" \
+  org.opencontainers.image.vendor="SuperPlane" \
+  org.opencontainers.image.source="https://github.com/superplanehq/superplane" \
+  org.opencontainers.image.url="https://superplane.com" \
+  org.opencontainers.image.documentation="https://docs.superplane.com"
+
 # postgresql-client needs to be installed here too,
 # otherwise the createdb command won't work.
 # Install PostgreSQL 17.5 client tools

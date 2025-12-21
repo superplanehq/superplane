@@ -5,20 +5,29 @@ agent:
     type: f1-standard-2
     os_image: ubuntu2204
 blocks:
-  - name: "Build"
+  - name: "Release"
     dependencies: []
     task:
       env_vars:
         - name: DOCKER_BUILDKIT
           value: "1"
+
+      secrets:
+        - name: GHCR_PUSH_TOKEN
+
       prologue:
         commands:
           - checkout
+          - echo "$GHCR_PUSH_TOKEN" | docker login ghcr.io -u superplanehq --password-stdin
+
       jobs:
         - name: "Demo"
           commands:
             - bash release/demo/build.sh $REL_VERSION
+            - docker push ghcr.io/superplanehq/superplane-demo:$REL_VERSION
 
         - name: "Single Host"
           commands:
+            - docker build -t ghcr.io/superplanehq/superplane:$REL_VERSION -f Dockerfile .
+            - docker push ghcr.io/superplanehq/superplane:$REL_VERSION
             - bash release/single-host/build.sh $REL_VERSION
