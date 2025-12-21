@@ -31,3 +31,4 @@ blocks:
             - docker build -t ghcr.io/superplanehq/superplane:$REL_VERSION -f Dockerfile .
             - docker push ghcr.io/superplanehq/superplane:$REL_VERSION
             - bash release/single-host/build.sh $REL_VERSION
+            - node release/make-github-release.js $REL_VERSION
