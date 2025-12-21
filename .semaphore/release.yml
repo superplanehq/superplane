@@ -13,7 +13,8 @@ blocks:
           value: "1"
 
       secrets:
-        - name: GHCR_PUSH_TOKEN
+        - name: ghcr-push-token
+        - name: github-release-token
 
       prologue:
         commands:
