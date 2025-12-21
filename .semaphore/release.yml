@@ -1,0 +1,24 @@
+version: v1.0
+name: "Release ${{parameters.VERSION}}"
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+blocks:
+  - name: "Build"
+    dependencies: []
+    task:
+      env_vars:
+        - name: DOCKER_BUILDKIT
+          value: "1"
+      prologue:
+        commands:
+          - checkout
+      jobs:
+        - name: "Demo"
+          commands:
+            - bash release/demo/build.sh $VERSION
+
+        - name: "Single Host"
+          commands:
+            - bash release/single-host/build.sh $VERSION
