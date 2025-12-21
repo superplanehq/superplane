@@ -26,18 +26,8 @@ default_domain="$(hostname -f 2>/dev/null || hostname)"
 read -rp "Domain for Superplane (e.g. superplane.example.com) [${default_domain}]: " DOMAIN_INPUT
 DOMAIN="${DOMAIN_INPUT:-$default_domain}"
 
-echo ""
-read -rp "Use HTTPS for the generated BASE_URL? (y/N): " USE_HTTPS_INPUT
-USE_HTTPS_INPUT="${USE_HTTPS_INPUT:-n}"
-
-if [[ "${USE_HTTPS_INPUT}" =~ ^[Yy]$ ]]; then
-  SCHEME="https"
-else
-  SCHEME="http"
-fi
-
 SANITIZED_DOMAIN="$(echo "${DOMAIN}" | sed -E 's#^https?://##' | cut -d'/' -f1)"
-BASE_URL="${SCHEME}://${SANITIZED_DOMAIN}:8000"
+BASE_URL="https://${SANITIZED_DOMAIN}"
 
 echo ""
 read -rp "Configure email invitations via Resend now? (y/N): " CONFIGURE_EMAIL
@@ -92,6 +82,7 @@ APP_ENV=production
 APPLICATION_NAME=superplane
 
 BASE_URL=${BASE_URL}
+SUPERPLANE_DOMAIN=${SANITIZED_DOMAIN}
 PUBLIC_API_BASE_PATH=/api/v1
 WEB_BASE_PATH=
 

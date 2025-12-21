@@ -11,8 +11,21 @@ services:
         condition: service_healthy
     env_file:
       - superplane.env
+
+  caddy:
+    image: caddy:2
+    restart: always
+    depends_on:
+      - app
+    env_file:
+      - superplane.env
     ports:
-      - "8000:8000"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
 
   db:
     image: postgres:17.5
@@ -44,4 +57,7 @@ services:
 volumes:
   postgres-data:
     driver: local
-
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local

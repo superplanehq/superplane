@@ -29,6 +29,9 @@ echo "* Injecting install.sh"
 cp "${TEMPLATES_DIR}/install.sh" "${TARGET_DIR}/install.sh"
 chmod +x "${TARGET_DIR}/install.sh"
 
+echo "* Injecting Caddyfile"
+cp "${TEMPLATES_DIR}/Caddyfile" "${TARGET_DIR}/Caddyfile"
+
 echo "* Creating superplane-single-host.tar.gz"
 (
   cd "${BUILD_ROOT}"
@@ -38,4 +41,3 @@ echo "* Creating superplane-single-host.tar.gz"
 echo ""
 echo "Done."
 echo "Artifact: ${BUILD_ROOT}/superplane-single-host.tar.gz"
-

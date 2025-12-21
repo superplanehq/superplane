@@ -27,7 +27,7 @@ Run the installer to generate `superplane.env`:
 
 The script will:
 
-- Ask for the domain of your instance (for example `superplane.example.com`) and whether to use HTTP or HTTPS
+- Ask for the domain of your instance (for example `superplane.example.com`)
 - Optionally configure email invitations via Resend
 - Generate database credentials and application secrets
 - Write everything into `superplane.env`
@@ -43,4 +43,4 @@ docker compose pull
 docker compose up --wait --detach
 ```
 
-Superplane will then be available at the base URL derived from the domain you provided (by default `http://<your-domain>:8000`). The owner setup flow will guide you through creating the first account.
+Superplane will then be available at `https://<your-domain>/`. The Caddy container will automatically obtain and renew Let's Encrypt certificates for the domain you provided (ports 80 and 443 on your host must be open and the domain must point directly to this machine). The owner setup flow will guide you through creating the first account.
