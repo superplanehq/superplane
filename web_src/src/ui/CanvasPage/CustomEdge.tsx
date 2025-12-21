@@ -46,7 +46,7 @@ export function CustomEdge({
   // Update style based on selection and hover state
   const edgeStyle = {
     ...style,
-    stroke: selected || isHovered ? "#73D4FF" : style.stroke || "#DEF3FE",
+    stroke: selected || isHovered ? "#A1AEC0" : style.stroke || "#DEF3FE",
     strokeWidth: selected ? 3 : style.strokeWidth || 3,
   };
   const isActive = selected || isHovered;
@@ -72,11 +72,11 @@ export function CustomEdge({
           className={`edge-label nodrag nopan group flex items-center justify-center${isActive ? " edge-label-visible" : ""}`}
         >
           <button
-            className="edge-label-button flex items-center justify-center bg-red-100 rounded-full shadow-lg transition-all cursor-pointer"
+            className="edge-label-button flex items-center justify-center bg-slate-100 rounded-full shadow-lg transition-all cursor-pointer"
             onClick={onDeleteClick}
             aria-label="Delete edge"
           >
-            <CircleX size={20} className="text-red-500" />
+            <CircleX size={24} className="text-slate-400" />
           </button>
         </div>
       </EdgeLabelRenderer>
