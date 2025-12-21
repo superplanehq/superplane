@@ -1,5 +1,5 @@
 version: v1.0
-name: "Release ${{parameters.VERSION}}"
+name: "Release ${{parameters.REL_VERSION}}"
 agent:
   machine:
     type: f1-standard-2
@@ -17,8 +17,8 @@ blocks:
       jobs:
         - name: "Demo"
           commands:
-            - bash release/demo/build.sh $VERSION
+            - bash release/demo/build.sh $REL_VERSION
 
         - name: "Single Host"
           commands:
-            - bash release/single-host/build.sh $VERSION
+            - bash release/single-host/build.sh $REL_VERSION
