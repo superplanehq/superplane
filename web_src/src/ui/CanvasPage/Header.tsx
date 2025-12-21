@@ -121,7 +121,7 @@ export function Header({
   const sidebarOrganizationLinks = [
     {
       label: "Canvases",
-      href: organizationId ? `/${organizationId}/canvases` : "#",
+      href: organizationId ? `/${organizationId}` : "/",
       Icon: Palette,
     },
     {
