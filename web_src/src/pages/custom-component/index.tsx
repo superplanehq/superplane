@@ -1,6 +1,7 @@
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Connection, Edge, Node, addEdge, applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { useQueryClient } from "@tanstack/react-query";
 import ELK from "elkjs/lib/elk.bundled.js";
 import { AlertCircle, Puzzle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,7 +9,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ComponentsComponent, ComponentsNode, ComponentsAppInstallationRef } from "../../api-client";
 import { Heading } from "../../components/Heading/heading";
 import { Button } from "../../components/ui/button";
-import { useBlueprint, useComponents, useUpdateBlueprint } from "../../hooks/useBlueprintData";
+import { useBlueprint, useComponents, useUpdateBlueprint, blueprintKeys } from "../../hooks/useBlueprintData";
 import { useAvailableApplications, useInstalledApplications } from "../../hooks/useApplications";
 import { BlockData } from "../../ui/CanvasPage/Block";
 import type { BreadcrumbItem, NewNodeData } from "../../ui/CustomComponentBuilderPage";
@@ -123,6 +124,7 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
 export const CustomComponent = () => {
   const { organizationId, blueprintId } = useParams<{ organizationId: string; blueprintId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const [blueprintConfiguration, setBlueprintConfiguration] = useState<any[]>([]);
   const [blueprintOutputChannels, setBlueprintOutputChannels] = useState<any[]>([]);
@@ -356,50 +358,7 @@ export const CustomComponent = () => {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // Node and edge change handlers
-  const onNodesChange = useCallback(
-    (changes: any) => {
-      setNodes((nds) => applyNodeChanges(changes, nds));
-      // Only mark as unsaved if it's a position change (user dragging nodes)
-      // Don't mark for 'select' or 'dimensions' changes which happen automatically
-      const hasPositionChange = changes.some((change: any) => change.type === "position" && change.dragging);
-      if (hasPositionChange) {
-        saveSnapshot();
-        setHasUnsavedChanges(true);
-      }
-    },
-    [saveSnapshot],
-  );
-
-  const onEdgesChange = useCallback(
-    (changes: any) => {
-      setEdges((eds) => applyEdgeChanges(changes, eds));
-      // Only mark as unsaved for edge removal, not for selection changes
-      const hasRemoval = changes.some((change: any) => change.type === "remove");
-      if (hasRemoval) {
-        saveSnapshot();
-        setHasUnsavedChanges(true);
-      }
-    },
-    [saveSnapshot],
-  );
-
-  const onConnect = useCallback(
-    (params: Connection) => {
-      saveSnapshot();
-      setEdges((eds) => addEdge({ ...params, style: { strokeWidth: 3, stroke: "#C9D5E1" } }, eds));
-      setHasUnsavedChanges(true);
-    },
-    [saveSnapshot],
-  );
-
-  const generateNodeId = (componentName: string, nodeName: string) => {
-    const randomChars = Math.random().toString(36).substring(2, 8);
-    const sanitizedComponent = componentName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    return `${sanitizedComponent}-${sanitizedName}-${randomChars}`;
-  };
-
+  // Save blueprint to backend
   const handleSaveBlueprint = useCallback(
     async (customNodes?: Node[], customEdges?: Edge[]) => {
       try {
@@ -483,6 +442,64 @@ export const CustomComponent = () => {
       updateBlueprintMutation,
     ],
   );
+
+  // Node and edge change handlers
+  const onNodesChange = useCallback(
+    (changes: any) => {
+      const updatedNodes = applyNodeChanges(changes, nodes);
+      setNodes(updatedNodes);
+
+      // Check for position changes when dragging ends
+      const positionChangeEnded = changes.find(
+        (change: any) => change.type === "position" && change.position && change.dragging === false,
+      );
+
+      if (positionChangeEnded) {
+        // Save immediately when dragging ends
+        // Use setTimeout to ensure state is updated before saving
+        setTimeout(() => {
+          handleSaveBlueprint(updatedNodes, edges);
+        }, 0);
+      } else {
+        // Mark as unsaved while dragging (for the warning prompt)
+        const hasPositionChange = changes.some((change: any) => change.type === "position" && change.dragging);
+        if (hasPositionChange) {
+          saveSnapshot();
+          setHasUnsavedChanges(true);
+        }
+      }
+    },
+    [nodes, edges, saveSnapshot, handleSaveBlueprint],
+  );
+
+  const onEdgesChange = useCallback(
+    (changes: any) => {
+      setEdges((eds) => applyEdgeChanges(changes, eds));
+      // Only mark as unsaved for edge removal, not for selection changes
+      const hasRemoval = changes.some((change: any) => change.type === "remove");
+      if (hasRemoval) {
+        saveSnapshot();
+        setHasUnsavedChanges(true);
+      }
+    },
+    [saveSnapshot],
+  );
+
+  const onConnect = useCallback(
+    (params: Connection) => {
+      saveSnapshot();
+      setEdges((eds) => addEdge({ ...params, style: { strokeWidth: 3, stroke: "#C9D5E1" } }, eds));
+      setHasUnsavedChanges(true);
+    },
+    [saveSnapshot],
+  );
+
+  const generateNodeId = (componentName: string, nodeName: string) => {
+    const randomChars = Math.random().toString(36).substring(2, 8);
+    const sanitizedComponent = componentName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+    const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+    return `${sanitizedComponent}-${sanitizedName}-${randomChars}`;
+  };
 
   const getNodeEditData = useCallback(
     (nodeId: string) => {
