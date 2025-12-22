@@ -186,7 +186,7 @@ function hasExecutionOrQueueItems(
 function runWorkflowEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution,
-  nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[]
+  nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
 ): EventSection[] | undefined {
   if (!hasExecutionOrQueueItems(execution, nodeQueueItems)) {
     return undefined;
