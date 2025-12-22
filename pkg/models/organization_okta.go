@@ -45,8 +45,6 @@ func SaveOrganizationOktaConfig(config *OrganizationOktaConfig) error {
 }
 
 func HashSCIMToken(token string) string {
-	// Placeholder: actual hashing is implemented in pkg/public/okta_saml.go hashSCIMToken.
-	// This function exists so that gRPC actions don't depend on public package.
 	return hashString(token)
 }
 

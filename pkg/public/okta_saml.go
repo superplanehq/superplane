@@ -1,7 +1,6 @@
 package public
 
 import (
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
@@ -15,9 +14,13 @@ import (
 )
 
 func (s *Server) registerOktaRoutes(r *mux.Router) {
-	publicRoute := r.Methods(http.MethodPost).Subrouter()
-
-	publicRoute.HandleFunc("/orgs/{orgId}/okta/auth", s.handleOktaSAML).Methods(http.MethodPost)
+	r.HandleFunc("/orgs/{orgId}/okta/auth", s.handleOktaSAML).Methods(http.MethodPost)
+	// SCIM base is /orgs/{orgId}/okta/scim
+	r.HandleFunc("/orgs/{orgId}/okta/scim/ServiceProviderConfig", s.handleSCIMServiceProviderConfig).Methods(http.MethodGet)
+	r.HandleFunc("/orgs/{orgId}/okta/scim/Users", s.handleSCIMUsers).Methods(http.MethodGet, http.MethodPost)
+	r.HandleFunc("/orgs/{orgId}/okta/scim/Users/{userId}", s.handleSCIMUser).Methods(http.MethodGet, http.MethodPatch, http.MethodDelete)
+	r.HandleFunc("/orgs/{orgId}/okta/scim/Groups", s.handleSCIMGroups).Methods(http.MethodGet, http.MethodPost)
+	r.HandleFunc("/orgs/{orgId}/okta/scim/Groups/{groupId}", s.handleSCIMGroup).Methods(http.MethodGet, http.MethodPatch, http.MethodDelete)
 }
 
 func (s *Server) handleOktaSAML(w http.ResponseWriter, r *http.Request) {
@@ -142,9 +145,4 @@ func buildCertificateStore(pemCert string) (*dsig.MemoryX509CertificateStore, er
 	return &dsig.MemoryX509CertificateStore{
 		Roots: []*x509.Certificate{cert},
 	}, nil
-}
-
-func hashSCIMToken(token string) string {
-	sum := sha256.Sum256([]byte(token))
-	return base64.StdEncoding.EncodeToString(sum[:])
 }
