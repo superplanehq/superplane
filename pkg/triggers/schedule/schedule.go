@@ -357,11 +357,10 @@ func (s *Schedule) Setup(ctx core.TriggerContext) error {
 	}
 
 	formatted := nextTrigger.Format(time.RFC3339)
-	ctx.MetadataContext.Set(Metadata{
+	return ctx.MetadataContext.Set(Metadata{
 		NextTrigger:   &formatted,
 		ReferenceTime: metadata.ReferenceTime,
 	})
-	return nil
 }
 
 func (s *Schedule) Actions() []core.Action {
@@ -441,11 +440,10 @@ func (s *Schedule) emitEvent(ctx core.TriggerActionContext) error {
 	}
 
 	formatted := nextTrigger.Format(time.RFC3339)
-	ctx.MetadataContext.Set(Metadata{
+	return ctx.MetadataContext.Set(Metadata{
 		NextTrigger:   &formatted,
 		ReferenceTime: existingMetadata.ReferenceTime,
 	})
-	return nil
 }
 
 func getNextTrigger(config Configuration, now time.Time, referenceTime *string) (*time.Time, error) {
@@ -487,7 +485,7 @@ func getNextTrigger(config Configuration, now time.Time, referenceTime *string) 
 		if config.WeeksInterval == nil {
 			return nil, fmt.Errorf("weeksInterval is required for weeks schedule")
 		}
-		if config.WeekDays == nil || len(config.WeekDays) == 0 {
+		if len(config.WeekDays) == 0 {
 			return nil, fmt.Errorf("weekDays is required for weeks schedule")
 		}
 		hour := 0

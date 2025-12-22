@@ -81,21 +81,16 @@ func InvokeNodeExecutionAction(
 		Name:                  actionName,
 		Parameters:            parameters,
 		Configuration:         node.Configuration.Data(),
-		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
-		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
+		MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
+		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
 		AuthContext:           contexts.NewAuthContext(tx, orgID, authService, user),
-		RequestContext:        contexts.NewExecutionRequestContext(database.Conn(), execution),
+		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
 		IntegrationContext:    contexts.NewIntegrationContext(tx, registry),
 	}
 
 	err = component.HandleAction(actionCtx)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "action execution failed: %v", err)
-	}
-
-	err = database.Conn().Save(&execution).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to save execution: %w", err)
 	}
 
 	messages.NewWorkflowExecutionMessage(

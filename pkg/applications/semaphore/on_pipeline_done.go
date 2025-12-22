@@ -94,13 +94,17 @@ func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("error finding project %s: %v", config.Project, err)
 	}
 
-	ctx.MetadataContext.Set(OnPipelineDoneMetadata{
+	err = ctx.MetadataContext.Set(OnPipelineDoneMetadata{
 		Project: &Project{
 			ID:   project.Metadata.ProjectID,
 			Name: project.Metadata.ProjectName,
 			URL:  fmt.Sprintf("%s/projects/%s", string(client.OrgURL), project.Metadata.ProjectID),
 		},
 	})
+
+	if err != nil {
+		return fmt.Errorf("error setting metadata: %v", err)
+	}
 
 	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
 		Project: project.Metadata.ProjectName,

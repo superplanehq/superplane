@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func TestNextMinutesTrigger(t *testing.T) {
@@ -496,11 +497,6 @@ func TestEmitEvent(t *testing.T) {
 				},
 			}
 
-			// Mock metadata context
-			mockMetadataContext := &mockMetadataContext{
-				data: map[string]any{},
-			}
-
 			// Mock request context
 			mockRequestContext := &mockRequestContext{}
 
@@ -508,7 +504,7 @@ func TestEmitEvent(t *testing.T) {
 				Name:            "emitEvent",
 				Configuration:   tt.config,
 				EventContext:    mockEventContext,
-				MetadataContext: mockMetadataContext,
+				MetadataContext: &contexts.MetadataContext{},
 				RequestContext:  mockRequestContext,
 			}
 

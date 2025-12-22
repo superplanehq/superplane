@@ -733,8 +733,8 @@ func (s *Server) executeComponenteNode(ctx context.Context, body []byte, headers
 				ID:                    execution.ID.String(),
 				WorkflowID:            execution.WorkflowID.String(),
 				Configuration:         execution.Configuration.Data(),
-				MetadataContext:       contexts.NewExecutionMetadataContext(execution),
-				NodeMetadataContext:   contexts.NewNodeMetadataContext(&node),
+				MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
+				NodeMetadataContext:   contexts.NewNodeMetadataContext(tx, &node),
 				ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
 				RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
 			}, nil

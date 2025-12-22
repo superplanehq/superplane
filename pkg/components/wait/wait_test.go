@@ -1,144 +1,65 @@
 package wait
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
-
-type mockExecutionStateContext struct {
-	finished   bool
-	passed     bool
-	failed     bool
-	passedData map[string][]any
-}
-
-func (m *mockExecutionStateContext) SetKV(key, value string) error {
-	return nil
-}
-
-func (m *mockExecutionStateContext) IsFinished() bool { return m.finished }
-func (m *mockExecutionStateContext) Pass(outputs map[string][]any) error {
-	m.passed = true
-	m.finished = true
-	m.passedData = outputs
-	return nil
-}
-func (m *mockExecutionStateContext) Fail(reason, message string) error {
-	m.failed = true
-	m.finished = true
-	return fmt.Errorf("execution failed: %s - %s", reason, message)
-}
 
 func TestWait_HandleAction_PushThrough(t *testing.T) {
 	w := &Wait{}
 
-	mockState := &mockExecutionStateContext{}
-	mockMetadata := &mockMetadataContext{}
-	mockAuth := &mockAuthContext{}
-
+	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ActionContext{
 		Name:                  "pushThrough",
-		ExecutionStateContext: mockState,
-		MetadataContext:       mockMetadata,
-		AuthContext:           mockAuth,
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       &contexts.MetadataContext{},
+		AuthContext:           &contexts.AuthContext{},
 		Configuration:         nil,
 		Parameters:            map[string]any{},
 	}
 
 	err := w.HandleAction(ctx)
 	assert.NoError(t, err)
-	assert.True(t, mockState.passed)
-	assert.True(t, mockState.finished)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.IsFinished())
 }
 
 func TestWait_HandleAction_TimeReached(t *testing.T) {
 	w := &Wait{}
 
-	mockState := &mockExecutionStateContext{}
-	mockMetadata := &mockMetadataContext{}
-
+	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ActionContext{
 		Name:                  "timeReached",
-		ExecutionStateContext: mockState,
-		MetadataContext:       mockMetadata,
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       &contexts.MetadataContext{},
 		Parameters:            map[string]any{},
 	}
 
 	err := w.HandleAction(ctx)
 	assert.NoError(t, err)
-	assert.True(t, mockState.passed)
-	assert.True(t, mockState.finished)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
 }
 
 func TestWait_HandleAction_Unknown(t *testing.T) {
 	w := &Wait{}
 
-	mockState := &mockExecutionStateContext{}
-	mockMetadata := &mockMetadataContext{}
-
+	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ActionContext{
 		Name:                  "unknown",
-		ExecutionStateContext: mockState,
-		MetadataContext:       mockMetadata,
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       &contexts.MetadataContext{},
 		Parameters:            map[string]any{},
 	}
 
 	err := w.HandleAction(ctx)
 	assert.Error(t, err)
-	assert.False(t, mockState.passed)
-	assert.False(t, mockState.failed)
-}
-
-type mockRequestContext struct {
-	scheduledDuration time.Duration
-	scheduledAction   string
-	scheduledParams   map[string]any
-}
-
-func (m *mockRequestContext) ScheduleActionCall(action string, params map[string]any, duration time.Duration) error {
-	m.scheduledAction = action
-	m.scheduledParams = params
-	m.scheduledDuration = duration
-	return nil
-}
-
-// mockMetadataContext implements core.MetadataContext for tests
-type mockMetadataContext struct {
-	data any
-}
-
-func (m *mockMetadataContext) Get() any {
-	return m.data
-}
-
-func (m *mockMetadataContext) Set(data any) {
-	m.data = data
-}
-
-// mockAuthContext implements core.AuthContext for tests
-type mockAuthContext struct {
-	user *core.User
-}
-
-func (m *mockAuthContext) AuthenticatedUser() *core.User {
-	return m.user
-}
-
-func (m *mockAuthContext) GetUser(id uuid.UUID) (*core.User, error) {
-	return nil, nil
-}
-
-func (m *mockAuthContext) HasRole(role string) (bool, error) {
-	return false, nil
-}
-
-func (m *mockAuthContext) InGroup(group string) (bool, error) {
-	return false, nil
+	assert.False(t, stateCtx.Passed)
+	assert.False(t, stateCtx.Finished)
 }
 
 func TestParseIntegerValue(t *testing.T) {
@@ -320,7 +241,6 @@ func TestCalculateIntervalDuration(t *testing.T) {
 
 func TestWait_Execute_IntervalMode(t *testing.T) {
 	w := &Wait{}
-	mockRequest := &mockRequestContext{}
 
 	tests := []struct {
 		name        string
@@ -384,14 +304,13 @@ func TestWait_Execute_IntervalMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockMetadata := &mockMetadataContext{}
-			mockState := &mockExecutionStateContext{}
+			requestCtx := &contexts.RequestContext{}
 			ctx := core.ExecutionContext{
 				Configuration:         tt.config,
 				Data:                  tt.data,
-				RequestContext:        mockRequest,
-				MetadataContext:       mockMetadata,
-				ExecutionStateContext: mockState,
+				RequestContext:        requestCtx,
+				MetadataContext:       &contexts.MetadataContext{},
+				ExecutionStateContext: &contexts.ExecutionStateContext{},
 			}
 
 			err := w.Execute(ctx)
@@ -399,8 +318,8 @@ func TestWait_Execute_IntervalMode(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, "timeReached", mockRequest.scheduledAction)
-				assert.Equal(t, tt.expectedDur, mockRequest.scheduledDuration)
+				assert.Equal(t, "timeReached", requestCtx.Action)
+				assert.Equal(t, tt.expectedDur, requestCtx.Duration)
 			}
 		})
 	}
@@ -408,7 +327,6 @@ func TestWait_Execute_IntervalMode(t *testing.T) {
 
 func TestWait_Execute_CountdownMode(t *testing.T) {
 	w := &Wait{}
-	mockRequest := &mockRequestContext{}
 
 	futureTime := time.Now().Add(1 * time.Hour)
 	futureTimeStr := futureTime.Format(time.RFC3339)
@@ -462,14 +380,13 @@ func TestWait_Execute_CountdownMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockMetadata := &mockMetadataContext{}
-			mockState := &mockExecutionStateContext{}
+			requestCtx := &contexts.RequestContext{}
 			ctx := core.ExecutionContext{
 				Configuration:         tt.config,
 				Data:                  tt.data,
-				RequestContext:        mockRequest,
-				MetadataContext:       mockMetadata,
-				ExecutionStateContext: mockState,
+				RequestContext:        requestCtx,
+				MetadataContext:       &contexts.MetadataContext{},
+				ExecutionStateContext: &contexts.ExecutionStateContext{},
 			}
 
 			err := w.Execute(ctx)
@@ -480,10 +397,10 @@ func TestWait_Execute_CountdownMode(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, "timeReached", mockRequest.scheduledAction)
+				assert.Equal(t, "timeReached", requestCtx.Action)
 
-				assert.True(t, mockRequest.scheduledDuration > 59*time.Minute)
-				assert.True(t, mockRequest.scheduledDuration < 61*time.Minute)
+				assert.True(t, requestCtx.Duration > 59*time.Minute)
+				assert.True(t, requestCtx.Duration < 61*time.Minute)
 			}
 		})
 	}
@@ -491,7 +408,6 @@ func TestWait_Execute_CountdownMode(t *testing.T) {
 
 func TestWait_Execute_InvalidConfiguration(t *testing.T) {
 	w := &Wait{}
-	mockRequest := &mockRequestContext{}
 
 	tests := []struct {
 		name   string
@@ -529,13 +445,11 @@ func TestWait_Execute_InvalidConfiguration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockMetadata := &mockMetadataContext{}
-			mockState := &mockExecutionStateContext{}
 			ctx := core.ExecutionContext{
 				Configuration:         tt.config,
-				RequestContext:        mockRequest,
-				MetadataContext:       mockMetadata,
-				ExecutionStateContext: mockState,
+				RequestContext:        &contexts.RequestContext{},
+				MetadataContext:       &contexts.MetadataContext{},
+				ExecutionStateContext: &contexts.ExecutionStateContext{},
 			}
 
 			err := w.Execute(ctx)
@@ -548,25 +462,23 @@ func TestWait_Execute_InvalidConfiguration(t *testing.T) {
 func TestWait_HandleTimeReached_CompletionOutput(t *testing.T) {
 	w := &Wait{}
 
-	mockState := &mockExecutionStateContext{}
-	mockMetadata := &mockMetadataContext{}
-	// Set up metadata with start time
-	mockMetadata.Set(ExecutionMetadata{StartTime: "2025-12-10T09:02:43.651Z"})
-
+	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ActionContext{
 		Name:                  "timeReached",
-		ExecutionStateContext: mockState,
-		MetadataContext:       mockMetadata,
+		ExecutionStateContext: stateCtx,
+		MetadataContext: &contexts.MetadataContext{
+			Metadata: ExecutionMetadata{StartTime: "2025-12-10T09:02:43.651Z"},
+		},
 	}
 
 	err := w.HandleAction(ctx)
 	assert.NoError(t, err)
-	assert.True(t, mockState.passed)
-	assert.True(t, mockState.finished)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
 
 	// Check completion output structure
-	assert.Contains(t, mockState.passedData, core.DefaultOutputChannel.Name)
-	outputs := mockState.passedData[core.DefaultOutputChannel.Name]
+	assert.Contains(t, stateCtx.Outputs, core.DefaultOutputChannel.Name)
+	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
 	assert.Len(t, outputs, 1)
 
 	output := outputs[0].(map[string]any)
@@ -580,34 +492,30 @@ func TestWait_HandleTimeReached_CompletionOutput(t *testing.T) {
 func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
 	w := &Wait{}
 
-	mockState := &mockExecutionStateContext{}
-	mockMetadata := &mockMetadataContext{}
-	mockAuth := &mockAuthContext{
-		user: &core.User{
-			Email: "alex@company.com",
-			Name:  "Aleksandar Mitrović",
-		},
-	}
-	// Set up metadata with start time
-	mockMetadata.Set(ExecutionMetadata{StartTime: "2025-12-10T09:02:43.651Z"})
-
+	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ActionContext{
 		Name:                  "pushThrough",
-		ExecutionStateContext: mockState,
-		MetadataContext:       mockMetadata,
-		AuthContext:           mockAuth,
+		ExecutionStateContext: stateCtx,
+		AuthContext: &contexts.AuthContext{
+			User: &core.User{
+				Email: "alex@company.com",
+				Name:  "Aleksandar Mitrović",
+			},
+		},
+		MetadataContext: &contexts.MetadataContext{
+			Metadata: ExecutionMetadata{StartTime: "2025-12-10T09:02:43.651Z"},
+		},
 	}
 
 	err := w.HandleAction(ctx)
 	assert.NoError(t, err)
-	assert.True(t, mockState.passed)
-	assert.True(t, mockState.finished)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
 
 	// Check completion output structure
-	assert.Contains(t, mockState.passedData, core.DefaultOutputChannel.Name)
-	outputs := mockState.passedData[core.DefaultOutputChannel.Name]
+	assert.Contains(t, stateCtx.Outputs, core.DefaultOutputChannel.Name)
+	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
 	assert.Len(t, outputs, 1)
-
 	output := outputs[0].(map[string]any)
 	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["timestamp_started"])
 	assert.Equal(t, "completed", output["result"])
@@ -623,7 +531,6 @@ func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
 
 func TestWait_Execute_CountdownMode_ResolvedValues(t *testing.T) {
 	w := &Wait{}
-	mockRequest := &mockRequestContext{}
 
 	futureTime := time.Now().Add(1 * time.Hour)
 	futureTimeStr := futureTime.Format(time.RFC3339)
@@ -672,13 +579,11 @@ func TestWait_Execute_CountdownMode_ResolvedValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockMetadata := &mockMetadataContext{}
-			mockState := &mockExecutionStateContext{}
 			ctx := core.ExecutionContext{
 				Configuration:         tt.config,
-				RequestContext:        mockRequest,
-				MetadataContext:       mockMetadata,
-				ExecutionStateContext: mockState,
+				RequestContext:        &contexts.RequestContext{},
+				MetadataContext:       &contexts.MetadataContext{},
+				ExecutionStateContext: &contexts.ExecutionStateContext{},
 			}
 
 			err := w.Execute(ctx)
@@ -702,33 +607,29 @@ func TestWait_Execute_CountdownMode_ResolvedValues(t *testing.T) {
 func TestWait_Cancel_CompletionOutput(t *testing.T) {
 	w := &Wait{}
 
-	mockState := &mockExecutionStateContext{}
-	mockMetadata := &mockMetadataContext{}
-	mockAuth := &mockAuthContext{
-		user: &core.User{
-			Email: "alex@company.com",
-			Name:  "Aleksandar Mitrović",
-		},
-	}
-	// Set up metadata with start time
-	mockMetadata.Set(ExecutionMetadata{StartTime: "2025-12-10T09:02:43.651Z"})
-
+	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ExecutionContext{
-		ExecutionStateContext: mockState,
-		MetadataContext:       mockMetadata,
-		AuthContext:           mockAuth,
+		ExecutionStateContext: stateCtx,
+		MetadataContext: &contexts.MetadataContext{
+			Metadata: ExecutionMetadata{StartTime: "2025-12-10T09:02:43.651Z"},
+		},
+		AuthContext: &contexts.AuthContext{
+			User: &core.User{
+				Email: "alex@company.com",
+				Name:  "Aleksandar Mitrović",
+			},
+		},
 	}
 
 	err := w.Cancel(ctx)
 	assert.NoError(t, err)
-	assert.True(t, mockState.passed)
-	assert.True(t, mockState.finished)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
 
 	// Check completion output structure
-	assert.Contains(t, mockState.passedData, core.DefaultOutputChannel.Name)
-	outputs := mockState.passedData[core.DefaultOutputChannel.Name]
+	assert.Contains(t, stateCtx.Outputs, core.DefaultOutputChannel.Name)
+	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
 	assert.Len(t, outputs, 1)
-
 	output := outputs[0].(map[string]any)
 	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["timestamp_started"])
 	assert.Equal(t, "cancelled", output["result"])

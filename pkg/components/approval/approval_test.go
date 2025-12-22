@@ -5,72 +5,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
-
-type MockExecutionStateContext struct {
-	mock.Mock
-}
-
-func (m *MockExecutionStateContext) SetKV(key, value string) error {
-	args := m.Called(key, value)
-	return args.Error(0)
-}
-
-func (m *MockExecutionStateContext) Pass(outputs map[string][]any) error {
-	args := m.Called(outputs)
-	return args.Error(0)
-}
-
-func (m *MockExecutionStateContext) Fail(reason, message string) error {
-	args := m.Called(reason, message)
-	return args.Error(0)
-}
-
-func (m *MockExecutionStateContext) IsFinished() bool {
-	args := m.Called()
-	return args.Bool(0)
-}
-
-type MockMetadataContext struct {
-	mock.Mock
-}
-
-func (m *MockMetadataContext) Set(data any) {
-	m.Called(data)
-}
-
-func (m *MockMetadataContext) Get() any {
-	args := m.Called()
-	return args.Get(0)
-}
-
-type MockAuthContext struct {
-	mock.Mock
-}
-
-func (m *MockAuthContext) AuthenticatedUser() *core.User {
-	args := m.Called()
-	return args.Get(0).(*core.User)
-}
-
-func (m *MockAuthContext) HasRole(role string) (bool, error) {
-	args := m.Called(role)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockAuthContext) InGroup(group string) (bool, error) {
-	args := m.Called(group)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockAuthContext) GetUser(userID uuid.UUID) (*core.User, error) {
-	args := m.Called(userID)
-	return args.Get(0).(*core.User), args.Error(1)
-}
 
 func TestApproval_OutputChannels(t *testing.T) {
 	approval := &Approval{}
@@ -97,34 +36,30 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 		},
 	}
 
-	mockExecStateCtx := &MockExecutionStateContext{}
-	mockMetadataCtx := &MockMetadataContext{}
-	mockAuthCtx := &MockAuthContext{}
-
-	mockMetadataCtx.On("Get").Return(metadata)
-	mockMetadataCtx.On("Set", mock.Anything)
-
-	mockAuthCtx.On("AuthenticatedUser").Return(user)
-
-	mockExecStateCtx.On("Pass", mock.MatchedBy(func(outputs map[string][]any) bool {
-		_, hasApproved := outputs[ChannelApproved]
-		return hasApproved
-	})).Return(nil)
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: metadata,
+	}
+	authCtx := &contexts.AuthContext{
+		User: user,
+	}
 
 	ctx := core.ActionContext{
 		Name: "approve",
 		Parameters: map[string]any{
 			"index": float64(0),
 		},
-		MetadataContext:       mockMetadataCtx,
-		ExecutionStateContext: mockExecStateCtx,
-		AuthContext:           mockAuthCtx,
+		MetadataContext:       metadataCtx,
+		ExecutionStateContext: stateCtx,
+		AuthContext:           authCtx,
 	}
 
 	err := approval.HandleAction(ctx)
 
 	assert.NoError(t, err)
-	mockExecStateCtx.AssertExpectations(t)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
+	assert.Contains(t, stateCtx.Outputs, ChannelApproved)
 }
 
 func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
@@ -138,19 +73,13 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 		},
 	}
 
-	mockExecStateCtx := &MockExecutionStateContext{}
-	mockMetadataCtx := &MockMetadataContext{}
-	mockAuthCtx := &MockAuthContext{}
-
-	mockMetadataCtx.On("Get").Return(metadata)
-	mockMetadataCtx.On("Set", mock.Anything)
-
-	mockAuthCtx.On("AuthenticatedUser").Return(user)
-
-	mockExecStateCtx.On("Pass", mock.MatchedBy(func(outputs map[string][]any) bool {
-		_, hasRejected := outputs[ChannelRejected]
-		return hasRejected
-	})).Return(nil)
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: metadata,
+	}
+	authCtx := &contexts.AuthContext{
+		User: user,
+	}
 
 	ctx := core.ActionContext{
 		Name: "reject",
@@ -158,15 +87,17 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 			"index":  float64(0),
 			"reason": "Not approved",
 		},
-		MetadataContext:       mockMetadataCtx,
-		ExecutionStateContext: mockExecStateCtx,
-		AuthContext:           mockAuthCtx,
+		MetadataContext:       metadataCtx,
+		ExecutionStateContext: stateCtx,
+		AuthContext:           authCtx,
 	}
 
 	err := approval.HandleAction(ctx)
 
 	assert.NoError(t, err)
-	mockExecStateCtx.AssertExpectations(t)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
+	assert.Contains(t, stateCtx.Outputs, ChannelRejected)
 }
 
 func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
@@ -182,30 +113,29 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 		},
 	}
 
-	mockExecStateCtx := &MockExecutionStateContext{}
-	mockMetadataCtx := &MockMetadataContext{}
-	mockAuthCtx := &MockAuthContext{}
-
-	mockMetadataCtx.On("Get").Return(metadata)
-	mockMetadataCtx.On("Set", mock.Anything)
-
-	mockAuthCtx.On("AuthenticatedUser").Return(user1)
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: metadata,
+	}
+	authCtx := &contexts.AuthContext{
+		User: user1,
+	}
 
 	ctx := core.ActionContext{
 		Name: "approve",
 		Parameters: map[string]any{
 			"index": float64(0),
 		},
-		MetadataContext:       mockMetadataCtx,
-		ExecutionStateContext: mockExecStateCtx,
-		AuthContext:           mockAuthCtx,
+		MetadataContext:       metadataCtx,
+		ExecutionStateContext: stateCtx,
+		AuthContext:           authCtx,
 	}
 
 	err := approval.HandleAction(ctx)
 
 	assert.NoError(t, err)
-
-	mockExecStateCtx.AssertNotCalled(t, "Pass")
+	assert.False(t, stateCtx.Passed)
+	assert.False(t, stateCtx.Finished)
 }
 
 func TestMetadata_UpdateResult(t *testing.T) {
@@ -312,42 +242,41 @@ func TestApproval_Execute(t *testing.T) {
 	approval := &Approval{}
 
 	t.Run("with empty items immediately completes with approved channel", func(t *testing.T) {
-		mockExecStateCtx := &MockExecutionStateContext{}
-		mockMetadataCtx := &MockMetadataContext{}
-		mockAuthCtx := &MockAuthContext{}
-
-		mockMetadataCtx.On("Set", mock.Anything)
-		mockExecStateCtx.On("Pass", mock.MatchedBy(func(outputs map[string][]any) bool {
-			_, hasApproved := outputs[ChannelApproved]
-			return hasApproved
-		})).Return(nil)
+		stateCtx := &contexts.ExecutionStateContext{}
+		metadataCtx := &contexts.MetadataContext{}
+		authCtx := &contexts.AuthContext{}
 
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"items": []any{},
 			},
-			MetadataContext:       mockMetadataCtx,
-			ExecutionStateContext: mockExecStateCtx,
-			AuthContext:           mockAuthCtx,
+			MetadataContext:       metadataCtx,
+			ExecutionStateContext: stateCtx,
+			AuthContext:           authCtx,
 		}
 
 		err := approval.Execute(ctx)
 
 		assert.NoError(t, err)
-		mockExecStateCtx.AssertExpectations(t)
-		mockMetadataCtx.AssertCalled(t, "Set", mock.Anything)
+		assert.True(t, stateCtx.Passed)
+		assert.True(t, stateCtx.Finished)
+		assert.Contains(t, stateCtx.Outputs, ChannelApproved)
+		assert.NotNil(t, metadataCtx.Metadata)
 	})
 
 	t.Run("with items does not immediately complete", func(t *testing.T) {
-		mockExecStateCtx := &MockExecutionStateContext{}
-		mockMetadataCtx := &MockMetadataContext{}
-		mockAuthCtx := &MockAuthContext{}
+		stateCtx := &contexts.ExecutionStateContext{}
+		metadataCtx := &contexts.MetadataContext{}
 
 		userID := uuid.New()
 		user := &core.User{ID: userID.String()}
 
-		mockMetadataCtx.On("Set", mock.Anything)
-		mockAuthCtx.On("GetUser", userID).Return(user, nil)
+		authCtx := &contexts.AuthContext{
+			User: user,
+			Users: map[string]*core.User{
+				userID.String(): user,
+			},
+		}
 
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
@@ -358,16 +287,17 @@ func TestApproval_Execute(t *testing.T) {
 					},
 				},
 			},
-			MetadataContext:       mockMetadataCtx,
-			ExecutionStateContext: mockExecStateCtx,
-			AuthContext:           mockAuthCtx,
+			MetadataContext:       metadataCtx,
+			ExecutionStateContext: stateCtx,
+			AuthContext:           authCtx,
 		}
 
 		err := approval.Execute(ctx)
 
 		assert.NoError(t, err)
-		mockExecStateCtx.AssertNotCalled(t, "Pass")
-		mockMetadataCtx.AssertCalled(t, "Set", mock.Anything)
+		assert.False(t, stateCtx.Passed)
+		assert.False(t, stateCtx.Finished)
+		assert.NotNil(t, metadataCtx.Metadata)
 	})
 }
 

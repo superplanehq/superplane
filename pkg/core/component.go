@@ -157,7 +157,7 @@ type Webhook struct {
  */
 type MetadataContext interface {
 	Get() any
-	Set(any)
+	Set(any) error
 }
 
 /*

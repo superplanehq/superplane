@@ -1,6 +1,9 @@
 package contexts
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -38,8 +41,9 @@ func (m *MetadataContext) Get() any {
 	return m.Metadata
 }
 
-func (m *MetadataContext) Set(metadata any) {
+func (m *MetadataContext) Set(metadata any) error {
 	m.Metadata = metadata
+	return nil
 }
 
 type AppInstallationContext struct {
@@ -114,4 +118,77 @@ func (c *AppInstallationContext) RequestWebhook(configuration any) error {
 
 func (c *AppInstallationContext) AssociateWebhook(webhookID uuid.UUID) {
 	// TODO: I don't like this method
+}
+
+type ExecutionStateContext struct {
+	Finished       bool
+	Passed         bool
+	FailureReason  string
+	FailureMessage string
+	Outputs        map[string][]any
+	KVs            map[string]string
+}
+
+func (c *ExecutionStateContext) IsFinished() bool {
+	return c.Finished
+}
+
+func (c *ExecutionStateContext) Pass(outputs map[string][]any) error {
+	c.Finished = true
+	c.Passed = true
+	c.Outputs = outputs
+	return nil
+}
+
+func (c *ExecutionStateContext) Fail(reason, message string) error {
+	c.Finished = true
+	c.Passed = false
+	c.FailureReason = reason
+	c.FailureMessage = message
+	return nil
+}
+
+func (c *ExecutionStateContext) SetKV(key, value string) error {
+	c.KVs[key] = value
+	return nil
+}
+
+type AuthContext struct {
+	User  *core.User
+	Users map[string]*core.User
+}
+
+func (c *AuthContext) AuthenticatedUser() *core.User {
+	return c.User
+}
+
+func (c *AuthContext) GetUser(id uuid.UUID) (*core.User, error) {
+	if c.Users != nil {
+		if user, ok := c.Users[id.String()]; ok {
+			return user, nil
+		}
+	}
+
+	return nil, fmt.Errorf("user not found: %s", id.String())
+}
+
+func (c *AuthContext) HasRole(role string) (bool, error) {
+	return false, fmt.Errorf("not implemented")
+}
+
+func (c *AuthContext) InGroup(group string) (bool, error) {
+	return false, fmt.Errorf("not implemented")
+}
+
+type RequestContext struct {
+	Duration time.Duration
+	Action   string
+	Params   map[string]any
+}
+
+func (c *RequestContext) ScheduleActionCall(action string, params map[string]any, duration time.Duration) error {
+	c.Action = action
+	c.Params = params
+	c.Duration = duration
+	return nil
 }

@@ -189,13 +189,17 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error finding project %s: %v", config.Project, err)
 	}
 
-	ctx.MetadataContext.Set(RunWorkflowNodeMetadata{
+	err = ctx.MetadataContext.Set(RunWorkflowNodeMetadata{
 		Project: &Project{
 			ID:   project.Metadata.ProjectID,
 			Name: project.Metadata.ProjectName,
 			URL:  fmt.Sprintf("%s/projects/%s", string(client.OrgURL), project.Metadata.ProjectID),
 		},
 	})
+
+	if err != nil {
+		return fmt.Errorf("error setting metadata: %v", err)
+	}
 
 	ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
 		Project: project.Metadata.ProjectName,
@@ -327,7 +331,10 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 
 	metadata.Pipeline.State = hook.Pipeline.State
 	metadata.Pipeline.Result = hook.Pipeline.Result
-	executionCtx.MetadataContext.Set(metadata)
+	err = executionCtx.MetadataContext.Set(metadata)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
+	}
 
 	if metadata.Pipeline.Result == PipelineResultPassed {
 		err = executionCtx.ExecutionStateContext.Pass(map[string][]any{
@@ -421,7 +428,10 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 
 	metadata.Pipeline.State = pipeline.State
 	metadata.Pipeline.Result = pipeline.Result
-	ctx.MetadataContext.Set(metadata)
+	err = ctx.MetadataContext.Set(metadata)
+	if err != nil {
+		return err
+	}
 
 	if pipeline.Result == PipelineResultPassed {
 		return ctx.ExecutionStateContext.Pass(map[string][]any{
@@ -456,7 +466,11 @@ func (r *RunWorkflow) finish(ctx core.ActionContext) error {
 	}
 
 	metadata.Data = dataMap
-	ctx.MetadataContext.Set(metadata)
+	err = ctx.MetadataContext.Set(metadata)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
