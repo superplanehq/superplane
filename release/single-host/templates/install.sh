@@ -15,18 +15,22 @@ cat "$(dirname "${BASH_SOURCE[0]:-$0}")/superplane-logo.txt"
 
 ENV_FILE="superplane.env"
 
-echo "This script will generate ${ENV_FILE} for a single-host deployment."
+echo "Running Superplane single-host installation."
 echo ""
 
-default_domain="$(hostname -f 2>/dev/null || hostname)"
-read -rp "Domain for Superplane (e.g. superplane.example.com) [${default_domain}]: " DOMAIN_INPUT
-DOMAIN="${DOMAIN_INPUT:-$default_domain}"
+while :; do
+  read -rp "1) Domain for Superplane (e.g. superplane.example.com): " DOMAIN
+  if [[ -n "${DOMAIN}" ]]; then
+    break
+  fi
+  echo "Domain is required. Please enter a value."
+done
 
 SANITIZED_DOMAIN="$(echo "${DOMAIN}" | sed -E 's#^https?://##' | cut -d'/' -f1)"
 BASE_URL="https://${SANITIZED_DOMAIN}"
 
 echo ""
-read -rp "Configure email invitations via Resend now? (y/N): " CONFIGURE_EMAIL
+read -rp "2) Configure email invitations via Resend now? (y/N): " CONFIGURE_EMAIL
 CONFIGURE_EMAIL="${CONFIGURE_EMAIL:-n}"
 
 RESEND_API_KEY=""
@@ -45,7 +49,7 @@ if [[ "${CONFIGURE_EMAIL}" =~ ^[Yy]$ ]]; then
 fi
 
 echo ""
-read -rp "Allow open signups (anyone can create an account)? (y/N): " ALLOW_SIGNUP_INPUT
+read -rp "3) Allow open signups (anyone can create an account)? (y/N): " ALLOW_SIGNUP_INPUT
 ALLOW_SIGNUP_INPUT="${ALLOW_SIGNUP_INPUT:-n}"
 
 if [[ "${ALLOW_SIGNUP_INPUT}" =~ ^[Yy]$ ]]; then
@@ -143,9 +147,17 @@ else
 fi
 
 echo ""
-echo -e "${LBLUE}Configuration written to ${ENV_FILE}.${CLEAR}"
+echo "Configuration written to ${ENV_FILE}."
 echo ""
-echo "Next steps:"
-echo "  1) docker compose pull"
-echo "  2) docker compose up --wait --detach"
+
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]:-$0}")"
+
+echo "Running docker compose pull..."
+docker compose -f "${SCRIPT_DIR}/docker-compose.yml" pull
+
+echo "Running docker compose up --wait --detach..."
+docker compose -f "${SCRIPT_DIR}/docker-compose.yml" up --wait --detach
+
 echo ""
+echo "Superplane is starting via docker compose."
+echo "Visit ${BASE_URL} in your browser."
