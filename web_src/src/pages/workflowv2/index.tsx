@@ -439,7 +439,6 @@ export function WorkflowPageV2() {
     (nodeId: string): SidebarData | null => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
-      setCurrentHistoryNode({ nodeId, nodeType: node?.type || "TYPE_ACTION" });
 
       // Get current data from store (don't trigger load here - that's done in useEffect)
       const nodeData = getNodeData(nodeId);
@@ -481,6 +480,9 @@ export function WorkflowPageV2() {
     (nodeId: string) => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return;
+
+      // Set current history node for tracking
+      setCurrentHistoryNode({ nodeId, nodeType: node?.type || "TYPE_ACTION" });
 
       loadNodeDataMethod(workflowId!, nodeId, node.type!, queryClient);
     },
