@@ -826,6 +826,119 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
   );
 
+  const handlePlaceholderAdd = useCallback(
+    async (data: {
+      position: { x: number; y: number };
+      sourceNodeId: string;
+      sourceHandleId: string | null;
+    }): Promise<string> => {
+      if (!workflow || !organizationId || !workflowId) return "";
+
+      saveWorkflowSnapshot(workflow);
+
+      const newNodeId = `node-${Date.now()}`;
+
+      // Create placeholder node - will fail validation but still be saved
+      const newNode: ComponentsNode = {
+        id: newNodeId,
+        name: "New Component",
+        type: "TYPE_COMPONENT",
+        // NO component/blueprint/trigger reference - causes validation error
+        configuration: {},
+        metadata: {},
+        position: {
+          x: Math.round(data.position.x),
+          y: Math.round(data.position.y),
+        },
+      };
+
+      const newEdge: ComponentsEdge = {
+        sourceId: data.sourceNodeId,
+        targetId: newNodeId,
+        channel: data.sourceHandleId || "default",
+      };
+
+      const updatedWorkflow = {
+        ...workflow,
+        spec: {
+          ...workflow.spec,
+          nodes: [...(workflow.spec?.nodes || []), newNode],
+          edges: [...(workflow.spec?.edges || []), newEdge],
+        },
+      };
+
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      await handleSaveWorkflow(updatedWorkflow);
+
+      return newNodeId;
+    },
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
+  );
+
+  const handlePlaceholderConfigure = useCallback(
+    async (data: {
+      placeholderId: string;
+      buildingBlock: any;
+      nodeName: string;
+      configuration: Record<string, any>;
+      appName?: string;
+    }): Promise<void> => {
+      if (!workflow || !organizationId || !workflowId) {
+        return;
+      }
+
+      saveWorkflowSnapshot(workflow);
+
+      const nodeIndex = workflow.spec?.nodes?.findIndex((n) => n.id === data.placeholderId);
+      if (nodeIndex === undefined || nodeIndex === -1) {
+        return;
+      }
+
+      const filteredConfiguration = filterVisibleConfiguration(
+        data.configuration,
+        data.buildingBlock.configuration || [],
+      );
+
+      // Update placeholder with real component data
+      const updatedNode: ComponentsNode = {
+        ...workflow.spec!.nodes![nodeIndex],
+        name: data.nodeName.trim(),
+        type:
+          data.buildingBlock.type === "trigger"
+            ? "TYPE_TRIGGER"
+            : data.buildingBlock.type === "blueprint"
+              ? "TYPE_BLUEPRINT"
+              : "TYPE_COMPONENT",
+        configuration: filteredConfiguration,
+      };
+
+      // Add the reference that was missing
+      if (data.buildingBlock.type === "component") {
+        updatedNode.component = { name: data.buildingBlock.name };
+      } else if (data.buildingBlock.type === "trigger") {
+        updatedNode.trigger = { name: data.buildingBlock.name };
+      } else if (data.buildingBlock.type === "blueprint") {
+        updatedNode.blueprint = { id: data.buildingBlock.id };
+      }
+
+      const updatedNodes = [...(workflow.spec?.nodes || [])];
+      updatedNodes[nodeIndex] = updatedNode;
+
+      const updatedWorkflow = {
+        ...workflow,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+          edges: workflow.spec?.edges || [],
+        },
+      };
+
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      await handleSaveWorkflow(updatedWorkflow);
+    },
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
+  );
+
   const handleEdgeCreate = useCallback(
     (sourceId: string, targetId: string, sourceHandle?: string | null) => {
       if (!workflow || !organizationId || !workflowId) return;
@@ -1314,6 +1427,8 @@ export function WorkflowPageV2() {
       onConfigure={handleConfigure}
       buildingBlocks={buildingBlocks}
       onNodeAdd={handleNodeAdd}
+      onPlaceholderAdd={handlePlaceholderAdd}
+      onPlaceholderConfigure={handlePlaceholderConfigure}
       installedApplications={installedApplications}
       hasFitToViewRef={hasFitToViewRef}
       hasUserToggledSidebarRef={hasUserToggledSidebarRef}
@@ -1705,6 +1820,38 @@ function prepareComponentNode(
   queryClient: QueryClient,
   organizationId?: string,
 ): CanvasNode {
+  // Detect placeholder nodes (no component reference, name is "New Component")
+  const isPlaceholder = !node.component?.name && node.name === "New Component";
+
+  if (isPlaceholder) {
+    // Render placeholder as a ComponentBase with friendly message
+    const canvasNode: CanvasNode = {
+      id: node.id!,
+      position: { x: node.position?.x!, y: node.position?.y! },
+      data: {
+        type: "component",
+        label: "New Component",
+        state: "pending" as const,
+        outputChannels: ["default"],
+        component: {
+          iconSlug: "box-dashed",
+          iconColor: getColorClass("gray"),
+          collapsedBackground: getBackgroundColorClass("gray"),
+          collapsed: false,
+          title: "New Component",
+          includeEmptyState: true,
+          emptyStateProps: {
+            description: "Select a component from the sidebar to configure this node",
+          },
+          // Don't show error - show description instead
+          error: undefined,
+          parameters: [],
+        },
+      },
+    };
+    return canvasNode;
+  }
+
   const componentNameParts = node.component?.name?.split(".") || [];
   const componentName = componentNameParts[0];
 

@@ -8,7 +8,7 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { Loader2, Puzzle, ScanLine, ScanText } from "lucide-react";
+import { Loader2, ScanLine, ScanText } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -31,14 +31,13 @@ import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../
 import { ComponentSidebar } from "../componentSidebar";
 import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
-import { ComponentBaseProps, EventState, EventStateMap } from "../componentBase";
+import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
-import { getBackgroundColorClass } from "@/utils/colors";
 import { SidebarEvent } from "../componentSidebar/types";
 
 export interface SidebarData {
@@ -158,6 +157,18 @@ export interface CanvasPageProps {
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
+  onPlaceholderAdd?: (data: {
+    position: { x: number; y: number };
+    sourceNodeId: string;
+    sourceHandleId: string | null;
+  }) => Promise<string>;
+  onPlaceholderConfigure?: (data: {
+    placeholderId: string;
+    buildingBlock: BuildingBlock;
+    nodeName: string;
+    configuration: Record<string, any>;
+    appName?: string;
+  }) => Promise<void>;
 
   // Refs to persist state across re-renders
   hasFitToViewRef?: React.MutableRefObject<boolean>;
@@ -367,95 +378,33 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleConnectionDropInEmptySpace = useCallback(
-    (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
-      if (!sourceConnection) return;
+    async (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
+      if (!sourceConnection || !props.onPlaceholderAdd) return;
 
-      const pendingNodeId = `pending_connection_${Date.now()}`;
+      // Save placeholder immediately to backend
+      const placeholderId = await props.onPlaceholderAdd({
+        position: { x: position.x, y: position.y - 30 },
+        sourceNodeId: sourceConnection.nodeId,
+        sourceHandleId: sourceConnection.handleId,
+      });
 
-      const placeholderNode: CanvasNode = {
-        id: pendingNodeId,
-        type: "default",
-        position: {
-          x: position.x,
-          y: position.y - 30,
-        },
-        data: {
-          type: "component",
-          label: "New Component",
-          state: "neutral",
-          component: {
-            title: "New Component",
-            headerColor: "bg-white",
-            iconSlug: "puzzle",
-            iconColor: "text-gray-800",
-            collapsedBackground: getBackgroundColorClass("white"),
-            hideActionsButton: true,
-            includeEmptyState: true,
-            emptyStateProps: {
-              icon: Puzzle,
-              title: "Select the component from sidebar",
-            },
-          } as ComponentBaseProps,
-          isPendingConnection: true,
-          sourceConnection: {
-            nodeId: sourceConnection.nodeId,
-            handleId: sourceConnection.handleId,
-          },
-        },
-      };
-
-      // Add the new node first
-      state.setNodes((nodes) => [...nodes, placeholderNode]);
-
-      // Check if current template is a configured template (not just pending connection)
-      const currentTemplateNode = templateNodeId ? state.nodes.find((n) => n.id === templateNodeId) : null;
-      const isCurrentTemplateConfigured =
-        currentTemplateNode?.data?.isTemplate && !currentTemplateNode?.data?.isPendingConnection;
-
-      // Only select and set as template if there isn't a configured template being created
-      // Allow switching between pending nodes, but prevent overwriting configured templates
-      if (!isCurrentTemplateConfigured) {
-        // Then update all nodes to set selection (deselect others, select the new one)
-        // This needs to happen in a separate setNodes call to ensure ReactFlow processes the selection
-        setTimeout(() => {
-          state.setNodes((nodes) =>
-            nodes.map((node) => ({
-              ...node,
-              selected: node.id === pendingNodeId,
-            })),
-          );
-        }, 0);
-        setTemplateNodeId(pendingNodeId);
-      }
-
-      // Create edge locally (not via parent) - it will be preserved by useCanvasState
-      const edgeId = `${sourceConnection.nodeId}--${pendingNodeId}--${sourceConnection.handleId || "default"}`;
-      state.setEdges([
-        ...state.edges,
-        {
-          id: edgeId,
-          source: sourceConnection.nodeId,
-          target: pendingNodeId,
-          sourceHandle: sourceConnection.handleId || "default",
-        },
-      ]);
-
-      // Open component sidebar to track the selected node
-      state.componentSidebar.open(pendingNodeId);
-
-      // Open BuildingBlocksSidebar for component selection
+      // Open building blocks sidebar for user to configure
       setIsBuildingBlocksSidebarOpen(true);
+      state.componentSidebar.open(placeholderId);
     },
-    [state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen],
+    [props, state, setIsBuildingBlocksSidebarOpen],
   );
 
   const handlePendingConnectionNodeClick = useCallback(
     (nodeId: string) => {
-      // Set this node as the active template
+      // For both placeholders and legacy pending connections:
+      // Set this node as the active template so we can configure it when a building block is selected
       setTemplateNodeId(nodeId);
+
       // Open the BuildingBlocksSidebar so user can select a component
       setIsBuildingBlocksSidebarOpen(true);
-      // Close ComponentSidebar since pending nodes don't have configuration yet
+
+      // Close ComponentSidebar since we're selecting a building block first
       state.componentSidebar.close();
     },
     [setTemplateNodeId, setIsBuildingBlocksSidebarOpen, state.componentSidebar],
@@ -463,39 +412,66 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleBuildingBlockClick = useCallback(
     async (block: BuildingBlock) => {
-      const pendingNode = state.nodes.find((n) => n.id === templateNodeId && n.data.isPendingConnection);
-      if (!pendingNode || !templateNodeId) {
+      if (!templateNodeId) {
         return;
       }
 
-      // Parse default configuration from building block
-      const defaultConfiguration = parseDefaultValues(block.configuration || []);
+      // Check if templateNodeId is a placeholder (persisted node) or legacy pending connection (local-only)
+      const workflowNode = props.workflowNodes?.find((n) => n.id === templateNodeId);
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
 
-      // Save immediately with defaults
-      if (props.onNodeAdd) {
-        const newNodeId = await props.onNodeAdd({
+      if (isPlaceholder && props.onPlaceholderConfigure) {
+        // Handle placeholder node (persisted)
+        const defaultConfiguration = parseDefaultValues(block.configuration || []);
+
+        await props.onPlaceholderConfigure({
+          placeholderId: templateNodeId,
           buildingBlock: block,
           nodeName: block.name || "",
           configuration: defaultConfiguration,
-          position: pendingNode.position,
-          sourceConnection: pendingNode.data.sourceConnection as
-            | { nodeId: string; handleId: string | null }
-            | undefined,
           appName: block.appName,
         });
 
-        // Remove pending node
-        state.setNodes((nodes) => nodes.filter((n) => n.id !== templateNodeId));
-
-        // Clear template state
         setTemplateNodeId(null);
-
-        // Close building blocks sidebar
         setIsBuildingBlocksSidebarOpen(false);
-
-        // Open component sidebar for the new node
-        state.componentSidebar.open(newNodeId);
+        state.componentSidebar.open(templateNodeId);
         setCurrentTab("settings");
+        return;
+      }
+
+      // Check for local pending connection nodes (legacy)
+      const pendingNode = state.nodes.find((n) => n.id === templateNodeId && n.data.isPendingConnection);
+
+      if (pendingNode) {
+        // Parse default configuration from building block
+        const defaultConfiguration = parseDefaultValues(block.configuration || []);
+
+        // Save immediately with defaults
+        if (props.onNodeAdd) {
+          const newNodeId = await props.onNodeAdd({
+            buildingBlock: block,
+            nodeName: block.name || "",
+            configuration: defaultConfiguration,
+            position: pendingNode.position,
+            sourceConnection: pendingNode.data.sourceConnection as
+              | { nodeId: string; handleId: string | null }
+              | undefined,
+            appName: block.appName,
+          });
+
+          // Remove pending node
+          state.setNodes((nodes) => nodes.filter((n) => n.id !== templateNodeId));
+
+          // Clear template state
+          setTemplateNodeId(null);
+
+          // Close building blocks sidebar
+          setIsBuildingBlocksSidebarOpen(false);
+
+          // Open component sidebar for the new node
+          state.componentSidebar.open(newNodeId);
+          setCurrentTab("settings");
+        }
       }
     },
     [templateNodeId, state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen],
@@ -656,6 +632,7 @@ function CanvasPage(props: CanvasPageProps) {
               hasFitToViewRef={hasFitToViewRef}
               viewportRefProp={props.viewportRef}
               highlightedNodeIds={highlightedNodeIds}
+              workflowNodes={props.workflowNodes}
             />
           </ReactFlowProvider>
 
@@ -1023,6 +1000,7 @@ function CanvasContent({
   onPendingConnectionNodeClick,
   onTemplateNodeClick,
   highlightedNodeIds,
+  workflowNodes,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1052,6 +1030,7 @@ function CanvasContent({
   onPendingConnectionNodeClick?: (nodeId: string) => void;
   onTemplateNodeClick?: (nodeId: string) => void;
   highlightedNodeIds: Set<string>;
+  workflowNodes?: ComponentsNode[];
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1085,6 +1064,10 @@ function CanvasContent({
       const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       const isPendingConnection = clickedNode?.data?.isPendingConnection;
 
+      // Check if this is a placeholder node (persisted, not local-only)
+      const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
+
       // Check if this is a template node
       const isTemplateNode = clickedNode?.data?.isTemplate && !clickedNode?.data?.isPendingConnection;
 
@@ -1095,12 +1078,15 @@ function CanvasContent({
 
       // Allow switching to pending connection nodes or other template nodes even if there's a configured template
       // But block switching to other regular/real nodes
-      if (isCurrentTemplateConfigured && nodeId !== templateNodeId && !isPendingConnection && !isTemplateNode) {
+      if (isCurrentTemplateConfigured && nodeId !== templateNodeId && !isPendingConnection && !isTemplateNode && !isPlaceholder) {
         return;
       }
 
       if (isPendingConnection && onPendingConnectionNodeClick) {
         // Notify parent that a pending connection node was clicked
+        onPendingConnectionNodeClick(nodeId);
+      } else if (isPlaceholder && onPendingConnectionNodeClick) {
+        // Handle placeholder clicks the same as pending connections
         onPendingConnectionNodeClick(nodeId);
       } else {
         if (isTemplateNode && onTemplateNodeClick) {
@@ -1124,7 +1110,7 @@ function CanvasContent({
         })),
       );
     },
-    [templateNodeId, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, onTemplateNodeClick],
+    [templateNodeId, workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, onTemplateNodeClick],
   );
 
   const onRunRef = useRef(onRun);
