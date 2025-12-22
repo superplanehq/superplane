@@ -924,12 +924,37 @@ export function WorkflowPageV2() {
       const updatedNodes = [...(workflow.spec?.nodes || [])];
       updatedNodes[nodeIndex] = updatedNode;
 
+      // Update outgoing edges from this node to use valid channels
+      // Find edges where this node is the source
+      const outgoingEdges = workflow.spec?.edges?.filter((edge) => edge.sourceId === data.placeholderId) || [];
+
+      let updatedEdges = [...(workflow.spec?.edges || [])];
+
+      if (outgoingEdges.length > 0) {
+        // Get the valid output channels for the new component
+        const validChannels =
+          data.buildingBlock.outputChannels?.map((ch: any) => ch.name).filter(Boolean) || ["default"];
+
+        // Update each outgoing edge to use a valid channel
+        updatedEdges = updatedEdges.map((edge) => {
+          if (edge.sourceId === data.placeholderId) {
+            // If the current channel is not valid for the new component, use the first valid channel
+            const newChannel = validChannels.includes(edge.channel) ? edge.channel : validChannels[0];
+            return {
+              ...edge,
+              channel: newChannel,
+            };
+          }
+          return edge;
+        });
+      }
+
       const updatedWorkflow = {
         ...workflow,
         spec: {
           ...workflow.spec,
           nodes: updatedNodes,
-          edges: workflow.spec?.edges || [],
+          edges: updatedEdges,
         },
       };
 

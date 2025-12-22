@@ -1360,14 +1360,18 @@ function CanvasContent({
       const currentConnectingFrom = connectingFromRef.current;
 
       if (currentConnectingFrom && !connectionCompletedRef.current) {
-        const mouseEvent = event as MouseEvent;
-        const canvasPosition = screenToFlowPosition({
-          x: mouseEvent.clientX,
-          y: mouseEvent.clientY,
-        });
+        // Only create placeholder for source handles (right side / output)
+        // Don't create placeholders for target handles (left side / input)
+        if (currentConnectingFrom.handleType === "source") {
+          const mouseEvent = event as MouseEvent;
+          const canvasPosition = screenToFlowPosition({
+            x: mouseEvent.clientX,
+            y: mouseEvent.clientY,
+          });
 
-        if (onConnectionDropInEmptySpace) {
-          onConnectionDropInEmptySpace(canvasPosition, currentConnectingFrom);
+          if (onConnectionDropInEmptySpace) {
+            onConnectionDropInEmptySpace(canvasPosition, currentConnectingFrom);
+          }
         }
       }
 
