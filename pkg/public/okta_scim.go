@@ -197,6 +197,14 @@ func (s *Server) handleSCIMUsers(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Ensure the user has at least a viewer role in the organization so that
+		// they are visible in org member listings.
+		if s.authService != nil {
+			if err := s.authService.AssignRole(user.ID.String(), models.RoleOrgViewer, org.ID.String(), models.DomainTypeOrganization); err != nil {
+				log.Errorf("SCIM: failed to assign default viewer role to user %s in org %s: %v", user.ID, org.ID, err)
+			}
+		}
+
 		// Handle initial active state
 		if !req.Active {
 			if err := user.Delete(); err != nil {
