@@ -648,6 +648,7 @@ function CanvasPage(props: CanvasPageProps) {
               viewportRefProp={props.viewportRef}
               highlightedNodeIds={highlightedNodeIds}
               workflowNodes={props.workflowNodes}
+              setCurrentTab={setCurrentTab}
             />
           </ReactFlowProvider>
 
@@ -1016,6 +1017,7 @@ function CanvasContent({
   onTemplateNodeClick,
   highlightedNodeIds,
   workflowNodes,
+  setCurrentTab,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1046,6 +1048,7 @@ function CanvasContent({
   onTemplateNodeClick?: (nodeId: string) => void;
   highlightedNodeIds: Set<string>;
   workflowNodes?: ComponentsNode[];
+  setCurrentTab?: (tab: "latest" | "settings") => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1117,6 +1120,11 @@ function CanvasContent({
           // Regular node click
           stateRef.current.componentSidebar.open(nodeId);
 
+          // Reset to Runs tab when clicking on a regular node
+          if (setCurrentTab) {
+            setCurrentTab("latest");
+          }
+
           // Close building blocks sidebar when clicking on a regular node
           if (onBuildingBlocksSidebarToggle) {
             onBuildingBlocksSidebarToggle(false);
@@ -1131,7 +1139,14 @@ function CanvasContent({
         })),
       );
     },
-    [templateNodeId, workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, onTemplateNodeClick],
+    [
+      templateNodeId,
+      workflowNodes,
+      onBuildingBlocksSidebarToggle,
+      onPendingConnectionNodeClick,
+      onTemplateNodeClick,
+      setCurrentTab,
+    ],
   );
 
   const onRunRef = useRef(onRun);
