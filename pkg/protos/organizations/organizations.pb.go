@@ -1594,6 +1594,338 @@ func (x *InvitationCreated) GetTimestamp() *timestamp.Timestamp {
 	return nil
 }
 
+type OktaSettings struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SamlIssuer      string                 `protobuf:"bytes,1,opt,name=saml_issuer,json=samlIssuer,proto3" json:"saml_issuer,omitempty"`
+	SamlCertificate string                 `protobuf:"bytes,2,opt,name=saml_certificate,json=samlCertificate,proto3" json:"saml_certificate,omitempty"`
+	EnforceSso      bool                   `protobuf:"varint,3,opt,name=enforce_sso,json=enforceSso,proto3" json:"enforce_sso,omitempty"`
+	HasScimToken    bool                   `protobuf:"varint,4,opt,name=has_scim_token,json=hasScimToken,proto3" json:"has_scim_token,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *OktaSettings) Reset() {
+	*x = OktaSettings{}
+	mi := &file_organizations_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OktaSettings) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OktaSettings) ProtoMessage() {}
+
+func (x *OktaSettings) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OktaSettings.ProtoReflect.Descriptor instead.
+func (*OktaSettings) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *OktaSettings) GetSamlIssuer() string {
+	if x != nil {
+		return x.SamlIssuer
+	}
+	return ""
+}
+
+func (x *OktaSettings) GetSamlCertificate() string {
+	if x != nil {
+		return x.SamlCertificate
+	}
+	return ""
+}
+
+func (x *OktaSettings) GetEnforceSso() bool {
+	if x != nil {
+		return x.EnforceSso
+	}
+	return false
+}
+
+func (x *OktaSettings) GetHasScimToken() bool {
+	if x != nil {
+		return x.HasScimToken
+	}
+	return false
+}
+
+type GetOktaSettingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetOktaSettingsRequest) Reset() {
+	*x = GetOktaSettingsRequest{}
+	mi := &file_organizations_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOktaSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOktaSettingsRequest) ProtoMessage() {}
+
+func (x *GetOktaSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOktaSettingsRequest.ProtoReflect.Descriptor instead.
+func (*GetOktaSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *GetOktaSettingsRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type GetOktaSettingsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Settings      *OktaSettings          `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetOktaSettingsResponse) Reset() {
+	*x = GetOktaSettingsResponse{}
+	mi := &file_organizations_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOktaSettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOktaSettingsResponse) ProtoMessage() {}
+
+func (x *GetOktaSettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOktaSettingsResponse.ProtoReflect.Descriptor instead.
+func (*GetOktaSettingsResponse) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *GetOktaSettingsResponse) GetSettings() *OktaSettings {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+type UpdateOktaSettingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Settings      *OktaSettings          `protobuf:"bytes,2,opt,name=settings,proto3" json:"settings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateOktaSettingsRequest) Reset() {
+	*x = UpdateOktaSettingsRequest{}
+	mi := &file_organizations_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateOktaSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateOktaSettingsRequest) ProtoMessage() {}
+
+func (x *UpdateOktaSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateOktaSettingsRequest.ProtoReflect.Descriptor instead.
+func (*UpdateOktaSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *UpdateOktaSettingsRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UpdateOktaSettingsRequest) GetSettings() *OktaSettings {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+type UpdateOktaSettingsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateOktaSettingsResponse) Reset() {
+	*x = UpdateOktaSettingsResponse{}
+	mi := &file_organizations_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateOktaSettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateOktaSettingsResponse) ProtoMessage() {}
+
+func (x *UpdateOktaSettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateOktaSettingsResponse.ProtoReflect.Descriptor instead.
+func (*UpdateOktaSettingsResponse) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{36}
+}
+
+type RotateOktaSCIMTokenRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RotateOktaSCIMTokenRequest) Reset() {
+	*x = RotateOktaSCIMTokenRequest{}
+	mi := &file_organizations_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RotateOktaSCIMTokenRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RotateOktaSCIMTokenRequest) ProtoMessage() {}
+
+func (x *RotateOktaSCIMTokenRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RotateOktaSCIMTokenRequest.ProtoReflect.Descriptor instead.
+func (*RotateOktaSCIMTokenRequest) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *RotateOktaSCIMTokenRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type RotateOktaSCIMTokenResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RotateOktaSCIMTokenResponse) Reset() {
+	*x = RotateOktaSCIMTokenResponse{}
+	mi := &file_organizations_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RotateOktaSCIMTokenResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RotateOktaSCIMTokenResponse) ProtoMessage() {}
+
+func (x *RotateOktaSCIMTokenResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_organizations_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RotateOktaSCIMTokenResponse.ProtoReflect.Descriptor instead.
+func (*RotateOktaSCIMTokenResponse) Descriptor() ([]byte, []int) {
+	return file_organizations_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *RotateOktaSCIMTokenResponse) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
 type Organization_Metadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1607,7 +1939,7 @@ type Organization_Metadata struct {
 
 func (x *Organization_Metadata) Reset() {
 	*x = Organization_Metadata{}
-	mi := &file_organizations_proto_msgTypes[32]
+	mi := &file_organizations_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1619,7 +1951,7 @@ func (x *Organization_Metadata) String() string {
 func (*Organization_Metadata) ProtoMessage() {}
 
 func (x *Organization_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[32]
+	mi := &file_organizations_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1682,7 +2014,7 @@ type AppInstallation_Metadata struct {
 
 func (x *AppInstallation_Metadata) Reset() {
 	*x = AppInstallation_Metadata{}
-	mi := &file_organizations_proto_msgTypes[33]
+	mi := &file_organizations_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1694,7 +2026,7 @@ func (x *AppInstallation_Metadata) String() string {
 func (*AppInstallation_Metadata) ProtoMessage() {}
 
 func (x *AppInstallation_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[33]
+	mi := &file_organizations_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1748,7 +2080,7 @@ type AppInstallation_Spec struct {
 
 func (x *AppInstallation_Spec) Reset() {
 	*x = AppInstallation_Spec{}
-	mi := &file_organizations_proto_msgTypes[34]
+	mi := &file_organizations_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1760,7 +2092,7 @@ func (x *AppInstallation_Spec) String() string {
 func (*AppInstallation_Spec) ProtoMessage() {}
 
 func (x *AppInstallation_Spec) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[34]
+	mi := &file_organizations_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1803,7 +2135,7 @@ type AppInstallation_Status struct {
 
 func (x *AppInstallation_Status) Reset() {
 	*x = AppInstallation_Status{}
-	mi := &file_organizations_proto_msgTypes[35]
+	mi := &file_organizations_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1815,7 +2147,7 @@ func (x *AppInstallation_Status) String() string {
 func (*AppInstallation_Status) ProtoMessage() {}
 
 func (x *AppInstallation_Status) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[35]
+	mi := &file_organizations_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1878,7 +2210,7 @@ type AppInstallation_NodeRef struct {
 
 func (x *AppInstallation_NodeRef) Reset() {
 	*x = AppInstallation_NodeRef{}
-	mi := &file_organizations_proto_msgTypes[36]
+	mi := &file_organizations_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1890,7 +2222,7 @@ func (x *AppInstallation_NodeRef) String() string {
 func (*AppInstallation_NodeRef) ProtoMessage() {}
 
 func (x *AppInstallation_NodeRef) ProtoReflect() protoreflect.Message {
-	mi := &file_organizations_proto_msgTypes[36]
+	mi := &file_organizations_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2060,7 +2392,26 @@ const file_organizations_proto_rawDesc = "" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"r\n" +
 	"\x11InvitationCreated\x12#\n" +
 	"\rinvitation_id\x18\x01 \x01(\tR\finvitationId\x128\n" +
-	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xff\x1a\n" +
+	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\xa1\x01\n" +
+	"\fOktaSettings\x12\x1f\n" +
+	"\vsaml_issuer\x18\x01 \x01(\tR\n" +
+	"samlIssuer\x12)\n" +
+	"\x10saml_certificate\x18\x02 \x01(\tR\x0fsamlCertificate\x12\x1f\n" +
+	"\venforce_sso\x18\x03 \x01(\bR\n" +
+	"enforceSso\x12$\n" +
+	"\x0ehas_scim_token\x18\x04 \x01(\bR\fhasScimToken\"(\n" +
+	"\x16GetOktaSettingsRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"]\n" +
+	"\x17GetOktaSettingsResponse\x12B\n" +
+	"\bsettings\x18\x01 \x01(\v2&.Superplane.Organizations.OktaSettingsR\bsettings\"o\n" +
+	"\x19UpdateOktaSettingsRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12B\n" +
+	"\bsettings\x18\x02 \x01(\v2&.Superplane.Organizations.OktaSettingsR\bsettings\"\x1c\n" +
+	"\x1aUpdateOktaSettingsResponse\",\n" +
+	"\x1aRotateOktaSCIMTokenRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"3\n" +
+	"\x1bRotateOktaSCIMTokenResponse\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token2\x99\"\n" +
 	"\rOrganizations\x12\xa7\x02\n" +
 	"\x14DescribeOrganization\x125.Superplane.Organizations.DescribeOrganizationRequest\x1a6.Superplane.Organizations.DescribeOrganizationResponse\"\x9f\x01\x92Az\n" +
 	"\fOrganization\x12\x18Get organization details\x1aPReturns the details of a specific organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/organizations/{id}\x12\x96\x02\n" +
@@ -2086,7 +2437,13 @@ const file_organizations_proto_rawDesc = "" +
 	"\x11UpdateApplication\x122.Superplane.Organizations.UpdateApplicationRequest\x1a3.Superplane.Organizations.UpdateApplicationResponse\"\xad\x01\x92Af\n" +
 	"\fOrganization\x12\x1fUpdate application installation\x1a5Updates the configuration of an installed application\x82\xd3\xe4\x93\x02>:\x01*29/api/v1/organizations/{id}/applications/{installation_id}\x12\xa1\x02\n" +
 	"\x14UninstallApplication\x125.Superplane.Organizations.UninstallApplicationRequest\x1a6.Superplane.Organizations.UninstallApplicationResponse\"\x99\x01\x92AU\n" +
-	"\fOrganization\x12\x15Uninstall application\x1a.Uninstalls an application from an organization\x82\xd3\xe4\x93\x02;*9/api/v1/organizations/{id}/applications/{installation_id}B\xf0\x01\x92A\xaf\x01\x12\x84\x01\n" +
+	"\fOrganization\x12\x15Uninstall application\x1a.Uninstalls an application from an organization\x82\xd3\xe4\x93\x02;*9/api/v1/organizations/{id}/applications/{installation_id}\x12\x96\x02\n" +
+	"\x0fGetOktaSettings\x120.Superplane.Organizations.GetOktaSettingsRequest\x1a1.Superplane.Organizations.GetOktaSettingsResponse\"\x9d\x01\x92As\n" +
+	"\fOrganization\x12%Get Okta settings for an organization\x1a<Returns the Okta SAML/SCIM configuration for an organization\x82\xd3\xe4\x93\x02!\x12\x1f/api/v1/organizations/{id}/okta\x12\xab\x02\n" +
+	"\x12UpdateOktaSettings\x123.Superplane.Organizations.UpdateOktaSettingsRequest\x1a4.Superplane.Organizations.UpdateOktaSettingsResponse\"\xa9\x01\x92A|\n" +
+	"\fOrganization\x12(Update Okta settings for an organization\x1aBCreates or updates the Okta SAML configuration for an organization\x82\xd3\xe4\x93\x02$:\x01*\x1a\x1f/api/v1/organizations/{id}/okta\x12\xd0\x02\n" +
+	"\x13RotateOktaSCIMToken\x124.Superplane.Organizations.RotateOktaSCIMTokenRequest\x1a5.Superplane.Organizations.RotateOktaSCIMTokenResponse\"\xcb\x01\x92A\x92\x01\n" +
+	"\fOrganization\x12*Rotate Okta SCIM token for an organization\x1aVGenerates a new SCIM token for the organization's Okta integration and returns it once\x82\xd3\xe4\x93\x02/:\x01*\"*/api/v1/organizations/{id}/okta/scim-tokenB\xf0\x01\x92A\xaf\x01\x12\x84\x01\n" +
 	"\x1cSuperplane Organizations API\x128API for managing organizations in the Superplane service\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ;github.com/superplanehq/superplane/pkg/protos/organizationsb\x06proto3"
 
@@ -2102,7 +2459,7 @@ func file_organizations_proto_rawDescGZIP() []byte {
 	return file_organizations_proto_rawDescData
 }
 
-var file_organizations_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
+var file_organizations_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
 var file_organizations_proto_goTypes = []any{
 	(*Organization)(nil),                 // 0: Superplane.Organizations.Organization
 	(*DescribeOrganizationRequest)(nil),  // 1: Superplane.Organizations.DescribeOrganizationRequest
@@ -2136,74 +2493,89 @@ var file_organizations_proto_goTypes = []any{
 	(*OrganizationUpdated)(nil),          // 29: Superplane.Organizations.OrganizationUpdated
 	(*OrganizationDeleted)(nil),          // 30: Superplane.Organizations.OrganizationDeleted
 	(*InvitationCreated)(nil),            // 31: Superplane.Organizations.InvitationCreated
-	(*Organization_Metadata)(nil),        // 32: Superplane.Organizations.Organization.Metadata
-	(*AppInstallation_Metadata)(nil),     // 33: Superplane.Organizations.AppInstallation.Metadata
-	(*AppInstallation_Spec)(nil),         // 34: Superplane.Organizations.AppInstallation.Spec
-	(*AppInstallation_Status)(nil),       // 35: Superplane.Organizations.AppInstallation.Status
-	(*AppInstallation_NodeRef)(nil),      // 36: Superplane.Organizations.AppInstallation.NodeRef
-	nil,                                  // 37: Superplane.Organizations.BrowserAction.FormFieldsEntry
-	(*timestamp.Timestamp)(nil),          // 38: google.protobuf.Timestamp
-	(*_struct.Struct)(nil),               // 39: google.protobuf.Struct
+	(*OktaSettings)(nil),                 // 32: Superplane.Organizations.OktaSettings
+	(*GetOktaSettingsRequest)(nil),       // 33: Superplane.Organizations.GetOktaSettingsRequest
+	(*GetOktaSettingsResponse)(nil),      // 34: Superplane.Organizations.GetOktaSettingsResponse
+	(*UpdateOktaSettingsRequest)(nil),    // 35: Superplane.Organizations.UpdateOktaSettingsRequest
+	(*UpdateOktaSettingsResponse)(nil),   // 36: Superplane.Organizations.UpdateOktaSettingsResponse
+	(*RotateOktaSCIMTokenRequest)(nil),   // 37: Superplane.Organizations.RotateOktaSCIMTokenRequest
+	(*RotateOktaSCIMTokenResponse)(nil),  // 38: Superplane.Organizations.RotateOktaSCIMTokenResponse
+	(*Organization_Metadata)(nil),        // 39: Superplane.Organizations.Organization.Metadata
+	(*AppInstallation_Metadata)(nil),     // 40: Superplane.Organizations.AppInstallation.Metadata
+	(*AppInstallation_Spec)(nil),         // 41: Superplane.Organizations.AppInstallation.Spec
+	(*AppInstallation_Status)(nil),       // 42: Superplane.Organizations.AppInstallation.Status
+	(*AppInstallation_NodeRef)(nil),      // 43: Superplane.Organizations.AppInstallation.NodeRef
+	nil,                                  // 44: Superplane.Organizations.BrowserAction.FormFieldsEntry
+	(*timestamp.Timestamp)(nil),          // 45: google.protobuf.Timestamp
+	(*_struct.Struct)(nil),               // 46: google.protobuf.Struct
 }
 var file_organizations_proto_depIdxs = []int32{
-	32, // 0: Superplane.Organizations.Organization.metadata:type_name -> Superplane.Organizations.Organization.Metadata
+	39, // 0: Superplane.Organizations.Organization.metadata:type_name -> Superplane.Organizations.Organization.Metadata
 	0,  // 1: Superplane.Organizations.DescribeOrganizationResponse.organization:type_name -> Superplane.Organizations.Organization
 	0,  // 2: Superplane.Organizations.UpdateOrganizationRequest.organization:type_name -> Superplane.Organizations.Organization
 	0,  // 3: Superplane.Organizations.UpdateOrganizationResponse.organization:type_name -> Superplane.Organizations.Organization
-	38, // 4: Superplane.Organizations.Invitation.created_at:type_name -> google.protobuf.Timestamp
+	45, // 4: Superplane.Organizations.Invitation.created_at:type_name -> google.protobuf.Timestamp
 	7,  // 5: Superplane.Organizations.CreateInvitationResponse.invitation:type_name -> Superplane.Organizations.Invitation
 	7,  // 6: Superplane.Organizations.ListInvitationsResponse.invitations:type_name -> Superplane.Organizations.Invitation
 	26, // 7: Superplane.Organizations.ListApplicationsResponse.applications:type_name -> Superplane.Organizations.AppInstallation
-	39, // 8: Superplane.Organizations.InstallApplicationRequest.configuration:type_name -> google.protobuf.Struct
+	46, // 8: Superplane.Organizations.InstallApplicationRequest.configuration:type_name -> google.protobuf.Struct
 	26, // 9: Superplane.Organizations.InstallApplicationResponse.installation:type_name -> Superplane.Organizations.AppInstallation
 	26, // 10: Superplane.Organizations.DescribeApplicationResponse.installation:type_name -> Superplane.Organizations.AppInstallation
-	39, // 11: Superplane.Organizations.UpdateApplicationRequest.configuration:type_name -> google.protobuf.Struct
+	46, // 11: Superplane.Organizations.UpdateApplicationRequest.configuration:type_name -> google.protobuf.Struct
 	26, // 12: Superplane.Organizations.UpdateApplicationResponse.installation:type_name -> Superplane.Organizations.AppInstallation
-	33, // 13: Superplane.Organizations.AppInstallation.metadata:type_name -> Superplane.Organizations.AppInstallation.Metadata
-	34, // 14: Superplane.Organizations.AppInstallation.spec:type_name -> Superplane.Organizations.AppInstallation.Spec
-	35, // 15: Superplane.Organizations.AppInstallation.status:type_name -> Superplane.Organizations.AppInstallation.Status
-	37, // 16: Superplane.Organizations.BrowserAction.form_fields:type_name -> Superplane.Organizations.BrowserAction.FormFieldsEntry
-	38, // 17: Superplane.Organizations.OrganizationCreated.timestamp:type_name -> google.protobuf.Timestamp
-	38, // 18: Superplane.Organizations.OrganizationUpdated.timestamp:type_name -> google.protobuf.Timestamp
-	38, // 19: Superplane.Organizations.OrganizationDeleted.timestamp:type_name -> google.protobuf.Timestamp
-	38, // 20: Superplane.Organizations.InvitationCreated.timestamp:type_name -> google.protobuf.Timestamp
-	38, // 21: Superplane.Organizations.Organization.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	38, // 22: Superplane.Organizations.Organization.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	38, // 23: Superplane.Organizations.AppInstallation.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	38, // 24: Superplane.Organizations.AppInstallation.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	39, // 25: Superplane.Organizations.AppInstallation.Spec.configuration:type_name -> google.protobuf.Struct
-	39, // 26: Superplane.Organizations.AppInstallation.Status.metadata:type_name -> google.protobuf.Struct
-	27, // 27: Superplane.Organizations.AppInstallation.Status.browser_action:type_name -> Superplane.Organizations.BrowserAction
-	36, // 28: Superplane.Organizations.AppInstallation.Status.used_in:type_name -> Superplane.Organizations.AppInstallation.NodeRef
-	1,  // 29: Superplane.Organizations.Organizations.DescribeOrganization:input_type -> Superplane.Organizations.DescribeOrganizationRequest
-	3,  // 30: Superplane.Organizations.Organizations.UpdateOrganization:input_type -> Superplane.Organizations.UpdateOrganizationRequest
-	5,  // 31: Superplane.Organizations.Organizations.DeleteOrganization:input_type -> Superplane.Organizations.DeleteOrganizationRequest
-	14, // 32: Superplane.Organizations.Organizations.RemoveUser:input_type -> Superplane.Organizations.RemoveUserRequest
-	8,  // 33: Superplane.Organizations.Organizations.CreateInvitation:input_type -> Superplane.Organizations.CreateInvitationRequest
-	10, // 34: Superplane.Organizations.Organizations.ListInvitations:input_type -> Superplane.Organizations.ListInvitationsRequest
-	12, // 35: Superplane.Organizations.Organizations.RemoveInvitation:input_type -> Superplane.Organizations.RemoveInvitationRequest
-	16, // 36: Superplane.Organizations.Organizations.ListApplications:input_type -> Superplane.Organizations.ListApplicationsRequest
-	20, // 37: Superplane.Organizations.Organizations.DescribeApplication:input_type -> Superplane.Organizations.DescribeApplicationRequest
-	18, // 38: Superplane.Organizations.Organizations.InstallApplication:input_type -> Superplane.Organizations.InstallApplicationRequest
-	22, // 39: Superplane.Organizations.Organizations.UpdateApplication:input_type -> Superplane.Organizations.UpdateApplicationRequest
-	24, // 40: Superplane.Organizations.Organizations.UninstallApplication:input_type -> Superplane.Organizations.UninstallApplicationRequest
-	2,  // 41: Superplane.Organizations.Organizations.DescribeOrganization:output_type -> Superplane.Organizations.DescribeOrganizationResponse
-	4,  // 42: Superplane.Organizations.Organizations.UpdateOrganization:output_type -> Superplane.Organizations.UpdateOrganizationResponse
-	6,  // 43: Superplane.Organizations.Organizations.DeleteOrganization:output_type -> Superplane.Organizations.DeleteOrganizationResponse
-	15, // 44: Superplane.Organizations.Organizations.RemoveUser:output_type -> Superplane.Organizations.RemoveUserResponse
-	9,  // 45: Superplane.Organizations.Organizations.CreateInvitation:output_type -> Superplane.Organizations.CreateInvitationResponse
-	11, // 46: Superplane.Organizations.Organizations.ListInvitations:output_type -> Superplane.Organizations.ListInvitationsResponse
-	13, // 47: Superplane.Organizations.Organizations.RemoveInvitation:output_type -> Superplane.Organizations.RemoveInvitationResponse
-	17, // 48: Superplane.Organizations.Organizations.ListApplications:output_type -> Superplane.Organizations.ListApplicationsResponse
-	21, // 49: Superplane.Organizations.Organizations.DescribeApplication:output_type -> Superplane.Organizations.DescribeApplicationResponse
-	19, // 50: Superplane.Organizations.Organizations.InstallApplication:output_type -> Superplane.Organizations.InstallApplicationResponse
-	23, // 51: Superplane.Organizations.Organizations.UpdateApplication:output_type -> Superplane.Organizations.UpdateApplicationResponse
-	25, // 52: Superplane.Organizations.Organizations.UninstallApplication:output_type -> Superplane.Organizations.UninstallApplicationResponse
-	41, // [41:53] is the sub-list for method output_type
-	29, // [29:41] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	40, // 13: Superplane.Organizations.AppInstallation.metadata:type_name -> Superplane.Organizations.AppInstallation.Metadata
+	41, // 14: Superplane.Organizations.AppInstallation.spec:type_name -> Superplane.Organizations.AppInstallation.Spec
+	42, // 15: Superplane.Organizations.AppInstallation.status:type_name -> Superplane.Organizations.AppInstallation.Status
+	44, // 16: Superplane.Organizations.BrowserAction.form_fields:type_name -> Superplane.Organizations.BrowserAction.FormFieldsEntry
+	45, // 17: Superplane.Organizations.OrganizationCreated.timestamp:type_name -> google.protobuf.Timestamp
+	45, // 18: Superplane.Organizations.OrganizationUpdated.timestamp:type_name -> google.protobuf.Timestamp
+	45, // 19: Superplane.Organizations.OrganizationDeleted.timestamp:type_name -> google.protobuf.Timestamp
+	45, // 20: Superplane.Organizations.InvitationCreated.timestamp:type_name -> google.protobuf.Timestamp
+	32, // 21: Superplane.Organizations.GetOktaSettingsResponse.settings:type_name -> Superplane.Organizations.OktaSettings
+	32, // 22: Superplane.Organizations.UpdateOktaSettingsRequest.settings:type_name -> Superplane.Organizations.OktaSettings
+	45, // 23: Superplane.Organizations.Organization.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	45, // 24: Superplane.Organizations.Organization.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	45, // 25: Superplane.Organizations.AppInstallation.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	45, // 26: Superplane.Organizations.AppInstallation.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	46, // 27: Superplane.Organizations.AppInstallation.Spec.configuration:type_name -> google.protobuf.Struct
+	46, // 28: Superplane.Organizations.AppInstallation.Status.metadata:type_name -> google.protobuf.Struct
+	27, // 29: Superplane.Organizations.AppInstallation.Status.browser_action:type_name -> Superplane.Organizations.BrowserAction
+	43, // 30: Superplane.Organizations.AppInstallation.Status.used_in:type_name -> Superplane.Organizations.AppInstallation.NodeRef
+	1,  // 31: Superplane.Organizations.Organizations.DescribeOrganization:input_type -> Superplane.Organizations.DescribeOrganizationRequest
+	3,  // 32: Superplane.Organizations.Organizations.UpdateOrganization:input_type -> Superplane.Organizations.UpdateOrganizationRequest
+	5,  // 33: Superplane.Organizations.Organizations.DeleteOrganization:input_type -> Superplane.Organizations.DeleteOrganizationRequest
+	14, // 34: Superplane.Organizations.Organizations.RemoveUser:input_type -> Superplane.Organizations.RemoveUserRequest
+	8,  // 35: Superplane.Organizations.Organizations.CreateInvitation:input_type -> Superplane.Organizations.CreateInvitationRequest
+	10, // 36: Superplane.Organizations.Organizations.ListInvitations:input_type -> Superplane.Organizations.ListInvitationsRequest
+	12, // 37: Superplane.Organizations.Organizations.RemoveInvitation:input_type -> Superplane.Organizations.RemoveInvitationRequest
+	16, // 38: Superplane.Organizations.Organizations.ListApplications:input_type -> Superplane.Organizations.ListApplicationsRequest
+	20, // 39: Superplane.Organizations.Organizations.DescribeApplication:input_type -> Superplane.Organizations.DescribeApplicationRequest
+	18, // 40: Superplane.Organizations.Organizations.InstallApplication:input_type -> Superplane.Organizations.InstallApplicationRequest
+	22, // 41: Superplane.Organizations.Organizations.UpdateApplication:input_type -> Superplane.Organizations.UpdateApplicationRequest
+	24, // 42: Superplane.Organizations.Organizations.UninstallApplication:input_type -> Superplane.Organizations.UninstallApplicationRequest
+	33, // 43: Superplane.Organizations.Organizations.GetOktaSettings:input_type -> Superplane.Organizations.GetOktaSettingsRequest
+	35, // 44: Superplane.Organizations.Organizations.UpdateOktaSettings:input_type -> Superplane.Organizations.UpdateOktaSettingsRequest
+	37, // 45: Superplane.Organizations.Organizations.RotateOktaSCIMToken:input_type -> Superplane.Organizations.RotateOktaSCIMTokenRequest
+	2,  // 46: Superplane.Organizations.Organizations.DescribeOrganization:output_type -> Superplane.Organizations.DescribeOrganizationResponse
+	4,  // 47: Superplane.Organizations.Organizations.UpdateOrganization:output_type -> Superplane.Organizations.UpdateOrganizationResponse
+	6,  // 48: Superplane.Organizations.Organizations.DeleteOrganization:output_type -> Superplane.Organizations.DeleteOrganizationResponse
+	15, // 49: Superplane.Organizations.Organizations.RemoveUser:output_type -> Superplane.Organizations.RemoveUserResponse
+	9,  // 50: Superplane.Organizations.Organizations.CreateInvitation:output_type -> Superplane.Organizations.CreateInvitationResponse
+	11, // 51: Superplane.Organizations.Organizations.ListInvitations:output_type -> Superplane.Organizations.ListInvitationsResponse
+	13, // 52: Superplane.Organizations.Organizations.RemoveInvitation:output_type -> Superplane.Organizations.RemoveInvitationResponse
+	17, // 53: Superplane.Organizations.Organizations.ListApplications:output_type -> Superplane.Organizations.ListApplicationsResponse
+	21, // 54: Superplane.Organizations.Organizations.DescribeApplication:output_type -> Superplane.Organizations.DescribeApplicationResponse
+	19, // 55: Superplane.Organizations.Organizations.InstallApplication:output_type -> Superplane.Organizations.InstallApplicationResponse
+	23, // 56: Superplane.Organizations.Organizations.UpdateApplication:output_type -> Superplane.Organizations.UpdateApplicationResponse
+	25, // 57: Superplane.Organizations.Organizations.UninstallApplication:output_type -> Superplane.Organizations.UninstallApplicationResponse
+	34, // 58: Superplane.Organizations.Organizations.GetOktaSettings:output_type -> Superplane.Organizations.GetOktaSettingsResponse
+	36, // 59: Superplane.Organizations.Organizations.UpdateOktaSettings:output_type -> Superplane.Organizations.UpdateOktaSettingsResponse
+	38, // 60: Superplane.Organizations.Organizations.RotateOktaSCIMToken:output_type -> Superplane.Organizations.RotateOktaSCIMTokenResponse
+	46, // [46:61] is the sub-list for method output_type
+	31, // [31:46] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_organizations_proto_init() }
@@ -2217,7 +2589,7 @@ func file_organizations_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_organizations_proto_rawDesc), len(file_organizations_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   38,
+			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

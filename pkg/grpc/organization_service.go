@@ -106,3 +106,18 @@ func (s *OrganizationService) UninstallApplication(ctx context.Context, req *pb.
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.UninstallApplication(ctx, orgID, req.InstallationId)
 }
+
+func (s *OrganizationService) GetOktaSettings(ctx context.Context, req *pb.GetOktaSettingsRequest) (*pb.GetOktaSettingsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.GetOktaSettings(ctx, orgID)
+}
+
+func (s *OrganizationService) UpdateOktaSettings(ctx context.Context, req *pb.UpdateOktaSettingsRequest) (*pb.UpdateOktaSettingsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateOktaSettings(ctx, orgID, req.Settings)
+}
+
+func (s *OrganizationService) RotateOktaSCIMToken(ctx context.Context, req *pb.RotateOktaSCIMTokenRequest) (*pb.RotateOktaSCIMTokenResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.RotateOktaSCIMToken(ctx, orgID)
+}
