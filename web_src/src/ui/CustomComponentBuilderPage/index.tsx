@@ -95,7 +95,7 @@ export interface CustomComponentBuilderPageProps {
     nodeName: string,
     appInstallationRef?: ComponentsAppInstallationRef,
   ) => void;
-  onNodeAdd?: (newNodeData: NewNodeData) => void;
+  onNodeAdd?: (newNodeData: NewNodeData) => Promise<string | undefined> | string | undefined | void;
   organizationId?: string;
 
   // Building blocks
@@ -504,7 +504,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   }, [selectedNodeId, isNodeSidebarOpen, props.getNodeEditData]);
 
   const handleBuildingBlockDrop = useCallback(
-    (block: BuildingBlock, position?: { x: number; y: number }) => {
+    async (block: BuildingBlock, position?: { x: number; y: number }) => {
       if (templateNodeId) {
         return;
       }
@@ -519,13 +519,19 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
 
       // Immediately add the node with default configuration (skip template/sidebar step)
       if (props.onNodeAdd) {
-        props.onNodeAdd({
+        const newNodeId = await props.onNodeAdd({
           buildingBlock: block,
           nodeName: block.name || "",
           configuration: defaultConfiguration,
           position,
           appName: block.appName,
         });
+
+        // After the node is added, open the sidebar for configuration
+        if (newNodeId) {
+          setIsNodeSidebarOpen(true);
+          setSelectedNodeId(newNodeId);
+        }
       }
 
       // Close building blocks sidebar after dropping a block

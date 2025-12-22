@@ -828,6 +828,9 @@ export const CustomComponent = () => {
           convertedTemplateIdsRef.current.delete(savedTemplateId);
         }, 1000);
       }
+
+      // Return the new node ID so the caller can open the sidebar
+      return newNodeId;
     },
     [saveSnapshot, handleSaveBlueprint, edges],
   );
