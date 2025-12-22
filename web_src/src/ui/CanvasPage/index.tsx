@@ -532,9 +532,11 @@ function CanvasPage(props: CanvasPageProps) {
     (configuration: Record<string, any>, nodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => {
       if (editingNodeData && props.onNodeConfigurationSave) {
         props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
+        // Close the component sidebar after saving
+        state.componentSidebar.close();
       }
     },
-    [editingNodeData, props],
+    [editingNodeData, props, state.componentSidebar],
   );
 
   const handleToggleView = useCallback(

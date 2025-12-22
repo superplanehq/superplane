@@ -545,6 +545,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         handleSaveNewNode(configuration, nodeName, appInstallationRef);
       } else if (editingNodeData && props.onNodeConfigurationSave) {
         props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
+        // Close the component sidebar after saving
+        setIsNodeSidebarOpen(false);
       }
     },
     [templateNodeId, newNodeData, editingNodeData, props],
