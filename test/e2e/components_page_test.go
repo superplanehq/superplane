@@ -116,7 +116,7 @@ func (s *CustomComponentsSteps) GivenACanvasWithComponentExists() {
 	source2 := q.TestID("building-block-e2e-deployment-component")
 	target2 := q.TestID("rf__wrapper")
 	s.session.DragAndDrop(source2, target2, 900, 250)
-	s.session.Click(q.TestID("add-node-button"))
+	s.session.Click(q.TestID("save-node-button"))
 
 	s.canvas.Connect("Start", "E2E Deployment Component")
 	s.canvas.Save()
