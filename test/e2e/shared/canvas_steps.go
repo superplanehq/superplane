@@ -187,18 +187,15 @@ func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {
 		s.t.Fatalf("getting bounding box for edge %q: %v", loc, err)
 	}
 
-	// This is not very precise, but Playwright does not support clicking on SVG paths directly
-	// so we click a bit left (20px) from the center of the right handle
+	// Click on the edge to delete it (edges now delete on click instead of requiring a separate delete button)
+	// Click a bit left (40px) from the center of the target handle to hit the edge
 
-	centerX := box.X + box.Width/2 - 20
+	centerX := box.X + box.Width/2 - 40
 	centerY := box.Y + box.Height/2
 
-	if err := s.session.Page().Mouse().Click(centerX-20, centerY, pw.MouseClickOptions{}); err != nil {
+	if err := s.session.Page().Mouse().Click(centerX, centerY, pw.MouseClickOptions{}); err != nil {
 		s.t.Fatalf("clicking edge %q at center: %v", loc, err)
 	}
-
-	deleteButton := q.Locator(`button[aria-label="Delete edge"]`)
-	s.session.Click(deleteButton)
 
 	s.session.Sleep(300)
 }
