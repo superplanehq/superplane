@@ -45,7 +45,7 @@ func WithNode(logger *log.Entry, node models.WorkflowNode) *log.Entry {
 	if node.ParentNodeID != nil {
 		return logger.WithFields(log.Fields{
 			"node_id": node.NodeID,
-			"parent":  node.ParentNodeID,
+			"parent":  *node.ParentNodeID,
 		})
 	}
 

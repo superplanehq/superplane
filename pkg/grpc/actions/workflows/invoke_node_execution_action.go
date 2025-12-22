@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -24,6 +25,7 @@ func InvokeNodeExecutionAction(
 	ctx context.Context,
 	authService authorization.Authorization,
 	registry *registry.Registry,
+	encryptor crypto.Encryptor,
 	orgID uuid.UUID,
 	workflowID uuid.UUID,
 	executionID uuid.UUID,
@@ -88,6 +90,15 @@ func InvokeNodeExecutionAction(
 		AuthContext:           contexts.NewAuthContext(tx, orgID, authService, user),
 		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
 		IntegrationContext:    contexts.NewIntegrationContext(tx, registry),
+	}
+
+	if node.AppInstallationID != nil {
+		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to find app installation: %v", err)
+		}
+
+		actionCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
 	}
 
 	err = component.HandleAction(actionCtx)

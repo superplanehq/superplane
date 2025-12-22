@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -172,14 +171,6 @@ func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.W
 		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
 	}
 
-	if execution.ParentExecutionID == nil {
-		return w.invokeParentNodeComponentAction(tx, request, execution)
-	}
-
-	return w.invokeChildNodeComponentAction(tx, request, execution)
-}
-
-func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request *models.WorkflowNodeRequest, execution *models.WorkflowNodeExecution) error {
 	node, err := models.FindWorkflowNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
@@ -201,6 +192,8 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
 	}
 
+	logger := logging.ForNode(*node)
+	logger = logging.WithExecution(logger, execution, nil)
 	actionCtx := core.ActionContext{
 		Name:                  actionName,
 		Configuration:         node.Configuration.Data(),
@@ -217,71 +210,11 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 
+		logger = logging.WithAppInstallation(logger, *appInstallation)
 		actionCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
 	}
 
-	err = component.HandleAction(actionCtx)
-	if err != nil {
-		return fmt.Errorf("action execution failed: %w", err)
-	}
-
-	err = tx.Save(&execution).Error
-	if err != nil {
-		return fmt.Errorf("error saving execution after action handler: %v", err)
-	}
-
-	return request.Complete(tx)
-}
-
-func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request *models.WorkflowNodeRequest, execution *models.WorkflowNodeExecution) error {
-	parentExecution, err := models.FindNodeExecutionInTransaction(tx, execution.WorkflowID, *execution.ParentExecutionID)
-	if err != nil {
-		return fmt.Errorf("parent execution %s not found: %w", execution.ParentExecutionID, err)
-	}
-
-	parentNode, err := models.FindWorkflowNode(tx, execution.WorkflowID, parentExecution.NodeID)
-	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
-	}
-
-	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, parentNode.Ref.Data().Blueprint.ID)
-	if err != nil {
-		return fmt.Errorf("blueprint not found: %w", err)
-	}
-
-	childNodeID := strings.Split(execution.NodeID, ":")[1]
-	childNode, err := blueprint.FindNode(childNodeID)
-	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
-	}
-
-	component, err := w.registry.GetComponent(childNode.Ref.Component.Name)
-	if err != nil {
-		return fmt.Errorf("component not found: %w", err)
-	}
-
-	spec := request.Spec.Data()
-	if spec.InvokeAction == nil {
-		return fmt.Errorf("spec is not specified")
-	}
-
-	actionName := spec.InvokeAction.ActionName
-	actionDef := findAction(component.Actions(), actionName)
-	if actionDef == nil {
-		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
-	}
-
-	actionCtx := core.ActionContext{
-		Name:                  actionName,
-		Configuration:         childNode.Configuration,
-		Parameters:            spec.InvokeAction.Parameters,
-		Logger:                logging.ForExecution(execution, parentExecution),
-		MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
-		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
-		IntegrationContext:    contexts.NewIntegrationContext(tx, w.registry),
-	}
-
+	actionCtx.Logger = logger
 	err = component.HandleAction(actionCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)
