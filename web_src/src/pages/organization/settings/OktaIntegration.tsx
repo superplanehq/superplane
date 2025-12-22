@@ -14,16 +14,8 @@ export function OktaIntegration() {
   const [showToken, setShowToken] = useState(false);
   const [lastToken, setLastToken] = useState<string | null>(null);
 
-  const {
-    oktaSettings,
-    isLoading,
-    error,
-    updateSettings,
-    isUpdating,
-    rotateToken,
-    isRotating,
-    rotatedToken,
-  } = useOktaSettings(organizationId || "");
+  const { oktaSettings, isLoading, error, updateSettings, isUpdating, rotateToken, isRotating, rotatedToken } =
+    useOktaSettings(organizationId || "");
 
   React.useEffect(() => {
     if (oktaSettings) {
@@ -109,9 +101,7 @@ export function OktaIntegration() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              SAML Certificate
-            </label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SAML Certificate</label>
             <textarea
               className="w-full min-h-[160px] rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={samlCertificate}
@@ -146,9 +136,7 @@ export function OktaIntegration() {
             </p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              SCIM base URL
-            </label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SCIM base URL</label>
             <Input readOnly value={scimBaseUrl} />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Use this as the SCIM connector base URL in your Okta provisioning settings.
@@ -184,4 +172,3 @@ export function OktaIntegration() {
     </div>
   );
 }
-

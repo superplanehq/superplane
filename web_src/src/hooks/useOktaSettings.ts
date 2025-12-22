@@ -18,6 +18,9 @@ export function useOktaSettings(organizationId: string) {
     queryFn: async () => {
       const res = await organizationsGetOktaSettings({
         path: { id: organizationId },
+        headers: {
+          "x-organization-id": organizationId,
+        },
       });
       return res.data;
     },
@@ -27,6 +30,9 @@ export function useOktaSettings(organizationId: string) {
     mutationFn: async (body: OrganizationsUpdateOktaSettingsBody) => {
       return organizationsUpdateOktaSettings({
         path: { id: organizationId },
+        headers: {
+          "x-organization-id": organizationId,
+        },
         body,
       });
     },
@@ -39,6 +45,9 @@ export function useOktaSettings(organizationId: string) {
     mutationFn: async (body: OrganizationsRotateOktaScimTokenBody) => {
       const res = await organizationsRotateOktaScimToken({
         path: { id: organizationId },
+        headers: {
+          "x-organization-id": organizationId,
+        },
         body,
       });
       return res.data;
@@ -56,4 +65,3 @@ export function useOktaSettings(organizationId: string) {
     rotatedToken: rotateTokenMutation.data?.token,
   };
 }
-

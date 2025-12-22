@@ -23,7 +23,7 @@ func TestOktaIntegration(t *testing.T) {
 		const samlIssuer = "https://e2e-okta.example.com/app/superplane/123"
 		const samlCertificate = "-----BEGIN CERTIFICATE-----\nE2E-OKTA-CERT\n-----END CERTIFICATE-----"
 
-		steps.startUI()
+		steps.start(true, false)
 		steps.visitOktaSettingsPage()
 		steps.fillSAMLSettings(samlIssuer, samlCertificate)
 		steps.enableEnforceSSO()
@@ -36,7 +36,7 @@ func TestOktaIntegration(t *testing.T) {
 		const samlIssuer = "https://e2e-okta.example.com/app/superplane/123"
 		const samlCertificate = "-----BEGIN CERTIFICATE-----\nE2E-OKTA-CERT\n-----END CERTIFICATE-----"
 
-		steps.startUI()
+		steps.start(true, false)
 		steps.visitOktaSettingsPage()
 		steps.fillSAMLSettings(samlIssuer, samlCertificate)
 		steps.saveSettings()
@@ -49,7 +49,7 @@ func TestOktaIntegration(t *testing.T) {
 	t.Run("adding users via SCIM", func(t *testing.T) {
 		const email = "okta-user@example.com"
 
-		steps.startSCIM()
+		steps.start(false, true)
 		steps.configureOkta()
 
 		userID := steps.provisionUser(email)
@@ -61,7 +61,7 @@ func TestOktaIntegration(t *testing.T) {
 	t.Run("deleting users via SCIM", func(t *testing.T) {
 		const email = "okta-user-delete@example.com"
 
-		steps.startSCIM()
+		steps.start(false, true)
 		steps.configureOkta()
 
 		userID := steps.provisionUser(email)
@@ -75,7 +75,7 @@ func TestOktaIntegration(t *testing.T) {
 		const email = "okta-group-user@example.com"
 		const groupName = "okta-e2e-group"
 
-		steps.startSCIM()
+		steps.start(false, true)
 		steps.configureOkta()
 
 		userID := steps.provisionUser(email)
@@ -93,21 +93,20 @@ func TestOktaIntegration(t *testing.T) {
 }
 
 type oktaIntegrationSteps struct {
-	t       *testing.T
-	session *session.TestSession
+	t         *testing.T
+	session   *session.TestSession
 	scimToken string
 }
 
-func (s *oktaIntegrationSteps) startUI() {
+func (s *oktaIntegrationSteps) start(withLogin bool, withSCIM bool) {
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
-	s.session.Login()
-}
-
-func (s *oktaIntegrationSteps) startSCIM() {
-	s.session = ctx.NewSession(s.t)
-	s.session.Start()
-	s.scimToken = "e2e-scim-token"
+	if withLogin {
+		s.session.Login()
+	}
+	if withSCIM {
+		s.scimToken = "e2e-scim-token"
+	}
 }
 
 func (s *oktaIntegrationSteps) visitOktaSettingsPage() {
