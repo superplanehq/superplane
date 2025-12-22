@@ -536,12 +536,3 @@ func TestUpdateWorkflow_ErroredNodeBecomesValidAgain(t *testing.T) {
 	assert.Equal(t, models.WorkflowNodeStateReady, testNode.State, "node should now be in ready state")
 	assert.Nil(t, testNode.StateReason, "node should not have error reason")
 }
-
-func findNodeByID(nodes []models.Node, id string) *models.Node {
-	for i := range nodes {
-		if nodes[i].ID == id {
-			return &nodes[i]
-		}
-	}
-	return nil
-}

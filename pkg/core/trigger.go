@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations"
 )
@@ -65,6 +66,7 @@ type Trigger interface {
 }
 
 type TriggerContext struct {
+	Logger                 *log.Entry
 	Configuration          any
 	MetadataContext        MetadataContext
 	RequestContext         RequestContext

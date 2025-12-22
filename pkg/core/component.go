@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -117,6 +118,7 @@ type ExecutionContext struct {
 	WorkflowID             string
 	Data                   any
 	Configuration          any
+	Logger                 *log.Entry
 	MetadataContext        MetadataContext
 	NodeMetadataContext    MetadataContext
 	ExecutionStateContext  ExecutionStateContext
@@ -131,6 +133,7 @@ type ExecutionContext struct {
  * to control the state and metadata of each execution of it.
  */
 type SetupContext struct {
+	Logger                 *log.Entry
 	Configuration          any
 	MetadataContext        MetadataContext
 	RequestContext         RequestContext

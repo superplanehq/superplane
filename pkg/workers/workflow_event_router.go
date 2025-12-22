@@ -179,7 +179,7 @@ func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, workflow *models.Wor
 func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, logger *log.Entry, workflow *models.Workflow, execution *models.WorkflowNodeExecution, event *models.WorkflowEvent) ([]models.WorkflowNodeQueueItem, error) {
 	now := time.Now()
 
-	logger = logging.ForExecution(logger, execution, nil)
+	logger = logging.WithExecution(logger, execution, nil)
 	w.logger.Infof("Processing event")
 
 	var createdQueueItems []models.WorkflowNodeQueueItem
@@ -225,7 +225,7 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, logger *lo
 		return nil, nil, err
 	}
 
-	logger = logging.ForExecution(logger, execution, parentExecution)
+	logger = logging.WithExecution(logger, execution, parentExecution)
 	logger.Info("Processing child execution event")
 
 	blueprintID := parentNode.Ref.Data().Blueprint.ID

@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -88,7 +89,7 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 			}
 		}
 
-		return deleteNodes(tx, existingNodes, expandedNodes, workflowID)
+		return deleteNodes(tx, existingNodes, expandedNodes)
 	})
 
 	if err != nil {
@@ -225,6 +226,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		return err
 	}
 
+	logger := logging.ForNode(node)
 	triggerCtx := core.TriggerContext{
 		Configuration:      node.Configuration.Data(),
 		MetadataContext:    contexts.NewNodeMetadataContext(tx, &node),
@@ -240,6 +242,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 
+		logger = logging.WithAppInstallation(logger, *appInstallation)
 		triggerCtx.AppInstallationContext = contexts.NewAppInstallationContext(
 			tx,
 			&node,
@@ -249,6 +252,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		)
 	}
 
+	triggerCtx.Logger = logger
 	err = trigger.Setup(triggerCtx)
 	if err != nil {
 		return fmt.Errorf("error setting up node %s: %v", node.NodeID, err)
@@ -264,6 +268,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 		return err
 	}
 
+	logger := logging.ForNode(node)
 	setupCtx := core.SetupContext{
 		Configuration:      node.Configuration.Data(),
 		MetadataContext:    contexts.NewNodeMetadataContext(tx, &node),
@@ -277,6 +282,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 
+		logger = logging.WithAppInstallation(logger, *appInstallation)
 		setupCtx.AppInstallationContext = contexts.NewAppInstallationContext(
 			tx,
 			&node,
@@ -286,6 +292,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 		)
 	}
 
+	setupCtx.Logger = logger
 	err = component.Setup(setupCtx)
 	if err != nil {
 		return fmt.Errorf("error setting up node %s: %v", node.NodeID, err)
@@ -294,7 +301,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 	return tx.Save(&node).Error
 }
 
-func deleteNodes(tx *gorm.DB, existingNodes []models.WorkflowNode, newNodes []models.Node, workflowID uuid.UUID) error {
+func deleteNodes(tx *gorm.DB, existingNodes []models.WorkflowNode, newNodes []models.Node) error {
 	for _, existingNode := range existingNodes {
 		if !slices.ContainsFunc(newNodes, func(n models.Node) bool { return n.ID == existingNode.NodeID }) {
 			err := models.DeleteWorkflowNode(tx, existingNode)
