@@ -203,6 +203,7 @@ type ActionContext struct {
 	Name                   string
 	Configuration          any
 	Parameters             map[string]any
+	Logger                 *log.Entry
 	MetadataContext        MetadataContext
 	ExecutionStateContext  ExecutionStateContext
 	AuthContext            AuthContext

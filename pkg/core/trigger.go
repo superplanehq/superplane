@@ -91,6 +91,7 @@ type TriggerActionContext struct {
 	Name                   string
 	Parameters             map[string]any
 	Configuration          any
+	Logger                 *log.Entry
 	MetadataContext        MetadataContext
 	RequestContext         RequestContext
 	EventContext           EventContext
