@@ -5,7 +5,14 @@ import {
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, EventStateRegistry, StateFunction } from "../types";
-import { ComponentBaseProps, ComponentBaseSpec, DEFAULT_EVENT_STATE_MAP, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import {
+  ComponentBaseProps,
+  ComponentBaseSpec,
+  DEFAULT_EVENT_STATE_MAP,
+  EventSection,
+  EventState,
+  EventStateMap,
+} from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from "..";
@@ -19,7 +26,7 @@ interface ExecutionMetadata {
   pipeline?: {
     state: string;
     result: string;
-  }
+  };
 }
 
 export const RUN_WORKFLOW_STATE_MAP: EventStateMap = {
@@ -87,7 +94,6 @@ export const RUN_WORKFLOW_STATE_REGISTRY: EventStateRegistry = {
   getState: runWorkflowStateFunction,
 };
 
-
 export const runWorkflowMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
@@ -96,7 +102,6 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
-
     return {
       title: node.name!,
       iconSrc: SemaphoreLogo,
@@ -181,7 +186,7 @@ function hasExecutionOrQueueItems(
 function runWorkflowEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution,
-  nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[]
+  nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
 ): EventSection[] | undefined {
   if (!hasExecutionOrQueueItems(execution, nodeQueueItems)) {
     return undefined;
