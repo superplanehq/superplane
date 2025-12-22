@@ -487,7 +487,7 @@ func getNextTrigger(config Configuration, now time.Time, referenceTime *string) 
 		if config.WeeksInterval == nil {
 			return nil, fmt.Errorf("weeksInterval is required for weeks schedule")
 		}
-		if config.WeekDays == nil || len(config.WeekDays) == 0 {
+		if len(config.WeekDays) == 0 {
 			return nil, fmt.Errorf("weekDays is required for weeks schedule")
 		}
 		hour := 0
