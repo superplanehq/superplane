@@ -141,10 +141,10 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 	// GitHub
 	if githubKey := os.Getenv("GITHUB_CLIENT_ID"); githubKey != "" {
 		if githubSecret := os.Getenv("GITHUB_CLIENT_SECRET"); githubSecret != "" {
-			providers["github"] = authentication.ProviderConfig{
+			providers[models.ProviderGitHub] = authentication.ProviderConfig{
 				Key:         githubKey,
 				Secret:      githubSecret,
-				CallbackURL: fmt.Sprintf("%s/auth/github/callback", baseURL),
+				CallbackURL: fmt.Sprintf("%s/auth/%s/callback", baseURL, models.ProviderGitHub),
 			}
 		}
 	}
@@ -152,10 +152,24 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 	// Google
 	if googleKey := os.Getenv("GOOGLE_CLIENT_ID"); googleKey != "" {
 		if googleSecret := os.Getenv("GOOGLE_CLIENT_SECRET"); googleSecret != "" {
-			providers["google"] = authentication.ProviderConfig{
+			providers[models.ProviderGoogle] = authentication.ProviderConfig{
 				Key:         googleKey,
 				Secret:      googleSecret,
-				CallbackURL: fmt.Sprintf("%s/auth/google/callback", baseURL),
+				CallbackURL: fmt.Sprintf("%s/auth/%s/callback", baseURL, models.ProviderGoogle),
+			}
+		}
+	}
+
+	// Okta
+	if oktaKey := os.Getenv("OKTA_CLIENT_ID"); oktaKey != "" {
+		if oktaSecret := os.Getenv("OKTA_CLIENT_SECRET"); oktaSecret != "" {
+			if oktaOrgURL := os.Getenv("OKTA_ORG_URL"); oktaOrgURL != "" {
+				providers[models.ProviderOkta] = authentication.ProviderConfig{
+					Key:         oktaKey,
+					Secret:      oktaSecret,
+					CallbackURL: fmt.Sprintf("%s/auth/%s/callback", baseURL, models.ProviderOkta),
+					OrgURL:      oktaOrgURL,
+				}
 			}
 		}
 	}

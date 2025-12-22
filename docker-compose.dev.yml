@@ -56,6 +56,9 @@ services:
       GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
+      OKTA_CLIENT_ID: ${OKTA_CLIENT_ID:-}
+      OKTA_CLIENT_SECRET: ${OKTA_CLIENT_SECRET:-}
+      OKTA_ORG_URL: ${OKTA_ORG_URL:-}
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
       TEMPLATE_DIR: "/app/templates"
