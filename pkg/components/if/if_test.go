@@ -4,34 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
-
-type MockExecutionStateContext struct {
-	mock.Mock
-}
-
-func (m *MockExecutionStateContext) SetKV(key string, value string) error {
-	args := m.Called(key, value)
-	return args.Error(0)
-}
-
-func (m *MockExecutionStateContext) Pass(outputs map[string][]any) error {
-	args := m.Called(outputs)
-	return args.Error(0)
-}
-
-func (m *MockExecutionStateContext) Fail(reason, message string) error {
-	args := m.Called(reason, message)
-	return args.Error(0)
-}
-
-func (m *MockExecutionStateContext) IsFinished() bool {
-	args := m.Called()
-	return args.Bool(0)
-}
 
 func TestIf_Execute_EmitsEmptyEvents(t *testing.T) {
 	tests := []struct {
@@ -71,21 +47,20 @@ func TestIf_Execute_EmitsEmptyEvents(t *testing.T) {
 
 			ifComponent := &If{}
 
-			mockExecStateCtx := &MockExecutionStateContext{}
-
-			mockExecStateCtx.On("Pass", tt.expectedOutputs).Return(nil)
+			stateCtx := &contexts.ExecutionStateContext{}
 
 			ctx := core.ExecutionContext{
 				Data:                  tt.inputData,
 				Configuration:         tt.configuration,
-				ExecutionStateContext: mockExecStateCtx,
+				ExecutionStateContext: stateCtx,
 			}
 
 			err := ifComponent.Execute(ctx)
 
 			assert.NoError(t, err)
-
-			mockExecStateCtx.AssertExpectations(t)
+			assert.True(t, stateCtx.Passed)
+			assert.True(t, stateCtx.Finished)
+			assert.Equal(t, tt.expectedOutputs, stateCtx.Outputs)
 		})
 	}
 }
@@ -93,16 +68,15 @@ func TestIf_Execute_EmitsEmptyEvents(t *testing.T) {
 func TestIf_Execute_InvalidExpression_ShouldReturnError(t *testing.T) {
 	ifComponent := &If{}
 
-	mockExecStateCtx := &MockExecutionStateContext{}
+	stateCtx := &contexts.ExecutionStateContext{}
 
 	ctx := core.ExecutionContext{
 		Data:                  map[string]any{"test": "value"},
 		Configuration:         map[string]any{"expression": "invalid expression syntax +++"},
-		ExecutionStateContext: mockExecStateCtx,
+		ExecutionStateContext: stateCtx,
 	}
 
 	err := ifComponent.Execute(ctx)
-	assert.Error(t, err)
 	assert.Error(t, err)
 
 }
@@ -110,12 +84,12 @@ func TestIf_Execute_InvalidExpression_ShouldReturnError(t *testing.T) {
 func TestIf_Execute_NonBooleanResult_ShouldReturnError(t *testing.T) {
 	ifComponent := &If{}
 
-	mockExecStateCtx := &MockExecutionStateContext{}
+	stateCtx := &contexts.ExecutionStateContext{}
 
 	ctx := core.ExecutionContext{
 		Data:                  map[string]any{"test": "value"},
 		Configuration:         map[string]any{"expression": "$.test"},
-		ExecutionStateContext: mockExecStateCtx,
+		ExecutionStateContext: stateCtx,
 	}
 
 	err := ifComponent.Execute(ctx)
@@ -145,19 +119,19 @@ func TestIf_Execute_BothTrueAndFalsePathsEmitEmpty(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ifComponent := &If{}
 
-			mockExecStateCtx := &MockExecutionStateContext{}
-
-			mockExecStateCtx.On("Pass", tt.expectedOutputs).Return(nil)
+			stateCtx := &contexts.ExecutionStateContext{}
 
 			ctx := core.ExecutionContext{
 				Data:                  map[string]any{"test": "value"},
 				Configuration:         tt.configuration,
-				ExecutionStateContext: mockExecStateCtx,
+				ExecutionStateContext: stateCtx,
 			}
 
 			err := ifComponent.Execute(ctx)
 			assert.NoError(t, err)
-			mockExecStateCtx.AssertExpectations(t)
+			assert.True(t, stateCtx.Passed)
+			assert.True(t, stateCtx.Finished)
+			assert.Equal(t, tt.expectedOutputs, stateCtx.Outputs)
 		})
 	}
 }

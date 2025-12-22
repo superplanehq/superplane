@@ -487,27 +487,15 @@ func TestEmitEvent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			schedule := &Schedule{}
 
-			// Mock event context that captures the emitted payload
-			var emittedPayload map[string]any
-			mockEventContext := &mockEventContext{
-				emitFunc: func(payload any) error {
-					if p, ok := payload.(map[string]any); ok {
-						emittedPayload = p
-					}
-					return nil
-				},
-			}
-
-			// Mock request context
-			mockRequestContext := &mockRequestContext{}
+			eventCtx := &contexts.EventContext{}
 
 			ctx := core.TriggerActionContext{
 				Name:            "emitEvent",
 				Configuration:   tt.config,
 				Logger:          log.NewEntry(log.StandardLogger()),
-				EventContext:    mockEventContext,
+				EventContext:    eventCtx,
 				MetadataContext: &contexts.MetadataContext{},
-				RequestContext:  mockRequestContext,
+				RequestContext:  &contexts.RequestContext{},
 			}
 
 			err := schedule.emitEvent(ctx)
@@ -517,8 +505,14 @@ func TestEmitEvent(t *testing.T) {
 			}
 
 			// Validate payload structure
-			if emittedPayload == nil {
-				t.Errorf("expected payload to be emitted, but got nil")
+			if len(eventCtx.EmittedEvents) == 0 {
+				t.Errorf("expected payload to be emitted, but got none")
+				return
+			}
+
+			emittedPayload, ok := eventCtx.EmittedEvents[0].(map[string]any)
+			if !ok {
+				t.Errorf("expected emitted event to be map[string]any, got %T", eventCtx.EmittedEvents[0])
 				return
 			}
 
@@ -559,35 +553,4 @@ func TestEmitEvent(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Mock implementations for testing
-type mockEventContext struct {
-	emitFunc func(any) error
-}
-
-func (m *mockEventContext) Emit(payload any) error {
-	if m.emitFunc != nil {
-		return m.emitFunc(payload)
-	}
-	return nil
-}
-
-type mockMetadataContext struct {
-	data any
-}
-
-func (m *mockMetadataContext) Get() any {
-	return m.data
-}
-
-func (m *mockMetadataContext) Set(data any) {
-	m.data = data
-}
-
-type mockRequestContext struct{}
-
-func (m *mockRequestContext) ScheduleActionCall(actionName string, payload map[string]any, delay time.Duration) error {
-	// Not implemented for this test
-	return nil
 }

@@ -4,34 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
-
-type MockExecutionStateContext struct {
-	mock.Mock
-}
-
-func (m *MockExecutionStateContext) SetKV(key, value string) error {
-	args := m.Called(key, value)
-	return args.Error(0)
-}
-
-func (m *MockExecutionStateContext) Pass(outputs map[string][]any) error {
-	args := m.Called(outputs)
-	return args.Error(0)
-}
-
-func (m *MockExecutionStateContext) Fail(reason, message string) error {
-	args := m.Called(reason, message)
-	return args.Error(0)
-}
-
-func (m *MockExecutionStateContext) IsFinished() bool {
-	args := m.Called()
-	return args.Bool(0)
-}
 
 func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 	tests := []struct {
@@ -71,21 +47,20 @@ func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 
 			filter := &Filter{}
 
-			mockExecStateCtx := &MockExecutionStateContext{}
-
-			mockExecStateCtx.On("Pass", tt.expectedOutputs).Return(nil)
+			stateCtx := &contexts.ExecutionStateContext{}
 
 			ctx := core.ExecutionContext{
 				Data:                  tt.inputData,
 				Configuration:         tt.configuration,
-				ExecutionStateContext: mockExecStateCtx,
+				ExecutionStateContext: stateCtx,
 			}
 
 			err := filter.Execute(ctx)
 
 			assert.NoError(t, err)
-
-			mockExecStateCtx.AssertExpectations(t)
+			assert.True(t, stateCtx.Passed)
+			assert.True(t, stateCtx.Finished)
+			assert.Equal(t, tt.expectedOutputs, stateCtx.Outputs)
 		})
 	}
 }
@@ -93,12 +68,12 @@ func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 func TestFilter_Execute_InvalidExpression_ShouldReturnError(t *testing.T) {
 	filter := &Filter{}
 
-	mockExecStateCtx := &MockExecutionStateContext{}
+	stateCtx := &contexts.ExecutionStateContext{}
 
 	ctx := core.ExecutionContext{
 		Data:                  map[string]any{"test": "value"},
 		Configuration:         map[string]any{"expression": "invalid expression syntax +++"},
-		ExecutionStateContext: mockExecStateCtx,
+		ExecutionStateContext: stateCtx,
 	}
 
 	err := filter.Execute(ctx)
@@ -109,12 +84,12 @@ func TestFilter_Execute_InvalidExpression_ShouldReturnError(t *testing.T) {
 func TestFilter_Execute_NonBooleanResult_ShouldReturnError(t *testing.T) {
 	filter := &Filter{}
 
-	mockExecStateCtx := &MockExecutionStateContext{}
+	stateCtx := &contexts.ExecutionStateContext{}
 
 	ctx := core.ExecutionContext{
 		Data:                  map[string]any{"test": "value"},
 		Configuration:         map[string]any{"expression": "$.test"},
-		ExecutionStateContext: mockExecStateCtx,
+		ExecutionStateContext: stateCtx,
 	}
 
 	err := filter.Execute(ctx)

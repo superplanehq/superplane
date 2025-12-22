@@ -4,34 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
-
-type MockExecutionStateContext struct {
-	mock.Mock
-}
-
-func (m *MockExecutionStateContext) SetKV(key string, value string) error {
-	args := m.Called(key, value)
-	return args.Error(0)
-}
-
-func (m *MockExecutionStateContext) Pass(outputs map[string][]any) error {
-	args := m.Called(outputs)
-	return args.Error(0)
-}
-
-func (m *MockExecutionStateContext) Fail(reason, message string) error {
-	args := m.Called(reason, message)
-	return args.Error(0)
-}
-
-func (m *MockExecutionStateContext) IsFinished() bool {
-	args := m.Called()
-	return args.Bool(0)
-}
 
 func TestNoop_Execute_EmitsEmptyEvents(t *testing.T) {
 	tests := []struct {
@@ -64,20 +40,19 @@ func TestNoop_Execute_EmitsEmptyEvents(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			noop := &NoOp{}
 
-			mockExecStateCtx := &MockExecutionStateContext{}
-
-			mockExecStateCtx.On("Pass", map[string][]any{"default": {make(map[string]any)}}).Return(nil)
+			stateCtx := &contexts.ExecutionStateContext{}
 
 			ctx := core.ExecutionContext{
 				Data:                  tt.inputData,
-				ExecutionStateContext: mockExecStateCtx,
+				ExecutionStateContext: stateCtx,
 			}
 
 			err := noop.Execute(ctx)
 
 			assert.NoError(t, err)
-
-			mockExecStateCtx.AssertExpectations(t)
+			assert.True(t, stateCtx.Passed)
+			assert.True(t, stateCtx.Finished)
+			assert.Equal(t, map[string][]any{"default": {make(map[string]any)}}, stateCtx.Outputs)
 		})
 	}
 }
@@ -85,27 +60,27 @@ func TestNoop_Execute_EmitsEmptyEvents(t *testing.T) {
 func TestNoop_Execute_AlwaysEmitsEmpty(t *testing.T) {
 	t.Run("noop should never pass through original data", func(t *testing.T) {
 		noop := &NoOp{}
-		mockExecStateCtx := &MockExecutionStateContext{}
+		stateCtx := &contexts.ExecutionStateContext{}
 
 		originalData := map[string]any{
 			"important": "data",
 			"that":      "should not be passed through",
 		}
 
-		mockExecStateCtx.AssertNotCalled(t, "Pass", map[string][]any{
-			core.DefaultOutputChannel.Name: {originalData},
-		})
-
-		mockExecStateCtx.On("Pass", map[string][]any{"default": {make(map[string]any)}}).Return(nil)
-
 		ctx := core.ExecutionContext{
 			Data:                  originalData,
-			ExecutionStateContext: mockExecStateCtx,
+			ExecutionStateContext: stateCtx,
 		}
 
 		err := noop.Execute(ctx)
 		assert.NoError(t, err)
-		mockExecStateCtx.AssertExpectations(t)
+		assert.True(t, stateCtx.Passed)
+		assert.True(t, stateCtx.Finished)
+
+		// Verify that the output is an empty map, not the original data
+		expectedOutputs := map[string][]any{"default": {make(map[string]any)}}
+		assert.Equal(t, expectedOutputs, stateCtx.Outputs)
+		assert.NotEqual(t, map[string][]any{core.DefaultOutputChannel.Name: {originalData}}, stateCtx.Outputs)
 	})
 }
 
