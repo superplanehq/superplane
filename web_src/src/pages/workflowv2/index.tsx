@@ -1959,6 +1959,18 @@ function prepareComponentBaseNode(
     additionalData,
   );
 
+  // If there's an error and empty state is shown, customize the message
+  const hasError = !!node.errorMessage;
+  const showingEmptyState = componentBaseProps.includeEmptyState;
+  const emptyStateProps =
+    hasError && showingEmptyState
+      ? {
+          ...componentBaseProps.emptyStateProps,
+          icon: componentBaseProps.emptyStateProps?.icon || Puzzle,
+          title: "Finish configuring this component",
+        }
+      : componentBaseProps.emptyStateProps;
+
   return {
     id: node.id!,
     position: { x: node.position?.x || 0, y: node.position?.y || 0 },
@@ -1969,6 +1981,7 @@ function prepareComponentBaseNode(
       outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
       component: {
         ...componentBaseProps,
+        emptyStateProps,
         error: node.errorMessage,
       },
     },

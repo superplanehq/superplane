@@ -1238,14 +1238,22 @@ function CanvasContent({
     // Do not close sidebar or reset state while creating a new component
     if (templateNodeId) return;
 
-    // Clear ReactFlow's selection state, but keep sidebars open
+    // Clear ReactFlow's selection state and close both sidebars
     stateRef.current.setNodes((nodes) =>
       nodes.map((node) => ({
         ...node,
         selected: false,
       })),
     );
-  }, [templateNodeId]);
+
+    // Close component sidebar
+    stateRef.current.componentSidebar.close();
+
+    // Close building blocks sidebar
+    if (onBuildingBlocksSidebarToggle) {
+      onBuildingBlocksSidebarToggle(false);
+    }
+  }, [templateNodeId, onBuildingBlocksSidebarToggle]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
