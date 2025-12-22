@@ -4,12 +4,89 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseMapper } from "../types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState } from "@/ui/componentBase";
+import { ComponentBaseMapper, EventStateRegistry, StateFunction } from "../types";
+import { ComponentBaseProps, ComponentBaseSpec, DEFAULT_EVENT_STATE_MAP, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
-import { getTriggerRenderer, getState, getStateMap } from "..";
+import { getTriggerRenderer } from "..";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+
+interface ExecutionMetadata {
+  workflow?: {
+    id: string;
+    url: string;
+  };
+  pipeline?: {
+    state: string;
+    result: string;
+  }
+}
+
+export const RUN_WORKFLOW_STATE_MAP: EventStateMap = {
+  ...DEFAULT_EVENT_STATE_MAP,
+  running: {
+    icon: "loader-circle",
+    textColor: "text-black",
+    backgroundColor: "bg-blue-100",
+    badgeColor: "bg-blue-500",
+  },
+  passed: {
+    icon: "circle-check",
+    textColor: "text-black",
+    backgroundColor: "bg-green-100",
+    badgeColor: "bg-emerald-500",
+  },
+  failed: {
+    icon: "circle-x",
+    textColor: "text-black",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-400",
+  },
+  stopped: {
+    icon: "circle-stop",
+    textColor: "text-black",
+    backgroundColor: "bg-gray-100",
+    badgeColor: "bg-gray-500",
+  },
+};
+
+/**
+ * Semaphore-specific state logic function
+ */
+export const runWorkflowStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+  if (!execution) return "neutral";
+
+  //
+  // If workflow is still running
+  //
+  if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
+    return "running";
+  }
+
+  const metadata = execution.metadata as ExecutionMetadata;
+  if (execution.result === "RESULT_FAILED") {
+    return "failed";
+  }
+
+  const pipelineResult = metadata.pipeline?.result;
+  if (pipelineResult === "failed") {
+    return "failed";
+  }
+  if (pipelineResult === "stopped") {
+    return "stopped";
+  }
+
+  return "passed";
+};
+
+/**
+ * Semaphore-specific state registry
+ */
+export const RUN_WORKFLOW_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: RUN_WORKFLOW_STATE_MAP,
+  getState: runWorkflowStateFunction,
+};
+
 
 export const runWorkflowMapper: ComponentBaseMapper = {
   props(
@@ -19,7 +96,6 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
-    const componentName = componentDefinition.name || "semaphore";
 
     return {
       title: node.name!,
@@ -30,11 +106,11 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       iconBackground: getBackgroundColorClass(componentDefinition?.color || "gray"),
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      eventSections: runWorkflowEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName),
+      eventSections: runWorkflowEventSections(nodes, lastExecutions[0], nodeQueueItems),
       includeEmptyState: !hasExecutionOrQueueItems(lastExecutions[0], nodeQueueItems),
       metadata: runWorkflowMetadataList(node),
       specs: runWorkflowSpecs(node),
-      eventStateMap: getStateMap(componentName),
+      eventStateMap: RUN_WORKFLOW_STATE_MAP,
     };
   },
 };
@@ -95,15 +171,6 @@ function runWorkflowSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   return specs;
 }
 
-interface ExecutionMetadata {
-  workflow?: {
-    id: string;
-    url: string;
-    state: string;
-    result: string;
-  };
-}
-
 function hasExecutionOrQueueItems(
   execution: WorkflowsWorkflowNodeExecution,
   nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
@@ -114,8 +181,7 @@ function hasExecutionOrQueueItems(
 function runWorkflowEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution,
-  nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
-  componentName?: string,
+  nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[]
 ): EventSection[] | undefined {
   if (!hasExecutionOrQueueItems(execution, nodeQueueItems)) {
     return undefined;
@@ -134,7 +200,7 @@ function runWorkflowEventSections(
       showAutomaticTime: true,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: componentName ? getState(componentName)(execution) : executionToEventSectionState(execution),
+      eventState: runWorkflowStateFunction(execution),
     });
   }
 
@@ -157,17 +223,4 @@ function runWorkflowEventSections(
   }
 
   return sections;
-}
-
-function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
-  }
-
-  const metadata = execution.metadata as ExecutionMetadata;
-  if (metadata.workflow?.result === "passed") {
-    return "success";
-  }
-
-  return "failed";
 }

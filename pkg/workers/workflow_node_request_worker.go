@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
@@ -132,6 +133,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Wor
 		Name:            actionName,
 		Parameters:      spec.InvokeAction.Parameters,
 		Configuration:   node.Configuration.Data(),
+		Logger:          logging.ForNode(*node),
 		MetadataContext: contexts.NewNodeMetadataContext(tx, node),
 		EventContext:    contexts.NewEventContext(tx, node),
 		RequestContext:  contexts.NewNodeRequestContext(tx, node),
@@ -273,6 +275,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 		Name:                  actionName,
 		Configuration:         childNode.Configuration,
 		Parameters:            spec.InvokeAction.Parameters,
+		Logger:                logging.ForExecution(execution, parentExecution),
 		MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
 		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),

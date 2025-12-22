@@ -13,7 +13,11 @@ func ForEvent(logger *log.Entry, event models.WorkflowEvent) *log.Entry {
 	})
 }
 
-func ForExecution(
+func ForExecution(execution *models.WorkflowNodeExecution, parent *models.WorkflowNodeExecution) *log.Entry {
+	return WithExecution(log.NewEntry(log.StandardLogger()), execution, parent)
+}
+
+func WithExecution(
 	logger *log.Entry,
 	execution *models.WorkflowNodeExecution,
 	parent *models.WorkflowNodeExecution,
@@ -33,14 +37,24 @@ func ForExecution(
 	return logEntry
 }
 
-func ForNode(logger *log.Entry, node models.WorkflowNode) *log.Entry {
+func ForNode(node models.WorkflowNode) *log.Entry {
+	return WithNode(log.NewEntry(log.StandardLogger()), node)
+}
+
+func WithNode(logger *log.Entry, node models.WorkflowNode) *log.Entry {
+	if node.ParentNodeID != nil {
+		return logger.WithFields(log.Fields{
+			"node_id": node.NodeID,
+			"parent":  node.ParentNodeID,
+		})
+	}
+
 	return logger.WithFields(log.Fields{
 		"node_id": node.NodeID,
-		"parent":  node.ParentNodeID,
 	})
 }
 
-func ForQueueItem(logger *log.Entry, queueItem models.WorkflowNodeQueueItem) *log.Entry {
+func WithQueueItem(logger *log.Entry, queueItem models.WorkflowNodeQueueItem) *log.Entry {
 	return logger.WithFields(log.Fields{
 		"queue_item_id": queueItem.ID,
 		"root_event":    queueItem.RootEventID,
@@ -48,7 +62,11 @@ func ForQueueItem(logger *log.Entry, queueItem models.WorkflowNodeQueueItem) *lo
 }
 
 func ForAppInstallation(appInstallation models.AppInstallation) *log.Entry {
-	return log.WithFields(log.Fields{
+	return WithAppInstallation(log.NewEntry(log.StandardLogger()), appInstallation)
+}
+
+func WithAppInstallation(logger *log.Entry, appInstallation models.AppInstallation) *log.Entry {
+	return logger.WithFields(log.Fields{
 		"app_name":        appInstallation.AppName,
 		"installation_id": appInstallation.ID,
 	})

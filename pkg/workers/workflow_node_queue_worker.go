@@ -53,7 +53,7 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 			telemetry.RecordQueueWorkerNodesCount(context.Background(), len(nodes))
 
 			for _, node := range nodes {
-				logger := logging.ForNode(w.logger, node)
+				logger := logging.WithNode(w.logger, node)
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
@@ -124,7 +124,7 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 		return nil, nil, err
 	}
 
-	logger = logging.ForQueueItem(logger, *queueItem)
+	logger = logging.WithQueueItem(logger, *queueItem)
 	logger.Info("Processing queue item")
 
 	ctx, err := contexts.BuildProcessQueueContext(tx, node, queueItem)
