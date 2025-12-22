@@ -152,8 +152,8 @@ echo ""
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]:-$0}")"
 
-echo "Running docker compose pull..."
-docker compose -f "${SCRIPT_DIR}/docker-compose.yml" pull
+echo "Pulling Docker images (this may take a while)..."
+docker compose -f "${SCRIPT_DIR}/docker-compose.yml" pull --quiet
 
 echo "Running docker compose up --wait --detach..."
 docker compose -f "${SCRIPT_DIR}/docker-compose.yml" up --wait --detach
