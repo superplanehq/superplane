@@ -63,7 +63,7 @@ export function CustomComponentConfigurationSidebar({
         size="icon"
         onClick={() => onToggle(true)}
         aria-label="Open settings"
-        className="absolute top-4 right-40 z-10 shadow-md"
+        className="absolute top-4 right-40 z-10"
         title="Blueprint Settings"
       >
         <Settings size={24} />
