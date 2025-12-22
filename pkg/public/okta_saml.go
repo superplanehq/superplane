@@ -59,11 +59,14 @@ func (s *Server) handleOktaSAML(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	acsURL := s.BaseURL + "/orgs/" + org.ID.String() + "/okta/auth"
+
 	sp := &saml2.SAMLServiceProvider{
-		IdentityProviderIssuer: config.SamlIssuer,
-		ServiceProviderIssuer:  s.BaseURL + "/orgs/" + org.ID.String() + "/okta/auth",
-		AudienceURI:            s.BaseURL + "/orgs/" + org.ID.String() + "/okta/auth",
-		IDPCertificateStore:    certStore,
+		IdentityProviderIssuer:      config.SamlIssuer,
+		ServiceProviderIssuer:       acsURL,
+		AssertionConsumerServiceURL: acsURL,
+		AudienceURI:                 acsURL,
+		IDPCertificateStore:         certStore,
 	}
 
 	assertionInfo, err := sp.RetrieveAssertionInfo(samlResponse)

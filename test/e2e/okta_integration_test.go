@@ -2,14 +2,23 @@ package e2e
 
 import (
 	"bytes"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/beevik/etree"
+	dsig "github.com/russellhaering/goxmldsig"
+	saml2 "github.com/russellhaering/gosaml2"
+	"github.com/russellhaering/gosaml2/types"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -23,7 +32,8 @@ func TestOktaIntegration(t *testing.T) {
 		const samlIssuer = "https://e2e-okta.example.com/app/superplane/123"
 		const samlCertificate = "-----BEGIN CERTIFICATE-----\nE2E-OKTA-CERT\n-----END CERTIFICATE-----"
 
-		steps.start(true, false)
+		steps.start()
+		steps.login()
 		steps.visitOktaSettingsPage()
 		steps.fillSAMLSettings(samlIssuer, samlCertificate)
 		steps.enableEnforceSSO()
@@ -36,7 +46,8 @@ func TestOktaIntegration(t *testing.T) {
 		const samlIssuer = "https://e2e-okta.example.com/app/superplane/123"
 		const samlCertificate = "-----BEGIN CERTIFICATE-----\nE2E-OKTA-CERT\n-----END CERTIFICATE-----"
 
-		steps.start(true, false)
+		steps.start()
+		steps.login()
 		steps.visitOktaSettingsPage()
 		steps.fillSAMLSettings(samlIssuer, samlCertificate)
 		steps.saveSettings()
@@ -49,7 +60,8 @@ func TestOktaIntegration(t *testing.T) {
 	t.Run("adding users via SCIM", func(t *testing.T) {
 		const email = "okta-user@example.com"
 
-		steps.start(false, true)
+		steps.start()
+		steps.enableSCIM()
 		steps.configureOkta()
 
 		userID := steps.provisionUser(email)
@@ -61,7 +73,8 @@ func TestOktaIntegration(t *testing.T) {
 	t.Run("deleting users via SCIM", func(t *testing.T) {
 		const email = "okta-user-delete@example.com"
 
-		steps.start(false, true)
+		steps.start()
+		steps.enableSCIM()
 		steps.configureOkta()
 
 		userID := steps.provisionUser(email)
@@ -75,7 +88,8 @@ func TestOktaIntegration(t *testing.T) {
 		const email = "okta-group-user@example.com"
 		const groupName = "okta-e2e-group"
 
-		steps.start(false, true)
+		steps.start()
+		steps.enableSCIM()
 		steps.configureOkta()
 
 		userID := steps.provisionUser(email)
@@ -90,6 +104,73 @@ func TestOktaIntegration(t *testing.T) {
 		steps.removeUserFromGroup(groupName, userID)
 		steps.assertGroupHasNoMembers(groupName)
 	})
+
+	t.Run("saml login via okta", func(t *testing.T) {
+		steps.start()
+
+		baseURL := os.Getenv("BASE_URL")
+		require.NotEmpty(t, baseURL, "BASE_URL must be set for e2e tests")
+
+		orgID := steps.session.OrgID.String()
+		email := steps.session.Account.Email
+
+		issuer := "http://example.okta.com/app/superplane/e2e"
+
+		// Generate a key pair and self-signed certificate for signing.
+		keyStore := dsig.RandomKeyStoreForTest()
+		_, certDER, err := keyStore.GetKeyPair()
+		require.NoError(t, err)
+
+		cert, err := x509.ParseCertificate(certDER)
+		require.NoError(t, err)
+
+		pemCert := pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: cert.Raw,
+		})
+
+		oktaConfig := &models.OrganizationOktaConfig{
+			OrganizationID: steps.session.OrgID,
+			SamlIssuer:     issuer,
+			SamlCertificate: string(pemCert),
+		}
+
+		err = models.SaveOrganizationOktaConfig(oktaConfig)
+		require.NoError(t, err)
+
+		acsURL := fmt.Sprintf("%s/orgs/%s/okta/auth", baseURL, orgID)
+
+		samlResponse := buildTestSAMLResponse(t, acsURL, issuer, email, keyStore)
+
+		client := &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				// Do not follow redirects so we can inspect the initial Set-Cookie + Location.
+				return http.ErrUseLastResponse
+			},
+		}
+
+		form := url.Values{}
+		form.Set("SAMLResponse", samlResponse)
+
+		resp, err := client.PostForm(acsURL, form)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusTemporaryRedirect, resp.StatusCode)
+
+		location, err := resp.Location()
+		require.NoError(t, err)
+		require.Contains(t, location.Path, "/"+orgID)
+
+		foundCookie := false
+		for _, c := range resp.Cookies() {
+			if c.Name == "account_token" && c.Value != "" {
+				foundCookie = true
+				break
+			}
+		}
+		require.True(t, foundCookie, "expected account_token cookie to be set after SAML login")
+	})
 }
 
 type oktaIntegrationSteps struct {
@@ -98,15 +179,17 @@ type oktaIntegrationSteps struct {
 	scimToken string
 }
 
-func (s *oktaIntegrationSteps) start(withLogin bool, withSCIM bool) {
+func (s *oktaIntegrationSteps) start() {
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
-	if withLogin {
-		s.session.Login()
-	}
-	if withSCIM {
-		s.scimToken = "e2e-scim-token"
-	}
+}
+
+func (s *oktaIntegrationSteps) login() {
+	s.session.Login()
+}
+
+func (s *oktaIntegrationSteps) enableSCIM() {
+	s.scimToken = "e2e-scim-token"
 }
 
 func (s *oktaIntegrationSteps) visitOktaSettingsPage() {
@@ -453,4 +536,103 @@ func (s *oktaIntegrationSteps) assertGroupHasNoMembers(groupName string) {
 	}
 	require.NoError(s.t, json.Unmarshal(data, &resp))
 	require.Len(s.t, resp.Members, 0)
+}
+
+func buildTestSAMLResponse(t *testing.T, acsURL, issuer, email string, keyStore dsig.X509KeyStore) string {
+	t.Helper()
+
+	now := time.Now().UTC().Truncate(time.Second)
+
+	notBefore := now.Add(-5 * time.Minute).Format(time.RFC3339)
+	notOnOrAfter := now.Add(5 * time.Minute).Format(time.RFC3339)
+
+	responseID := "_e2e-response"
+	assertionID := "_e2e-assertion"
+
+	resp := &types.Response{
+		ID:           responseID,
+		Destination:  acsURL,
+		Version:      "2.0",
+		IssueInstant: now,
+		Status: &types.Status{
+			StatusCode: &types.StatusCode{
+				Value: saml2.StatusCodeSuccess,
+			},
+		},
+		Issuer: &types.Issuer{
+			Value: issuer,
+		},
+		Assertions: []types.Assertion{
+			{
+				Version:      "2.0",
+				ID:           assertionID,
+				IssueInstant: now,
+				Issuer: &types.Issuer{
+					Value: issuer,
+				},
+				Subject: &types.Subject{
+					NameID: &types.NameID{
+						Value: email,
+					},
+					SubjectConfirmation: &types.SubjectConfirmation{
+						Method: saml2.SubjMethodBearer,
+						SubjectConfirmationData: &types.SubjectConfirmationData{
+							NotOnOrAfter: notOnOrAfter,
+							Recipient:    acsURL,
+						},
+					},
+				},
+				Conditions: &types.Conditions{
+					NotBefore:    notBefore,
+					NotOnOrAfter: notOnOrAfter,
+					AudienceRestrictions: []types.AudienceRestriction{
+						{
+							Audiences: []types.Audience{
+								{Value: acsURL},
+							},
+						},
+					},
+				},
+				AttributeStatement: &types.AttributeStatement{
+					Attributes: []types.Attribute{
+						{
+							FriendlyName: "email",
+							Name:         "email",
+							NameFormat:   "urn:oasis:names:tc:SAML:2.0:attrname-format:basic",
+							Values: []types.AttributeValue{
+								{
+									Type:  "xs:string",
+									Value: email,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	rawXML, err := xml.Marshal(resp)
+	require.NoError(t, err)
+
+	doc := etree.NewDocument()
+	err = doc.ReadFromBytes(rawXML)
+	require.NoError(t, err)
+
+	el := doc.Root()
+	if el.SelectAttrValue("ID", "") == "" {
+		el.CreateAttr("ID", responseID)
+	}
+
+	signingCtx := dsig.NewDefaultSigningContext(keyStore)
+	signedEl, err := signingCtx.SignEnveloped(el)
+	require.NoError(t, err)
+
+	signedDoc := etree.NewDocument()
+	signedDoc.SetRoot(signedEl)
+
+	signedBytes, err := signedDoc.WriteToBytes()
+	require.NoError(t, err)
+
+	return base64.StdEncoding.EncodeToString(signedBytes)
 }
