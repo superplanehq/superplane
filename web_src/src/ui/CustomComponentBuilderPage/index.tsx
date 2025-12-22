@@ -606,25 +606,6 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     [newNodeData, props, templateNodeId],
   );
 
-  const handleCancelTemplate = useCallback(() => {
-    // If parent provides onCancelTemplate, delegate to it (for pending connection nodes)
-    if (props.onCancelTemplate) {
-      props.onCancelTemplate();
-      return;
-    }
-
-    // Otherwise, handle locally (for regular template nodes)
-    if (templateNodeId) {
-      if (props.onRemoveTemplateNode) {
-        props.onRemoveTemplateNode(templateNodeId);
-      }
-      setLocalTemplateNodeId(null);
-      setLocalNewNodeData(null);
-      setIsNodeSidebarOpen(false);
-      setSelectedNodeId(null);
-    }
-  }, [templateNodeId, props, setLocalTemplateNodeId, setLocalNewNodeData]);
-
   const handleNodeSidebarClose = useCallback(() => {
     setIsNodeSidebarOpen(false);
     setSelectedNodeId(null);
@@ -915,10 +896,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             showSettingsTab={true}
             currentTab="settings"
             onTabChange={() => {}} // No tab switching in custom component builder
-            templateNodeId={templateNodeId}
-            newNodeData={newNodeData}
-            onCancelTemplate={handleCancelTemplate}
-            nodeConfigMode={templateNodeId ? "create" : "edit"}
+            nodeConfigMode="edit"
             nodeName={editingNodeData?.nodeName || ""}
             nodeLabel={editingNodeData?.displayLabel}
             nodeConfiguration={editingNodeData?.configuration || {}}

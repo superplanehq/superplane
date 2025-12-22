@@ -43,7 +43,7 @@ export function SettingsTab({
   configuration,
   configurationFields,
   onSave,
-  onCancel,
+  onCancel: _onCancel,
   domainId,
   domainType,
   customField,
@@ -71,7 +71,7 @@ export function SettingsTab({
   const {
     validationErrors: realtimeValidationErrors,
     validateNow,
-    clearErrors: clearRealtimeErrors,
+    clearErrors: _clearRealtimeErrors,
     hasFieldError: hasRealtimeFieldError,
   } = useRealtimeValidation(
     configurationFields,
@@ -200,15 +200,6 @@ export function SettingsTab({
   const handleSave = () => {
     validateNow();
     onSave(nodeConfiguration, currentNodeName, selectedAppInstallation);
-  };
-
-  const handleCancel = () => {
-    setNodeConfiguration(configuration || {});
-    setCurrentNodeName(nodeName);
-    setValidationErrors(new Set());
-    setShowValidation(false);
-    clearRealtimeErrors();
-    onCancel?.();
   };
 
   return (
@@ -354,13 +345,8 @@ export function SettingsTab({
       </div>
 
       <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-        {mode === "create" && (
-          <Button data-testid="cancel-node-add-button" variant="outline" onClick={handleCancel}>
-            Cancel
-          </Button>
-        )}
-        <Button data-testid="add-node-button" variant="default" onClick={handleSave}>
-          {mode === "edit" ? "Save" : "Add"}
+        <Button data-testid="save-node-button" variant="default" onClick={handleSave}>
+          Save
         </Button>
       </div>
     </div>

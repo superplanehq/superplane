@@ -745,8 +745,8 @@ export function WorkflowPageV2() {
   };
 
   const handleNodeAdd = useCallback(
-    async (newNodeData: NewNodeData) => {
-      if (!workflow || !organizationId || !workflowId) return;
+    async (newNodeData: NewNodeData): Promise<string> => {
+      if (!workflow || !organizationId || !workflowId) return "";
 
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
@@ -819,6 +819,9 @@ export function WorkflowPageV2() {
 
       // Save to server immediately
       await handleSaveWorkflow(updatedWorkflow);
+
+      // Return the new node ID
+      return newNodeId;
     },
     [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
   );
