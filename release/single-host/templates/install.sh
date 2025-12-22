@@ -6,16 +6,12 @@ BLUE="\033[0;34m"
 LBLUE="\033[1;34m"
 CLEAR="\033[0m"
 
-echo -e ""
-echo -e "${BLUE}  ____                        _                 ${CLEAR}"
-echo -e "${BLUE} / ___| _   _ _ __   ___ _ __| | __ _ _ __      ${CLEAR}"
-echo -e "${BLUE} \\___ \\| | | | '_ \\ / _ \\ '__| |/ _\` | '_ \\ ${CLEAR}"
-echo -e "${BLUE}  ___) | |_| | |_) |  __/ |  | | (_| | | | |    ${CLEAR}"
-echo -e "${BLUE} |____/ \\__,_| .__/ \\___|_|  |_|\\__,_|_| |_|   ${CLEAR}"
-echo -e "${BLUE}             |_|                                ${CLEAR}"
-echo -e ""
-echo -e "${LBLUE}Superplane Single-Host Installer${CLEAR}"
-echo -e ""
+#
+# The logo is generated using:
+# script -q /dev/null npx oh-my-logo "SuperPlane" purple --filled > release/single-host/templates/superplane-logo.txt
+#
+
+cat "$(dirname "${BASH_SOURCE[0]:-$0}")/superplane-logo.txt"
 
 ENV_FILE="superplane.env"
 
