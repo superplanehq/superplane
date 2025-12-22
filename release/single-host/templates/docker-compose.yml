@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   app:
     image: ghcr.io/superplanehq/superplane:__SUPERPLANE_VERSION__
@@ -11,12 +9,19 @@ services:
         condition: service_healthy
     env_file:
       - superplane.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   caddy:
     image: caddy:2
     restart: always
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     env_file:
       - superplane.env
     ports:
