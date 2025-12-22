@@ -2,7 +2,7 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
-import { Loader2 } from "lucide-react";
+import { Loader2, Puzzle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -1824,7 +1824,7 @@ function prepareComponentNode(
   const isPlaceholder = !node.component?.name && node.name === "New Component";
 
   if (isPlaceholder) {
-    // Render placeholder as a ComponentBase with friendly message
+    // Render placeholder as a ComponentBase with error state styling
     const canvasNode: CanvasNode = {
       id: node.id!,
       position: { x: node.position?.x!, y: node.position?.y! },
@@ -1841,10 +1841,10 @@ function prepareComponentNode(
           title: "New Component",
           includeEmptyState: true,
           emptyStateProps: {
-            description: "Select a component from the sidebar to configure this node",
+            icon: Puzzle,
+            title: "Finish configuring this component",
           },
-          // Don't show error - show description instead
-          error: undefined,
+          error: "Select a component from the sidebar to configure this node",
           parameters: [],
         },
       },

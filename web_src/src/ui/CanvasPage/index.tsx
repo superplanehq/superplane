@@ -311,6 +311,18 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleNodeEdit = useCallback(
     (nodeId: string) => {
+      // Check if this is a placeholder - if so, open building blocks sidebar instead
+      const workflowNode = props.workflowNodes?.find((n) => n.id === nodeId);
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
+
+      if (isPlaceholder) {
+        // For placeholders, open building blocks sidebar
+        setTemplateNodeId(nodeId);
+        setIsBuildingBlocksSidebarOpen(true);
+        state.componentSidebar.close();
+        return;
+      }
+
       // Open the sidebar for this node (data will be automatically available via useMemo)
       if (!state.componentSidebar.isOpen || state.componentSidebar.selectedNodeId !== nodeId) {
         state.componentSidebar.open(nodeId);
@@ -326,7 +338,7 @@ function CanvasPage(props: CanvasPageProps) {
         props.onEdit(nodeId);
       }
     },
-    [props.getNodeEditData, props.onEdit, state.componentSidebar],
+    [props, state.componentSidebar, setTemplateNodeId, setIsBuildingBlocksSidebarOpen, setCurrentTab],
   );
 
   // Get editing data for the currently selected node
@@ -388,11 +400,12 @@ function CanvasPage(props: CanvasPageProps) {
         sourceHandleId: sourceConnection.handleId,
       });
 
-      // Open building blocks sidebar for user to configure
+      // Set as template node and open building blocks sidebar
+      setTemplateNodeId(placeholderId);
       setIsBuildingBlocksSidebarOpen(true);
-      state.componentSidebar.open(placeholderId);
+      state.componentSidebar.close();
     },
-    [props, state, setIsBuildingBlocksSidebarOpen],
+    [props, state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen],
   );
 
   const handlePendingConnectionNodeClick = useCallback(
