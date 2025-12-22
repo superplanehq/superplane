@@ -15,6 +15,7 @@ import { semaphoreMapper as oldSemaphoreMapper, SEMAPHORE_STATE_REGISTRY } from 
 import {
   componentMappers as semaphoreComponentMappers,
   triggerRenderers as semaphoreTriggerRenderers,
+  eventStateRegistry as semaphoreEventStateRegistry,
 } from "./semaphore/index";
 import { componentMappers as githubComponentMappers, triggerRenderers as githubTriggerRenderers } from "./github/index";
 import { timeGateMapper } from "./timegate";
@@ -51,6 +52,10 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
+};
+
+const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
+  semaphore: semaphoreEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -119,8 +124,20 @@ export function getComponentAdditionalDataBuilder(componentName: string): Compon
  * Get the appropriate state registry for a component type.
  * Falls back to the default state registry if no specific registry is registered.
  */
-export function getEventStateRegistry(componentName: string): EventStateRegistry {
-  return eventStateRegistries[componentName] || DEFAULT_STATE_REGISTRY;
+export function getEventStateRegistry(name: string): EventStateRegistry {
+  const parts = name.split(".");
+  if (parts.length == 1) {
+    return eventStateRegistries[name] || DEFAULT_STATE_REGISTRY;
+  }
+
+  const appName = parts[0];
+  const appRegistry = appEventStateRegistries[appName];
+  if (!appRegistry) {
+    return DEFAULT_STATE_REGISTRY;
+  }
+
+  const componentName = parts[1];
+  return appRegistry[componentName] || DEFAULT_STATE_REGISTRY;
 }
 
 /**
