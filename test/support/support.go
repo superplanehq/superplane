@@ -16,7 +16,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
-	"github.com/superplanehq/superplane/test/semaphore"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -38,36 +37,29 @@ import (
 )
 
 type ResourceRegistry struct {
-	User             uuid.UUID
-	UserModel        *models.User
-	Organization     *models.Organization
-	Account          *models.Account
-	Integration      *models.Integration
-	Encryptor        crypto.Encryptor
-	AuthService      *authorization.AuthService
-	Registry         *registry.Registry
-	SemaphoreAPIMock *semaphore.SemaphoreAPIMock
+	User         uuid.UUID
+	UserModel    *models.User
+	Organization *models.Organization
+	Account      *models.Account
+	Integration  *models.Integration
+	Encryptor    crypto.Encryptor
+	AuthService  *authorization.AuthService
+	Registry     *registry.Registry
 }
 
-func (r *ResourceRegistry) Close() {
-	if r.SemaphoreAPIMock != nil {
-		r.SemaphoreAPIMock.Close()
-	}
-}
+func (r *ResourceRegistry) Close() {}
 
 type SetupOptions struct {
-	Source      bool
-	Stage       bool
-	Approvals   int
-	Integration bool
+	Source    bool
+	Stage     bool
+	Approvals int
 }
 
 func Setup(t *testing.T) *ResourceRegistry {
 	return SetupWithOptions(t, SetupOptions{
-		Source:      true,
-		Stage:       true,
-		Integration: true,
-		Approvals:   1,
+		Source:    true,
+		Stage:     true,
+		Approvals: 1,
 	})
 }
 
@@ -79,13 +71,10 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	//
 	encryptor := crypto.NewNoOpEncryptor()
 	r := ResourceRegistry{
-		Encryptor:        encryptor,
-		Registry:         registry.NewRegistry(encryptor),
-		AuthService:      AuthService(t),
-		SemaphoreAPIMock: semaphore.NewSemaphoreAPIMock(),
+		Encryptor:   encryptor,
+		Registry:    registry.NewRegistry(encryptor),
+		AuthService: AuthService(t),
 	}
-
-	require.NoError(t, r.SemaphoreAPIMock.Init())
 
 	//
 	// Create organization and user
@@ -125,36 +114,6 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	r.User = user.ID
 	r.UserModel = user
 	r.Organization = organization
-
-	//
-	// Create integration
-	//
-	if options.Integration {
-		secret, err := CreateSecret(t, &r, map[string]string{"key": "test"})
-		require.NoError(t, err)
-		integration, err := models.CreateIntegration(&models.Integration{
-			Name:       RandomName("integration"),
-			CreatedBy:  r.User,
-			Type:       models.IntegrationTypeSemaphore,
-			DomainType: models.DomainTypeOrganization,
-			DomainID:   r.Organization.ID,
-			URL:        r.SemaphoreAPIMock.Server.URL,
-			AuthType:   models.IntegrationAuthTypeToken,
-			Auth: datatypes.NewJSONType(models.IntegrationAuth{
-				Token: &models.IntegrationAuthToken{
-					ValueFrom: models.ValueDefinitionFrom{
-						Secret: &models.ValueDefinitionFromSecret{
-							Name: secret.Name,
-							Key:  "key",
-						},
-					},
-				},
-			}),
-		})
-
-		require.NoError(t, err)
-		r.Integration = integration
-	}
 
 	return &r
 }
