@@ -121,7 +121,10 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 	}
 
 	metadata.Repository = &appMetadata.Repositories[repoIndex]
-	ctx.MetadataContext.Set(metadata)
+	err = ctx.MetadataContext.Set(metadata)
+	if err != nil {
+		return fmt.Errorf("error setting metadata: %v", err)
+	}
 
 	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
 		EventType:  "issues",

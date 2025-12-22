@@ -251,7 +251,10 @@ func (t *OnEvent) Setup(ctx core.TriggerContext) error {
 
 	// Store metadata
 	metadata.Resource = config.Resource
-	ctx.MetadataContext.Set(metadata)
+	err = ctx.MetadataContext.Set(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
+	}
 
 	// Request webhook if needed
 	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{

@@ -310,11 +310,9 @@ func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 	}
 
 	formatted := nextValidTime.Format(time.RFC3339)
-	ctx.MetadataContext.Set(Metadata{
+	return ctx.MetadataContext.Set(Metadata{
 		NextValidTime: &formatted,
 	})
-
-	return nil
 }
 
 func (tg *TimeGate) validateSpec(spec Spec) error {

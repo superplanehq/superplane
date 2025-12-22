@@ -368,7 +368,10 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 	}
 
 	metadata.UpdateResult()
-	ctx.MetadataContext.Set(metadata)
+	err = ctx.MetadataContext.Set(metadata)
+	if err != nil {
+		return fmt.Errorf("error setting metadata: %v", err)
+	}
 
 	//
 	// If no items are specified, just finish the execution.
@@ -450,8 +453,7 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 	// without finishing the execution.
 	//
 	if !metadata.Completed() {
-		ctx.MetadataContext.Set(metadata)
-		return nil
+		return ctx.MetadataContext.Set(metadata)
 	}
 
 	//
@@ -461,7 +463,10 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 	// the final state of the execution is rejected.
 	//
 	metadata.UpdateResult()
-	ctx.MetadataContext.Set(metadata)
+	err = ctx.MetadataContext.Set(metadata)
+	if err != nil {
+		return err
+	}
 
 	var outputChannel string
 	if metadata.Result == StateApproved {

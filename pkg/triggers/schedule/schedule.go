@@ -357,11 +357,10 @@ func (s *Schedule) Setup(ctx core.TriggerContext) error {
 	}
 
 	formatted := nextTrigger.Format(time.RFC3339)
-	ctx.MetadataContext.Set(Metadata{
+	return ctx.MetadataContext.Set(Metadata{
 		NextTrigger:   &formatted,
 		ReferenceTime: metadata.ReferenceTime,
 	})
-	return nil
 }
 
 func (s *Schedule) Actions() []core.Action {
@@ -441,11 +440,10 @@ func (s *Schedule) emitEvent(ctx core.TriggerActionContext) error {
 	}
 
 	formatted := nextTrigger.Format(time.RFC3339)
-	ctx.MetadataContext.Set(Metadata{
+	return ctx.MetadataContext.Set(Metadata{
 		NextTrigger:   &formatted,
 		ReferenceTime: existingMetadata.ReferenceTime,
 	})
-	return nil
 }
 
 func getNextTrigger(config Configuration, now time.Time, referenceTime *string) (*time.Time, error) {
