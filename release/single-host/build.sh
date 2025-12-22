@@ -32,6 +32,9 @@ chmod +x "${TARGET_DIR}/install.sh"
 echo "* Injecting Caddyfile"
 cp "${TEMPLATES_DIR}/Caddyfile" "${TARGET_DIR}/Caddyfile"
 
+echo "* Injecting superplane-logo.txt"
+cp "${TEMPLATES_DIR}/superplane-logo.txt" "${TARGET_DIR}/superplane-logo.txt"
+
 echo "* Creating superplane-single-host.tar.gz"
 (
   cd "${BUILD_ROOT}"
