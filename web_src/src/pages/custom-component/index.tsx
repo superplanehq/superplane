@@ -1,7 +1,6 @@
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Connection, Edge, Node, addEdge, applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useQueryClient } from "@tanstack/react-query";
 import ELK from "elkjs/lib/elk.bundled.js";
 import { AlertCircle, Puzzle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -9,7 +8,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ComponentsComponent, ComponentsNode, ComponentsAppInstallationRef } from "../../api-client";
 import { Heading } from "../../components/Heading/heading";
 import { Button } from "../../components/ui/button";
-import { useBlueprint, useComponents, useUpdateBlueprint, blueprintKeys } from "../../hooks/useBlueprintData";
+import { useBlueprint, useComponents, useUpdateBlueprint } from "../../hooks/useBlueprintData";
 import { useAvailableApplications, useInstalledApplications } from "../../hooks/useApplications";
 import { BlockData } from "../../ui/CanvasPage/Block";
 import type { BreadcrumbItem, NewNodeData } from "../../ui/CustomComponentBuilderPage";
@@ -125,7 +124,6 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
 export const CustomComponent = () => {
   const { organizationId, blueprintId } = useParams<{ organizationId: string; blueprintId: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const [blueprintConfiguration, setBlueprintConfiguration] = useState<any[]>([]);
   const [blueprintOutputChannels, setBlueprintOutputChannels] = useState<any[]>([]);

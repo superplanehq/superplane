@@ -33,8 +33,6 @@ import {
   OutputChannel,
 } from "../CustomComponentConfigurationSidebar";
 import { ComponentSidebar } from "../componentSidebar";
-import { getBackgroundColorClass } from "@/utils/colors";
-import { ComponentBaseProps } from "../componentBase";
 import { buildBuildingBlockCategories } from "../buildingBlocks";
 import { ConfigurationFieldModal } from "./ConfigurationFieldModal";
 import { OutputChannelConfigurationModal } from "./OutputChannelConfigurationModal";

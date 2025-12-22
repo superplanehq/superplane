@@ -1091,7 +1091,13 @@ function CanvasContent({
 
       // Allow switching to pending connection nodes or other template nodes even if there's a configured template
       // But block switching to other regular/real nodes
-      if (isCurrentTemplateConfigured && nodeId !== templateNodeId && !isPendingConnection && !isTemplateNode && !isPlaceholder) {
+      if (
+        isCurrentTemplateConfigured &&
+        nodeId !== templateNodeId &&
+        !isPendingConnection &&
+        !isTemplateNode &&
+        !isPlaceholder
+      ) {
         return;
       }
 

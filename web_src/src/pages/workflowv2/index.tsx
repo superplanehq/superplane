@@ -932,8 +932,9 @@ export function WorkflowPageV2() {
 
       if (outgoingEdges.length > 0) {
         // Get the valid output channels for the new component
-        const validChannels =
-          data.buildingBlock.outputChannels?.map((ch: any) => ch.name).filter(Boolean) || ["default"];
+        const validChannels = data.buildingBlock.outputChannels?.map((ch: any) => ch.name).filter(Boolean) || [
+          "default",
+        ];
 
         // Update each outgoing edge to use a valid channel
         updatedEdges = updatedEdges.map((edge) => {

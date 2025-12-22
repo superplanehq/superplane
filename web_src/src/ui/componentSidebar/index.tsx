@@ -476,18 +476,18 @@ export const ComponentSidebar = ({
             </div>
             <div className="absolute top-3 right-9 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none pt-0.5">
               <SidebarActionsDropdown
-                  onRun={onRun}
-                  runDisabled={runDisabled}
-                  runDisabledTooltip={runDisabledTooltip}
-                  onDuplicate={onDuplicate}
-                  onDocs={onDocs}
-                  onEdit={onEdit}
-                  onConfigure={onConfigure}
-                  onDeactivate={onDeactivate}
-                  onToggleView={onToggleView}
-                  onDelete={onDelete}
-                  isCompactView={isCompactView}
-                />
+                onRun={onRun}
+                runDisabled={runDisabled}
+                runDisabledTooltip={runDisabledTooltip}
+                onDuplicate={onDuplicate}
+                onDocs={onDocs}
+                onEdit={onEdit}
+                onConfigure={onConfigure}
+                onDeactivate={onDeactivate}
+                onToggleView={onToggleView}
+                onDelete={onDelete}
+                isCompactView={isCompactView}
+              />
             </div>
           </div>
           <div
