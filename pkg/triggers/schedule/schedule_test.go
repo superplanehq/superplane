@@ -553,4 +553,3 @@ func TestEmitEvent(t *testing.T) {
 		})
 	}
 }
-

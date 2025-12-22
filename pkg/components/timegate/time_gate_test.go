@@ -102,7 +102,6 @@ func TestTimeGate_Actions(t *testing.T) {
 	assert.True(t, hasPushThrough)
 }
 
-
 func TestTimeGate_HandleAction_PushThrough_Finishes(t *testing.T) {
 	tg := &TimeGate{}
 
