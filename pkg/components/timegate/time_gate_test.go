@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func TestTimeGate_Name(t *testing.T) {
@@ -101,43 +102,21 @@ func TestTimeGate_Actions(t *testing.T) {
 	assert.True(t, hasPushThrough)
 }
 
-// High-signal tests for action handling behavior
-type actionMockExecutionStateContext struct {
-	finished bool
-	passed   bool
-	failed   bool
-}
-
-func (m *actionMockExecutionStateContext) SetKV(key string, value string) error {
-	return nil
-}
-
-func (m *actionMockExecutionStateContext) IsFinished() bool { return m.finished }
-func (m *actionMockExecutionStateContext) Pass(outputs map[string][]any) error {
-	m.passed = true
-	m.finished = true
-	return nil
-}
-func (m *actionMockExecutionStateContext) Fail(reason, message string) error {
-	m.failed = true
-	m.finished = true
-	return nil
-}
 
 func TestTimeGate_HandleAction_PushThrough_Finishes(t *testing.T) {
 	tg := &TimeGate{}
 
-	mockState := &actionMockExecutionStateContext{}
+	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ActionContext{
 		Name:                  "pushThrough",
-		ExecutionStateContext: mockState,
+		ExecutionStateContext: stateCtx,
 		Parameters:            map[string]any{},
 	}
 
 	err := tg.HandleAction(ctx)
 	assert.NoError(t, err)
-	assert.True(t, mockState.passed)
-	assert.True(t, mockState.finished)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
 }
 
 func TestParseTimeString(t *testing.T) {
