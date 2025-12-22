@@ -22,9 +22,6 @@ func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *model
 	os.Setenv("GITHUB_CLIENT_SECRET", "test-client-secret")
 	os.Setenv("GOOGLE_CLIENT_ID", "test-google-client-id")
 	os.Setenv("GOOGLE_CLIENT_SECRET", "test-google-client-secret")
-	os.Setenv("OKTA_CLIENT_ID", "test-okta-client-id")
-	os.Setenv("OKTA_CLIENT_SECRET", "test-okta-client-secret")
-	os.Setenv("OKTA_ORG_URL", "https://example.okta.com")
 	os.Setenv("BASE_URL", "http://localhost:8000")
 
 	signer := jwt.NewSigner("test-client-secret")
@@ -52,7 +49,6 @@ func Test__Login(t *testing.T) {
 	assert.Contains(t, response.Body.String(), "Superplane")
 	assert.Contains(t, response.Body.String(), "Continue with GitHub")
 	assert.Contains(t, response.Body.String(), "Continue with Google")
-	assert.Contains(t, response.Body.String(), "Continue with Okta")
 }
 
 func Test__Logout(t *testing.T) {
@@ -132,9 +128,6 @@ func TestServer_ProviderConfiguration(t *testing.T) {
 	os.Unsetenv("GITHUB_CLIENT_SECRET")
 	os.Unsetenv("GOOGLE_CLIENT_ID")
 	os.Unsetenv("GOOGLE_CLIENT_SECRET")
-	os.Unsetenv("OKTA_CLIENT_ID")
-	os.Unsetenv("OKTA_CLIENT_SECRET")
-	os.Unsetenv("OKTA_ORG_URL")
 
 	providers := getOAuthProviders()
 	assert.Empty(t, providers)
@@ -160,23 +153,10 @@ func TestServer_ProviderConfiguration(t *testing.T) {
 	assert.Equal(t, "test-google-client-secret", providers[models.ProviderGoogle].Secret)
 	assert.Equal(t, "http://localhost:8000/auth/google/callback", providers[models.ProviderGoogle].CallbackURL)
 
-	// Test with Okta configured
-	os.Setenv("OKTA_CLIENT_ID", "test-okta-client-id")
-	os.Setenv("OKTA_CLIENT_SECRET", "test-okta-client-secret")
-	os.Setenv("OKTA_ORG_URL", "https://example.okta.com")
-
-	providers = getOAuthProviders()
-	assert.Contains(t, providers, models.ProviderOkta)
-	assert.Equal(t, "test-okta-client-id", providers[models.ProviderOkta].Key)
-	assert.Equal(t, "test-okta-client-secret", providers[models.ProviderOkta].Secret)
-	assert.Equal(t, "https://example.okta.com", providers[models.ProviderOkta].OrgURL)
-	assert.Equal(t, "http://localhost:8000/auth/okta/callback", providers[models.ProviderOkta].CallbackURL)
-
-	// Test with all providers configured
+	// Test with both providers configured
 	assert.Contains(t, providers, models.ProviderGitHub)
 	assert.Contains(t, providers, models.ProviderGoogle)
-	assert.Contains(t, providers, models.ProviderOkta)
-	assert.Len(t, providers, 3)
+	assert.Len(t, providers, 2)
 }
 
 func TestServer_AuthIntegration(t *testing.T) {

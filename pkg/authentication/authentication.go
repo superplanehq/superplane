@@ -17,7 +17,6 @@ import (
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/github"
 	"github.com/markbates/goth/providers/google"
-	"github.com/markbates/goth/providers/okta"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -43,7 +42,6 @@ type ProviderConfig struct {
 	Key         string
 	Secret      string
 	CallbackURL string
-	OrgURL      string
 }
 
 func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string, templateDir string, blockSignup bool) *Handler {
@@ -73,13 +71,6 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 		case models.ProviderGoogle:
 			gothProviders = append(gothProviders, google.New(config.Key, config.Secret, config.CallbackURL, "email", "profile"))
 			log.Infof("Google OAuth provider initialized")
-		case models.ProviderOkta:
-			if config.OrgURL == "" {
-				log.Warn("Okta OAuth not configured - missing OrgURL")
-				continue
-			}
-			gothProviders = append(gothProviders, okta.New(config.Key, config.Secret, config.OrgURL, config.CallbackURL, "openid", "profile", "email"))
-			log.Infof("Okta OAuth provider initialized")
 		default:
 			log.Warnf("Unknown provider: %s", providerName)
 		}
