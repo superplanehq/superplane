@@ -159,20 +159,6 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 			}
 		}
 	}
-
-	// Okta
-	if oktaKey := os.Getenv("OKTA_CLIENT_ID"); oktaKey != "" {
-		if oktaSecret := os.Getenv("OKTA_CLIENT_SECRET"); oktaSecret != "" {
-			if oktaOrgURL := os.Getenv("OKTA_ORG_URL"); oktaOrgURL != "" {
-				providers[models.ProviderOkta] = authentication.ProviderConfig{
-					Key:         oktaKey,
-					Secret:      oktaSecret,
-					CallbackURL: fmt.Sprintf("%s/auth/%s/callback", baseURL, models.ProviderOkta),
-					OrgURL:      oktaOrgURL,
-				}
-			}
-		}
-	}
 	return providers
 }
 
@@ -377,6 +363,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Register authentication routes (no auth required)
 	s.authHandler.RegisterRoutes(r)
+
+	// Okta SAML / SCIM routes (no auth, secured via shared secrets / SAML)
+	s.registerOktaRoutes(r)
 
 	//
 	// Public routes (no authentication required)

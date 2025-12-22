@@ -161,7 +161,7 @@ CREATE TABLE public.blueprints (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100) NOT NULL,
+    ptype character varying(100),
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -239,6 +239,22 @@ CREATE TABLE public.organization_invitations (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     canvas_ids jsonb DEFAULT '[]'::jsonb
+);
+
+
+--
+-- Name: organization_okta_configs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_okta_configs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    saml_issuer text NOT NULL,
+    saml_certificate text NOT NULL,
+    scim_token_hash text NOT NULL,
+    enforce_sso boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -612,6 +628,22 @@ ALTER TABLE ONLY public.organization_invitations
 
 
 --
+-- Name: organization_okta_configs organization_okta_configs_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_okta_configs
+    ADD CONSTRAINT organization_okta_configs_organization_id_key UNIQUE (organization_id);
+
+
+--
+-- Name: organization_okta_configs organization_okta_configs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_okta_configs
+    ADD CONSTRAINT organization_okta_configs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organizations organizations_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -838,6 +870,13 @@ CREATE INDEX idx_app_installations_organization_id ON public.app_installations U
 --
 
 CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (organization_id);
+
+
+--
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --
@@ -1163,6 +1202,14 @@ ALTER TABLE ONLY public.organization_invitations
 
 
 --
+-- Name: organization_okta_configs organization_okta_configs_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_okta_configs
+    ADD CONSTRAINT organization_okta_configs_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: users users_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1354,7 +1401,11 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
+<<<<<<< HEAD
 20260201090000	f
+=======
+20251222191505	f
+>>>>>>> ce7a6eab5 (Saml support)
 \.
 
 
