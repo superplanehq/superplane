@@ -1589,10 +1589,14 @@ function CanvasContent({
       state.edges?.map((e) => ({
         ...e,
         ...EDGE_STYLE,
-        data: { ...e.data, isHovered: e.id === hoveredEdgeId },
+        data: {
+          ...e.data,
+          isHovered: e.id === hoveredEdgeId,
+          onDelete: (edgeId: string) => state.onEdgesChange([{ id: edgeId, type: "remove" }]),
+        },
         zIndex: e.id === hoveredEdgeId ? 1000 : 0,
       })),
-    [state.edges, hoveredEdgeId],
+    [state.edges, hoveredEdgeId, state.onEdgesChange],
   );
 
   return (

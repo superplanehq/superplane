@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { CSSProperties, useCallback } from "react";
 import { BaseEdge, EdgeLabelRenderer, EdgeProps, getBezierPath, useReactFlow } from "@xyflow/react";
 import { CircleX } from "lucide-react";
 
@@ -16,6 +16,7 @@ export function CustomEdge({
 }: EdgeProps) {
   const { setEdges } = useReactFlow();
   const isHovered = data?.isHovered || false;
+  const onDeleteEdge = data?.onDelete as ((edgeId: string) => void) | undefined;
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -26,58 +27,56 @@ export function CustomEdge({
     targetPosition,
   });
 
-  const onEdgeClick = useCallback(() => {
-    setEdges((edges) =>
-      edges.map((edge) => ({
-        ...edge,
-        selected: edge.id === id,
-      })),
-    );
-  }, [id, setEdges]);
+  const handleEdgeDelete = useCallback(() => {
+    if (onDeleteEdge) {
+      onDeleteEdge(id);
+      return;
+    }
 
-  const onDeleteClick = useCallback(
-    (event: React.MouseEvent) => {
-      event.stopPropagation();
-      setEdges((edges) => edges.filter((edge) => edge.id !== id));
-    },
-    [id, setEdges],
-  );
+    setEdges((edges) => edges.filter((edge) => edge.id !== id));
+  }, [id, onDeleteEdge, setEdges]);
 
   // Update style based on selection and hover state
-  const edgeStyle = {
+  const edgeStyle: CSSProperties = {
     ...style,
-    stroke: selected || isHovered ? "#73D4FF" : style.stroke || "#DEF3FE",
+    stroke: selected || isHovered ? "#A1AEC0" : style.stroke || "#DEF3FE",
     strokeWidth: selected ? 3 : style.strokeWidth || 3,
+    pointerEvents: "visibleStroke",
   };
-  const isActive = selected || isHovered;
+  const shouldShowIcon = isHovered || selected;
 
   return (
     <>
-      <BaseEdge
-        path={edgePath}
-        style={edgeStyle}
-        onClick={onEdgeClick}
-        interactionWidth={20}
-        className={isHovered ? "hovered" : undefined}
+      <BaseEdge path={edgePath} style={edgeStyle} interactionWidth={20} className={isHovered ? "hovered" : undefined} />
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={20}
+        style={{ cursor: "pointer", pointerEvents: "stroke" }}
+        onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          event.stopPropagation();
+          handleEdgeDelete();
+        }}
       />
       <EdgeLabelRenderer>
         <div
           style={{
             position: "absolute",
-            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px) scale(var(--edge-label-scale, 1))`,
-            width: "40px",
-            height: "40px",
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            width: "32px",
+            height: "32px",
             zIndex: 1001,
+            pointerEvents: "none",
+            opacity: shouldShowIcon ? 1 : 0,
+            transition: "opacity 150ms ease",
           }}
-          className={`edge-label nodrag nopan group flex items-center justify-center${isActive ? " edge-label-visible" : ""}`}
+          className="edge-label nodrag nopan flex items-center justify-center"
         >
-          <button
-            className="edge-label-button flex items-center justify-center bg-red-100 rounded-full shadow-lg transition-all cursor-pointer"
-            onClick={onDeleteClick}
-            aria-label="Delete edge"
-          >
-            <CircleX size={20} className="text-red-500" />
-          </button>
+          <div className="rounded-full bg-slate-100 p-1">
+            <CircleX size={18} className="text-slate-500" />
+          </div>
         </div>
       </EdgeLabelRenderer>
     </>

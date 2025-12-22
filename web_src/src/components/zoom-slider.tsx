@@ -57,7 +57,7 @@ export function ZoomSlider({
     <TooltipProvider delayDuration={300}>
       <Panel
         className={cn(
-          "bg-primary-foreground text-foreground flex gap-0.5 rounded-md p-0.5",
+          "bg-white text-gray-800 outline-1 outline-slate-950/20 flex gap-0.5 rounded-md p-0.5",
           orientation === "horizontal" ? "flex-row" : "flex-col",
           className,
         )}

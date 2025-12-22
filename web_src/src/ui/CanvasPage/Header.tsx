@@ -1,10 +1,21 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 // import { Avatar } from "@/components/Avatar/avatar";
-import { Icon } from "@/components/Icon";
 import { useAccount } from "@/contexts/AccountContext";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { resolveIcon } from "@/lib/utils";
-import { ChevronDown, Undo2 } from "lucide-react";
+import {
+  ChevronDown,
+  Palette,
+  LogOut,
+  Plug,
+  ArrowRightLeft,
+  Building,
+  Shield,
+  Undo2,
+  CircleUser,
+  User as UserIcon,
+  Users,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../button";
 
@@ -58,14 +69,29 @@ export function Header({
   useEffect(() => {
     if (!isMenuOpen) return;
 
-    const handleClickOutside = (event: MouseEvent) => {
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const listenerOptions: AddEventListenerOptions = { capture: true };
+
+    document.addEventListener("mousedown", handlePointerDown, listenerOptions);
+    document.addEventListener("touchstart", handlePointerDown, listenerOptions);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown, listenerOptions);
+      document.removeEventListener("touchstart", handlePointerDown, listenerOptions);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isMenuOpen]);
 
   // const accountInitials = account?.name
@@ -82,30 +108,35 @@ export function Header({
     {
       label: "Profile",
       href: organizationId ? `/${organizationId}/settings/profile` : "#",
-      icon: "person",
+      Icon: CircleUser,
     },
     {
       label: "Sign Out",
-      icon: "logout",
+      Icon: LogOut,
       onClick: () => handleSignOut(),
     },
   ];
 
   const sidebarOrganizationLinks = [
     {
+      label: "Canvases",
+      href: organizationId ? `/${organizationId}` : "/",
+      Icon: Palette,
+    },
+    {
       label: "Settings",
       href: organizationId ? `/${organizationId}/settings/general` : "#",
-      icon: "business",
+      Icon: Building,
     },
-    { label: "Members", href: organizationId ? `/${organizationId}/settings/members` : "#", icon: "person" },
-    { label: "Groups", href: organizationId ? `/${organizationId}/settings/groups` : "#", icon: "group" },
-    { label: "Roles", href: organizationId ? `/${organizationId}/settings/roles` : "#", icon: "shield" },
+    { label: "Members", href: organizationId ? `/${organizationId}/settings/members` : "#", Icon: UserIcon },
+    { label: "Groups", href: organizationId ? `/${organizationId}/settings/groups` : "#", Icon: Users },
+    { label: "Roles", href: organizationId ? `/${organizationId}/settings/roles` : "#", Icon: Shield },
     {
       label: "Integrations",
       href: organizationId ? `/${organizationId}/settings/integrations` : "#",
-      icon: "integration_instructions",
+      Icon: Plug,
     },
-    { label: "Change Organization", href: "/", icon: "swap_horiz" },
+    { label: "Change Organization", href: "/", Icon: ArrowRightLeft },
   ];
 
   const handleSignOut = () => {
@@ -145,21 +176,20 @@ export function Header({
                     </div>
                   </div>
                   <div className="mt-2 flex flex-col">
-                    {sidebarOrganizationLinks.map((link) => (
-                      <a
-                        key={link.label}
-                        href={link.href}
-                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        <Icon
-                          name={link.icon}
-                          size="sm"
-                          className="text-gray-500 transition group-hover:text-gray-800"
-                        />
-                        <span>{link.label}</span>
-                      </a>
-                    ))}
+                    {sidebarOrganizationLinks.map((link) => {
+                      const MenuIcon = link.Icon;
+                      return (
+                        <a
+                          key={link.label}
+                          href={link.href}
+                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                          <span>{link.label}</span>
+                        </a>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="px-4 pt-3 pb-4">
@@ -173,19 +203,16 @@ export function Header({
                     </div>
                   </div>
                   <div className="mt-2 flex flex-col">
-                    {sidebarUserLinks.map((link) =>
-                      link.href ? (
+                    {sidebarUserLinks.map((link) => {
+                      const MenuIcon = link.Icon;
+                      return link.href ? (
                         <a
                           key={link.label}
                           href={link.href}
                           className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
                           onClick={() => setIsMenuOpen(false)}
                         >
-                          <Icon
-                            name={link.icon}
-                            size="sm"
-                            className="text-gray-500 transition group-hover:text-gray-800"
-                          />
+                          <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
                           <span>{link.label}</span>
                         </a>
                       ) : (
@@ -195,15 +222,11 @@ export function Header({
                           onClick={link.onClick}
                           className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-blue-100 hover:text-gray-800"
                         >
-                          <Icon
-                            name={link.icon}
-                            size="sm"
-                            className="text-gray-500 transition group-hover:text-gray-800"
-                          />
+                          <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
                           <span>{link.label}</span>
                         </button>
-                      ),
-                    )}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
