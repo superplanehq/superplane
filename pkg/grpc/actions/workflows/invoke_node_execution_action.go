@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -81,6 +82,7 @@ func InvokeNodeExecutionAction(
 		Name:                  actionName,
 		Parameters:            parameters,
 		Configuration:         node.Configuration.Data(),
+		Logger:                logging.ForExecution(execution, nil),
 		MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
 		AuthContext:           contexts.NewAuthContext(tx, orgID, authService, user),

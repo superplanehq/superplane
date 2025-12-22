@@ -440,6 +440,8 @@ func (s *Schedule) emitEvent(ctx core.TriggerActionContext) error {
 	}
 
 	formatted := nextTrigger.Format(time.RFC3339)
+	ctx.Logger.Infof("Next trigger at: %v", formatted)
+
 	return ctx.MetadataContext.Set(Metadata{
 		NextTrigger:   &formatted,
 		ReferenceTime: existingMetadata.ReferenceTime,

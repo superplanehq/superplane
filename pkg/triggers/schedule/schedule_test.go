@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -487,14 +488,14 @@ func TestEmitEvent(t *testing.T) {
 			schedule := &Schedule{}
 
 			eventCtx := &contexts.EventContext{}
-			requestCtx := &contexts.RequestContext{}
 
 			ctx := core.TriggerActionContext{
 				Name:            "emitEvent",
 				Configuration:   tt.config,
+				Logger:          log.NewEntry(log.StandardLogger()),
 				EventContext:    eventCtx,
 				MetadataContext: &contexts.MetadataContext{},
-				RequestContext:  requestCtx,
+				RequestContext:  &contexts.RequestContext{},
 			}
 
 			err := schedule.emitEvent(ctx)

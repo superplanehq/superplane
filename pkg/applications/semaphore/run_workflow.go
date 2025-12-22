@@ -242,6 +242,8 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionStateContext.Fail("failed to run workflow", err.Error())
 	}
 
+	ctx.Logger.Infof("New workflow created - workflow=%s, pipeline=%s", response.WorkflowID, response.PipelineID)
+
 	ctx.MetadataContext.Set(RunWorkflowExecutionMetadata{
 		Workflow: &WorkflowMetadata{
 			ID:  response.WorkflowID,

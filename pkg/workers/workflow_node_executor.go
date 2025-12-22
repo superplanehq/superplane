@@ -192,8 +192,8 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 }
 
 func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.WorkflowNodeExecution, node *models.WorkflowNode) error {
-	logger := logging.ForExecution(
-		logging.ForNode(w.logger, *node),
+	logger := logging.WithExecution(
+		logging.WithNode(w.logger, *node),
 		execution,
 		nil,
 	)
@@ -248,9 +248,11 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 
+		logger = logging.WithAppInstallation(logger, *appInstallation)
 		ctx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
 	}
 
+	ctx.Logger = logger
 	if err := component.Execute(ctx); err != nil {
 		logger.Errorf("failed to execute component: %v", err)
 		err = execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, err.Error())

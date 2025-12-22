@@ -685,7 +685,7 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 		return s.executeTriggerNode(ctx, body, headers, node)
 	}
 
-	return s.executeComponenteNode(ctx, body, headers, node)
+	return s.executeComponentNode(ctx, body, headers, node)
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
@@ -707,7 +707,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	})
 }
 
-func (s *Server) executeComponenteNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
+func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
 	ref := node.Ref.Data()
 	component, err := s.registry.GetComponent(ref.Component.Name)
 	if err != nil {
@@ -737,6 +737,7 @@ func (s *Server) executeComponenteNode(ctx context.Context, body []byte, headers
 				NodeMetadataContext:   contexts.NewNodeMetadataContext(tx, &node),
 				ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
 				RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
+				Logger:                logging.ForExecution(execution, nil),
 			}, nil
 		},
 	})
