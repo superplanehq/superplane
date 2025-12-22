@@ -8,10 +8,10 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/models"
 	saml2 "github.com/russellhaering/gosaml2"
 	dsig "github.com/russellhaering/goxmldsig"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 func (s *Server) registerOktaRoutes(r *mux.Router) {
