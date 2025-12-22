@@ -522,6 +522,7 @@ export const CustomComponent = () => {
         nodeId: node.id,
         nodeName: (node.data as any).label as string,
         displayLabel: component.label || ((node.data as any).label as string),
+        icon: component.icon,
         configuration: (node.data as any)._originalConfiguration || {},
         configurationFields: component.configuration || [],
         appName,
@@ -810,7 +811,17 @@ export const CustomComponent = () => {
       setNewNodeData(null);
 
       // Save to server immediately with the updated nodes and edges
-      await handleSaveBlueprint(updatedNodes, updatedEdges);
+      console.log("[handleNodeAdd] Auto-saving after adding node", {
+        newNodeId,
+        updatedNodesCount: updatedNodes.length,
+      });
+      try {
+        await handleSaveBlueprint(updatedNodes, updatedEdges);
+        console.log("[handleNodeAdd] Auto-save completed successfully");
+      } catch (error) {
+        console.error("Failed to auto-save after adding node:", error);
+        showErrorToast("Failed to save component");
+      }
 
       // Clean up the converted template ID after save completes
       if (savedTemplateId) {
@@ -977,15 +988,12 @@ export const CustomComponent = () => {
   );
 
   // Handle clicking on a pending connection node or placeholder
-  const handlePendingConnectionNodeClick = useCallback(
-    (nodeId: string) => {
-      setTemplateNodeId(nodeId);
-      setIsBuildingBlocksSidebarOpen(true);
-      // Clear any existing template configuration (close ComponentSidebar)
-      setNewNodeData(null);
-    },
-    [],
-  );
+  const handlePendingConnectionNodeClick = useCallback((nodeId: string) => {
+    setTemplateNodeId(nodeId);
+    setIsBuildingBlocksSidebarOpen(true);
+    // Clear any existing template configuration (close ComponentSidebar)
+    setNewNodeData(null);
+  }, []);
 
   // Handle clicking on a template node (already configured, re-opening for editing)
   const handleTemplateNodeClick = useCallback(
@@ -1064,8 +1072,9 @@ export const CustomComponent = () => {
       let updatedEdges = [...(blueprint.edges || [])];
 
       if (outgoingEdges.length > 0) {
-        const validChannels =
-          data.buildingBlock.outputChannels?.map((ch: any) => ch.name).filter(Boolean) || ["default"];
+        const validChannels = data.buildingBlock.outputChannels?.map((ch: any) => ch.name).filter(Boolean) || [
+          "default",
+        ];
 
         updatedEdges = updatedEdges.map((edge: any) => {
           if (edge.sourceId === data.placeholderId) {

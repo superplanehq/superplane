@@ -97,6 +97,7 @@ interface ComponentSidebarProps {
 
   // Settings tab props
   showSettingsTab?: boolean;
+  hideRunsTab?: boolean; // Hide the "Runs" tab when showing only settings
   currentTab?: "latest" | "settings";
   onTabChange?: (tab: "latest" | "settings") => void;
   nodeConfigMode?: "create" | "edit";
@@ -169,6 +170,7 @@ export const ComponentSidebar = ({
   loadExecutionChain,
   getExecutionState,
   showSettingsTab = false,
+  hideRunsTab = false,
   currentTab = "latest",
   onTabChange,
   nodeConfigMode = "edit",
@@ -510,16 +512,18 @@ export const ComponentSidebar = ({
             {showSettingsTab && (
               <div className="border-border border-b-1">
                 <div className="flex px-4">
-                  <button
-                    onClick={() => onTabChange?.("latest")}
-                    className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
-                      activeTab === "latest"
-                        ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                    }`}
-                  >
-                    Runs
-                  </button>
+                  {!hideRunsTab && (
+                    <button
+                      onClick={() => onTabChange?.("latest")}
+                      className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
+                        activeTab === "latest"
+                          ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                      }`}
+                    >
+                      Runs
+                    </button>
+                  )}
                   <button
                     onClick={() => onTabChange?.("settings")}
                     className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors flex items-center gap-1.5 ${

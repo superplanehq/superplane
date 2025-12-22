@@ -43,6 +43,7 @@ export interface NodeEditData {
   nodeId: string;
   nodeName: string;
   displayLabel?: string;
+  icon?: string;
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
   appName?: string;
@@ -510,75 +511,23 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         return;
       }
 
-      // Generate unique template node ID
-      const newTemplateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Parse default configuration values from the building block
+      const defaultConfiguration: Record<string, any> = {};
+      (block.configuration || []).forEach((config: any) => {
+        if (config.default !== undefined && config.default !== null) {
+          defaultConfiguration[config.key] = config.default;
+        }
+      });
 
-      // Deselect all existing nodes first
-      props.onNodesChange(
-        props.nodes.map((node) => ({
-          type: "select",
-          id: node.id,
-          selected: false,
-        })),
-      );
-
-      // Create template node data
-      const templateNode: Node = {
-        id: newTemplateId,
-        type: "default",
-        position: position || { x: props.nodes.length * 250, y: 100 },
-        selected: true,
-        data: {
-          type: "component",
-          label: block.label || block.name || "New Component",
-          state: "pending" as const,
-          outputChannels: ["default"],
-          component: {
-            title: block.label || block.name || "New Component",
-            headerColor: "#e5e7eb",
-            iconSlug: block.icon,
-            iconColor: "text-gray-800",
-            collapsedBackground: getBackgroundColorClass("white"),
-            hideActionsButton: true,
-            includeEmptyState: true,
-            emptyStateTitle: block.type === "trigger" ? "Waiting for the first event" : undefined,
-          } as ComponentBaseProps,
-          isTemplate: true,
-          buildingBlock: block,
-          tempConfiguration: {},
-          tempNodeName: block.name || "",
-          _originalComponent: block.name,
-          _originalConfiguration: {},
-        } as any,
-      };
-
-      // Add the template node using the helper callback
-      if (props.onAddTemplateNode) {
-        props.onAddTemplateNode(templateNode);
-      }
-
-      // In delegated mode, we need to notify parent to set template state
-      // In non-delegated mode, set local state
-      if (props.templateNodeId !== undefined) {
-        // Delegated mode - parent manages state via onAddTemplateNode callback
-        // The parent's onAddTemplateNode will set both templateNodeId and newNodeData
-        // Then the useEffect will open the ComponentSidebar automatically
-      } else {
-        // Non-delegated mode - manage state locally
-        setTemplateNodeId(newTemplateId);
-        setNewNodeData({
-          icon: block.icon || "circle-off",
+      // Immediately add the node with default configuration (skip template/sidebar step)
+      if (props.onNodeAdd) {
+        props.onNodeAdd({
           buildingBlock: block,
           nodeName: block.name || "",
-          displayLabel: block.label || block.name || "",
-          configuration: {},
+          configuration: defaultConfiguration,
           position,
           appName: block.appName,
         });
-
-        // Open sidebar in non-delegated mode
-        setIsNodeSidebarOpen(true);
-        setSelectedNodeId(newTemplateId);
       }
 
       // Close building blocks sidebar after dropping a block
@@ -690,11 +639,9 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         // Notify parent to restore template state
         props.onTemplateNodeClick(nodeId);
       } else {
-        // Regular node click - only in non-delegated mode
-        if (props.templateNodeId === undefined) {
-          setIsNodeSidebarOpen(true);
-          setSelectedNodeId(nodeId);
-        }
+        // Regular node click - always open sidebar for regular nodes
+        setIsNodeSidebarOpen(true);
+        setSelectedNodeId(nodeId);
       }
 
       // Update selection
@@ -917,7 +864,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             isOpen={isNodeSidebarOpen}
             onClose={handleNodeSidebarClose}
             nodeId={selectedNodeId}
-            iconSlug={newNodeData?.icon || "gear"}
+            iconSlug={editingNodeData?.icon || newNodeData?.icon || "gear"}
             iconColor="text-black"
             latestEvents={[]}
             nextInQueueEvents={[]}
@@ -926,6 +873,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             totalInHistoryCount={0}
             hideQueueEvents={true}
             showSettingsTab={true}
+            hideRunsTab={true}
             currentTab="settings"
             onTabChange={() => {}} // No tab switching in custom component builder
             nodeConfigMode="edit"
