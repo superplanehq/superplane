@@ -114,6 +114,7 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
     outputChannels: channels,
     component: {
       ...componentBaseProps,
+      includeEmptyState: false, // Never show empty state in component editor
       error: node.errorMessage,
     },
   };
