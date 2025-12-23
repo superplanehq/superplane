@@ -30,7 +30,7 @@ type RunWorkflowNodeMetadata struct {
 type RunWorkflowExecutionMetadata struct {
 	Workflow *WorkflowMetadata `json:"workflow" mapstructure:"workflow"`
 	Pipeline *PipelineMetadata `json:"pipeline" mapstructure:"pipeline"`
-	Data     map[string]any    `json:"data,omitempty" mapstructure:"data,omitempty"`
+	Extra    map[string]any    `json:"extra,omitempty" mapstructure:"extra,omitempty"`
 }
 
 type WorkflowMetadata struct {
@@ -460,7 +460,7 @@ func (r *RunWorkflow) finish(ctx core.ActionContext) error {
 		return fmt.Errorf("data is invalid")
 	}
 
-	metadata.Data = dataMap
+	metadata.Extra = dataMap
 	err = ctx.MetadataContext.Set(metadata)
 	if err != nil {
 		return err
