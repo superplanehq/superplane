@@ -200,11 +200,10 @@ func TestHTTP__Execute__GET(t *testing.T) {
 	//
 	// Verify output
 	//
-	assert.Contains(t, stateCtx.Outputs, core.DefaultOutputChannel.Name)
-	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
-	assert.Len(t, outputs, 1)
+	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
+	assert.Equal(t, stateCtx.Type, "http.request.finished")
 
-	response := outputs[0].(map[string]any)
+	response := stateCtx.Payloads[0].(map[string]any)
 	assert.Equal(t, 200, response["status"])
 	assert.NotNil(t, response["headers"])
 	assert.NotNil(t, response["body"])
@@ -262,8 +261,10 @@ func TestHTTP__Execute__POST_JSON(t *testing.T) {
 	//
 	// Verify response
 	//
-	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
-	response := outputs[0].(map[string]any)
+	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
+	assert.Equal(t, stateCtx.Type, "http.request.finished")
+
+	response := stateCtx.Payloads[0].(map[string]any)
 	assert.Equal(t, 201, response["status"])
 }
 
@@ -312,8 +313,9 @@ func TestHTTP__Execute__POST_XML(t *testing.T) {
 	// Verify response.
 	// Body should be a string since it's XML.
 	//
-	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
-	response := outputs[0].(map[string]any)
+	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
+	assert.Equal(t, stateCtx.Type, "http.request.finished")
+	response := stateCtx.Payloads[0].(map[string]any)
 	assert.Equal(t, 200, response["status"])
 	body := response["body"].(string)
 	assert.Contains(t, body, "OK")
@@ -512,8 +514,9 @@ func TestHTTP__Execute__NonJSONResponse(t *testing.T) {
 	//
 	// Verify body is stored as string
 	//
-	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
-	response := outputs[0].(map[string]any)
+	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
+	assert.Equal(t, stateCtx.Type, "http.request.finished")
+	response := stateCtx.Payloads[0].(map[string]any)
 	body := response["body"].(string)
 	assert.Equal(t, "Plain text response", body)
 }
@@ -548,8 +551,9 @@ func TestHTTP__Execute__EmptyResponse(t *testing.T) {
 	//
 	// Verify response structure
 	//
-	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
-	response := outputs[0].(map[string]any)
+	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
+	assert.Equal(t, stateCtx.Type, "http.request.finished")
+	response := stateCtx.Payloads[0].(map[string]any)
 	assert.Equal(t, 204, response["status"])
 	assert.Nil(t, response["body"])
 }
@@ -586,8 +590,9 @@ func TestHTTP__Execute__HTTPError(t *testing.T) {
 	//
 	// Verify status code is captured
 	//
-	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
-	response := outputs[0].(map[string]any)
+	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
+	assert.Equal(t, stateCtx.Type, "http.request.finished")
+	response := stateCtx.Payloads[0].(map[string]any)
 	assert.Equal(t, 404, response["status"])
 }
 
