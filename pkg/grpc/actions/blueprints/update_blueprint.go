@@ -25,7 +25,7 @@ func UpdateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		return nil, status.Errorf(codes.NotFound, "blueprint not found: %v", err)
 	}
 
-	nodes, edges, err := ParseBlueprint(registry, blueprint)
+	nodes, edges, err := ParseBlueprint(registry, organizationID, blueprint)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid blueprint: %v", err)
 	}

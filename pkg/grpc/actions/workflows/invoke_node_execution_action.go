@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -23,6 +24,7 @@ import (
 func InvokeNodeExecutionAction(
 	ctx context.Context,
 	authService authorization.Authorization,
+	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	orgID uuid.UUID,
 	workflowID uuid.UUID,
@@ -78,11 +80,11 @@ func InvokeNodeExecutionAction(
 	}
 
 	tx := database.Conn()
+	logger := logging.ForExecution(execution, nil)
 	actionCtx := core.ActionContext{
 		Name:                  actionName,
 		Parameters:            parameters,
 		Configuration:         node.Configuration.Data(),
-		Logger:                logging.ForExecution(execution, nil),
 		MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
 		AuthContext:           contexts.NewAuthContext(tx, orgID, authService, user),
@@ -90,6 +92,18 @@ func InvokeNodeExecutionAction(
 		IntegrationContext:    contexts.NewIntegrationContext(tx, registry),
 	}
 
+	if node.AppInstallationID != nil {
+		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			logger.Errorf("error finding app installation: %v", err)
+			return nil, status.Error(codes.Internal, "error building context")
+		}
+
+		logger = logging.WithAppInstallation(logger, *appInstallation)
+		actionCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
+	}
+
+	actionCtx.Logger = logger
 	err = component.HandleAction(actionCtx)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "action execution failed: %v", err)

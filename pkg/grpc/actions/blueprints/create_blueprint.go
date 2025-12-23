@@ -24,7 +24,7 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	nodes, edges, err := ParseBlueprint(registry, blueprint)
+	nodes, edges, err := ParseBlueprint(registry, organizationID, blueprint)
 	if err != nil {
 		return nil, err
 	}
