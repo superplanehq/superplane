@@ -149,11 +149,6 @@ type IntegrationContext interface {
 	GetIntegration(ID string) (integrations.ResourceManager, error)
 }
 
-type Webhook struct {
-	ID            uuid.UUID
-	Configuration any
-}
-
 /*
  * MetadataContext allows components to store/retrieve
  * component-specific information about each execution.

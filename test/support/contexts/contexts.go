@@ -51,7 +51,6 @@ type AppInstallationContext struct {
 	State            string
 	StateDescription string
 	BrowserAction    *core.BrowserAction
-	Webhooks         []core.Webhook
 	Secrets          map[string]core.InstallationSecret
 	WebhookRequests  []any
 }
@@ -102,22 +101,9 @@ func (c *AppInstallationContext) GetSecrets() ([]core.InstallationSecret, error)
 	return secrets, nil
 }
 
-func (c *AppInstallationContext) ListWebhooks() ([]core.Webhook, error) {
-	return []core.Webhook{}, nil
-}
-
-func (c *AppInstallationContext) CreateWebhook(configuration any) error {
-	c.Webhooks = append(c.Webhooks, core.Webhook{ID: uuid.New(), Configuration: configuration})
-	return nil
-}
-
 func (c *AppInstallationContext) RequestWebhook(configuration any) error {
 	c.WebhookRequests = append(c.WebhookRequests, configuration)
 	return nil
-}
-
-func (c *AppInstallationContext) AssociateWebhook(webhookID uuid.UUID) {
-	// TODO: I don't like this method
 }
 
 type ExecutionStateContext struct {

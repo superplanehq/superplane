@@ -101,32 +101,18 @@ type WebhookConfiguration struct {
 	Project string `json:"project"`
 }
 
-func (s *Semaphore) RequestWebhook(ctx core.AppInstallationContext, configuration any) error {
-	config := WebhookConfiguration{}
-	err := mapstructure.Decode(configuration, &config)
-	if err != nil {
-		return fmt.Errorf("Failed to decode configuration: %v", err)
+func (s *Semaphore) CompareWebhookConfig(a, b any) (bool, error) {
+	configA := WebhookConfiguration{}
+	if err := mapstructure.Decode(a, &configA); err != nil {
+		return false, err
 	}
 
-	hooks, err := ctx.ListWebhooks()
-	if err != nil {
-		return fmt.Errorf("Failed to list webhooks: %v", err)
+	configB := WebhookConfiguration{}
+	if err := mapstructure.Decode(b, &configB); err != nil {
+		return false, err
 	}
 
-	for _, hook := range hooks {
-		c := WebhookConfiguration{}
-		err := mapstructure.Decode(hook.Configuration, &c)
-		if err != nil {
-			return err
-		}
-
-		if c.Project == config.Project {
-			ctx.AssociateWebhook(hook.ID)
-			return nil
-		}
-	}
-
-	return ctx.CreateWebhook(configuration)
+	return configA.Project == configB.Project, nil
 }
 
 type WebhookMetadata struct {
