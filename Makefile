@@ -1,4 +1,4 @@
-.PHONY: lint test
+.PHONY: lint test test.license.check
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -55,6 +55,9 @@ test.e2e.single:
 
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
+
+test.license.check:
+	bash ./scripts/license-check.sh
 
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1

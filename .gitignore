@@ -10,3 +10,4 @@ tmp/screenshots
 e2e.test
 wget-log*
 .env.docker
+vendor/bundle
