@@ -37,9 +37,10 @@ blocks:
             - make test
 
         - name: "E2E Tests"
+          parallelism: 10
           commands:
             - make setup.playwright
-            - make test.e2e
+            - make test.e2e.autoparallel INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
 
         - name: "Check: DB structure"
           commands:
