@@ -132,7 +132,8 @@ export function PayloadTooltip({ children, title, value, contentType = "json" }:
     <Tippy
       render={() => (
         <div
-          className={`bg-white border-2 border-gray-200 rounded-md ${maxWidth} max-h-[400px] overflow-auto text-left`}
+          className={`bg-white border-2 border-gray-200 rounded-md ${maxWidth} max-h-[400px] overflow-auto text-left shadow-lg`}
+          style={{ zIndex: 9999 }}
         >
           <div className="flex items-center border-b p-2">
             <span className="font-medium text-gray-500 text-sm">{title}</span>
@@ -143,6 +144,7 @@ export function PayloadTooltip({ children, title, value, contentType = "json" }:
       placement="top"
       interactive={true}
       delay={200}
+      zIndex={9999}
     >
       {children as ReactElement}
     </Tippy>

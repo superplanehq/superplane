@@ -15,7 +15,7 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle, hi
   return (
     <Tippy
       render={() => (
-        <div className="bg-white outline-1 outline-slate-300 shadow-md rounded-md max-w-[700px]">
+        <div className="bg-white outline-1 outline-slate-300 shadow-md rounded-md max-w-[700px]" style={{ zIndex: 9999 }}>
           <div className="flex items-center border-b border-slate-300">
             <span className="font-medium text-gray-500 text-[13px] px-3 py-1.5">
               {!hideCount ? specValues.length : ""} {tooltipTitle || specTitle}
@@ -41,6 +41,7 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle, hi
       placement="top"
       interactive={true}
       delay={200}
+      zIndex={9999}
     >
       {children as ReactElement}
     </Tippy>
