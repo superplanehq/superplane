@@ -9,6 +9,7 @@ import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 export const StringFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const [validationError, setValidationError] = React.useState<string | null>(null);
 
   // Detect if this field should use Monaco Editor based on field name
   const isMultilineField = field.name === "payloadText" || field.name === "payloadXML";
@@ -21,12 +22,42 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const validateXML = (xmlString: string): boolean => {
+    if (!xmlString.trim()) {
+      setValidationError(null);
+      return true;
+    }
+
+    try {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+      const parseError = xmlDoc.querySelector("parsererror");
+
+      if (parseError) {
+        setValidationError("Invalid XML format");
+        return false;
+      }
+
+      setValidationError(null);
+      return true;
+    } catch (error) {
+      setValidationError("Invalid XML format");
+      return false;
+    }
+  };
+
   // Use Monaco Editor for multiline payload fields
   if (isMultilineField) {
     const editorValue = (value as string) || "";
 
     const handleEditorChange = (newValue: string | undefined) => {
       const valueToUse = newValue || "";
+
+      // Validate XML if this is an XML field
+      if (field.name === "payloadXML") {
+        validateXML(valueToUse);
+      }
+
       onChange(valueToUse || undefined);
     };
 
@@ -56,7 +87,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
       <>
         <div className="flex flex-col gap-2 relative">
           <div
-            className={`border rounded-md overflow-hidden ${hasError ? "border-red-500 border-2" : "border-gray-300 dark:border-gray-700"}`}
+            className={`border rounded-md overflow-hidden ${hasError || validationError ? "border-red-500 border-2" : "border-gray-300 dark:border-gray-700"}`}
             style={{ height: "200px" }}
           >
             <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
@@ -86,6 +117,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
               options={editorOptions}
             />
           </div>
+          {validationError && <p className="text-red-600 dark:text-red-400 text-xs">{validationError}</p>}
         </div>
 
         {/* Expanded Editor Modal */}

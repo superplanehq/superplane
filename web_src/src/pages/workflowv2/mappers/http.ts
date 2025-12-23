@@ -61,27 +61,32 @@ function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
     let payload: any = null;
     let payloadIcon = "file-json";
     let payloadTitle = "payload";
+    let tooltipContentType: "json" | "xml" | "text" = "json";
 
     switch (contentType) {
       case "application/json":
         payload = node.configuration?.payload;
         payloadIcon = "file-json";
         payloadTitle = "json payload";
+        tooltipContentType = "json";
         break;
       case "application/x-www-form-urlencoded":
         payload = node.configuration?.payloadFormData;
         payloadIcon = "list";
         payloadTitle = "form data";
+        tooltipContentType = "json"; // Form data is shown as badges, not tooltip
         break;
       case "text/plain":
         payload = node.configuration?.payloadText;
         payloadIcon = "file-text";
         payloadTitle = "text payload";
+        tooltipContentType = "text";
         break;
       case "application/xml":
         payload = node.configuration?.payloadXML;
         payloadIcon = "file-code";
         payloadTitle = "xml payload";
+        tooltipContentType = "xml";
         break;
     }
 
@@ -120,6 +125,7 @@ function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
             tooltipTitle: `request ${payloadTitle}`,
             iconSlug: payloadIcon,
             value: payload,
+            contentType: tooltipContentType,
           });
         }
       }
