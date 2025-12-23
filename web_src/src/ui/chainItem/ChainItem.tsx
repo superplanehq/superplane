@@ -350,10 +350,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             }
           }}
         >
-          <DialogContent
-            className="max-w-4xl max-h-[90vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <DialogTitle>Payload</DialogTitle>
               <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy"} hideOnClick={false}>
