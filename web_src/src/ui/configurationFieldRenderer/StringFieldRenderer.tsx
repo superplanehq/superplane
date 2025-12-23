@@ -4,13 +4,22 @@ import { Input } from "../input";
 import { FieldRendererProps } from "./types";
 import { resolveIcon } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 
 export const StringFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
 
   // Detect if this field should use Monaco Editor based on field name
   const isMultilineField = field.name === "payloadText" || field.name === "payloadXML";
   const language = field.name === "payloadXML" ? "xml" : "plaintext";
+
+  const copyToClipboard = () => {
+    const textToCopy = (value as string) || "";
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   // Use Monaco Editor for multiline payload fields
   if (isMultilineField) {
@@ -50,14 +59,23 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
             className={`border rounded-md overflow-hidden ${hasError ? "border-red-500 border-2" : "border-gray-300 dark:border-gray-700"}`}
             style={{ height: "200px" }}
           >
-            <div className="absolute right-2 top-2 z-10">
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="p-1 text-gray-500 hover:text-gray-800 bg-white/80 hover:bg-white rounded border border-gray-300"
-                title="Expand editor"
-              >
-                {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
-              </button>
+            <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
+              <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
+                <button
+                  onClick={copyToClipboard}
+                  className="p-1 rounded text-gray-500 hover:text-gray-800"
+                >
+                  {React.createElement(resolveIcon("copy"), { size: 14 })}
+                </button>
+              </SimpleTooltip>
+              <SimpleTooltip content="Expand">
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-1 text-gray-500 hover:text-gray-800"
+                >
+                  {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
+                </button>
+              </SimpleTooltip>
             </div>
             <Editor
               height="100%"
@@ -72,9 +90,26 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
 
         {/* Expanded Editor Modal */}
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
-            <DialogTitle>{field.label || field.name}</DialogTitle>
-            <div className="flex-1 overflow-hidden border border-gray-200 dark:border-gray-700 rounded-md">
+          <DialogContent
+            className="max-w-4xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <DialogTitle>{field.label || field.name}</DialogTitle>
+              <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyToClipboard();
+                  }}
+                  className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
+                >
+                  {React.createElement(resolveIcon("copy"), { size: 14 })}
+                  Copy
+                </button>
+              </SimpleTooltip>
+            </div>
+            <div className="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-md">
               <Editor
                 height="600px"
                 defaultLanguage={language}
