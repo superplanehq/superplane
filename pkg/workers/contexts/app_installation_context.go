@@ -46,14 +46,27 @@ func (c *AppInstallationContext) RequestWebhook(configuration any) error {
 		return err
 	}
 
-	return app.RequestWebhook(c, configuration)
+	webhooks, err := models.ListAppInstallationWebhooks(c.tx, c.appInstallation.ID)
+	if err != nil {
+		return fmt.Errorf("Failed to list webhooks: %v", err)
+	}
+
+	for _, hook := range webhooks {
+		ok, err := app.CompareWebhookConfig(hook.Configuration.Data(), configuration)
+		if err != nil {
+			return err
+		}
+
+		if ok {
+			c.node.WebhookID = &hook.ID
+			return nil
+		}
+	}
+
+	return c.createWebhook(configuration)
 }
 
-func (c *AppInstallationContext) AssociateWebhook(id uuid.UUID) {
-	c.node.WebhookID = &id
-}
-
-func (c *AppInstallationContext) CreateWebhook(configuration any) error {
+func (c *AppInstallationContext) createWebhook(configuration any) error {
 	webhookID := uuid.New()
 	_, encryptedKey, err := crypto.NewRandomKey(context.Background(), c.encryptor, webhookID.String())
 	if err != nil {
@@ -77,23 +90,6 @@ func (c *AppInstallationContext) CreateWebhook(configuration any) error {
 
 	c.node.WebhookID = &webhookID
 	return nil
-}
-
-func (c *AppInstallationContext) ListWebhooks() ([]core.Webhook, error) {
-	webhooks, err := models.ListAppInstallationWebhooks(c.tx, c.appInstallation.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	hooks := []core.Webhook{}
-	for _, webhook := range webhooks {
-		hooks = append(hooks, core.Webhook{
-			ID:            webhook.ID,
-			Configuration: webhook.Configuration.Data(),
-		})
-	}
-
-	return hooks, nil
 }
 
 func (c *AppInstallationContext) GetConfig(name string) ([]byte, error) {

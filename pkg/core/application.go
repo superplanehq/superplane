@@ -55,10 +55,11 @@ type Application interface {
 	HandleRequest(ctx HTTPRequestContext)
 
 	/*
-	 * Request a webhook from the app installation.
-	 * Used by components/triggers that need access to application webhooks.
+	 * Used to compare webhook configurations.
+	 * If the configuration is the same,
+	 * the system will reuse the existing webhook.
 	 */
-	RequestWebhook(ctx AppInstallationContext, configuration any) error
+	CompareWebhookConfig(a, b any) (bool, error)
 
 	/*
 	 * Set up webhooks through the app installation, in the external system.
@@ -121,27 +122,10 @@ type AppInstallationContext interface {
 	GetSecrets() ([]InstallationSecret, error)
 
 	/*
-	 * List the webhooks associated with the app installation.
-	 */
-	ListWebhooks() ([]Webhook, error)
-
-	/*
-	 * Create a new webhook for the app installation,
-	 * and associate it with the current node.
-	 */
-	CreateWebhook(configuration any) error
-
-	/*
 	 * Request a new webhook from the app installation.
 	 * Called from the components/triggers Setup().
 	 */
 	RequestWebhook(configuration any) error
-
-	/*
-	 * Associate the current node with this webhook ID.
-	 * TODO: not happy about this method at all.
-	 */
-	AssociateWebhook(webhookID uuid.UUID)
 }
 
 type InstallationSecret struct {

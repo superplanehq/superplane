@@ -335,7 +335,7 @@ func (a *MyApp) Triggers() []core.Trigger {
 
 ### 3. Implement Webhook Setup (if needed)
 
-If your trigger requires webhooks, implement the webhook setup methods in your main application file:
+If your triggers or components require webhooks, implement the webhook setup methods in your main application file:
 
 ```go
 type WebhookConfiguration struct {
@@ -343,46 +343,50 @@ type WebhookConfiguration struct {
 	Resource  string `json:"resource"`
 }
 
-func (a *MyApp) RequestWebhook(ctx core.AppInstallationContext, configuration any) error {
-	config := WebhookConfiguration{}
-	err := mapstructure.Decode(configuration, &config)
-	if err != nil {
-		return fmt.Errorf("failed to decode configuration: %v", err)
+// CompareWebhookConfig defines when two webhook configurations are equal.
+// This is used to determine if an existing webhook can be reused.
+func (a *MyApp) CompareWebhookConfig(a, b any) (bool, error) {
+	configA := WebhookConfiguration{}
+	if err := mapstructure.Decode(a, &configA); err != nil {
+		return false, err
 	}
 
-	// Check if webhook already exists
-	hooks, err := ctx.ListWebhooks()
-	if err != nil {
-		return fmt.Errorf("failed to list webhooks: %v", err)
+	configB := WebhookConfiguration{}
+	if err := mapstructure.Decode(b, &configB); err != nil {
+		return false, err
 	}
 
-	for _, hook := range hooks {
-		c := WebhookConfiguration{}
-		err := mapstructure.Decode(hook.Configuration, &c)
-		if err != nil {
-			return err
-		}
-
-		if c.Resource == config.Resource && c.EventType == config.EventType {
-			ctx.AssociateWebhook(hook.ID)
-			return nil
-		}
-	}
-
-	return ctx.CreateWebhook(configuration)
+	// Define equality based on your application's webhook configuration.
+	// Webhooks with matching configurations can be shared across multiple triggers/components.
+	return configA.Resource == configB.Resource && configA.EventType == configB.EventType, nil
 }
 
+// SetupWebhook creates a webhook in the external service.
+// This is called by the webhook provisioner for pending webhook records.
 func (a *MyApp) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (any, error) {
 	// Create webhook in the external service
-	// Return metadata about the created webhook
+	// Return metadata about the created webhook (e.g., webhook ID)
 	return nil, nil
 }
 
+// CleanupWebhook deletes a webhook from the external service.
+// This is called by the webhook cleanup worker for deleted webhook records.
 func (a *MyApp) CleanupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) error {
-	// Delete webhook from the external service
+	// Delete webhook from the external service using the metadata
 	return nil
 }
 ```
+
+**Webhook Logic Overview:**
+
+The webhook management logic is centralized in `AppInstallationContext.RequestWebhook()`. When a trigger or component requests a webhook:
+
+1. The context lists all existing webhooks for the app installation
+2. For each existing webhook, it calls your application's `CompareWebhookConfig()` to check if configurations match
+3. If a match is found, the node is associated with the existing webhook
+4. If no match is found, a new webhook is created
+
+This means multiple triggers and components can share the same webhook if they have matching configurations, reducing the number of webhooks created in external services.
 
 ## Adding Components
 
