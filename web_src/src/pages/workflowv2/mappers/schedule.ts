@@ -329,8 +329,6 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
     return {
-      Result: "emitted",
-      "Readable date/time": (event.data?.["Readable date"] as string) || "n/a",
       Timestamp: (event.data?.["timestamp"] as string) || "n/a",
     };
   },

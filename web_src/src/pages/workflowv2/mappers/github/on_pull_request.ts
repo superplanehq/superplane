@@ -44,7 +44,7 @@ interface OnPullRequestEventData {
  */
 export const onPullRequestTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    const eventData = event.data as OnPullRequestEventData;
+    const eventData = event.data?.data as OnPullRequestEventData;
 
     return {
       title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,
@@ -53,7 +53,7 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
-    const eventData = lastEvent.data as OnPullRequestEventData;
+    const eventData = lastEvent.data?.data as OnPullRequestEventData;
 
     return {
       URL: eventData?.pull_request?._links?.html?.href || "",
@@ -93,7 +93,7 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnPullRequestEventData;
+      const eventData = lastEvent.data?.data as OnPullRequestEventData;
 
       props.lastEventData = {
         title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,
