@@ -188,7 +188,8 @@ func (s *Semaphore) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	err = ctx.EventContext.Emit(data)
+	err = ctx.EventContext.Emit("semaphore", data)
+
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}

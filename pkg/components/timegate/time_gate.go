@@ -296,9 +296,11 @@ func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 	interval := time.Until(nextValidTime)
 
 	if interval <= 0 {
-		return ctx.ExecutionStateContext.Pass(map[string][]any{
-			core.DefaultOutputChannel.Name: {ctx.Data},
-		})
+		return ctx.ExecutionStateContext.Emit(
+			core.DefaultOutputChannel.Name,
+			"timegate.finished",
+			[]any{ctx.Data},
+		)
 	}
 
 	//
@@ -415,9 +417,11 @@ func (tg *TimeGate) HandleTimeReached(ctx core.ActionContext) error {
 		return nil
 	}
 
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {map[string]any{}},
-	})
+	return ctx.ExecutionStateContext.Emit(
+		core.DefaultOutputChannel.Name,
+		"timegate.finished",
+		[]any{map[string]any{}},
+	)
 }
 
 func (tg *TimeGate) HandlePushThrough(ctx core.ActionContext) error {
@@ -426,9 +430,11 @@ func (tg *TimeGate) HandlePushThrough(ctx core.ActionContext) error {
 		return nil
 	}
 
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {map[string]any{}},
-	})
+	return ctx.ExecutionStateContext.Emit(
+		core.DefaultOutputChannel.Name,
+		"timegate.finished",
+		[]any{map[string]any{}},
+	)
 }
 
 func (tg *TimeGate) configEqual(a, b Spec) bool {

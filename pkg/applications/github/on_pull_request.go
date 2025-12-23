@@ -154,7 +154,8 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 		return http.StatusOK, nil
 	}
 
-	err = ctx.EventContext.Emit(data)
+	err = ctx.EventContext.Emit("github.pullRequest", data)
+
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}

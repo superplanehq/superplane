@@ -11,6 +11,7 @@ import (
 )
 
 const ComponentName = "noop"
+const PayloadType = "noop.finished"
 
 func init() {
 	registry.RegisterComponent(ComponentName, &NoOp{})
@@ -47,9 +48,11 @@ func (c *NoOp) Configuration() []configuration.Field {
 }
 
 func (c *NoOp) Execute(ctx core.ExecutionContext) error {
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {make(map[string]any)},
-	})
+	return ctx.ExecutionStateContext.Emit(
+		core.DefaultOutputChannel.Name,
+		PayloadType,
+		[]any{map[string]any{}},
+	)
 }
 
 func (c *NoOp) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {

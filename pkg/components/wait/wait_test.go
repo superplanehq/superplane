@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -477,16 +478,15 @@ func TestWait_HandleTimeReached_CompletionOutput(t *testing.T) {
 	assert.True(t, stateCtx.Finished)
 
 	// Check completion output structure
-	assert.Contains(t, stateCtx.Outputs, core.DefaultOutputChannel.Name)
-	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
-	assert.Len(t, outputs, 1)
+	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+	require.Len(t, stateCtx.Payloads, 1)
 
-	output := outputs[0].(map[string]any)
-	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["timestamp_started"])
-	assert.Equal(t, "completed", output["result"])
-	assert.Equal(t, "timeout", output["reason"])
-	assert.Nil(t, output["actor"])
-	assert.Contains(t, output, "timestamp_finished")
+	outputData := stateCtx.Payloads[0].(map[string]any)
+	assert.Equal(t, "2025-12-10T09:02:43.651Z", outputData["started_at"])
+	assert.Equal(t, "completed", outputData["result"])
+	assert.Equal(t, "timeout", outputData["reason"])
+	assert.Nil(t, outputData["actor"])
+	assert.Contains(t, outputData, "finished_at")
 }
 
 func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
@@ -513,18 +513,17 @@ func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
 	assert.True(t, stateCtx.Finished)
 
 	// Check completion output structure
-	assert.Contains(t, stateCtx.Outputs, core.DefaultOutputChannel.Name)
-	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
-	assert.Len(t, outputs, 1)
-	output := outputs[0].(map[string]any)
-	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["timestamp_started"])
-	assert.Equal(t, "completed", output["result"])
-	assert.Equal(t, "manual_override", output["reason"])
-	assert.Contains(t, output, "timestamp_finished")
+	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+	require.Len(t, stateCtx.Payloads, 1)
+	outputData := stateCtx.Payloads[0].(map[string]any)
+	assert.Equal(t, "2025-12-10T09:02:43.651Z", outputData["started_at"])
+	assert.Equal(t, "completed", outputData["result"])
+	assert.Equal(t, "manual_override", outputData["reason"])
+	assert.Contains(t, outputData, "finished_at")
 
 	// Check actor information
-	assert.NotNil(t, output["actor"])
-	actor := output["actor"].(map[string]any)
+	assert.NotNil(t, outputData["actor"])
+	actor := outputData["actor"].(map[string]any)
 	assert.Equal(t, "alex@company.com", actor["email"])
 	assert.Equal(t, "Aleksandar Mitrović", actor["display_name"])
 }
@@ -627,14 +626,13 @@ func TestWait_Cancel_CompletionOutput(t *testing.T) {
 	assert.True(t, stateCtx.Finished)
 
 	// Check completion output structure
-	assert.Contains(t, stateCtx.Outputs, core.DefaultOutputChannel.Name)
-	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
-	assert.Len(t, outputs, 1)
-	output := outputs[0].(map[string]any)
-	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["timestamp_started"])
+	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+	require.Len(t, stateCtx.Payloads, 1)
+	output := stateCtx.Payloads[0].(map[string]any)
+	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["started_at"])
 	assert.Equal(t, "cancelled", output["result"])
 	assert.Equal(t, "user_cancel", output["reason"])
-	assert.Contains(t, output, "timestamp_finished")
+	assert.Contains(t, output, "finished_at")
 
 	// Check actor information
 	assert.NotNil(t, output["actor"])

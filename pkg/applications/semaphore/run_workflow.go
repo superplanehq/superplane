@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
+const PayloadType = "semaphore.workflow.finished"
 const PassedOutputChannel = "passed"
 const FailedOutputChannel = "failed"
 const PipelineStateDone = "done"
@@ -29,7 +30,7 @@ type RunWorkflowNodeMetadata struct {
 type RunWorkflowExecutionMetadata struct {
 	Workflow *WorkflowMetadata `json:"workflow" mapstructure:"workflow"`
 	Pipeline *PipelineMetadata `json:"pipeline" mapstructure:"pipeline"`
-	Data     map[string]any    `json:"data,omitempty" mapstructure:"data,omitempty"`
+	Extra    map[string]any    `json:"extra,omitempty" mapstructure:"extra,omitempty"`
 }
 
 type WorkflowMetadata struct {
@@ -339,13 +340,9 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	}
 
 	if metadata.Pipeline.Result == PipelineResultPassed {
-		err = executionCtx.ExecutionStateContext.Pass(map[string][]any{
-			PassedOutputChannel: {metadata},
-		})
+		err = executionCtx.ExecutionStateContext.Emit(PassedOutputChannel, PayloadType, []any{metadata})
 	} else {
-		err = executionCtx.ExecutionStateContext.Pass(map[string][]any{
-			FailedOutputChannel: {metadata},
-		})
+		err = executionCtx.ExecutionStateContext.Emit(FailedOutputChannel, PayloadType, []any{metadata})
 	}
 
 	if err != nil {
@@ -436,14 +433,10 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 	}
 
 	if pipeline.Result == PipelineResultPassed {
-		return ctx.ExecutionStateContext.Pass(map[string][]any{
-			PassedOutputChannel: {metadata},
-		})
+		return ctx.ExecutionStateContext.Emit(PassedOutputChannel, PayloadType, []any{metadata})
 	}
 
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		FailedOutputChannel: {metadata},
-	})
+	return ctx.ExecutionStateContext.Emit(FailedOutputChannel, PayloadType, []any{metadata})
 }
 
 func (r *RunWorkflow) finish(ctx core.ActionContext) error {
@@ -467,7 +460,7 @@ func (r *RunWorkflow) finish(ctx core.ActionContext) error {
 		return fmt.Errorf("data is invalid")
 	}
 
-	metadata.Data = dataMap
+	metadata.Extra = dataMap
 	err = ctx.MetadataContext.Set(metadata)
 	if err != nil {
 		return err

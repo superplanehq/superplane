@@ -11,34 +11,39 @@ import (
 
 func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 	tests := []struct {
-		name            string
-		configuration   map[string]any
-		inputData       any
-		expectedOutputs map[string][]any
+		name                 string
+		configuration        map[string]any
+		inputData            any
+		expectedOutputsCount int
+		expectedChannel      string
 	}{
 		{
-			name:            "filter with true condition emits empty event",
-			configuration:   map[string]any{"expression": "true"},
-			inputData:       map[string]any{"test": "value"},
-			expectedOutputs: map[string][]any{"default": {make(map[string]any)}},
+			name:                 "filter with true condition emits empty event",
+			configuration:        map[string]any{"expression": "true"},
+			inputData:            map[string]any{"test": "value"},
+			expectedOutputsCount: 1,
+			expectedChannel:      "default",
 		},
 		{
-			name:            "filter with false condition emits empty event",
-			configuration:   map[string]any{"expression": "false"},
-			inputData:       map[string]any{"test": "value"},
-			expectedOutputs: map[string][]any{},
+			name:                 "filter with false condition emits empty event",
+			configuration:        map[string]any{"expression": "false"},
+			inputData:            map[string]any{"test": "value"},
+			expectedOutputsCount: 0,
+			expectedChannel:      "",
 		},
 		{
-			name:            "filter with complex true condition emits empty event",
-			configuration:   map[string]any{"expression": "$.test == 'value'"},
-			inputData:       map[string]any{"test": "value"},
-			expectedOutputs: map[string][]any{"default": {make(map[string]any)}},
+			name:                 "filter with complex true condition emits empty event",
+			configuration:        map[string]any{"expression": "$.test == 'value'"},
+			inputData:            map[string]any{"test": "value"},
+			expectedOutputsCount: 1,
+			expectedChannel:      "default",
 		},
 		{
-			name:            "filter with complex false condition emits empty event",
-			configuration:   map[string]any{"expression": "$.test == 'different'"},
-			inputData:       map[string]any{"test": "value"},
-			expectedOutputs: map[string][]any{},
+			name:                 "filter with complex false condition emits empty event",
+			configuration:        map[string]any{"expression": "$.test == 'different'"},
+			inputData:            map[string]any{"test": "value"},
+			expectedOutputsCount: 0,
+			expectedChannel:      "",
 		},
 	}
 
@@ -60,7 +65,16 @@ func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 			assert.NoError(t, err)
 			assert.True(t, stateCtx.Passed)
 			assert.True(t, stateCtx.Finished)
-			assert.Equal(t, tt.expectedOutputs, stateCtx.Outputs)
+			if tt.expectedOutputsCount > 0 {
+				assert.Equal(t, tt.expectedChannel, stateCtx.Channel)
+				assert.Equal(t, "filter.executed", stateCtx.Type)
+				assert.Len(t, stateCtx.Payloads, 1)
+				assert.Equal(t, make(map[string]any), stateCtx.Payloads[0])
+			} else {
+				assert.Empty(t, stateCtx.Channel)
+				assert.Empty(t, stateCtx.Type)
+				assert.Empty(t, stateCtx.Payloads)
+			}
 		})
 	}
 }

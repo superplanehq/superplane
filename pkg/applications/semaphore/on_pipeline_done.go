@@ -145,7 +145,8 @@ func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	err = ctx.EventContext.Emit(data)
+	err = ctx.EventContext.Emit("semaphore.pipelineDone", data)
+
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}

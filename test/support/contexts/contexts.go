@@ -9,16 +9,21 @@ import (
 )
 
 type EventContext struct {
-	EmittedEvents []any
+	Payloads []Payload
 }
 
-func (e *EventContext) Emit(event any) error {
-	e.EmittedEvents = append(e.EmittedEvents, event)
+type Payload struct {
+	Type string
+	Data any
+}
+
+func (e *EventContext) Emit(payloadType string, payload any) error {
+	e.Payloads = append(e.Payloads, Payload{Type: payloadType, Data: payload})
 	return nil
 }
 
 func (e *EventContext) Count() int {
-	return len(e.EmittedEvents)
+	return len(e.Payloads)
 }
 
 type WebhookContext struct {
@@ -111,7 +116,9 @@ type ExecutionStateContext struct {
 	Passed         bool
 	FailureReason  string
 	FailureMessage string
-	Outputs        map[string][]any
+	Channel        string
+	Type           string
+	Payloads       []any
 	KVs            map[string]string
 }
 
@@ -119,10 +126,18 @@ func (c *ExecutionStateContext) IsFinished() bool {
 	return c.Finished
 }
 
-func (c *ExecutionStateContext) Pass(outputs map[string][]any) error {
+func (c *ExecutionStateContext) Pass() error {
 	c.Finished = true
 	c.Passed = true
-	c.Outputs = outputs
+	return nil
+}
+
+func (c *ExecutionStateContext) Emit(channel, payloadType string, payloads []any) error {
+	c.Finished = true
+	c.Passed = true
+	c.Channel = channel
+	c.Type = payloadType
+	c.Payloads = payloads
 	return nil
 }
 

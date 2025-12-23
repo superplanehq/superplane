@@ -163,9 +163,23 @@ type MetadataContext interface {
  */
 type ExecutionStateContext interface {
 	IsFinished() bool
-	Pass(outputs map[string][]any) error
-	Fail(reason, message string) error
 	SetKV(key, value string) error
+
+	/*
+	 * Pass the execution, emitting a payload to the specified channel.
+	 */
+	Emit(channel, payloadType string, payloads []any) error
+
+	/*
+	 * Pass the execution, without emitting any payloads from it.
+	 */
+	Pass() error
+
+	/*
+	 * Fails the execution.
+	 * No payloads are emitted.
+	 */
+	Fail(reason, message string) error
 }
 
 /*

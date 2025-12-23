@@ -8,11 +8,14 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
+
+const PayloadType = "wait.finished"
 
 func init() {
 	registry.RegisterComponent("wait", &Wait{})
@@ -28,8 +31,8 @@ type Spec struct {
 }
 
 type ExecutionMetadata struct {
-	StartTime        string `json:"start_time"`
-	IntervalDuration int64  `json:"interval_duration"` // Duration in milliseconds
+	StartTime        string `json:"start_time" mapstructure:"start_time"`
+	IntervalDuration int64  `json:"interval_duration" mapstructure:"interval_duration"` // Duration in milliseconds
 }
 
 const (
@@ -221,13 +224,12 @@ func calculateIntervalDuration(value int, unit string) (time.Duration, error) {
 	}
 }
 
-func createCompletionOutput(startTime, finishTime, result, reason string, actor *core.User) map[string]any {
+func createPayload(startedAt, finishedAt, result, reason string, actor *core.User) map[string]any {
 	output := map[string]any{
-		"timestamp_started":  startTime,
-		"timestamp_finished": finishTime,
-		"result":             result,
-		"reason":             reason,
-		"actor":              nil,
+		"started_at":  startedAt,
+		"finished_at": finishedAt,
+		"result":      result,
+		"reason":      reason,
 	}
 
 	if actor != nil {
@@ -245,7 +247,8 @@ func getStartTimeFromMetadata(metadataCtx core.MetadataContext) string {
 	if err := mapstructure.Decode(metadataCtx.Get(), &metadata); err == nil && metadata.StartTime != "" {
 		return metadata.StartTime
 	}
-	// Fallback to current time if no start time found
+
+	log.Info("no start time found in metadata")
 	return time.Now().Format(time.RFC3339)
 }
 
@@ -342,13 +345,19 @@ func (w *Wait) HandleTimeReached(ctx core.ActionContext) error {
 		return nil
 	}
 
-	startTime := getStartTimeFromMetadata(ctx.MetadataContext)
-	finishTime := time.Now().Format(time.RFC3339)
-	completionOutput := createCompletionOutput(startTime, finishTime, "completed", "timeout", nil)
-
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {completionOutput},
-	})
+	return ctx.ExecutionStateContext.Emit(
+		core.DefaultOutputChannel.Name,
+		PayloadType,
+		[]any{
+			createPayload(
+				getStartTimeFromMetadata(ctx.MetadataContext),
+				time.Now().Format(time.RFC3339),
+				"completed",
+				"timeout",
+				nil,
+			),
+		},
+	)
 }
 
 func (w *Wait) HandlePushThrough(ctx core.ActionContext) error {
@@ -356,15 +365,19 @@ func (w *Wait) HandlePushThrough(ctx core.ActionContext) error {
 		return nil
 	}
 
-	// Create completion output for manual override
-	startTime := getStartTimeFromMetadata(ctx.MetadataContext)
-	finishTime := time.Now().Format(time.RFC3339)
-	actor := ctx.AuthContext.AuthenticatedUser()
-	completionOutput := createCompletionOutput(startTime, finishTime, "completed", "manual_override", actor)
-
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {completionOutput},
-	})
+	return ctx.ExecutionStateContext.Emit(
+		core.DefaultOutputChannel.Name,
+		PayloadType,
+		[]any{
+			createPayload(
+				getStartTimeFromMetadata(ctx.MetadataContext),
+				time.Now().Format(time.RFC3339),
+				"completed",
+				"manual_override",
+				ctx.AuthContext.AuthenticatedUser(),
+			),
+		},
+	)
 }
 
 func (w *Wait) Setup(ctx core.SetupContext) error {
@@ -380,12 +393,17 @@ func (w *Wait) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowN
 }
 
 func (w *Wait) Cancel(ctx core.ExecutionContext) error {
-	startTime := getStartTimeFromMetadata(ctx.MetadataContext)
-	finishTime := time.Now().Format(time.RFC3339)
-	actor := ctx.AuthContext.AuthenticatedUser()
-	completionOutput := createCompletionOutput(startTime, finishTime, "cancelled", "user_cancel", actor)
-
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {completionOutput},
-	})
+	return ctx.ExecutionStateContext.Emit(
+		core.DefaultOutputChannel.Name,
+		PayloadType,
+		[]any{
+			createPayload(
+				getStartTimeFromMetadata(ctx.MetadataContext),
+				time.Now().Format(time.RFC3339),
+				"cancelled",
+				"user_cancel",
+				ctx.AuthContext.AuthenticatedUser(),
+			),
+		},
+	)
 }

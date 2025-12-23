@@ -379,9 +379,11 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		"body":    bodyData,
 	}
 
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {response},
-	})
+	return ctx.ExecutionStateContext.Emit(
+		core.DefaultOutputChannel.Name,
+		"http.request.finished",
+		[]any{response},
+	)
 }
 
 func (e *HTTP) serializePayload(spec Spec) (io.Reader, string, error) {
