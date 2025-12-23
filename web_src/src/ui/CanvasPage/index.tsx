@@ -8,7 +8,7 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { Loader2, Puzzle, ScanLine, ScanText } from "lucide-react";
+import { Loader2, ScanLine, ScanText } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -25,20 +25,19 @@ import {
   TriggersTrigger,
   BlueprintsBlueprint,
 } from "@/api-client";
-import { getCustomFieldRenderer } from "@/pages/workflowv2/mappers";
+import { parseDefaultValues } from "@/utils/components";
 import { AiSidebar } from "../ai";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
 import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
-import { ComponentBaseProps, EventState, EventStateMap } from "../componentBase";
+import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
-import { getBackgroundColorClass } from "@/utils/colors";
 import { SidebarEvent } from "../componentSidebar/types";
 
 export interface SidebarData {
@@ -157,7 +156,19 @@ export interface CanvasPageProps {
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
-  onNodeAdd?: (newNodeData: NewNodeData) => void;
+  onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
+  onPlaceholderAdd?: (data: {
+    position: { x: number; y: number };
+    sourceNodeId: string;
+    sourceHandleId: string | null;
+  }) => Promise<string>;
+  onPlaceholderConfigure?: (data: {
+    placeholderId: string;
+    buildingBlock: BuildingBlock;
+    nodeName: string;
+    configuration: Record<string, any>;
+    appName?: string;
+  }) => Promise<void>;
 
   // Refs to persist state across re-renders
   hasFitToViewRef?: React.MutableRefObject<boolean>;
@@ -259,7 +270,6 @@ function CanvasPage(props: CanvasPageProps) {
   const cancelQueueItemRef = useRef<CanvasPageProps["onCancelQueueItem"]>(props.onCancelQueueItem);
   cancelQueueItemRef.current = props.onCancelQueueItem;
   const state = useCanvasState(props);
-  const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
   const [currentTab, setCurrentTab] = useState<"latest" | "settings">("latest");
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
@@ -301,6 +311,18 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleNodeEdit = useCallback(
     (nodeId: string) => {
+      // Check if this is a placeholder - if so, open building blocks sidebar instead
+      const workflowNode = props.workflowNodes?.find((n) => n.id === nodeId);
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
+
+      if (isPlaceholder) {
+        // For placeholders, open building blocks sidebar
+        setTemplateNodeId(nodeId);
+        setIsBuildingBlocksSidebarOpen(true);
+        state.componentSidebar.close();
+        return;
+      }
+
       // Open the sidebar for this node (data will be automatically available via useMemo)
       if (!state.componentSidebar.isOpen || state.componentSidebar.selectedNodeId !== nodeId) {
         state.componentSidebar.open(nodeId);
@@ -316,7 +338,7 @@ function CanvasPage(props: CanvasPageProps) {
         props.onEdit(nodeId);
       }
     },
-    [props.getNodeEditData, props.onEdit, state.componentSidebar],
+    [props, state.componentSidebar, setTemplateNodeId, setIsBuildingBlocksSidebarOpen, setCurrentTab],
   );
 
   // Get editing data for the currently selected node
@@ -368,237 +390,130 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleConnectionDropInEmptySpace = useCallback(
-    (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
-      if (!sourceConnection) return;
+    async (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
+      if (!sourceConnection || !props.onPlaceholderAdd) return;
 
-      const pendingNodeId = `pending_connection_${Date.now()}`;
+      // Save placeholder immediately to backend
+      const placeholderId = await props.onPlaceholderAdd({
+        position: { x: position.x, y: position.y - 30 },
+        sourceNodeId: sourceConnection.nodeId,
+        sourceHandleId: sourceConnection.handleId,
+      });
 
-      const placeholderNode: CanvasNode = {
-        id: pendingNodeId,
-        type: "default",
-        position: {
-          x: position.x,
-          y: position.y - 30,
-        },
-        data: {
-          type: "component",
-          label: "New Component",
-          state: "neutral",
-          component: {
-            title: "New Component",
-            headerColor: "bg-white",
-            iconSlug: "puzzle",
-            iconColor: "text-gray-800",
-            collapsedBackground: getBackgroundColorClass("white"),
-            hideActionsButton: true,
-            includeEmptyState: true,
-            emptyStateProps: {
-              icon: Puzzle,
-              title: "Select the component from sidebar",
-            },
-          } as ComponentBaseProps,
-          isPendingConnection: true,
-          sourceConnection: {
-            nodeId: sourceConnection.nodeId,
-            handleId: sourceConnection.handleId,
-          },
-        },
-      };
-
-      // Add the new node first
-      state.setNodes((nodes) => [...nodes, placeholderNode]);
-
-      // Check if current template is a configured template (not just pending connection)
-      const currentTemplateNode = templateNodeId ? state.nodes.find((n) => n.id === templateNodeId) : null;
-      const isCurrentTemplateConfigured =
-        currentTemplateNode?.data?.isTemplate && !currentTemplateNode?.data?.isPendingConnection;
-
-      // Only select and set as template if there isn't a configured template being created
-      // Allow switching between pending nodes, but prevent overwriting configured templates
-      if (!isCurrentTemplateConfigured) {
-        // Then update all nodes to set selection (deselect others, select the new one)
-        // This needs to happen in a separate setNodes call to ensure ReactFlow processes the selection
-        setTimeout(() => {
-          state.setNodes((nodes) =>
-            nodes.map((node) => ({
-              ...node,
-              selected: node.id === pendingNodeId,
-            })),
-          );
-        }, 0);
-        setTemplateNodeId(pendingNodeId);
-      }
-
-      // Create edge locally (not via parent) - it will be preserved by useCanvasState
-      const edgeId = `${sourceConnection.nodeId}--${pendingNodeId}--${sourceConnection.handleId || "default"}`;
-      state.setEdges([
-        ...state.edges,
-        {
-          id: edgeId,
-          source: sourceConnection.nodeId,
-          target: pendingNodeId,
-          sourceHandle: sourceConnection.handleId || "default",
-        },
-      ]);
-
-      // Open component sidebar to track the selected node
-      state.componentSidebar.open(pendingNodeId);
-
-      // Open BuildingBlocksSidebar for component selection
+      // Set as template node and open building blocks sidebar
+      setTemplateNodeId(placeholderId);
       setIsBuildingBlocksSidebarOpen(true);
+      state.componentSidebar.close();
     },
-    [state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen],
+    [props, state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen],
   );
 
   const handlePendingConnectionNodeClick = useCallback(
     (nodeId: string) => {
-      // Set this node as the active template
+      // For both placeholders and legacy pending connections:
+      // Set this node as the active template so we can configure it when a building block is selected
       setTemplateNodeId(nodeId);
+
       // Open the BuildingBlocksSidebar so user can select a component
       setIsBuildingBlocksSidebarOpen(true);
-      // Close ComponentSidebar since pending nodes don't have configuration yet
+
+      // Close ComponentSidebar since we're selecting a building block first
       state.componentSidebar.close();
     },
     [setTemplateNodeId, setIsBuildingBlocksSidebarOpen, state.componentSidebar],
   );
 
-  const handleTemplateNodeClick = useCallback(
-    (nodeId: string) => {
-      const templateNode = state.nodes.find((n) => n.id === nodeId);
-      if (!templateNode) return;
-
-      const buildingBlock = templateNode.data.buildingBlock as BuildingBlock;
-
-      // Restore template state from the node - including sourceConnection and position
-      setTemplateNodeId(nodeId);
-      setNewNodeData({
-        buildingBlock: buildingBlock,
-        nodeName: (templateNode.data.nodeName || buildingBlock?.name || "New Component") as string,
-        icon: (templateNode.data.icon || buildingBlock?.icon || "Box") as string,
-        configuration: templateNode.data.configuration || {},
-        position: templateNode.position,
-        sourceConnection: templateNode.data.sourceConnection as { nodeId: string; handleId: string | null } | undefined,
-      });
-      // Open ComponentSidebar for configuration
-      state.componentSidebar.open(nodeId);
-    },
-    [state, setTemplateNodeId, setNewNodeData],
-  );
-
   const handleBuildingBlockClick = useCallback(
-    (block: BuildingBlock) => {
-      const pendingNode = state.nodes.find((n) => n.id === templateNodeId && n.data.isPendingConnection);
-      if (!pendingNode || !templateNodeId) {
+    async (block: BuildingBlock) => {
+      if (!templateNodeId) {
         return;
       }
 
-      // Update the same node (keep ID to preserve edge)
-      state.setNodes((nodes) =>
-        nodes.map((n) =>
-          n.id === templateNodeId
-            ? {
-                ...n,
-                data: {
-                  type: "component",
-                  label: block.label || block.name || "New Component",
-                  state: "neutral",
-                  component: {
-                    title: block.label || block.name || "New Component",
-                    headerColor: "#e5e7eb",
-                    iconSlug: block.icon,
-                    iconColor: "text-gray-800",
-                    collapsedBackground: getBackgroundColorClass("white"),
-                    hideActionsButton: true,
-                    includeEmptyState: true,
-                  } as ComponentBaseProps,
-                  isTemplate: true,
-                  isPendingConnection: false, // Remove pending connection flag
-                  buildingBlock: block,
-                  tempConfiguration: {},
-                  tempNodeName: block.name || "",
-                  sourceConnection: pendingNode.data.sourceConnection, // Preserve sourceConnection for later
-                  configuration: {},
-                  nodeName: block.name || "",
-                  icon: block.icon,
-                },
-              }
-            : n,
-        ),
-      );
+      // Check if templateNodeId is a placeholder (persisted node) or legacy pending connection (local-only)
+      const workflowNode = props.workflowNodes?.find((n) => n.id === templateNodeId);
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
 
-      setNewNodeData({
-        buildingBlock: block,
-        nodeName: block.name || "",
-        displayLabel: block.label || block.name || "",
-        configuration: {},
-        position: pendingNode.position,
-        sourceConnection: pendingNode.data.sourceConnection as { nodeId: string; handleId: string | null } | undefined,
-        appName: block.appName,
-      });
+      if (isPlaceholder && props.onPlaceholderConfigure) {
+        // Handle placeholder node (persisted)
+        const defaultConfiguration = parseDefaultValues(block.configuration || []);
 
-      setIsBuildingBlocksSidebarOpen(false);
-      state.componentSidebar.open(templateNodeId);
-      setCurrentTab("settings");
+        await props.onPlaceholderConfigure({
+          placeholderId: templateNodeId,
+          buildingBlock: block,
+          nodeName: block.name || "",
+          configuration: defaultConfiguration,
+          appName: block.appName,
+        });
+
+        setTemplateNodeId(null);
+        setIsBuildingBlocksSidebarOpen(false);
+        state.componentSidebar.open(templateNodeId);
+        setCurrentTab("settings");
+        return;
+      }
+
+      // Check for local pending connection nodes (legacy)
+      const pendingNode = state.nodes.find((n) => n.id === templateNodeId && n.data.isPendingConnection);
+
+      if (pendingNode) {
+        // Parse default configuration from building block
+        const defaultConfiguration = parseDefaultValues(block.configuration || []);
+
+        // Save immediately with defaults
+        if (props.onNodeAdd) {
+          const newNodeId = await props.onNodeAdd({
+            buildingBlock: block,
+            nodeName: block.name || "",
+            configuration: defaultConfiguration,
+            position: pendingNode.position,
+            sourceConnection: pendingNode.data.sourceConnection as
+              | { nodeId: string; handleId: string | null }
+              | undefined,
+            appName: block.appName,
+          });
+
+          // Remove pending node
+          state.setNodes((nodes) => nodes.filter((n) => n.id !== templateNodeId));
+
+          // Clear template state
+          setTemplateNodeId(null);
+
+          // Close building blocks sidebar
+          setIsBuildingBlocksSidebarOpen(false);
+
+          // Open component sidebar for the new node
+          state.componentSidebar.open(newNodeId);
+          setCurrentTab("settings");
+        }
+      }
     },
-    [templateNodeId, state, setCurrentTab, setNewNodeData, setIsBuildingBlocksSidebarOpen],
+    [templateNodeId, state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen],
   );
 
   const handleBuildingBlockDrop = useCallback(
-    (block: BuildingBlock, position?: { x: number; y: number }) => {
-      if (templateNodeId) {
-        return;
-      }
+    async (block: BuildingBlock, position?: { x: number; y: number }) => {
+      // Parse default configuration from building block
+      const defaultConfiguration = parseDefaultValues(block.configuration || []);
 
-      // Generate unique template node ID
-      const newTemplateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      // Create template node data
-      const templateNode: CanvasNode = {
-        id: newTemplateId,
-        type: "default",
-        position: position || { x: 0, y: 0 },
-        selected: true,
-        data: {
-          type: "component",
-          label: block.label || block.name || "New Component",
-          state: "neutral",
-          component: {
-            title: block.label || block.name || "New Component",
-            headerColor: "#e5e7eb",
-            iconSlug: block.icon,
-            iconColor: "text-gray-800",
-            collapsedBackground: getBackgroundColorClass("white"),
-            hideActionsButton: true,
-            includeEmptyState: true,
-            emptyStateTitle: block.type === "trigger" ? "Waiting for the first event" : undefined,
-          } as ComponentBaseProps,
-          isTemplate: true,
+      // Save immediately with defaults
+      if (props.onNodeAdd) {
+        const newNodeId = await props.onNodeAdd({
           buildingBlock: block,
-          tempConfiguration: {},
-          tempNodeName: block.name || "",
-        },
-      };
+          nodeName: block.name || "",
+          configuration: defaultConfiguration,
+          position,
+          appName: block.appName,
+        });
 
-      // Deselect all existing nodes and add the new selected template node
-      state.setNodes((nodes) => [...nodes.map((n) => ({ ...n, selected: false })), templateNode]);
+        // Close building blocks sidebar
+        setIsBuildingBlocksSidebarOpen(false);
 
-      setTemplateNodeId(newTemplateId);
-      setNewNodeData({
-        icon: block.icon || "circle-off",
-        buildingBlock: block,
-        nodeName: block.name || "",
-        displayLabel: block.label || block.name || "",
-        configuration: {},
-        position,
-        appName: block.appName,
-      });
-
-      state.componentSidebar.open(newTemplateId);
-      setCurrentTab("settings");
-      // Close building blocks sidebar when dropping a new component
-      setIsBuildingBlocksSidebarOpen(false);
+        // Open component sidebar for the new node
+        state.componentSidebar.open(newNodeId);
+        setCurrentTab("settings");
+      }
     },
-    [templateNodeId, state, setCurrentTab],
+    [state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen],
   );
 
   const handleSidebarToggle = useCallback(
@@ -615,52 +530,14 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, any>, nodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => {
-      if (templateNodeId && newNodeData) {
-        // Template nodes should always be converted to real nodes
-        // Remove the template node first
-        state.setNodes((nodes) => nodes.filter((node) => node.id !== templateNodeId));
-
-        // Remove edges connected to the template node (they'll be recreated by parent if needed)
-        state.setEdges(state.edges.filter((edge) => edge.source !== templateNodeId && edge.target !== templateNodeId));
-
-        // Create the real node through the normal flow
-        if (props.onNodeAdd) {
-          props.onNodeAdd({
-            buildingBlock: newNodeData.buildingBlock,
-            nodeName,
-            configuration,
-            position: newNodeData.position,
-            appName: newNodeData.appName,
-            appInstallationRef,
-            sourceConnection: newNodeData.sourceConnection, // Will be undefined for dropped components
-          });
-        }
-
-        // Clear template state
-        setTemplateNodeId(null);
-        setNewNodeData(null);
-
-        // Close sidebar and reset tab
-        state.componentSidebar.close();
-        setCurrentTab("latest");
-      } else if (editingNodeData && props.onNodeConfigurationSave) {
+      if (editingNodeData && props.onNodeConfigurationSave) {
         props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
+        // Close the component sidebar after saving
+        state.componentSidebar.close();
       }
     },
-    [templateNodeId, newNodeData, editingNodeData, props, state, setTemplateNodeId, setNewNodeData, setCurrentTab],
+    [editingNodeData, props, state.componentSidebar],
   );
-
-  const handleCancelTemplate = useCallback(() => {
-    if (templateNodeId) {
-      // Just close the sidebar and clear template state
-      // The node remains as a configured template so user can click it again to continue configuring
-      setTemplateNodeId(null);
-      setNewNodeData(null);
-
-      state.componentSidebar.close();
-      setCurrentTab("latest");
-    }
-  }, [templateNodeId, state]);
 
   const handleToggleView = useCallback(
     (nodeId: string) => {
@@ -705,7 +582,6 @@ function CanvasPage(props: CanvasPageProps) {
 
       // Clear template tracking if this was the active template
       if (templateNodeId === nodeIdToRemove) {
-        setNewNodeData(null);
         setTemplateNodeId(null);
       }
     }
@@ -742,7 +618,7 @@ function CanvasPage(props: CanvasPageProps) {
           onToggle={handleSidebarToggle}
           blocks={props.buildingBlocks || []}
           canvasZoom={canvasZoom}
-          disabled={!!templateNodeId && !state.nodes.find((n) => n.id === templateNodeId && n.data.isPendingConnection)}
+          disabled={false}
           onBlockClick={handleBuildingBlockClick}
         />
 
@@ -767,12 +643,12 @@ function CanvasPage(props: CanvasPageProps) {
               onBuildingBlocksSidebarToggle={handleSidebarToggle}
               onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
               onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
-              onTemplateNodeClick={handleTemplateNodeClick}
               onZoomChange={setCanvasZoom}
               hasFitToViewRef={hasFitToViewRef}
               viewportRefProp={props.viewportRef}
-              templateNodeId={templateNodeId}
               highlightedNodeIds={highlightedNodeIds}
+              workflowNodes={props.workflowNodes}
+              setCurrentTab={setCurrentTab}
             />
           </ReactFlowProvider>
 
@@ -819,9 +695,6 @@ function CanvasPage(props: CanvasPageProps) {
             onEdit={handleNodeEdit}
             currentTab={currentTab}
             onTabChange={setCurrentTab}
-            templateNodeId={templateNodeId}
-            onCancelTemplate={handleCancelTemplate}
-            newNodeData={newNodeData}
             organizationId={props.organizationId}
             getCustomField={props.getCustomField}
             installedApplications={props.installedApplications}
@@ -851,36 +724,6 @@ function CanvasPage(props: CanvasPageProps) {
       )}
     </div>
   );
-}
-
-/**
- * Create a custom field renderer for template nodes based on building block data
- */
-function getTemplateCustomField(
-  buildingBlock: BuildingBlock,
-): ((configuration: Record<string, unknown>) => React.ReactNode) | null {
-  // Determine component name based on building block type and name
-  let componentName = "";
-  if (buildingBlock.type === "trigger") {
-    componentName = buildingBlock.name;
-  } else if (buildingBlock.type === "component") {
-    componentName = buildingBlock.name;
-  } else if (buildingBlock.type === "blueprint") {
-    componentName = "default";
-  }
-
-  const renderer = getCustomFieldRenderer(componentName);
-  if (!renderer) return null;
-
-  // Return a function that takes the current configuration
-  return (configuration: Record<string, unknown>) => {
-    // Create a mock node for the renderer - it only needs name and the configuration
-    const mockNode = {
-      name: configuration.nodeName || buildingBlock.label || buildingBlock.name,
-      configuration,
-    };
-    return renderer.render(mockNode as any, configuration);
-  };
 }
 
 function Sidebar({
@@ -918,9 +761,6 @@ function Sidebar({
   onEdit,
   currentTab,
   onTabChange,
-  templateNodeId,
-  onCancelTemplate,
-  newNodeData,
   organizationId,
   getCustomField,
   installedApplications,
@@ -967,9 +807,6 @@ function Sidebar({
   onEdit?: (nodeId: string) => void;
   currentTab?: "latest" | "settings";
   onTabChange?: (tab: "latest" | "settings") => void;
-  templateNodeId?: string | null;
-  onCancelTemplate?: () => void;
-  newNodeData: NewNodeData | null;
   organizationId?: string;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
   installedApplications?: OrganizationsAppInstallation[];
@@ -980,26 +817,11 @@ function Sidebar({
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
 }) {
   const sidebarData = useMemo(() => {
-    if (templateNodeId && newNodeData) {
-      return {
-        title: newNodeData.nodeName,
-        iconSlug: newNodeData.icon,
-        iconColor: "text-black",
-        latestEvents: [],
-        nextInQueueEvents: [],
-        metadata: [],
-        iconBackground: "",
-        totalInQueueCount: 0,
-        totalInHistoryCount: 0,
-        hideQueueEvents: true,
-      } as SidebarData;
-    }
-
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
       return null;
     }
     return getSidebarData(state.componentSidebar.selectedNodeId);
-  }, [state.componentSidebar.selectedNodeId, getSidebarData, templateNodeId, newNodeData]);
+  }, [state.componentSidebar.selectedNodeId, getSidebarData]);
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
@@ -1102,21 +924,15 @@ function Sidebar({
       domainId={organizationId}
       domainType="DOMAIN_TYPE_ORGANIZATION"
       customField={
-        // For template nodes, derive customField from buildingBlock
-        templateNodeId && newNodeData
-          ? getTemplateCustomField(newNodeData.buildingBlock) || undefined
-          : getCustomField && state.componentSidebar.selectedNodeId
-            ? getCustomField(state.componentSidebar.selectedNodeId) || undefined
-            : undefined
+        getCustomField && state.componentSidebar.selectedNodeId
+          ? getCustomField(state.componentSidebar.selectedNodeId) || undefined
+          : undefined
       }
       appName={editingNodeData?.appName}
       appInstallationRef={editingNodeData?.appInstallationRef}
       installedApplications={installedApplications}
       currentTab={currentTab}
       onTabChange={onTabChange}
-      templateNodeId={templateNodeId}
-      onCancelTemplate={onCancelTemplate}
-      newNodeData={newNodeData}
       workflowNodes={workflowNodes}
       components={components}
       triggers={triggers}
@@ -1200,6 +1016,8 @@ function CanvasContent({
   onPendingConnectionNodeClick,
   onTemplateNodeClick,
   highlightedNodeIds,
+  workflowNodes,
+  setCurrentTab,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1229,6 +1047,8 @@ function CanvasContent({
   onPendingConnectionNodeClick?: (nodeId: string) => void;
   onTemplateNodeClick?: (nodeId: string) => void;
   highlightedNodeIds: Set<string>;
+  workflowNodes?: ComponentsNode[];
+  setCurrentTab?: (tab: "latest" | "settings") => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1262,6 +1082,10 @@ function CanvasContent({
       const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       const isPendingConnection = clickedNode?.data?.isPendingConnection;
 
+      // Check if this is a placeholder node (persisted, not local-only)
+      const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
+
       // Check if this is a template node
       const isTemplateNode = clickedNode?.data?.isTemplate && !clickedNode?.data?.isPendingConnection;
 
@@ -1272,12 +1096,21 @@ function CanvasContent({
 
       // Allow switching to pending connection nodes or other template nodes even if there's a configured template
       // But block switching to other regular/real nodes
-      if (isCurrentTemplateConfigured && nodeId !== templateNodeId && !isPendingConnection && !isTemplateNode) {
+      if (
+        isCurrentTemplateConfigured &&
+        nodeId !== templateNodeId &&
+        !isPendingConnection &&
+        !isTemplateNode &&
+        !isPlaceholder
+      ) {
         return;
       }
 
       if (isPendingConnection && onPendingConnectionNodeClick) {
         // Notify parent that a pending connection node was clicked
+        onPendingConnectionNodeClick(nodeId);
+      } else if (isPlaceholder && onPendingConnectionNodeClick) {
+        // Handle placeholder clicks the same as pending connections
         onPendingConnectionNodeClick(nodeId);
       } else {
         if (isTemplateNode && onTemplateNodeClick) {
@@ -1286,6 +1119,11 @@ function CanvasContent({
         } else {
           // Regular node click
           stateRef.current.componentSidebar.open(nodeId);
+
+          // Reset to Runs tab when clicking on a regular node
+          if (setCurrentTab) {
+            setCurrentTab("latest");
+          }
 
           // Close building blocks sidebar when clicking on a regular node
           if (onBuildingBlocksSidebarToggle) {
@@ -1301,7 +1139,14 @@ function CanvasContent({
         })),
       );
     },
-    [templateNodeId, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, onTemplateNodeClick],
+    [
+      templateNodeId,
+      workflowNodes,
+      onBuildingBlocksSidebarToggle,
+      onPendingConnectionNodeClick,
+      onTemplateNodeClick,
+      setCurrentTab,
+    ],
   );
 
   const onRunRef = useRef(onRun);
@@ -1416,14 +1261,22 @@ function CanvasContent({
     // Do not close sidebar or reset state while creating a new component
     if (templateNodeId) return;
 
-    // Clear ReactFlow's selection state, but keep sidebars open
+    // Clear ReactFlow's selection state and close both sidebars
     stateRef.current.setNodes((nodes) =>
       nodes.map((node) => ({
         ...node,
         selected: false,
       })),
     );
-  }, [templateNodeId]);
+
+    // Close component sidebar
+    stateRef.current.componentSidebar.close();
+
+    // Close building blocks sidebar
+    if (onBuildingBlocksSidebarToggle) {
+      onBuildingBlocksSidebarToggle(false);
+    }
+  }, [templateNodeId, onBuildingBlocksSidebarToggle]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
@@ -1538,14 +1391,18 @@ function CanvasContent({
       const currentConnectingFrom = connectingFromRef.current;
 
       if (currentConnectingFrom && !connectionCompletedRef.current) {
-        const mouseEvent = event as MouseEvent;
-        const canvasPosition = screenToFlowPosition({
-          x: mouseEvent.clientX,
-          y: mouseEvent.clientY,
-        });
+        // Only create placeholder for source handles (right side / output)
+        // Don't create placeholders for target handles (left side / input)
+        if (currentConnectingFrom.handleType === "source") {
+          const mouseEvent = event as MouseEvent;
+          const canvasPosition = screenToFlowPosition({
+            x: mouseEvent.clientX,
+            y: mouseEvent.clientY,
+          });
 
-        if (onConnectionDropInEmptySpace) {
-          onConnectionDropInEmptySpace(canvasPosition, currentConnectingFrom);
+          if (onConnectionDropInEmptySpace) {
+            onConnectionDropInEmptySpace(canvasPosition, currentConnectingFrom);
+          }
         }
       }
 

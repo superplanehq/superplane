@@ -2,7 +2,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { Connection, Edge, Node, addEdge, applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import ELK from "elkjs/lib/elk.bundled.js";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Puzzle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ComponentsComponent, ComponentsNode, ComponentsAppInstallationRef } from "../../api-client";
@@ -74,6 +74,32 @@ const getBlockType = (componentName: string): BlockData["type"] => {
 
 // Helper function to create minimal BlockData for a component
 const createBlockData = (node: any, component: ComponentsComponent | undefined): BlockData => {
+  // Detect placeholder nodes (no component reference, name is "New Component")
+  const isPlaceholder = !node.component?.name && node.name === "New Component";
+
+  if (isPlaceholder) {
+    // Render placeholder with puzzle icon and error state
+    return {
+      label: "New Component",
+      state: "pending",
+      type: "component",
+      outputChannels: ["default"],
+      component: {
+        iconSlug: "box-dashed",
+        iconColor: "text-gray-500",
+        collapsedBackground: "bg-white",
+        collapsed: false,
+        title: "New Component",
+        includeEmptyState: true,
+        emptyStateProps: {
+          icon: Puzzle,
+          title: "Select a component from the sidebar to configure this node",
+        },
+        error: "Select a component from the sidebar to configure this node",
+      },
+    };
+  }
+
   const componentName = node.component?.name || "";
   const blockType = getBlockType(componentName);
   const channels = component?.outputChannels?.map((channel: any) => channel.name) || ["default"];
@@ -87,6 +113,7 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
     outputChannels: channels,
     component: {
       ...componentBaseProps,
+      includeEmptyState: false, // Never show empty state in component editor
       error: node.errorMessage,
     },
   };
@@ -330,50 +357,7 @@ export const CustomComponent = () => {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // Node and edge change handlers
-  const onNodesChange = useCallback(
-    (changes: any) => {
-      setNodes((nds) => applyNodeChanges(changes, nds));
-      // Only mark as unsaved if it's a position change (user dragging nodes)
-      // Don't mark for 'select' or 'dimensions' changes which happen automatically
-      const hasPositionChange = changes.some((change: any) => change.type === "position" && change.dragging);
-      if (hasPositionChange) {
-        saveSnapshot();
-        setHasUnsavedChanges(true);
-      }
-    },
-    [saveSnapshot],
-  );
-
-  const onEdgesChange = useCallback(
-    (changes: any) => {
-      setEdges((eds) => applyEdgeChanges(changes, eds));
-      // Only mark as unsaved for edge removal, not for selection changes
-      const hasRemoval = changes.some((change: any) => change.type === "remove");
-      if (hasRemoval) {
-        saveSnapshot();
-        setHasUnsavedChanges(true);
-      }
-    },
-    [saveSnapshot],
-  );
-
-  const onConnect = useCallback(
-    (params: Connection) => {
-      saveSnapshot();
-      setEdges((eds) => addEdge({ ...params, style: { strokeWidth: 3, stroke: "#C9D5E1" } }, eds));
-      setHasUnsavedChanges(true);
-    },
-    [saveSnapshot],
-  );
-
-  const generateNodeId = (componentName: string, nodeName: string) => {
-    const randomChars = Math.random().toString(36).substring(2, 8);
-    const sanitizedComponent = componentName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    return `${sanitizedComponent}-${sanitizedName}-${randomChars}`;
-  };
-
+  // Save blueprint to backend
   const handleSaveBlueprint = useCallback(
     async (customNodes?: Node[], customEdges?: Edge[]) => {
       try {
@@ -385,13 +369,10 @@ export const CustomComponent = () => {
           .filter((node) => !node.id.startsWith("template_") && !node.id.startsWith("pending_connection_")) // Exclude template and pending nodes
           .map((node) => {
             const nodeData = node.data as any;
-            return {
+            const blueprintNode: ComponentsNode = {
               id: node.id,
               name: nodeData.label as string,
               type: "TYPE_COMPONENT",
-              component: {
-                name: nodeData._originalComponent as string,
-              },
               configuration: nodeData._originalConfiguration || {},
               appInstallation: nodeData._appInstallationRef,
               position: {
@@ -399,6 +380,15 @@ export const CustomComponent = () => {
                 y: Math.round(node.position.y),
               },
             };
+
+            // Only add component reference if it exists (skip for placeholders)
+            if (nodeData._originalComponent) {
+              blueprintNode.component = {
+                name: nodeData._originalComponent as string,
+              };
+            }
+
+            return blueprintNode;
           });
 
         // Use provided edges or current edges
@@ -452,6 +442,64 @@ export const CustomComponent = () => {
     ],
   );
 
+  // Node and edge change handlers
+  const onNodesChange = useCallback(
+    (changes: any) => {
+      const updatedNodes = applyNodeChanges(changes, nodes);
+      setNodes(updatedNodes);
+
+      // Check for position changes when dragging ends
+      const positionChangeEnded = changes.find(
+        (change: any) => change.type === "position" && change.position && change.dragging === false,
+      );
+
+      if (positionChangeEnded) {
+        // Save immediately when dragging ends
+        // Use setTimeout to ensure state is updated before saving
+        setTimeout(() => {
+          handleSaveBlueprint(updatedNodes, edges);
+        }, 0);
+      } else {
+        // Mark as unsaved while dragging (for the warning prompt)
+        const hasPositionChange = changes.some((change: any) => change.type === "position" && change.dragging);
+        if (hasPositionChange) {
+          saveSnapshot();
+          setHasUnsavedChanges(true);
+        }
+      }
+    },
+    [nodes, edges, saveSnapshot, handleSaveBlueprint],
+  );
+
+  const onEdgesChange = useCallback(
+    (changes: any) => {
+      setEdges((eds) => applyEdgeChanges(changes, eds));
+      // Only mark as unsaved for edge removal, not for selection changes
+      const hasRemoval = changes.some((change: any) => change.type === "remove");
+      if (hasRemoval) {
+        saveSnapshot();
+        setHasUnsavedChanges(true);
+      }
+    },
+    [saveSnapshot],
+  );
+
+  const onConnect = useCallback(
+    (params: Connection) => {
+      saveSnapshot();
+      setEdges((eds) => addEdge({ ...params, style: { strokeWidth: 3, stroke: "#C9D5E1" } }, eds));
+      setHasUnsavedChanges(true);
+    },
+    [saveSnapshot],
+  );
+
+  const generateNodeId = (componentName: string, nodeName: string) => {
+    const randomChars = Math.random().toString(36).substring(2, 8);
+    const sanitizedComponent = componentName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+    const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+    return `${sanitizedComponent}-${sanitizedName}-${randomChars}`;
+  };
+
   const getNodeEditData = useCallback(
     (nodeId: string) => {
       const node = (nodesRef.current || []).find((n) => n.id === nodeId);
@@ -473,6 +521,7 @@ export const CustomComponent = () => {
         nodeId: node.id,
         nodeName: (node.data as any).label as string,
         displayLabel: component.label || ((node.data as any).label as string),
+        icon: component.icon,
         configuration: (node.data as any)._originalConfiguration || {},
         configurationFields: component.configuration || [],
         appName,
@@ -761,7 +810,17 @@ export const CustomComponent = () => {
       setNewNodeData(null);
 
       // Save to server immediately with the updated nodes and edges
-      await handleSaveBlueprint(updatedNodes, updatedEdges);
+      console.log("[handleNodeAdd] Auto-saving after adding node", {
+        newNodeId,
+        updatedNodesCount: updatedNodes.length,
+      });
+      try {
+        await handleSaveBlueprint(updatedNodes, updatedEdges);
+        console.log("[handleNodeAdd] Auto-save completed successfully");
+      } catch (error) {
+        console.error("Failed to auto-save after adding node:", error);
+        showErrorToast("Failed to save component");
+      }
 
       // Clean up the converted template ID after save completes
       if (savedTemplateId) {
@@ -769,6 +828,9 @@ export const CustomComponent = () => {
           convertedTemplateIdsRef.current.delete(savedTemplateId);
         }, 1000);
       }
+
+      // Return the new node ID so the caller can open the sidebar
+      return newNodeId;
     },
     [saveSnapshot, handleSaveBlueprint, edges],
   );
@@ -830,85 +892,104 @@ export const CustomComponent = () => {
     [saveSnapshot],
   );
 
-  // Handle dropping edge in empty space to create pending connection node
+  // Handle dropping edge in empty space to create placeholder node (saved to backend)
   const handleConnectionDropInEmptySpace = useCallback(
-    (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
+    async (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
       saveSnapshot();
-      const pendingNodeId = `pending_connection_${Date.now()}`;
+      const newNodeId = `node-${Date.now()}`;
 
-      // Create a placeholder "New Component" node
-      const placeholderNode: Node = {
-        id: pendingNodeId,
-        type: "default",
-        position,
-        data: {
-          type: "component",
-          label: "New Component",
-          state: "neutral",
-          component: {
-            title: "New Component",
-            headerColor: "#e5e7eb",
-            iconSlug: "Puzzle",
-            iconColor: "text-gray-500",
-            collapsedBackground: "bg-white",
-            hideActionsButton: true,
-            includeEmptyState: true,
-          },
-          isPendingConnection: true,
-          sourceConnection,
-          emptyState: {
-            icon: "Puzzle",
-            title: "Select the component from sidebar",
-          },
+      // Create placeholder node - will fail validation but still be saved
+      const newNode: ComponentsNode = {
+        id: newNodeId,
+        name: "New Component",
+        type: "TYPE_COMPONENT",
+        // NO component reference - causes validation error
+        configuration: {},
+        metadata: {},
+        position: {
+          x: Math.round(position.x),
+          y: Math.round(position.y),
         },
       };
 
-      setNodes((nodes) => [...nodes, placeholderNode]);
+      const newEdge = {
+        sourceId: sourceConnection.nodeId,
+        targetId: newNodeId,
+        channel: sourceConnection.handleId || "default",
+      };
 
-      // Check if current template is a configured template (not just pending connection)
-      const currentTemplateNode = templateNodeId ? nodes.find((n) => n.id === templateNodeId) : null;
-      const isCurrentTemplateConfigured =
-        currentTemplateNode?.data &&
-        (currentTemplateNode.data as any).isTemplate &&
-        !(currentTemplateNode.data as any).isPendingConnection;
+      // Get current blueprint nodes and edges
+      const currentNodes = (nodesRef.current || [])
+        .filter((node) => !node.id.startsWith("template_") && !node.id.startsWith("pending_connection_"))
+        .map((node) => {
+          const nodeData = node.data as any;
+          const blueprintNode: ComponentsNode = {
+            id: node.id,
+            name: nodeData.label as string,
+            type: "TYPE_COMPONENT",
+            configuration: nodeData._originalConfiguration || {},
+            appInstallation: nodeData._appInstallationRef,
+            position: {
+              x: Math.round(node.position.x),
+              y: Math.round(node.position.y),
+            },
+          };
 
-      // Only select and set as template if there isn't a configured template being created
-      // Allow switching between pending nodes, but prevent overwriting configured templates
-      if (!isCurrentTemplateConfigured) {
-        // Then update all nodes to set selection (deselect others, select the new one)
-        // This needs to happen in a separate setNodes call to ensure ReactFlow processes the selection
-        setTimeout(() => {
-          setNodes((nodes) =>
-            nodes.map((node) => ({
-              ...node,
-              selected: node.id === pendingNodeId,
-            })),
-          );
-        }, 0);
-        setTemplateNodeId(pendingNodeId);
-      }
+          // Only add component reference if it exists (skip for placeholders)
+          if (nodeData._originalComponent) {
+            blueprintNode.component = {
+              name: nodeData._originalComponent as string,
+            };
+          }
 
-      // Create edge
-      const edgeId = `${sourceConnection.nodeId}--${pendingNodeId}--${sourceConnection.handleId || "default"}`;
-      setEdges((edges) => [
-        ...edges,
-        {
-          id: edgeId,
-          source: sourceConnection.nodeId,
-          sourceHandle: sourceConnection.handleId || "default",
-          target: pendingNodeId,
-          style: { strokeWidth: 3, stroke: "#C9D5E1" },
-        },
-      ]);
+          return blueprintNode;
+        });
 
-      // Open building blocks sidebar
+      const currentEdges = edges
+        .filter(
+          (edge) =>
+            !edge.source.startsWith("template_") &&
+            !edge.target.startsWith("template_") &&
+            !edge.source.startsWith("pending_connection_") &&
+            !edge.target.startsWith("pending_connection_"),
+        )
+        .map((edge) => ({
+          sourceId: edge.source!,
+          targetId: edge.target!,
+          channel: edge.sourceHandle || "default",
+        }));
+
+      // Save with new placeholder node and edge
+      await updateBlueprintMutation.mutateAsync({
+        name: blueprintName,
+        description: blueprintDescription,
+        nodes: [...currentNodes, newNode],
+        edges: [...currentEdges, newEdge],
+        configuration: blueprintConfiguration,
+        outputChannels: blueprintOutputChannels,
+        icon: blueprintIcon,
+        color: blueprintColor,
+      });
+
+      // Set template node ID and open building blocks sidebar
+      setTemplateNodeId(newNodeId);
       setIsBuildingBlocksSidebarOpen(true);
-      setHasUnsavedChanges(true);
+      setHasUnsavedChanges(false); // We just saved
     },
-    [saveSnapshot, nodes, templateNodeId],
+    [
+      saveSnapshot,
+      edges,
+      blueprintName,
+      blueprintDescription,
+      blueprintConfiguration,
+      blueprintOutputChannels,
+      blueprintIcon,
+      blueprintColor,
+      updateBlueprintMutation,
+    ],
   );
 
-  // Handle clicking on a pending connection node
+  // Handle clicking on a pending connection node or placeholder
   const handlePendingConnectionNodeClick = useCallback((nodeId: string) => {
     setTemplateNodeId(nodeId);
     setIsBuildingBlocksSidebarOpen(true);
@@ -940,10 +1021,130 @@ export const CustomComponent = () => {
     [nodes],
   );
 
+  // Handle configuring a placeholder node with a building block
+  const handlePlaceholderConfigure = useCallback(
+    async (data: {
+      placeholderId: string;
+      buildingBlock: any;
+      nodeName: string;
+      configuration: Record<string, any>;
+      appName?: string;
+    }): Promise<void> => {
+      if (!blueprint || !organizationId || !blueprintId) {
+        return;
+      }
+
+      saveSnapshot();
+
+      const nodeIndex = blueprint.nodes?.findIndex((n: ComponentsNode) => n.id === data.placeholderId);
+      if (nodeIndex === undefined || nodeIndex === -1) {
+        return;
+      }
+
+      const filteredConfiguration = filterVisibleConfiguration(
+        data.configuration,
+        data.buildingBlock.configuration || [],
+      );
+
+      const updatedNode: ComponentsNode = {
+        ...blueprint.nodes![nodeIndex],
+        name: data.nodeName.trim(),
+        type:
+          data.buildingBlock.type === "trigger"
+            ? "TYPE_TRIGGER"
+            : data.buildingBlock.type === "blueprint"
+              ? "TYPE_BLUEPRINT"
+              : "TYPE_COMPONENT",
+        configuration: filteredConfiguration,
+      };
+
+      if (data.buildingBlock.type === "component") {
+        updatedNode.component = { name: data.buildingBlock.name };
+      } else if (data.buildingBlock.type === "trigger") {
+        updatedNode.trigger = { name: data.buildingBlock.name };
+      } else if (data.buildingBlock.type === "blueprint") {
+        updatedNode.blueprint = { id: data.buildingBlock.id };
+      }
+
+      const updatedNodes = [...(blueprint.nodes || [])];
+      updatedNodes[nodeIndex] = updatedNode;
+
+      // Update outgoing edges to use valid channels
+      const outgoingEdges = blueprint.edges?.filter((edge: any) => edge.sourceId === data.placeholderId) || [];
+      let updatedEdges = [...(blueprint.edges || [])];
+
+      if (outgoingEdges.length > 0) {
+        const validChannels = data.buildingBlock.outputChannels?.map((ch: any) => ch.name).filter(Boolean) || [
+          "default",
+        ];
+
+        updatedEdges = updatedEdges.map((edge: any) => {
+          if (edge.sourceId === data.placeholderId) {
+            const newChannel = validChannels.includes(edge.channel) ? edge.channel : validChannels[0];
+            return { ...edge, channel: newChannel };
+          }
+          return edge;
+        });
+      }
+
+      await updateBlueprintMutation.mutateAsync({
+        name: blueprintName,
+        description: blueprintDescription,
+        nodes: updatedNodes,
+        edges: updatedEdges,
+        configuration: blueprintConfiguration,
+        outputChannels: blueprintOutputChannels,
+        icon: blueprintIcon,
+        color: blueprintColor,
+      });
+
+      setHasUnsavedChanges(false);
+    },
+    [
+      blueprint,
+      organizationId,
+      blueprintId,
+      saveSnapshot,
+      blueprintName,
+      blueprintDescription,
+      blueprintConfiguration,
+      blueprintOutputChannels,
+      blueprintIcon,
+      blueprintColor,
+      updateBlueprintMutation,
+    ],
+  );
+
   // Handle selecting a building block for a pending connection node
   const handleBuildingBlockClick = useCallback(
-    (block: any) => {
+    async (block: any) => {
       if (!templateNodeId) return;
+
+      // Check if this is a placeholder node (persisted, not local-only)
+      const blueprintNode = blueprint?.nodes?.find((n: ComponentsNode) => n.id === templateNodeId);
+      const isPlaceholder = blueprintNode?.name === "New Component" && !blueprintNode.component?.name;
+
+      if (isPlaceholder) {
+        const defaultConfiguration: Record<string, any> = {};
+        (block.configuration || []).forEach((config: any) => {
+          if (config.default !== undefined && config.default !== null) {
+            defaultConfiguration[config.key] = config.default;
+          }
+        });
+
+        await handlePlaceholderConfigure({
+          placeholderId: templateNodeId,
+          buildingBlock: block,
+          nodeName: block.name || "",
+          configuration: defaultConfiguration,
+          appName: block.appName,
+        });
+
+        setTemplateNodeId(null);
+        setIsBuildingBlocksSidebarOpen(false);
+        setNewNodeData(null);
+        return;
+      }
 
       saveSnapshot();
 
@@ -1023,7 +1224,7 @@ export const CustomComponent = () => {
       setIsBuildingBlocksSidebarOpen(false);
       setHasUnsavedChanges(true);
     },
-    [templateNodeId, saveSnapshot],
+    [templateNodeId, blueprint, handlePlaceholderConfigure, nodes, saveSnapshot],
   );
 
   // Handle canceling template creation
@@ -1110,6 +1311,7 @@ export const CustomComponent = () => {
         onOutputChannelsChange={handleOutputChannelsChange}
         nodes={nodes}
         edges={edges}
+        blueprintNodes={blueprint?.nodes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

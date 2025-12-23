@@ -2,7 +2,7 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
-import { Loader2 } from "lucide-react";
+import { Loader2, Puzzle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -439,7 +439,6 @@ export function WorkflowPageV2() {
     (nodeId: string): SidebarData | null => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
-      setCurrentHistoryNode({ nodeId, nodeType: node?.type || "TYPE_ACTION" });
 
       // Get current data from store (don't trigger load here - that's done in useEffect)
       const nodeData = getNodeData(nodeId);
@@ -481,6 +480,9 @@ export function WorkflowPageV2() {
     (nodeId: string) => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return;
+
+      // Set current history node for tracking
+      setCurrentHistoryNode({ nodeId, nodeType: node?.type || "TYPE_ACTION" });
 
       loadNodeDataMethod(workflowId!, nodeId, node.type!, queryClient);
     },
@@ -745,8 +747,8 @@ export function WorkflowPageV2() {
   };
 
   const handleNodeAdd = useCallback(
-    async (newNodeData: NewNodeData) => {
-      if (!workflow || !organizationId || !workflowId) return;
+    async (newNodeData: NewNodeData): Promise<string> => {
+      if (!workflow || !organizationId || !workflowId) return "";
 
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
@@ -818,6 +820,148 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       // Save to server immediately
+      await handleSaveWorkflow(updatedWorkflow);
+
+      // Return the new node ID
+      return newNodeId;
+    },
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
+  );
+
+  const handlePlaceholderAdd = useCallback(
+    async (data: {
+      position: { x: number; y: number };
+      sourceNodeId: string;
+      sourceHandleId: string | null;
+    }): Promise<string> => {
+      if (!workflow || !organizationId || !workflowId) return "";
+
+      saveWorkflowSnapshot(workflow);
+
+      const newNodeId = `node-${Date.now()}`;
+
+      // Create placeholder node - will fail validation but still be saved
+      const newNode: ComponentsNode = {
+        id: newNodeId,
+        name: "New Component",
+        type: "TYPE_COMPONENT",
+        // NO component/blueprint/trigger reference - causes validation error
+        configuration: {},
+        metadata: {},
+        position: {
+          x: Math.round(data.position.x),
+          y: Math.round(data.position.y),
+        },
+      };
+
+      const newEdge: ComponentsEdge = {
+        sourceId: data.sourceNodeId,
+        targetId: newNodeId,
+        channel: data.sourceHandleId || "default",
+      };
+
+      const updatedWorkflow = {
+        ...workflow,
+        spec: {
+          ...workflow.spec,
+          nodes: [...(workflow.spec?.nodes || []), newNode],
+          edges: [...(workflow.spec?.edges || []), newEdge],
+        },
+      };
+
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      await handleSaveWorkflow(updatedWorkflow);
+
+      return newNodeId;
+    },
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
+  );
+
+  const handlePlaceholderConfigure = useCallback(
+    async (data: {
+      placeholderId: string;
+      buildingBlock: any;
+      nodeName: string;
+      configuration: Record<string, any>;
+      appName?: string;
+    }): Promise<void> => {
+      if (!workflow || !organizationId || !workflowId) {
+        return;
+      }
+
+      saveWorkflowSnapshot(workflow);
+
+      const nodeIndex = workflow.spec?.nodes?.findIndex((n) => n.id === data.placeholderId);
+      if (nodeIndex === undefined || nodeIndex === -1) {
+        return;
+      }
+
+      const filteredConfiguration = filterVisibleConfiguration(
+        data.configuration,
+        data.buildingBlock.configuration || [],
+      );
+
+      // Update placeholder with real component data
+      const updatedNode: ComponentsNode = {
+        ...workflow.spec!.nodes![nodeIndex],
+        name: data.nodeName.trim(),
+        type:
+          data.buildingBlock.type === "trigger"
+            ? "TYPE_TRIGGER"
+            : data.buildingBlock.type === "blueprint"
+              ? "TYPE_BLUEPRINT"
+              : "TYPE_COMPONENT",
+        configuration: filteredConfiguration,
+      };
+
+      // Add the reference that was missing
+      if (data.buildingBlock.type === "component") {
+        updatedNode.component = { name: data.buildingBlock.name };
+      } else if (data.buildingBlock.type === "trigger") {
+        updatedNode.trigger = { name: data.buildingBlock.name };
+      } else if (data.buildingBlock.type === "blueprint") {
+        updatedNode.blueprint = { id: data.buildingBlock.id };
+      }
+
+      const updatedNodes = [...(workflow.spec?.nodes || [])];
+      updatedNodes[nodeIndex] = updatedNode;
+
+      // Update outgoing edges from this node to use valid channels
+      // Find edges where this node is the source
+      const outgoingEdges = workflow.spec?.edges?.filter((edge) => edge.sourceId === data.placeholderId) || [];
+
+      let updatedEdges = [...(workflow.spec?.edges || [])];
+
+      if (outgoingEdges.length > 0) {
+        // Get the valid output channels for the new component
+        const validChannels = data.buildingBlock.outputChannels?.map((ch: any) => ch.name).filter(Boolean) || [
+          "default",
+        ];
+
+        // Update each outgoing edge to use a valid channel
+        updatedEdges = updatedEdges.map((edge) => {
+          if (edge.sourceId === data.placeholderId) {
+            // If the current channel is not valid for the new component, use the first valid channel
+            const newChannel = validChannels.includes(edge.channel) ? edge.channel : validChannels[0];
+            return {
+              ...edge,
+              channel: newChannel,
+            };
+          }
+          return edge;
+        });
+      }
+
+      const updatedWorkflow = {
+        ...workflow,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+          edges: updatedEdges,
+        },
+      };
+
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
       await handleSaveWorkflow(updatedWorkflow);
     },
     [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
@@ -1311,6 +1455,8 @@ export function WorkflowPageV2() {
       onConfigure={handleConfigure}
       buildingBlocks={buildingBlocks}
       onNodeAdd={handleNodeAdd}
+      onPlaceholderAdd={handlePlaceholderAdd}
+      onPlaceholderConfigure={handlePlaceholderConfigure}
       installedApplications={installedApplications}
       hasFitToViewRef={hasFitToViewRef}
       hasUserToggledSidebarRef={hasUserToggledSidebarRef}
@@ -1702,6 +1848,38 @@ function prepareComponentNode(
   queryClient: QueryClient,
   organizationId?: string,
 ): CanvasNode {
+  // Detect placeholder nodes (no component reference, name is "New Component")
+  const isPlaceholder = !node.component?.name && node.name === "New Component";
+
+  if (isPlaceholder) {
+    // Render placeholder as a ComponentBase with error state styling
+    const canvasNode: CanvasNode = {
+      id: node.id!,
+      position: { x: node.position?.x!, y: node.position?.y! },
+      data: {
+        type: "component",
+        label: "New Component",
+        state: "pending" as const,
+        outputChannels: ["default"],
+        component: {
+          iconSlug: "box-dashed",
+          iconColor: getColorClass("gray"),
+          collapsedBackground: getBackgroundColorClass("gray"),
+          collapsed: false,
+          title: "New Component",
+          includeEmptyState: true,
+          emptyStateProps: {
+            icon: Puzzle,
+            title: "Finish configuring this component",
+          },
+          error: "Select a component from the sidebar to configure this node",
+          parameters: [],
+        },
+      },
+    };
+    return canvasNode;
+  }
+
   const componentNameParts = node.component?.name?.split(".") || [];
   const componentName = componentNameParts[0];
 
@@ -1784,6 +1962,18 @@ function prepareComponentBaseNode(
     additionalData,
   );
 
+  // If there's an error and empty state is shown, customize the message
+  const hasError = !!node.errorMessage;
+  const showingEmptyState = componentBaseProps.includeEmptyState;
+  const emptyStateProps =
+    hasError && showingEmptyState
+      ? {
+          ...componentBaseProps.emptyStateProps,
+          icon: componentBaseProps.emptyStateProps?.icon || Puzzle,
+          title: "Finish configuring this component",
+        }
+      : componentBaseProps.emptyStateProps;
+
   return {
     id: node.id!,
     position: { x: node.position?.x || 0, y: node.position?.y || 0 },
@@ -1794,6 +1984,7 @@ function prepareComponentBaseNode(
       outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
       component: {
         ...componentBaseProps,
+        emptyStateProps,
         error: node.errorMessage,
       },
     },

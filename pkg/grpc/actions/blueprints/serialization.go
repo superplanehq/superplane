@@ -49,6 +49,8 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 	}
 
 	nodeIDs := make(map[string]bool)
+	nodeValidationErrors := make(map[string]string)
+
 	for i, node := range blueprint.Nodes {
 		if node.Id == "" {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "node %d: id is required", i)
@@ -63,8 +65,10 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 		}
 
 		nodeIDs[node.Id] = true
+
+		// Collect validation errors instead of failing immediately
 		if err := validateNodeRef(registry, node); err != nil {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node %s: %v", node.Id, err)
+			nodeValidationErrors[node.Id] = err.Error()
 		}
 	}
 
@@ -82,7 +86,17 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 		return nil, nil, err
 	}
 
-	return actions.ProtoToNodes(blueprint.Nodes), actions.ProtoToEdges(blueprint.Edges), nil
+	// Convert proto nodes to models, adding validation errors where applicable
+	nodes := actions.ProtoToNodes(blueprint.Nodes)
+	for i := range nodes {
+		if errorMsg, hasError := nodeValidationErrors[nodes[i].ID]; hasError {
+			nodes[i].ErrorMessage = &errorMsg
+		} else {
+			nodes[i].ErrorMessage = nil
+		}
+	}
+
+	return nodes, actions.ProtoToEdges(blueprint.Edges), nil
 }
 
 func validateNodeRef(registry *registry.Registry, node *componentpb.Node) error {

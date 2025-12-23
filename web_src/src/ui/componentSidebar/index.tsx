@@ -22,7 +22,6 @@ import {
   BlueprintsBlueprint,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
-import { NewNodeData } from "../CanvasPage";
 import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
@@ -98,11 +97,9 @@ interface ComponentSidebarProps {
 
   // Settings tab props
   showSettingsTab?: boolean;
+  hideRunsTab?: boolean; // Hide the "Runs" tab when showing only settings
   currentTab?: "latest" | "settings";
   onTabChange?: (tab: "latest" | "settings") => void;
-  templateNodeId?: string | null;
-  newNodeData: NewNodeData | null;
-  onCancelTemplate?: () => void;
   nodeConfigMode?: "create" | "edit";
   nodeName?: string;
   nodeLabel?: string;
@@ -173,11 +170,9 @@ export const ComponentSidebar = ({
   loadExecutionChain,
   getExecutionState,
   showSettingsTab = false,
+  hideRunsTab = false,
   currentTab = "latest",
   onTabChange,
-  templateNodeId,
-  onCancelTemplate,
-  newNodeData,
   nodeConfigMode = "edit",
   nodeName = "",
   nodeLabel,
@@ -211,9 +206,7 @@ export const ComponentSidebar = ({
   const [executionChainEventId, setExecutionChainEventId] = useState<string | null>(null);
   const [executionChainTriggerEvent, setExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
-  // For template nodes, force settings tab and block latest tab
-  const isTemplateNode = !!templateNodeId && !!newNodeData;
-  const activeTab = isTemplateNode ? "settings" : currentTab || "latest";
+  const activeTab = currentTab || "latest";
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
   const [justCopied, setJustCopied] = useState(false);
@@ -466,9 +459,9 @@ export const ComponentSidebar = ({
                 <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
                   {iconSrc ? <img src={iconSrc} alt={nodeName} className="w-6 h-6" /> : <Icon size={16} />}
                 </div>
-                <h2 className="text-base font-semibold">{isTemplateNode ? newNodeData.nodeName : nodeName}</h2>
+                <h2 className="text-base font-semibold">{nodeName}</h2>
               </div>
-              {nodeId && !isTemplateNode && (
+              {nodeId && (
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] text-gray-500 font-mono">{nodeId}</span>
                   <button
@@ -481,23 +474,21 @@ export const ComponentSidebar = ({
                 </div>
               )}
             </div>
-            {!templateNodeId && (
-              <div className="absolute top-3 right-9 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none pt-0.5">
-                <SidebarActionsDropdown
-                  onRun={onRun}
-                  runDisabled={runDisabled}
-                  runDisabledTooltip={runDisabledTooltip}
-                  onDuplicate={onDuplicate}
-                  onDocs={onDocs}
-                  onEdit={onEdit}
-                  onConfigure={onConfigure}
-                  onDeactivate={onDeactivate}
-                  onToggleView={onToggleView}
-                  onDelete={onDelete}
-                  isCompactView={isCompactView}
-                />
-              </div>
-            )}
+            <div className="absolute top-3 right-9 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none pt-0.5">
+              <SidebarActionsDropdown
+                onRun={onRun}
+                runDisabled={runDisabled}
+                runDisabledTooltip={runDisabledTooltip}
+                onDuplicate={onDuplicate}
+                onDocs={onDocs}
+                onEdit={onEdit}
+                onConfigure={onConfigure}
+                onDeactivate={onDeactivate}
+                onToggleView={onToggleView}
+                onDelete={onDelete}
+                isCompactView={isCompactView}
+              />
+            </div>
           </div>
           <div
             onClick={() => onClose?.()}
@@ -521,28 +512,30 @@ export const ComponentSidebar = ({
             {showSettingsTab && (
               <div className="border-border border-b-1">
                 <div className="flex px-4">
-                  <button
-                    onClick={() => !isTemplateNode && onTabChange?.("latest")}
-                    disabled={isTemplateNode}
-                    className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
-                      isTemplateNode
-                        ? "border-transparent text-gray-300 cursor-not-allowed dark:text-gray-600"
-                        : activeTab === "latest"
+                  {!hideRunsTab && (
+                    <button
+                      onClick={() => onTabChange?.("latest")}
+                      className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
+                        activeTab === "latest"
                           ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
                           : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                    }`}
-                  >
-                    Runs
-                  </button>
+                      }`}
+                    >
+                      Runs
+                    </button>
+                  )}
                   <button
                     onClick={() => onTabChange?.("settings")}
-                    className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
+                    className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors flex items-center gap-1.5 ${
                       activeTab === "settings"
                         ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
                         : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                     }`}
                   >
                     Configuration
+                    {nodeId && workflowNodes.find((n) => n.id === nodeId)?.errorMessage && (
+                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -580,22 +573,18 @@ export const ComponentSidebar = ({
             {showSettingsTab && (
               <TabsContent value="settings" className="mt-0">
                 <SettingsTab
-                  mode={isTemplateNode ? "create" : nodeConfigMode}
-                  nodeName={isTemplateNode ? newNodeData.nodeName : nodeName}
-                  nodeLabel={isTemplateNode ? newNodeData.displayLabel : nodeLabel}
-                  configuration={isTemplateNode ? newNodeData.configuration : nodeConfiguration}
-                  configurationFields={
-                    isTemplateNode
-                      ? (newNodeData.buildingBlock.configuration as ConfigurationField[])
-                      : nodeConfigurationFields
-                  }
+                  mode={nodeConfigMode}
+                  nodeName={nodeName}
+                  nodeLabel={nodeLabel}
+                  configuration={nodeConfiguration}
+                  configurationFields={nodeConfigurationFields}
                   onSave={onNodeConfigSave || (() => {})}
-                  onCancel={isTemplateNode ? onCancelTemplate : onNodeConfigCancel}
+                  onCancel={onNodeConfigCancel}
                   domainId={domainId}
                   domainType={domainType}
                   customField={customField}
-                  appName={isTemplateNode ? newNodeData.appName : appName}
-                  appInstallationRef={isTemplateNode ? newNodeData.appInstallationRef : appInstallationRef}
+                  appName={appName}
+                  appInstallationRef={appInstallationRef}
                   installedApplications={installedApplications}
                 />
               </TabsContent>

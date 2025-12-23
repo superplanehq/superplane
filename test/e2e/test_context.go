@@ -83,6 +83,13 @@ func (s *TestContext) launchBrowser() {
 			Width:  2560,
 			Height: 1440,
 		},
+		RecordVideo: &pw.RecordVideo{
+			Dir: "/app/tmp/videos",
+			Size: &pw.Size{
+				Width:  2560,
+				Height: 1440,
+			},
+		},
 	})
 	if err != nil {
 		panic("browser context: " + err.Error())

@@ -15,6 +15,7 @@ import "./blueprint-canvas-reset.css";
 
 import {
   ComponentsComponent,
+  ComponentsNode,
   ConfigurationField,
   SuperplaneBlueprintsOutputChannel,
   AuthorizationDomainType,
@@ -32,8 +33,6 @@ import {
   OutputChannel,
 } from "../CustomComponentConfigurationSidebar";
 import { ComponentSidebar } from "../componentSidebar";
-import { getBackgroundColorClass } from "@/utils/colors";
-import { ComponentBaseProps } from "../componentBase";
 import { buildBuildingBlockCategories } from "../buildingBlocks";
 import { ConfigurationFieldModal } from "./ConfigurationFieldModal";
 import { OutputChannelConfigurationModal } from "./OutputChannelConfigurationModal";
@@ -42,6 +41,7 @@ export interface NodeEditData {
   nodeId: string;
   nodeName: string;
   displayLabel?: string;
+  icon?: string;
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
   appName?: string;
@@ -78,6 +78,7 @@ export interface CustomComponentBuilderPageProps {
   // Canvas
   nodes: Node[];
   edges: Edge[];
+  blueprintNodes?: ComponentsNode[]; // Backend blueprint nodes for error detection
   onNodesChange: (changes: any) => void;
   onEdgesChange: (changes: any) => void;
   onConnect: (connection: Connection) => void;
@@ -94,7 +95,7 @@ export interface CustomComponentBuilderPageProps {
     nodeName: string,
     appInstallationRef?: ComponentsAppInstallationRef,
   ) => void;
-  onNodeAdd?: (newNodeData: NewNodeData) => void;
+  onNodeAdd?: (newNodeData: NewNodeData) => Promise<string | undefined> | string | undefined | void;
   organizationId?: string;
 
   // Building blocks
@@ -113,7 +114,7 @@ export interface CustomComponentBuilderPageProps {
   onBuildingBlocksSidebarToggle?: (open: boolean) => void;
   onConnectionDropInEmptySpace?: (
     position: { x: number; y: number },
-    sourceConnection: { nodeId: string; handleId: string | null },
+    sourceConnection: { nodeId: string; handleId: string | null; handleType?: "source" | "target" | null },
   ) => void;
   onPendingConnectionNodeClick?: (nodeId: string) => void;
   onTemplateNodeClick?: (nodeId: string) => void;
@@ -177,6 +178,8 @@ function CanvasContent({
   connectionCompletedRef,
   connectingFromRef,
   templateNodeId,
+  onCancelTemplate,
+  onBuildingBlocksSidebarToggle,
 }: {
   nodes: Node[];
   edges: Edge[];
@@ -197,7 +200,7 @@ function CanvasContent({
   onConnectEnd?: () => void;
   onConnectionDropInEmptySpace?: (
     position: { x: number; y: number },
-    sourceConnection: { nodeId: string; handleId: string | null },
+    sourceConnection: { nodeId: string; handleId: string | null; handleType?: "source" | "target" | null },
   ) => void;
   connectionCompletedRef?: React.MutableRefObject<boolean>;
   connectingFromRef?: React.MutableRefObject<{
@@ -206,6 +209,8 @@ function CanvasContent({
     handleType: "source" | "target" | null;
   } | null>;
   templateNodeId?: string | null;
+  onCancelTemplate?: () => void;
+  onBuildingBlocksSidebarToggle?: (open: boolean) => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -284,8 +289,14 @@ function CanvasContent({
   const handlePaneClick = useCallback(() => {
     // do not close sidebar while we are creating a new component
     if (templateNodeId) return;
-    // Could add pane click handling here if needed
-  }, [templateNodeId]);
+    // Close both component sidebar and building blocks sidebar
+    if (onCancelTemplate) {
+      onCancelTemplate();
+    }
+    if (onBuildingBlocksSidebarToggle) {
+      onBuildingBlocksSidebarToggle(false);
+    }
+  }, [templateNodeId, onCancelTemplate, onBuildingBlocksSidebarToggle]);
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -303,14 +314,17 @@ function CanvasContent({
       const currentConnectingFrom = connectingFromRef?.current;
 
       if (currentConnectingFrom && connectionCompletedRef && !connectionCompletedRef.current) {
-        const mouseEvent = event as MouseEvent;
-        const canvasPosition = screenToFlowPosition({
-          x: mouseEvent.clientX,
-          y: mouseEvent.clientY,
-        });
+        // Only create placeholder for source handles (right side / output)
+        if (currentConnectingFrom.handleType === "source") {
+          const mouseEvent = event as MouseEvent;
+          const canvasPosition = screenToFlowPosition({
+            x: mouseEvent.clientX,
+            y: mouseEvent.clientY,
+          });
 
-        if (onConnectionDropInEmptySpace) {
-          onConnectionDropInEmptySpace(canvasPosition, currentConnectingFrom);
+          if (onConnectionDropInEmptySpace) {
+            onConnectionDropInEmptySpace(canvasPosition, currentConnectingFrom);
+          }
         }
       }
 
@@ -462,13 +476,23 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   // Node configuration handlers
   const handleNodeEdit = useCallback(
     (nodeId: string) => {
+      // Check if this is a placeholder node (persisted, not local-only)
+      const blueprintNode = props.blueprintNodes?.find((n) => n.id === nodeId);
+      const isPlaceholder = blueprintNode?.name === "New Component" && !blueprintNode.component?.name;
+
+      if (isPlaceholder && props.onPendingConnectionNodeClick) {
+        // For placeholders, open building blocks sidebar instead
+        props.onPendingConnectionNodeClick(nodeId);
+        return;
+      }
+
       if (!isNodeSidebarOpen || selectedNodeId !== nodeId) {
         setIsNodeSidebarOpen(true);
         setSelectedNodeId(nodeId);
       }
       // Always shows settings tab - no tab switching needed
     },
-    [isNodeSidebarOpen, selectedNodeId],
+    [isNodeSidebarOpen, selectedNodeId, props],
   );
 
   // Get editing data for the currently selected node
@@ -480,80 +504,34 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   }, [selectedNodeId, isNodeSidebarOpen, props.getNodeEditData]);
 
   const handleBuildingBlockDrop = useCallback(
-    (block: BuildingBlock, position?: { x: number; y: number }) => {
+    async (block: BuildingBlock, position?: { x: number; y: number }) => {
       if (templateNodeId) {
         return;
       }
 
-      // Generate unique template node ID
-      const newTemplateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Parse default configuration values from the building block
+      const defaultConfiguration: Record<string, any> = {};
+      (block.configuration || []).forEach((config: any) => {
+        if (config.default !== undefined && config.default !== null) {
+          defaultConfiguration[config.key] = config.default;
+        }
+      });
 
-      // Deselect all existing nodes first
-      props.onNodesChange(
-        props.nodes.map((node) => ({
-          type: "select",
-          id: node.id,
-          selected: false,
-        })),
-      );
-
-      // Create template node data
-      const templateNode: Node = {
-        id: newTemplateId,
-        type: "default",
-        position: position || { x: props.nodes.length * 250, y: 100 },
-        selected: true,
-        data: {
-          type: "component",
-          label: block.label || block.name || "New Component",
-          state: "pending" as const,
-          outputChannels: ["default"],
-          component: {
-            title: block.label || block.name || "New Component",
-            headerColor: "#e5e7eb",
-            iconSlug: block.icon,
-            iconColor: "text-gray-800",
-            collapsedBackground: getBackgroundColorClass("white"),
-            hideActionsButton: true,
-            includeEmptyState: true,
-            emptyStateTitle: block.type === "trigger" ? "Waiting for the first event" : undefined,
-          } as ComponentBaseProps,
-          isTemplate: true,
-          buildingBlock: block,
-          tempConfiguration: {},
-          tempNodeName: block.name || "",
-          _originalComponent: block.name,
-          _originalConfiguration: {},
-        } as any,
-      };
-
-      // Add the template node using the helper callback
-      if (props.onAddTemplateNode) {
-        props.onAddTemplateNode(templateNode);
-      }
-
-      // In delegated mode, we need to notify parent to set template state
-      // In non-delegated mode, set local state
-      if (props.templateNodeId !== undefined) {
-        // Delegated mode - parent manages state via onAddTemplateNode callback
-        // The parent's onAddTemplateNode will set both templateNodeId and newNodeData
-        // Then the useEffect will open the ComponentSidebar automatically
-      } else {
-        // Non-delegated mode - manage state locally
-        setTemplateNodeId(newTemplateId);
-        setNewNodeData({
-          icon: block.icon || "circle-off",
+      // Immediately add the node with default configuration (skip template/sidebar step)
+      if (props.onNodeAdd) {
+        const newNodeId = await props.onNodeAdd({
           buildingBlock: block,
           nodeName: block.name || "",
-          displayLabel: block.label || block.name || "",
-          configuration: {},
+          configuration: defaultConfiguration,
           position,
           appName: block.appName,
         });
 
-        // Open sidebar in non-delegated mode
-        setIsNodeSidebarOpen(true);
-        setSelectedNodeId(newTemplateId);
+        // After the node is added, open the sidebar for configuration
+        if (newNodeId) {
+          setIsNodeSidebarOpen(true);
+          setSelectedNodeId(newNodeId);
+        }
       }
 
       // Close building blocks sidebar after dropping a block
@@ -573,6 +551,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         handleSaveNewNode(configuration, nodeName, appInstallationRef);
       } else if (editingNodeData && props.onNodeConfigurationSave) {
         props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
+        // Close the component sidebar after saving
+        setIsNodeSidebarOpen(false);
       }
     },
     [templateNodeId, newNodeData, editingNodeData, props],
@@ -605,25 +585,6 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     },
     [newNodeData, props, templateNodeId],
   );
-
-  const handleCancelTemplate = useCallback(() => {
-    // If parent provides onCancelTemplate, delegate to it (for pending connection nodes)
-    if (props.onCancelTemplate) {
-      props.onCancelTemplate();
-      return;
-    }
-
-    // Otherwise, handle locally (for regular template nodes)
-    if (templateNodeId) {
-      if (props.onRemoveTemplateNode) {
-        props.onRemoveTemplateNode(templateNodeId);
-      }
-      setLocalTemplateNodeId(null);
-      setLocalNewNodeData(null);
-      setIsNodeSidebarOpen(false);
-      setSelectedNodeId(null);
-    }
-  }, [templateNodeId, props, setLocalTemplateNodeId, setLocalNewNodeData]);
 
   const handleNodeSidebarClose = useCallback(() => {
     setIsNodeSidebarOpen(false);
@@ -659,6 +620,10 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
       const isPendingConnection = (clickedNode?.data as any)?.isPendingConnection;
       const isTemplateNode = (clickedNode?.data as any)?.isTemplate && !isPendingConnection;
 
+      // Check if this is a placeholder node (persisted, not local-only)
+      const blueprintNode = props.blueprintNodes?.find((n) => n.id === nodeId);
+      const isPlaceholder = blueprintNode?.name === "New Component" && !blueprintNode.component?.name;
+
       // Check if the current template is a configured template (not just pending connection)
       const currentTemplateNode = templateNodeId ? props.nodes.find((n) => n.id === templateNodeId) : null;
       const isCurrentTemplateConfigured =
@@ -673,15 +638,16 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
       if (isPendingConnection && props.onPendingConnectionNodeClick) {
         // Notify parent that a pending connection node was clicked
         props.onPendingConnectionNodeClick(nodeId);
+      } else if (isPlaceholder && props.onPendingConnectionNodeClick) {
+        // For placeholders, open building blocks sidebar instead
+        props.onPendingConnectionNodeClick(nodeId);
       } else if (isTemplateNode && props.onTemplateNodeClick) {
         // Notify parent to restore template state
         props.onTemplateNodeClick(nodeId);
       } else {
-        // Regular node click - only in non-delegated mode
-        if (props.templateNodeId === undefined) {
-          setIsNodeSidebarOpen(true);
-          setSelectedNodeId(nodeId);
-        }
+        // Regular node click - always open sidebar for regular nodes
+        setIsNodeSidebarOpen(true);
+        setSelectedNodeId(nodeId);
       }
 
       // Update selection
@@ -850,9 +816,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           onToggle={props.onBuildingBlocksSidebarToggle || setIsLeftSidebarOpen}
           blocks={buildingBlockCategories}
           canvasZoom={canvasZoom}
-          disabled={
-            !!templateNodeId && !props.nodes.find((n) => n.id === templateNodeId && (n.data as any).isPendingConnection)
-          }
+          disabled={false}
           onBlockClick={props.onBuildingBlockClick}
         />
 
@@ -878,6 +842,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
               connectionCompletedRef={connectionCompletedRef}
               connectingFromRef={connectingFromRef}
               templateNodeId={templateNodeId}
+              onCancelTemplate={props.onCancelTemplate}
+              onBuildingBlocksSidebarToggle={props.onBuildingBlocksSidebarToggle}
             />
           </ReactFlowProvider>
         </div>
@@ -904,7 +870,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             isOpen={isNodeSidebarOpen}
             onClose={handleNodeSidebarClose}
             nodeId={selectedNodeId}
-            iconSlug={newNodeData?.icon || "gear"}
+            iconSlug={editingNodeData?.icon || newNodeData?.icon || "gear"}
             iconColor="text-black"
             latestEvents={[]}
             nextInQueueEvents={[]}
@@ -913,12 +879,10 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             totalInHistoryCount={0}
             hideQueueEvents={true}
             showSettingsTab={true}
+            hideRunsTab={true}
             currentTab="settings"
             onTabChange={() => {}} // No tab switching in custom component builder
-            templateNodeId={templateNodeId}
-            newNodeData={newNodeData}
-            onCancelTemplate={handleCancelTemplate}
-            nodeConfigMode={templateNodeId ? "create" : "edit"}
+            nodeConfigMode="edit"
             nodeName={editingNodeData?.nodeName || ""}
             nodeLabel={editingNodeData?.displayLabel}
             nodeConfiguration={editingNodeData?.configuration || {}}
@@ -931,6 +895,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             appName={editingNodeData?.appName}
             appInstallationRef={editingNodeData?.appInstallationRef}
             installedApplications={props.installedApplications}
+            workflowNodes={props.blueprintNodes}
           />
         )}
       </div>

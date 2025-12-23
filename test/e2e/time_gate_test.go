@@ -125,7 +125,7 @@ func (s *TimeGateSteps) setTimezone(timezone string) {
 }
 
 func (s *TimeGateSteps) saveTimeGate() {
-	s.session.Click(q.TestID("add-node-button"))
+	s.session.Click(q.TestID("save-node-button"))
 	s.session.Sleep(500)
 }
 

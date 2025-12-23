@@ -126,7 +126,7 @@ func (s *GithubTriggerSteps) addGithubTriggerNode() {
 	s.session.Click(eventTypeTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Push")`))
 
-	s.session.Click(q.TestID("add-node-button"))
+	s.session.Click(q.TestID("save-node-button"))
 
 	s.session.Sleep(1000)
 }
