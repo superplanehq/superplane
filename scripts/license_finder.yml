@@ -1,0 +1,56 @@
+---
+- - :permit
+  - MIT
+  - :who:
+    :why:
+    :versions: []
+    :when: 2025-12-23 00:00:00.000000000 Z
+- - :permit
+  - Apache 2.0
+  - :who:
+    :why:
+    :versions: []
+    :when: 2025-12-23 00:00:00.000000000 Z
+- - :permit
+  - ISC
+  - :who:
+    :why:
+    :versions: []
+    :when: 2025-12-23 00:00:00.000000000 Z
+- - :permit
+  - BSD
+  - :who:
+    :why:
+    :versions: []
+    :when: 2025-12-23 00:00:00.000000000 Z
+- - :permit
+  - Simplified BSD
+  - :who:
+    :why:
+    :versions: []
+    :when: 2025-12-23 00:00:00.000000000 Z
+- - :permit
+  - New BSD
+  - :who:
+    :why:
+    :versions: []
+    :when: 2025-12-23 00:00:00.000000000 Z
+- - :permit
+  - BSD-2-Clause
+  - :who:
+    :why:
+    :versions: []
+    :when: 2025-12-23 00:00:00.000000000 Z
+- - :permit
+  - BSD-3-Clause
+  - :who:
+    :why:
+    :versions: []
+    :when: 2025-12-23 00:00:00.000000000 Z
+- - :permit
+  - 0BSD
+  - :who:
+    :why:
+    :versions: []
+    :when: 2025-12-23 00:00:00.000000000 Z
+
