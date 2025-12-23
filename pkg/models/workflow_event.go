@@ -209,14 +209,19 @@ func (e *WorkflowEvent) RoutedInTransaction(tx *gorm.DB) error {
 
 // FindLastEventPerNode finds the most recent event for each node in a workflow
 // using DISTINCT ON to get one event per node_id, ordered by created_at DESC
+// Only returns events for nodes that have not been deleted
 func FindLastEventPerNode(workflowID uuid.UUID) ([]WorkflowEvent, error) {
 	var events []WorkflowEvent
 	err := database.Conn().
 		Raw(`
-			SELECT DISTINCT ON (node_id) *
-			FROM workflow_events
-			WHERE workflow_id = ?
-			ORDER BY node_id, created_at DESC
+			SELECT DISTINCT ON (we.node_id) we.*
+			FROM workflow_events we
+			INNER JOIN workflow_nodes wn
+				ON we.workflow_id = wn.workflow_id
+				AND we.node_id = wn.node_id
+			WHERE we.workflow_id = ?
+			AND wn.deleted_at IS NULL
+			ORDER BY we.node_id, we.created_at DESC
 		`, workflowID).
 		Scan(&events).
 		Error

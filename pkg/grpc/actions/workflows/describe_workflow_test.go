@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -369,5 +370,274 @@ func Test__DescribeWorkflow(t *testing.T) {
 		assert.Empty(t, response.Workflow.Status.LastExecutions)
 		assert.Empty(t, response.Workflow.Status.NextQueueItems)
 		assert.Empty(t, response.Workflow.Status.LastEvents)
+	})
+
+	t.Run("status excludes executions for deleted nodes", func(t *testing.T) {
+		//
+		// Create a workflow with three nodes
+		//
+		workflow, workflowNodes := support.CreateWorkflow(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.WorkflowNode{
+				{
+					NodeID: "active-node-1",
+					Name:   "Active Node 1",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+				{
+					NodeID: "active-node-2",
+					Name:   "Active Node 2",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+				{
+					NodeID: "deleted-node",
+					Name:   "Deleted Node",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		//
+		// Create events for executions
+		//
+		rootEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-1", "default", nil)
+		event1 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-1", "default", nil)
+		rootEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-2", "default", nil)
+		event2 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-2", "default", nil)
+		rootEvent3 := support.EmitWorkflowEventForNode(t, workflow.ID, "deleted-node", "default", nil)
+		event3 := support.EmitWorkflowEventForNode(t, workflow.ID, "deleted-node", "default", nil)
+
+		//
+		// Create executions for all nodes
+		//
+		activeExec1 := support.CreateWorkflowNodeExecution(t, workflow.ID, "active-node-1", rootEvent1.ID, event1.ID, nil)
+		activeExec2 := support.CreateWorkflowNodeExecution(t, workflow.ID, "active-node-2", rootEvent2.ID, event2.ID, nil)
+		deletedExec := support.CreateWorkflowNodeExecution(t, workflow.ID, "deleted-node", rootEvent3.ID, event3.ID, nil)
+
+		//
+		// Delete one node (soft delete)
+		//
+		var deletedNode *models.WorkflowNode
+		for i := range workflowNodes {
+			if workflowNodes[i].NodeID == "deleted-node" {
+				deletedNode = &workflowNodes[i]
+				break
+			}
+		}
+		require.NotNil(t, deletedNode)
+		err := database.Conn().Delete(deletedNode).Error
+		require.NoError(t, err)
+
+		//
+		// Describe the workflow
+		//
+		response, err := DescribeWorkflow(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.Workflow.Status)
+
+		//
+		// Verify we only get executions for active nodes, not deleted ones
+		//
+		assert.Len(t, response.Workflow.Status.LastExecutions, 2)
+
+		// Verify active node executions are included
+		executionIDs := make(map[string]bool)
+		for _, exec := range response.Workflow.Status.LastExecutions {
+			executionIDs[exec.Id] = true
+			// Verify it's not the deleted node's execution
+			assert.NotEqual(t, "deleted-node", exec.NodeId)
+		}
+
+		assert.True(t, executionIDs[activeExec1.ID.String()])
+		assert.True(t, executionIDs[activeExec2.ID.String()])
+		assert.False(t, executionIDs[deletedExec.ID.String()])
+	})
+
+	t.Run("status excludes queue items for deleted nodes", func(t *testing.T) {
+		//
+		// Create a workflow with three nodes
+		//
+		workflow, workflowNodes := support.CreateWorkflow(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.WorkflowNode{
+				{
+					NodeID: "active-node-1",
+					Name:   "Active Node 1",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+				{
+					NodeID: "active-node-2",
+					Name:   "Active Node 2",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+				{
+					NodeID: "deleted-node",
+					Name:   "Deleted Node",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		//
+		// Create events for queue items
+		//
+		rootEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-1", "default", nil)
+		event1 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-1", "default", nil)
+		rootEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-2", "default", nil)
+		event2 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-2", "default", nil)
+		rootEvent3 := support.EmitWorkflowEventForNode(t, workflow.ID, "deleted-node", "default", nil)
+		event3 := support.EmitWorkflowEventForNode(t, workflow.ID, "deleted-node", "default", nil)
+
+		//
+		// Create queue items for all nodes
+		//
+		activeQI1 := support.CreateWorkflowQueueItem(t, workflow.ID, "active-node-1", rootEvent1.ID, event1.ID)
+		activeQI2 := support.CreateWorkflowQueueItem(t, workflow.ID, "active-node-2", rootEvent2.ID, event2.ID)
+		deletedQI := support.CreateWorkflowQueueItem(t, workflow.ID, "deleted-node", rootEvent3.ID, event3.ID)
+
+		//
+		// Delete one node (soft delete)
+		//
+		var deletedNode *models.WorkflowNode
+		for i := range workflowNodes {
+			if workflowNodes[i].NodeID == "deleted-node" {
+				deletedNode = &workflowNodes[i]
+				break
+			}
+		}
+		require.NotNil(t, deletedNode)
+		err := database.Conn().Delete(deletedNode).Error
+		require.NoError(t, err)
+
+		//
+		// Describe the workflow
+		//
+		response, err := DescribeWorkflow(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.Workflow.Status)
+
+		//
+		// Verify we only get queue items for active nodes, not deleted ones
+		//
+		assert.Len(t, response.Workflow.Status.NextQueueItems, 2)
+
+		// Verify active node queue items are included
+		queueItemIDs := make(map[string]bool)
+		for _, item := range response.Workflow.Status.NextQueueItems {
+			queueItemIDs[item.Id] = true
+			// Verify it's not the deleted node's queue item
+			assert.NotEqual(t, "deleted-node", item.NodeId)
+		}
+
+		assert.True(t, queueItemIDs[activeQI1.ID.String()])
+		assert.True(t, queueItemIDs[activeQI2.ID.String()])
+		assert.False(t, queueItemIDs[deletedQI.ID.String()])
+	})
+
+	t.Run("status excludes events for deleted nodes", func(t *testing.T) {
+		//
+		// Create a workflow with three nodes
+		//
+		workflow, workflowNodes := support.CreateWorkflow(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.WorkflowNode{
+				{
+					NodeID: "active-node-1",
+					Name:   "Active Node 1",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+				{
+					NodeID: "active-node-2",
+					Name:   "Active Node 2",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+				{
+					NodeID: "deleted-node",
+					Name:   "Deleted Node",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		//
+		// Create events for all nodes
+		//
+		activeEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-1", "default", nil)
+		activeEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-2", "default", nil)
+		deletedEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "deleted-node", "default", nil)
+
+		//
+		// Delete one node (soft delete)
+		//
+		var deletedNode *models.WorkflowNode
+		for i := range workflowNodes {
+			if workflowNodes[i].NodeID == "deleted-node" {
+				deletedNode = &workflowNodes[i]
+				break
+			}
+		}
+		require.NotNil(t, deletedNode)
+		err := database.Conn().Delete(deletedNode).Error
+		require.NoError(t, err)
+
+		//
+		// Describe the workflow
+		//
+		response, err := DescribeWorkflow(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.Workflow.Status)
+
+		//
+		// Verify we only get events for active nodes, not deleted ones
+		//
+		assert.Len(t, response.Workflow.Status.LastEvents, 2)
+
+		// Verify active node events are included
+		eventIDs := make(map[string]bool)
+		for _, event := range response.Workflow.Status.LastEvents {
+			eventIDs[event.Id] = true
+			// Verify it's not the deleted node's event
+			assert.NotEqual(t, "deleted-node", event.NodeId)
+		}
+
+		assert.True(t, eventIDs[activeEvent1.ID.String()])
+		assert.True(t, eventIDs[activeEvent2.ID.String()])
+		assert.False(t, eventIDs[deletedEvent.ID.String()])
 	})
 }
