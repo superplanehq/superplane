@@ -508,15 +508,20 @@ func (e *WorkflowNodeExecution) CreateRequest(tx *gorm.DB, reqType string, spec 
 
 // FindLastExecutionPerNode finds the most recent execution for each node in a workflow
 // using DISTINCT ON to get one execution per node_id, ordered by created_at DESC
+// Only returns executions for nodes that have not been deleted
 func FindLastExecutionPerNode(workflowID uuid.UUID) ([]WorkflowNodeExecution, error) {
 	var executions []WorkflowNodeExecution
 	err := database.Conn().
 		Raw(`
-			SELECT DISTINCT ON (node_id) *
-			FROM workflow_node_executions
-			WHERE workflow_id = ?
-			AND parent_execution_id IS NULL
-			ORDER BY node_id, created_at DESC
+			SELECT DISTINCT ON (wne.node_id) wne.*
+			FROM workflow_node_executions wne
+			INNER JOIN workflow_nodes wn
+				ON wne.workflow_id = wn.workflow_id
+				AND wne.node_id = wn.node_id
+			WHERE wne.workflow_id = ?
+			AND wne.parent_execution_id IS NULL
+			AND wn.deleted_at IS NULL
+			ORDER BY wne.node_id, wne.created_at DESC
 		`, workflowID).
 		Scan(&executions).
 		Error
