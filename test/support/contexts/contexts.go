@@ -125,7 +125,7 @@ type ExecutionStateContext struct {
 	Passed         bool
 	FailureReason  string
 	FailureMessage string
-	Outputs        map[string][]any
+	Outputs        map[string][]core.Payload
 	KVs            map[string]string
 }
 
@@ -133,7 +133,7 @@ func (c *ExecutionStateContext) IsFinished() bool {
 	return c.Finished
 }
 
-func (c *ExecutionStateContext) Pass(outputs map[string][]any) error {
+func (c *ExecutionStateContext) Pass(outputs map[string][]core.Payload) error {
 	c.Finished = true
 	c.Passed = true
 	c.Outputs = outputs

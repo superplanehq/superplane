@@ -346,8 +346,10 @@ func (w *Wait) HandleTimeReached(ctx core.ActionContext) error {
 	finishTime := time.Now().Format(time.RFC3339)
 	completionOutput := createCompletionOutput(startTime, finishTime, "completed", "timeout", nil)
 
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {completionOutput},
+	return ctx.ExecutionStateContext.Pass(map[string][]core.Payload{
+		core.DefaultOutputChannel.Name: {
+			{Type: "wait.finished", Timestamp: time.Now(), Data: completionOutput},
+		},
 	})
 }
 
@@ -362,8 +364,10 @@ func (w *Wait) HandlePushThrough(ctx core.ActionContext) error {
 	actor := ctx.AuthContext.AuthenticatedUser()
 	completionOutput := createCompletionOutput(startTime, finishTime, "completed", "manual_override", actor)
 
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {completionOutput},
+	return ctx.ExecutionStateContext.Pass(map[string][]core.Payload{
+		core.DefaultOutputChannel.Name: {
+			{Type: "wait.finished", Timestamp: time.Now(), Data: completionOutput},
+		},
 	})
 }
 
@@ -385,7 +389,9 @@ func (w *Wait) Cancel(ctx core.ExecutionContext) error {
 	actor := ctx.AuthContext.AuthenticatedUser()
 	completionOutput := createCompletionOutput(startTime, finishTime, "cancelled", "user_cancel", actor)
 
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {completionOutput},
+	return ctx.ExecutionStateContext.Pass(map[string][]core.Payload{
+		core.DefaultOutputChannel.Name: {
+			{Type: "wait.finished", Timestamp: time.Now(), Data: completionOutput},
+		},
 	})
 }

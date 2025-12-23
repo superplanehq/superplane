@@ -3,6 +3,7 @@ package noop
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -47,8 +48,14 @@ func (c *NoOp) Configuration() []configuration.Field {
 }
 
 func (c *NoOp) Execute(ctx core.ExecutionContext) error {
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {make(map[string]any)},
+	return ctx.ExecutionStateContext.Pass(map[string][]core.Payload{
+		core.DefaultOutputChannel.Name: {
+			{
+				Type:      "noop.finished",
+				Timestamp: time.Now(),
+				Data:      map[string]any{},
+			},
+		},
 	})
 }
 

@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -18,7 +19,15 @@ func (s *ExecutionStateContext) IsFinished() bool {
 	return s.execution.State == models.WorkflowNodeExecutionStateFinished
 }
 
-func (s *ExecutionStateContext) Pass(outputs map[string][]any) error {
+func (s *ExecutionStateContext) Pass(payloads map[string][]core.Payload) error {
+	outputs := make(map[string][]any, len(payloads))
+	for k, v := range payloads {
+		outputs[k] = make([]any, len(v))
+		for i, p := range v {
+			outputs[k][i] = p
+		}
+	}
+
 	_, err := s.execution.PassInTransaction(s.tx, outputs)
 	if err != nil {
 		return err

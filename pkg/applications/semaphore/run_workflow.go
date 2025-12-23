@@ -339,12 +339,24 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	}
 
 	if metadata.Pipeline.Result == PipelineResultPassed {
-		err = executionCtx.ExecutionStateContext.Pass(map[string][]any{
-			PassedOutputChannel: {metadata},
+		err = executionCtx.ExecutionStateContext.Pass(map[string][]core.Payload{
+			PassedOutputChannel: {
+				{
+					Type:      "semaphore.workflow.finished",
+					Timestamp: time.Now(),
+					Data:      metadata,
+				},
+			},
 		})
 	} else {
-		err = executionCtx.ExecutionStateContext.Pass(map[string][]any{
-			FailedOutputChannel: {metadata},
+		err = executionCtx.ExecutionStateContext.Pass(map[string][]core.Payload{
+			FailedOutputChannel: {
+				{
+					Type:      "semaphore.workflow.finished",
+					Timestamp: time.Now(),
+					Data:      metadata,
+				},
+			},
 		})
 	}
 
@@ -436,13 +448,25 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 	}
 
 	if pipeline.Result == PipelineResultPassed {
-		return ctx.ExecutionStateContext.Pass(map[string][]any{
-			PassedOutputChannel: {metadata},
+		return ctx.ExecutionStateContext.Pass(map[string][]core.Payload{
+			PassedOutputChannel: {
+				{
+					Type:      "semaphore.workflow.finished",
+					Timestamp: time.Now(),
+					Data:      metadata,
+				},
+			},
 		})
 	}
 
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		FailedOutputChannel: {metadata},
+	return ctx.ExecutionStateContext.Pass(map[string][]core.Payload{
+		FailedOutputChannel: {
+			{
+				Type:      "semaphore.workflow.finished",
+				Timestamp: time.Now(),
+				Data:      metadata,
+			},
+		},
 	})
 }
 

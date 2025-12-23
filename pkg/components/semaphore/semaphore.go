@@ -350,13 +350,25 @@ func (s *Semaphore) poll(ctx core.ActionContext) error {
 	ctx.MetadataContext.Set(newMetadata)
 
 	if result == "passed" {
-		return ctx.ExecutionStateContext.Pass(map[string][]any{
-			PassedOutputChannel: {newMetadata},
+		return ctx.ExecutionStateContext.Pass(map[string][]core.Payload{
+			PassedOutputChannel: {
+				{
+					Type:      "semaphore.workflow.finished",
+					Timestamp: time.Now(),
+					Data:      metadata,
+				},
+			},
 		})
 	}
 
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		FailedOutputChannel: {newMetadata},
+	return ctx.ExecutionStateContext.Pass(map[string][]core.Payload{
+		FailedOutputChannel: {
+			{
+				Type:      "semaphore.workflow.finished",
+				Timestamp: time.Now(),
+				Data:      metadata,
+			},
+		},
 	})
 }
 
@@ -393,8 +405,10 @@ func (s *Semaphore) finish(ctx core.ActionContext) error {
 
 	ctx.MetadataContext.Set(newMetadata)
 
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		PassedOutputChannel: {newMetadata},
+	return ctx.ExecutionStateContext.Pass(map[string][]core.Payload{
+		PassedOutputChannel: {
+			{Type: "semaphore.workflow.finished", Timestamp: time.Now(), Data: metadata},
+		},
 	})
 }
 

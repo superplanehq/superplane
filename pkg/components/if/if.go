@@ -97,14 +97,18 @@ func (f *If) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("expression must evaluate to boolean, got %T", output)
 	}
 
-	var outputs map[string][]any
+	var outputs map[string][]core.Payload
 	if matches {
-		outputs = map[string][]any{
-			ChannelNameTrue: {make(map[string]any)},
+		outputs = map[string][]core.Payload{
+			ChannelNameTrue: {
+				{Type: "if.executed", Timestamp: time.Now(), Data: map[string]any{}},
+			},
 		}
 	} else {
-		outputs = map[string][]any{
-			ChannelNameFalse: {make(map[string]any)},
+		outputs = map[string][]core.Payload{
+			ChannelNameFalse: {
+				{Type: "if.executed", Timestamp: time.Now(), Data: map[string]any{}},
+			},
 		}
 	}
 

@@ -168,9 +168,15 @@ type MetadataContext interface {
  */
 type ExecutionStateContext interface {
 	IsFinished() bool
-	Pass(outputs map[string][]any) error
+	Pass(outputs map[string][]Payload) error
 	Fail(reason, message string) error
 	SetKV(key, value string) error
+}
+
+type Payload struct {
+	Type      string    `json:"type"`
+	Timestamp time.Time `json:"timestamp"`
+	Data      any       `json:"data"`
 }
 
 /*

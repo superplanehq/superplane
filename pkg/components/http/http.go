@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -187,8 +188,14 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		"body":    bodyData,
 	}
 
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		core.DefaultOutputChannel.Name: {response},
+	return ctx.ExecutionStateContext.Pass(map[string][]core.Payload{
+		core.DefaultOutputChannel.Name: {
+			{
+				Type:      "http.request.finished",
+				Timestamp: time.Now(),
+				Data:      response,
+			},
+		},
 	})
 }
 

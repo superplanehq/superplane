@@ -93,9 +93,15 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("expression must evaluate to boolean, got %T", output)
 	}
 
-	outputs := map[string][]any{}
+	outputs := map[string][]core.Payload{}
 	if matches {
-		outputs[core.DefaultOutputChannel.Name] = []any{make(map[string]any)}
+		outputs[core.DefaultOutputChannel.Name] = []core.Payload{
+			{
+				Type:      "filter.executed",
+				Timestamp: time.Now(),
+				Data:      map[string]any{},
+			},
+		}
 	}
 
 	return ctx.ExecutionStateContext.Pass(outputs)

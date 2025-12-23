@@ -481,12 +481,13 @@ func TestWait_HandleTimeReached_CompletionOutput(t *testing.T) {
 	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
 	assert.Len(t, outputs, 1)
 
-	output := outputs[0].(map[string]any)
-	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["timestamp_started"])
-	assert.Equal(t, "completed", output["result"])
-	assert.Equal(t, "timeout", output["reason"])
-	assert.Nil(t, output["actor"])
-	assert.Contains(t, output, "timestamp_finished")
+	payload := outputs[0]
+	outputData := payload.Data.(map[string]any)
+	assert.Equal(t, "2025-12-10T09:02:43.651Z", outputData["timestamp_started"])
+	assert.Equal(t, "completed", outputData["result"])
+	assert.Equal(t, "timeout", outputData["reason"])
+	assert.Nil(t, outputData["actor"])
+	assert.Contains(t, outputData, "timestamp_finished")
 }
 
 func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
@@ -514,9 +515,9 @@ func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
 
 	// Check completion output structure
 	assert.Contains(t, stateCtx.Outputs, core.DefaultOutputChannel.Name)
-	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
-	assert.Len(t, outputs, 1)
-	output := outputs[0].(map[string]any)
+	payloads := stateCtx.Outputs[core.DefaultOutputChannel.Name]
+	assert.Len(t, payloads, 1)
+	output := payloads[0].Data.(map[string]any)
 	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["timestamp_started"])
 	assert.Equal(t, "completed", output["result"])
 	assert.Equal(t, "manual_override", output["reason"])
@@ -628,9 +629,9 @@ func TestWait_Cancel_CompletionOutput(t *testing.T) {
 
 	// Check completion output structure
 	assert.Contains(t, stateCtx.Outputs, core.DefaultOutputChannel.Name)
-	outputs := stateCtx.Outputs[core.DefaultOutputChannel.Name]
-	assert.Len(t, outputs, 1)
-	output := outputs[0].(map[string]any)
+	payloads := stateCtx.Outputs[core.DefaultOutputChannel.Name]
+	assert.Len(t, payloads, 1)
+	output := payloads[0].Data.(map[string]any)
 	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["timestamp_started"])
 	assert.Equal(t, "cancelled", output["result"])
 	assert.Equal(t, "user_cancel", output["reason"])
