@@ -168,9 +168,14 @@ type MetadataContext interface {
  */
 type ExecutionStateContext interface {
 	IsFinished() bool
-	Pass(outputs map[string][]Payload) error
+	Pass(outputs []Output) error
 	Fail(reason, message string) error
 	SetKV(key, value string) error
+}
+
+type Output struct {
+	Channel  string
+	Payloads []Payload
 }
 
 type Payload struct {

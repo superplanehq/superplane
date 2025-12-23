@@ -52,7 +52,11 @@ func TestNoop_Execute_EmitsEmptyEvents(t *testing.T) {
 			assert.NoError(t, err)
 			assert.True(t, stateCtx.Passed)
 			assert.True(t, stateCtx.Finished)
-			assert.Equal(t, map[string][]any{"default": {make(map[string]any)}}, stateCtx.Outputs)
+			assert.Len(t, stateCtx.Outputs, 1)
+			assert.Equal(t, "default", stateCtx.Outputs[0].Channel)
+			assert.Len(t, stateCtx.Outputs[0].Payloads, 1)
+			assert.Equal(t, "noop.finished", stateCtx.Outputs[0].Payloads[0].Type)
+			assert.Equal(t, make(map[string]any), stateCtx.Outputs[0].Payloads[0].Data)
 		})
 	}
 }
@@ -78,9 +82,12 @@ func TestNoop_Execute_AlwaysEmitsEmpty(t *testing.T) {
 		assert.True(t, stateCtx.Finished)
 
 		// Verify that the output is an empty map, not the original data
-		expectedOutputs := map[string][]any{"default": {make(map[string]any)}}
-		assert.Equal(t, expectedOutputs, stateCtx.Outputs)
-		assert.NotEqual(t, map[string][]any{core.DefaultOutputChannel.Name: {originalData}}, stateCtx.Outputs)
+		assert.Len(t, stateCtx.Outputs, 1)
+		assert.Equal(t, "default", stateCtx.Outputs[0].Channel)
+		assert.Len(t, stateCtx.Outputs[0].Payloads, 1)
+		assert.Equal(t, "noop.finished", stateCtx.Outputs[0].Payloads[0].Type)
+		assert.Equal(t, make(map[string]any), stateCtx.Outputs[0].Payloads[0].Data)
+		assert.NotEqual(t, originalData, stateCtx.Outputs[0].Payloads[0].Data)
 	})
 }
 

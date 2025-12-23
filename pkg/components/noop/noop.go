@@ -48,12 +48,15 @@ func (c *NoOp) Configuration() []configuration.Field {
 }
 
 func (c *NoOp) Execute(ctx core.ExecutionContext) error {
-	return ctx.ExecutionStateContext.Pass(map[string][]core.Payload{
-		core.DefaultOutputChannel.Name: {
-			{
-				Type:      "noop.finished",
-				Timestamp: time.Now(),
-				Data:      map[string]any{},
+	return ctx.ExecutionStateContext.Pass([]core.Output{
+		{
+			Channel: core.DefaultOutputChannel.Name,
+			Payloads: []core.Payload{
+				{
+					Type:      "noop.finished",
+					Timestamp: time.Now(),
+					Data:      map[string]any{},
+				},
 			},
 		},
 	})

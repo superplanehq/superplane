@@ -59,7 +59,8 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, stateCtx.Passed)
 	assert.True(t, stateCtx.Finished)
-	assert.Contains(t, stateCtx.Outputs, ChannelApproved)
+	assert.Len(t, stateCtx.Outputs, 1)
+	assert.Equal(t, ChannelApproved, stateCtx.Outputs[0].Channel)
 }
 
 func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
@@ -97,7 +98,8 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, stateCtx.Passed)
 	assert.True(t, stateCtx.Finished)
-	assert.Contains(t, stateCtx.Outputs, ChannelRejected)
+	assert.Len(t, stateCtx.Outputs, 1)
+	assert.Equal(t, ChannelRejected, stateCtx.Outputs[0].Channel)
 }
 
 func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
@@ -260,7 +262,8 @@ func TestApproval_Execute(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, stateCtx.Passed)
 		assert.True(t, stateCtx.Finished)
-		assert.Contains(t, stateCtx.Outputs, ChannelApproved)
+		assert.Len(t, stateCtx.Outputs, 1)
+		assert.Equal(t, ChannelApproved, stateCtx.Outputs[0].Channel)
 		assert.NotNil(t, metadataCtx.Metadata)
 	})
 

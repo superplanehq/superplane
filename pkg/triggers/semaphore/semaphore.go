@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -188,7 +189,12 @@ func (s *Semaphore) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	err = ctx.EventContext.Emit(data)
+	err = ctx.EventContext.Emit(core.Payload{
+		Type:      "semaphore",
+		Timestamp: time.Now(),
+		Data:      data,
+	})
+
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}

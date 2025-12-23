@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -240,7 +241,12 @@ func (g *GitHub) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusOK, nil
 	}
 
-	err = ctx.EventContext.Emit(data)
+	err = ctx.EventContext.Emit(core.Payload{
+		Type:      "github",
+		Timestamp: time.Now(),
+		Data:      data,
+	})
+
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}

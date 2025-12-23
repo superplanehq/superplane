@@ -19,16 +19,16 @@ func (s *ExecutionStateContext) IsFinished() bool {
 	return s.execution.State == models.WorkflowNodeExecutionStateFinished
 }
 
-func (s *ExecutionStateContext) Pass(payloads map[string][]core.Payload) error {
-	outputs := make(map[string][]any, len(payloads))
-	for k, v := range payloads {
-		outputs[k] = make([]any, len(v))
-		for i, p := range v {
-			outputs[k][i] = p
+func (s *ExecutionStateContext) Pass(outputs []core.Output) error {
+	payloads := make(map[string][]any, len(outputs))
+	for _, output := range outputs {
+		payloads[output.Channel] = make([]any, len(output.Payloads))
+		for i, p := range output.Payloads {
+			payloads[output.Channel][i] = p
 		}
 	}
 
-	_, err := s.execution.PassInTransaction(s.tx, outputs)
+	_, err := s.execution.PassInTransaction(s.tx, payloads)
 	if err != nil {
 		return err
 	}

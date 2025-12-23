@@ -188,12 +188,15 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		"body":    bodyData,
 	}
 
-	return ctx.ExecutionStateContext.Pass(map[string][]core.Payload{
-		core.DefaultOutputChannel.Name: {
-			{
-				Type:      "http.request.finished",
-				Timestamp: time.Now(),
-				Data:      response,
+	return ctx.ExecutionStateContext.Pass([]core.Output{
+		{
+			Channel: core.DefaultOutputChannel.Name,
+			Payloads: []core.Payload{
+				{
+					Type:      "http.request.finished",
+					Timestamp: time.Now(),
+					Data:      response,
+				},
 			},
 		},
 	})

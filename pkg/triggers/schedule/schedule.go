@@ -400,24 +400,28 @@ func (s *Schedule) emitEvent(ctx core.TriggerActionContext) error {
 	}
 
 	payload := map[string]any{
-		"timestamp":     now.Format(time.RFC3339),
-		"Readable date": now.Format("January 2nd 2006, 15:04:05 pm"),
-		"Readable time": now.Format("15:04:05 pm"),
-		"Day of week":   now.Format("Monday"),
-		"Year":          now.Format("2006"),
-		"Month":         now.Format("January"),
-		"Day of month":  now.Format("2"),
-		"Hour":          now.Format("15"),
-		"Minute":        now.Format("04"),
-		"Second":        now.Format("05"),
+		"calendar": map[string]any{
+			"year":     now.Format("2006"),
+			"month":    now.Format("January"),
+			"day":      now.Format("2"),
+			"hour":     now.Format("15"),
+			"minute":   now.Format("04"),
+			"second":   now.Format("05"),
+			"week_day": now.Format("Monday"),
+		},
 	}
 
 	// Only include timezone for schedule types that support it
 	if timezone != nil {
-		payload["Timezone"] = formatTimezone(timezone)
+		payload["timezone"] = formatTimezone(timezone)
 	}
 
-	err = ctx.EventContext.Emit(payload)
+	err = ctx.EventContext.Emit(core.Payload{
+		Type:      "scheduler.tick",
+		Timestamp: time.Now(),
+		Data:      payload,
+	})
+
 	if err != nil {
 		return err
 	}

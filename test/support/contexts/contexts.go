@@ -9,16 +9,16 @@ import (
 )
 
 type EventContext struct {
-	EmittedEvents []any
+	Payloads []core.Payload
 }
 
-func (e *EventContext) Emit(event any) error {
-	e.EmittedEvents = append(e.EmittedEvents, event)
+func (e *EventContext) Emit(event core.Payload) error {
+	e.Payloads = append(e.Payloads, event)
 	return nil
 }
 
 func (e *EventContext) Count() int {
-	return len(e.EmittedEvents)
+	return len(e.Payloads)
 }
 
 type WebhookContext struct {
@@ -125,7 +125,7 @@ type ExecutionStateContext struct {
 	Passed         bool
 	FailureReason  string
 	FailureMessage string
-	Outputs        map[string][]core.Payload
+	Outputs        []core.Output
 	KVs            map[string]string
 }
 
@@ -133,7 +133,7 @@ func (c *ExecutionStateContext) IsFinished() bool {
 	return c.Finished
 }
 
-func (c *ExecutionStateContext) Pass(outputs map[string][]core.Payload) error {
+func (c *ExecutionStateContext) Pass(outputs []core.Output) error {
 	c.Finished = true
 	c.Passed = true
 	c.Outputs = outputs
