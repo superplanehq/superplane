@@ -56,7 +56,7 @@ func (s *ComponentSteps) AddNoop(name string, pos models.Position) {
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(300)
+	s.session.Sleep(500)
 }
 
 func (s *ComponentSteps) Save() {
@@ -75,7 +75,7 @@ func (s *ComponentSteps) AddApproval(nodeName string, pos models.Position) {
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(300)
+	s.session.Sleep(500)
 }
 
 func (s *ComponentSteps) AddManualTrigger(name string, pos models.Position) {
@@ -87,6 +87,7 @@ func (s *ComponentSteps) AddManualTrigger(name string, pos models.Position) {
 	s.session.DragAndDrop(startSource, target, pos.X, pos.Y)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.Click(q.TestID("save-node-button"))
+	s.session.Sleep(500)
 }
 
 func (s *ComponentSteps) AddWait(name string, pos models.Position, duration int, unit string) {
@@ -107,7 +108,7 @@ func (s *ComponentSteps) AddWait(name string, pos models.Position, duration int,
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + unit + `")`))
 
 	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(300)
+	s.session.Sleep(500)
 }
 
 func (s *ComponentSteps) StartAddingTimeGate(name string, pos models.Position) {
@@ -143,6 +144,7 @@ func (s *ComponentSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
 
 	s.session.Click(q.TestID("save-node-button"))
+	s.session.Sleep(500)
 }
 
 func (s *ComponentSteps) Connect(sourceName, targetName string) {

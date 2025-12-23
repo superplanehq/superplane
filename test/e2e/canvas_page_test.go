@@ -307,6 +307,7 @@ func (s *CanvasPageSteps) assertQueuedItemsVisibleInSidebar() {
 func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
 	eventItem := q.Locator("h2:has-text('Queued') ~ div")
 	s.session.HoverOver(eventItem)
+	s.session.Sleep(300) // Wait for hover to register and actions button to appear
 	s.session.Click(q.Locator("h2:has-text('Queued') ~ div button[aria-label='Open actions']"))
 	s.session.TakeScreenshot()
 	s.session.Sleep(300)
@@ -318,6 +319,7 @@ func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
 func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
 	eventItem := q.Locator("h2:has-text('Latest') ~ div")
 	s.session.HoverOver(eventItem)
+	s.session.Sleep(300) // Wait for hover to register and actions button to appear
 	s.session.Click(q.Locator("h2:has-text('Latest') ~ div button[aria-label='Open actions']"))
 	s.session.TakeScreenshot()
 	s.session.Sleep(300)

@@ -96,7 +96,7 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 
 	s.session.Click(q.TestID("save-node-button"))
 
-	s.session.Sleep(300)
+	s.session.Sleep(500)
 }
 
 func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
@@ -108,6 +108,7 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 	s.session.DragAndDrop(startSource, target, pos.X, pos.Y)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.Click(q.TestID("save-node-button"))
+	s.session.Sleep(500)
 }
 
 func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, unit string) {
@@ -132,7 +133,7 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + unit + `")`))
 
 	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(300)
+	s.session.Sleep(500)
 }
 
 func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
@@ -168,6 +169,7 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
 
 	s.session.Click(q.TestID("save-node-button"))
+	s.session.Sleep(500)
 }
 
 func (s *CanvasSteps) Connect(sourceName, targetName string) {

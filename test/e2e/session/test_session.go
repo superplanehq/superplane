@@ -62,7 +62,14 @@ func (s *TestSession) StartWithoutUser() {
 
 func (s *TestSession) Close() {
 	if s.page != nil {
+		// Close the page first to finalize the video
+		videoPath, _ := s.page.Video().Path()
 		_ = s.page.Close()
+
+		// If test failed, keep the video, otherwise delete it
+		if !s.t.Failed() && videoPath != "" {
+			_ = os.Remove(videoPath)
+		}
 	}
 }
 
