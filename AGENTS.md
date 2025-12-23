@@ -26,6 +26,7 @@
 - When adding a new worker in pkg/workers, always add its startup to `cmd/server/main.go`, and update the docker compose files with the new environment variables that are needed.
 - After adding new API endpoints, ensure the new endpoints have their authorization covered in `pkg/authorization/interceptor.go`
 - For UI component workflow, see [web_src/AGENTS.md](web_src/AGENTS.md)
+- For new components or triggers, see [docs/development/component-implementations.md](docs/development/component-implementations.md)
 - After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI:
   - `make pb.gen` to regenerate protobuf files
   - `make openapi.spec.gen` to generate OpenAPI spec for the API

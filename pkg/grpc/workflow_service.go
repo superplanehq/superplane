@@ -125,6 +125,7 @@ func (s *WorkflowService) InvokeNodeExecutionAction(ctx context.Context, req *pb
 	return workflows.InvokeNodeExecutionAction(
 		ctx,
 		s.authService,
+		s.encryptor,
 		s.registry,
 		uuid.MustParse(organizationID),
 		workflowID,

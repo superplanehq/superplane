@@ -2,6 +2,8 @@ import React from "react";
 import { Label } from "../label";
 import { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
+import { TextFieldRenderer } from "./TextFieldRenderer";
+import { XMLFieldRenderer } from "./XMLFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
 import { BooleanFieldRenderer } from "./BooleanFieldRenderer";
 import { SelectFieldRenderer } from "./SelectFieldRenderer";
@@ -161,6 +163,12 @@ export const ConfigurationFieldRenderer = ({
       case "string":
         return <StringFieldRenderer {...commonProps} />;
 
+      case "text":
+        return <TextFieldRenderer {...commonProps} />;
+
+      case "xml":
+        return <XMLFieldRenderer {...commonProps} />;
+
       case "number":
         return <NumberFieldRenderer {...commonProps} />;
 
@@ -261,6 +269,41 @@ export const ConfigurationFieldRenderer = ({
     }
   };
 
+  // For boolean fields, render label inline with switch
+  if (field.type === "boolean") {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          {renderField()}
+          <Label className={`text-left cursor-pointer ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
+            {field.label || field.name}
+            {isRequired && <span className="text-red-500 ml-1">*</span>}
+            {hasFieldError &&
+              ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
+                (!enableRealtimeValidation &&
+                  validationErrors &&
+                  isRequired &&
+                  (value === undefined || value === null || value === ""))) && (
+                <span className="text-red-500 text-xs ml-2">- required field</span>
+              )}
+          </Label>
+        </div>
+
+        {/* Display validation errors */}
+        {allFieldErrors.length > 0 && (
+          <div className="space-y-1">
+            {allFieldErrors.map((error, index) => (
+              <p key={index} className="text-xs text-red-500 dark:text-red-400 text-left">
+                {error.message}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // For all other field types, render label above field
   return (
     <div className="space-y-2">
       <Label className={`block text-left ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>

@@ -2,7 +2,9 @@ package blueprints
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -43,7 +45,7 @@ func SerializeBlueprint(in *models.Blueprint) *pb.Blueprint {
 	}
 }
 
-func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]models.Node, []models.Edge, error) {
+func ParseBlueprint(registry *registry.Registry, organizationID string, blueprint *pb.Blueprint) ([]models.Node, []models.Edge, error) {
 	if blueprint.Name == "" {
 		return nil, nil, status.Error(codes.InvalidArgument, "blueprint name is required")
 	}
@@ -67,7 +69,7 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 		nodeIDs[node.Id] = true
 
 		// Collect validation errors instead of failing immediately
-		if err := validateNodeRef(registry, node); err != nil {
+		if err := validateNodeRef(registry, organizationID, node); err != nil {
 			nodeValidationErrors[node.Id] = err.Error()
 		}
 	}
@@ -99,7 +101,7 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 	return nodes, actions.ProtoToEdges(blueprint.Edges), nil
 }
 
-func validateNodeRef(registry *registry.Registry, node *componentpb.Node) error {
+func validateNodeRef(registry *registry.Registry, organizationID string, node *componentpb.Node) error {
 	switch node.Type {
 	case componentpb.Node_TYPE_COMPONENT:
 		if node.Component == nil {
@@ -108,6 +110,19 @@ func validateNodeRef(registry *registry.Registry, node *componentpb.Node) error 
 
 		if node.Component.Name == "" {
 			return fmt.Errorf("component name is required")
+		}
+
+		// Check if this is an application component (contains a dot)
+		parts := strings.SplitN(node.Component.Name, ".", 2)
+		if len(parts) > 2 {
+			return fmt.Errorf("invalid component name: %s", node.Component.Name)
+		}
+
+		// For application components, validate the app installation
+		if len(parts) == 2 {
+			if err := validateAppInstallation(organizationID, node.AppInstallation); err != nil {
+				return err
+			}
 		}
 
 		_, err := registry.GetComponent(node.Component.Name)
@@ -119,6 +134,29 @@ func validateNodeRef(registry *registry.Registry, node *componentpb.Node) error 
 	default:
 		return fmt.Errorf("invalid node type")
 	}
+}
+
+func validateAppInstallation(organizationID string, ref *componentpb.AppInstallationRef) error {
+	if ref == nil || ref.Id == "" {
+		return fmt.Errorf("app installation is required")
+	}
+
+	installationID, err := uuid.Parse(ref.Id)
+	if err != nil {
+		return fmt.Errorf("invalid app installation ID: %v", err)
+	}
+
+	orgID, err := uuid.Parse(organizationID)
+	if err != nil {
+		return fmt.Errorf("invalid organization ID: %v", err)
+	}
+
+	_, err = models.FindAppInstallation(orgID, installationID)
+	if err != nil {
+		return fmt.Errorf("app installation not found or does not belong to this organization")
+	}
+
+	return nil
 }
 
 func validateAcyclic(nodes []*componentpb.Node, edges []*componentpb.Edge) error {

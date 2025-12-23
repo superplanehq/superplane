@@ -197,7 +197,7 @@ func EmitWorkflowEventForNodeWithData(
 	return &event
 }
 
-func CreateWorkflowQueueItem(t *testing.T, workflowID uuid.UUID, nodeID string, rootEventID uuid.UUID, eventID uuid.UUID) {
+func CreateWorkflowQueueItem(t *testing.T, workflowID uuid.UUID, nodeID string, rootEventID uuid.UUID, eventID uuid.UUID) *models.WorkflowNodeQueueItem {
 	now := time.Now()
 
 	queueItem := models.WorkflowNodeQueueItem{
@@ -211,6 +211,7 @@ func CreateWorkflowQueueItem(t *testing.T, workflowID uuid.UUID, nodeID string, 
 
 	err := database.Conn().Create(&queueItem).Error
 	require.NoError(t, err)
+	return &queueItem
 }
 
 func CreateNodeExecutionWithConfiguration(

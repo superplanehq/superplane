@@ -1,4 +1,4 @@
-.PHONY: lint test
+.PHONY: lint test test.license.check
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -48,13 +48,19 @@ test.e2e.setup:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "cd web_src && npm ci"
 
 test.e2e:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --packages="$(E2E_TEST_PACKAGES)" -- -p 1
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1
+
+test.e2e.autoparallel:
+	docker compose $(DOCKER_COMPOSE_OPTS) exec -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
 
 test.e2e.single:
 	bash ./scripts/vscode_run_tests.sh line $(FILE) $(LINE)
 
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
+
+test.license.check:
+	bash ./scripts/license-check.sh
 
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1

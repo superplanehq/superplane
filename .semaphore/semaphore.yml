@@ -5,6 +5,17 @@ agent:
     type: f1-standard-2
     os_image: ubuntu2204
 blocks:
+  - name: "📜 License Check"
+    dependencies: []
+    task:
+      prologue:
+        commands:
+          - checkout
+      jobs:
+        - name: "Licence Check"
+          commands:
+            - make test.license.check
+
   - name: "\U0001F9EA QA"
     dependencies: []
     task:
@@ -26,9 +37,10 @@ blocks:
             - make test
 
         - name: "E2E Tests"
+          parallelism: 10
           commands:
             - make setup.playwright
-            - make test.e2e
+            - make test.e2e.autoparallel INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
 
         - name: "Check: DB structure"
           commands:

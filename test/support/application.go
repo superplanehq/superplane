@@ -54,8 +54,8 @@ func (t *DummyApplication) Sync(ctx core.SyncContext) error {
 func (t *DummyApplication) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
-func (t *DummyApplication) RequestWebhook(ctx core.AppInstallationContext, configuration any) error {
-	return nil
+func (t *DummyApplication) CompareWebhookConfig(a, b any) (bool, error) {
+	return false, nil
 }
 
 func (t *DummyApplication) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (any, error) {

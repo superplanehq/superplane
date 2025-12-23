@@ -294,32 +294,21 @@ type WebhookConfiguration struct {
 	Repository string `json:"repository"`
 }
 
-func (g *GitHub) RequestWebhook(ctx core.AppInstallationContext, configuration any) error {
-	config := WebhookConfiguration{}
-	err := mapstructure.Decode(configuration, &config)
+func (g *GitHub) CompareWebhookConfig(a, b any) (bool, error) {
+	configA := WebhookConfiguration{}
+	configB := WebhookConfiguration{}
+
+	err := mapstructure.Decode(a, &configA)
 	if err != nil {
-		return fmt.Errorf("Failed to decode configuration: %v", err)
+		return false, err
 	}
 
-	hooks, err := ctx.ListWebhooks()
+	err = mapstructure.Decode(b, &configB)
 	if err != nil {
-		return fmt.Errorf("Failed to list webhooks: %v", err)
+		return false, err
 	}
 
-	for _, hook := range hooks {
-		c := WebhookConfiguration{}
-		err := mapstructure.Decode(hook.Configuration, &c)
-		if err != nil {
-			return err
-		}
-
-		if c.Repository == config.Repository && c.EventType == config.EventType {
-			ctx.AssociateWebhook(hook.ID)
-			return nil
-		}
-	}
-
-	return ctx.CreateWebhook(configuration)
+	return configA.Repository == configB.Repository && configA.EventType == configB.EventType, nil
 }
 
 type Webhook struct {

@@ -201,6 +201,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
 	}
 
+	logger := logging.ForExecution(execution, nil)
 	actionCtx := core.ActionContext{
 		Name:                  actionName,
 		Configuration:         node.Configuration.Data(),
@@ -217,9 +218,11 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 
+		logger = logging.WithAppInstallation(logger, *appInstallation)
 		actionCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
 	}
 
+	actionCtx.Logger = logger
 	err = component.HandleAction(actionCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)

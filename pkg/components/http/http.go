@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -23,11 +25,22 @@ type Header struct {
 	Value string `json:"value"`
 }
 
+type KeyValue struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type Spec struct {
-	URL     string   `json:"url"`
-	Method  string   `json:"method"`
-	Payload any      `json:"payload"`
-	Headers []Header `json:"headers"`
+	Method      string      `json:"method"`
+	URL         string      `json:"url"`
+	SendHeaders bool        `json:"sendHeaders"`
+	Headers     []Header    `json:"headers"`
+	SendBody    bool        `json:"sendBody"`
+	ContentType string      `json:"contentType"`
+	JSON        *any        `json:"json,omitempty"`
+	XML         *string     `json:"xml,omitempty"`
+	Text        *string     `json:"text,omitempty"`
+	FormData    *[]KeyValue `json:"formData,omitempty"`
 }
 
 type HTTP struct{}
@@ -53,6 +66,50 @@ func (e *HTTP) Color() string {
 }
 
 func (e *HTTP) Setup(ctx core.SetupContext) error {
+	spec := Spec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return err
+	}
+
+	if spec.URL == "" {
+		return fmt.Errorf("url is required")
+	}
+
+	if spec.Method == "" {
+		return fmt.Errorf("method is required")
+	}
+
+	if !spec.SendBody {
+		return nil
+	}
+
+	if spec.ContentType == "" {
+		return fmt.Errorf("content type is required when sending a body")
+	}
+
+	switch spec.ContentType {
+	case "application/json":
+		if spec.JSON == nil {
+			return fmt.Errorf("json is required")
+		}
+
+	case "application/x-www-form-urlencoded":
+		if spec.FormData == nil {
+			return fmt.Errorf("form data is required")
+		}
+
+	case "text/plain":
+		if spec.Text == nil {
+			return fmt.Errorf("text is required")
+		}
+
+	case "application/xml":
+		if spec.XML == nil {
+			return fmt.Errorf("xml is required")
+		}
+	}
+
 	return nil
 }
 
@@ -62,12 +119,6 @@ func (e *HTTP) OutputChannels(configuration any) []core.OutputChannel {
 
 func (e *HTTP) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:     "url",
-			Label:    "URL",
-			Type:     configuration.FieldTypeString,
-			Required: true,
-		},
 		{
 			Name:     "method",
 			Type:     configuration.FieldTypeSelect,
@@ -87,19 +138,31 @@ func (e *HTTP) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "payload",
-			Type:     configuration.FieldTypeObject,
-			Label:    "Payload",
-			Required: false,
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "method", Values: []string{"POST", "PUT"}},
-			},
+			Name:        "url",
+			Label:       "URL",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "https://api.example.com/endpoint",
+		},
+		{
+			Name:        "sendHeaders",
+			Label:       "Send Headers",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Enable to send custom headers with this request",
 		},
 		{
 			Name:     "headers",
 			Label:    "Headers",
 			Type:     configuration.FieldTypeList,
 			Required: false,
+			Default: []map[string]any{
+				{"name": "", "value": ""},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "sendHeaders", Values: []string{"true"}},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Header",
@@ -107,21 +170,136 @@ func (e *HTTP) Configuration() []configuration.Field {
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
 							{
-								Name:     "name",
-								Type:     configuration.FieldTypeString,
-								Label:    "Header Name",
-								Required: true,
+								Name:        "name",
+								Type:        configuration.FieldTypeString,
+								Label:       "Header Name",
+								Required:    true,
+								Placeholder: "Content-Type",
 							},
 							{
-								Name:     "value",
-								Type:     configuration.FieldTypeString,
-								Label:    "Header value",
-								Required: true,
+								Name:        "value",
+								Type:        configuration.FieldTypeString,
+								Label:       "Header Value",
+								Required:    true,
+								Placeholder: "application/json",
 							},
 						},
 					},
 				},
 			},
+		},
+		{
+			Name:        "sendBody",
+			Label:       "Send Body",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Enable to send a request body with this request",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "method", Values: []string{"POST", "PUT", "PATCH"}},
+			},
+		},
+		{
+			Name:        "contentType",
+			Label:       "Content Type",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     "application/json",
+			Description: "The content type of the request body",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "method", Values: []string{"POST", "PUT", "PATCH"}},
+				{Field: "sendBody", Values: []string{"true"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "sendBody", Values: []string{"true"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "JSON", Value: "application/json"},
+						{Label: "Form Data", Value: "application/x-www-form-urlencoded"},
+						{Label: "Plain Text", Value: "text/plain"},
+						{Label: "XML", Value: "application/xml"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "json",
+			Type:        configuration.FieldTypeObject,
+			Label:       "JSON Payload",
+			Required:    false,
+			Description: "The JSON object to send as the request body",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "method", Values: []string{"POST", "PUT", "PATCH"}},
+				{Field: "sendBody", Values: []string{"true"}},
+				{Field: "contentType", Values: []string{"application/json"}},
+			},
+		},
+		{
+			Name:     "formData",
+			Label:    "Form Data",
+			Type:     configuration.FieldTypeList,
+			Required: false,
+			Default: []map[string]any{
+				{"key": "", "value": ""},
+			},
+			Description: "Key-value pairs to send as form data",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "method", Values: []string{"POST", "PUT", "PATCH"}},
+				{Field: "sendBody", Values: []string{"true"}},
+				{Field: "contentType", Values: []string{"application/x-www-form-urlencoded"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Parameter",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:        "key",
+								Type:        configuration.FieldTypeString,
+								Label:       "Key",
+								Required:    true,
+								Placeholder: "username",
+							},
+							{
+								Name:        "value",
+								Type:        configuration.FieldTypeString,
+								Label:       "Value",
+								Required:    true,
+								Placeholder: "john.doe",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "text",
+			Type:        configuration.FieldTypeText,
+			Label:       "Text Payload",
+			Required:    false,
+			Description: "Plain text to send as the request body",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "method", Values: []string{"POST", "PUT", "PATCH"}},
+				{Field: "sendBody", Values: []string{"true"}},
+				{Field: "contentType", Values: []string{"text/plain"}},
+			},
+			Placeholder: "Enter plain text content",
+		},
+		{
+			Name:        "xml",
+			Type:        configuration.FieldTypeXML,
+			Label:       "XML Payload",
+			Required:    false,
+			Description: "XML content to send as the request body",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "method", Values: []string{"POST", "PUT", "PATCH"}},
+				{Field: "sendBody", Values: []string{"true"}},
+				{Field: "contentType", Values: []string{"application/xml"}},
+			},
+			Placeholder: "<?xml version=\"1.0\"?>\n<root>\n  <element>value</element>\n</root>",
 		},
 	}
 }
@@ -145,9 +323,14 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	body, err := e.getBody(spec.Method, spec.Payload)
-	if err != nil {
-		return err
+	// Serialize payload based on content type
+	var body io.Reader
+	var contentType string
+	if spec.SendBody && (spec.Method == "POST" || spec.Method == "PUT" || spec.Method == "PATCH") {
+		body, contentType, err = e.serializePayload(spec)
+		if err != nil {
+			return err
+		}
 	}
 
 	req, err := http.NewRequest(spec.Method, spec.URL, body)
@@ -155,9 +338,16 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	for _, header := range spec.Headers {
-		req.Header.Set(header.Name, header.Value)
+	// Set Content-Type if we have one
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+
+	// Apply custom headers if enabled (can override Content-Type)
+	if spec.SendHeaders {
+		for _, header := range spec.Headers {
+			req.Header.Set(header.Name, header.Value)
+		}
 	}
 
 	resp, err := http.DefaultClient.Do(req)
@@ -174,9 +364,11 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 
 	var bodyData any
 	if len(respBody) > 0 {
+		// Try to parse as JSON, but don't fail if it's not JSON
 		err := json.Unmarshal(respBody, &bodyData)
 		if err != nil {
-			return fmt.Errorf("failed to parse response: %w", err)
+			// If not valid JSON, store as string
+			bodyData = string(respBody)
 		}
 	}
 
@@ -194,17 +386,31 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (e *HTTP) getBody(method string, payload any) (io.Reader, error) {
-	if method == http.MethodGet || payload == nil {
-		return nil, nil
-	}
+func (e *HTTP) serializePayload(spec Spec) (io.Reader, string, error) {
+	switch spec.ContentType {
+	case "application/json":
+		data, err := json.Marshal(spec.JSON)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to marshal JSON payload: %w", err)
+		}
+		return bytes.NewReader(data), spec.ContentType, nil
 
-	bodyData, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request body: %w", err)
-	}
+	case "application/x-www-form-urlencoded":
+		values := url.Values{}
+		for _, kv := range *spec.FormData {
+			values.Add(kv.Key, kv.Value)
+		}
+		return strings.NewReader(values.Encode()), spec.ContentType, nil
 
-	return bytes.NewReader(bodyData), nil
+	case "text/plain":
+		return strings.NewReader(*spec.Text), spec.ContentType, nil
+
+	case "application/xml":
+		return strings.NewReader(*spec.XML), spec.ContentType, nil
+
+	default:
+		return nil, "", fmt.Errorf("unsupported content type: %s", spec.ContentType)
+	}
 }
 
 func (e *HTTP) Cancel(ctx core.ExecutionContext) error {
