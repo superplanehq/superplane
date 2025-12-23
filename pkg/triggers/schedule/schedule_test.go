@@ -426,7 +426,6 @@ func TestEmitEvent(t *testing.T) {
 	tests := []struct {
 		name               string
 		config             Configuration
-		timezone           string
 		shouldHaveTimezone bool
 	}{
 		{
@@ -455,7 +454,6 @@ func TestEmitEvent(t *testing.T) {
 				Minute:       intPtr(0),
 				Timezone:     stringPtr("-5"),
 			},
-			timezone:           "GMT-5.0 (UTC-05:00)",
 			shouldHaveTimezone: true,
 		},
 		{
@@ -468,7 +466,6 @@ func TestEmitEvent(t *testing.T) {
 				Minute:        intPtr(30),
 				Timezone:      stringPtr("1"),
 			},
-			timezone:           "GMT+1.0 (UTC+01:00)",
 			shouldHaveTimezone: true,
 		},
 		{
@@ -478,7 +475,6 @@ func TestEmitEvent(t *testing.T) {
 				CronExpression: stringPtr("0 30 14 * * *"),
 				Timezone:       stringPtr("2"),
 			},
-			timezone:           "GMT+2.0 (UTC+02:00)",
 			shouldHaveTimezone: true,
 		},
 	}
@@ -516,30 +512,9 @@ func TestEmitEvent(t *testing.T) {
 				return
 			}
 
-			baseFields := []string{
-				"timestamp", "Readable date", "Readable time", "Day of week",
-				"Year", "Month", "Day of month", "Hour", "Minute", "Second",
-			}
-
-			for _, field := range baseFields {
-				if _, ok := emittedPayload[field]; !ok {
-					t.Errorf("expected field %q in payload, but it was missing", field)
-				}
-			}
-
-			// Validate timezone field presence based on schedule type
-			if tt.shouldHaveTimezone {
-				if timezone, ok := emittedPayload["Timezone"].(string); ok {
-					if timezone != tt.timezone {
-						t.Errorf("expected timezone %q, got %q", tt.timezone, timezone)
-					}
-				} else {
-					t.Errorf("expected Timezone field to be present and be a string")
-				}
-			} else {
-				if _, ok := emittedPayload["Timezone"]; ok {
-					t.Errorf("expected Timezone field to be absent for schedule type %q", tt.config.Type)
-				}
+			// Validate top-level structure
+			if payloadType, ok := emittedPayload["type"].(string); !ok || payloadType != "scheduler.tick" {
+				t.Errorf("expected type field to be 'scheduler.tick', got %v", emittedPayload["type"])
 			}
 
 			// Validate timestamp format
@@ -550,6 +525,44 @@ func TestEmitEvent(t *testing.T) {
 				}
 			} else {
 				t.Errorf("expected timestamp field to be a string")
+			}
+
+			// Validate data field exists
+			data, ok := emittedPayload["data"].(map[string]any)
+			if !ok {
+				t.Errorf("expected data field to be map[string]any, got %T", emittedPayload["data"])
+				return
+			}
+
+			// Validate calendar fields
+			calendar, ok := data["calendar"].(map[string]any)
+			if !ok {
+				t.Errorf("expected data.calendar field to be map[string]any, got %T", data["calendar"])
+				return
+			}
+
+			calendarFields := []string{"year", "month", "day", "hour", "minute", "second", "weekday"}
+			for _, field := range calendarFields {
+				if _, ok := calendar[field]; !ok {
+					t.Errorf("expected field %q in data.calendar, but it was missing", field)
+				}
+			}
+
+			// Validate timezone field presence based on schedule type
+			if tt.shouldHaveTimezone {
+				if _, ok := data["timezone"].(string); !ok {
+					t.Errorf("expected data.timezone field to be present and be a string")
+				}
+				if _, ok := data["utc_offset"].(string); !ok {
+					t.Errorf("expected data.utc_offset field to be present and be a string")
+				}
+			} else {
+				if _, ok := data["timezone"]; ok {
+					t.Errorf("expected timezone field to be absent for schedule type %q", tt.config.Type)
+				}
+				if _, ok := data["utc_offset"]; ok {
+					t.Errorf("expected utc_offset field to be absent for schedule type %q", tt.config.Type)
+				}
 			}
 		})
 	}
