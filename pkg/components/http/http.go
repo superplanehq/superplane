@@ -25,14 +25,22 @@ type Header struct {
 	Value string `json:"value"`
 }
 
+type KeyValue struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type Spec struct {
-	Method      string   `json:"method"`
-	URL         string   `json:"url"`
-	SendHeaders bool     `json:"sendHeaders"`
-	Headers     []Header `json:"headers"`
-	SendBody    bool     `json:"sendBody"`
-	ContentType string   `json:"contentType"`
-	Payload     any      `json:"payload"`
+	Method      string      `json:"method"`
+	URL         string      `json:"url"`
+	SendHeaders bool        `json:"sendHeaders"`
+	Headers     []Header    `json:"headers"`
+	SendBody    bool        `json:"sendBody"`
+	ContentType string      `json:"contentType"`
+	JSON        *any        `json:"json,omitempty"`
+	XML         *string     `json:"xml,omitempty"`
+	Text        *string     `json:"text,omitempty"`
+	FormData    *[]KeyValue `json:"formData,omitempty"`
 }
 
 type HTTP struct{}
@@ -58,6 +66,50 @@ func (e *HTTP) Color() string {
 }
 
 func (e *HTTP) Setup(ctx core.SetupContext) error {
+	spec := Spec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return err
+	}
+
+	if spec.URL == "" {
+		return fmt.Errorf("url is required")
+	}
+
+	if spec.Method == "" {
+		return fmt.Errorf("method is required")
+	}
+
+	if !spec.SendBody {
+		return nil
+	}
+
+	if spec.ContentType == "" {
+		return fmt.Errorf("content type is required when sending a body")
+	}
+
+	switch spec.ContentType {
+	case "application/json":
+		if spec.JSON == nil {
+			return fmt.Errorf("json is required")
+		}
+
+	case "application/x-www-form-urlencoded":
+		if spec.FormData == nil {
+			return fmt.Errorf("form data is required")
+		}
+
+	case "text/plain":
+		if spec.Text == nil {
+			return fmt.Errorf("text is required")
+		}
+
+	case "application/xml":
+		if spec.XML == nil {
+			return fmt.Errorf("xml is required")
+		}
+	}
+
 	return nil
 }
 
@@ -173,7 +225,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "payload",
+			Name:        "json",
 			Type:        configuration.FieldTypeObject,
 			Label:       "JSON Payload",
 			Required:    false,
@@ -185,7 +237,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "payloadFormData",
+			Name:     "formData",
 			Label:    "Form Data",
 			Type:     configuration.FieldTypeList,
 			Required: false,
@@ -224,8 +276,8 @@ func (e *HTTP) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "payloadText",
-			Type:        configuration.FieldTypeString,
+			Name:        "text",
+			Type:        configuration.FieldTypeText,
 			Label:       "Text Payload",
 			Required:    false,
 			Description: "Plain text to send as the request body",
@@ -237,8 +289,8 @@ func (e *HTTP) Configuration() []configuration.Field {
 			Placeholder: "Enter plain text content",
 		},
 		{
-			Name:        "payloadXML",
-			Type:        configuration.FieldTypeString,
+			Name:        "xml",
+			Type:        configuration.FieldTypeXML,
 			Label:       "XML Payload",
 			Required:    false,
 			Description: "XML content to send as the request body",
@@ -271,36 +323,11 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	// Backward compatibility: handle old "payload" field for POST/PUT/PATCH
-	if !spec.SendBody && spec.Payload != nil &&
-		(spec.Method == "POST" || spec.Method == "PUT" || spec.Method == "PATCH") {
-		spec.SendBody = true
-		if spec.ContentType == "" {
-			spec.ContentType = "application/json"
-		}
-	}
-
-	// Determine which payload field to use based on content type
-	var payload any
-	if spec.SendBody {
-		switch spec.ContentType {
-		case "application/json", "":
-			payload = ctx.Configuration.(map[string]any)["payload"]
-		case "application/x-www-form-urlencoded":
-			payload = ctx.Configuration.(map[string]any)["payloadFormData"]
-		case "text/plain":
-			payload = ctx.Configuration.(map[string]any)["payloadText"]
-		case "application/xml":
-			payload = ctx.Configuration.(map[string]any)["payloadXML"]
-		}
-	}
-
 	// Serialize payload based on content type
 	var body io.Reader
 	var contentType string
-	if spec.SendBody && payload != nil &&
-		(spec.Method == "POST" || spec.Method == "PUT" || spec.Method == "PATCH") {
-		body, contentType, err = e.serializePayload(spec.ContentType, payload)
+	if spec.SendBody && (spec.Method == "POST" || spec.Method == "PUT" || spec.Method == "PATCH") {
+		body, contentType, err = e.serializePayload(spec)
 		if err != nil {
 			return err
 		}
@@ -357,50 +384,30 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 	})
 }
 
-func (e *HTTP) serializePayload(contentType string, payload any) (io.Reader, string, error) {
-	if contentType == "" {
-		contentType = "application/json"
-	}
-
-	switch contentType {
+func (e *HTTP) serializePayload(spec Spec) (io.Reader, string, error) {
+	switch spec.ContentType {
 	case "application/json":
-		if payload == nil {
-			return nil, contentType, nil
-		}
-		data, err := json.Marshal(payload)
+		data, err := json.Marshal(spec.JSON)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to marshal JSON payload: %w", err)
 		}
-		return bytes.NewReader(data), contentType, nil
+		return bytes.NewReader(data), spec.ContentType, nil
 
 	case "application/x-www-form-urlencoded":
-		formParams, ok := payload.([]any)
-		if !ok || len(formParams) == 0 {
-			return nil, contentType, nil
-		}
 		values := url.Values{}
-		for _, item := range formParams {
-			param, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-			key, keyOk := param["key"].(string)
-			value, valueOk := param["value"].(string)
-			if keyOk && valueOk {
-				values.Add(key, value)
-			}
+		for _, kv := range *spec.FormData {
+			values.Add(kv.Key, kv.Value)
 		}
-		return strings.NewReader(values.Encode()), contentType, nil
+		return strings.NewReader(values.Encode()), spec.ContentType, nil
 
-	case "text/plain", "application/xml":
-		text, ok := payload.(string)
-		if !ok || text == "" {
-			return nil, contentType, nil
-		}
-		return strings.NewReader(text), contentType, nil
+	case "text/plain":
+		return strings.NewReader(*spec.Text), spec.ContentType, nil
+
+	case "application/xml":
+		return strings.NewReader(*spec.XML), spec.ContentType, nil
 
 	default:
-		return nil, "", fmt.Errorf("unsupported content type: %s", contentType)
+		return nil, "", fmt.Errorf("unsupported content type: %s", spec.ContentType)
 	}
 }
 
