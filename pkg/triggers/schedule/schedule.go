@@ -399,22 +399,41 @@ func (s *Schedule) emitEvent(ctx core.TriggerActionContext) error {
 		now = time.Now()
 	}
 
+	// Build the standardized payload envelope
 	payload := map[string]any{
-		"timestamp":     now.Format(time.RFC3339),
-		"Readable date": now.Format("January 2nd 2006, 15:04:05 pm"),
-		"Readable time": now.Format("15:04:05 pm"),
-		"Day of week":   now.Format("Monday"),
-		"Year":          now.Format("2006"),
-		"Month":         now.Format("January"),
-		"Day of month":  now.Format("2"),
-		"Hour":          now.Format("15"),
-		"Minute":        now.Format("04"),
-		"Second":        now.Format("05"),
+		"type":      "scheduler.tick",
+		"timestamp": now.UTC().Format(time.RFC3339),
+		"data":      map[string]any{},
 	}
 
-	// Only include timezone for schedule types that support it
+	data := payload["data"].(map[string]any)
+
+	// Add timezone information for schedule types that support it
 	if timezone != nil {
-		payload["Timezone"] = formatTimezone(timezone)
+		_, offset := now.Zone()
+		hours := offset / 3600
+		minutes := (offset % 3600) / 60
+
+		sign := "+"
+		if offset < 0 {
+			sign = "-"
+			hours = -hours
+			minutes = -minutes
+		}
+
+		data["timezone"] = timezone.String()
+		data["utc_offset"] = fmt.Sprintf("%s%02d:%02d", sign, hours, minutes)
+	}
+
+	// Add calendar convenience fields (in local timezone if applicable, UTC otherwise)
+	data["calendar"] = map[string]any{
+		"year":    now.Year(),
+		"month":   int(now.Month()),
+		"day":     now.Day(),
+		"hour":    now.Hour(),
+		"minute":  now.Minute(),
+		"second":  now.Second(),
+		"weekday": int(now.Weekday()),
 	}
 
 	err = ctx.EventContext.Emit(payload)
@@ -751,24 +770,4 @@ func nextCronTrigger(cronExpression string, now time.Time) (*time.Time, error) {
 
 func intPtr(v int) *int {
 	return &v
-}
-
-func formatTimezone(loc *time.Location) string {
-	if loc == time.UTC {
-		return "UTC (UTC+00:00)"
-	}
-
-	now := time.Now().In(loc)
-	_, offset := now.Zone()
-	hours := offset / 3600
-	minutes := (offset % 3600) / 60
-
-	sign := "+"
-	if offset < 0 {
-		sign = "-"
-		hours = -hours
-		minutes = -minutes
-	}
-
-	return fmt.Sprintf("%s (UTC%s%02d:%02d)", loc.String(), sign, hours, minutes)
 }
