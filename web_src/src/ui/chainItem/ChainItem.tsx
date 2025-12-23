@@ -6,6 +6,7 @@ import { WorkflowsWorkflowNodeExecution, ComponentsNode, WorkflowsWorkflowEvent 
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { formatTimeAgo } from "@/utils/date";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
 
 export interface ChildExecution {
@@ -340,34 +341,34 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         )}
 
         {/* Payload Modal */}
-        {isPayloadModalOpen && modalPayload && (
-          <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
-              <div className="flex items-center justify-between p-4 border-b">
-                <h3 className="text-lg font-semibold text-gray-800">Payload</h3>
-                <div className="flex items-center gap-2">
-                  <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
-                    <button
-                      onClick={() => copyPayloadToClipboard(modalPayload)}
-                      className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
-                    >
-                      {React.createElement(resolveIcon("copy"), { size: 14 })}
-                      Copy
-                    </button>
-                  </SimpleTooltip>
-                  <button
-                    onClick={() => {
-                      setIsPayloadModalOpen(false);
-                      setModalPayload(null);
-                    }}
-                    className="p-1 text-gray-500 hover:text-gray-800"
-                  >
-                    {React.createElement(resolveIcon("x"), { size: 16 })}
-                  </button>
-                </div>
-              </div>
-              <div className="flex-1 overflow-auto bg-white rounded-b-lg">
-                <div className="p-4">
+        <Dialog
+          open={isPayloadModalOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsPayloadModalOpen(false);
+              setModalPayload(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Payload</DialogTitle>
+              <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy"} hideOnClick={false}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyPayloadToClipboard(modalPayload);
+                  }}
+                  className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
+                >
+                  {React.createElement(resolveIcon("copy"), { size: 14 })}
+                  Copy
+                </button>
+              </SimpleTooltip>
+            </div>
+            <div className="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-md">
+              <div className="p-4">
+                {modalPayload && (
                   <JsonView
                     value={typeof modalPayload === "string" ? JSON.parse(modalPayload) : modalPayload}
                     style={{
@@ -381,11 +382,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                     displayObjectSize={false}
                     enableClipboard={false}
                   />
-                </div>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Connecting line */}

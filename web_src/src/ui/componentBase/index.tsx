@@ -3,7 +3,7 @@ import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import { CollapsedComponent } from "../collapsedComponent";
 import { ComponentHeader } from "../componentHeader";
 import { SpecsTooltip } from "./SpecsTooltip";
-import { JsonTooltip } from "./JsonTooltip";
+import { PayloadTooltip } from "./PayloadTooltip";
 import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
 import { MetadataItem, MetadataList } from "../metadataList";
@@ -116,11 +116,13 @@ export interface ComponentBaseSpec {
   //
   // Either use:
   // - values for badge-based specs (like headers), or
-  // - value for JSON specs (like payload)
+  // - value for JSON/text/XML specs (like payload)
   //
   values?: ComponentBaseSpecValue[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   value?: any;
+  // Content type for value tooltips (json, xml, or text)
+  contentType?: "json" | "xml" | "text";
 }
 
 export type EventState = "success" | "failed" | "neutral" | "queued" | "running" | string;
@@ -358,11 +360,15 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                     </span>
                   </SpecsTooltip>
                 ) : spec.value !== undefined ? (
-                  <JsonTooltip title={spec.tooltipTitle || spec.title} value={spec.value}>
+                  <PayloadTooltip
+                    title={spec.tooltipTitle || spec.title}
+                    value={spec.value}
+                    contentType={spec.contentType || "json"}
+                  >
                     <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
                       {spec.title}
                     </span>
-                  </JsonTooltip>
+                  </PayloadTooltip>
                 ) : null}
               </div>
             ))}

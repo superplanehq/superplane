@@ -53,18 +53,88 @@ function getHTTPMetadataList(node: ComponentsNode): MetadataItem[] {
 function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
 
-  const payload = node.configuration?.payload;
-  if (payload && Object.keys(payload).length > 0) {
-    specs.push({
-      title: "payload",
-      tooltipTitle: "request payload",
-      iconSlug: "file-json",
-      value: payload,
-    });
+  const sendBody = node.configuration?.sendBody;
+  const contentType = node.configuration?.contentType || "application/json";
+
+  // Show payload based on content type if sendBody is enabled
+  if (sendBody) {
+    let payload: any = null;
+    let payloadIcon = "file-json";
+    let payloadTitle = "payload";
+    let tooltipContentType: "json" | "xml" | "text" = "json";
+
+    switch (contentType) {
+      case "application/json":
+        payload = node.configuration?.payload;
+        payloadIcon = "file-json";
+        payloadTitle = "json payload";
+        tooltipContentType = "json";
+        break;
+      case "application/x-www-form-urlencoded":
+        payload = node.configuration?.payloadFormData;
+        payloadIcon = "list";
+        payloadTitle = "form data";
+        tooltipContentType = "json"; // Form data is shown as badges, not tooltip
+        break;
+      case "text/plain":
+        payload = node.configuration?.payloadText;
+        payloadIcon = "file-text";
+        payloadTitle = "text payload";
+        tooltipContentType = "text";
+        break;
+      case "application/xml":
+        payload = node.configuration?.payloadXML;
+        payloadIcon = "file-code";
+        payloadTitle = "xml payload";
+        tooltipContentType = "xml";
+        break;
+    }
+
+    // Only show payload spec if there's actual content
+    if (payload) {
+      const hasContent =
+        (typeof payload === "object" && !Array.isArray(payload) && Object.keys(payload).length > 0) ||
+        (typeof payload === "string" && payload.length > 0) ||
+        (Array.isArray(payload) && payload.length > 0);
+
+      if (hasContent) {
+        // For form data, show as badges like headers
+        if (contentType === "application/x-www-form-urlencoded" && Array.isArray(payload)) {
+          specs.push({
+            title: payloadTitle,
+            tooltipTitle: "form data parameters",
+            iconSlug: payloadIcon,
+            values: payload.map((param: { key: string; value: string }) => ({
+              badges: [
+                {
+                  label: param.key,
+                  bgColor: "bg-green-100",
+                  textColor: "text-green-800",
+                },
+                {
+                  label: param.value,
+                  bgColor: "bg-gray-100",
+                  textColor: "text-gray-800",
+                },
+              ],
+            })),
+          });
+        } else {
+          specs.push({
+            title: payloadTitle,
+            tooltipTitle: `request ${payloadTitle}`,
+            iconSlug: payloadIcon,
+            value: payload,
+            contentType: tooltipContentType,
+          });
+        }
+      }
+    }
   }
 
+  const sendHeaders = node.configuration?.sendHeaders;
   const headers = node.configuration?.headers as Array<{ name: string; value: string }> | undefined;
-  if (headers && headers.length > 0) {
+  if (sendHeaders && headers && headers.length > 0) {
     specs.push({
       title: "header",
       tooltipTitle: "request headers",
