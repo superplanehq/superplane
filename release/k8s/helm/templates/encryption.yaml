@@ -1,0 +1,11 @@
+{{- if eq .Values.encryption.secretName "" }}
+{{- $key := .Values.encryption.key | required ".Values.encryption.key is required." -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.encryption.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  ENCRYPTION_KEY: {{ $key }}
+{{- end }}

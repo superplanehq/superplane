@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-api
+  namespace: {{ .Release.Namespace }}
+{{- if eq .Values.ingress.className "gce" }}
+  annotations:
+    cloud.google.com/backend-config: '{"default": "ingress-backend-config"}'
+    cloud.google.com/neg: '{"ingress": true}'
+{{- end }}
+spec:
+  type: NodePort
+  selector:
+    app: superplane
+    service: {{ .Release.Name }}-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: superplane
+    service: {{ .Release.Name }}-api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: superplane
+      service: {{ .Release.Name }}-api
+  template:
+    metadata:
+      name: {{ .Release.Name }}-api
+      labels:
+        app: superplane
+        service: {{ .Release.Name }}-api
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Release.Name }}-api
+          image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.domain.configMapName }}
+            - secretRef:
+                name: {{ include "secrets.database.name" . }}
+            - secretRef:
+                name: {{ include "secrets.rabbitmq.name" . }}
+            - secretRef:
+                name: {{ include "secrets.authentication.name" . }}
+            - secretRef:
+                name: {{ include "secrets.telemetry.name" . }}
+            - secretRef:
+                name: {{ include "secrets.encryption.name" . }}
+            - secretRef:
+                name: {{ include "secrets.jwt.name" . }}
+            - secretRef:
+                name: {{ include "secrets.session.name" . }}
+            - secretRef:
+                name: {{ include "secrets.sentry.name" . }}
+          env:
+            - name: START_PUBLIC_API
+              value: "yes"
+            - name: START_INTERNAL_API
+              value: "yes"
+            - name: START_GRPC_GATEWAY
+              value: "yes"
+            - name: START_EVENT_DISTRIBUTER
+              value: "yes"
+            - name: START_WEB_SERVER
+              value: "yes"
+            - name: START_RBAC_POLICY_RELOAD_CONSUMER
+              value: "yes"
+            - name: PUBLIC_API_BASE_PATH
+              value: "/api/v1"
+            - name: WEB_BASE_PATH
+              value: ""
+            - name: SWAGGER_BASE_PATH
+              value: "/app/api/swagger"
+            - name: RBAC_MODEL_PATH
+              value: /app/rbac/rbac_model.conf
+            - name: RBAC_ORG_POLICY_PATH
+              value: /app/rbac/rbac_org_policy.csv
+            - name: RBAC_CANVAS_POLICY_PATH
+              value: /app/rbac/rbac_canvas_policy.csv
+            - name: APPLICATION_NAME
+              value: superplane
+            - name: DB_POOL_SIZE
+              value: "{{ .Values.api.dbPoolSize }}"
+            - name: TEMPLATE_DIR
+              value: /app/templates
+            - name: BLOCK_SIGNUP
+{{- if .Values.api.blockSignup }}
+              value: "yes"
+{{- else }}
+              value: "no"
+{{- end }}
+            - name: OTEL_ENABLED
+              value: "yes"
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 5
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+
+          {{- with .Values.api.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

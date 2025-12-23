@@ -1,0 +1,11 @@
+{{- if eq .Values.jwt.secretName "" }}
+{{- $secret := .Values.jwt.secret | required ".Values.jwt.secret is required." -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.jwt.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  JWT_SECRET: {{ $secret }}
+{{- end }}

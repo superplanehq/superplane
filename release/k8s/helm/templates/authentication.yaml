@@ -1,0 +1,21 @@
+{{- if eq .Values.authentication.secretName "" }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.authentication.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+{{ if .Values.authentication.github.enabled }}
+  {{ $clientId := .Values.authentication.github.clientId | required ".Values.authentication.github.clientId is required." -}}
+  {{ $clientSecret := .Values.authentication.github.clientSecret | required ".Values.authentication.github.clientSecret is required." -}}
+  GITHUB_CLIENT_ID: {{ $clientId }}
+  GITHUB_CLIENT_SECRET: {{ $clientSecret }}
+{{ end }}
+{{ if .Values.authentication.google.enabled }}
+  {{ $clientId := .Values.authentication.google.clientId | required ".Values.authentication.google.clientId is required." -}}
+  {{ $clientSecret := .Values.authentication.google.clientSecret | required ".Values.authentication.google.clientSecret is required." -}}
+  GOOGLE_CLIENT_ID: {{ $clientId }}
+  GOOGLE_CLIENT_SECRET: {{ $clientSecret }}
+{{ end }}
+{{- end }}

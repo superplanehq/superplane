@@ -1,0 +1,10 @@
+{{- if eq .Values.email.secretName "" }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.email.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  RESEND_API_KEY: {{ .Values.email.resendApiKey | b64enc }}
+{{- end }}

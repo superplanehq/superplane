@@ -1,0 +1,80 @@
+{{- if eq .Values.database.secretName "" }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.database.name" . }}
+  namespace: "{{ .Release.Namespace }}"
+data:
+  DB_NAME: superplane
+  DB_HOST: {{ .Values.database.host | b64enc }}
+  DB_PORT: {{ .Values.database.port | toString | b64enc }}
+  DB_USERNAME: {{ .Values.database.username | b64enc }}
+  DB_PASSWORD: {{ .Values.database.password | b64enc }}
+  POSTGRES_DB_SSL: {{ .Values.database.ssl | toString | b64enc }}
+{{- end }}
+{{- if .Values.database.local.enabled }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: {{ .Release.Namespace }}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:{{ .Values.database.local.version }}
+          ports:
+            - containerPort: {{ .Values.database.port }}
+          args:
+            - -c
+            - max_connections={{ .Values.database.local.maxConnections }}
+            - -c
+            - shared_buffers={{ .Values.database.local.sharedBuffers }}
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.database.name" . }}
+                  key: DB_USERNAME
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.database.name" . }}
+                  key: DB_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: {{ .Values.database.local.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.database.port }}
+      targetPort: {{ .Values.database.port }}
+  selector:
+    app: postgres
+{{- end }}

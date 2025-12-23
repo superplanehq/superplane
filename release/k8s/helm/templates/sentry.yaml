@@ -1,0 +1,15 @@
+{{- if eq .Values.sentry.secretName "" }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.sentry.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+{{ if .Values.sentry.enabled }}
+  {{ $dsn := .Values.sentry.dsn | required ".Values.sentry.dsn is required." -}}
+  {{ $environment := .Values.sentry.environment | required ".Values.sentry.environment is required." -}}
+  SENTRY_DSN: {{ $dsn }}
+  SENTRY_ENVIRONMENT: {{ $environment }}
+{{- end }}
+{{- end }}

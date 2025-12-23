@@ -1,0 +1,11 @@
+{{- if eq .Values.session.secretName "" }}
+{{- $key := .Values.session.key | required ".Values.session.key is required." -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.session.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  SESSION_SECRET: {{ $key }}
+{{- end }}
