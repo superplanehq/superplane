@@ -416,11 +416,7 @@ func (s *Schedule) emitEvent(ctx core.TriggerActionContext) error {
 		payload["timezone"] = formatTimezone(timezone)
 	}
 
-	err = ctx.EventContext.Emit(core.Payload{
-		Type:      "scheduler.tick",
-		Timestamp: time.Now(),
-		Data:      payload,
-	})
+	err = ctx.EventContext.Emit("scheduler.tick", payload)
 
 	if err != nil {
 		return err

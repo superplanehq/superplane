@@ -168,20 +168,23 @@ type MetadataContext interface {
  */
 type ExecutionStateContext interface {
 	IsFinished() bool
-	Pass(outputs []Output) error
-	Fail(reason, message string) error
 	SetKV(key, value string) error
-}
 
-type Output struct {
-	Channel  string
-	Payloads []Payload
-}
+	/*
+	 * Pass the execution, emitting a payload to the specified channel.
+	 */
+	Emit(channel, payloadType string, payloads []any) error
 
-type Payload struct {
-	Type      string    `json:"type"`
-	Timestamp time.Time `json:"timestamp"`
-	Data      any       `json:"data"`
+	/*
+	 * Pass the execution, without emitting any payloads from it.
+	 */
+	Pass() error
+
+	/*
+	 * Fails the execution.
+	 * No payloads are emitted.
+	 */
+	Fail(reason, message string) error
 }
 
 /*

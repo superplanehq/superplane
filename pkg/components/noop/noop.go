@@ -3,7 +3,6 @@ package noop
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -12,6 +11,7 @@ import (
 )
 
 const ComponentName = "noop"
+const PayloadType = "noop.finished"
 
 func init() {
 	registry.RegisterComponent(ComponentName, &NoOp{})
@@ -48,18 +48,11 @@ func (c *NoOp) Configuration() []configuration.Field {
 }
 
 func (c *NoOp) Execute(ctx core.ExecutionContext) error {
-	return ctx.ExecutionStateContext.Pass([]core.Output{
-		{
-			Channel: core.DefaultOutputChannel.Name,
-			Payloads: []core.Payload{
-				{
-					Type:      "noop.finished",
-					Timestamp: time.Now(),
-					Data:      map[string]any{},
-				},
-			},
-		},
-	})
+	return ctx.ExecutionStateContext.Emit(
+		core.DefaultOutputChannel.Name,
+		PayloadType,
+		[]any{map[string]any{}},
+	)
 }
 
 func (c *NoOp) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {

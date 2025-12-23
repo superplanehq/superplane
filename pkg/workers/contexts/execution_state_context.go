@@ -1,7 +1,8 @@
 package contexts
 
 import (
-	"github.com/superplanehq/superplane/pkg/core"
+	"time"
+
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -19,16 +20,29 @@ func (s *ExecutionStateContext) IsFinished() bool {
 	return s.execution.State == models.WorkflowNodeExecutionStateFinished
 }
 
-func (s *ExecutionStateContext) Pass(outputs []core.Output) error {
-	payloads := make(map[string][]any, len(outputs))
-	for _, output := range outputs {
-		payloads[output.Channel] = make([]any, len(output.Payloads))
-		for i, p := range output.Payloads {
-			payloads[output.Channel][i] = p
-		}
+func (s *ExecutionStateContext) Pass() error {
+	_, err := s.execution.PassInTransaction(s.tx, map[string][]any{})
+	if err != nil {
+		return err
 	}
 
-	_, err := s.execution.PassInTransaction(s.tx, payloads)
+	return nil
+}
+
+func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any) error {
+	outputs := map[string][]any{
+		channel: {},
+	}
+
+	for _, payload := range payloads {
+		outputs[channel] = append(outputs[channel], map[string]any{
+			"type":      payloadType,
+			"timestamp": time.Now(),
+			"data":      payload,
+		})
+	}
+
+	_, err := s.execution.PassInTransaction(s.tx, outputs)
 	if err != nil {
 		return err
 	}

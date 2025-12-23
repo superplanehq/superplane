@@ -60,11 +60,10 @@ func TestIf_Execute_EmitsEmptyEvents(t *testing.T) {
 			assert.NoError(t, err)
 			assert.True(t, stateCtx.Passed)
 			assert.True(t, stateCtx.Finished)
-			assert.Len(t, stateCtx.Outputs, 1)
-			assert.Equal(t, tt.expectedChannel, stateCtx.Outputs[0].Channel)
-			assert.Len(t, stateCtx.Outputs[0].Payloads, 1)
-			assert.Equal(t, "if.executed", stateCtx.Outputs[0].Payloads[0].Type)
-			assert.Equal(t, make(map[string]any), stateCtx.Outputs[0].Payloads[0].Data)
+			assert.Equal(t, tt.expectedChannel, stateCtx.Channel)
+			assert.Equal(t, "if.executed", stateCtx.Type)
+			assert.Len(t, stateCtx.Payloads, 1)
+			assert.Equal(t, make(map[string]any), stateCtx.Payloads[0])
 		})
 	}
 }
@@ -135,11 +134,10 @@ func TestIf_Execute_BothTrueAndFalsePathsEmitEmpty(t *testing.T) {
 			assert.NoError(t, err)
 			assert.True(t, stateCtx.Passed)
 			assert.True(t, stateCtx.Finished)
-			assert.Len(t, stateCtx.Outputs, 1)
-			assert.Equal(t, tt.expectedChannel, stateCtx.Outputs[0].Channel)
-			assert.Len(t, stateCtx.Outputs[0].Payloads, 1)
-			assert.Equal(t, "if.executed", stateCtx.Outputs[0].Payloads[0].Type)
-			assert.Equal(t, make(map[string]any), stateCtx.Outputs[0].Payloads[0].Data)
+			assert.Equal(t, tt.expectedChannel, stateCtx.Channel)
+			assert.Equal(t, "if.executed", stateCtx.Type)
+			assert.Len(t, stateCtx.Payloads, 1)
+			assert.Equal(t, make(map[string]any), stateCtx.Payloads[0])
 		})
 	}
 }

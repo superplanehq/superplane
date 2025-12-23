@@ -97,28 +97,19 @@ func (f *If) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("expression must evaluate to boolean, got %T", output)
 	}
 
-	var outputs []core.Output
 	if matches {
-		outputs = []core.Output{
-			{
-				Channel: ChannelNameTrue,
-				Payloads: []core.Payload{
-					{Type: "if.executed", Timestamp: time.Now(), Data: map[string]any{}},
-				},
-			},
-		}
-	} else {
-		outputs = []core.Output{
-			{
-				Channel: ChannelNameFalse,
-				Payloads: []core.Payload{
-					{Type: "if.executed", Timestamp: time.Now(), Data: map[string]any{}},
-				},
-			},
-		}
+		return ctx.ExecutionStateContext.Emit(
+			ChannelNameTrue,
+			"if.executed",
+			[]any{map[string]any{}},
+		)
 	}
 
-	return ctx.ExecutionStateContext.Pass(outputs)
+	return ctx.ExecutionStateContext.Emit(
+		ChannelNameFalse,
+		"if.executed",
+		[]any{map[string]any{}},
+	)
 }
 
 func (f *If) Actions() []core.Action {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -146,11 +145,7 @@ func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	err = ctx.EventContext.Emit(core.Payload{
-		Type:      "semaphore.pipelineDone",
-		Timestamp: time.Now(),
-		Data:      data,
-	})
+	err = ctx.EventContext.Emit("semaphore.pipelineDone", data)
 
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)

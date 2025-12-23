@@ -84,7 +84,7 @@ type WebhookSetupOptions struct {
 }
 
 type EventContext interface {
-	Emit(data Payload) error
+	Emit(payloadType string, payload any) error
 }
 
 type TriggerActionContext struct {

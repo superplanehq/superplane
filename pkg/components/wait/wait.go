@@ -15,6 +15,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const PayloadType = "wait.finished"
+
 func init() {
 	registry.RegisterComponent("wait", &Wait{})
 }
@@ -343,24 +345,19 @@ func (w *Wait) HandleTimeReached(ctx core.ActionContext) error {
 		return nil
 	}
 
-	return ctx.ExecutionStateContext.Pass([]core.Output{
-		{
-			Channel: core.DefaultOutputChannel.Name,
-			Payloads: []core.Payload{
-				{
-					Type:      "wait.finished",
-					Timestamp: time.Now(),
-					Data: createPayload(
-						getStartTimeFromMetadata(ctx.MetadataContext),
-						time.Now().Format(time.RFC3339),
-						"completed",
-						"timeout",
-						nil,
-					),
-				},
-			},
+	return ctx.ExecutionStateContext.Emit(
+		core.DefaultOutputChannel.Name,
+		PayloadType,
+		[]any{
+			createPayload(
+				getStartTimeFromMetadata(ctx.MetadataContext),
+				time.Now().Format(time.RFC3339),
+				"completed",
+				"timeout",
+				nil,
+			),
 		},
-	})
+	)
 }
 
 func (w *Wait) HandlePushThrough(ctx core.ActionContext) error {
@@ -368,24 +365,19 @@ func (w *Wait) HandlePushThrough(ctx core.ActionContext) error {
 		return nil
 	}
 
-	return ctx.ExecutionStateContext.Pass([]core.Output{
-		{
-			Channel: core.DefaultOutputChannel.Name,
-			Payloads: []core.Payload{
-				{
-					Type:      "wait.finished",
-					Timestamp: time.Now(),
-					Data: createPayload(
-						getStartTimeFromMetadata(ctx.MetadataContext),
-						time.Now().Format(time.RFC3339),
-						"completed",
-						"manual_override",
-						ctx.AuthContext.AuthenticatedUser(),
-					),
-				},
-			},
+	return ctx.ExecutionStateContext.Emit(
+		core.DefaultOutputChannel.Name,
+		PayloadType,
+		[]any{
+			createPayload(
+				getStartTimeFromMetadata(ctx.MetadataContext),
+				time.Now().Format(time.RFC3339),
+				"completed",
+				"manual_override",
+				ctx.AuthContext.AuthenticatedUser(),
+			),
 		},
-	})
+	)
 }
 
 func (w *Wait) Setup(ctx core.SetupContext) error {
@@ -401,22 +393,17 @@ func (w *Wait) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowN
 }
 
 func (w *Wait) Cancel(ctx core.ExecutionContext) error {
-	return ctx.ExecutionStateContext.Pass([]core.Output{
-		{
-			Channel: core.DefaultOutputChannel.Name,
-			Payloads: []core.Payload{
-				{
-					Type:      "wait.finished",
-					Timestamp: time.Now(),
-					Data: createPayload(
-						getStartTimeFromMetadata(ctx.MetadataContext),
-						time.Now().Format(time.RFC3339),
-						"cancelled",
-						"user_cancel",
-						ctx.AuthContext.AuthenticatedUser(),
-					),
-				},
-			},
+	return ctx.ExecutionStateContext.Emit(
+		core.DefaultOutputChannel.Name,
+		PayloadType,
+		[]any{
+			createPayload(
+				getStartTimeFromMetadata(ctx.MetadataContext),
+				time.Now().Format(time.RFC3339),
+				"cancelled",
+				"user_cancel",
+				ctx.AuthContext.AuthenticatedUser(),
+			),
 		},
-	})
+	)
 }

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -19,9 +18,16 @@ func NewEventContext(tx *gorm.DB, workflowNode *models.WorkflowNode) *EventConte
 	return &EventContext{tx: tx, workflowNode: workflowNode}
 }
 
-func (s *EventContext) Emit(data core.Payload) error {
+func (s *EventContext) Emit(payloadType string, payload any) error {
 	var v any
-	err := mapstructure.Decode(data, &v)
+
+	structuredPayload := map[string]any{
+		"type":      payloadType,
+		"timestamp": time.Now(),
+		"data":      payload,
+	}
+
+	err := mapstructure.Decode(structuredPayload, &v)
 	if err != nil {
 		return err
 	}

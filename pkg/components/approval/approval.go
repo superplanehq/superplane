@@ -377,18 +377,11 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 	// If no items are specified, just finish the execution.
 	//
 	if metadata.Completed() {
-		return ctx.ExecutionStateContext.Pass([]core.Output{
-			{
-				Channel: ChannelApproved,
-				Payloads: []core.Payload{
-					{
-						Type:      "approval.finished",
-						Timestamp: time.Now(),
-						Data:      metadata,
-					},
-				},
-			},
-		})
+		return ctx.ExecutionStateContext.Emit(
+			ChannelApproved,
+			"approval.finished",
+			[]any{metadata},
+		)
 	}
 
 	return nil
@@ -484,18 +477,11 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 		outputChannel = ChannelRejected
 	}
 
-	return ctx.ExecutionStateContext.Pass([]core.Output{
-		{
-			Channel: outputChannel,
-			Payloads: []core.Payload{
-				{
-					Type:      "approval.finished",
-					Timestamp: time.Now(),
-					Data:      metadata,
-				},
-			},
-		},
-	})
+	return ctx.ExecutionStateContext.Emit(
+		outputChannel,
+		"approval.finished",
+		[]any{metadata},
+	)
 }
 
 func (a *Approval) handleApprove(ctx core.ActionContext) (*Metadata, error) {
