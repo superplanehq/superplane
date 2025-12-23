@@ -1,0 +1,11 @@
+{{- if and .Values.ingress.ssl.enabled (eq .Values.ingress.ssl.type "custom") }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.ingress.ssl.custom.secretName }}
+  namespace: {{ .Release.Namespace }}
+type: kubernetes.io/tls
+data:
+  tls.crt: {{ .Values.ingress.ssl.custom.crt | quote }}
+  tls.key: {{ .Values.ingress.ssl.custom.key | quote }}
+{{- end }}

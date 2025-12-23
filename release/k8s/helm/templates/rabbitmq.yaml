@@ -1,0 +1,79 @@
+{{- if eq .Values.rabbitmq.secretName "" }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.rabbitmq.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: rabbitmq
+data:
+  RABBITMQ_USER: {{ .Values.rabbitmq.username | b64enc }}
+  RABBITMQ_PASSWORD: {{ .Values.rabbitmq.password | b64enc }}
+  RABBITMQ_URL: {{ printf "%s://%s:%s@%s:%s?verify=verify_none" .Values.rabbitmq.protocol .Values.rabbitmq.username .Values.rabbitmq.password .Values.rabbitmq.host (toString .Values.rabbitmq.port) | b64enc }}
+{{- end }}
+{{- if .Values.rabbitmq.local.enabled }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  namespace: {{ .Release.Namespace }}
+spec:
+  serviceName: "rabbitmq"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:{{ .Values.rabbitmq.local.version }}
+          ports:
+            - containerPort: {{ .Values.rabbitmq.port }}
+              name: amqp
+            - containerPort: {{ .Values.rabbitmq.managementPort }}
+              name: management
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.rabbitmq.name" . }}
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.rabbitmq.name" . }}
+                  key: RABBITMQ_PASSWORD
+          volumeMounts:
+            - name: rabbitmq-storage
+              mountPath: /var/lib/rabbitmq
+  volumeClaimTemplates:
+    - metadata:
+        name: rabbitmq-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: {{ .Values.rabbitmq.local.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.rabbitmq.port }}
+      targetPort: {{ .Values.rabbitmq.port }}
+      name: amqp
+    - port: {{ .Values.rabbitmq.managementPort }}
+      targetPort: {{ .Values.rabbitmq.managementPort }}
+      name: management
+  selector:
+    app: rabbitmq
+{{- end }}

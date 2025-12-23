@@ -1,0 +1,19 @@
+{{- if eq .Values.telemetry.secretName "" }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.telemetry.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+{{ if .Values.telemetry.opentelemetry.enabled }}
+  {{ $endpoint := .Values.telemetry.opentelemetry.endpoint | required ".Values.telemetry.opentelemetry.endpoint is required." -}}
+  {{ $protocol := .Values.telemetry.opentelemetry.protocol | required ".Values.telemetry.opentelemetry.protocol is required." -}}
+  {{ $headers := .Values.telemetry.opentelemetry.headers | required ".Values.telemetry.opentelemetry.headers is required." -}}
+  {{ $serviceName := .Values.telemetry.opentelemetry.serviceName | required ".Values.telemetry.opentelemetry.serviceName is required." -}}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ $endpoint }}
+  OTEL_EXPORTER_OTLP_PROTOCOL: {{ $protocol }}
+  OTEL_EXPORTER_OTLP_HEADERS: {{ $headers }}
+  OTEL_SERVICE_NAME: {{ $serviceName }}
+{{ end }}
+{{- end }}
