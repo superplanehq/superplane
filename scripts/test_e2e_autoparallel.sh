@@ -86,7 +86,7 @@ regex="^($(printf '%s\n' "${selected_tests[@]}" | paste -sd '|' -))$"
 junit_file="junit-report.e2e.${INDEX}.xml"
 
 echo "Running gotestsum with -run '${regex}'"
-echo "JUnit report: ${junit_file}"
+echo "JUnit report (shard): ${junit_file}"
 
 gotestsum \
   --format short \
@@ -97,3 +97,6 @@ gotestsum \
   -- \
   -p 1 \
   -run "${regex}"
+
+# Keep backward compatibility with CI that expects junit-report.xml
+cp "${junit_file}" junit-report.xml
