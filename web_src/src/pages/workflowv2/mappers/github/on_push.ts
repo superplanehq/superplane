@@ -40,7 +40,7 @@ interface PushEventData {
  */
 export const onPushTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    const eventData = event.data as PushEventData;
+    const eventData = event.data?.data as PushEventData;
 
     return {
       title: eventData?.head_commit?.message || "",
@@ -49,7 +49,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
-    const eventData = lastEvent.data as PushEventData;
+    const eventData = lastEvent.data?.data as PushEventData;
 
     return {
       Commit: eventData?.head_commit?.message || "",
@@ -100,7 +100,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as PushEventData;
+      const eventData = lastEvent.data?.data as PushEventData;
       props.lastEventData = {
         title: eventData?.head_commit?.message || "",
         subtitle: eventData?.head_commit?.id || "",

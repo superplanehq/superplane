@@ -36,7 +36,7 @@ interface OnIssueEventData {
  */
 export const onIssueTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    const eventData = event.data as OnIssueEventData;
+    const eventData = event.data?.data as OnIssueEventData;
 
     return {
       title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
@@ -45,7 +45,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
-    const eventData = lastEvent.data as OnIssueEventData;
+    const eventData = lastEvent.data?.data as OnIssueEventData;
 
     return {
       URL: eventData?.issue?.html_url || "",
@@ -86,7 +86,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnIssueEventData;
+      const eventData = lastEvent.data?.data as OnIssueEventData;
 
       props.lastEventData = {
         title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,

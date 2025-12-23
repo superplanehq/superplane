@@ -32,7 +32,7 @@ interface OnPipelineDoneEventData {
  */
 export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    const eventData = event.data as OnPipelineDoneEventData;
+    const eventData = event.data?.data as OnPipelineDoneEventData;
 
     return {
       title: eventData.pipeline?.name || "",
@@ -41,7 +41,7 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
-    const eventData = lastEvent.data as OnPipelineDoneEventData;
+    const eventData = lastEvent.data?.data as OnPipelineDoneEventData;
 
     return {
       Project: eventData?.project?.name || "",
@@ -74,7 +74,7 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnPipelineDoneEventData;
+      const eventData = lastEvent.data?.data as OnPipelineDoneEventData;
       props.lastEventData = {
         title: eventData.pipeline?.name || "",
         subtitle: eventData.pipeline?.result || "",

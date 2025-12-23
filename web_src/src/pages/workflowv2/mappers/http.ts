@@ -162,11 +162,11 @@ function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 function getHTTPEventSections(execution: WorkflowsWorkflowNodeExecution, componentName: string): EventSection[] {
   const outputs = execution.outputs as Record<string, unknown>;
   const defaultArray = outputs?.default as unknown[];
-  const response = defaultArray?.[0] as { status?: string };
+  const response = defaultArray?.[0] as { data?: { status?: string } };
 
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: execution.state == "STATE_FINISHED" ? `Status: ${response?.status}` : "Running...",
+    eventTitle: execution.state == "STATE_FINISHED" ? `Status: ${response?.data?.status}` : "Running...",
     eventState: getState(componentName)(execution),
     eventId: execution.rootEvent?.id,
   };

@@ -41,7 +41,7 @@ interface OnReleaseEventData {
  */
 export const onReleaseTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    const eventData = event.data as OnReleaseEventData;
+    const eventData = event.data?.data as OnReleaseEventData;
     const assetCount = eventData?.release?.assets?.length || 0;
     const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";
 
@@ -52,7 +52,7 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
-    const eventData = lastEvent.data as OnReleaseEventData;
+    const eventData = lastEvent.data?.data as OnReleaseEventData;
     const values: Record<string, string> = {
       Name: eventData?.release?.name || "",
       Tag: eventData?.release?.tag_name || "",
@@ -98,7 +98,7 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnReleaseEventData;
+      const eventData = lastEvent.data?.data as OnReleaseEventData;
       const assetCount = eventData?.release?.assets?.length || 0;
       const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";
 
