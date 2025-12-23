@@ -2,6 +2,8 @@ import React from "react";
 import { Label } from "../label";
 import { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
+import { TextFieldRenderer } from "./TextFieldRenderer";
+import { XMLFieldRenderer } from "./XMLFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
 import { BooleanFieldRenderer } from "./BooleanFieldRenderer";
 import { SelectFieldRenderer } from "./SelectFieldRenderer";
@@ -160,6 +162,12 @@ export const ConfigurationFieldRenderer = ({
     switch (field.type) {
       case "string":
         return <StringFieldRenderer {...commonProps} />;
+
+      case "text":
+        return <TextFieldRenderer {...commonProps} />;
+
+      case "xml":
+        return <XMLFieldRenderer {...commonProps} />;
 
       case "number":
         return <NumberFieldRenderer {...commonProps} />;

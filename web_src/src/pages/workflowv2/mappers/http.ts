@@ -65,25 +65,25 @@ function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 
     switch (contentType) {
       case "application/json":
-        payload = node.configuration?.payload;
+        payload = node.configuration?.json;
         payloadIcon = "file-json";
         payloadTitle = "json payload";
         tooltipContentType = "json";
         break;
       case "application/x-www-form-urlencoded":
-        payload = node.configuration?.payloadFormData;
+        payload = node.configuration?.formData;
         payloadIcon = "list";
         payloadTitle = "form data";
         tooltipContentType = "json"; // Form data is shown as badges, not tooltip
         break;
       case "text/plain":
-        payload = node.configuration?.payloadText;
+        payload = node.configuration?.text;
         payloadIcon = "file-text";
         payloadTitle = "text payload";
         tooltipContentType = "text";
         break;
       case "application/xml":
-        payload = node.configuration?.payloadXML;
+        payload = node.configuration?.xml;
         payloadIcon = "file-code";
         payloadTitle = "xml payload";
         tooltipContentType = "xml";

@@ -5,6 +5,8 @@ const (
 	 * Basic field types
 	 */
 	FieldTypeString      = "string"
+	FieldTypeText        = "text"
+	FieldTypeXML         = "xml"
 	FieldTypeNumber      = "number"
 	FieldTypeBool        = "boolean"
 	FieldTypeSelect      = "select"
