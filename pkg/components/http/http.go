@@ -396,6 +396,10 @@ func (e *HTTP) serializePayload(spec Spec) (io.Reader, string, error) {
 		return bytes.NewReader(data), spec.ContentType, nil
 
 	case "application/x-www-form-urlencoded":
+		if spec.FormData == nil {
+			return nil, "", fmt.Errorf("form data is required for application/x-www-form-urlencoded")
+		}
+
 		values := url.Values{}
 		for _, kv := range *spec.FormData {
 			values.Add(kv.Key, kv.Value)
@@ -403,9 +407,17 @@ func (e *HTTP) serializePayload(spec Spec) (io.Reader, string, error) {
 		return strings.NewReader(values.Encode()), spec.ContentType, nil
 
 	case "text/plain":
+		if spec.Text == nil {
+			return nil, "", fmt.Errorf("text is required for text/plain")
+		}
+
 		return strings.NewReader(*spec.Text), spec.ContentType, nil
 
 	case "application/xml":
+		if spec.XML == nil {
+			return nil, "", fmt.Errorf("xml is required for application/xml")
+		}
+
 		return strings.NewReader(*spec.XML), spec.ContentType, nil
 
 	default:
