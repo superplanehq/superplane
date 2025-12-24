@@ -82,7 +82,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 			}
 
 			ctx := core.ExecutionContext{
-				ID:                    execution.ID.String(),
+				ID:                    execution.ID,
 				WorkflowID:            execution.WorkflowID.String(),
 				Configuration:         execution.Configuration.Data(),
 				MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),

@@ -74,7 +74,7 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 }
 
 func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.WorkflowNode) error {
-	var executions []*models.WorkflowNodeExecution
+	var executionIDs []*uuid.UUID
 	var queueItem *models.WorkflowNodeQueueItem
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		n, err := models.LockWorkflowNode(tx, node.WorkflowID, node.NodeID)
@@ -83,21 +83,21 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node mod
 			return nil
 		}
 
-		executions, queueItem, err = w.processNode(tx, logger, n)
+		executionIDs, queueItem, err = w.processNode(tx, logger, n)
 		return err
 	})
 
 	if err == nil {
-		if len(executions) > 0 {
-			for _, execution := range executions {
-				if execution == nil {
+		if len(executionIDs) > 0 {
+			for _, executionID := range executionIDs {
+				if executionID == nil {
 					continue
 				}
 
 				messages.NewWorkflowExecutionMessage(
-					execution.WorkflowID.String(),
-					execution.ID.String(),
-					execution.NodeID,
+					node.WorkflowID.String(),
+					executionID.String(),
+					node.NodeID,
 				).Publish()
 			}
 		}
@@ -114,7 +114,7 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node mod
 	return err
 }
 
-func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.WorkflowNode) ([]*models.WorkflowNodeExecution, *models.WorkflowNodeQueueItem, error) {
+func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.WorkflowNode) ([]*uuid.UUID, *models.WorkflowNodeQueueItem, error) {
 	queueItem, err := node.FirstQueueItem(tx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -156,28 +156,28 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 		return executions, queueItem, nil
 	}
 
-	var exec *models.WorkflowNodeExecution
+	var executionID *uuid.UUID
 	switch node.Type {
 	case models.NodeTypeComponent:
 		/*
 		 * For component nodes, delegate to the component's ProcessQueueItem implementation to handle
 		 * the processing.
 		 */
-		exec, err = w.processComponentNode(ctx, node)
+		executionID, err = w.processComponentNode(ctx, node)
 	case models.NodeTypeBlueprint:
 		/*
 		 * For blueprint nodes, use the default processing logic.
 		 * Blueprint nodes do not have custom processing logic.
 		 */
-		exec, err = ctx.DefaultProcessing()
+		executionID, err = ctx.DefaultProcessing()
 	default:
 		return nil, nil, fmt.Errorf("unsupported node type: %s", node.Type)
 	}
 
-	return []*models.WorkflowNodeExecution{exec}, queueItem, err
+	return []*uuid.UUID{executionID}, queueItem, err
 }
 
-func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, node *models.WorkflowNode) (*models.WorkflowNodeExecution, error) {
+func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, node *models.WorkflowNode) (*uuid.UUID, error) {
 	ref := node.Ref.Data()
 
 	if ref.Component == nil || ref.Component.Name == "" {
@@ -192,7 +192,7 @@ func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *core.ProcessQueueCon
 	return comp.ProcessQueueItem(*ctx)
 }
 
-func (w *WorkflowNodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) ([]*models.WorkflowNodeExecution, error) {
+func (w *WorkflowNodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) ([]*uuid.UUID, error) {
 	err := configErr.QueueItem.Delete(tx)
 	if err != nil {
 		return nil, err
@@ -230,7 +230,7 @@ func (w *WorkflowNodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logg
 	}
 
 	if parentExecutionID == nil {
-		return []*models.WorkflowNodeExecution{&execution}, nil
+		return []*uuid.UUID{&execution.ID}, nil
 	}
 
 	//
@@ -247,7 +247,7 @@ func (w *WorkflowNodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logg
 		return nil, err
 	}
 
-	return []*models.WorkflowNodeExecution{&execution, parent}, nil
+	return []*uuid.UUID{&execution.ID, &parent.ID}, nil
 }
 
 func (w *WorkflowNodeQueueWorker) getParentExecutionID(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) (*uuid.UUID, error) {
