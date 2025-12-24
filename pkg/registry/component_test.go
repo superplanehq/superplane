@@ -17,16 +17,16 @@ type panickingComponent struct {
 	name string
 }
 
-func (p *panickingComponent) Name() string                                       { return p.name }
-func (p *panickingComponent) Label() string                                      { return "Panicking Component" }
-func (p *panickingComponent) Description() string                                { return "description" }
-func (p *panickingComponent) Icon() string                                       { return "icon" }
-func (p *panickingComponent) Color() string                                      { return "red" }
-func (p *panickingComponent) Configuration() []configuration.Field               { return nil }
-func (p *panickingComponent) Actions() []core.Action                             { return nil }
-func (p *panickingComponent) OutputChannels(config any) []core.OutputChannel     { return nil }
-func (p *panickingComponent) Setup(ctx core.SetupContext) error                  { panic("setup panic") }
-func (p *panickingComponent) Execute(ctx core.ExecutionContext) error            { panic("execute panic") }
+func (p *panickingComponent) Name() string                                   { return p.name }
+func (p *panickingComponent) Label() string                                  { return "Panicking Component" }
+func (p *panickingComponent) Description() string                            { return "description" }
+func (p *panickingComponent) Icon() string                                   { return "icon" }
+func (p *panickingComponent) Color() string                                  { return "red" }
+func (p *panickingComponent) Configuration() []configuration.Field           { return nil }
+func (p *panickingComponent) Actions() []core.Action                         { return nil }
+func (p *panickingComponent) OutputChannels(config any) []core.OutputChannel { return nil }
+func (p *panickingComponent) Setup(ctx core.SetupContext) error              { panic("setup panic") }
+func (p *panickingComponent) Execute(ctx core.ExecutionContext) error        { panic("execute panic") }
 func (p *panickingComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	panic("process queue item panic")
 }

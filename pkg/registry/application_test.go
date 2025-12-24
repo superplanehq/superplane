@@ -16,16 +16,20 @@ import (
 // panickingApplication is an application that panics in all panicable methods
 type panickingApplication struct{}
 
-func (p *panickingApplication) Name() string                                 { return "panicking-app" }
-func (p *panickingApplication) Label() string                                { return "Panicking App" }
-func (p *panickingApplication) Icon() string                                 { return "icon" }
-func (p *panickingApplication) Description() string                          { return "description" }
-func (p *panickingApplication) Configuration() []configuration.Field         { return nil }
-func (p *panickingApplication) Components() []core.Component                 { return nil }
-func (p *panickingApplication) Triggers() []core.Trigger                     { return nil }
-func (p *panickingApplication) Sync(ctx core.SyncContext) error              { panic("sync panic") }
-func (p *panickingApplication) HandleRequest(ctx core.HTTPRequestContext)    { panic("handle request panic") }
-func (p *panickingApplication) CompareWebhookConfig(a, b any) (bool, error)  { panic("compare webhook config panic") }
+func (p *panickingApplication) Name() string                         { return "panicking-app" }
+func (p *panickingApplication) Label() string                        { return "Panicking App" }
+func (p *panickingApplication) Icon() string                         { return "icon" }
+func (p *panickingApplication) Description() string                  { return "description" }
+func (p *panickingApplication) Configuration() []configuration.Field { return nil }
+func (p *panickingApplication) Components() []core.Component         { return nil }
+func (p *panickingApplication) Triggers() []core.Trigger             { return nil }
+func (p *panickingApplication) Sync(ctx core.SyncContext) error      { panic("sync panic") }
+func (p *panickingApplication) HandleRequest(ctx core.HTTPRequestContext) {
+	panic("handle request panic")
+}
+func (p *panickingApplication) CompareWebhookConfig(a, b any) (bool, error) {
+	panic("compare webhook config panic")
+}
 func (p *panickingApplication) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (any, error) {
 	panic("setup webhook panic")
 }
