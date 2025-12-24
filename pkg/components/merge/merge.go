@@ -103,91 +103,112 @@ func (m *Merge) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*models.WorkflowNodeExecution, error) {
-	mergeGroup := ctx.RootEventID
-
-	execID, err := m.findOrCreateExecution(ctx, mergeGroup)
+func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+	spec := &Spec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error decoding configuration: %v", err)
+	}
+
+	executionCtx, err := m.findOrCreateExecution(ctx, ctx.RootEventID)
+	if err != nil {
+		return nil, fmt.Errorf("error finding or creating execution: %v", err)
 	}
 
 	if err := ctx.DequeueItem(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error dequeuing item: %v", err)
 	}
 
 	if err := ctx.UpdateNodeState(models.WorkflowNodeStateReady); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error updating node state: %v", err)
 	}
 
 	incoming, err := ctx.CountDistinctIncomingSources()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error counting distinct incoming sources: %v", err)
 	}
 
-	md, err := m.addEventToMetadata(ctx, execID)
+	md, err := m.addEventToMetadata(ctx, executionCtx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error adding event to metadata: %v", err)
 	}
 
-	// Decode config to check for optional stop expression
-	spec := &Spec{}
-	_ = mapstructure.Decode(ctx.Configuration, &spec)
-
+	//
+	// Check for optional stop expression
 	// If already short-circuited, do not finish again
+	//
 	if md.StopEarly {
 		return nil, nil
 	}
 
+	//
 	// Evaluate stop expression if provided
+	//
 	if spec.StopIfExpression != "" {
 		env := map[string]any{
 			"$": ctx.Input,
 		}
+
 		vm, err := expr.Compile(spec.StopIfExpression, expr.Env(env), expr.AsBool())
 		if err != nil {
 			return nil, fmt.Errorf("stopIfExpression compilation failed: %w", err)
 		}
+
 		out, err := expr.Run(vm, env)
 		if err != nil {
 			return nil, fmt.Errorf("stopIfExpression evaluation failed: %w", err)
 		}
+
+		//
+		// If stopExpression is truthy,
+		// we mark metadata and fail immediately
+		//
 		if b, ok := out.(bool); ok && b {
-			// Mark metadata and fail immediately
 			md.StopEarly = true
-			if err := ctx.SetExecutionMetadata(execID, md); err != nil {
+			err := executionCtx.MetadataContext.Set(md)
+			if err != nil {
 				return nil, err
 			}
-			return ctx.FailExecution(execID, "stopped", "Stopped by stopIfExpression")
+
+			return &executionCtx.ID, executionCtx.ExecutionStateContext.Fail("stopped", "Stopped by stopIfExpression")
 		}
 	}
 
 	if len(md.Sources) >= incoming {
-		return ctx.PassExecution(execID, map[string][]any{
-			core.DefaultOutputChannel.Name: {md},
-		})
+		return &executionCtx.ID, executionCtx.ExecutionStateContext.Emit(
+			core.DefaultOutputChannel.Name,
+			"merge.finished",
+			[]any{md},
+		)
 	}
 
 	return nil, nil
 }
 
-func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup string) (uuid.UUID, error) {
-	execID, found, err := ctx.FindExecutionIDByKV("merge_group", mergeGroup)
+func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup string) (*core.ExecutionContext, error) {
+	executionCtx, err := ctx.FindExecutionByKV("merge_group", mergeGroup)
 	if err != nil {
-		return uuid.Nil, err
+		return nil, err
 	}
 
-	if found {
-		return execID, nil
+	//
+	// Execution already exists, just return it.
+	//
+	if executionCtx != nil {
+		return executionCtx, nil
 	}
 
-	execID, err = ctx.CreateExecution()
+	//
+	// Execution does not exist yet, create it.
+	//
+	executionCtx, err = ctx.CreateExecution()
 	if err != nil {
-		return uuid.Nil, err
+		return nil, err
 	}
 
-	err = ctx.SetExecutionKV(execID, "merge_group", mergeGroup)
+	err = executionCtx.ExecutionStateContext.SetKV("merge_group", mergeGroup)
 	if err != nil {
-		return uuid.Nil, err
+		return nil, err
 	}
 
 	md := &ExecutionMetadata{
@@ -196,29 +217,26 @@ func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup s
 		Sources:  []string{},
 	}
 
-	err = ctx.SetExecutionMetadata(execID, md)
-	if err != nil {
-		return uuid.Nil, err
-	}
-
-	return execID, nil
-}
-
-func (m *Merge) addEventToMetadata(ctx core.ProcessQueueContext, execID uuid.UUID) (*ExecutionMetadata, error) {
-	md := &ExecutionMetadata{}
-
-	rawMeta, err := ctx.GetExecutionMetadata(execID)
+	err = executionCtx.MetadataContext.Set(md)
 	if err != nil {
 		return nil, err
 	}
 
-	err = mapstructure.Decode(rawMeta, md)
+	return executionCtx, nil
+}
+
+func (m *Merge) addEventToMetadata(ctx core.ProcessQueueContext, executionCtx *core.ExecutionContext) (*ExecutionMetadata, error) {
+	md := &ExecutionMetadata{}
+	err := mapstructure.Decode(executionCtx.MetadataContext.Get(), md)
 	if err != nil {
 		return nil, err
 	}
 
 	md.EventIDs = append(md.EventIDs, ctx.EventID)
+
+	//
 	// Track distinct source nodes that reached this merge
+	//
 	if ctx.SourceNodeID != "" {
 		exists := false
 		for _, s := range md.Sources {
@@ -232,7 +250,7 @@ func (m *Merge) addEventToMetadata(ctx core.ProcessQueueContext, execID uuid.UUI
 		}
 	}
 
-	err = ctx.SetExecutionMetadata(execID, md)
+	err = executionCtx.MetadataContext.Set(md)
 	if err != nil {
 		return nil, err
 	}

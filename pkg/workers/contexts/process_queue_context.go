@@ -1,12 +1,12 @@
 package contexts
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -69,7 +69,7 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		Input:         event.Data.Data(),
 	}
 
-	ctx.CreateExecution = func() (uuid.UUID, error) {
+	ctx.CreateExecution = func() (*core.ExecutionContext, error) {
 		now := time.Now()
 
 		execution := models.WorkflowNodeExecution{
@@ -95,11 +95,21 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 			}
 		}
 
-		if err := tx.Create(&execution).Error; err != nil {
-			return uuid.Nil, err
+		err := tx.Create(&execution).Error
+		if err != nil {
+			return nil, err
 		}
 
-		return execution.ID, nil
+		return &core.ExecutionContext{
+			ID:                    execution.ID,
+			WorkflowID:            execution.WorkflowID.String(),
+			Configuration:         execution.Configuration.Data(),
+			MetadataContext:       NewExecutionMetadataContext(tx, &execution),
+			NodeMetadataContext:   NewNodeMetadataContext(tx, node),
+			ExecutionStateContext: NewExecutionStateContext(tx, &execution),
+			RequestContext:        NewExecutionRequestContext(tx, &execution),
+			Logger:                logging.WithExecution(logging.ForNode(*node), &execution, nil),
+		}, nil
 	}
 
 	ctx.DequeueItem = func() error {
@@ -110,98 +120,21 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		return node.UpdateState(tx, state)
 	}
 
-	ctx.DefaultProcessing = func() (*models.WorkflowNodeExecution, error) {
-		execID, err := ctx.CreateExecution()
+	ctx.DefaultProcessing = func() (*uuid.UUID, error) {
+		executionCtx, err := ctx.CreateExecution()
 		if err != nil {
 			return nil, err
 		}
+
 		if err := ctx.DequeueItem(); err != nil {
 			return nil, err
 		}
+
 		if err := ctx.UpdateNodeState(models.WorkflowNodeStateProcessing); err != nil {
 			return nil, err
 		}
-		return models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
-	}
 
-	ctx.GetExecutionMetadata = func(execID uuid.UUID) (map[string]any, error) {
-		exec, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
-		if err != nil {
-			return nil, err
-		}
-
-		return exec.Metadata.Data(), nil
-	}
-
-	ctx.SetExecutionMetadata = func(execID uuid.UUID, metadata any) error {
-		exec, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
-		if err != nil {
-			return err
-		}
-
-		b, err := json.Marshal(metadata)
-		if err != nil {
-			return err
-		}
-
-		var v map[string]any
-		err = json.Unmarshal(b, &v)
-		if err != nil {
-			return err
-		}
-
-		exec.Metadata = datatypes.NewJSONType(v)
-		return tx.Save(exec).Error
-	}
-
-	ctx.CountIncomingEdges = func() (int, error) {
-		// If this is an internal (blueprint) node, count incoming edges
-		// from the blueprint graph; otherwise count at the workflow level.
-		if node.ParentNodeID != nil && *node.ParentNodeID != "" {
-			// Parent should be a blueprint node. Load it and its blueprint spec.
-			parent, err := models.FindWorkflowNode(tx, node.WorkflowID, *node.ParentNodeID)
-			if err != nil {
-				return 0, err
-			}
-
-			// Defensive: if no blueprint ref, fallback to workflow edges.
-			blueprintID := parent.Ref.Data().Blueprint.ID
-			if blueprintID != "" {
-				bp, err := models.FindUnscopedBlueprintInTransaction(tx, blueprintID)
-				if err != nil {
-					return 0, err
-				}
-
-				// Child node id inside the blueprint (strip the parent prefix + ':')
-				prefix := parent.NodeID + ":"
-				childID := node.NodeID
-				if len(childID) > len(prefix) && childID[:len(prefix)] == prefix {
-					childID = childID[len(prefix):]
-				}
-
-				count := 0
-				for _, e := range bp.Edges {
-					if e.TargetID == childID {
-						count++
-					}
-				}
-				return count, nil
-			}
-			// Fallthrough to workflow-level counting if blueprint id missing
-		}
-
-		wf, err := models.FindWorkflowWithoutOrgScopeInTransaction(tx, node.WorkflowID)
-		if err != nil {
-			return 0, err
-		}
-
-		count := 0
-		for _, edge := range wf.Edges {
-			if edge.TargetID == node.NodeID {
-				count++
-			}
-		}
-		return count, nil
+		return &executionCtx.ID, nil
 	}
 
 	ctx.CountDistinctIncomingSources = func() (int, error) {
@@ -250,45 +183,26 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		return len(uniq), nil
 	}
 
-	ctx.PassExecution = func(execID uuid.UUID, outputs map[string][]any) (*models.WorkflowNodeExecution, error) {
-		exec, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
-		if err != nil {
-			return nil, err
-		}
-
-		exec.PassInTransaction(tx, outputs)
-
-		return exec, nil
-	}
-
-	ctx.FailExecution = func(execID uuid.UUID, reason, message string) (*models.WorkflowNodeExecution, error) {
-		exec, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := exec.FailInTransaction(tx, reason, message); err != nil {
-			return nil, err
-		}
-
-		return exec, nil
-	}
-
-	ctx.FindExecutionIDByKV = func(key string, value string) (uuid.UUID, bool, error) {
-		exec, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
+	ctx.FindExecutionByKV = func(key string, value string) (*core.ExecutionContext, error) {
+		execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
-				return uuid.Nil, false, nil
+				return nil, nil
 			}
 
-			return uuid.Nil, false, err
+			return nil, err
 		}
 
-		return exec.ID, true, nil
-	}
-
-	ctx.SetExecutionKV = func(execID uuid.UUID, key string, value string) error {
-		return models.CreateWorkflowNodeExecutionKVInTransaction(tx, node.WorkflowID, node.NodeID, execID, key, value)
+		return &core.ExecutionContext{
+			ID:                    execution.ID,
+			WorkflowID:            execution.WorkflowID.String(),
+			Configuration:         execution.Configuration.Data(),
+			MetadataContext:       NewExecutionMetadataContext(tx, execution),
+			NodeMetadataContext:   NewNodeMetadataContext(tx, node),
+			ExecutionStateContext: NewExecutionStateContext(tx, execution),
+			RequestContext:        NewExecutionRequestContext(tx, execution),
+			Logger:                logging.WithExecution(logging.ForNode(*node), execution, nil),
+		}, nil
 	}
 
 	return ctx, nil

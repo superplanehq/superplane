@@ -730,7 +730,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 			}
 
 			return &core.ExecutionContext{
-				ID:                    execution.ID.String(),
+				ID:                    execution.ID,
 				WorkflowID:            execution.WorkflowID.String(),
 				Configuration:         execution.Configuration.Data(),
 				MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
