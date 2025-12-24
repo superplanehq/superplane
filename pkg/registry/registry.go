@@ -92,21 +92,21 @@ func (r *Registry) Init() {
 	}
 
 	//
-	// Copy registered integrations, components and triggers
+	// Copy registered components, triggers, and applications with safe wrappers
 	//
 	mu.RLock()
 	defer mu.RUnlock()
 
 	for name, component := range registeredComponents {
-		r.Components[name] = component
+		r.Components[name] = NewPanicableComponent(component)
 	}
 
 	for name, trigger := range registeredTriggers {
-		r.Triggers[name] = trigger
+		r.Triggers[name] = NewPanicableTrigger(trigger)
 	}
 
 	for name, application := range registeredApplications {
-		r.Applications[name] = application
+		r.Applications[name] = NewPanicableApplication(application)
 	}
 }
 
