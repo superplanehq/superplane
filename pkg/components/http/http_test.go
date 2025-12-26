@@ -570,7 +570,7 @@ func TestHTTP__Execute__HTTPError(t *testing.T) {
 
 	//
 	// Execute component
-	// Component doesn't fail on HTTP errors
+	// Component should fail on HTTP errors (non-2xx by default)
 	//
 	h := &HTTP{}
 	stateCtx := &contexts.ExecutionStateContext{}
@@ -584,14 +584,14 @@ func TestHTTP__Execute__HTTPError(t *testing.T) {
 	}
 
 	err := h.Execute(ctx)
-	assert.NoError(t, err)
-	assert.True(t, stateCtx.Passed)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "HTTP request failed with status 404")
 
 	//
-	// Verify status code is captured
+	// Verify status code is captured and failed event is emitted
 	//
 	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
-	assert.Equal(t, stateCtx.Type, "http.request.finished")
+	assert.Equal(t, stateCtx.Type, "http.request.failed")
 	response := stateCtx.Payloads[0].(map[string]any)
 	assert.Equal(t, 404, response["status"])
 }
