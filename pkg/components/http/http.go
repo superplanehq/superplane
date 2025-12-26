@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -31,16 +32,18 @@ type KeyValue struct {
 }
 
 type Spec struct {
-	Method      string      `json:"method"`
-	URL         string      `json:"url"`
-	SendHeaders bool        `json:"sendHeaders"`
-	Headers     []Header    `json:"headers"`
-	SendBody    bool        `json:"sendBody"`
-	ContentType string      `json:"contentType"`
-	JSON        *any        `json:"json,omitempty"`
-	XML         *string     `json:"xml,omitempty"`
-	Text        *string     `json:"text,omitempty"`
-	FormData    *[]KeyValue `json:"formData,omitempty"`
+	Method             string      `json:"method"`
+	URL                string      `json:"url"`
+	SendHeaders        bool        `json:"sendHeaders"`
+	Headers            []Header    `json:"headers"`
+	SendBody           bool        `json:"sendBody"`
+	ContentType        string      `json:"contentType"`
+	JSON               *any        `json:"json,omitempty"`
+	XML                *string     `json:"xml,omitempty"`
+	Text               *string     `json:"text,omitempty"`
+	FormData           *[]KeyValue `json:"formData,omitempty"`
+	CustomSuccessCodes bool        `json:"customSuccessCodes"`
+	SuccessCodes       string      `json:"successCodes"`
 }
 
 type HTTP struct{}
@@ -301,6 +304,26 @@ func (e *HTTP) Configuration() []configuration.Field {
 			},
 			Placeholder: "<?xml version=\"1.0\"?>\n<root>\n  <element>value</element>\n</root>",
 		},
+		{
+			Name:        "customSuccessCodes",
+			Label:       "Custom Success State",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Enable to define custom success status codes",
+		},
+		{
+			Name:        "successCodes",
+			Type:        configuration.FieldTypeString,
+			Label:       "Success Codes",
+			Required:    false,
+			Default:     "2xx",
+			Description: "Comma-separated list of success status codes (e.g., 200, 201, 2xx)",
+			Placeholder: "2xx, 3xx",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "customSuccessCodes", Values: []string{"true"}},
+			},
+		},
 	}
 }
 
@@ -352,6 +375,25 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		// Set metadata result to "error" for network/connection failures
+		if ctx.MetadataContext != nil {
+			ctx.MetadataContext.Set(map[string]any{
+				"result": "error",
+			})
+		}
+
+		// Emit error event for network/connection failures
+		errorResponse := map[string]any{
+			"error": err.Error(),
+		}
+		emitErr := ctx.ExecutionStateContext.Emit(
+			core.DefaultOutputChannel.Name,
+			"http.request.error",
+			[]any{errorResponse},
+		)
+		if emitErr != nil {
+			return fmt.Errorf("request failed: %w (and failed to emit event: %v)", err, emitErr)
+		}
 		return fmt.Errorf("request failed: %w", err)
 	}
 
@@ -359,6 +401,26 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		// Set metadata result to "error" for response reading failures
+		if ctx.MetadataContext != nil {
+			ctx.MetadataContext.Set(map[string]any{
+				"result": "error",
+			})
+		}
+
+		// Emit error event for response reading failures
+		errorResponse := map[string]any{
+			"status": resp.StatusCode,
+			"error":  fmt.Sprintf("failed to read response body: %v", err),
+		}
+		emitErr := ctx.ExecutionStateContext.Emit(
+			core.DefaultOutputChannel.Name,
+			"http.request.error",
+			[]any{errorResponse},
+		)
+		if emitErr != nil {
+			return fmt.Errorf("failed to read response: %w (and failed to emit event: %v)", err, emitErr)
+		}
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
@@ -379,11 +441,80 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		"body":    bodyData,
 	}
 
-	return ctx.ExecutionStateContext.Emit(
+	// Check if status code matches success codes
+	var isSuccess bool
+	if spec.CustomSuccessCodes {
+		isSuccess = e.matchesSuccessCode(resp.StatusCode, spec.SuccessCodes)
+	} else {
+		// Default behavior: 2xx is success
+		isSuccess = e.matchesSuccessCode(resp.StatusCode, "2xx")
+	}
+
+	// Set metadata result based on success/failure
+	var metadataResult string
+	if isSuccess {
+		metadataResult = "success"
+	} else {
+		metadataResult = "failed"
+	}
+	if ctx.MetadataContext != nil {
+		ctx.MetadataContext.Set(map[string]any{
+			"result": metadataResult,
+		})
+	}
+
+	// Emit event with response data
+	eventType := "http.request.finished"
+	if !isSuccess {
+		eventType = "http.request.failed"
+	}
+
+	err = ctx.ExecutionStateContext.Emit(
 		core.DefaultOutputChannel.Name,
-		"http.request.finished",
+		eventType,
 		[]any{response},
 	)
+	if err != nil {
+		return err
+	}
+
+	// Return error if request failed to mark execution as failed
+	if !isSuccess {
+		return fmt.Errorf("HTTP request failed with status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// matchesSuccessCode checks if the given status code matches any of the success code patterns
+func (e *HTTP) matchesSuccessCode(statusCode int, successCodes string) bool {
+	// Default to 2xx if not specified
+	if successCodes == "" {
+		successCodes = "2xx"
+	}
+
+	// Split by comma and trim spaces
+	codes := strings.Split(successCodes, ",")
+	for _, code := range codes {
+		code = strings.TrimSpace(code)
+
+		// Handle wildcard patterns like 2xx, 3xx, etc.
+		if strings.HasSuffix(code, "xx") {
+			prefix := strings.TrimSuffix(code, "xx")
+			statusStr := strconv.Itoa(statusCode)
+			if strings.HasPrefix(statusStr, prefix) {
+				return true
+			}
+		} else {
+			// Handle specific status codes like 200, 201, etc.
+			expectedCode, err := strconv.Atoi(code)
+			if err == nil && statusCode == expectedCode {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (e *HTTP) serializePayload(spec Spec) (io.Reader, string, error) {
