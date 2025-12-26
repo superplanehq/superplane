@@ -4,11 +4,94 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseMapper } from "./types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
+import { ComponentBaseMapper, EventStateRegistry } from "./types";
+import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventStateMap, EventState } from "@/ui/componentBase";
 import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
-import { getState, getStateMap } from ".";
+
+// Custom state map for HTTP component with error state
+const HTTP_EVENT_STATE_MAP: EventStateMap = {
+  triggered: {
+    icon: "circle",
+    textColor: "text-black",
+    backgroundColor: "bg-violet-100",
+    badgeColor: "bg-violet-400",
+  },
+  success: {
+    icon: "circle-check",
+    textColor: "text-black",
+    backgroundColor: "bg-green-100",
+    badgeColor: "bg-emerald-500",
+  },
+  failed: {
+    icon: "circle-x",
+    textColor: "text-black",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-400",
+  },
+  error: {
+    icon: "alert-triangle",
+    textColor: "text-black",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-500",
+  },
+  neutral: {
+    icon: "circle",
+    textColor: "text-black",
+    backgroundColor: "bg-gray-50",
+    badgeColor: "bg-gray-400",
+  },
+  queued: {
+    icon: "circle-dashed",
+    textColor: "text-black",
+    backgroundColor: "bg-orange-100",
+    badgeColor: "bg-yellow-600",
+  },
+  running: {
+    icon: "refresh-cw",
+    textColor: "text-black",
+    backgroundColor: "bg-sky-100",
+    badgeColor: "bg-blue-500",
+  },
+};
+
+// Custom state function for HTTP component
+const httpStateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+  if (!execution) return "neutral";
+
+  if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
+    return "running";
+  }
+
+  // Check metadata result for success/failed/error distinction
+  if (execution.state === "STATE_FINISHED") {
+    const metadata = execution.metadata as Record<string, any> | undefined;
+
+    if (metadata?.result === "success") {
+      return "success";
+    }
+
+    if (metadata?.result === "failed") {
+      return "failed";
+    }
+
+    if (metadata?.result === "error") {
+      return "error";
+    }
+
+    // Fallback to execution result
+    if (execution.result === "RESULT_PASSED") {
+      return "success";
+    }
+  }
+
+  return "failed";
+};
+
+export const HTTP_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: HTTP_EVENT_STATE_MAP,
+  getState: httpStateFunction,
+};
 
 export const httpMapper: ComponentBaseMapper = {
   props(
@@ -18,8 +101,6 @@ export const httpMapper: ComponentBaseMapper = {
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     _items?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
-    const componentName = componentDefinition.name || "http";
-
     return {
       iconSlug: componentDefinition.icon || "globe",
       headerColor: "bg-white",
@@ -28,11 +109,11 @@ export const httpMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
       title: node.name!,
-      eventSections: lastExecutions[0] ? getHTTPEventSections(lastExecutions[0], componentName) : undefined,
+      eventSections: lastExecutions[0] ? getHTTPEventSections(lastExecutions[0], httpStateFunction) : undefined,
       includeEmptyState: !lastExecutions[0],
       metadata: getHTTPMetadataList(node),
       specs: getHTTPSpecs(node),
-      eventStateMap: getStateMap(componentName),
+      eventStateMap: HTTP_EVENT_STATE_MAP,
     };
   },
 };
@@ -159,15 +240,30 @@ function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   return specs;
 }
 
-function getHTTPEventSections(execution: WorkflowsWorkflowNodeExecution, componentName: string): EventSection[] {
+function getHTTPEventSections(
+  execution: WorkflowsWorkflowNodeExecution,
+  stateFunction: (execution: WorkflowsWorkflowNodeExecution) => EventState,
+): EventSection[] {
   const outputs = execution.outputs as Record<string, unknown>;
   const defaultArray = outputs?.default as unknown[];
-  const response = defaultArray?.[0] as { data?: { status?: string } };
+  const response = defaultArray?.[0] as { data?: { status?: string; error?: string } };
+
+  // Determine event title based on response
+  let eventTitle = "Running...";
+  if (execution.state === "STATE_FINISHED") {
+    if (response?.data?.error) {
+      eventTitle = `Error: ${response.data.error}`;
+    } else if (response?.data?.status) {
+      eventTitle = `Status: ${response.data.status}`;
+    } else {
+      eventTitle = "Request completed";
+    }
+  }
 
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: execution.state == "STATE_FINISHED" ? `Status: ${response?.data?.status}` : "Running...",
-    eventState: getState(componentName)(execution),
+    eventTitle,
+    eventState: stateFunction(execution),
     eventId: execution.rootEvent?.id,
   };
 

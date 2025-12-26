@@ -10,7 +10,7 @@ import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { noopMapper } from "./noop";
 import { ifMapper } from "./if";
-import { httpMapper } from "./http";
+import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
 import { semaphoreMapper as oldSemaphoreMapper, SEMAPHORE_STATE_REGISTRY } from "./semaphore";
 import {
   componentMappers as semaphoreComponentMappers,
@@ -65,6 +65,7 @@ const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBui
 const eventStateRegistries: Record<string, EventStateRegistry> = {
   approval: APPROVAL_STATE_REGISTRY,
   semaphore: SEMAPHORE_STATE_REGISTRY,
+  http: HTTP_STATE_REGISTRY,
 };
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {

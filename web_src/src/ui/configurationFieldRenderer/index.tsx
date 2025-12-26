@@ -299,6 +299,13 @@ export const ConfigurationFieldRenderer = ({
             ))}
           </div>
         )}
+
+        {/* Display field description */}
+        {field.description && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-left bg-gray-50 dark:bg-gray-800 p-2 rounded">
+            {field.description}
+          </p>
+        )}
       </div>
     );
   }
@@ -331,6 +338,13 @@ export const ConfigurationFieldRenderer = ({
             </p>
           ))}
         </div>
+      )}
+
+      {/* Display field description */}
+      {field.description && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-left bg-gray-50 dark:bg-gray-800 p-2 rounded">
+          {field.description}
+        </p>
       )}
 
       {/* Display type-specific help text */}
