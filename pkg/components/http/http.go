@@ -376,9 +376,11 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		// Set metadata result to "error" for network/connection failures
-		ctx.MetadataContext.Set(map[string]any{
-			"result": "error",
-		})
+		if ctx.MetadataContext != nil {
+			ctx.MetadataContext.Set(map[string]any{
+				"result": "error",
+			})
+		}
 
 		// Emit error event for network/connection failures
 		errorResponse := map[string]any{
@@ -400,9 +402,11 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		// Set metadata result to "error" for response reading failures
-		ctx.MetadataContext.Set(map[string]any{
-			"result": "error",
-		})
+		if ctx.MetadataContext != nil {
+			ctx.MetadataContext.Set(map[string]any{
+				"result": "error",
+			})
+		}
 
 		// Emit error event for response reading failures
 		errorResponse := map[string]any{
@@ -453,9 +457,11 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 	} else {
 		metadataResult = "failed"
 	}
-	ctx.MetadataContext.Set(map[string]any{
-		"result": metadataResult,
-	})
+	if ctx.MetadataContext != nil {
+		ctx.MetadataContext.Set(map[string]any{
+			"result": metadataResult,
+		})
+	}
 
 	// Emit event with response data
 	eventType := "http.request.finished"
