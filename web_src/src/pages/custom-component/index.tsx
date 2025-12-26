@@ -93,9 +93,9 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
         includeEmptyState: true,
         emptyStateProps: {
           icon: Puzzle,
-          title: "Select a component from the sidebar to configure this node",
+          title: "Select a component from the sidebar",
         },
-        error: "Select a component from the sidebar to configure this node",
+        error: "Select a component from the sidebar",
       },
     };
   }

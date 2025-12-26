@@ -161,7 +161,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
             <span
               className={cn(
                 "text-base font-normal",
-                approved ? "text-emerald-500" : rejected ? "text-red-500" : "text-muted-foreground",
+                approved ? "text-green-700" : rejected ? "text-red-700" : "text-muted-foreground",
               )}
             >
               {approved ? "Approved" : rejected ? "Rejected" : "Pending"}

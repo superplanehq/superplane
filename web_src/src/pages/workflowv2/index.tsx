@@ -1872,7 +1872,7 @@ function prepareComponentNode(
             icon: Puzzle,
             title: "Finish configuring this component",
           },
-          error: "Select a component from the sidebar to configure this node",
+          error: "Select a component from the sidebar",
           parameters: [],
         },
       },

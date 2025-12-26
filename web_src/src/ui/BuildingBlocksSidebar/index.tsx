@@ -370,7 +370,7 @@ function CategorySection({
                 <div className="flex items-center gap-2">
                   <ItemTitle className="text-sm font-medium">{block.label || block.name}</ItemTitle>
                   {block.deprecated && (
-                    <span className="px-1.5 py-0.5 text-[11px] font-medium bg-orange-100 text-amber-800 rounded whitespace-nowrap">
+                    <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/10 text-gray-500 rounded whitespace-nowrap">
                       Deprecated
                     </span>
                   )}

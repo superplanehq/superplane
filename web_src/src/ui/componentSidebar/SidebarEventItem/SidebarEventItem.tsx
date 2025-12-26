@@ -493,7 +493,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       </a>
                     ) : (
                       <span
-                        className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                        className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
                         title={stringValue}
                       >
                         {stringValue}
@@ -530,7 +530,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       </a>
                     ) : (
                       <span
-                        className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                        className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
                         title={stringValue}
                       >
                         {stringValue}
@@ -713,7 +713,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       </a>
                     ) : (
                       <span
-                        className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                        className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
                         title={value}
                       >
                         {value}
