@@ -1873,7 +1873,7 @@ function prepareComponentNode(
           includeEmptyState: true,
           emptyStateProps: {
             icon: Puzzle,
-            title: "Finish configuring this component",
+            title: "Select a component from the sidebar",
           },
           error: "Select a component from the sidebar",
           parameters: [],

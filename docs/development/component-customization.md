@@ -137,19 +137,19 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP, // Inherit defaults
   waiting: {
     icon: "clock",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-orange-100",
     badgeColor: "bg-yellow-600",
   },
   approved: {
     icon: "circle-check",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   rejected: {
     icon: "circle-x",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },

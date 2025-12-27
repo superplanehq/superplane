@@ -139,37 +139,37 @@ export type EventStateMap = Record<EventState, EventStateStyle>;
 export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
   triggered: {
     icon: "circle",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-violet-100",
     badgeColor: "bg-violet-400",
   },
   success: {
     icon: "circle-check",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   failed: {
     icon: "circle-x",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
   neutral: {
     icon: "circle",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-gray-50",
     badgeColor: "bg-gray-400",
   },
   queued: {
     icon: "circle-dashed",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-orange-100",
     badgeColor: "bg-yellow-600",
   },
   running: {
     icon: "refresh-cw",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-sky-100",
     badgeColor: "bg-blue-500",
   },

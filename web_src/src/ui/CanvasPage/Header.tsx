@@ -245,7 +245,7 @@ export function Header({
                     <a
                       href={item.href}
                       onClick={item.onClick}
-                      className="hover:text-black transition-colors flex items-center gap-2"
+                      className="hover:text-gray-800 transition-colors flex items-center gap-2"
                     >
                       {item.iconSrc && (
                         <div
@@ -269,8 +269,8 @@ export function Header({
                     </a>
                   ) : (
                     <span
-                      className={`flex items-center gap-2 ${
-                        index === breadcrumbs.length - 1 ? "text-black font-medium" : ""
+                      className={`flex items-center gap-1 ${
+                        index === breadcrumbs.length - 1 ? "text-gray-800 font-medium" : ""
                       }`}
                     >
                       {item.iconSrc && (

@@ -281,7 +281,7 @@ function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
   const heading = activeTab === "custom-components" ? "Bundles" : "Canvases";
   const description =
     activeTab === "custom-components"
-      ? "Overview of all Bundles created and maintained by your team."
+      ? "Bundles let you group multiple Components into a single reusable unit."
       : "Overview of all mapped automations across your organization.";
   const buttonText = activeTab === "custom-components" ? "New Bundle" : "New Canvas";
 

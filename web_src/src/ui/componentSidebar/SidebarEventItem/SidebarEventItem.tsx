@@ -414,7 +414,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     onClick={() => setActiveTab("current")}
                     className={`px-5 py-1 text-sm font-medium rounded-tl-md  ${
                       activeTab === "current"
-                        ? "text-black border-b-1 border-black"
+                        ? "text-gray-800 border-b-1 border-black"
                         : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                     }`}
                   >
@@ -426,7 +426,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     onClick={() => setActiveTab("root")}
                     className={`px-5 py-1 text-sm font-medium ${
                       activeTab === "root"
-                        ? "text-black border-b-1 border-black"
+                        ? "text-gray-800 border-b-1 border-black"
                         : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                     }`}
                   >
@@ -443,7 +443,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     }}
                     className={`px-5 py-1 text-sm font-medium ${
                       activeTab === "executionChain"
-                        ? "text-black border-b-1 border-black"
+                        ? "text-gray-800 border-b-1 border-black"
                         : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                     }`}
                   >
@@ -456,7 +456,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                   onClick={() => setActiveTab("payload")}
                   className={`px-3 py-1 text-sm font-medium rounded-tr-md flex items-center gap-1 ${
                     activeTab === "payload"
-                      ? "text-black border-b-1 border-black bg-gray-100"
+                      ? "text-gray-800 border-b-1 border-black bg-gray-100"
                       : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-l-1 border-gray-200"
                   }`}
                 >
