@@ -57,7 +57,7 @@ export function BuildingBlocksSidebar({
         className="absolute top-4 right-4 z-10"
       >
         <Plus size={16} />
-        Component
+        Components
       </Button>
     );
   }
