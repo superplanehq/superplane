@@ -339,6 +339,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         `cursor-pointer p-2 relative rounded-md border-1 border-slate-950/20 hover:translate-x-1 transition-transform duration-200 ${EventBackground}` +
         (totalItems && index < totalItems - 1 ? " mb-4" : "")
       }
+      data-testid="sidebar-event-item"
+      data-event-state={event.state || "unknown"}
+      data-event-kind={event.kind || "execution"}
       onClick={(e) => {
         e.stopPropagation();
         // For trigger events and component executions, navigate to execution chain instead of toggling inline
