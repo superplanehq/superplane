@@ -302,7 +302,7 @@ export function Header({
           {/* Right side - Save button */}
           <div className="flex items-center gap-3">
             {unsavedMessage && (
-              <span className="text-sm text-yellow-700 bg-orange-100 px-2 py-1 rounded-md hidden sm:inline">
+              <span className="text-xs font-medium text-yellow-700 bg-orange-100 px-2 py-1 rounded hidden sm:inline">
                 {unsavedMessage}
               </span>
             )}
