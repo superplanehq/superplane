@@ -69,8 +69,8 @@ func (steps *TestHomePageSteps) AssertComponentSavedInDB(s string) {
 }
 
 func (steps *TestHomePageSteps) FillInNewComponentForm(name string) {
-	newComponentButton := q.Text("New Component")
-	saveComponentButton := q.Text("Create Component")
+	newComponentButton := q.Text("New Bundle")
+	saveComponentButton := q.Text("Create Bundle")
 	componentNameInput := q.TestID("component-name-input")
 
 	steps.session.Click(newComponentButton)
@@ -80,6 +80,6 @@ func (steps *TestHomePageSteps) FillInNewComponentForm(name string) {
 }
 
 func (steps *TestHomePageSteps) SwitchToComponentsTab() {
-	componentsTab := q.Text("Components")
+	componentsTab := q.Text("Bundles")
 	steps.session.Click(componentsTab)
 }
