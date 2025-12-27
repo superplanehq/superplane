@@ -871,7 +871,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             onClose={handleNodeSidebarClose}
             nodeId={selectedNodeId}
             iconSlug={editingNodeData?.icon || newNodeData?.icon || "gear"}
-            iconColor="text-black"
+            iconColor="text-gray-800"
             latestEvents={[]}
             nextInQueueEvents={[]}
             iconBackground=""

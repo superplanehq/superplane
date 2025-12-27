@@ -49,7 +49,7 @@ export function buildBuildingBlockCategories(
       ),
     },
     {
-      name: "Components",
+      name: "Bundles",
       blocks: blueprints.map(
         (b): BuildingBlock => ({
           id: b.id,
@@ -58,8 +58,8 @@ export function buildBuildingBlockCategories(
           type: "blueprint",
           outputChannels: b.outputChannels,
           configuration: b.configuration,
-          icon: b.icon,
-          color: b.color,
+          icon: "component",
+          color: "gray",
           isLive: true,
         }),
       ),

@@ -280,7 +280,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         </a>
                       ) : (
                         <span
-                          className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                          className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
                           title={stringValue}
                         >
                           {stringValue}

@@ -4,7 +4,7 @@ import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { resolveIcon } from "@/lib/utils";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { ChevronRight, GripVerticalIcon, Plus, X } from "lucide-react";
+import { ChevronRight, GripVerticalIcon, Plus, Search, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
@@ -119,7 +119,7 @@ export function BuildingBlocksSidebar({
   const categoryOrder: Record<string, number> = {
     Primitives: 0,
     Triggers: 1,
-    Components: 2,
+    Bundles: 2,
   };
 
   const sortedCategories = [...(blocks || [])].sort((a, b) => {
@@ -156,7 +156,7 @@ export function BuildingBlocksSidebar({
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3 relative">
+      <div className="flex items-center justify-between gap-3 px-5 py-4 relative">
         <div className="flex flex-col items-start gap-3 w-full">
           <div className="flex justify-between gap-3 w-full">
             <div className="flex flex-col gap-0.5">
@@ -165,7 +165,7 @@ export function BuildingBlocksSidebar({
           </div>
           <div
             onClick={() => onToggle(false)}
-            className="absolute top-3 right-2 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+            className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
           >
             <X size={16} />
           </div>
@@ -173,19 +173,20 @@ export function BuildingBlocksSidebar({
       </div>
 
       {/* Search */}
-      <div className="flex items-center gap-2 px-4">
-        <div className="flex-1">
+      <div className="flex items-center gap-2 px-5">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <input
             type="text"
             placeholder="Filter components..."
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-800 focus:border-transparent"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-800 focus:border-transparent"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
-      <div className="gap-2 py-4">
+      <div className="gap-2 py-6">
         {sortedCategories.map((category) => (
           <CategorySection
             key={category.name}
@@ -277,15 +278,17 @@ function CategorySection({
   }
 
   return (
-    <details className="flex-1 px-4 mb-4" open>
-      <summary className="cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 mb-3 flex items-center gap-1 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
-        <ChevronRight className="h-3 w-3 transition-transform [[details[open]]>&]:rotate-90" />
-        <span className="text-[13px] text-gray-500 font-medium pl-1">{category.name}</span>
+    <details className="flex-1 px-5 mb-5" open>
+      <summary className="relative cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 mb-3 flex items-center gap-1 [&::-webkit-details-marker]:hidden [&::marker]:hidden before:absolute before:inset-x-0 before:top-1/2 before:-translate-y-1/2 before:h-px before:bg-slate-200 dark:before:bg-gray-800 before:content-[''] before:transform">
+        <span className="relative z-10 flex items-center gap-1 bg-white dark:bg-gray-900 pr-3">
+          <ChevronRight className="h-3 w-3 transition-transform [[details[open]]>&]:rotate-90" />
+          <span className="text-[13px] text-gray-500 font-medium pl-1">{category.name}</span>
+        </span>
       </summary>
 
       <ItemGroup>
         {allBlocks.map((block) => {
-          const iconSlug = block.icon || "zap";
+          const iconSlug = block.type === "blueprint" ? "component" : block.icon || "zap";
           const IconComponent = resolveIcon(iconSlug);
 
           const isLive = !!block.isLive;
@@ -370,7 +373,7 @@ function CategorySection({
                 <div className="flex items-center gap-2">
                   <ItemTitle className="text-sm font-medium">{block.label || block.name}</ItemTitle>
                   {block.deprecated && (
-                    <span className="px-1.5 py-0.5 text-[11px] font-medium bg-orange-100 text-amber-800 rounded whitespace-nowrap">
+                    <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap">
                       Deprecated
                     </span>
                   )}

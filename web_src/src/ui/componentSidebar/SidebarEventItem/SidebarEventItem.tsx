@@ -339,6 +339,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         `cursor-pointer p-2 relative rounded-md border-1 border-slate-950/20 hover:translate-x-1 transition-transform duration-200 ${EventBackground}` +
         (totalItems && index < totalItems - 1 ? " mb-4" : "")
       }
+      data-testid="sidebar-event-item"
+      data-event-state={event.state || "unknown"}
+      data-event-kind={event.kind || "execution"}
       onClick={(e) => {
         e.stopPropagation();
         // For trigger events and component executions, navigate to execution chain instead of toggling inline
@@ -414,7 +417,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     onClick={() => setActiveTab("current")}
                     className={`px-5 py-1 text-sm font-medium rounded-tl-md  ${
                       activeTab === "current"
-                        ? "text-black border-b-1 border-black"
+                        ? "text-gray-800 border-b-1 border-black"
                         : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                     }`}
                   >
@@ -426,7 +429,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     onClick={() => setActiveTab("root")}
                     className={`px-5 py-1 text-sm font-medium ${
                       activeTab === "root"
-                        ? "text-black border-b-1 border-black"
+                        ? "text-gray-800 border-b-1 border-black"
                         : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                     }`}
                   >
@@ -443,7 +446,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     }}
                     className={`px-5 py-1 text-sm font-medium ${
                       activeTab === "executionChain"
-                        ? "text-black border-b-1 border-black"
+                        ? "text-gray-800 border-b-1 border-black"
                         : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                     }`}
                   >
@@ -456,7 +459,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                   onClick={() => setActiveTab("payload")}
                   className={`px-3 py-1 text-sm font-medium rounded-tr-md flex items-center gap-1 ${
                     activeTab === "payload"
-                      ? "text-black border-b-1 border-black bg-gray-100"
+                      ? "text-gray-800 border-b-1 border-black bg-gray-100"
                       : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-l-1 border-gray-200"
                   }`}
                 >
@@ -493,7 +496,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       </a>
                     ) : (
                       <span
-                        className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                        className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
                         title={stringValue}
                       >
                         {stringValue}
@@ -530,7 +533,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       </a>
                     ) : (
                       <span
-                        className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                        className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
                         title={stringValue}
                       >
                         {stringValue}
@@ -713,7 +716,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       </a>
                     ) : (
                       <span
-                        className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                        className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
                         title={value}
                       >
                         {value}

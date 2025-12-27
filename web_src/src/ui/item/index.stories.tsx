@@ -72,7 +72,7 @@ export const Compact: Story = {
       <Item variant="outline" size="sm" asChild>
         <a href="#">
           <ItemMedia>
-            <BadgeCheck className="size-5 text-emerald-500" />
+            <BadgeCheck className="size-5 text-green-700" />
           </ItemMedia>
           <ItemContent>
             <ItemTitle>Your profile has been verified.</ItemTitle>

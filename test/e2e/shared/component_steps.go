@@ -25,10 +25,10 @@ func NewComponentSteps(name string, t *testing.T, session *session.TestSession) 
 
 func (s *ComponentSteps) Create() {
 	s.session.VisitHomePage()
-	s.session.Click(q.Text("Components"))
-	s.session.Click(q.Text("New Component"))
+	s.session.Click(q.Text("Bundles"))
+	s.session.Click(q.Text("New Bundle"))
 	s.session.FillIn(q.TestID("component-name-input"), s.ComponentName)
-	s.session.Click(q.Text("Create Component"))
+	s.session.Click(q.Text("Create Bundle"))
 	s.session.Sleep(300)
 }
 

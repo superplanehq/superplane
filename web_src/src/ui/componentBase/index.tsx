@@ -139,37 +139,37 @@ export type EventStateMap = Record<EventState, EventStateStyle>;
 export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
   triggered: {
     icon: "circle",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-violet-100",
     badgeColor: "bg-violet-400",
   },
   success: {
     icon: "circle-check",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   failed: {
     icon: "circle-x",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
   neutral: {
     icon: "circle",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-gray-50",
     badgeColor: "bg-gray-400",
   },
   queued: {
     icon: "circle-dashed",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-orange-100",
     badgeColor: "bg-yellow-600",
   },
   running: {
     icon: "refresh-cw",
-    textColor: "text-black",
+    textColor: "text-gray-800",
     backgroundColor: "bg-sky-100",
     badgeColor: "bg-blue-500",
   },
@@ -252,7 +252,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   if (collapsed) {
     return (
       <SelectionWrapper selected={selected} fullRounded>
-        <div className={`relative ${hasError ? "border-2 border-red-500 rounded-full" : ""}`}>
+        <div className={`relative ${hasError ? "!outline-orange-500 rounded-full" : ""}`}>
           <CollapsedComponent
             iconSrc={iconSrc}
             iconSlug={iconSlug}
@@ -316,7 +316,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   return (
     <SelectionWrapper selected={selected}>
       <div
-        className={`relative flex flex-col outline-1 outline-slate-400 rounded-md w-[23rem] bg-white ${hasError ? "border-2 border-red-500" : ""}`}
+        className={`relative flex flex-col outline-1 outline-slate-400 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""}`}
       >
         <ComponentHeader
           iconSrc={iconSrc}
@@ -395,7 +395,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="absolute -top-3 -right-3 bg-red-500 rounded-full p-1 cursor-pointer">
+                <div className="absolute -top-3 -right-3 bg-orange-500 rounded-full p-1 cursor-pointer">
                   <AlertTriangle size={16} className="text-white" />
                 </div>
               </TooltipTrigger>

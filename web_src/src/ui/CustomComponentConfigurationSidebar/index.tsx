@@ -9,8 +9,6 @@ import { useState } from "react";
 export interface BlueprintMetadata {
   name: string;
   description: string;
-  icon: string;
-  color: string;
 }
 
 export interface OutputChannel {
@@ -64,7 +62,7 @@ export function CustomComponentConfigurationSidebar({
         onClick={() => onToggle(true)}
         aria-label="Open settings"
         className="absolute top-4 right-40 z-10"
-        title="Blueprint Settings"
+        title="Bundle Settings"
       >
         <Settings size={24} />
       </Button>
@@ -85,7 +83,7 @@ export function CustomComponentConfigurationSidebar({
     <div className="w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col z-50">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-0">
-        <h2 className="text-md font-semibold text-gray-800 dark:text-gray-100">Component Settings</h2>
+        <h2 className="text-md font-semibold text-gray-800 dark:text-gray-100">Bundle Settings</h2>
         <Button variant="outline" size="icon" onClick={() => onToggle(false)} aria-label="Close settings">
           <PanelLeftClose size={24} className="rotate-180" />
         </Button>
@@ -115,34 +113,8 @@ export function CustomComponentConfigurationSidebar({
               value={metadata.description}
               onChange={(e) => onMetadataChange({ ...metadata, description: e.target.value })}
               className="mt-1"
-              placeholder="Blueprint description"
+              placeholder="Bundle description"
             />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="blueprint-icon" className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                Icon
-              </Label>
-              <Input
-                id="blueprint-icon"
-                value={metadata.icon}
-                onChange={(e) => onMetadataChange({ ...metadata, icon: e.target.value })}
-                className="mt-1"
-                placeholder="Icon name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="blueprint-color" className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                Color
-              </Label>
-              <Input
-                id="blueprint-color"
-                value={metadata.color}
-                onChange={(e) => onMetadataChange({ ...metadata, color: e.target.value })}
-                className="mt-1"
-                placeholder="Color"
-              />
-            </div>
           </div>
         </div>
       </div>
