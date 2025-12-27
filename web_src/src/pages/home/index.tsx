@@ -12,7 +12,6 @@ import { useAccount } from "../../contexts/AccountContext";
 import { useBlueprints, useDeleteBlueprint } from "../../hooks/useBlueprintData";
 import { useDeleteWorkflow, useWorkflows } from "../../hooks/useWorkflowData";
 import { cn, resolveIcon } from "../../lib/utils";
-import { getColorClass } from "../../utils/colors";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 
 import { Button } from "../../ui/button";
@@ -28,8 +27,6 @@ interface BlueprintCardData {
   description?: string;
   createdAt: string;
   type: "blueprint";
-  icon?: string;
-  color?: string;
   createdBy?: { id?: string; name?: string };
 }
 
@@ -67,7 +64,7 @@ const HomePage = () => {
     error: workflowApiError,
   } = useWorkflows(organizationId || "");
 
-  const blueprintError = blueprintApiError ? "Failed to fetch components. Please try again later." : null;
+  const blueprintError = blueprintApiError ? "Failed to fetch Bundles. Please try again later." : null;
   const workflowError = workflowApiError ? "Failed to fetch workflows. Please try again later." : null;
 
   const blueprints: BlueprintCardData[] = (blueprintsData || []).map((blueprint: any) => ({
@@ -76,8 +73,6 @@ const HomePage = () => {
     description: blueprint.description,
     createdAt: blueprint.createdAt ? new Date(blueprint.createdAt).toLocaleDateString() : "Unknown",
     type: "blueprint" as const,
-    icon: blueprint.icon,
-    color: blueprint.color,
     createdBy: blueprint.createdBy,
   }));
 
@@ -210,7 +205,7 @@ function Tabs({ activeTab, setActiveTab, blueprints, workflows }: TabsProps) {
             : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
         }`}
       >
-        Components ({blueprints.length})
+        Bundles ({blueprints.length})
       </button>
     </div>
   );
@@ -257,7 +252,7 @@ function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
     "focus:ring-2 focus:ring-blue-500 focus:border-transparent",
   );
 
-  const searchPlaceholder = activeTab === "custom-components" ? "Search components..." : "Search canvases...";
+  const searchPlaceholder = activeTab === "custom-components" ? "Search Bundles..." : "Search canvases...";
 
   return (
     <div className="flex items-center gap-2">
@@ -283,12 +278,12 @@ interface PageHeaderProps {
 }
 
 function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
-  const heading = activeTab === "custom-components" ? "Components" : "Canvases";
+  const heading = activeTab === "custom-components" ? "Bundles" : "Canvases";
   const description =
     activeTab === "custom-components"
-      ? "Overview of all components created and maintained by your team."
+      ? "Overview of all Bundles created and maintained by your team."
       : "Overview of all mapped automations across your organization.";
-  const buttonText = activeTab === "custom-components" ? "New Component" : "New Canvas";
+  const buttonText = activeTab === "custom-components" ? "New Bundle" : "New Canvas";
 
   return (
     <div className="flex items-center justify-between mb-6">
@@ -368,10 +363,10 @@ function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
     <div className="text-center py-12">
       <Box className="mx-auto text-gray-400 mb-4" size={48} />
       <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
-        {searchQuery ? "No components found" : "No components yet"}
+        {searchQuery ? "No Bundles found" : "No Bundles yet"}
       </Heading>
       <Text className="text-gray-600 dark:text-gray-400 mb-6">
-        {searchQuery ? "Try adjusting your search criteria." : "Get started by creating your first component."}
+        {searchQuery ? "Try adjusting your search criteria." : "Get started by creating your first Bundle."}
       </Text>
     </div>
   );
@@ -619,8 +614,8 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
       showSuccessToast("Component deleted successfully");
       closeDialog();
     } catch (error) {
-      console.error("Failed to delete component:", error);
-      showErrorToast("Failed to delete component");
+      console.error("Failed to delete Bundle:", error);
+      showErrorToast("Failed to delete Bundle");
     }
   };
 
@@ -648,9 +643,9 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
       </div>
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
-        <DialogTitle className="text-red-900 dark:text-red-100">Delete component</DialogTitle>
+        <DialogTitle className="text-red-900 dark:text-red-100">Delete Bundle</DialogTitle>
         <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
-          This action cannot be undone. Are you sure you want to delete this component?
+          This action cannot be undone. Are you sure you want to delete this Bundle?
         </DialogDescription>
         <DialogBody>
           <Text className="text-sm text-gray-600 dark:text-gray-400">
@@ -688,7 +683,7 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
       {filteredBlueprints.map((blueprint) => {
-        const IconComponent = resolveIcon(blueprint.icon);
+        const IconComponent = resolveIcon("component");
         return (
           <div
             key={blueprint.id}
@@ -698,7 +693,7 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
               <div>
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    <IconComponent size={24} className={getColorClass(blueprint.color)} />
+                    <IconComponent size={24} className="text-gray-600 dark:text-gray-400" />
                     <div className="flex flex-col flex-1 min-w-0">
                       <button
                         onClick={() => navigate(`/${organizationId}/custom-components/${blueprint.id}`)}
@@ -749,7 +744,7 @@ function BlueprintListView({ filteredBlueprints, organizationId }: BlueprintGrid
   return (
     <div className="space-y-2">
       {filteredBlueprints.map((blueprint) => {
-        const IconComponent = resolveIcon(blueprint.icon);
+        const IconComponent = resolveIcon("component");
         return (
           <div
             key={blueprint.id}
@@ -761,7 +756,7 @@ function BlueprintListView({ filteredBlueprints, organizationId }: BlueprintGrid
                 className="block text-left w-full"
               >
                 <div className="flex items-center gap-3">
-                  <IconComponent size={24} className={getColorClass(blueprint.color)} />
+                  <IconComponent size={24} className="text-gray-600 dark:text-gray-400" />
                   <div className="flex-1">
                     <Heading
                       level={3}

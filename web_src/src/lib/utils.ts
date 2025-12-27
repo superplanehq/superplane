@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { BookMarked, type LucideIcon } from "lucide-react";
+import { Puzzle, type LucideIcon } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 
 export function cn(...inputs: ClassValue[]) {
@@ -9,7 +9,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export const resolveIcon = (slug?: string): LucideIcon => {
   if (!slug) {
-    return BookMarked;
+    return Puzzle;
   }
 
   const pascalCase = slug
@@ -23,7 +23,7 @@ export const resolveIcon = (slug?: string): LucideIcon => {
     return candidate as LucideIcon;
   }
 
-  return BookMarked;
+  return Puzzle;
 };
 
 export const calcRelativeTimeFromDiff = (diff: number) => {

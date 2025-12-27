@@ -38,12 +38,12 @@ export function CreateCustomComponentModal({
     setNameError("");
 
     if (!blueprintName.trim()) {
-      setNameError("Component name is required");
+      setNameError("Bundle name is required");
       return;
     }
 
     if (blueprintName.trim().length > MAX_BLUEPRINT_NAME_LENGTH) {
-      setNameError(`Component name must be ${MAX_BLUEPRINT_NAME_LENGTH} characters or less`);
+      setNameError(`Bundle name must be ${MAX_BLUEPRINT_NAME_LENGTH} characters or less`);
       return;
     }
 
@@ -59,23 +59,23 @@ export function CreateCustomComponentModal({
       setNameError("");
       onClose();
     } catch (error) {
-      console.error("Error creating component:", error);
+      console.error("Error creating Bundle:", error);
       const errorMessage =
-        (error as Error)?.message || error?.toString() || "Something went wrong. We failed to create a component";
+        (error as Error)?.message || error?.toString() || "Something went wrong. We failed to create a Bundle";
 
       showErrorToast(errorMessage);
 
       if (errorMessage.toLowerCase().includes("already") || errorMessage.toLowerCase().includes("exists")) {
-        setNameError("A component with this name already exists");
+        setNameError("A Bundle with this name already exists");
       }
     }
   };
 
   return (
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
-      <DialogTitle>New component</DialogTitle>
+      <DialogTitle>New Bundle</DialogTitle>
       <DialogDescription className="text-sm">
-        Create a custom component that can be reused across your canvases and automations.
+        Create a custom Bundle that can be reused across your canvases and automations.
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
         <Icon name="close" size="sm" />
@@ -85,7 +85,7 @@ export function CreateCustomComponentModal({
         <div className="space-y-6">
           {/* Blueprint Name */}
           <Field>
-            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Component name *</Label>
+            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bundle name *</Label>
             <Input
               data-testid="component-name-input"
               type="text"
@@ -99,7 +99,7 @@ export function CreateCustomComponentModal({
                   setNameError("");
                 }
               }}
-              placeholder="Give this component a clear name for reuse"
+              placeholder="Give this Bundle a clear name for reuse"
               className={`w-full ${nameError ? "border-red-500" : ""}`}
               autoFocus
               maxLength={MAX_BLUEPRINT_NAME_LENGTH}
@@ -120,7 +120,7 @@ export function CreateCustomComponentModal({
                   setBlueprintDescription(e.target.value);
                 }
               }}
-              placeholder="Note the purpose of this component (optional)"
+              placeholder="Note the purpose of this Bundle (optional)"
               rows={3}
               className="w-full"
               maxLength={MAX_BLUEPRINT_DESCRIPTION_LENGTH}
@@ -138,7 +138,7 @@ export function CreateCustomComponentModal({
           disabled={!blueprintName.trim() || isLoading || !!nameError}
           className="flex items-center gap-2"
         >
-          {isLoading ? "Creating component..." : "Create component"}
+          {isLoading ? "Creating Bundle..." : "Create Bundle"}
         </Button>
       </DialogActions>
     </Dialog>

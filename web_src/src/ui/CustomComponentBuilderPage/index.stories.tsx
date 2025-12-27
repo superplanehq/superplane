@@ -28,8 +28,6 @@ export const Default: Story = {
     const [edges, setEdges] = useState<Edge[]>(mockEdges);
     const [blueprintName, setBlueprintName] = useState("Deploy to Production");
     const [description, setDescription] = useState("Automated deployment workflow with approval gates");
-    const [icon, setIcon] = useState("rocket");
-    const [color, setColor] = useState("blue");
     const [configurationFields, setConfigurationFields] = useState<ConfigurationField[]>([
       {
         name: "environment",
@@ -72,20 +70,16 @@ export const Default: Story = {
       <CustomComponentBuilderPage
         customComponentName={blueprintName}
         breadcrumbs={[
-          { label: "Components" },
-          { label: blueprintName, iconSlug: "rocket", iconColor: "text-blue-600" },
+          { label: "Bundles" },
+          { label: blueprintName, iconSlug: "component", iconColor: "text-gray-600" },
         ]}
         metadata={{
           name: blueprintName,
           description,
-          icon,
-          color,
         }}
         onMetadataChange={(metadata) => {
           setBlueprintName(metadata.name);
           setDescription(metadata.description);
-          setIcon(metadata.icon);
-          setColor(metadata.color);
         }}
         configurationFields={configurationFields}
         onConfigurationFieldsChange={setConfigurationFields}
@@ -137,8 +131,6 @@ export const EmptyBlueprint: Story = {
     const [edges, setEdges] = useState<Edge[]>([]);
     const [blueprintName, setBlueprintName] = useState("New Component");
     const [description, setDescription] = useState("");
-    const [icon, setIcon] = useState("");
-    const [color, setColor] = useState("");
     const [configurationFields, setConfigurationFields] = useState<ConfigurationField[]>([]);
     const [outputChannels, setOutputChannels] = useState<OutputChannel[]>([]);
 
@@ -146,20 +138,16 @@ export const EmptyBlueprint: Story = {
       <CustomComponentBuilderPage
         customComponentName={blueprintName}
         breadcrumbs={[
-          { label: "Components" },
-          { label: blueprintName, iconSlug: "rocket", iconColor: "text-blue-600" },
+          { label: "Bundles" },
+          { label: blueprintName, iconSlug: "component", iconColor: "text-gray-600" },
         ]}
         metadata={{
           name: blueprintName,
           description,
-          icon,
-          color,
         }}
         onMetadataChange={(metadata) => {
           setBlueprintName(metadata.name);
           setDescription(metadata.description);
-          setIcon(metadata.icon);
-          setColor(metadata.color);
         }}
         configurationFields={configurationFields}
         onConfigurationFieldsChange={setConfigurationFields}

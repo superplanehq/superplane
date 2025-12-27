@@ -57,7 +57,7 @@ export function BuildingBlocksSidebar({
         className="absolute top-4 right-4 z-10"
       >
         <Plus size={16} />
-        Components
+        Component
       </Button>
     );
   }
@@ -119,7 +119,7 @@ export function BuildingBlocksSidebar({
   const categoryOrder: Record<string, number> = {
     Primitives: 0,
     Triggers: 1,
-    Components: 2,
+    Bundles: 2,
   };
 
   const sortedCategories = [...(blocks || [])].sort((a, b) => {
@@ -288,7 +288,7 @@ function CategorySection({
 
       <ItemGroup>
         {allBlocks.map((block) => {
-          const iconSlug = block.icon || "zap";
+          const iconSlug = block.type === "blueprint" ? "component" : block.icon || "zap";
           const IconComponent = resolveIcon(iconSlug);
 
           const isLive = !!block.isLive;

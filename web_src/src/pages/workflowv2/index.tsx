@@ -71,6 +71,9 @@ import {
 } from "./utils";
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 
+const BUNDLE_ICON_SLUG = "component";
+const BUNDLE_COLOR = "gray";
+
 type UnsavedChangeKind = "position" | "structural";
 
 export function WorkflowPageV2() {
@@ -1687,7 +1690,7 @@ function prepareCompositeNode(
 ): CanvasNode {
   const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
   const isMissing = !blueprintMetadata;
-  const color = blueprintMetadata?.color || "gray";
+  const color = BUNDLE_COLOR;
   const executions = nodeExecutionsMap[node.id!] || [];
 
   // Use node name if available, otherwise fall back to blueprint name (from metadata)
@@ -1710,8 +1713,8 @@ function prepareCompositeNode(
       state: "pending" as const,
       outputChannels: blueprintMetadata?.outputChannels?.map((c) => c.name!) || ["default"],
       composite: {
-        iconSlug: blueprintMetadata?.icon || "box-x",
-        iconColor: getColorClass("black"),
+        iconSlug: BUNDLE_ICON_SLUG,
+        iconColor: getColorClass(color),
         collapsedBackground: getBackgroundColorClass(color),
         collapsed: node.isCollapsed,
         title: displayLabel,
@@ -2081,8 +2084,8 @@ function prepareSidebarData(
   let color = "indigo";
 
   if (blueprintMetadata) {
-    iconSlug = blueprintMetadata.icon || iconSlug;
-    color = blueprintMetadata.color || color;
+    iconSlug = BUNDLE_ICON_SLUG;
+    color = BUNDLE_COLOR;
   } else if (componentMetadata) {
     iconSlug = componentMetadata.icon || iconSlug;
     color = componentMetadata.color || color;

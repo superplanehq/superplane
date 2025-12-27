@@ -2,7 +2,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { Connection, Edge, Node, addEdge, applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import ELK from "elkjs/lib/elk.bundled.js";
-import { AlertCircle, Puzzle } from "lucide-react";
+import { AlertCircle, Component as ComponentIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ComponentsComponent, ComponentsNode, ComponentsAppInstallationRef } from "../../api-client";
@@ -18,6 +18,9 @@ import { showErrorToast, showSuccessToast } from "../../utils/toast";
 import { getComponentBaseMapper } from "../workflowv2/mappers";
 
 const elk = new ELK();
+const BUNDLE_ICON_SLUG = "component";
+const BUNDLE_COLOR = "gray";
+const BUNDLE_ICON_COLOR_CLASS = "text-gray-600";
 
 const getLayoutedElements = async (nodes: Node[], edges: Edge[]) => {
   const graph = {
@@ -85,14 +88,14 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
       type: "component",
       outputChannels: ["default"],
       component: {
-        iconSlug: "box-dashed",
+        iconSlug: "component",
         iconColor: "text-gray-500",
         collapsedBackground: "bg-white",
         collapsed: false,
         title: "New Component",
         includeEmptyState: true,
         emptyStateProps: {
-          icon: Puzzle,
+          icon: ComponentIcon,
           title: "Select a component from the sidebar",
         },
         error: "Select a component from the sidebar",
@@ -129,8 +132,6 @@ export const CustomComponent = () => {
   const [blueprintOutputChannels, setBlueprintOutputChannels] = useState<any[]>([]);
   const [blueprintName, setBlueprintName] = useState("");
   const [blueprintDescription, setBlueprintDescription] = useState("");
-  const [blueprintIcon, setBlueprintIcon] = useState("");
-  const [blueprintColor, setBlueprintColor] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Fetch blueprint and components
@@ -176,12 +177,10 @@ export const CustomComponent = () => {
         edges,
         blueprintName,
         blueprintDescription,
-        blueprintIcon,
-        blueprintColor,
         timestamp: Date.now(),
       });
     }
-  }, [initialBlueprintSnapshot, nodes, edges, blueprintName, blueprintDescription, blueprintIcon, blueprintColor]);
+  }, [initialBlueprintSnapshot, nodes, edges, blueprintName, blueprintDescription]);
 
   // Revert to initial state
   const handleRevert = useCallback(() => {
@@ -191,8 +190,6 @@ export const CustomComponent = () => {
       setEdges(initialBlueprintSnapshot.edges);
       setBlueprintName(initialBlueprintSnapshot.blueprintName);
       setBlueprintDescription(initialBlueprintSnapshot.blueprintDescription);
-      setBlueprintIcon(initialBlueprintSnapshot.blueprintIcon);
-      setBlueprintColor(initialBlueprintSnapshot.blueprintColor);
 
       // Clear the snapshot since we're back to the initial state
       setInitialBlueprintSnapshot(null);
@@ -208,8 +205,6 @@ export const CustomComponent = () => {
       saveSnapshot();
       setBlueprintName(metadata.name);
       setBlueprintDescription(metadata.description);
-      setBlueprintIcon(metadata.icon);
-      setBlueprintColor(metadata.color);
       setHasUnsavedChanges(true);
     },
     [saveSnapshot],
@@ -226,8 +221,6 @@ export const CustomComponent = () => {
       }
       setBlueprintName(blueprint.name || "");
       setBlueprintDescription(blueprint.description || "");
-      setBlueprintIcon(blueprint.icon || "");
-      setBlueprintColor(blueprint.color || "");
     }
   }, [blueprint]);
 
@@ -414,8 +407,8 @@ export const CustomComponent = () => {
           edges: blueprintEdges,
           configuration: blueprintConfiguration,
           outputChannels: blueprintOutputChannels,
-          icon: blueprintIcon,
-          color: blueprintColor,
+          icon: BUNDLE_ICON_SLUG,
+          color: BUNDLE_COLOR,
         });
 
         showSuccessToast("Component saved successfully");
@@ -436,8 +429,6 @@ export const CustomComponent = () => {
       blueprintDescription,
       blueprintConfiguration,
       blueprintOutputChannels,
-      blueprintIcon,
-      blueprintColor,
       updateBlueprintMutation,
     ],
   );
@@ -967,8 +958,8 @@ export const CustomComponent = () => {
         edges: [...currentEdges, newEdge],
         configuration: blueprintConfiguration,
         outputChannels: blueprintOutputChannels,
-        icon: blueprintIcon,
-        color: blueprintColor,
+        icon: BUNDLE_ICON_SLUG,
+        color: BUNDLE_COLOR,
       });
 
       // Set template node ID and open building blocks sidebar
@@ -983,8 +974,6 @@ export const CustomComponent = () => {
       blueprintDescription,
       blueprintConfiguration,
       blueprintOutputChannels,
-      blueprintIcon,
-      blueprintColor,
       updateBlueprintMutation,
     ],
   );
@@ -1094,8 +1083,8 @@ export const CustomComponent = () => {
         edges: updatedEdges,
         configuration: blueprintConfiguration,
         outputChannels: blueprintOutputChannels,
-        icon: blueprintIcon,
-        color: blueprintColor,
+        icon: BUNDLE_ICON_SLUG,
+        color: BUNDLE_COLOR,
       });
 
       setHasUnsavedChanges(false);
@@ -1109,8 +1098,6 @@ export const CustomComponent = () => {
       blueprintDescription,
       blueprintConfiguration,
       blueprintOutputChannels,
-      blueprintIcon,
-      blueprintColor,
       updateBlueprintMutation,
     ],
   );
@@ -1286,11 +1273,11 @@ export const CustomComponent = () => {
     fromWorkflowId && workflowName
       ? [
           { label: workflowName, href: `/${organizationId}/workflows/${fromWorkflowId}` },
-          { label: blueprintName, iconSlug: blueprintIcon, iconColor: `text-${blueprintColor}-600` },
+          { label: blueprintName, iconSlug: BUNDLE_ICON_SLUG, iconColor: BUNDLE_ICON_COLOR_CLASS },
         ]
       : [
-          { label: "Components", href: `/${organizationId}` },
-          { label: blueprintName, iconSlug: blueprintIcon, iconColor: `text-${blueprintColor}-600` },
+          { label: "Bundles", href: `/${organizationId}` },
+          { label: blueprintName, iconSlug: BUNDLE_ICON_SLUG, iconColor: BUNDLE_ICON_COLOR_CLASS },
         ];
 
   return (
@@ -1301,8 +1288,6 @@ export const CustomComponent = () => {
         metadata={{
           name: blueprintName,
           description: blueprintDescription,
-          icon: blueprintIcon,
-          color: blueprintColor,
         }}
         onMetadataChange={handleMetadataChange}
         configurationFields={blueprintConfiguration}

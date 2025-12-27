@@ -80,8 +80,8 @@ const sampleBlueprints: BuildingBlock[] = [
     label: "Deploy to Kubernetes",
     description: "Deploy an application to a Kubernetes cluster",
     type: "blueprint",
-    icon: "box",
-    color: "indigo",
+    icon: "component",
+    color: "gray",
     outputChannels: [{ name: "success" }, { name: "failure" }],
     configuration: [
       { name: "namespace", type: "string" },
@@ -94,8 +94,8 @@ const sampleBlueprints: BuildingBlock[] = [
     label: "Send Notification",
     description: "Send a notification to multiple channels",
     type: "blueprint",
-    icon: "bell",
-    color: "pink",
+    icon: "component",
+    color: "gray",
     outputChannels: [{ name: "default" }],
     configuration: [
       { name: "message", type: "string" },
@@ -110,7 +110,7 @@ const sampleBlocks: BuildingBlockCategory[] = [
     blocks: [...sampleTriggers, ...sampleComponents],
   },
   {
-    name: "Components",
+    name: "Bundles",
     blocks: sampleBlueprints,
   },
 ];
