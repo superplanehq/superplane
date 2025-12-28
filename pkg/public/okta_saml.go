@@ -11,6 +11,7 @@ import (
 	dsig "github.com/russellhaering/goxmldsig"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/utils"
 )
 
 func (s *Server) registerOktaRoutes(r *mux.Router) {
@@ -48,9 +49,12 @@ func (s *Server) handleOktaSAML(w http.ResponseWriter, r *http.Request) {
 
 	samlResponse := r.FormValue("SAMLResponse")
 	if samlResponse == "" {
+		log.Errorf("Okta SAML: missing SAMLResponse for org %s", org.ID)
 		http.Error(w, "missing SAMLResponse", http.StatusBadRequest)
 		return
 	}
+
+	log.Debugf("Okta SAML: received SAMLResponse for org %s (length: %d)", org.ID, len(samlResponse))
 
 	certStore, err := buildCertificateStore(config.SamlCertificate)
 	if err != nil {
@@ -82,11 +86,37 @@ func (s *Server) handleOktaSAML(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Try to get email from various common attribute names
 	email := assertionInfo.Values.Get("email")
 	if email == "" {
+		email = assertionInfo.Values.Get("Email")
+	}
+	if email == "" {
+		email = assertionInfo.Values.Get("mail")
+	}
+	if email == "" {
+		email = assertionInfo.Values.Get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")
+	}
+	if email == "" {
+		email = assertionInfo.Values.Get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailAddress")
+	}
+
+	// Fall back to NameID if no email attribute is found
+	if email == "" && assertionInfo.NameID != "" {
+		email = assertionInfo.NameID
+		log.Infof("Okta SAML: using NameID as email for org %s: %s", org.ID, email)
+	}
+
+	if email == "" {
+		// Log available attributes for debugging
+		log.Errorf("Okta SAML: email claim missing for org %s. Available attributes: %+v, NameID: %s", org.ID, assertionInfo.Values, assertionInfo.NameID)
 		http.Error(w, "email claim missing", http.StatusForbidden)
 		return
 	}
+
+	// Normalize email for consistency
+	email = utils.NormalizeEmail(email)
+	log.Debugf("Okta SAML: extracted and normalized email for org %s: %s", org.ID, email)
 
 	account, err := models.FindAccountByEmail(email)
 	if err != nil {
