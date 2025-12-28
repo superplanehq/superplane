@@ -138,24 +138,24 @@ func TestServer_ProviderConfiguration(t *testing.T) {
 	os.Setenv("BASE_URL", "http://localhost:8000")
 
 	providers = getOAuthProviders()
-	assert.Contains(t, providers, "github")
-	assert.Equal(t, "test-client-id", providers["github"].Key)
-	assert.Equal(t, "test-client-secret", providers["github"].Secret)
-	assert.Equal(t, "http://localhost:8000/auth/github/callback", providers["github"].CallbackURL)
+	assert.Contains(t, providers, models.ProviderGitHub)
+	assert.Equal(t, "test-client-id", providers[models.ProviderGitHub].Key)
+	assert.Equal(t, "test-client-secret", providers[models.ProviderGitHub].Secret)
+	assert.Equal(t, "http://localhost:8000/auth/github/callback", providers[models.ProviderGitHub].CallbackURL)
 
 	// Test with Google configured
 	os.Setenv("GOOGLE_CLIENT_ID", "test-google-client-id")
 	os.Setenv("GOOGLE_CLIENT_SECRET", "test-google-client-secret")
 
 	providers = getOAuthProviders()
-	assert.Contains(t, providers, "google")
-	assert.Equal(t, "test-google-client-id", providers["google"].Key)
-	assert.Equal(t, "test-google-client-secret", providers["google"].Secret)
-	assert.Equal(t, "http://localhost:8000/auth/google/callback", providers["google"].CallbackURL)
+	assert.Contains(t, providers, models.ProviderGoogle)
+	assert.Equal(t, "test-google-client-id", providers[models.ProviderGoogle].Key)
+	assert.Equal(t, "test-google-client-secret", providers[models.ProviderGoogle].Secret)
+	assert.Equal(t, "http://localhost:8000/auth/google/callback", providers[models.ProviderGoogle].CallbackURL)
 
 	// Test with both providers configured
-	assert.Contains(t, providers, "github")
-	assert.Contains(t, providers, "google")
+	assert.Contains(t, providers, models.ProviderGitHub)
+	assert.Contains(t, providers, models.ProviderGoogle)
 	assert.Len(t, providers, 2)
 }
 

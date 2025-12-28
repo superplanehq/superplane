@@ -22,6 +22,7 @@ import { Members } from "./Members";
 import { Integrations } from "./Integrations";
 import { Applications } from "./Applications";
 import { ApplicationDetails } from "./ApplicationDetails";
+import { OktaIntegration } from "./OktaIntegration";
 
 export function OrganizationSettings() {
   const navigate = useNavigate();
@@ -77,6 +78,7 @@ export function OrganizationSettings() {
     { id: "roles", label: "Roles", icon: "admin_panel_settings" },
     { id: "integrations", label: "Integrations", icon: "integration_instructions" },
     { id: "applications", label: "Applications", icon: "apps" },
+    { id: "okta", label: "Okta", icon: "security" },
   ];
 
   return (
@@ -176,6 +178,7 @@ export function OrganizationSettings() {
               <Route path="create-role" element={<CreateRolePage />} />
               <Route path="create-role/:roleName" element={<CreateRolePage />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="okta" element={<OktaIntegration />} />
               <Route
                 path="billing"
                 element={

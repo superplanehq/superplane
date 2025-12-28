@@ -1,0 +1,1 @@
+-- Intentionally left blank. We don't roll back migrations.

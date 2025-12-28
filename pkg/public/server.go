@@ -22,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -29,7 +30,6 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	nooptrace "go.opentelemetry.io/otel/trace/noop"
 
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbApplications "github.com/superplanehq/superplane/pkg/protos/applications"
@@ -136,10 +136,10 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 	// GitHub
 	if githubKey := os.Getenv("GITHUB_CLIENT_ID"); githubKey != "" {
 		if githubSecret := os.Getenv("GITHUB_CLIENT_SECRET"); githubSecret != "" {
-			providers["github"] = authentication.ProviderConfig{
+			providers[models.ProviderGitHub] = authentication.ProviderConfig{
 				Key:         githubKey,
 				Secret:      githubSecret,
-				CallbackURL: fmt.Sprintf("%s/auth/github/callback", baseURL),
+				CallbackURL: fmt.Sprintf("%s/auth/%s/callback", baseURL, models.ProviderGitHub),
 			}
 		}
 	}
@@ -147,10 +147,10 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 	// Google
 	if googleKey := os.Getenv("GOOGLE_CLIENT_ID"); googleKey != "" {
 		if googleSecret := os.Getenv("GOOGLE_CLIENT_SECRET"); googleSecret != "" {
-			providers["google"] = authentication.ProviderConfig{
+			providers[models.ProviderGoogle] = authentication.ProviderConfig{
 				Key:         googleKey,
 				Secret:      googleSecret,
-				CallbackURL: fmt.Sprintf("%s/auth/google/callback", baseURL),
+				CallbackURL: fmt.Sprintf("%s/auth/%s/callback", baseURL, models.ProviderGoogle),
 			}
 		}
 	}
@@ -352,6 +352,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Register authentication routes (no auth required)
 	s.authHandler.RegisterRoutes(r)
+
+	// Okta SAML / SCIM routes (no auth, secured via shared secrets / SAML)
+	s.registerOktaRoutes(r)
 
 	//
 	// Public routes (no authentication required)

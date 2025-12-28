@@ -236,3 +236,7 @@ image.auth:
 image.push:
 	docker tag $(IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
 	docker push $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
+
+demo.start:
+	bash release/demo/build.sh local-test
+	docker run -ti --rm ghcr.io/superplanehq/superplane-demo:local-test	
