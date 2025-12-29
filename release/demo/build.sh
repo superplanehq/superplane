@@ -12,4 +12,4 @@ VERSION="$1"
 IMAGE="ghcr.io/superplanehq/superplane-demo:${VERSION}"
 
 echo "Building Superplane demo image: ${IMAGE}"
-docker build -f release/demo/Dockerfile -t "${IMAGE}" .
+docker buildx build --platform linux/amd64,linux/arm64 -f release/demo/Dockerfile -t "${IMAGE}" .
