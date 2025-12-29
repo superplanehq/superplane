@@ -23,6 +23,7 @@ import (
 	// Import components, triggers, and applications to register them via init()
 	_ "github.com/superplanehq/superplane/pkg/applications/github"
 	_ "github.com/superplanehq/superplane/pkg/applications/semaphore"
+	_ "github.com/superplanehq/superplane/pkg/components/annotation"
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
