@@ -46,7 +46,8 @@ stop_spinner() {
 }
 
 # Defaults for embedded PostgreSQL and RabbitMQ and app
-: "${PGDATA:=/var/lib/postgresql/data}"
+# Use /app/data for persistent storage (can be mounted as a volume)
+: "${PGDATA:=/app/data/postgres}"
 : "${DB_HOST:=127.0.0.1}"
 : "${DB_PORT:=5432}"
 : "${DB_NAME:=superplane_demo}"
@@ -98,6 +99,14 @@ export DB_HOST DB_PORT DB_NAME DB_USERNAME DB_PASSWORD POSTGRES_DB_SSL APPLICATI
   ENCRYPTION_KEY JWT_SECRET SESSION_SECRET NO_ENCRYPTION
 
 # ===========================================================================
+# Setting up data directory structure
+# ===========================================================================
+
+# Ensure /app/data exists and has proper permissions for persistent storage
+mkdir -p /app/data/postgres /app/data/rabbitmq/mnesia /app/data/rabbitmq/logs /app/data/cloudflared
+chown -R postgres:postgres /app/data/postgres || true
+
+# ===========================================================================
 # Starting embedded services
 # ===========================================================================
 
@@ -112,8 +121,8 @@ fi
 
 su - postgres -c "pg_ctl -D '${PGDATA}' -o '-p ${DB_PORT}' -w start" >/dev/null 2>&1
 
-RABBITMQ_LOG_BASE=${RABBITMQ_LOG_BASE:-/var/log/rabbitmq}
-RABBITMQ_MNESIA_BASE=${RABBITMQ_MNESIA_BASE:-/var/lib/rabbitmq/mnesia}
+RABBITMQ_LOG_BASE=${RABBITMQ_LOG_BASE:-/app/data/rabbitmq/logs}
+RABBITMQ_MNESIA_BASE=${RABBITMQ_MNESIA_BASE:-/app/data/rabbitmq/mnesia}
 
 mkdir -p "${RABBITMQ_LOG_BASE}" "${RABBITMQ_MNESIA_BASE}"
 
@@ -158,13 +167,13 @@ stop_spinner
 # ===========================================================================
 
 if [ "${CLOUDFLARE_QUICK_TUNNEL}" = "1" ]; then
-  mkdir -p /var/log/cloudflared
-  cloudflared tunnel --no-autoupdate --url "http://127.0.0.1:8000" > /var/log/cloudflared/cloudflared.log 2>&1 &
+  mkdir -p /app/data/cloudflared
+  cloudflared tunnel --no-autoupdate --url "http://127.0.0.1:8000" > /app/data/cloudflared/cloudflared.log 2>&1 &
 
   start_spinner "Creating a public URL via Cloudflare Tunnel"
   for i in {1..60}; do
-    if [ -f /var/log/cloudflared/cloudflared.log ]; then
-      URL=$(grep -Eo 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' /var/log/cloudflared/cloudflared.log | head -n 1 || true)
+    if [ -f /app/data/cloudflared/cloudflared.log ]; then
+      URL=$(grep -Eo 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' /app/data/cloudflared/cloudflared.log | head -n 1 || true)
       if [ -n "${URL}" ]; then
         BASE_URL="${URL}"
         export BASE_URL
