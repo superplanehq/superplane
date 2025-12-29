@@ -30,3 +30,11 @@ func (c *ExecutionRequestContext) ScheduleActionCall(actionName string, paramete
 		},
 	}, &runAt)
 }
+
+func (c *ExecutionRequestContext) GetWorkflowID() string {
+	return c.execution.WorkflowID.String()
+}
+
+func (c *ExecutionRequestContext) GetNodeID() string {
+	return c.execution.NodeID
+}

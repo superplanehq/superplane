@@ -34,8 +34,9 @@ func (w *WebhookContext) GetSecret() ([]byte, error) {
 	return []byte(w.Secret), nil
 }
 
-func (w *WebhookContext) Setup(options *core.WebhookSetupOptions) error {
-	return nil
+func (w *WebhookContext) Setup(options *core.WebhookSetupOptions) (*uuid.UUID, error) {
+	id := uuid.New()
+	return &id, nil
 }
 
 type MetadataContext struct {

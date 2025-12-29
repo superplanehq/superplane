@@ -133,7 +133,7 @@ func (s *Semaphore) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to find project %s: %w", config.Project, err)
 	}
 
-	err = ctx.WebhookContext.Setup(&core.WebhookSetupOptions{
+	_, err = ctx.WebhookContext.Setup(&core.WebhookSetupOptions{
 		IntegrationID: &integrationID,
 		Resource:      resource,
 		Configuration: config,

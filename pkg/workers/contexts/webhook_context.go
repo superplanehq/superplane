@@ -42,14 +42,14 @@ func (c *WebhookContext) GetSecret() ([]byte, error) {
 	return c.encryptor.Decrypt(c.ctx, webhook.Secret, []byte(webhook.ID.String()))
 }
 
-func (c *WebhookContext) Setup(options *core.WebhookSetupOptions) error {
+func (c *WebhookContext) Setup(options *core.WebhookSetupOptions) (*uuid.UUID, error) {
 	webhook, err := c.findOrCreateWebhook(options)
 	if err != nil {
-		return fmt.Errorf("failed to find or create webhook: %w", err)
+		return nil, fmt.Errorf("failed to find or create webhook: %w", err)
 	}
 
 	c.node.WebhookID = &webhook.ID
-	return nil
+	return &webhook.ID, nil
 }
 
 func (c *WebhookContext) findOrCreateWebhook(options *core.WebhookSetupOptions) (*models.Webhook, error) {

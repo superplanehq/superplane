@@ -116,6 +116,6 @@ type WebhookRequestContext struct {
 }
 
 type WebhookContext interface {
-	Setup(options *WebhookSetupOptions) error
+	Setup(options *WebhookSetupOptions) (*uuid.UUID, error)
 	GetSecret() ([]byte, error)
 }
