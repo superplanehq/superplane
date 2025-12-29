@@ -45,60 +45,6 @@ stop_spinner() {
   trap - EXIT
 }
 
-# Defaults for embedded PostgreSQL and RabbitMQ and app
-# Use /app/data for persistent storage (can be mounted as a volume)
-: "${PGDATA:=/app/data/postgres}"
-: "${DB_HOST:=127.0.0.1}"
-: "${DB_PORT:=5432}"
-: "${DB_NAME:=superplane_demo}"
-: "${DB_USERNAME:=postgres}"
-: "${DB_PASSWORD:=postgres}"
-: "${POSTGRES_DB_SSL:=false}"
-: "${APPLICATION_NAME:=superplane}"
-: "${BASE_URL:=http://localhost:8000}"
-: "${RABBITMQ_URL:=amqp://guest:guest@127.0.0.1:5672}"
-: "${SWAGGER_BASE_PATH:=/app/api/swagger}"
-: "${RBAC_MODEL_PATH:=/app/rbac/rbac_model.conf}"
-: "${RBAC_ORG_POLICY_PATH:=/app/rbac/rbac_org_policy.csv}"
-: "${TEMPLATE_DIR:=/app/templates}"
-: "${WEB_BASE_PATH:=}"
-
-: "${PUBLIC_API_BASE_PATH:=/api/v1}"
-
-: "${OWNER_SETUP_ENABLED:=yes}"
-: "${CLOUDFLARE_QUICK_TUNNEL:=1}"
-
-: "${START_PUBLIC_API:=yes}"
-: "${START_INTERNAL_API:=yes}"
-: "${START_GRPC_GATEWAY:=yes}"
-: "${START_CONSUMERS:=yes}"
-: "${START_WEB_SERVER:=yes}"
-: "${START_EVENT_DISTRIBUTER:=yes}"
-: "${START_WORKFLOW_EVENT_ROUTER:=yes}"
-: "${START_WORKFLOW_NODE_EXECUTOR:=yes}"
-: "${START_WORKFLOW_NODE_QUEUE_WORKER:=yes}"
-: "${START_NODE_REQUEST_WORKER:=yes}"
-: "${START_WEBHOOK_PROVISIONER:=yes}"
-: "${START_WEBHOOK_CLEANUP_WORKER:=yes}"
-: "${START_WORKFLOW_CLEANUP_WORKER:=yes}"
-
-# Reasonable defaults so the demo server can start without extra config.
-# These will be overridden by persisted secrets if they exist.
-: "${ENCRYPTION_KEY:=1234567890abcdefghijklmnopqrstuv}"
-: "${JWT_SECRET:=1234567890abcdefghijklmnopqrstuv}"
-: "${SESSION_SECRET:=1234567890abcdefghijklmnopqrstuv}"
-: "${NO_ENCRYPTION:=yes}"
-
-export DB_HOST DB_PORT DB_NAME DB_USERNAME DB_PASSWORD POSTGRES_DB_SSL APPLICATION_NAME \
-  BASE_URL WEB_BASE_PATH PUBLIC_API_BASE_PATH OWNER_SETUP_ENABLED CLOUDFLARE_QUICK_TUNNEL \
-  RABBITMQ_URL SWAGGER_BASE_PATH RBAC_MODEL_PATH RBAC_ORG_POLICY_PATH TEMPLATE_DIR \
-  START_PUBLIC_API START_INTERNAL_API START_GRPC_GATEWAY START_CONSUMERS \
-  START_WEB_SERVER START_EVENT_DISTRIBUTER START_WORKFLOW_EVENT_ROUTER \
-  START_WORKFLOW_NODE_EXECUTOR START_WORKFLOW_NODE_QUEUE_WORKER \
-  START_NODE_REQUEST_WORKER START_WEBHOOK_PROVISIONER START_WEBHOOK_CLEANUP_WORKER \
-  START_WORKFLOW_CLEANUP_WORKER \
-  ENCRYPTION_KEY JWT_SECRET SESSION_SECRET NO_ENCRYPTION
-
 # ===========================================================================
 # Setting up data directory structure
 # ===========================================================================
@@ -108,42 +54,16 @@ mkdir -p /app/data/postgres /app/data/rabbitmq/mnesia /app/data/rabbitmq/logs /a
 chown -R postgres:postgres /app/data/postgres || true
 
 # ===========================================================================
-# Generating and persisting secrets
+# Generating and loading environment variables
 # ===========================================================================
 
-SECRETS_FILE="/app/data/secrets.env"
+# Generate or load all environment variables
+/app/gen-superplane-env.sh /app/data/superplane.env
 
-# Function to generate a random 32-character hex string
-generate_secret() {
-  head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n'
-}
-
-# Load existing secrets if they exist
-if [ -f "${SECRETS_FILE}" ]; then
-  # Source the secrets file to load persisted values
-  set -a
-  source "${SECRETS_FILE}"
-  set +a
-  echo "Loaded persisted secrets from ${SECRETS_FILE}"
-else
-  # Generate new random secrets and persist them
-  echo "Generating new random secrets..."
-  ENCRYPTION_KEY=$(generate_secret)
-  JWT_SECRET=$(generate_secret)
-  SESSION_SECRET=$(generate_secret)
-  
-  # Save secrets to file for persistence
-  cat > "${SECRETS_FILE}" <<EOF
-ENCRYPTION_KEY=${ENCRYPTION_KEY}
-JWT_SECRET=${JWT_SECRET}
-SESSION_SECRET=${SESSION_SECRET}
-EOF
-  chmod 600 "${SECRETS_FILE}"
-  echo "Saved secrets to ${SECRETS_FILE}"
-fi
-
-# Export the secrets (in case they were just generated)
-export ENCRYPTION_KEY JWT_SECRET SESSION_SECRET
+# Source the environment file
+set -a
+source /app/data/superplane.env
+set +a
 
 # ===========================================================================
 # Starting embedded services
