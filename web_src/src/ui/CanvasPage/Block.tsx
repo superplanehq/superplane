@@ -101,6 +101,11 @@ const HANDLE_STYLE = {
 function LeftHandle({ data, nodeId }: BlockProps) {
   if (data.type === "trigger") return null;
 
+  // Hide left handle for display-only components (no output channels = can't execute/emit)
+  if (data.type === "component" && (!data.outputChannels || data.outputChannels.length === 0)) {
+    return null;
+  }
+
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed) ||
@@ -149,6 +154,11 @@ function RightHandle({ data, nodeId }: BlockProps) {
   const isTemplate = (data as any).isTemplate;
   const isPendingConnection = (data as any).isPendingConnection;
   if (isTemplate || isPendingConnection) return null;
+
+  // Hide right handle for display-only components (no output channels = can't emit events)
+  if (data.type === "component" && (!data.outputChannels || data.outputChannels.length === 0)) {
+    return null;
+  }
 
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||

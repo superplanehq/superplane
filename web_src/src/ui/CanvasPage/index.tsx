@@ -236,6 +236,11 @@ const nodeTypes = {
       return <Block data={blockData} nodeId={nodeProps.id} selected={nodeProps.selected} />;
     }
 
+    // Check if component can execute based on outputChannels metadata
+    const workflowNode = callbacks.workflowNodes?.find((n: any) => n.id === nodeProps.id);
+    const componentMetadata = callbacks.components?.find((c: any) => c.name === workflowNode?.component?.name);
+    const canExecute = componentMetadata?.outputChannels && componentMetadata.outputChannels.length > 0;
+
     return (
       <Block
         data={blockData}
@@ -247,7 +252,7 @@ const nodeTypes = {
         onClick={() => callbacks.handleNodeClick(nodeProps.id)}
         onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
         onDelete={callbacks.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
-        onRun={callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
+        onRun={canExecute && callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
         onDuplicate={callbacks.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
         onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
         onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
@@ -648,6 +653,7 @@ function CanvasPage(props: CanvasPageProps) {
               viewportRefProp={props.viewportRef}
               highlightedNodeIds={highlightedNodeIds}
               workflowNodes={props.workflowNodes}
+              components={props.components}
               setCurrentTab={setCurrentTab}
             />
           </ReactFlowProvider>
@@ -1017,6 +1023,7 @@ function CanvasContent({
   onTemplateNodeClick,
   highlightedNodeIds,
   workflowNodes,
+  components,
   setCurrentTab,
 }: {
   state: CanvasPageState;
@@ -1048,6 +1055,7 @@ function CanvasContent({
   onTemplateNodeClick?: (nodeId: string) => void;
   highlightedNodeIds: Set<string>;
   workflowNodes?: ComponentsNode[];
+  components?: ComponentsComponent[];
   setCurrentTab?: (tab: "latest" | "settings") => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
@@ -1332,6 +1340,8 @@ function CanvasContent({
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
+    workflowNodes,
+    components,
   });
   callbacksRef.current = {
     handleNodeExpand,
@@ -1346,6 +1356,8 @@ function CanvasContent({
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
+    workflowNodes,
+    components,
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes

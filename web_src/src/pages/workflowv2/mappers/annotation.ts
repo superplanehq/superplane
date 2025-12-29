@@ -6,6 +6,7 @@ import {
 } from "@/api-client";
 import { ComponentBaseMapper } from "./types";
 import { ComponentBaseProps } from "@/ui/componentBase";
+import React from "react";
 
 export const annotationMapper: ComponentBaseMapper = {
   props(
@@ -23,17 +24,14 @@ export const annotationMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-gray-100",
       title: node.name!,
-      specs: content
-        ? [
-            {
-              title: "Content",
-              value: content,
-              contentType: "text",
-            },
-          ]
+      customField: content
+        ? React.createElement(
+            "div",
+            { className: "px-3 py-2 text-sm text-gray-700 whitespace-pre-wrap border-t border-gray-200 text-left bg-amber-50 font-bold" },
+            content,
+          )
         : undefined,
       includeEmptyState: false, // Never show "No executions received yet" for display-only component
-      hideActionsButton: true, // Hide Run/Configure action menu
     };
   },
 };
