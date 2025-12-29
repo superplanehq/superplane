@@ -16,7 +16,8 @@ export const annotationMapper: ComponentBaseMapper = {
     _lastExecutions: WorkflowsWorkflowNodeExecution[],
     _nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
-    const content = node.configuration?.content || "";
+    const content = (node.configuration?.content as string) || "";
+    const displayText = content || "Configure this component to add your annotation...";
 
     return {
       iconSlug: componentDefinition.icon || "sticky-note",
@@ -24,13 +25,15 @@ export const annotationMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-gray-100",
       title: node.name!,
-      customField: content
-        ? React.createElement(
-            "div",
-            { className: "px-3 py-2 text-sm text-gray-700 whitespace-pre-wrap border-t border-gray-200 text-left bg-amber-50 font-bold" },
-            content,
-          )
-        : undefined,
+      customField: React.createElement(
+        "div",
+        {
+          className: `px-3 py-2 text-sm whitespace-pre-wrap border-t border-gray-200 text-left ${
+            content ? "text-gray-700 bg-amber-50 font-bold" : "text-gray-400 bg-gray-50 italic"
+          }`,
+        },
+        displayText,
+      ),
       includeEmptyState: false, // Never show "No executions received yet" for display-only component
     };
   },
