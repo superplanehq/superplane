@@ -155,6 +155,7 @@ export type ConfigurationField = {
   type?: string;
   description?: string;
   required?: boolean;
+  readOnly?: boolean;
   defaultValue?: string;
   label?: string;
   visibilityConditions?: Array<ConfigurationVisibilityCondition>;

@@ -24,6 +24,7 @@ type ConfigurationField struct {
 	Type                 *string                            `json:"type,omitempty"`
 	Description          *string                            `json:"description,omitempty"`
 	Required             *bool                              `json:"required,omitempty"`
+	ReadOnly             *bool                              `json:"readOnly,omitempty"`
 	DefaultValue         *string                            `json:"defaultValue,omitempty"`
 	Label                *string                            `json:"label,omitempty"`
 	VisibilityConditions []ConfigurationVisibilityCondition `json:"visibilityConditions,omitempty"`
@@ -177,6 +178,38 @@ func (o *ConfigurationField) HasRequired() bool {
 // SetRequired gets a reference to the given bool and assigns it to the Required field.
 func (o *ConfigurationField) SetRequired(v bool) {
 	o.Required = &v
+}
+
+// GetReadOnly returns the ReadOnly field value if set, zero value otherwise.
+func (o *ConfigurationField) GetReadOnly() bool {
+	if o == nil || IsNil(o.ReadOnly) {
+		var ret bool
+		return ret
+	}
+	return *o.ReadOnly
+}
+
+// GetReadOnlyOk returns a tuple with the ReadOnly field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationField) GetReadOnlyOk() (*bool, bool) {
+	if o == nil || IsNil(o.ReadOnly) {
+		return nil, false
+	}
+	return o.ReadOnly, true
+}
+
+// HasReadOnly returns a boolean if a field has been set.
+func (o *ConfigurationField) HasReadOnly() bool {
+	if o != nil && !IsNil(o.ReadOnly) {
+		return true
+	}
+
+	return false
+}
+
+// SetReadOnly gets a reference to the given bool and assigns it to the ReadOnly field.
+func (o *ConfigurationField) SetReadOnly(v bool) {
+	o.ReadOnly = &v
 }
 
 // GetDefaultValue returns the DefaultValue field value if set, zero value otherwise.
@@ -456,6 +489,9 @@ func (o ConfigurationField) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Required) {
 		toSerialize["required"] = o.Required
+	}
+	if !IsNil(o.ReadOnly) {
+		toSerialize["readOnly"] = o.ReadOnly
 	}
 	if !IsNil(o.DefaultValue) {
 		toSerialize["defaultValue"] = o.DefaultValue
