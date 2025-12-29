@@ -83,6 +83,7 @@ stop_spinner() {
 : "${START_WORKFLOW_CLEANUP_WORKER:=yes}"
 
 # Reasonable defaults so the demo server can start without extra config.
+# These will be overridden by persisted secrets if they exist.
 : "${ENCRYPTION_KEY:=1234567890abcdefghijklmnopqrstuv}"
 : "${JWT_SECRET:=1234567890abcdefghijklmnopqrstuv}"
 : "${SESSION_SECRET:=1234567890abcdefghijklmnopqrstuv}"
@@ -105,6 +106,44 @@ export DB_HOST DB_PORT DB_NAME DB_USERNAME DB_PASSWORD POSTGRES_DB_SSL APPLICATI
 # Ensure /app/data exists and has proper permissions for persistent storage
 mkdir -p /app/data/postgres /app/data/rabbitmq/mnesia /app/data/rabbitmq/logs /app/data/cloudflared
 chown -R postgres:postgres /app/data/postgres || true
+
+# ===========================================================================
+# Generating and persisting secrets
+# ===========================================================================
+
+SECRETS_FILE="/app/data/secrets.env"
+
+# Function to generate a random 32-character hex string
+generate_secret() {
+  head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n'
+}
+
+# Load existing secrets if they exist
+if [ -f "${SECRETS_FILE}" ]; then
+  # Source the secrets file to load persisted values
+  set -a
+  source "${SECRETS_FILE}"
+  set +a
+  echo "Loaded persisted secrets from ${SECRETS_FILE}"
+else
+  # Generate new random secrets and persist them
+  echo "Generating new random secrets..."
+  ENCRYPTION_KEY=$(generate_secret)
+  JWT_SECRET=$(generate_secret)
+  SESSION_SECRET=$(generate_secret)
+  
+  # Save secrets to file for persistence
+  cat > "${SECRETS_FILE}" <<EOF
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
+JWT_SECRET=${JWT_SECRET}
+SESSION_SECRET=${SESSION_SECRET}
+EOF
+  chmod 600 "${SECRETS_FILE}"
+  echo "Saved secrets to ${SECRETS_FILE}"
+fi
+
+# Export the secrets (in case they were just generated)
+export ENCRYPTION_KEY JWT_SECRET SESSION_SECRET
 
 # ===========================================================================
 # Starting embedded services
