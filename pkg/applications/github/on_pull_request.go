@@ -13,13 +13,10 @@ import (
 
 type OnPullRequest struct{}
 
-type OnPullRequestMetadata struct {
-	Repository *Repository `json:"repository"`
-}
-
 type OnPullRequestConfiguration struct {
-	Repository string   `json:"repository"`
-	Actions    []string `json:"action"`
+	BaseRepositoryConfig `mapstructure:",squash"`
+
+	Actions []string `json:"action"`
 }
 
 func (p *OnPullRequest) Name() string {
@@ -75,47 +72,19 @@ func (p *OnPullRequest) Configuration() []configuration.Field {
 }
 
 func (p *OnPullRequest) Setup(ctx core.TriggerContext) error {
-	var metadata OnPullRequestMetadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := ensureRepoInMetadata(
+		ctx.MetadataContext,
+		ctx.AppInstallationContext,
+		ctx.Configuration,
+	)
+
 	if err != nil {
-		return fmt.Errorf("failed to parse metadata: %w", err)
+		return err
 	}
 
-	//
-	// If metadata is set, it means the trigger was already setup
-	//
-	if metadata.Repository != nil {
-		return nil
-	}
-
-	config := OnPullRequestConfiguration{}
-	err = mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
+	var config BaseRepositoryConfig
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	if config.Repository == "" {
-		return fmt.Errorf("repository is required")
-	}
-
-	appMetadata := Metadata{}
-	err = mapstructure.Decode(ctx.AppInstallationContext.GetMetadata(), &appMetadata)
-	if err != nil {
-		return fmt.Errorf("error decoding app installation metadata: %v", err)
-	}
-
-	repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r Repository) bool {
-		return r.Name == config.Repository
-	})
-
-	if repoIndex == -1 {
-		return fmt.Errorf("repository %s is not accessible to app installation", config.Repository)
-	}
-
-	metadata.Repository = &appMetadata.Repositories[repoIndex]
-	err = ctx.MetadataContext.Set(metadata)
-	if err != nil {
-		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
 	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{

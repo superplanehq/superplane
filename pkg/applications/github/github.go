@@ -88,7 +88,11 @@ func (g *GitHub) Configuration() []configuration.Field {
 }
 
 func (g *GitHub) Components() []core.Component {
-	return []core.Component{}
+	return []core.Component{
+		&GetIssue{},
+		&CreateIssue{},
+		&UpdateIssue{},
+	}
 }
 
 func (g *GitHub) Triggers() []core.Trigger {

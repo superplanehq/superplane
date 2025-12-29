@@ -51,7 +51,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 			Body:    []byte(`{"ref":"refs/heads/main"}`),
 			Headers: headers,
 			Configuration: OnPushConfiguration{
-				Repository: "test",
+				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "test"},
 				Refs: []configuration.Predicate{
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
@@ -81,7 +81,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: OnPushConfiguration{
-				Repository: "test",
+				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "test"},
 				Refs: []configuration.Predicate{
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
@@ -112,7 +112,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: OnPushConfiguration{
-				Repository: "test",
+				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "test"},
 				Refs: []configuration.Predicate{
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
@@ -143,7 +143,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: OnPushConfiguration{
-				Repository: "test",
+				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "test"},
 				Refs: []configuration.Predicate{
 					{Type: configuration.PredicateTypeNotEquals, Value: "refs/heads/main"},
 				},
@@ -174,7 +174,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: OnPushConfiguration{
-				Repository: "test",
+				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "test"},
 				Refs: []configuration.Predicate{
 					{Type: configuration.PredicateTypeMatches, Value: "refs/heads/feat/*"},
 				},
@@ -205,7 +205,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: OnPushConfiguration{
-				Repository: "test",
+				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "test"},
 				Refs: []configuration.Predicate{
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
@@ -229,7 +229,9 @@ func Test__OnPush__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			AppInstallationContext: appCtx,
 			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          OnPushConfiguration{Repository: ""},
+			Configuration: OnPushConfiguration{
+				BaseRepositoryConfig: BaseRepositoryConfig{Repository: ""},
+			},
 		})
 
 		require.ErrorContains(t, err, "repository is required")
@@ -244,7 +246,9 @@ func Test__OnPush__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			AppInstallationContext: appCtx,
 			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          OnPushConfiguration{Repository: "world"},
+			Configuration: OnPushConfiguration{
+				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "world"},
+			},
 		})
 
 		require.ErrorContains(t, err, "repository world is not accessible to app installation")
@@ -261,10 +265,12 @@ func Test__OnPush__Setup(t *testing.T) {
 		require.NoError(t, trigger.Setup(core.TriggerContext{
 			AppInstallationContext: appCtx,
 			MetadataContext:        &nodeMetadataCtx,
-			Configuration:          OnPushConfiguration{Repository: "hello"},
+			Configuration: OnPushConfiguration{
+				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "hello"},
+			},
 		}))
 
-		require.Equal(t, nodeMetadataCtx.Get(), OnPushMetadata{Repository: &helloRepo})
+		require.Equal(t, nodeMetadataCtx.Get(), NodeMetadata{Repository: &helloRepo})
 		require.Len(t, appCtx.WebhookRequests, 1)
 
 		webhookRequest := appCtx.WebhookRequests[0].(WebhookConfiguration)

@@ -1891,6 +1891,7 @@ function prepareComponentNode(
     case "noop":
     case "http":
     case "semaphore":
+    case "github": // TODO: this is not OK
     case "time_gate":
     case "filter":
     case "if":
