@@ -277,6 +277,10 @@ func (a *Approval) OutputChannels(configuration any) []core.OutputChannel {
 	}
 }
 
+func (a *Approval) IsDisplayOnly() bool {
+	return false
+}
+
 func (a *Approval) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

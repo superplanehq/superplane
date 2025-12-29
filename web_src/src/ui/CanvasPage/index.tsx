@@ -236,10 +236,10 @@ const nodeTypes = {
       return <Block data={blockData} nodeId={nodeProps.id} selected={nodeProps.selected} />;
     }
 
-    // Check if component can execute based on outputChannels metadata
+    // Check if component is display-only (should not have Run action)
     const workflowNode = callbacks.workflowNodes?.find((n: any) => n.id === nodeProps.id);
     const componentMetadata = callbacks.components?.find((c: any) => c.name === workflowNode?.component?.name);
-    const canExecute = componentMetadata?.outputChannels && componentMetadata.outputChannels.length > 0;
+    const isDisplayOnly = componentMetadata?.isDisplayOnly === true;
 
     return (
       <Block
@@ -252,7 +252,7 @@ const nodeTypes = {
         onClick={() => callbacks.handleNodeClick(nodeProps.id)}
         onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
         onDelete={callbacks.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
-        onRun={canExecute && callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
+        onRun={!isDisplayOnly && callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
         onDuplicate={callbacks.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
         onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
         onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
@@ -829,6 +829,19 @@ function Sidebar({
     return getSidebarData(state.componentSidebar.selectedNodeId);
   }, [state.componentSidebar.selectedNodeId, getSidebarData]);
 
+  // Determine if the selected node is a display-only component
+  const shouldHideRunsTab = useMemo(() => {
+    if (!state.componentSidebar.selectedNodeId || !workflowNodes || !components) {
+      return false;
+    }
+    const workflowNode = workflowNodes.find((n) => n.id === state.componentSidebar.selectedNodeId);
+    if (!workflowNode?.component?.name) {
+      return false;
+    }
+    const componentMetadata = components.find((c) => c.name === workflowNode.component?.name);
+    return componentMetadata?.isDisplayOnly === true;
+  }, [state.componentSidebar.selectedNodeId, workflowNodes, components]);
+
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
 
@@ -887,6 +900,7 @@ function Sidebar({
       totalInQueueCount={sidebarData.totalInQueueCount}
       totalInHistoryCount={sidebarData.totalInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
+      hideRunsTab={shouldHideRunsTab}
       getTabData={
         getTabData && state.componentSidebar.selectedNodeId ? (event) => getTabData(event.nodeId!, event) : undefined
       }

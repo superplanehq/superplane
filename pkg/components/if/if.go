@@ -54,6 +54,10 @@ func (f *If) OutputChannels(configuration any) []core.OutputChannel {
 	}
 }
 
+func (f *If) IsDisplayOnly() bool {
+	return false
+}
+
 func (f *If) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

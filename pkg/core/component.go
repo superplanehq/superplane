@@ -50,6 +50,13 @@ type Component interface {
 	OutputChannels(configuration any) []OutputChannel
 
 	/*
+	 * IsDisplayOnly indicates whether this component is display-only
+	 * (never executes or creates execution records).
+	 * Display-only components are purely for UI purposes like annotations.
+	 */
+	IsDisplayOnly() bool
+
+	/*
 	 * The configuration fields exposed by the component.
 	 */
 	Configuration() []configuration.Field

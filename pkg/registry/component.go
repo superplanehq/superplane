@@ -57,6 +57,10 @@ func (s *PanicableComponent) OutputChannels(config any) []core.OutputChannel {
 	return s.underlying.OutputChannels(config)
 }
 
+func (s *PanicableComponent) IsDisplayOnly() bool {
+	return s.underlying.IsDisplayOnly()
+}
+
 /*
  * Panicking methods.
  * These are where the component logic is implemented,

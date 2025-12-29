@@ -206,7 +206,8 @@ export const ComponentSidebar = ({
   const [executionChainEventId, setExecutionChainEventId] = useState<string | null>(null);
   const [executionChainTriggerEvent, setExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
-  const activeTab = currentTab || "latest";
+  // If Runs tab is hidden, force settings tab
+  const activeTab = hideRunsTab ? "settings" : (currentTab || "latest");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
   const [justCopied, setJustCopied] = useState(false);

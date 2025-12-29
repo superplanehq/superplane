@@ -96,6 +96,10 @@ func (r *RunWorkflow) OutputChannels(configuration any) []core.OutputChannel {
 	}
 }
 
+func (r *RunWorkflow) IsDisplayOnly() bool {
+	return false
+}
+
 func (r *RunWorkflow) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

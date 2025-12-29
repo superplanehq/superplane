@@ -120,6 +120,10 @@ func (e *HTTP) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
+func (e *HTTP) IsDisplayOnly() bool {
+	return false
+}
+
 func (e *HTTP) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

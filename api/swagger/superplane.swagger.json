@@ -2924,6 +2924,9 @@
         },
         "color": {
           "type": "string"
+        },
+        "isDisplayOnly": {
+          "type": "boolean"
         }
       }
     },

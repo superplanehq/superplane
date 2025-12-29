@@ -43,6 +43,10 @@ func (c *NoOp) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
+func (c *NoOp) IsDisplayOnly() bool {
+	return false
+}
+
 func (c *NoOp) Configuration() []configuration.Field {
 	return []configuration.Field{}
 }

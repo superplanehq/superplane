@@ -64,6 +64,10 @@ func (tg *TimeGate) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
+func (tg *TimeGate) IsDisplayOnly() bool {
+	return false
+}
+
 func (tg *TimeGate) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

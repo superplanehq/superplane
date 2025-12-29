@@ -41,6 +41,10 @@ func (f *Filter) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
+func (f *Filter) IsDisplayOnly() bool {
+	return false
+}
+
 func (f *Filter) Icon() string {
 	return "funnel"
 }

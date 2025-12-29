@@ -34,6 +34,10 @@ func (m *Merge) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
+func (m *Merge) IsDisplayOnly() bool {
+	return false
+}
+
 type Spec struct {
 	ExecutionTimeout struct {
 		Value int    `json:"value"`

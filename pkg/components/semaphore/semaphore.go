@@ -92,6 +92,10 @@ func (s *Semaphore) OutputChannels(configuration any) []core.OutputChannel {
 	}
 }
 
+func (s *Semaphore) IsDisplayOnly() bool {
+	return false
+}
+
 func (s *Semaphore) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -29,7 +29,7 @@ export const annotationMapper: ComponentBaseMapper = {
         "div",
         {
           className: `px-3 py-2 text-sm whitespace-pre-wrap border-t border-gray-200 text-left ${
-            content ? "text-gray-700 bg-amber-50 font-bold" : "text-gray-400 bg-gray-50 italic"
+            content ? "text-black-900 bg-amber-50" : "text-gray-400 bg-gray-50 italic"
           }`,
         },
         displayText,

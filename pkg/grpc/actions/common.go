@@ -896,6 +896,7 @@ func SerializeComponents(in []core.Component) []*componentpb.Component {
 			Color:          component.Color(),
 			OutputChannels: channels,
 			Configuration:  configuration,
+			IsDisplayOnly:  component.IsDisplayOnly(),
 		}
 	}
 

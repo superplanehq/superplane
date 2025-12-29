@@ -82,6 +82,7 @@ message Component {
   repeated OutputChannel output_channels = 5;
   string icon = 6;
   string color = 7;
+  bool is_display_only = 8;
 }
 
 message OutputChannel {

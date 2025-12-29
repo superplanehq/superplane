@@ -43,6 +43,11 @@ func (c *Annotation) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{}
 }
 
+func (c *Annotation) IsDisplayOnly() bool {
+	// Annotation is display-only - never executes or creates execution records
+	return true
+}
+
 func (c *Annotation) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

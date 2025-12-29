@@ -64,6 +64,10 @@ func (w *Wait) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
+func (w *Wait) IsDisplayOnly() bool {
+	return false
+}
+
 func (w *Wait) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
