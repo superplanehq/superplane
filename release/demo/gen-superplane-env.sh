@@ -29,7 +29,7 @@ TEMPLATE_DIR="${TEMPLATE_DIR:-/app/templates}"
 WEB_BASE_PATH="${WEB_BASE_PATH:-}"
 PUBLIC_API_BASE_PATH="${PUBLIC_API_BASE_PATH:-/api/v1}"
 OWNER_SETUP_ENABLED="${OWNER_SETUP_ENABLED:-yes}"
-CLOUDFLARE_QUICK_TUNNEL="${CLOUDFLARE_QUICK_TUNNEL:-1}"
+LOCALTUNNEL_ENABLED="${LOCALTUNNEL_ENABLED:-1}"
 START_PUBLIC_API="${START_PUBLIC_API:-yes}"
 START_INTERNAL_API="${START_INTERNAL_API:-yes}"
 START_GRPC_GATEWAY="${START_GRPC_GATEWAY:-yes}"
@@ -65,6 +65,14 @@ if [ -z "${SESSION_SECRET:-}" ] || [ "${SESSION_SECRET}" = "1234567890abcdefghij
   SESSION_SECRET=$(generate_secret)
 fi
 
+# Generate random subdomain for localtunnel if it doesn't exist
+# Format: superplane-local-{random}
+if [ -z "${LOCALTUNNEL_SUBDOMAIN:-}" ]; then
+  # Generate a random 8-character hex string for the subdomain
+  RANDOM_SUFFIX=$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 8)
+  LOCALTUNNEL_SUBDOMAIN="superplane-local-${RANDOM_SUFFIX}"
+fi
+
 # Ensure directory exists
 mkdir -p "$(dirname "${ENV_FILE}")"
 
@@ -87,7 +95,8 @@ export TEMPLATE_DIR="${TEMPLATE_DIR}"
 export WEB_BASE_PATH="${WEB_BASE_PATH}"
 export PUBLIC_API_BASE_PATH="${PUBLIC_API_BASE_PATH}"
 export OWNER_SETUP_ENABLED="${OWNER_SETUP_ENABLED}"
-export CLOUDFLARE_QUICK_TUNNEL="${CLOUDFLARE_QUICK_TUNNEL}"
+export LOCALTUNNEL_ENABLED="${LOCALTUNNEL_ENABLED}"
+export LOCALTUNNEL_SUBDOMAIN="${LOCALTUNNEL_SUBDOMAIN}"
 export START_PUBLIC_API="${START_PUBLIC_API}"
 export START_INTERNAL_API="${START_INTERNAL_API}"
 export START_GRPC_GATEWAY="${START_GRPC_GATEWAY}"

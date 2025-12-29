@@ -11,7 +11,7 @@ source /app/spinner.sh
 # ===========================================================================
 
 # Ensure /app/data exists and has proper permissions for persistent storage
-mkdir -p /app/data/postgres /app/data/rabbitmq/mnesia /app/data/rabbitmq/logs /app/data/cloudflared
+mkdir -p /app/data/postgres /app/data/rabbitmq/mnesia /app/data/rabbitmq/logs
 chown -R postgres:postgres /app/data/postgres || true
 
 # ===========================================================================
@@ -83,29 +83,46 @@ migrate -source file:///app/db/migrations -database "${DB_URL}" up >/dev/null 2>
 stop_spinner
 
 # ===========================================================================
-# Starting Cloudflare tunnel
+# Starting localtunnel
 # ===========================================================================
 
-if [ "${CLOUDFLARE_QUICK_TUNNEL}" = "1" ]; then
-  mkdir -p /app/data/cloudflared
-  cloudflared tunnel --no-autoupdate --url "http://127.0.0.1:8000" > /app/data/cloudflared/cloudflared.log 2>&1 &
-
-  start_spinner "Creating a public URL via Cloudflare Tunnel"
+if [ "${LOCALTUNNEL_ENABLED}" = "1" ]; then
+  start_spinner "Creating a public URL via localtunnel"
+  
+  # Start localtunnel with the persisted subdomain
+  npx -y localtunnel --port 8000 --subdomain "${LOCALTUNNEL_SUBDOMAIN}" > /tmp/localtunnel.log 2>&1 &
+  LOCALTUNNEL_PID=$!
+  
+  # Wait for the tunnel to be ready
   for i in {1..60}; do
-    if [ -f /app/data/cloudflared/cloudflared.log ]; then
-      URL=$(grep -Eo 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' /app/data/cloudflared/cloudflared.log | head -n 1 || true)
+    if [ -f /tmp/localtunnel.log ]; then
+      URL=$(grep -Eo 'https://[a-zA-Z0-9.-]+\.loca\.lt' /tmp/localtunnel.log | head -n 1 || true)
       if [ -n "${URL}" ]; then
         BASE_URL="${URL}"
         export BASE_URL
+        # Update the env file with the new BASE_URL
+        sed -i "s|^export BASE_URL=.*|export BASE_URL=\"${BASE_URL}\"|" /app/data/superplane.env || \
+          echo "export BASE_URL=\"${BASE_URL}\"" >> /app/data/superplane.env
         stop_spinner
         break
       fi
     fi
     sleep 1
   done
+  
+  # If we didn't get a URL, kill the process
+  if [ -z "${URL:-}" ]; then
+    kill $LOCALTUNNEL_PID >/dev/null 2>&1 || true
+    stop_spinner
+    echo "Warning: Failed to create localtunnel URL" >&2
+  fi
 fi
 
 echo ""
-echo "  Visit: ${URL}"
+if [ -n "${URL:-}" ]; then
+  echo "  Visit: ${URL}"
+else
+  echo "  Visit: ${BASE_URL}"
+fi
 
 exec /app/build/superplane >/dev/null 2>&1
