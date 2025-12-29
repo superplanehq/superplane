@@ -8,6 +8,7 @@ import {
 import { defaultTriggerRenderer } from "./default";
 import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
+import { annotationMapper } from "./annotation";
 import { noopMapper } from "./noop";
 import { ifMapper } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
@@ -34,6 +35,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
 };
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
+  annotation: annotationMapper,
   noop: noopMapper,
   if: ifMapper,
   http: httpMapper,

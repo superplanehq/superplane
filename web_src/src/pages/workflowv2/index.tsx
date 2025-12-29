@@ -1887,6 +1887,7 @@ function prepareComponentNode(
   const componentName = componentNameParts[0];
 
   switch (componentName) {
+    case "annotation":
     case "approval":
     case "noop":
     case "http":
