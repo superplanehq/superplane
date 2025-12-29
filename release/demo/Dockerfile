@@ -112,7 +112,8 @@ COPY --from=builder /app/templates /app/templates
 # Trial entrypoint that runs embedded Postgres and RabbitMQ and then Superplane.
 COPY release/demo/entrypoint.sh /app/entrypoint.sh
 COPY release/demo/gen-superplane-env.sh /app/gen-superplane-env.sh
-RUN chmod +x /app/entrypoint.sh /app/docker-entrypoint.sh /app/gen-superplane-env.sh
+COPY release/demo/spinner.sh /app/spinner.sh
+RUN chmod +x /app/entrypoint.sh /app/docker-entrypoint.sh /app/gen-superplane-env.sh /app/spinner.sh
 
 EXPOSE 8000
 
