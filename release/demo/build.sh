@@ -9,7 +9,13 @@ if [ "${1-}" = "" ]; then
 fi
 
 VERSION="$1"
-IMAGE="ghcr.io/superplanehq/superplane-demo:${VERSION}"
 
-echo "Building Superplane demo image: ${IMAGE}"
-docker buildx build --platform linux/amd64,linux/arm64 -f release/demo/Dockerfile -t "${IMAGE}" .
+echo "Building SuperPlane demo image"
+
+docker buildx build \
+  --push \
+  --platform linux/amd64,linux/arm64 \
+  -t "ghcr.io/superplanehq/superplane-demo:${VERSION}" \
+  -t "ghcr.io/superplanehq/superplane-demo:stable" \
+  -t "ghcr.io/superplanehq/superplane-demo:beta" \
+  -f release/demo/Dockerfile . \
