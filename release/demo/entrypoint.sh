@@ -87,7 +87,7 @@ stop_spinner
 # ===========================================================================
 
 if [ "${LOCALTUNNEL_ENABLED}" = "1" ]; then
-  start_spinner "Creating a public URL via localtunnel"
+  start_spinner "Setting up a public webhook tunnel"
   
   # Start localtunnel with the persisted subdomain
   npx -y localtunnel --port 8000 --subdomain "${LOCALTUNNEL_SUBDOMAIN}" > /tmp/localtunnel.log 2>&1 &
@@ -98,11 +98,11 @@ if [ "${LOCALTUNNEL_ENABLED}" = "1" ]; then
     if [ -f /tmp/localtunnel.log ]; then
       URL=$(grep -Eo 'https://[a-zA-Z0-9.-]+\.loca\.lt' /tmp/localtunnel.log | head -n 1 || true)
       if [ -n "${URL}" ]; then
-        BASE_URL="${URL}"
-        export BASE_URL
-        # Update the env file with the new BASE_URL
-        sed -i "s|^export BASE_URL=.*|export BASE_URL=\"${BASE_URL}\"|" /app/data/superplane.env || \
-          echo "export BASE_URL=\"${BASE_URL}\"" >> /app/data/superplane.env
+        WEBHOOKS_BASE_URL="${URL}"
+        export WEBHOOKS_BASE_URL
+        # Update the env file with the new WEBHOOKS_BASE_URL
+        sed -i "s|^export WEBHOOKS_BASE_URL=.*|export WEBHOOKS_BASE_URL=\"${WEBHOOKS_BASE_URL}\"|" /app/data/superplane.env || \
+          echo "export WEBHOOKS_BASE_URL=\"${WEBHOOKS_BASE_URL}\"" >> /app/data/superplane.env
         stop_spinner
         break
       fi
@@ -119,10 +119,6 @@ if [ "${LOCALTUNNEL_ENABLED}" = "1" ]; then
 fi
 
 echo ""
-if [ -n "${URL:-}" ]; then
-  echo "  Visit: ${URL}"
-else
-  echo "  Visit: ${BASE_URL}"
-fi
+echo "  Visit: ${BASE_URL}"
 
 exec /app/build/superplane >/dev/null 2>&1
