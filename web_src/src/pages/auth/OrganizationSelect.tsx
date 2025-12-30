@@ -1,3 +1,4 @@
+import SuperplaneLogo from "@/assets/superplane.svg";
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Text } from "../../components/Text/text";
@@ -50,7 +51,7 @@ const OrganizationSelect: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-100 p-8">
         <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500"></div>
           <Text className="text-gray-600 dark:text-gray-400">Loading...</Text>
         </div>
       </div>
@@ -59,7 +60,10 @@ const OrganizationSelect: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <div className="p-8 pt-6">
+      <div className="p-8">
+        <div className="flex mb-4">
+          <img src={SuperplaneLogo} alt="Superplane" className="h-6" />
+        </div>
         <div className="max-w-7xl w-full">
           <div className="mb-6">
             <Text className="font-medium text-gray-800 text-left">
@@ -104,7 +108,7 @@ const OrganizationSelect: React.FC = () => {
               onClick={() => navigate("/create")}
             >
               <div className="flex items-center">
-                <h4 className="text-base font-semibold text-gray-800 text-center">+ Create New</h4>
+                <h4 className="text-base font-semibold text-gray-800 text-center">+ Create new</h4>
               </div>
               <Text className="text-sm text-gray-500 font-medium text-center">
                 Start fresh with a new organization
