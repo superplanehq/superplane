@@ -267,8 +267,8 @@ func (t *OnEvent) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (t *OnEvent) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (t *OnEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

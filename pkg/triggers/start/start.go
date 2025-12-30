@@ -50,6 +50,6 @@ func (s *Start) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (s *Start) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (s *Start) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }

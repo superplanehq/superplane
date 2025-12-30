@@ -153,7 +153,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Wor
 		actionCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
 	}
 
-	err = trigger.HandleAction(actionCtx)
+	_, err = trigger.HandleAction(actionCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)
 	}

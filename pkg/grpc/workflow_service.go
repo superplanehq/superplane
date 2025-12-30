@@ -14,16 +14,18 @@ import (
 )
 
 type WorkflowService struct {
-	registry    *registry.Registry
-	encryptor   crypto.Encryptor
-	authService authorization.Authorization
+	registry       *registry.Registry
+	encryptor      crypto.Encryptor
+	authService    authorization.Authorization
+	webhookBaseURL string
 }
 
-func NewWorkflowService(authService authorization.Authorization, registry *registry.Registry, encryptor crypto.Encryptor) *WorkflowService {
+func NewWorkflowService(authService authorization.Authorization, registry *registry.Registry, encryptor crypto.Encryptor, webhookBaseURL string) *WorkflowService {
 	return &WorkflowService{
-		registry:    registry,
-		encryptor:   encryptor,
-		authService: authService,
+		registry:       registry,
+		encryptor:      encryptor,
+		authService:    authService,
+		webhookBaseURL: webhookBaseURL,
 	}
 }
 
@@ -50,7 +52,7 @@ func (s *WorkflowService) UpdateWorkflow(ctx context.Context, req *pb.UpdateWork
 		return nil, status.Error(codes.InvalidArgument, "workflow is required")
 	}
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return workflows.UpdateWorkflow(ctx, s.encryptor, s.registry, organizationID, req.Id, req.Workflow)
+	return workflows.UpdateWorkflow(ctx, s.encryptor, s.registry, organizationID, req.Id, req.Workflow, s.webhookBaseURL)
 }
 
 func (s *WorkflowService) DeleteWorkflow(ctx context.Context, req *pb.DeleteWorkflowRequest) (*pb.DeleteWorkflowResponse, error) {
@@ -132,6 +134,36 @@ func (s *WorkflowService) InvokeNodeExecutionAction(ctx context.Context, req *pb
 		executionID,
 		req.ActionName,
 		req.Parameters.AsMap(),
+	)
+}
+
+func (s *WorkflowService) InvokeNodeTriggerAction(ctx context.Context, req *pb.InvokeNodeTriggerActionRequest) (*pb.InvokeNodeTriggerActionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+
+	workflowID, err := uuid.Parse(req.WorkflowId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+	}
+
+	if req.NodeId == "" {
+		return nil, status.Error(codes.InvalidArgument, "node_id is required")
+	}
+
+	if req.ActionName == "" {
+		return nil, status.Error(codes.InvalidArgument, "action_name is required")
+	}
+
+	return workflows.InvokeNodeTriggerAction(
+		ctx,
+		s.authService,
+		s.encryptor,
+		s.registry,
+		uuid.MustParse(organizationID),
+		workflowID,
+		req.NodeId,
+		req.ActionName,
+		req.Parameters.AsMap(),
+		s.webhookBaseURL,
 	)
 }
 

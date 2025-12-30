@@ -372,13 +372,13 @@ func (s *Schedule) Actions() []core.Action {
 	}
 }
 
-func (s *Schedule) HandleAction(ctx core.TriggerActionContext) error {
+func (s *Schedule) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	switch ctx.Name {
 	case "emitEvent":
-		return s.emitEvent(ctx)
+		return nil, s.emitEvent(ctx)
 	}
 
-	return fmt.Errorf("action %s not supported", ctx.Name)
+	return nil, fmt.Errorf("action %s not supported", ctx.Name)
 }
 
 func (s *Schedule) emitEvent(ctx core.TriggerActionContext) error {

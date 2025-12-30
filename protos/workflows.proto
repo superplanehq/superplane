@@ -152,6 +152,18 @@ service Workflows {
     };
   }
 
+  rpc InvokeNodeTriggerAction(InvokeNodeTriggerActionRequest) returns (InvokeNodeTriggerActionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/workflows/{workflow_id}/triggers/{node_id}/actions/{action_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Invoke trigger action";
+      description: "Invokes a custom action on a workflow node trigger";
+      tags: "WorkflowNode";
+    };
+  }
+
   rpc ListChildExecutions(ListChildExecutionsRequest) returns (ListChildExecutionsResponse) {
     option (google.api.http) = {
       post: "/api/v1/workflows/{workflow_id}/executions/{execution_id}/children"
@@ -396,6 +408,17 @@ message InvokeNodeExecutionActionRequest {
 }
 
 message InvokeNodeExecutionActionResponse {}
+
+message InvokeNodeTriggerActionRequest {
+  string workflow_id = 1;
+  string node_id = 2;
+  string action_name = 3;
+  google.protobuf.Struct parameters = 4;
+}
+
+message InvokeNodeTriggerActionResponse {
+  google.protobuf.Struct result = 1;
+}
 
 message ListWorkflowEventsRequest {
   string workflow_id = 1;

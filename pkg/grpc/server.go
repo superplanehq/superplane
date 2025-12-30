@@ -52,7 +52,7 @@ func sentryRecoveryHandler(p any) error {
 	return status.Errorf(codes.Internal, "internal server error")
 }
 
-func RunServer(baseURL string, webhooksBaseURL string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, port int) {
+func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, port int) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)
 	lis, err := net.Listen("tcp", endpoint)
 
@@ -116,7 +116,7 @@ func RunServer(baseURL string, webhooksBaseURL string, encryptor crypto.Encrypto
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
-	workflowService := NewWorkflowService(authService, registry, encryptor)
+	workflowService := NewWorkflowService(authService, registry, encryptor, webhooksBaseURL+basePath)
 	pbWorkflows.RegisterWorkflowsServer(grpcServer, workflowService)
 
 	applicationService := NewApplicationService(encryptor, registry)

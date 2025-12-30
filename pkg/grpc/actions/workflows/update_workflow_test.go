@@ -78,6 +78,7 @@ func TestUpdateWorkflow_NodeRemovalUseSoftDelete(t *testing.T) {
 		r.Organization.ID.String(),
 		workflow.ID.String(),
 		updatedWorkflowPB,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateWorkflow should succeed when removing nodes with execution KVs")
 
@@ -181,6 +182,7 @@ func TestUpdateWorkflow_ErroredNodesCanExist(t *testing.T) {
 		r.Organization.ID.String(),
 		workflow.ID.String(),
 		updatedWorkflowPB,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateWorkflow should succeed even with existing errored nodes")
 
@@ -262,6 +264,7 @@ func TestUpdateWorkflow_ErroredNodeResetOnUpdate(t *testing.T) {
 		r.Organization.ID.String(),
 		workflow.ID.String(),
 		updatedWorkflowPB,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateWorkflow should succeed and reset errored node")
 
@@ -364,6 +367,7 @@ func TestUpdateWorkflow_NonErroredNodesKeepState(t *testing.T) {
 		r.Organization.ID.String(),
 		workflow.ID.String(),
 		updatedWorkflowPB,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateWorkflow should succeed")
 
@@ -436,6 +440,7 @@ func TestUpdateWorkflow_ValidationErrorsPersisted(t *testing.T) {
 		r.Organization.ID.String(),
 		workflow.ID.String(),
 		updatedWorkflowPB,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateWorkflow should succeed even with validation errors")
 
@@ -492,6 +497,7 @@ func TestUpdateWorkflow_ErroredNodeBecomesValidAgain(t *testing.T) {
 		r.Organization.ID.String(),
 		workflow.ID.String(),
 		invalidWorkflowPB,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateWorkflow should succeed even with validation errors")
 
@@ -528,6 +534,7 @@ func TestUpdateWorkflow_ErroredNodeBecomesValidAgain(t *testing.T) {
 		r.Organization.ID.String(),
 		workflow.ID.String(),
 		validWorkflowPB,
+		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateWorkflow should succeed with valid configuration")
 

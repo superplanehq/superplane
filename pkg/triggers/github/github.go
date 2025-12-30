@@ -160,7 +160,7 @@ func (g *GitHub) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("integration ID is invalid: %w", err)
 	}
 
-	err = ctx.WebhookContext.Setup(&core.WebhookSetupOptions{
+	_, err = ctx.WebhookContext.Setup(&core.WebhookSetupOptions{
 		IntegrationID: &integrationID,
 		Resource:      resource,
 		Configuration: config,
@@ -185,8 +185,8 @@ func (g *GitHub) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (g *GitHub) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (g *GitHub) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (g *GitHub) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

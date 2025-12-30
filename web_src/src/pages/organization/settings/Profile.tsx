@@ -183,7 +183,7 @@ export function Profile() {
                     <Icon name={tokenVisible ? "visibility_off" : "visibility"} />
                   </Button>
                   <Button variant="secondary" onClick={copyToken} className="flex items-center gap-1">
-                    <Icon name="content_copy" />
+                    <Icon name="copy" />
                     Copy
                   </Button>
                 </div>

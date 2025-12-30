@@ -830,6 +830,18 @@ export type WorkflowsInvokeNodeExecutionActionResponse = {
   [key: string]: unknown;
 };
 
+export type WorkflowsInvokeNodeTriggerActionBody = {
+  parameters?: {
+    [key: string]: unknown;
+  };
+};
+
+export type WorkflowsInvokeNodeTriggerActionResponse = {
+  result?: {
+    [key: string]: unknown;
+  };
+};
+
 export type WorkflowsListChildExecutionsBody = {
   [key: string]: unknown;
 };
@@ -2893,6 +2905,37 @@ export type WorkflowsDeleteNodeQueueItemResponses = {
 
 export type WorkflowsDeleteNodeQueueItemResponse2 =
   WorkflowsDeleteNodeQueueItemResponses[keyof WorkflowsDeleteNodeQueueItemResponses];
+
+export type WorkflowsInvokeNodeTriggerActionData = {
+  body: WorkflowsInvokeNodeTriggerActionBody;
+  path: {
+    workflowId: string;
+    nodeId: string;
+    actionName: string;
+  };
+  query?: never;
+  url: "/api/v1/workflows/{workflowId}/triggers/{nodeId}/actions/{actionName}";
+};
+
+export type WorkflowsInvokeNodeTriggerActionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type WorkflowsInvokeNodeTriggerActionError =
+  WorkflowsInvokeNodeTriggerActionErrors[keyof WorkflowsInvokeNodeTriggerActionErrors];
+
+export type WorkflowsInvokeNodeTriggerActionResponses = {
+  /**
+   * A successful response.
+   */
+  200: WorkflowsInvokeNodeTriggerActionResponse;
+};
+
+export type WorkflowsInvokeNodeTriggerActionResponse2 =
+  WorkflowsInvokeNodeTriggerActionResponses[keyof WorkflowsInvokeNodeTriggerActionResponses];
 
 export type ClientOptions = {
   baseUrl: `http://${string}` | `https://${string}` | (string & {});
