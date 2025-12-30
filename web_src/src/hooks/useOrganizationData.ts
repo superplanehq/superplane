@@ -21,6 +21,7 @@ import {
   organizationsListInvitations,
   organizationsCreateInvitation,
   organizationsRemoveInvitation,
+  organizationsDeleteOrganization,
 } from "../api-client/sdk.gen";
 import { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
 import { withOrganizationHeader } from "../utils/withOrganizationHeader";
@@ -178,6 +179,23 @@ export const useOrganizationInvitations = (organizationId: string) => {
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!organizationId,
+  });
+};
+
+export const useDeleteOrganization = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      return await organizationsDeleteOrganization(
+        withOrganizationHeader({
+          path: { id: organizationId },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: organizationKeys.all });
+    },
   });
 };
 

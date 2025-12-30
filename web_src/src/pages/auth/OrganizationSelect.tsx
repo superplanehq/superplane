@@ -134,7 +134,9 @@ const OrganizationSelect: React.FC = () => {
               <div className="flex items-center">
                 <h4 className="text-sm font-semibold text-gray-800 text-center">+ Create new</h4>
               </div>
-              <Text className="text-[13px] text-gray-500 font-medium text-center">Start fresh with a new organization</Text>
+              <Text className="text-[13px] text-gray-500 font-medium text-center">
+                Start fresh with a new organization
+              </Text>
             </div>
           </div>
         </div>

@@ -65,40 +65,43 @@ const OrganizationCreate: React.FC = () => {
       <div className="flex items-center justify-center p-8">
         <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-8 outline outline-slate-950/10">
           <div className="text-center mb-8">
-          <h4 className="text-xl font-semibold text-gray-800 mb-1">Create Organization</h4>
-          <Text className="text-gray-800">Set up a new SuperPlane organization</Text>
-        </div>
+            <h4 className="text-xl font-semibold text-gray-800 mb-1">Create Organization</h4>
+            <Text className="text-gray-800">Set up a new SuperPlane organization</Text>
+          </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-              <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
+              </div>
+            )}
+
+            <div>
+              <label
+                htmlFor="name"
+                className="block text-sm font-medium text-gray-800 text-left dark:text-gray-300 mb-2"
+              >
+                Organization Name
+              </label>
+              <input
+                type="text"
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="w-full px-3 py-2 outline-1 outline-slate-300 rounded-md shadow-md focus:outline-gray-800"
+                placeholder="e.g. SuperDuper Inc."
+                data-1p-ignore
+              />
             </div>
-          )}
 
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-800 text-left dark:text-gray-300 mb-2">
-              Organization Name
-            </label>
-            <input
-              type="text"
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full px-3 py-2 outline-1 outline-slate-300 rounded-md shadow-md focus:outline-gray-800"
-              placeholder="e.g. SuperDuper Inc."
-              data-1p-ignore
-            />
-          </div>
-
-          <div className="flex space-x-4">
-            <Button type="submit" className="flex-1" disabled={loading || !name.trim()}>
-              {loading ? "Creating..." : "Create Organization"}
-            </Button>
-          </div>
-        </form>
-      </div>
+            <div className="flex space-x-4">
+              <Button type="submit" className="flex-1" disabled={loading || !name.trim()}>
+                {loading ? "Creating..." : "Create Organization"}
+              </Button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
