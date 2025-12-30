@@ -2675,6 +2675,58 @@
           "WorkflowNode"
         ]
       }
+    },
+    "/api/v1/workflows/{workflowId}/triggers/{nodeId}/actions/{actionName}": {
+      "post": {
+        "summary": "Invoke trigger action",
+        "description": "Invokes a custom action on a workflow node trigger",
+        "operationId": "Workflows_InvokeNodeTriggerAction",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsInvokeNodeTriggerActionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "actionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WorkflowsInvokeNodeTriggerActionBody"
+            }
+          }
+        ],
+        "tags": [
+          "WorkflowNode"
+        ]
+      }
     }
   },
   "definitions": {
@@ -4640,6 +4692,22 @@
     },
     "WorkflowsInvokeNodeExecutionActionResponse": {
       "type": "object"
+    },
+    "WorkflowsInvokeNodeTriggerActionBody": {
+      "type": "object",
+      "properties": {
+        "parameters": {
+          "type": "object"
+        }
+      }
+    },
+    "WorkflowsInvokeNodeTriggerActionResponse": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "object"
+        }
+      }
     },
     "WorkflowsListChildExecutionsBody": {
       "type": "object"

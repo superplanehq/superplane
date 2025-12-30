@@ -272,6 +272,137 @@ func (a *WorkflowNodeAPIService) WorkflowsEmitNodeEventExecute(r ApiWorkflowsEmi
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiWorkflowsInvokeNodeTriggerActionRequest struct {
+	ctx        context.Context
+	ApiService *WorkflowNodeAPIService
+	workflowId string
+	nodeId     string
+	actionName string
+	body       *WorkflowsInvokeNodeTriggerActionBody
+}
+
+func (r ApiWorkflowsInvokeNodeTriggerActionRequest) Body(body WorkflowsInvokeNodeTriggerActionBody) ApiWorkflowsInvokeNodeTriggerActionRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiWorkflowsInvokeNodeTriggerActionRequest) Execute() (*WorkflowsInvokeNodeTriggerActionResponse, *http.Response, error) {
+	return r.ApiService.WorkflowsInvokeNodeTriggerActionExecute(r)
+}
+
+/*
+WorkflowsInvokeNodeTriggerAction Invoke trigger action
+
+Invokes a custom action on a workflow node trigger
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param workflowId
+	@param nodeId
+	@param actionName
+	@return ApiWorkflowsInvokeNodeTriggerActionRequest
+*/
+func (a *WorkflowNodeAPIService) WorkflowsInvokeNodeTriggerAction(ctx context.Context, workflowId string, nodeId string, actionName string) ApiWorkflowsInvokeNodeTriggerActionRequest {
+	return ApiWorkflowsInvokeNodeTriggerActionRequest{
+		ApiService: a,
+		ctx:        ctx,
+		workflowId: workflowId,
+		nodeId:     nodeId,
+		actionName: actionName,
+	}
+}
+
+// Execute executes the request
+//
+//	@return WorkflowsInvokeNodeTriggerActionResponse
+func (a *WorkflowNodeAPIService) WorkflowsInvokeNodeTriggerActionExecute(r ApiWorkflowsInvokeNodeTriggerActionRequest) (*WorkflowsInvokeNodeTriggerActionResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *WorkflowsInvokeNodeTriggerActionResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowNodeAPIService.WorkflowsInvokeNodeTriggerAction")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/workflows/{workflowId}/triggers/{nodeId}/actions/{actionName}"
+	localVarPath = strings.Replace(localVarPath, "{"+"workflowId"+"}", url.PathEscape(parameterValueToString(r.workflowId, "workflowId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"nodeId"+"}", url.PathEscape(parameterValueToString(r.nodeId, "nodeId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"actionName"+"}", url.PathEscape(parameterValueToString(r.actionName, "actionName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiWorkflowsListNodeEventsRequest struct {
 	ctx        context.Context
 	ApiService *WorkflowNodeAPIService

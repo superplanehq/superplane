@@ -30,6 +30,7 @@ const (
 	Workflows_ListNodeEvents_FullMethodName            = "/Superplane.Workflows.Workflows/ListNodeEvents"
 	Workflows_EmitNodeEvent_FullMethodName             = "/Superplane.Workflows.Workflows/EmitNodeEvent"
 	Workflows_InvokeNodeExecutionAction_FullMethodName = "/Superplane.Workflows.Workflows/InvokeNodeExecutionAction"
+	Workflows_InvokeNodeTriggerAction_FullMethodName   = "/Superplane.Workflows.Workflows/InvokeNodeTriggerAction"
 	Workflows_ListChildExecutions_FullMethodName       = "/Superplane.Workflows.Workflows/ListChildExecutions"
 	Workflows_CancelExecution_FullMethodName           = "/Superplane.Workflows.Workflows/CancelExecution"
 	Workflows_ListWorkflowEvents_FullMethodName        = "/Superplane.Workflows.Workflows/ListWorkflowEvents"
@@ -51,6 +52,7 @@ type WorkflowsClient interface {
 	ListNodeEvents(ctx context.Context, in *ListNodeEventsRequest, opts ...grpc.CallOption) (*ListNodeEventsResponse, error)
 	EmitNodeEvent(ctx context.Context, in *EmitNodeEventRequest, opts ...grpc.CallOption) (*EmitNodeEventResponse, error)
 	InvokeNodeExecutionAction(ctx context.Context, in *InvokeNodeExecutionActionRequest, opts ...grpc.CallOption) (*InvokeNodeExecutionActionResponse, error)
+	InvokeNodeTriggerAction(ctx context.Context, in *InvokeNodeTriggerActionRequest, opts ...grpc.CallOption) (*InvokeNodeTriggerActionResponse, error)
 	ListChildExecutions(ctx context.Context, in *ListChildExecutionsRequest, opts ...grpc.CallOption) (*ListChildExecutionsResponse, error)
 	CancelExecution(ctx context.Context, in *CancelExecutionRequest, opts ...grpc.CallOption) (*CancelExecutionResponse, error)
 	ListWorkflowEvents(ctx context.Context, in *ListWorkflowEventsRequest, opts ...grpc.CallOption) (*ListWorkflowEventsResponse, error)
@@ -175,6 +177,16 @@ func (c *workflowsClient) InvokeNodeExecutionAction(ctx context.Context, in *Inv
 	return out, nil
 }
 
+func (c *workflowsClient) InvokeNodeTriggerAction(ctx context.Context, in *InvokeNodeTriggerActionRequest, opts ...grpc.CallOption) (*InvokeNodeTriggerActionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InvokeNodeTriggerActionResponse)
+	err := c.cc.Invoke(ctx, Workflows_InvokeNodeTriggerAction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *workflowsClient) ListChildExecutions(ctx context.Context, in *ListChildExecutionsRequest, opts ...grpc.CallOption) (*ListChildExecutionsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListChildExecutionsResponse)
@@ -230,6 +242,7 @@ type WorkflowsServer interface {
 	ListNodeEvents(context.Context, *ListNodeEventsRequest) (*ListNodeEventsResponse, error)
 	EmitNodeEvent(context.Context, *EmitNodeEventRequest) (*EmitNodeEventResponse, error)
 	InvokeNodeExecutionAction(context.Context, *InvokeNodeExecutionActionRequest) (*InvokeNodeExecutionActionResponse, error)
+	InvokeNodeTriggerAction(context.Context, *InvokeNodeTriggerActionRequest) (*InvokeNodeTriggerActionResponse, error)
 	ListChildExecutions(context.Context, *ListChildExecutionsRequest) (*ListChildExecutionsResponse, error)
 	CancelExecution(context.Context, *CancelExecutionRequest) (*CancelExecutionResponse, error)
 	ListWorkflowEvents(context.Context, *ListWorkflowEventsRequest) (*ListWorkflowEventsResponse, error)
@@ -275,6 +288,9 @@ func (UnimplementedWorkflowsServer) EmitNodeEvent(context.Context, *EmitNodeEven
 }
 func (UnimplementedWorkflowsServer) InvokeNodeExecutionAction(context.Context, *InvokeNodeExecutionActionRequest) (*InvokeNodeExecutionActionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InvokeNodeExecutionAction not implemented")
+}
+func (UnimplementedWorkflowsServer) InvokeNodeTriggerAction(context.Context, *InvokeNodeTriggerActionRequest) (*InvokeNodeTriggerActionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InvokeNodeTriggerAction not implemented")
 }
 func (UnimplementedWorkflowsServer) ListChildExecutions(context.Context, *ListChildExecutionsRequest) (*ListChildExecutionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListChildExecutions not implemented")
@@ -506,6 +522,24 @@ func _Workflows_InvokeNodeExecutionAction_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Workflows_InvokeNodeTriggerAction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InvokeNodeTriggerActionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowsServer).InvokeNodeTriggerAction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Workflows_InvokeNodeTriggerAction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowsServer).InvokeNodeTriggerAction(ctx, req.(*InvokeNodeTriggerActionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Workflows_ListChildExecutions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListChildExecutionsRequest)
 	if err := dec(in); err != nil {
@@ -628,6 +662,10 @@ var Workflows_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "InvokeNodeExecutionAction",
 			Handler:    _Workflows_InvokeNodeExecutionAction_Handler,
+		},
+		{
+			MethodName: "InvokeNodeTriggerAction",
+			Handler:    _Workflows_InvokeNodeTriggerAction_Handler,
 		},
 		{
 			MethodName: "ListChildExecutions",
