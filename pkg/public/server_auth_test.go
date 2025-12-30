@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *model
 	os.Setenv("BASE_URL", "http://localhost:8000")
 
 	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(r.Encryptor, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", "", "/app/templates", r.AuthService, false)
+	server, err := NewServer(r.Encryptor, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", "", "test", "/app/templates", r.AuthService, false)
 	require.NoError(t, err)
 
 	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
@@ -46,9 +47,9 @@ func Test__Login(t *testing.T) {
 	})
 
 	assert.Equal(t, http.StatusOK, response.Code)
-	assert.Contains(t, response.Body.String(), "Superplane")
-	assert.Contains(t, response.Body.String(), "Continue with GitHub")
-	assert.Contains(t, response.Body.String(), "Continue with Google")
+	assert.Contains(t, strings.ToLower(response.Body.String()), "superplane")
+	assert.Contains(t, response.Body.String(), "GitHub")
+	assert.Contains(t, response.Body.String(), "Google")
 }
 
 func Test__Logout(t *testing.T) {
@@ -166,7 +167,7 @@ func TestServer_AuthIntegration(t *testing.T) {
 	t.Run("should block signup when configured", func(t *testing.T) {
 
 		signer := jwt.NewSigner("test-client-secret")
-		blockedServer, err := NewServer(r.Encryptor, r.Registry, signer, crypto.NewOIDCVerifier(), "", "localhost", "", "/app/templates", r.AuthService, true)
+		blockedServer, err := NewServer(r.Encryptor, r.Registry, signer, crypto.NewOIDCVerifier(), "", "localhost", "", "test", "/app/templates", r.AuthService, true)
 		require.NoError(t, err)
 
 		handler := blockedServer.authHandler

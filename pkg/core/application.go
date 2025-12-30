@@ -85,6 +85,7 @@ type WebhookOptions struct {
 type SyncContext struct {
 	Configuration   any
 	BaseURL         string
+	WebhooksBaseURL string
 	OrganizationID  string
 	InstallationID  string
 	AppInstallation AppInstallationContext
@@ -146,5 +147,6 @@ type HTTPRequestContext struct {
 	Response        http.ResponseWriter
 	OrganizationID  string
 	BaseURL         string
+	WebhooksBaseURL string
 	AppInstallation AppInstallationContext
 }

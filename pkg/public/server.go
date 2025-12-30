@@ -72,6 +72,7 @@ type Server struct {
 	Router                *mux.Router
 	BasePath              string
 	BaseURL               string
+	WebhooksBaseURL       string
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
 	isDev                 bool
@@ -89,6 +90,7 @@ func NewServer(
 	oidcVerifier *crypto.OIDCVerifier,
 	basePath string,
 	baseURL string,
+	webhooksBaseURL string,
 	appEnv string,
 	templateDir string,
 	authorizationService authorization.Authorization,
@@ -103,6 +105,7 @@ func NewServer(
 
 	server := &Server{
 		BaseURL:               baseURL,
+		WebhooksBaseURL:       webhooksBaseURL,
 		BasePath:              basePath,
 		wsHub:                 ws.NewHub(),
 		authHandler:           authHandler,
@@ -428,11 +431,12 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	app.HandleRequest(core.HTTPRequestContext{
-		Logger:         logging.ForAppInstallation(*appInstallation),
-		Request:        r,
-		Response:       w,
-		BaseURL:        s.BaseURL,
-		OrganizationID: appInstallation.OrganizationID.String(),
+		Logger:          logging.ForAppInstallation(*appInstallation),
+		Request:         r,
+		Response:        w,
+		BaseURL:         s.BaseURL,
+		WebhooksBaseURL: s.WebhooksBaseURL,
+		OrganizationID:  appInstallation.OrganizationID.String(),
 		AppInstallation: contexts.NewAppInstallationContext(
 			database.Conn(),
 			nil,

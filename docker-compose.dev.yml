@@ -56,6 +56,7 @@ services:
       GOOGLE_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
+      WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Superplane}
@@ -126,7 +127,6 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
-    container_name: "rabbitmq"
     ports:
       - 5672:5672
       - 15672:15672

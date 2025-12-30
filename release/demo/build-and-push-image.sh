@@ -19,3 +19,4 @@ docker buildx build \
   -t "ghcr.io/superplanehq/superplane-demo:stable" \
   -t "ghcr.io/superplanehq/superplane-demo:beta" \
   -f release/demo/Dockerfile . \
+  

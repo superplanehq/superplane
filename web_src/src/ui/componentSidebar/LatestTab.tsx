@@ -90,7 +90,7 @@ export const LatestTab = ({
         <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Latest</h2>
         <div className="flex flex-col">
           {latestEvents.length === 0 ? (
-            <div className="text-center py-4 text-gray-500 text-sm">No events found</div>
+            <div className="text-center py-4 text-gray-500 text-sm font-medium">No events found</div>
           ) : (
             <>
               {latestEvents.slice(0, 5).map((event, index) => {

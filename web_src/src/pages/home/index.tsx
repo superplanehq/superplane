@@ -1,3 +1,4 @@
+import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Box, GitBranch, LayoutGrid, List, MoreVertical, Plus, Search, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
@@ -14,7 +15,7 @@ import { useDeleteWorkflow, useWorkflows } from "../../hooks/useWorkflowData";
 import { cn, resolveIcon } from "../../lib/utils";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 
-import { Button } from "../../ui/button";
+import { Button } from "@/components/ui/button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
 import { useCreateCustomComponentModalState } from "./useCreateCustomComponentModalState";
 
@@ -130,10 +131,13 @@ const HomePage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 pt-10">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+      <header className="bg-white border-b border-border px-3 py-3">
+        <OrganizationMenuButton organizationId={organizationId} />
+      </header>
       <main className="w-full h-full flex flex-column flex-grow-1">
-        <div className="bg-gray-50 dark:bg-gray-900 w-full flex-grow-1 p-6">
-          <div className="p-4">
+        <div className="bg-slate-100 w-full flex-grow-1">
+          <div className="p-8">
             <PageHeader activeTab={activeTab} onNewClick={onNewClick} />
 
             <Tabs
@@ -185,13 +189,13 @@ interface TabsProps {
 
 function Tabs({ activeTab, setActiveTab, blueprints, workflows }: TabsProps) {
   return (
-    <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
+    <div className="flex border-b border-border dark:border-gray-700 mb-6">
       <button
         onClick={() => setActiveTab("canvases")}
-        className={`px-4 py-2 text-sm font-medium border-b transition-colors ${
+        className={`px-4 py-2 mb-[-1px] text-sm font-medium border-b transition-colors ${
           activeTab === "canvases"
-            ? "border-blue-600 text-blue-600"
-            : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            ? "border-gray-800 text-gray-800"
+            : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
         }`}
       >
         Canvases ({workflows.length})
@@ -199,10 +203,10 @@ function Tabs({ activeTab, setActiveTab, blueprints, workflows }: TabsProps) {
 
       <button
         onClick={() => setActiveTab("custom-components")}
-        className={`px-4 py-2 text-sm font-medium border-b transition-colors ${
+        className={`px-4 py-2 mb-[-1px] text-sm font-medium border-b transition-colors ${
           activeTab === "custom-components"
-            ? "border-blue-600 text-blue-600"
-            : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            ? "border-gray-800 text-gray-800"
+            : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
         }`}
       >
         Bundles ({blueprints.length})
@@ -233,7 +237,7 @@ function ViewModeToggle({ viewMode, setViewMode }: ViewModeToggleProps) {
         onClick={() => setViewMode("list")}
         title="List view"
       >
-        <List size={18} />
+        <List size={16} />
       </Button>
     </div>
   );
@@ -247,9 +251,9 @@ interface SearchBarProps {
 
 function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
   const inputStyle = cn(
-    "h-9 w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700",
-    "rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-500",
-    "focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+    "h-9 w-full pl-10 pr-4 py-2 border border-border dark:border-gray-700",
+    "rounded-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-500",
+    "focus:ring-1 focus:ring-blue-800 focus:border-gray-800",
   );
 
   const searchPlaceholder = activeTab === "custom-components" ? "Search Bundles..." : "Search canvases...";
@@ -288,14 +292,14 @@ function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
   return (
     <div className="flex items-center justify-between mb-6">
       <div>
-        <Heading level={2} className="!text-2xl mb-2">
+        <Heading level={2} className="!text-2xl mb-1">
           {heading}
         </Heading>
         <Text className="text-gray-600 dark:text-gray-400">{description}</Text>
       </div>
 
-      <Button className="flex items-center bg-blue-700 text-white hover:bg-blue-600" onClick={onNewClick}>
-        <Plus size={20} />
+      <Button onClick={onNewClick} size="sm">
+        <Plus size={16} />
         {buttonText}
       </Button>
     </div>

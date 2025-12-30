@@ -88,7 +88,11 @@ func (g *GitHub) Configuration() []configuration.Field {
 }
 
 func (g *GitHub) Components() []core.Component {
-	return []core.Component{}
+	return []core.Component{
+		&GetIssue{},
+		&CreateIssue{},
+		&UpdateIssue{},
+	}
 }
 
 func (g *GitHub) Triggers() []core.Trigger {
@@ -565,7 +569,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 		"setup_url":    fmt.Sprintf(`%s/api/v1/apps/%s/setup`, ctx.BaseURL, ctx.InstallationID),
 		"redirect_url": fmt.Sprintf(`%s/api/v1/apps/%s/redirect`, ctx.BaseURL, ctx.InstallationID),
 		"hook_attributes": map[string]any{
-			"url": fmt.Sprintf(`%s/api/v1/apps/%s/webhook`, ctx.BaseURL, ctx.InstallationID),
+			"url": fmt.Sprintf(`%s/api/v1/apps/%s/webhook`, ctx.WebhooksBaseURL, ctx.InstallationID),
 		},
 	}
 
