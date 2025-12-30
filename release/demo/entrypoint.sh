@@ -103,7 +103,7 @@ if [ "${LOCALTUNNEL_ENABLED}" = "1" ]; then
         # Update the env file with the new WEBHOOKS_BASE_URL
         sed -i "s|^export WEBHOOKS_BASE_URL=.*|export WEBHOOKS_BASE_URL=\"${WEBHOOKS_BASE_URL}\"|" /app/data/superplane.env || \
           echo "export WEBHOOKS_BASE_URL=\"${WEBHOOKS_BASE_URL}\"" >> /app/data/superplane.env
-        stop_spinner
+        stop_spinner "Incoming webhooks will be received via: ${URL}"
         break
       fi
     fi
