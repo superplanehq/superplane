@@ -9,6 +9,7 @@ import "./App.css";
 import AuthGuard from "./components/AuthGuard";
 import Navigation from "./components/Navigation";
 import { AccountProvider } from "./contexts/AccountContext";
+import { isCustomComponentsEnabled } from "./lib/env";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
@@ -53,7 +54,9 @@ function App() {
             <Routes>
               {/* Organization-scoped protected routes */}
               <Route path=":organizationId" element={withAuthOnly(HomePage)} />
-              <Route path=":organizationId/custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
+              {isCustomComponentsEnabled() && (
+                <Route path=":organizationId/custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
+              )}
               <Route path=":organizationId/workflows/:workflowId" element={withAuthOnly(WorkflowPageV2)} />
               <Route
                 path=":organizationId/workflows/:workflowId/nodes/:nodeId/:executionId"

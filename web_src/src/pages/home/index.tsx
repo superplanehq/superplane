@@ -13,6 +13,7 @@ import { useAccount } from "../../contexts/AccountContext";
 import { useBlueprints, useDeleteBlueprint } from "../../hooks/useBlueprintData";
 import { useDeleteWorkflow, useWorkflows } from "../../hooks/useWorkflowData";
 import { cn, resolveIcon } from "../../lib/utils";
+import { isCustomComponentsEnabled } from "../../lib/env";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 
 import { Button } from "@/components/ui/button";
@@ -53,11 +54,12 @@ const HomePage = () => {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
 
+  const blueprintsQuery = useBlueprints(organizationId || "");
   const {
     data: blueprintsData = [],
     isLoading: blueprintsLoading,
     error: blueprintApiError,
-  } = useBlueprints(organizationId || "");
+  } = isCustomComponentsEnabled() ? blueprintsQuery : { data: [], isLoading: false, error: null };
 
   const {
     data: workflowsData = [],
@@ -123,7 +125,7 @@ const HomePage = () => {
   const error = activeTab === "custom-components" ? blueprintError : workflowError;
 
   const onNewClick = () => {
-    if (activeTab === "custom-components") {
+    if (activeTab === "custom-components" && isCustomComponentsEnabled()) {
       customComponentModalState.onOpen();
     } else {
       canvasModalState.onOpen();
@@ -171,7 +173,7 @@ const HomePage = () => {
       </main>
 
       <CreateCanvasModal {...canvasModalState} />
-      <CreateCustomComponentModal {...customComponentModalState} />
+      {isCustomComponentsEnabled() && <CreateCustomComponentModal {...customComponentModalState} />}
     </div>
   );
 };
@@ -201,16 +203,18 @@ function Tabs({ activeTab, setActiveTab, blueprints, workflows }: TabsProps) {
         Canvases ({workflows.length})
       </button>
 
-      <button
-        onClick={() => setActiveTab("custom-components")}
-        className={`px-4 py-2 mb-[-1px] text-sm font-medium border-b transition-colors ${
-          activeTab === "custom-components"
-            ? "border-gray-800 text-gray-800"
-            : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-        }`}
-      >
-        Bundles ({blueprints.length})
-      </button>
+      {isCustomComponentsEnabled() && (
+        <button
+          onClick={() => setActiveTab("custom-components")}
+          className={`px-4 py-2 mb-[-1px] text-sm font-medium border-b transition-colors ${
+            activeTab === "custom-components"
+              ? "border-gray-800 text-gray-800"
+              : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+          }`}
+        >
+          Bundles ({blueprints.length})
+        </button>
+      )}
     </div>
   );
 }
