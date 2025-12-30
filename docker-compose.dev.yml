@@ -67,6 +67,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
+      VITE_ENABLE_CUSTOM_COMPONENTS: "true"
 
     ports:
       - 5173:5173
