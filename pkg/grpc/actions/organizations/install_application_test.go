@@ -32,7 +32,7 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Create first installation
 		//
-		response, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
+		response, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Installation)
@@ -41,7 +41,7 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Try to create second installation with the same name
 		//
-		_, err = InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
+		_, err = InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -57,7 +57,7 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Create first installation
 		//
-		response, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
+		response, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		installationID := response.Installation.Metadata.Id
@@ -94,7 +94,7 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Create a new installation with the same name
 		//
-		response2, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
+		response2, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response2)
 		assert.Equal(t, installationName, response2.Installation.Metadata.Name)
@@ -123,7 +123,7 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Create installation in first organization
 		//
-		response1, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
+		response1, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "github", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response1)
 		assert.Equal(t, installationName, response1.Installation.Metadata.Name)
@@ -131,7 +131,7 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Create installation with same name in second organization
 		//
-		response2, err := InstallApplication(ctx, r.Registry, baseURL, org2.ID.String(), "github", installationName, appConfig)
+		response2, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, org2.ID.String(), "github", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response2)
 		assert.Equal(t, installationName, response2.Installation.Metadata.Name)
@@ -157,7 +157,7 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Try to install an application that doesn't exist
 		//
-		_, err = InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "nonexistent-app", installationName, appConfig)
+		_, err = InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "nonexistent-app", installationName, appConfig)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -180,7 +180,7 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Install the application
 		//
-		response, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
+		response, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Installation)
@@ -221,7 +221,7 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Install the application
 		//
-		response, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
+		response, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Installation)

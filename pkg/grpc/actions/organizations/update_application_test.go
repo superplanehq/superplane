@@ -38,7 +38,7 @@ func Test__UpdateApplication(t *testing.T) {
 		//
 		// Create installation
 		//
-		installResponse, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
+		installResponse, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, installResponse)
 		installationID := installResponse.Installation.Metadata.Id
@@ -46,7 +46,7 @@ func Test__UpdateApplication(t *testing.T) {
 		//
 		// Update the installation configuration
 		//
-		updateResponse, err := UpdateApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), installationID, map[string]any{"key": "value2", "new_key": "new_value"})
+		updateResponse, err := UpdateApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), installationID, map[string]any{"key": "value2", "new_key": "new_value"})
 		require.NoError(t, err)
 		require.NotNil(t, updateResponse)
 		require.NotNil(t, updateResponse.Installation)
@@ -94,14 +94,14 @@ func Test__UpdateApplication(t *testing.T) {
 		//
 		// Create installation
 		//
-		installResponse, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
+		installResponse, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
 		require.NoError(t, err)
 		installationID := installResponse.Installation.Metadata.Id
 
 		//
 		// Update the installation configuration (this should fail)
 		//
-		updateResponse, err := UpdateApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), installationID, map[string]any{"key": "value2"})
+		updateResponse, err := UpdateApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), installationID, map[string]any{"key": "value2"})
 		require.NoError(t, err)
 		require.NotNil(t, updateResponse)
 
@@ -124,7 +124,7 @@ func Test__UpdateApplication(t *testing.T) {
 		//
 		// Try to update with an invalid installation ID
 		//
-		_, err := UpdateApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "invalid-uuid", map[string]any{"key": "value"})
+		_, err := UpdateApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "invalid-uuid", map[string]any{"key": "value"})
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -136,7 +136,7 @@ func Test__UpdateApplication(t *testing.T) {
 		//
 		// Try to update a non-existent installation
 		//
-		_, err := UpdateApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), uuid.NewString(), map[string]any{"key": "value"})
+		_, err := UpdateApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), uuid.NewString(), map[string]any{"key": "value"})
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -160,14 +160,14 @@ func Test__UpdateApplication(t *testing.T) {
 		//
 		// Create installation with multiple config keys
 		//
-		installResponse, err := InstallApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
+		installResponse, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
 		require.NoError(t, err)
 		installationID := installResponse.Installation.Metadata.Id
 
 		//
 		// Update only one key
 		//
-		_, err = UpdateApplication(ctx, r.Registry, baseURL, r.Organization.ID.String(), installationID, map[string]any{"key2": "updated_value2"})
+		_, err = UpdateApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), installationID, map[string]any{"key2": "updated_value2"})
 		require.NoError(t, err)
 
 		//
