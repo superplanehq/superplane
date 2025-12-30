@@ -18,14 +18,16 @@ type WebhookContext struct {
 	ctx       context.Context
 	encryptor crypto.Encryptor
 	node      *models.WorkflowNode
+	baseURL   string
 }
 
-func NewWebhookContext(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, node *models.WorkflowNode) *WebhookContext {
+func NewWebhookContext(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, node *models.WorkflowNode, baseURL string) *WebhookContext {
 	return &WebhookContext{
 		tx:        tx,
 		ctx:       ctx,
 		node:      node,
 		encryptor: encryptor,
+		baseURL:   baseURL,
 	}
 }
 
@@ -132,4 +134,8 @@ func (c *WebhookContext) findOrCreateWebhook(options *core.WebhookSetupOptions) 
 	}
 
 	return &webhook, nil
+}
+
+func (c *WebhookContext) GetBaseURL() string {
+	return c.baseURL
 }

@@ -48,6 +48,10 @@ func (w *WebhookContext) Setup(options *core.WebhookSetupOptions) (*uuid.UUID, e
 	return &id, nil
 }
 
+func (w *WebhookContext) GetBaseURL() string {
+	return "http://localhost:3000/api/v1"
+}
+
 type MetadataContext struct {
 	Metadata any
 }

@@ -14,16 +14,18 @@ import (
 )
 
 type WorkflowService struct {
-	registry    *registry.Registry
-	encryptor   crypto.Encryptor
-	authService authorization.Authorization
+	registry       *registry.Registry
+	encryptor      crypto.Encryptor
+	authService    authorization.Authorization
+	webhookBaseURL string
 }
 
-func NewWorkflowService(authService authorization.Authorization, registry *registry.Registry, encryptor crypto.Encryptor) *WorkflowService {
+func NewWorkflowService(authService authorization.Authorization, registry *registry.Registry, encryptor crypto.Encryptor, webhookBaseURL string) *WorkflowService {
 	return &WorkflowService{
-		registry:    registry,
-		encryptor:   encryptor,
-		authService: authService,
+		registry:       registry,
+		encryptor:      encryptor,
+		authService:    authService,
+		webhookBaseURL: webhookBaseURL,
 	}
 }
 
@@ -50,7 +52,7 @@ func (s *WorkflowService) UpdateWorkflow(ctx context.Context, req *pb.UpdateWork
 		return nil, status.Error(codes.InvalidArgument, "workflow is required")
 	}
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return workflows.UpdateWorkflow(ctx, s.encryptor, s.registry, organizationID, req.Id, req.Workflow)
+	return workflows.UpdateWorkflow(ctx, s.encryptor, s.registry, organizationID, req.Id, req.Workflow, s.webhookBaseURL)
 }
 
 func (s *WorkflowService) DeleteWorkflow(ctx context.Context, req *pb.DeleteWorkflowRequest) (*pb.DeleteWorkflowResponse, error) {
@@ -161,6 +163,7 @@ func (s *WorkflowService) InvokeNodeTriggerAction(ctx context.Context, req *pb.I
 		req.NodeId,
 		req.ActionName,
 		req.Parameters.AsMap(),
+		s.webhookBaseURL,
 	)
 }
 

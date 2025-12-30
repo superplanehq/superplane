@@ -119,4 +119,5 @@ type WebhookContext interface {
 	Setup(options *WebhookSetupOptions) (*uuid.UUID, error)
 	GetSecret() ([]byte, error)
 	ResetSecret() ([]byte, []byte, error)
+	GetBaseURL() string
 }

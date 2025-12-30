@@ -120,18 +120,13 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	}
 }
 
-func startInternalAPI(baseURL string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
+func startInternalAPI(baseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(baseURL, encryptor, authService, registry, lookupInternalAPIPort())
+	grpc.RunServer(baseURL, basePath, encryptor, authService, registry, lookupInternalAPIPort())
 }
 
-func startPublicAPI(baseURL string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
+func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
 	log.Println("Starting Public API with integrated Web Server")
-
-	basePath := os.Getenv("PUBLIC_API_BASE_PATH")
-	if basePath == "" {
-		panic("PUBLIC_API_BASE_PATH must be set")
-	}
 
 	appEnv := os.Getenv("APP_ENV")
 	templateDir := os.Getenv("TEMPLATE_DIR")
@@ -271,6 +266,11 @@ func Start() {
 		panic("BASE_URL must be set")
 	}
 
+	basePath := os.Getenv("PUBLIC_API_BASE_PATH")
+	if basePath == "" {
+		panic("PUBLIC_API_BASE_PATH must be set")
+	}
+
 	// Sync missing default roles on startup
 	log.Info("Syncing default permissions for all organizations and canvases...")
 	if err := authService.CheckAndSyncMissingPermissions(); err != nil {
@@ -287,11 +287,11 @@ func Start() {
 	registry := registry.NewRegistry(encryptorInstance)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(baseURL, encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
+		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(baseURL, encryptorInstance, authService, registry)
+		go startInternalAPI(baseURL, basePath, encryptorInstance, authService, registry)
 	}
 
 	startWorkers(jwtSigner, encryptorInstance, registry, baseURL, authService)
@@ -310,4 +310,10 @@ func getWebhooksBaseURL() string {
 	}
 
 	return baseURL
+}
+
+func getWebhooksCompleteBaseURL() string {
+	baseURL := getWebhooksBaseURL()
+	basePath := os.Getenv("PUBLIC_API_BASE_PATH")
+	return baseURL + basePath
 }

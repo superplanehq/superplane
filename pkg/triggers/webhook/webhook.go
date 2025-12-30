@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -111,7 +110,7 @@ func (w *Webhook) Setup(ctx core.TriggerContext) error {
 			return fmt.Errorf("failed to setup webhook: %w", err)
 		}
 
-		baseURL := getWebhooksBaseURL()
+		baseURL := ctx.WebhookContext.GetBaseURL()
 		webhookURL = fmt.Sprintf("%s/webhooks/%s",
 			strings.TrimSuffix(baseURL, "/"),
 			webhookID.String())
@@ -262,11 +261,4 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	return http.StatusOK, nil
-}
-
-func getWebhooksBaseURL() string {
-	baseURL := os.Getenv("BASE_URL")
-	basePath := os.Getenv("PUBLIC_API_BASE_PATH")
-
-	return baseURL + basePath
 }

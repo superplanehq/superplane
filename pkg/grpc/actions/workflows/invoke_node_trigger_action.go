@@ -30,6 +30,7 @@ func InvokeNodeTriggerAction(
 	nodeID string,
 	actionName string,
 	parameters map[string]any,
+	webhookBaseURL string,
 ) (*pb.InvokeNodeTriggerActionResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
@@ -84,7 +85,7 @@ func InvokeNodeTriggerAction(
 		Configuration:   node.Configuration.Data(),
 		MetadataContext: contexts.NewNodeMetadataContext(tx, node),
 		RequestContext:  contexts.NewNodeRequestContext(tx, node),
-		WebhookContext:  contexts.NewWebhookContext(ctx, tx, encryptor, node),
+		WebhookContext:  contexts.NewWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
 	}
 
 	if node.AppInstallationID != nil {

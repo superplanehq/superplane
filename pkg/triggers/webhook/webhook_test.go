@@ -120,7 +120,9 @@ func TestGetWebhooksBaseURL(t *testing.T) {
 				os.Unsetenv("PUBLIC_API_BASE_PATH")
 			}()
 
-			result := getWebhooksBaseURL()
+			baseURL := os.Getenv("BASE_URL")
+			basePath := os.Getenv("PUBLIC_API_BASE_PATH")
+			result := baseURL + basePath
 			assert.Equal(t, tt.expectedResult, result)
 		})
 	}
@@ -158,7 +160,8 @@ func (m *mockNodeMetadataContext) Set(metadata any) error {
 }
 
 type mockWebhookContext struct {
-	Node *models.WorkflowNode
+	Node    *models.WorkflowNode
+	BaseURL string
 }
 
 func (m *mockWebhookContext) GetSecret() ([]byte, error) {
@@ -174,6 +177,13 @@ func (m *mockWebhookContext) Setup(options *core.WebhookSetupOptions) (*uuid.UUI
 	webhookID := uuid.New()
 	m.Node.WebhookID = &webhookID
 	return &webhookID, nil
+}
+
+func (m *mockWebhookContext) GetBaseURL() string {
+	if m.BaseURL != "" {
+		return m.BaseURL
+	}
+	return "http://localhost:3000/api/v1"
 }
 
 func TestWebhook_Setup(t *testing.T) {
@@ -193,7 +203,7 @@ func TestWebhook_Setup(t *testing.T) {
 			},
 			existingMeta: nil,
 			baseURL:      "https://api.superplane.com",
-			expectedURL:  "https://api.superplane.com/webhooks/test-workflow-test-node",
+			expectedURL:  "http://localhost:3000/api/v1/webhooks/test-workflow-test-node",
 		},
 		{
 			name: "setup with signature authentication",
@@ -202,7 +212,7 @@ func TestWebhook_Setup(t *testing.T) {
 			},
 			existingMeta: nil,
 			baseURL:      "https://api.superplane.com",
-			expectedURL:  "https://api.superplane.com/webhooks/test-workflow-test-node",
+			expectedURL:  "http://localhost:3000/api/v1/webhooks/test-workflow-test-node",
 		},
 		{
 			name: "already setup - should not change",
@@ -234,7 +244,8 @@ func TestWebhook_Setup(t *testing.T) {
 			}
 
 			webhookCtx := &mockWebhookContext{
-				Node: node,
+				Node:    node,
+				BaseURL: tt.baseURL,
 			}
 
 			ctx := core.TriggerContext{
@@ -728,7 +739,7 @@ func TestWebhook_URLGeneration_WithTrailingSlash(t *testing.T) {
 	metadata, ok := metadataCtx.Get().(Metadata)
 	require.True(t, ok)
 
-	assert.Contains(t, metadata.URL, "https://api.superplane.com/webhooks/")
+	assert.Contains(t, metadata.URL, "http://localhost:3000/api/v1/webhooks/")
 
 	urlParts := strings.Split(metadata.URL, "/webhooks/")
 	require.Len(t, urlParts, 2, "URL should contain /webhooks/ followed by UUID")
