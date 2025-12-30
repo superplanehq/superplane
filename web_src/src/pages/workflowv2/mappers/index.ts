@@ -17,7 +17,11 @@ import {
   triggerRenderers as semaphoreTriggerRenderers,
   eventStateRegistry as semaphoreEventStateRegistry,
 } from "./semaphore/index";
-import { componentMappers as githubComponentMappers, triggerRenderers as githubTriggerRenderers } from "./github/index";
+import {
+  componentMappers as githubComponentMappers,
+  triggerRenderers as githubTriggerRenderers,
+  eventStateRegistry as githubEventStateRegistry,
+} from "./github/index";
 import { timeGateMapper } from "./timegate";
 import { filterMapper } from "./filter";
 import { waitCustomFieldRenderer, waitMapper } from "./wait";
@@ -56,6 +60,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
   semaphore: semaphoreEventStateRegistry,
+  github: githubEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

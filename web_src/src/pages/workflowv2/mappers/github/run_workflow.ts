@@ -56,7 +56,7 @@ export const RUN_WORKFLOW_STATE_MAP: EventStateMap = {
 };
 
 /**
- * Semaphore-specific state logic function
+ * GitHub-specific state logic function
  */
 export const runWorkflowStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
   if (!execution) return "neutral";
@@ -68,21 +68,25 @@ export const runWorkflowStateFunction: StateFunction = (execution: WorkflowsWork
     return "running";
   }
 
-  const metadata = execution.metadata as ExecutionMetadata;
   if (execution.result === "RESULT_FAILED") {
     return "failed";
   }
 
-  const conclusion = metadata.workflowRun?.conclusion;
-  if (conclusion !== "success") {
-    return "failed";
-  }
+  const metadata = execution.metadata as ExecutionMetadata;
+  switch (metadata.workflowRun?.conclusion) {
+    case "cancelled":
+      return "stopped";
 
-  return "passed";
+    case "failure":
+      return "failed";
+
+    default:
+      return "passed";
+  }
 };
 
 /**
- * Semaphore-specific state registry
+ * GitHub-specific run workflow state registry
  */
 export const RUN_WORKFLOW_STATE_REGISTRY: EventStateRegistry = {
   stateMap: RUN_WORKFLOW_STATE_MAP,

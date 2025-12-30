@@ -187,12 +187,11 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	}
 
 	//
+	// Dispatch the workflow
 	// Make sure it works if user specifies full path,
 	// or just the path accepted by the API.
 	//
 	workflowFile := strings.Replace(spec.WorkflowFile, ".github/workflows/", "", 1)
-
-	// Dispatch the workflow
 	_, err = client.Actions.CreateWorkflowDispatchEventByFileName(
 		context.Background(),
 		appMetadata.Owner,
@@ -232,15 +231,15 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Save workflow run to metadata
-	execMetadata := RunWorkflowExecutionMetadata{
+	err = ctx.MetadataContext.Set(RunWorkflowExecutionMetadata{
 		WorkflowRun: &WorkflowRunMetadata{
 			ID:         run.GetID(),
 			Status:     run.GetStatus(),
 			Conclusion: run.GetConclusion(),
 			URL:        run.GetHTMLURL(),
 		},
-	}
-	err = ctx.MetadataContext.Set(execMetadata)
+	})
+
 	if err != nil {
 		return err
 	}
@@ -251,14 +250,78 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	ctx.Logger.Infof("Found workflow run - id=%d, status=%s, url=%s", run.GetID(), run.GetStatus(), run.GetHTMLURL())
+	ctx.Logger.Infof("Started workflow run %d", run.GetID())
 
 	// Schedule poll to check workflow status updates (in case webhook doesn't arrive)
 	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, WorkflowPollInterval)
 }
 
 func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
-	return nil
+	//
+	// Parse metadata and configuration
+	//
+	metadata := RunWorkflowExecutionMetadata{}
+	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	spec := RunWorkflowSpec{}
+	err = mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	var appMetadata Metadata
+	if err := mapstructure.Decode(ctx.AppInstallationContext.GetMetadata(), &appMetadata); err != nil {
+		return fmt.Errorf("failed to decode application metadata: %w", err)
+	}
+
+	// If no workflow run ID, nothing to cancel
+	if metadata.WorkflowRun == nil || metadata.WorkflowRun.ID == 0 {
+		ctx.Logger.Info("No workflow run to cancel")
+		return nil
+	}
+
+	// If workflow already completed, nothing to cancel
+	if metadata.WorkflowRun.Status == WorkflowRunStatusCompleted {
+		ctx.Logger.Info("Workflow run already completed, nothing to cancel")
+		return nil
+	}
+
+	//
+	// Create GitHub client, and cancel workflow run
+	//
+	client, err := NewClient(ctx.AppInstallationContext, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	response, err := client.Actions.CancelWorkflowRunByID(
+		context.Background(),
+		appMetadata.Owner,
+		spec.Repository,
+		metadata.WorkflowRun.ID,
+	)
+
+	//
+	// GitHub SDK returns an error even though it got a 202 response back :)
+	//
+	if response.StatusCode == http.StatusAccepted {
+		ctx.Logger.Infof("Workflow run %d cancelled", metadata.WorkflowRun.ID)
+		return nil
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to cancel workflow run: %w", err)
+	}
+
+	return fmt.Errorf(
+		"Cancel request for %d received status code %d: %v",
+		metadata.WorkflowRun.ID,
+		response.StatusCode,
+		err,
+	)
 }
 
 func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
@@ -275,31 +338,31 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		}
 	}
 
-	type Hook struct {
-		Action      string `json:"action"`
-		WorkflowRun struct {
-			ID         int64  `json:"id"`
-			Status     string `json:"status"`
-			Conclusion string `json:"conclusion"`
-			HTMLURL    string `json:"html_url"`
-		} `json:"workflow_run"`
-	}
-
-	hook := Hook{}
-	err = json.Unmarshal(ctx.Body, &hook)
+	// Parse the entire webhook payload
+	var payload map[string]any
+	err = json.Unmarshal(ctx.Body, &payload)
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
 	// We only care about completed workflow runs
-	if hook.Action != "completed" {
+	action, ok := payload["action"].(string)
+	if !ok || action != "completed" {
 		return http.StatusOK, nil
 	}
 
-	// Find the execution associated with this workflow run
-	executionCtx, err := ctx.FindExecutionByKV("workflow_run_id", fmt.Sprintf("%d", hook.WorkflowRun.ID))
+	newMetadata, data, err := metadataFromPayload(payload)
 	if err != nil {
-		// This workflow run wasn't started by SuperPlane, ignore it
+		return http.StatusInternalServerError, fmt.Errorf("error determing new metadata: %v", err)
+	}
+
+	//
+	// Find the execution associated with this workflow run
+	// If an error is returned, it means this run wasn't started by SuperPlane,
+	// so we just ignore it.
+	//
+	executionCtx, err := ctx.FindExecutionByKV("workflow_run_id", fmt.Sprintf("%d", newMetadata.WorkflowRun.ID))
+	if err != nil {
 		return http.StatusOK, nil
 	}
 
@@ -314,25 +377,15 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusOK, nil
 	}
 
-	// Update metadata
-	if metadata.WorkflowRun == nil {
-		metadata.WorkflowRun = &WorkflowRunMetadata{}
-	}
-	metadata.WorkflowRun.ID = hook.WorkflowRun.ID
-	metadata.WorkflowRun.Status = hook.WorkflowRun.Status
-	metadata.WorkflowRun.Conclusion = hook.WorkflowRun.Conclusion
-	metadata.WorkflowRun.URL = hook.WorkflowRun.HTMLURL
-
-	err = executionCtx.MetadataContext.Set(metadata)
+	err = executionCtx.MetadataContext.Set(newMetadata)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	// Emit based on conclusion
-	if hook.WorkflowRun.Conclusion == WorkflowRunConclusionSuccess {
-		err = executionCtx.ExecutionStateContext.Emit(WorkflowPassedOutputChannel, WorkflowPayloadType, []any{metadata})
+	if newMetadata.WorkflowRun.Conclusion == WorkflowRunConclusionSuccess {
+		err = executionCtx.ExecutionStateContext.Emit(WorkflowPassedOutputChannel, WorkflowPayloadType, []any{data})
 	} else {
-		err = executionCtx.ExecutionStateContext.Emit(WorkflowFailedOutputChannel, WorkflowPayloadType, []any{metadata})
+		err = executionCtx.ExecutionStateContext.Emit(WorkflowFailedOutputChannel, WorkflowPayloadType, []any{data})
 	}
 
 	if err != nil {
@@ -340,6 +393,42 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	}
 
 	return http.StatusOK, nil
+}
+
+func metadataFromPayload(payload map[string]any) (*RunWorkflowExecutionMetadata, map[string]any, error) {
+	workflowRun, ok := payload["workflow_run"].(map[string]any)
+	if !ok {
+		return nil, nil, fmt.Errorf("workflow_run not found in payload")
+	}
+
+	runID, ok := workflowRun["id"].(float64)
+	if !ok {
+		return nil, nil, fmt.Errorf("run ID not found or invalid")
+	}
+
+	status, ok := workflowRun["status"].(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("run status not found or invalid")
+	}
+
+	conclusion, ok := workflowRun["conclusion"].(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("run conclusion not found or invalid")
+	}
+
+	htmlURL, ok := workflowRun["html_url"].(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("run URL not found or invalid")
+	}
+
+	return &RunWorkflowExecutionMetadata{
+		WorkflowRun: &WorkflowRunMetadata{
+			ID:         int64(runID),
+			Status:     status,
+			Conclusion: conclusion,
+			URL:        htmlURL,
+		},
+	}, workflowRun, nil
 }
 
 func (r *RunWorkflow) Actions() []core.Action {
@@ -418,10 +507,10 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 
 	// Emit based on conclusion
 	if run.GetConclusion() == WorkflowRunConclusionSuccess {
-		return ctx.ExecutionStateContext.Emit(WorkflowPassedOutputChannel, WorkflowPayloadType, []any{metadata})
+		return ctx.ExecutionStateContext.Emit(WorkflowPassedOutputChannel, WorkflowPayloadType, []any{run})
 	}
 
-	return ctx.ExecutionStateContext.Emit(WorkflowFailedOutputChannel, WorkflowPayloadType, []any{metadata})
+	return ctx.ExecutionStateContext.Emit(WorkflowFailedOutputChannel, WorkflowPayloadType, []any{run})
 }
 
 func (r *RunWorkflow) findWorkflowRun(client *github.Client, owner, repo, executionID string) (*github.WorkflowRun, error) {
