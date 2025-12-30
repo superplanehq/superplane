@@ -48,7 +48,7 @@ func TestWebhook_Configuration(t *testing.T) {
 	webhook := &Webhook{}
 	config := webhook.Configuration()
 
-	assert.Len(t, config, 2)
+	assert.Len(t, config, 1)
 
 	authField := config[0]
 	assert.Equal(t, "authentication", authField.Name)
@@ -129,14 +129,6 @@ type mockRequestContext struct {
 
 func (m *mockRequestContext) ScheduleActionCall(actionName string, parameters map[string]any, interval time.Duration) error {
 	return nil
-}
-
-func (m *mockRequestContext) GetWorkflowID() string {
-	return m.workflowID
-}
-
-func (m *mockRequestContext) GetNodeID() string {
-	return m.nodeID
 }
 
 type mockNodeMetadataContext struct {

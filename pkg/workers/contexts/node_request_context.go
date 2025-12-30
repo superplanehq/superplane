@@ -37,14 +37,6 @@ func (c *NodeRequestContext) ScheduleActionCall(actionName string, parameters ma
 	}, &runAt)
 }
 
-func (c *NodeRequestContext) GetWorkflowID() string {
-	return c.node.WorkflowID.String()
-}
-
-func (c *NodeRequestContext) GetNodeID() string {
-	return c.node.NodeID
-}
-
 func (c *NodeRequestContext) completeCurrentRequestForNode() error {
 	request, err := models.FindPendingRequestForNode(c.tx, c.node.WorkflowID, c.node.NodeID)
 	if err == nil {
