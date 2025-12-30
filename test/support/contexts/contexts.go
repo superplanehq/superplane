@@ -194,3 +194,11 @@ func (c *RequestContext) ScheduleActionCall(action string, params map[string]any
 	c.Duration = duration
 	return nil
 }
+
+func (c *RequestContext) GetNodeID() string {
+	return ""
+}
+
+func (c *RequestContext) GetWorkflowID() string {
+	return ""
+}
