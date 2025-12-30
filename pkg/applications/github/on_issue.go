@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -13,13 +12,9 @@ import (
 
 type OnIssue struct{}
 
-type OnIssueMetadata struct {
-	Repository *Repository `json:"repository"`
-}
-
 type OnIssueConfiguration struct {
-	Repository string   `json:"repository"`
-	Actions    []string `json:"action"`
+	Repository string   `json:"repository" mapstructure:"repository"`
+	Actions    []string `json:"actions" mapstructure:"actions"`
 }
 
 func (i *OnIssue) Name() string {
@@ -83,47 +78,19 @@ func (i *OnIssue) Configuration() []configuration.Field {
 }
 
 func (i *OnIssue) Setup(ctx core.TriggerContext) error {
-	var metadata OnIssueMetadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := ensureRepoInMetadata(
+		ctx.MetadataContext,
+		ctx.AppInstallationContext,
+		ctx.Configuration,
+	)
+
 	if err != nil {
-		return fmt.Errorf("failed to parse metadata: %w", err)
+		return err
 	}
 
-	//
-	// If metadata is set, it means the trigger was already setup
-	//
-	if metadata.Repository != nil {
-		return nil
-	}
-
-	config := OnIssueConfiguration{}
-	err = mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
+	var config OnIssueConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	if config.Repository == "" {
-		return fmt.Errorf("repository is required")
-	}
-
-	appMetadata := Metadata{}
-	err = mapstructure.Decode(ctx.AppInstallationContext.GetMetadata(), &appMetadata)
-	if err != nil {
-		return fmt.Errorf("error decoding app installation metadata: %v", err)
-	}
-
-	repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r Repository) bool {
-		return r.Name == config.Repository
-	})
-
-	if repoIndex == -1 {
-		return fmt.Errorf("repository %s is not accessible to app installation", config.Repository)
-	}
-
-	metadata.Repository = &appMetadata.Repositories[repoIndex]
-	err = ctx.MetadataContext.Set(metadata)
-	if err != nil {
-		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
 	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{

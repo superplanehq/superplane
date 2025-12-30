@@ -1829,7 +1829,6 @@ function prepareNode(
       return prepareComponentNode(
         nodes,
         node,
-        blueprints,
         components,
         nodeExecutionsMap,
         nodeQueueItemsMap,
@@ -1843,7 +1842,6 @@ function prepareNode(
 function prepareComponentNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
-  blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
@@ -1886,48 +1884,20 @@ function prepareComponentNode(
   const componentNameParts = node.component?.name?.split(".") || [];
   const componentName = componentNameParts[0];
 
-  switch (componentName) {
-    case "approval":
-    case "noop":
-    case "http":
-    case "semaphore":
-    case "time_gate":
-    case "filter":
-    case "if":
-    case "wait":
-      return prepareComponentBaseNode(
-        nodes,
-        node,
-        components,
-        nodeExecutionsMap,
-        nodeQueueItemsMap,
-        workflowId,
-        queryClient,
-        organizationId || "",
-      );
-    case "merge":
-      return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
+  if (componentName == "merge") {
+    return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
   }
 
-  //
-  // TODO: render other component-type nodes as composites for now
-  // For generic components, we need to get outputChannels from component metadata
-  //
-  const componentMetadata = components.find((c) => c.name === node.component?.name);
-  const compositeNode = prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
-
-  // Override outputChannels with component metadata if available
-  if (componentMetadata?.outputChannels) {
-    return {
-      ...compositeNode,
-      data: {
-        ...compositeNode.data,
-        outputChannels: componentMetadata.outputChannels.map((c) => c.name!),
-      },
-    };
-  }
-
-  return compositeNode;
+  return prepareComponentBaseNode(
+    nodes,
+    node,
+    components,
+    nodeExecutionsMap,
+    nodeQueueItemsMap,
+    workflowId,
+    queryClient,
+    organizationId || "",
+  );
 }
 
 function prepareComponentBaseNode(
