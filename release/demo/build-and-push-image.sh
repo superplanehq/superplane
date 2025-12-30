@@ -16,7 +16,7 @@ docker buildx build \
   --push \
   --platform linux/amd64,linux/arm64 \
   -t "ghcr.io/superplanehq/superplane-demo:${VERSION}" \
+  -t "ghcr.io/superplanehq/superplane-demo:stable" \
+  -t "ghcr.io/superplanehq/superplane-demo:beta" \
   -f release/demo/Dockerfile . \
   
-  # -t "ghcr.io/superplanehq/superplane-demo:stable" \
-  # -t "ghcr.io/superplanehq/superplane-demo:beta" \
