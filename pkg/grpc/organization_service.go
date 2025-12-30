@@ -13,16 +13,19 @@ type OrganizationService struct {
 	authorizationService authorization.Authorization
 	registry             *registry.Registry
 	baseURL              string
+	webhooksBaseURL      string
 }
 
 func NewOrganizationService(
 	authorizationService authorization.Authorization,
 	registry *registry.Registry,
 	baseURL string,
+	webhooksBaseURL string,
 ) *OrganizationService {
 	return &OrganizationService{
 		registry:             registry,
 		baseURL:              baseURL,
+		webhooksBaseURL:      webhooksBaseURL,
 		authorizationService: authorizationService,
 	}
 }
@@ -78,6 +81,7 @@ func (s *OrganizationService) InstallApplication(ctx context.Context, req *pb.In
 		ctx,
 		s.registry,
 		s.baseURL,
+		s.webhooksBaseURL,
 		orgID,
 		req.AppName,
 		req.InstallationName,
@@ -91,6 +95,7 @@ func (s *OrganizationService) UpdateApplication(ctx context.Context, req *pb.Upd
 		ctx,
 		s.registry,
 		s.baseURL,
+		s.webhooksBaseURL,
 		orgID,
 		req.InstallationId,
 		req.Configuration.AsMap(),
