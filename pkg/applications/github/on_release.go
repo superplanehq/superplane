@@ -13,9 +13,8 @@ import (
 type OnRelease struct{}
 
 type OnReleaseConfiguration struct {
-	BaseRepositoryConfig `mapstructure:",squash"`
-
-	Actions []string `json:"action"`
+	Repository string   `json:"repository" mapstructure:"repository"`
+	Actions    []string `json:"actions" mapstructure:"actions"`
 }
 
 func (r *OnRelease) Name() string {
@@ -80,7 +79,7 @@ func (r *OnRelease) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	var config BaseRepositoryConfig
+	var config OnReleaseConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}

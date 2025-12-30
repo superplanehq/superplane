@@ -14,12 +14,11 @@ import (
 type CreateIssue struct{}
 
 type CreateIssueConfiguration struct {
-	BaseRepositoryConfig `mapstructure:",squash"`
-
-	Title     string   `mapstructure:"title"`
-	Body      string   `mapstructure:"body"`
-	Assignees []string `mapstructure:"assignees"`
-	Labels    []string `mapstructure:"labels"`
+	Repository string   `mapstructure:"repository"`
+	Title      string   `mapstructure:"title"`
+	Body       string   `mapstructure:"body"`
+	Assignees  []string `mapstructure:"assignees"`
+	Labels     []string `mapstructure:"labels"`
 }
 
 func (c *CreateIssue) Name() string {
@@ -49,32 +48,28 @@ func (c *CreateIssue) OutputChannels(configuration any) []core.OutputChannel {
 func (c *CreateIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "repository",
-			Label:       "Repository",
-			Description: "The repository where the issue will be created",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Name:     "repository",
+			Label:    "Repository",
+			Type:     configuration.FieldTypeString,
+			Required: true,
 		},
 		{
-			Name:        "title",
-			Label:       "Title",
-			Description: "The title of the issue",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Name:     "title",
+			Label:    "Title",
+			Type:     configuration.FieldTypeString,
+			Required: true,
 		},
 		{
-			Name:        "body",
-			Label:       "Body",
-			Description: "The body/description of the issue",
-			Type:        configuration.FieldTypeText,
-			Required:    false,
+			Name:     "body",
+			Label:    "Body",
+			Type:     configuration.FieldTypeText,
+			Required: false,
 		},
 		{
-			Name:        "assignees",
-			Label:       "Assignees",
-			Description: "GitHub usernames to assign to the issue",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
+			Name:     "assignees",
+			Label:    "Assignees",
+			Type:     configuration.FieldTypeList,
+			Required: false,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Assignee",
@@ -85,11 +80,10 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "labels",
-			Label:       "Labels",
-			Description: "Labels to add to the issue",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
+			Name:     "labels",
+			Label:    "Labels",
+			Type:     configuration.FieldTypeList,
+			Required: false,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Label",

@@ -3,6 +3,7 @@ package github
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"slices"
 
@@ -14,9 +15,8 @@ import (
 type OnPullRequest struct{}
 
 type OnPullRequestConfiguration struct {
-	BaseRepositoryConfig `mapstructure:",squash"`
-
-	Actions []string `json:"action"`
+	Repository string   `json:"repository" mapstructure:"repository"`
+	Actions    []string `json:"actions" mapstructure:"actions"`
 }
 
 func (p *OnPullRequest) Name() string {
@@ -82,7 +82,7 @@ func (p *OnPullRequest) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	var config BaseRepositoryConfig
+	var config OnPullRequestConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -137,6 +137,8 @@ func whitelistedAction(data map[string]any, allowed []string) bool {
 	if !ok {
 		return false
 	}
+
+	log.Printf("Allowed: %v, action: %v", allowed, action)
 
 	return slices.Contains(allowed, action.(string))
 }

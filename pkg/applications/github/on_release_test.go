@@ -50,9 +50,9 @@ func Test__OnRelease__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"action":"created"}`),
 			Headers: headers,
-			Configuration: OnReleaseConfiguration{
-				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "test"},
-				Actions:              []string{"created"},
+			Configuration: map[string]any{
+				"repository": "test",
+				"action":     []string{"created"},
 			},
 			WebhookContext: &contexts.WebhookContext{Secret: secret},
 			EventContext:   &contexts.EventContext{},
@@ -78,9 +78,9 @@ func Test__OnRelease__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Configuration: OnReleaseConfiguration{
-				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "test"},
-				Actions:              []string{"created"},
+			Configuration: map[string]any{
+				"repository": "test",
+				"action":     []string{"created"},
 			},
 			WebhookContext: &contexts.WebhookContext{Secret: secret},
 			EventContext:   eventContext,
@@ -107,9 +107,9 @@ func Test__OnRelease__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Configuration: OnReleaseConfiguration{
-				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "test"},
-				Actions:              []string{"created"},
+			Configuration: map[string]any{
+				"repository": "test",
+				"action":     []string{"created"},
 			},
 			WebhookContext: &contexts.WebhookContext{Secret: secret},
 			EventContext:   eventContext,
@@ -130,9 +130,7 @@ func Test__OnRelease__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			AppInstallationContext: appCtx,
 			MetadataContext:        &contexts.MetadataContext{},
-			Configuration: OnReleaseConfiguration{
-				BaseRepositoryConfig: BaseRepositoryConfig{Repository: ""},
-			},
+			Configuration:          map[string]any{"repository": ""},
 		})
 
 		require.ErrorContains(t, err, "repository is required")
@@ -147,9 +145,7 @@ func Test__OnRelease__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			AppInstallationContext: appCtx,
 			MetadataContext:        &contexts.MetadataContext{},
-			Configuration: OnReleaseConfiguration{
-				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "world"},
-			},
+			Configuration:          map[string]any{"repository": "world"},
 		})
 
 		require.ErrorContains(t, err, "repository world is not accessible to app installation")
@@ -166,9 +162,7 @@ func Test__OnRelease__Setup(t *testing.T) {
 		require.NoError(t, trigger.Setup(core.TriggerContext{
 			AppInstallationContext: appCtx,
 			MetadataContext:        &nodeMetadataCtx,
-			Configuration: OnReleaseConfiguration{
-				BaseRepositoryConfig: BaseRepositoryConfig{Repository: "hello"},
-			},
+			Configuration:          map[string]any{"repository": "hello"},
 		}))
 
 		require.Equal(t, nodeMetadataCtx.Get(), NodeMetadata{Repository: &helloRepo})

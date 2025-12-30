@@ -12,16 +12,9 @@ import (
 
 type OnPush struct{}
 
-type Repository struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
-	URL  string `json:"url"`
-}
-
 type OnPushConfiguration struct {
-	BaseRepositoryConfig `mapstructure:",squash"`
-
-	Refs []configuration.Predicate `json:"refs"`
+	Repository string                    `json:"repository" mapstructure:"repository"`
+	Refs       []configuration.Predicate `json:"refs" mapstructure:"refs"`
 }
 
 func (p *OnPush) Name() string {
@@ -83,7 +76,7 @@ func (p *OnPush) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	var config BaseRepositoryConfig
+	var config OnPushConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}

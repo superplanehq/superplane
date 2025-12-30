@@ -13,9 +13,8 @@ import (
 type GetIssue struct{}
 
 type GetIssueConfiguration struct {
-	BaseRepositoryConfig `mapstructure:",squash"`
-
-	IssueNumber int `mapstructure:"issueNumber"`
+	Repository  string `mapstructure:"repository"`
+	IssueNumber int    `mapstructure:"issueNumber"`
 }
 
 func (c *GetIssue) Name() string {
@@ -45,18 +44,16 @@ func (c *GetIssue) OutputChannels(configuration any) []core.OutputChannel {
 func (c *GetIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "repository",
-			Label:       "Repository",
-			Description: "The repository containing the issue",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Name:     "repository",
+			Label:    "Repository",
+			Type:     configuration.FieldTypeString,
+			Required: true,
 		},
 		{
-			Name:        "issueNumber",
-			Label:       "Issue Number",
-			Description: "The issue number to retrieve",
-			Type:        configuration.FieldTypeNumber,
-			Required:    true,
+			Name:     "issueNumber",
+			Label:    "Issue Number",
+			Type:     configuration.FieldTypeNumber,
+			Required: true,
 		},
 	}
 }
@@ -90,7 +87,7 @@ func (c *GetIssue) Execute(ctx core.ExecutionContext) error {
 	issue, _, err := client.Issues.Get(
 		context.Background(),
 		appMetadata.Owner,
-		config.BaseRepositoryConfig.Repository,
+		config.Repository,
 		config.IssueNumber,
 	)
 

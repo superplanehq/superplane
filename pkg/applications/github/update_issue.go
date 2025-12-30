@@ -14,14 +14,13 @@ import (
 type UpdateIssue struct{}
 
 type UpdateIssueConfiguration struct {
-	BaseRepositoryConfig `mapstructure:",squash"`
-
-	IssueNumber int      `mapstructure:"issueNumber"`
-	Title       string   `mapstructure:"title"`
-	Body        string   `mapstructure:"body"`
-	State       string   `mapstructure:"state"`
-	Assignees   []string `mapstructure:"assignees"`
-	Labels      []string `mapstructure:"labels"`
+	Repository  string   `json:"repository" mapstructure:"repository"`
+	IssueNumber int      `json:"issueNumber" mapstructure:"issueNumber"`
+	Title       string   `json:"title" mapstructure:"title"`
+	Body        string   `json:"body" mapstructure:"body"`
+	State       string   `json:"state" mapstructure:"state"`
+	Assignees   []string `json:"assignees" mapstructure:"assignees"`
+	Labels      []string `json:"labels" mapstructure:"labels"`
 }
 
 func (c *UpdateIssue) Name() string {
@@ -51,40 +50,35 @@ func (c *UpdateIssue) OutputChannels(configuration any) []core.OutputChannel {
 func (c *UpdateIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "repository",
-			Label:       "Repository",
-			Description: "The repository containing the issue",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Name:     "repository",
+			Label:    "Repository",
+			Type:     configuration.FieldTypeString,
+			Required: true,
 		},
 		{
-			Name:        "issueNumber",
-			Label:       "Issue Number",
-			Description: "The issue number to update",
-			Type:        configuration.FieldTypeNumber,
-			Required:    true,
+			Name:     "issueNumber",
+			Label:    "Issue Number",
+			Type:     configuration.FieldTypeNumber,
+			Required: true,
 		},
 		{
-			Name:        "title",
-			Label:       "Title",
-			Description: "The new title for the issue",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
+			Name:     "title",
+			Label:    "Title",
+			Type:     configuration.FieldTypeString,
+			Required: false,
 		},
 		{
-			Name:        "body",
-			Label:       "Body",
-			Description: "The new body/description for the issue",
-			Type:        configuration.FieldTypeText,
-			Required:    false,
+			Name:     "body",
+			Label:    "Body",
+			Type:     configuration.FieldTypeText,
+			Required: false,
 		},
 		{
-			Name:        "state",
-			Label:       "State",
-			Description: "The state of the issue",
-			Type:        configuration.FieldTypeSelect,
-			Required:    false,
-			Default:     "open",
+			Name:     "state",
+			Label:    "State",
+			Type:     configuration.FieldTypeSelect,
+			Required: false,
+			Default:  "open",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -101,11 +95,10 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "assignees",
-			Label:       "Assignees",
-			Description: "GitHub usernames to assign to the issue",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
+			Name:     "assignees",
+			Label:    "Assignees",
+			Type:     configuration.FieldTypeList,
+			Required: false,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Assignee",
@@ -116,11 +109,10 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "labels",
-			Label:       "Labels",
-			Description: "Labels for the issue",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
+			Name:     "labels",
+			Label:    "Labels",
+			Type:     configuration.FieldTypeList,
+			Required: false,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Label",

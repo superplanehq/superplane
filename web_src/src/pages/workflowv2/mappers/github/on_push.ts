@@ -3,14 +3,7 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
-
-interface GitHubMetadata {
-  repository: {
-    id: string;
-    name: string;
-    url: string;
-  };
-}
+import { BaseNodeMetadata } from "./base";
 
 type PredicateType = "equals" | "notEquals" | "matches";
 
@@ -59,7 +52,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
   },
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
-    const metadata = node.metadata as unknown as GitHubMetadata;
+    const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as GithubConfiguration;
     const metadataItems = [];
 

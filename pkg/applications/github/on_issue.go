@@ -13,9 +13,8 @@ import (
 type OnIssue struct{}
 
 type OnIssueConfiguration struct {
-	BaseRepositoryConfig `mapstructure:",squash"`
-
-	Actions []string `json:"action"`
+	Repository string   `json:"repository" mapstructure:"repository"`
+	Actions    []string `json:"actions" mapstructure:"actions"`
 }
 
 func (i *OnIssue) Name() string {
@@ -89,7 +88,7 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	var config BaseRepositoryConfig
+	var config OnIssueConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}

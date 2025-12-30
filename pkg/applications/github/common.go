@@ -2,6 +2,7 @@ package github
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"slices"
 	"strings"
@@ -11,12 +12,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
-type NodeMetadata struct {
-	Repository *Repository `json:"repository"`
+type Repository struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+	URL  string `json:"url"`
 }
 
-type BaseRepositoryConfig struct {
-	Repository string `mapstructure:"repository"`
+type NodeMetadata struct {
+	Repository *Repository `json:"repository"`
 }
 
 func ensureRepoInMetadata(ctx core.MetadataContext, app core.AppInstallationContext, configuration any) error {
@@ -33,12 +36,8 @@ func ensureRepoInMetadata(ctx core.MetadataContext, app core.AppInstallationCont
 		return nil
 	}
 
-	var config BaseRepositoryConfig
-	if err := mapstructure.Decode(configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	if config.Repository == "" {
+	repository := getRepositoryFromConfiguration(configuration)
+	if repository == "" {
 		return fmt.Errorf("repository is required")
 	}
 
@@ -51,16 +50,39 @@ func ensureRepoInMetadata(ctx core.MetadataContext, app core.AppInstallationCont
 	}
 
 	repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r Repository) bool {
-		return r.Name == config.Repository
+		return r.Name == repository
 	})
 
 	if repoIndex == -1 {
-		return fmt.Errorf("repository %s is not accessible to app installation", config.Repository)
+		return fmt.Errorf("repository %s is not accessible to app installation", repository)
 	}
 
-	return ctx.Set(&NodeMetadata{
+	return ctx.Set(NodeMetadata{
 		Repository: &appMetadata.Repositories[repoIndex],
 	})
+}
+
+func getRepositoryFromConfiguration(c any) string {
+	log.Printf("%v", c)
+	configMap, ok := c.(map[string]any)
+	if !ok {
+		log.Printf("A")
+		return ""
+	}
+
+	r, ok := configMap["repository"]
+	if !ok {
+		log.Printf("B")
+		return ""
+	}
+
+	repository, ok := r.(string)
+	if !ok {
+		log.Printf("C")
+		return ""
+	}
+
+	return repository
 }
 
 func verifySignature(ctx core.WebhookRequestContext, expectedType string) (int, error) {
