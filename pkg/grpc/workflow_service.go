@@ -207,5 +207,5 @@ func (s *WorkflowService) CancelExecution(ctx context.Context, req *pb.CancelExe
 
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 
-	return workflows.CancelExecution(ctx, s.authService, organizationID, s.registry, workflowID, executionID)
+	return workflows.CancelExecution(ctx, s.authService, s.encryptor, organizationID, s.registry, workflowID, executionID)
 }
