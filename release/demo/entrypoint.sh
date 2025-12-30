@@ -90,7 +90,7 @@ if [ "${LOCALTUNNEL_ENABLED}" = "1" ]; then
   start_spinner "Setting up a public webhook tunnel"
   
   # Start localtunnel with the persisted subdomain
-  npx -y localtunnel --port 8000 --subdomain "${LOCALTUNNEL_SUBDOMAIN}" > /tmp/localtunnel.log 2>&1 &
+  npx -y localtunnel --port 3000 --subdomain "${LOCALTUNNEL_SUBDOMAIN}" > /tmp/localtunnel.log 2>&1 &
   LOCALTUNNEL_PID=$!
   
   # Wait for the tunnel to be ready
