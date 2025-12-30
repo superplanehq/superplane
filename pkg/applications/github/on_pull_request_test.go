@@ -52,7 +52,7 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Configuration: map[string]any{
 				"repository": "test",
-				"action":     []string{"opened"},
+				"actions":    []string{"opened"},
 			},
 			WebhookContext: &contexts.WebhookContext{Secret: secret},
 			EventContext:   &contexts.EventContext{},
@@ -80,7 +80,7 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Configuration: map[string]any{
 				"repository": "test",
-				"action":     []string{"opened"},
+				"actions":    []string{"opened"},
 			},
 			WebhookContext: &contexts.WebhookContext{Secret: secret},
 			EventContext:   eventContext,
@@ -109,7 +109,7 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Configuration: map[string]any{
 				"repository": "test",
-				"action":     []string{"opened"},
+				"actions":    []string{"opened"},
 			},
 			WebhookContext: &contexts.WebhookContext{Secret: secret},
 			EventContext:   eventContext,

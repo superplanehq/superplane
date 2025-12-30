@@ -52,7 +52,7 @@ func Test__OnRelease__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Configuration: map[string]any{
 				"repository": "test",
-				"action":     []string{"created"},
+				"actions":    []string{"created"},
 			},
 			WebhookContext: &contexts.WebhookContext{Secret: secret},
 			EventContext:   &contexts.EventContext{},
@@ -80,7 +80,7 @@ func Test__OnRelease__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Configuration: map[string]any{
 				"repository": "test",
-				"action":     []string{"created"},
+				"actions":    []string{"created"},
 			},
 			WebhookContext: &contexts.WebhookContext{Secret: secret},
 			EventContext:   eventContext,
@@ -109,7 +109,7 @@ func Test__OnRelease__HandleWebhook(t *testing.T) {
 			Headers: headers,
 			Configuration: map[string]any{
 				"repository": "test",
-				"action":     []string{"created"},
+				"actions":    []string{"created"},
 			},
 			WebhookContext: &contexts.WebhookContext{Secret: secret},
 			EventContext:   eventContext,
