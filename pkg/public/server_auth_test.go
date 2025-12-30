@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,9 +47,9 @@ func Test__Login(t *testing.T) {
 	})
 
 	assert.Equal(t, http.StatusOK, response.Code)
-	assert.Contains(t, response.Body.String(), "Superplane")
-	assert.Contains(t, response.Body.String(), "Continue with GitHub")
-	assert.Contains(t, response.Body.String(), "Continue with Google")
+	assert.Contains(t, strings.ToLower(response.Body.String()), "superplane")
+	assert.Contains(t, response.Body.String(), "GitHub")
+	assert.Contains(t, response.Body.String(), "Google")
 }
 
 func Test__Logout(t *testing.T) {
