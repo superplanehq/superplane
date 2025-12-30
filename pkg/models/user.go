@@ -159,6 +159,37 @@ func FindOrganizationsForAccount(email string) ([]Organization, error) {
 	return organizations, err
 }
 
+func CountActiveUsersByOrganizationIDs(orgIDs []string) (map[string]int64, error) {
+	counts := make(map[string]int64)
+	if len(orgIDs) == 0 {
+		return counts, nil
+	}
+
+	type row struct {
+		OrganizationID string
+		Count          int64
+	}
+
+	var rows []row
+	err := database.Conn().
+		Table("users").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Where("organization_id IN ?", orgIDs).
+		Group("organization_id").
+		Scan(&rows).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, r := range rows {
+		counts[r.OrganizationID] = r.Count
+	}
+
+	return counts, nil
+}
+
 func FindAnyUserByEmail(email string) (*User, error) {
 	var user User
 

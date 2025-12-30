@@ -1,4 +1,5 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
+import { Building, Palette, User } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Text } from "../../components/Text/text";
@@ -8,7 +9,19 @@ interface Organization {
   id: string;
   name: string;
   description?: string;
+  canvasCount?: number;
+  memberCount?: number;
 }
+
+const formatCount = (count: number, noun: string) => {
+  const safeCount = Number.isFinite(count) ? count : 0;
+  const pluralOverrides: Record<string, string> = {
+    canvas: "canvases",
+    member: "members",
+  };
+  const nounToUse = safeCount === 1 ? noun : pluralOverrides[noun] || `${noun}s`;
+  return `${safeCount} ${nounToUse}`;
+};
 
 const OrganizationSelect: React.FC = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -70,7 +83,7 @@ const OrganizationSelect: React.FC = () => {
               Hey there{account?.name ? `, ${account.name}` : ""}!
             </Text>
             {organizations.length > 0 && (
-              <Text className="font-medium text-gray-800 text-left">
+              <Text className="font-medium text-gray-500 text-left">
                 Select one of your organizations below to get started:
               </Text>
             )}
@@ -93,24 +106,35 @@ const OrganizationSelect: React.FC = () => {
             {organizations.map((org) => (
               <div
                 key={org.id}
-                className="h-32 bg-white dark:bg-gray-900 rounded-md shadow-sm p-6 outline outline-slate-950/10 hover:outline-slate-950/15 hover:shadow-md transition-colors cursor-pointer"
+                className="h-48 bg-white dark:bg-gray-900 rounded-md shadow-sm p-6 outline outline-slate-950/10 hover:outline-slate-950/15 hover:shadow-md transition-colors cursor-pointer flex flex-col justify-between"
                 onClick={() => handleOrganizationSelect(org)}
               >
-                <div className="flex items-center mb-2">
-                  <h4 className="text-md font-semibold text-gray-800 dark:text-white truncate">{org.name}</h4>
+                <div className="flex items-center gap-2 mb-2 text-gray-800 dark:text-white">
+                  <Building size={16} />
+                  <h4 className="text-lg font-semibold truncate">{org.name}</h4>
                 </div>
                 <Text className="text-sm text-left text-gray-600 dark:text-gray-400 truncate">{org.description}</Text>
+                <div className="mt-3 text-sm font-medium text-gray-500 dark:text-gray-400 flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <Palette size={16} />
+                    {formatCount(org.canvasCount ?? 0, "canvas")}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <User size={16} />
+                    {formatCount(org.memberCount ?? 0, "member")}
+                  </div>
+                </div>
               </div>
             ))}
 
             <div
-              className="h-32 bg-white/50 hover:bg-white border-1 border-dashed border-gray-400 rounded-lg p-6 flex flex-col items-center justify-center transition-colors cursor-pointer"
+              className="h-48 bg-white/50 hover:bg-white border-1 border-dashed border-gray-400 rounded-lg p-6 flex flex-col items-center justify-center transition-colors cursor-pointer"
               onClick={() => navigate("/create")}
             >
               <div className="flex items-center">
-                <h4 className="text-base font-semibold text-gray-800 text-center">+ Create new</h4>
+                <h4 className="text-sm font-semibold text-gray-800 text-center">+ Create new</h4>
               </div>
-              <Text className="text-sm text-gray-500 font-medium text-center">Start fresh with a new organization</Text>
+              <Text className="text-[13px] text-gray-500 font-medium text-center">Start fresh with a new organization</Text>
             </div>
           </div>
         </div>

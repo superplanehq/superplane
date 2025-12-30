@@ -1,3 +1,4 @@
+import SuperplaneLogo from "@/assets/superplane.svg";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Text } from "../../components/Text/text";
@@ -51,12 +52,21 @@ const OrganizationCreate: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4">
-      <div className="max-w-lg w-full bg-white dark:bg-gray-900 rounded-lg shadow-xl p-8">
-        <div className="text-center mb-8">
-          <div className="text-4xl mb-4">🏢</div>
-          <h4 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Create Organization</h4>
-          <Text className="text-gray-600 dark:text-gray-400">Set up a new organization</Text>
+    <div className="min-h-screen bg-slate-100">
+      <div className="p-6 flex items-center">
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="text-sm font-medium text-gray-500 px-2 py-1 hover:bg-gray-950/5 rounded"
+        >
+          ← Back to Organizations
+        </button>
+      </div>
+      <div className="flex items-center justify-center p-8">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-8 outline outline-slate-950/10">
+          <div className="text-center mb-8">
+          <h4 className="text-xl font-semibold text-gray-800 mb-1">Create Organization</h4>
+          <Text className="text-gray-800">Set up a new SuperPlane organization</Text>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -67,8 +77,8 @@ const OrganizationCreate: React.FC = () => {
           )}
 
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-              Name
+            <label htmlFor="name" className="block text-sm font-medium text-gray-800 text-left dark:text-gray-300 mb-2">
+              Organization Name
             </label>
             <input
               type="text"
@@ -76,27 +86,19 @@ const OrganizationCreate: React.FC = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
-              placeholder="Acme Corporation"
+              className="w-full px-3 py-2 outline-1 outline-slate-300 rounded-md shadow-md focus:outline-gray-800"
+              placeholder="e.g. SuperDuper Inc."
+              data-1p-ignore
             />
           </div>
 
           <div className="flex space-x-4">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => navigate("/")}
-              className="flex-1"
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-
             <Button type="submit" className="flex-1" disabled={loading || !name.trim()}>
               {loading ? "Creating..." : "Create Organization"}
             </Button>
           </div>
         </form>
+      </div>
       </div>
     </div>
   );

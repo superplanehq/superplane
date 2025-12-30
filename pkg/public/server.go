@@ -580,6 +580,8 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		ID          string `json:"id"`
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		CanvasCount int64  `json:"canvasCount"`
+		MemberCount int64  `json:"memberCount"`
 	}
 
 	organizations, err := models.FindOrganizationsForAccount(account.Email)
@@ -588,12 +590,32 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	orgIDs := make([]string, 0, len(organizations))
+	for _, organization := range organizations {
+		orgIDs = append(orgIDs, organization.ID.String())
+	}
+
+	canvasCounts, err := models.CountWorkflowsByOrganizationIDs(orgIDs)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	memberCounts, err := models.CountActiveUsersByOrganizationIDs(orgIDs)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	response := []Organization{}
 	for _, organization := range organizations {
+		orgID := organization.ID.String()
 		response = append(response, Organization{
 			ID:          organization.ID.String(),
 			Name:        organization.Name,
 			Description: organization.Description,
+			CanvasCount: canvasCounts[orgID],
+			MemberCount: memberCounts[orgID],
 		})
 	}
 
