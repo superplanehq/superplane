@@ -9,15 +9,14 @@ message Field {
   string type = 2;
   string description = 3;
   bool required = 4;
-  bool read_only = 5;
-  optional string default_value = 6;
-  string label = 7;
-  repeated VisibilityCondition visibility_conditions = 8;
-  optional TypeOptions type_options = 9;
-  repeated RequiredCondition required_conditions = 10;
-  repeated ValidationRule validation_rules = 11;
-  optional string placeholder = 12;
-  optional bool sensitive = 13;
+  optional string default_value = 5;
+  string label = 6;
+  repeated VisibilityCondition visibility_conditions = 7;
+  optional TypeOptions type_options = 8;
+  repeated RequiredCondition required_conditions = 9;
+  repeated ValidationRule validation_rules = 10;
+  optional string placeholder = 11;
+  optional bool sensitive = 12;
 }
 
 message TypeOptions {

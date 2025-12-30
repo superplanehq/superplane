@@ -278,7 +278,6 @@ export const ConfigurationFieldRenderer = ({
           <Label className={`text-left cursor-pointer ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
             {field.label || field.name}
             {isRequired && <span className="text-red-500 ml-1">*</span>}
-            {field.readOnly && <span className="text-gray-500 text-xs ml-2">(read-only)</span>}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
                 (!enableRealtimeValidation &&
@@ -317,7 +316,6 @@ export const ConfigurationFieldRenderer = ({
       <Label className={`block text-left ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
         {field.label || field.name}
         {isRequired && <span className="text-red-500 ml-1">*</span>}
-        {field.readOnly && <span className="text-gray-500 text-xs ml-2">(read-only)</span>}
         {hasFieldError &&
           ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
             (!enableRealtimeValidation &&

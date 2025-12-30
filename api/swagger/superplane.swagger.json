@@ -3149,9 +3149,6 @@
         "required": {
           "type": "boolean"
         },
-        "readOnly": {
-          "type": "boolean"
-        },
         "defaultValue": {
           "type": "string"
         },

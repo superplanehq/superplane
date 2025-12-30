@@ -39,8 +39,3 @@ func (m *NodeMetadataContext) Set(value any) error {
 		Update("metadata", v).
 		Error
 }
-
-func (m *NodeMetadataContext) UpdateConfiguration(configMap map[string]any) error {
-	m.node.Configuration = datatypes.NewJSONType(configMap)
-	return m.tx.Model(m.node).Update("configuration", configMap).Error
-}

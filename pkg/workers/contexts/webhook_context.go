@@ -68,14 +68,14 @@ func (c *WebhookContext) ResetSecret() ([]byte, []byte, error) {
 	return []byte(plainKey), encryptedKey, nil
 }
 
-func (c *WebhookContext) Setup(options *core.WebhookSetupOptions) (*uuid.UUID, error) {
+func (c *WebhookContext) Setup(options *core.WebhookSetupOptions) (string, error) {
 	webhook, err := c.findOrCreateWebhook(options)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find or create webhook: %w", err)
+		return "", fmt.Errorf("failed to find or create webhook: %w", err)
 	}
 
 	c.node.WebhookID = &webhook.ID
-	return &webhook.ID, nil
+	return fmt.Sprintf("%s/webhooks/%s", c.GetBaseURL(), webhook.ID.String()), nil
 }
 
 func (c *WebhookContext) findOrCreateWebhook(options *core.WebhookSetupOptions) (*models.Webhook, error) {

@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 const MaxEventSize = 64 * 1024
@@ -28,7 +27,6 @@ type Metadata struct {
 }
 
 type Configuration struct {
-	URL            string `json:"url"`
 	Authentication string `json:"authentication"`
 }
 
@@ -54,14 +52,7 @@ func (w *Webhook) Color() string {
 
 func (w *Webhook) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:        "url",
-			Label:       "Webhook URL",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			ReadOnly:    true,
-			Description: "This URL will be generated automatically after saving the trigger",
-		},
+
 		{
 			Name:     "authentication",
 			Label:    "Authentication",
@@ -99,27 +90,13 @@ func (w *Webhook) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	var webhookURL string
 	if metadata.URL == "" {
-		if ctx.WebhookContext == nil {
-			return fmt.Errorf("webhook context is required")
-		}
-
-		webhookID, err := ctx.WebhookContext.Setup(nil)
+		webhookURL, err := ctx.WebhookContext.Setup(nil)
 		if err != nil {
 			return fmt.Errorf("failed to setup webhook: %w", err)
 		}
 
-		baseURL := ctx.WebhookContext.GetBaseURL()
-		webhookURL = fmt.Sprintf("%s/webhooks/%s",
-			strings.TrimSuffix(baseURL, "/"),
-			webhookID.String())
-
 		metadata.URL = webhookURL
-		config.URL = webhookURL
-	} else {
-		webhookURL = metadata.URL
-		config.URL = webhookURL
 	}
 
 	metadata.Authentication = config.Authentication
@@ -129,21 +106,7 @@ func (w *Webhook) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
-	return updateTriggerConfiguration(ctx, config)
-}
-
-func updateTriggerConfiguration(ctx core.TriggerContext, config Configuration) error {
-	nodeMetadataCtx, ok := ctx.MetadataContext.(*contexts.NodeMetadataContext)
-	if !ok {
-		return nil
-	}
-
-	configMap := map[string]any{
-		"url":            config.URL,
-		"authentication": config.Authentication,
-	}
-
-	return nodeMetadataCtx.UpdateConfiguration(configMap)
+	return nil
 }
 
 func (w *Webhook) Actions() []core.Action {

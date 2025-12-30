@@ -62,11 +62,6 @@ type Field struct {
 	Sensitive bool `json:"sensitive"`
 
 	/*
-	 * Whether the field is read-only (cannot be edited by user)
-	 */
-	ReadOnly bool `json:"read_only"`
-
-	/*
 	 * Type-specific options for fields.
 	 * The structure depends on the field type.
 	 */

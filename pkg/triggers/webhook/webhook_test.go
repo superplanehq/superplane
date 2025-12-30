@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -49,19 +50,12 @@ func TestWebhook_Configuration(t *testing.T) {
 
 	assert.Len(t, config, 2)
 
-	urlField := config[0]
-	assert.Equal(t, "url", urlField.Name)
-	assert.Equal(t, "Webhook URL", urlField.Label)
-	assert.True(t, urlField.ReadOnly)
-
-	authField := config[1]
+	authField := config[0]
 	assert.Equal(t, "authentication", authField.Name)
 	assert.Equal(t, "Authentication", authField.Label)
 	assert.True(t, authField.Required)
 	assert.Equal(t, "signature", authField.Default)
 	assert.Len(t, authField.TypeOptions.Select.Options, 3)
-
-	// No third field anymore since we removed headerKeyName
 }
 
 func TestWebhook_Actions(t *testing.T) {
@@ -172,11 +166,12 @@ func (m *mockWebhookContext) ResetSecret() ([]byte, []byte, error) {
 	return []byte("test-secret"), []byte("test-secret"), nil
 }
 
-func (m *mockWebhookContext) Setup(options *core.WebhookSetupOptions) (*uuid.UUID, error) {
+func (m *mockWebhookContext) Setup(options *core.WebhookSetupOptions) (string, error) {
 
 	webhookID := uuid.New()
 	m.Node.WebhookID = &webhookID
-	return &webhookID, nil
+	baseURL := m.GetBaseURL()
+	return fmt.Sprintf("%s/webhooks/%s", baseURL, webhookID.String()), nil
 }
 
 func (m *mockWebhookContext) GetBaseURL() string {

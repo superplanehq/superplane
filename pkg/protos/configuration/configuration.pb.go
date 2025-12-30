@@ -27,15 +27,14 @@ type Field struct {
 	Type                 string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
 	Description          string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	Required             bool                   `protobuf:"varint,4,opt,name=required,proto3" json:"required,omitempty"`
-	ReadOnly             bool                   `protobuf:"varint,5,opt,name=read_only,json=readOnly,proto3" json:"read_only,omitempty"`
-	DefaultValue         *string                `protobuf:"bytes,6,opt,name=default_value,json=defaultValue,proto3,oneof" json:"default_value,omitempty"`
-	Label                string                 `protobuf:"bytes,7,opt,name=label,proto3" json:"label,omitempty"`
-	VisibilityConditions []*VisibilityCondition `protobuf:"bytes,8,rep,name=visibility_conditions,json=visibilityConditions,proto3" json:"visibility_conditions,omitempty"`
-	TypeOptions          *TypeOptions           `protobuf:"bytes,9,opt,name=type_options,json=typeOptions,proto3,oneof" json:"type_options,omitempty"`
-	RequiredConditions   []*RequiredCondition   `protobuf:"bytes,10,rep,name=required_conditions,json=requiredConditions,proto3" json:"required_conditions,omitempty"`
-	ValidationRules      []*ValidationRule      `protobuf:"bytes,11,rep,name=validation_rules,json=validationRules,proto3" json:"validation_rules,omitempty"`
-	Placeholder          *string                `protobuf:"bytes,12,opt,name=placeholder,proto3,oneof" json:"placeholder,omitempty"`
-	Sensitive            *bool                  `protobuf:"varint,13,opt,name=sensitive,proto3,oneof" json:"sensitive,omitempty"`
+	DefaultValue         *string                `protobuf:"bytes,5,opt,name=default_value,json=defaultValue,proto3,oneof" json:"default_value,omitempty"`
+	Label                string                 `protobuf:"bytes,6,opt,name=label,proto3" json:"label,omitempty"`
+	VisibilityConditions []*VisibilityCondition `protobuf:"bytes,7,rep,name=visibility_conditions,json=visibilityConditions,proto3" json:"visibility_conditions,omitempty"`
+	TypeOptions          *TypeOptions           `protobuf:"bytes,8,opt,name=type_options,json=typeOptions,proto3,oneof" json:"type_options,omitempty"`
+	RequiredConditions   []*RequiredCondition   `protobuf:"bytes,9,rep,name=required_conditions,json=requiredConditions,proto3" json:"required_conditions,omitempty"`
+	ValidationRules      []*ValidationRule      `protobuf:"bytes,10,rep,name=validation_rules,json=validationRules,proto3" json:"validation_rules,omitempty"`
+	Placeholder          *string                `protobuf:"bytes,11,opt,name=placeholder,proto3,oneof" json:"placeholder,omitempty"`
+	Sensitive            *bool                  `protobuf:"varint,12,opt,name=sensitive,proto3,oneof" json:"sensitive,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -94,13 +93,6 @@ func (x *Field) GetDescription() string {
 func (x *Field) GetRequired() bool {
 	if x != nil {
 		return x.Required
-	}
-	return false
-}
-
-func (x *Field) GetReadOnly() bool {
-	if x != nil {
-		return x.ReadOnly
 	}
 	return false
 }
@@ -1057,22 +1049,21 @@ var File_configuration_proto protoreflect.FileDescriptor
 
 const file_configuration_proto_rawDesc = "" +
 	"\n" +
-	"\x13configuration.proto\x12\x18Superplane.Configuration\"\xbb\x05\n" +
+	"\x13configuration.proto\x12\x18Superplane.Configuration\"\x9e\x05\n" +
 	"\x05Field\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1a\n" +
-	"\brequired\x18\x04 \x01(\bR\brequired\x12\x1b\n" +
-	"\tread_only\x18\x05 \x01(\bR\breadOnly\x12(\n" +
-	"\rdefault_value\x18\x06 \x01(\tH\x00R\fdefaultValue\x88\x01\x01\x12\x14\n" +
-	"\x05label\x18\a \x01(\tR\x05label\x12b\n" +
-	"\x15visibility_conditions\x18\b \x03(\v2-.Superplane.Configuration.VisibilityConditionR\x14visibilityConditions\x12M\n" +
-	"\ftype_options\x18\t \x01(\v2%.Superplane.Configuration.TypeOptionsH\x01R\vtypeOptions\x88\x01\x01\x12\\\n" +
-	"\x13required_conditions\x18\n" +
-	" \x03(\v2+.Superplane.Configuration.RequiredConditionR\x12requiredConditions\x12S\n" +
-	"\x10validation_rules\x18\v \x03(\v2(.Superplane.Configuration.ValidationRuleR\x0fvalidationRules\x12%\n" +
-	"\vplaceholder\x18\f \x01(\tH\x02R\vplaceholder\x88\x01\x01\x12!\n" +
-	"\tsensitive\x18\r \x01(\bH\x03R\tsensitive\x88\x01\x01B\x10\n" +
+	"\brequired\x18\x04 \x01(\bR\brequired\x12(\n" +
+	"\rdefault_value\x18\x05 \x01(\tH\x00R\fdefaultValue\x88\x01\x01\x12\x14\n" +
+	"\x05label\x18\x06 \x01(\tR\x05label\x12b\n" +
+	"\x15visibility_conditions\x18\a \x03(\v2-.Superplane.Configuration.VisibilityConditionR\x14visibilityConditions\x12M\n" +
+	"\ftype_options\x18\b \x01(\v2%.Superplane.Configuration.TypeOptionsH\x01R\vtypeOptions\x88\x01\x01\x12\\\n" +
+	"\x13required_conditions\x18\t \x03(\v2+.Superplane.Configuration.RequiredConditionR\x12requiredConditions\x12S\n" +
+	"\x10validation_rules\x18\n" +
+	" \x03(\v2(.Superplane.Configuration.ValidationRuleR\x0fvalidationRules\x12%\n" +
+	"\vplaceholder\x18\v \x01(\tH\x02R\vplaceholder\x88\x01\x01\x12!\n" +
+	"\tsensitive\x18\f \x01(\bH\x03R\tsensitive\x88\x01\x01B\x10\n" +
 	"\x0e_default_valueB\x0f\n" +
 	"\r_type_optionsB\x0e\n" +
 	"\f_placeholderB\f\n" +
