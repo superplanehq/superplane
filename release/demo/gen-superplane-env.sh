@@ -52,7 +52,6 @@ if [ -f "${ENV_FILE}" ]; then
   set -a
   source "${ENV_FILE}"
   set +a
-  echo "Loaded persisted environment from ${ENV_FILE}" >&2
 fi
 
 # Generate random secrets if they don't exist
