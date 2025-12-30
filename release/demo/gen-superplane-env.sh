@@ -20,7 +20,8 @@ DB_USERNAME="${DB_USERNAME:-postgres}"
 DB_PASSWORD="${DB_PASSWORD:-postgres}"
 POSTGRES_DB_SSL="${POSTGRES_DB_SSL:-false}"
 APPLICATION_NAME="${APPLICATION_NAME:-superplane}"
-BASE_URL="${BASE_URL:-http://localhost:8000}"
+BASE_URL="${BASE_URL:-http://localhost:3000}"
+PUBLIC_API_PORT="${PUBLIC_API_PORT:-3000}"
 WEBHOOKS_BASE_URL="${WEBHOOKS_BASE_URL:-}"
 RABBITMQ_URL="${RABBITMQ_URL:-amqp://guest:guest@127.0.0.1:5672}"
 SWAGGER_BASE_PATH="${SWAGGER_BASE_PATH:-/app/api/swagger}"
@@ -52,7 +53,6 @@ if [ -f "${ENV_FILE}" ]; then
   set -a
   source "${ENV_FILE}"
   set +a
-  echo "Loaded persisted environment from ${ENV_FILE}" >&2
 fi
 
 # Generate random secrets if they don't exist
@@ -88,6 +88,7 @@ export DB_PASSWORD="${DB_PASSWORD}"
 export POSTGRES_DB_SSL="${POSTGRES_DB_SSL}"
 export APPLICATION_NAME="${APPLICATION_NAME}"
 export BASE_URL="${BASE_URL}"
+export PUBLIC_API_PORT="${PUBLIC_API_PORT}"
 export WEBHOOKS_BASE_URL="${WEBHOOKS_BASE_URL}"
 export RABBITMQ_URL="${RABBITMQ_URL}"
 export SWAGGER_BASE_PATH="${SWAGGER_BASE_PATH}"
