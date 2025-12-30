@@ -90,7 +90,7 @@ const OrganizationCreate: React.FC = () => {
                 onChange={(e) => setName(e.target.value)}
                 required
                 className="w-full px-3 py-2 outline-1 outline-slate-300 rounded-md shadow-md focus:outline-gray-800"
-                placeholder="e.g. SuperDuper Inc."
+                placeholder="e.g. Super Duper Org"
                 data-1p-ignore
               />
             </div>
