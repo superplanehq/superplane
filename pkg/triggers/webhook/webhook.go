@@ -29,18 +29,16 @@ type Metadata struct {
 	URL            string `json:"url"`
 	SignatureKey   string `json:"signatureKey,omitempty"`
 	Authentication string `json:"authentication"`
-	BearerToken    string `json:"bearerToken,omitempty"`
-	ApiKeyName     string `json:"apiKeyName,omitempty"`
-	ApiKeyValue    string `json:"apiKeyValue,omitempty"`
+	HeaderKeyName  string `json:"headerKeyName,omitempty"`
+	HeaderKeyValue string `json:"headerKeyValue,omitempty"`
 }
 
 type Configuration struct {
 	URL            string `json:"url"`
 	Authentication string `json:"authentication"`
 	SignatureKey   string `json:"signatureKey,omitempty"`
-	BearerToken    string `json:"bearerToken,omitempty"`
-	ApiKeyName     string `json:"apiKeyName,omitempty"`
-	ApiKeyValue    string `json:"apiKeyValue,omitempty"`
+	HeaderKeyName  string `json:"headerKeyName,omitempty"`
+	HeaderKeyValue string `json:"headerKeyValue,omitempty"`
 }
 
 func (w *Webhook) Name() string {
@@ -84,8 +82,7 @@ func (w *Webhook) Configuration() []configuration.Field {
 					Options: []configuration.FieldOption{
 						{Label: "None", Value: "none"},
 						{Label: "Signature (HMAC)", Value: "signature"},
-						{Label: "Bearer Token", Value: "bearer"},
-						{Label: "API Key", Value: "apikey"},
+						{Label: "Header Key", Value: "headerkey"},
 					},
 				},
 			},
@@ -106,59 +103,40 @@ func (w *Webhook) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "bearerToken",
-			Label:       "Bearer Token",
-			Type:        configuration.FieldTypeString,
-			Sensitive:   true,
-			Description: "Bearer token for Authorization header verification",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "authentication",
-					Values: []string{"bearer"},
-				},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{
-					Field:  "authentication",
-					Values: []string{"bearer"},
-				},
-			},
-		},
-		{
-			Name:        "apiKeyName",
-			Label:       "API Key Header Name",
+			Name:        "headerKeyName",
+			Label:       "Header Key Header Name",
 			Type:        configuration.FieldTypeString,
 			Default:     "X-API-Key",
-			Description: "Name of the header containing the API key",
+			Description: "Name of the header containing the Header Key",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "authentication",
-					Values: []string{"apikey"},
+					Values: []string{"headerkey"},
 				},
 			},
 			RequiredConditions: []configuration.RequiredCondition{
 				{
 					Field:  "authentication",
-					Values: []string{"apikey"},
+					Values: []string{"headerkey"},
 				},
 			},
 		},
 		{
-			Name:        "apiKeyValue",
-			Label:       "API Key Value",
+			Name:        "headerKeyValue",
+			Label:       "Header Key Value",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "The API key value to verify against",
+			Description: "The Header Key value to verify against",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "authentication",
-					Values: []string{"apikey"},
+					Values: []string{"headerkey"},
 				},
 			},
 			RequiredConditions: []configuration.RequiredCondition{
 				{
 					Field:  "authentication",
-					Values: []string{"apikey"},
+					Values: []string{"headerkey"},
 				},
 			},
 		},
@@ -209,18 +187,15 @@ func (w *Webhook) Setup(ctx core.TriggerContext) error {
 
 	metadata.Authentication = config.Authentication
 
-	configBearerToken := config.BearerToken
-	configApiKeyName := config.ApiKeyName
-	configApiKeyValue := config.ApiKeyValue
+	configHeaderKeyName := config.HeaderKeyName
+	configHeaderKeyValue := config.HeaderKeyValue
 
 	metadata.SignatureKey = ""
-	metadata.BearerToken = ""
-	metadata.ApiKeyName = ""
-	metadata.ApiKeyValue = ""
+	metadata.HeaderKeyName = ""
+	metadata.HeaderKeyValue = ""
 	config.SignatureKey = ""
-	config.BearerToken = ""
-	config.ApiKeyName = ""
-	config.ApiKeyValue = ""
+	config.HeaderKeyName = ""
+	config.HeaderKeyValue = ""
 
 	switch config.Authentication {
 	case "signature":
@@ -230,14 +205,11 @@ func (w *Webhook) Setup(ctx core.TriggerContext) error {
 		}
 		metadata.SignatureKey = key
 		config.SignatureKey = key
-	case "bearer":
-		metadata.BearerToken = configBearerToken
-		config.BearerToken = configBearerToken
-	case "apikey":
-		metadata.ApiKeyName = configApiKeyName
-		metadata.ApiKeyValue = configApiKeyValue
-		config.ApiKeyName = configApiKeyName
-		config.ApiKeyValue = configApiKeyValue
+	case "headerkey":
+		metadata.HeaderKeyName = configHeaderKeyName
+		metadata.HeaderKeyValue = configHeaderKeyValue
+		config.HeaderKeyName = configHeaderKeyName
+		config.HeaderKeyValue = configHeaderKeyValue
 	}
 
 	err = ctx.MetadataContext.Set(metadata)
@@ -258,9 +230,8 @@ func updateTriggerConfiguration(ctx core.TriggerContext, config Configuration) e
 		"url":            config.URL,
 		"authentication": config.Authentication,
 		"signatureKey":   config.SignatureKey,
-		"bearerToken":    config.BearerToken,
-		"apiKeyName":     config.ApiKeyName,
-		"apiKeyValue":    config.ApiKeyValue,
+		"headerKeyName":  config.HeaderKeyName,
+		"headerKeyValue": config.HeaderKeyValue,
 	}
 
 	return nodeMetadataCtx.UpdateConfiguration(configMap)
@@ -298,19 +269,17 @@ func (w *Webhook) resetAuth(ctx core.TriggerActionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	preserveApiKeyName := metadata.ApiKeyName
-	if metadata.Authentication == "apikey" && preserveApiKeyName == "" {
-		preserveApiKeyName = config.ApiKeyName
+	preserveHeaderKeyName := metadata.HeaderKeyName
+	if metadata.Authentication == "headerkey" && preserveHeaderKeyName == "" {
+		preserveHeaderKeyName = config.HeaderKeyName
 	}
 
 	metadata.SignatureKey = ""
-	metadata.BearerToken = ""
-	metadata.ApiKeyName = ""
-	metadata.ApiKeyValue = ""
+	metadata.HeaderKeyName = ""
+	metadata.HeaderKeyValue = ""
 	config.SignatureKey = ""
-	config.BearerToken = ""
-	config.ApiKeyName = ""
-	config.ApiKeyValue = ""
+	config.HeaderKeyName = ""
+	config.HeaderKeyValue = ""
 
 	switch metadata.Authentication {
 	case "signature":
@@ -356,7 +325,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 
 	switch metadata.Authentication {
 	case "signature":
-		signature := ctx.Headers.Get("X-Webhook-Signature")
+		signature := ctx.Headers.Get("X-Signature-256")
 		if signature == "" {
 			return http.StatusForbidden, fmt.Errorf("missing signature header")
 		}
@@ -369,28 +338,14 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		if err := crypto.VerifySignature([]byte(metadata.SignatureKey), ctx.Body, signature); err != nil {
 			return http.StatusForbidden, fmt.Errorf("invalid signature")
 		}
-	case "bearer":
-		authHeader := ctx.Headers.Get("Authorization")
-		if authHeader == "" {
-			return http.StatusUnauthorized, fmt.Errorf("missing authorization header")
+	case "headerkey":
+		headerKeyHeader := ctx.Headers.Get(metadata.HeaderKeyName)
+		if headerKeyHeader == "" {
+			return http.StatusUnauthorized, fmt.Errorf("missing Header Key header: %s", metadata.HeaderKeyName)
 		}
 
-		bearerToken := strings.TrimPrefix(authHeader, "Bearer ")
-		if bearerToken == authHeader || bearerToken == "" {
-			return http.StatusUnauthorized, fmt.Errorf("invalid bearer token format")
-		}
-
-		if bearerToken != metadata.BearerToken {
-			return http.StatusUnauthorized, fmt.Errorf("invalid bearer token")
-		}
-	case "apikey":
-		apiKeyHeader := ctx.Headers.Get(metadata.ApiKeyName)
-		if apiKeyHeader == "" {
-			return http.StatusUnauthorized, fmt.Errorf("missing API key header: %s", metadata.ApiKeyName)
-		}
-
-		if apiKeyHeader != metadata.ApiKeyValue {
-			return http.StatusUnauthorized, fmt.Errorf("invalid API key")
+		if headerKeyHeader != metadata.HeaderKeyValue {
+			return http.StatusUnauthorized, fmt.Errorf("invalid Header Key")
 		}
 	}
 

@@ -8,7 +8,7 @@ import {
 import { defaultTriggerRenderer } from "./default";
 import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
-import { webhookTriggerRenderer } from "./webhook";
+import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
 import { noopMapper } from "./noop";
 import { ifMapper } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
@@ -73,6 +73,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {
   schedule: scheduleCustomFieldRenderer,
   wait: waitCustomFieldRenderer,
+  webhook: webhookCustomFieldRenderer,
 };
 
 /**

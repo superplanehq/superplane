@@ -223,21 +223,11 @@ func TestWebhook_Setup(t *testing.T) {
 			expectedURL:  "https://api.superplane.com/webhooks/test-workflow-test-node",
 		},
 		{
-			name: "setup with bearer token authentication",
+			name: "setup with Header key authentication",
 			config: Configuration{
-				Authentication: "bearer",
-				BearerToken:    "test-bearer-token",
-			},
-			existingMeta: nil,
-			baseURL:      "https://api.superplane.com",
-			expectedURL:  "https://api.superplane.com/webhooks/test-workflow-test-node",
-		},
-		{
-			name: "setup with API key authentication",
-			config: Configuration{
-				Authentication: "apikey",
-				ApiKeyName:     "X-API-Key",
-				ApiKeyValue:    "test-api-key",
+				Authentication: "headerkey",
+				HeaderKeyName:  "X-API-Key",
+				HeaderKeyValue: "test-api-key",
 			},
 			existingMeta: nil,
 			baseURL:      "https://api.superplane.com",
@@ -325,40 +315,21 @@ func TestWebhook_Setup_AuthenticationMethodChange(t *testing.T) {
 	webhook := &Webhook{}
 
 	tests := []struct {
-		name                string
-		initialAuth         string
-		initialSignatureKey string
-		initialBearerToken  string
-		initialApiKeyName   string
-		initialApiKeyValue  string
-		newAuth             string
-		newBearerToken      string
-		newApiKeyName       string
-		newApiKeyValue      string
-		expectAuthChange    bool
+		name                  string
+		initialAuth           string
+		initialSignatureKey   string
+		initialHeaderKeyName  string
+		initialHeaderKeyValue string
+		newAuth               string
+		newHeaderKeyName      string
+		newHeaderKeyValue     string
+		expectAuthChange      bool
 	}{
 		{
 			name:             "change from none to signature",
 			initialAuth:      "none",
 			newAuth:          "signature",
 			expectAuthChange: true,
-		},
-		{
-			name:                "change from signature to bearer",
-			initialAuth:         "signature",
-			initialSignatureKey: "existingkey123",
-			newAuth:             "bearer",
-			newBearerToken:      "newbearertoken",
-			expectAuthChange:    true,
-		},
-		{
-			name:               "change from bearer to apikey",
-			initialAuth:        "bearer",
-			initialBearerToken: "existingtoken",
-			newAuth:            "apikey",
-			newApiKeyName:      "X-API-Key",
-			newApiKeyValue:     "newapikey123",
-			expectAuthChange:   true,
 		},
 		{
 			name:                "same authentication method should not change",
@@ -376,9 +347,8 @@ func TestWebhook_Setup_AuthenticationMethodChange(t *testing.T) {
 				URL:            "http://localhost:8000/webhooks/existing-webhook-id",
 				Authentication: tt.initialAuth,
 				SignatureKey:   tt.initialSignatureKey,
-				BearerToken:    tt.initialBearerToken,
-				ApiKeyName:     tt.initialApiKeyName,
-				ApiKeyValue:    tt.initialApiKeyValue,
+				HeaderKeyName:  tt.initialHeaderKeyName,
+				HeaderKeyValue: tt.initialHeaderKeyValue,
 			}
 
 			metadataCtx := &contexts.MetadataContext{
@@ -389,9 +359,8 @@ func TestWebhook_Setup_AuthenticationMethodChange(t *testing.T) {
 
 			config := Configuration{
 				Authentication: tt.newAuth,
-				BearerToken:    tt.newBearerToken,
-				ApiKeyName:     tt.newApiKeyName,
-				ApiKeyValue:    tt.newApiKeyValue,
+				HeaderKeyName:  tt.newHeaderKeyName,
+				HeaderKeyValue: tt.newHeaderKeyValue,
 			}
 
 			ctx := core.TriggerContext{
@@ -415,24 +384,16 @@ func TestWebhook_Setup_AuthenticationMethodChange(t *testing.T) {
 				switch tt.newAuth {
 				case "signature":
 					assert.NotEmpty(t, metadata.SignatureKey)
-					assert.Empty(t, metadata.BearerToken)
-					assert.Empty(t, metadata.ApiKeyName)
-					assert.Empty(t, metadata.ApiKeyValue)
-				case "bearer":
+					assert.Empty(t, metadata.HeaderKeyName)
+					assert.Empty(t, metadata.HeaderKeyValue)
+				case "headerkey":
 					assert.Empty(t, metadata.SignatureKey)
-					assert.Equal(t, tt.newBearerToken, metadata.BearerToken)
-					assert.Empty(t, metadata.ApiKeyName)
-					assert.Empty(t, metadata.ApiKeyValue)
-				case "apikey":
-					assert.Empty(t, metadata.SignatureKey)
-					assert.Empty(t, metadata.BearerToken)
-					assert.Equal(t, tt.newApiKeyName, metadata.ApiKeyName)
-					assert.Equal(t, tt.newApiKeyValue, metadata.ApiKeyValue)
+					assert.Equal(t, tt.newHeaderKeyName, metadata.HeaderKeyName)
+					assert.Equal(t, tt.newHeaderKeyValue, metadata.HeaderKeyValue)
 				case "none":
 					assert.Empty(t, metadata.SignatureKey)
-					assert.Empty(t, metadata.BearerToken)
-					assert.Empty(t, metadata.ApiKeyName)
-					assert.Empty(t, metadata.ApiKeyValue)
+					assert.Empty(t, metadata.HeaderKeyName)
+					assert.Empty(t, metadata.HeaderKeyValue)
 				}
 			} else {
 
@@ -461,23 +422,14 @@ func TestWebhook_HandleAction_ResetAuth(t *testing.T) {
 			checkField: "SignatureKey",
 		},
 		{
-			name: "reset bearer token successfully",
+			name: "reset Header key successfully",
 			existingMeta: Metadata{
 				URL:            "https://api.superplane.com/webhook",
-				Authentication: "bearer",
-				BearerToken:    "old-bearer-token",
+				Authentication: "headerkey",
+				HeaderKeyName:  "X-API-Key",
+				HeaderKeyValue: "old-api-key",
 			},
-			checkField: "BearerToken",
-		},
-		{
-			name: "reset API key successfully",
-			existingMeta: Metadata{
-				URL:            "https://api.superplane.com/webhook",
-				Authentication: "apikey",
-				ApiKeyName:     "X-API-Key",
-				ApiKeyValue:    "old-api-key",
-			},
-			checkField: "ApiKeyValue",
+			checkField: "HeaderKeyValue",
 		},
 		{
 			name: "error when no authentication is enabled",
@@ -528,14 +480,11 @@ func TestWebhook_HandleAction_ResetAuth(t *testing.T) {
 			case "SignatureKey":
 				assert.NotEqual(t, tt.existingMeta.SignatureKey, newMetadata.SignatureKey)
 				assert.Len(t, newMetadata.SignatureKey, 64)
-			case "BearerToken":
-				assert.NotEqual(t, tt.existingMeta.BearerToken, newMetadata.BearerToken)
-				assert.Len(t, newMetadata.BearerToken, 64)
-			case "ApiKeyValue":
-				assert.NotEqual(t, tt.existingMeta.ApiKeyValue, newMetadata.ApiKeyValue)
-				assert.Len(t, newMetadata.ApiKeyValue, 48)
+			case "HeaderKeyValue":
+				assert.NotEqual(t, tt.existingMeta.HeaderKeyValue, newMetadata.HeaderKeyValue)
+				assert.Len(t, newMetadata.HeaderKeyValue, 48)
 
-				assert.Equal(t, tt.existingMeta.ApiKeyName, newMetadata.ApiKeyName)
+				assert.Equal(t, tt.existingMeta.HeaderKeyName, newMetadata.HeaderKeyName)
 			}
 		})
 	}
@@ -598,7 +547,7 @@ func TestWebhook_HandleWebhook(t *testing.T) {
 			name: "signature authentication - empty signature",
 			body: []byte(`{"message": "hello"}`),
 			headers: map[string]string{
-				"X-Webhook-Signature": "sha256=",
+				"X-Signature-256": "sha256=",
 			},
 			config: Metadata{
 				Authentication: "signature",
@@ -612,7 +561,7 @@ func TestWebhook_HandleWebhook(t *testing.T) {
 			name: "signature authentication - invalid signature value",
 			body: []byte(`{"message": "hello"}`),
 			headers: map[string]string{
-				"X-Webhook-Signature": "sha256=invalid-signature",
+				"X-Signature-256": "sha256=invalid-signature",
 			},
 			config: Metadata{
 				Authentication: "signature",
@@ -633,94 +582,42 @@ func TestWebhook_HandleWebhook(t *testing.T) {
 			expectEmit: true,
 		},
 		{
-			name: "bearer token authentication - missing header",
+			name: "Header key authentication - missing header",
 			body: []byte(`{"message": "hello"}`),
 			config: Metadata{
-				Authentication: "bearer",
-				BearerToken:    "test-token",
+				Authentication: "headerkey",
+				HeaderKeyName:  "X-API-Key",
+				HeaderKeyValue: "test-key",
 			},
 			expectCode:     http.StatusUnauthorized,
 			expectError:    true,
-			expectedErrMsg: "missing authorization header",
+			expectedErrMsg: "missing Header key header: X-API-Key",
 		},
 		{
-			name: "bearer token authentication - invalid format",
-			body: []byte(`{"message": "hello"}`),
-			headers: map[string]string{
-				"Authorization": "InvalidFormat test-token",
-			},
-			config: Metadata{
-				Authentication: "bearer",
-				BearerToken:    "test-token",
-			},
-			expectCode:     http.StatusUnauthorized,
-			expectError:    true,
-			expectedErrMsg: "invalid bearer token format",
-		},
-		{
-			name: "bearer token authentication - invalid token",
-			body: []byte(`{"message": "hello"}`),
-			headers: map[string]string{
-				"Authorization": "Bearer wrong-token",
-			},
-			config: Metadata{
-				Authentication: "bearer",
-				BearerToken:    "test-token",
-			},
-			expectCode:     http.StatusUnauthorized,
-			expectError:    true,
-			expectedErrMsg: "invalid bearer token",
-		},
-		{
-			name: "bearer token authentication - valid token",
-			body: []byte(`{"message": "hello"}`),
-			headers: map[string]string{
-				"Authorization": "Bearer test-token",
-			},
-			config: Metadata{
-				Authentication: "bearer",
-				BearerToken:    "test-token",
-			},
-			expectCode: http.StatusOK,
-			expectEmit: true,
-		},
-		{
-			name: "API key authentication - missing header",
-			body: []byte(`{"message": "hello"}`),
-			config: Metadata{
-				Authentication: "apikey",
-				ApiKeyName:     "X-API-Key",
-				ApiKeyValue:    "test-key",
-			},
-			expectCode:     http.StatusUnauthorized,
-			expectError:    true,
-			expectedErrMsg: "missing API key header: X-API-Key",
-		},
-		{
-			name: "API key authentication - invalid key",
+			name: "Header key authentication - invalid key",
 			body: []byte(`{"message": "hello"}`),
 			headers: map[string]string{
 				"X-API-Key": "wrong-key",
 			},
 			config: Metadata{
-				Authentication: "apikey",
-				ApiKeyName:     "X-API-Key",
-				ApiKeyValue:    "test-key",
+				Authentication: "headerkey",
+				HeaderKeyName:  "X-API-Key",
+				HeaderKeyValue: "test-key",
 			},
 			expectCode:     http.StatusUnauthorized,
 			expectError:    true,
-			expectedErrMsg: "invalid API key",
+			expectedErrMsg: "invalid Header key",
 		},
 		{
-			name: "API key authentication - valid key",
+			name: "Header key authentication - valid key",
 			body: []byte(`{"message": "hello"}`),
 			headers: map[string]string{
 				"X-API-Key": "test-key",
 			},
 			config: Metadata{
-				Authentication: "apikey",
-				ApiKeyName:     "X-API-Key",
-				ApiKeyValue:    "test-key",
+				Authentication: "headerkey",
+				HeaderKeyName:  "X-API-Key",
+				HeaderKeyValue: "test-key",
 			},
 			expectCode: http.StatusOK,
 			expectEmit: true,
@@ -750,7 +647,7 @@ func TestWebhook_HandleWebhook(t *testing.T) {
 				h := hmac.New(sha256.New, []byte(tt.config.SignatureKey))
 				h.Write(tt.body)
 				signature := hex.EncodeToString(h.Sum(nil))
-				headers.Set("X-Webhook-Signature", "sha256="+signature)
+				headers.Set("X-Signature-256", "sha256="+signature)
 			}
 
 			eventCtx := &contexts.EventContext{}
@@ -831,7 +728,7 @@ func TestWebhook_HandleWebhook_SignatureVerification(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			headers := http.Header{}
-			headers.Set("X-Webhook-Signature", tt.signature)
+			headers.Set("X-Signature-256", tt.signature)
 
 			eventCtx := &contexts.EventContext{}
 
