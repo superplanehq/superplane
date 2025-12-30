@@ -115,8 +115,8 @@ func (p *OnPipelineDone) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (p *OnPipelineDone) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (p *OnPipelineDone) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

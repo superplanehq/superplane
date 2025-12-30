@@ -110,6 +110,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbWorkflows.Workflows_ListChildExecutions_FullMethodName:       {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbWorkflows.Workflows_CancelExecution_FullMethodName:           {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbWorkflows.Workflows_InvokeNodeExecutionAction_FullMethodName: {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbWorkflows.Workflows_InvokeNodeTriggerAction_FullMethodName:   {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbWorkflows.Workflows_ListNodeEvents_FullMethodName:            {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbWorkflows.Workflows_EmitNodeEvent_FullMethodName:             {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
 	}

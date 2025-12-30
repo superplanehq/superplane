@@ -127,8 +127,8 @@ func (r *OnRelease) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (r *OnRelease) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (r *OnRelease) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (r *OnRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

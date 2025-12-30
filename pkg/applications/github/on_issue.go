@@ -136,8 +136,8 @@ func (i *OnIssue) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (i *OnIssue) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (i *OnIssue) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

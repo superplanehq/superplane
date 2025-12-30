@@ -135,6 +135,35 @@ func (s *WorkflowService) InvokeNodeExecutionAction(ctx context.Context, req *pb
 	)
 }
 
+func (s *WorkflowService) InvokeNodeTriggerAction(ctx context.Context, req *pb.InvokeNodeTriggerActionRequest) (*pb.InvokeNodeTriggerActionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+
+	workflowID, err := uuid.Parse(req.WorkflowId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+	}
+
+	if req.NodeId == "" {
+		return nil, status.Error(codes.InvalidArgument, "node_id is required")
+	}
+
+	if req.ActionName == "" {
+		return nil, status.Error(codes.InvalidArgument, "action_name is required")
+	}
+
+	return workflows.InvokeNodeTriggerAction(
+		ctx,
+		s.authService,
+		s.encryptor,
+		s.registry,
+		uuid.MustParse(organizationID),
+		workflowID,
+		req.NodeId,
+		req.ActionName,
+		req.Parameters.AsMap(),
+	)
+}
+
 func (s *WorkflowService) ListWorkflowEvents(ctx context.Context, req *pb.ListWorkflowEventsRequest) (*pb.ListWorkflowEventsResponse, error) {
 	workflowID, err := uuid.Parse(req.WorkflowId)
 	if err != nil {

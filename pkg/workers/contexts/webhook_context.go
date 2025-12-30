@@ -42,6 +42,30 @@ func (c *WebhookContext) GetSecret() ([]byte, error) {
 	return c.encryptor.Decrypt(c.ctx, webhook.Secret, []byte(webhook.ID.String()))
 }
 
+func (c *WebhookContext) ResetSecret() ([]byte, []byte, error) {
+	if c.node.WebhookID == nil {
+		return nil, nil, fmt.Errorf("node does not have a webhook")
+	}
+
+	plainKey, encryptedKey, err := crypto.NewRandomKey(c.ctx, c.encryptor, c.node.WebhookID.String())
+	if err != nil {
+		return nil, nil, fmt.Errorf("error generating key for new webhook: %v", err)
+	}
+
+	webhook, err := models.FindWebhookInTransaction(c.tx, *c.node.WebhookID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error finding webhook: %v", err)
+	}
+
+	webhook.Secret = encryptedKey
+	err = c.tx.Save(webhook).Error
+	if err != nil {
+		return nil, nil, fmt.Errorf("error saving webhook: %v", err)
+	}
+
+	return []byte(plainKey), encryptedKey, nil
+}
+
 func (c *WebhookContext) Setup(options *core.WebhookSetupOptions) (*uuid.UUID, error) {
 	webhook, err := c.findOrCreateWebhook(options)
 	if err != nil {

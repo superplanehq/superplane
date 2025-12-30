@@ -130,8 +130,8 @@ func (p *OnPush) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (p *OnPush) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (p *OnPush) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

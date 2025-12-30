@@ -158,8 +158,8 @@ func (s *Semaphore) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (s *Semaphore) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (s *Semaphore) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (s *Semaphore) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

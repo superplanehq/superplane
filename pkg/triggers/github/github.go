@@ -185,8 +185,8 @@ func (g *GitHub) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (g *GitHub) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (g *GitHub) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (g *GitHub) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

@@ -80,11 +80,12 @@ func (s *PanicableTrigger) HandleWebhook(ctx core.WebhookRequestContext) (status
 	return s.underlying.HandleWebhook(ctx)
 }
 
-func (s *PanicableTrigger) HandleAction(ctx core.TriggerActionContext) (err error) {
+func (s *PanicableTrigger) HandleAction(ctx core.TriggerActionContext) (result map[string]any, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			ctx.Logger.Errorf("Trigger %s panicked in HandleAction(%s): %v\nStack: %s",
 				s.underlying.Name(), ctx.Name, r, debug.Stack())
+			result = nil
 			err = fmt.Errorf("trigger %s panicked in HandleAction(%s): %v",
 				s.underlying.Name(), ctx.Name, r)
 		}

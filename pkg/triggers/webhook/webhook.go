@@ -1,8 +1,6 @@
 package webhook
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -27,18 +25,14 @@ type Webhook struct{}
 
 type Metadata struct {
 	URL            string `json:"url"`
-	SignatureKey   string `json:"signatureKey,omitempty"`
 	Authentication string `json:"authentication"`
 	HeaderKeyName  string `json:"headerKeyName,omitempty"`
-	HeaderKeyValue string `json:"headerKeyValue,omitempty"`
 }
 
 type Configuration struct {
 	URL            string `json:"url"`
 	Authentication string `json:"authentication"`
-	SignatureKey   string `json:"signatureKey,omitempty"`
 	HeaderKeyName  string `json:"headerKeyName,omitempty"`
-	HeaderKeyValue string `json:"headerKeyValue,omitempty"`
 }
 
 func (w *Webhook) Name() string {
@@ -58,7 +52,7 @@ func (w *Webhook) Icon() string {
 }
 
 func (w *Webhook) Color() string {
-	return "blue"
+	return "black"
 }
 
 func (w *Webhook) Configuration() []configuration.Field {
@@ -88,45 +82,11 @@ func (w *Webhook) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "signatureKey",
-			Label:       "Signature Key",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			ReadOnly:    true,
-			Sensitive:   true,
-			Description: "HMAC signature key for webhook verification",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "authentication",
-					Values: []string{"signature"},
-				},
-			},
-		},
-		{
 			Name:        "headerKeyName",
 			Label:       "Header Key Header Name",
 			Type:        configuration.FieldTypeString,
 			Default:     "X-API-Key",
 			Description: "Name of the header containing the Header Key",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "authentication",
-					Values: []string{"headerkey"},
-				},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{
-					Field:  "authentication",
-					Values: []string{"headerkey"},
-				},
-			},
-		},
-		{
-			Name:        "headerKeyValue",
-			Label:       "Header Key Value",
-			Type:        configuration.FieldTypeString,
-			Sensitive:   true,
-			Description: "The Header Key value to verify against",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "authentication",
@@ -180,37 +140,11 @@ func (w *Webhook) Setup(ctx core.TriggerContext) error {
 		metadata.URL = webhookURL
 		config.URL = webhookURL
 	} else {
-
 		webhookURL = metadata.URL
 		config.URL = webhookURL
 	}
 
 	metadata.Authentication = config.Authentication
-
-	configHeaderKeyName := config.HeaderKeyName
-	configHeaderKeyValue := config.HeaderKeyValue
-
-	metadata.SignatureKey = ""
-	metadata.HeaderKeyName = ""
-	metadata.HeaderKeyValue = ""
-	config.SignatureKey = ""
-	config.HeaderKeyName = ""
-	config.HeaderKeyValue = ""
-
-	switch config.Authentication {
-	case "signature":
-		key, err := generateSignatureKey()
-		if err != nil {
-			return fmt.Errorf("failed to generate signature key: %w", err)
-		}
-		metadata.SignatureKey = key
-		config.SignatureKey = key
-	case "headerkey":
-		metadata.HeaderKeyName = configHeaderKeyName
-		metadata.HeaderKeyValue = configHeaderKeyValue
-		config.HeaderKeyName = configHeaderKeyName
-		config.HeaderKeyValue = configHeaderKeyValue
-	}
 
 	err = ctx.MetadataContext.Set(metadata)
 	if err != nil {
@@ -229,9 +163,7 @@ func updateTriggerConfiguration(ctx core.TriggerContext, config Configuration) e
 	configMap := map[string]any{
 		"url":            config.URL,
 		"authentication": config.Authentication,
-		"signatureKey":   config.SignatureKey,
 		"headerKeyName":  config.HeaderKeyName,
-		"headerKeyValue": config.HeaderKeyValue,
 	}
 
 	return nodeMetadataCtx.UpdateConfiguration(configMap)
@@ -240,76 +172,54 @@ func updateTriggerConfiguration(ctx core.TriggerContext, config Configuration) e
 func (w *Webhook) Actions() []core.Action {
 	return []core.Action{
 		{
-			Name:           "resetAuth",
-			Description:    "Reset/regenerate authentication credentials",
+			Name:           "resetAuthentication",
+			Description:    "Reset/regenerate authentication key",
 			UserAccessible: true,
 			Parameters:     []configuration.Field{},
 		},
 	}
 }
 
-func (w *Webhook) HandleAction(ctx core.TriggerActionContext) error {
+func (w *Webhook) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	switch ctx.Name {
-	case "resetAuth":
-		return w.resetAuth(ctx)
+	case "resetAuthentication":
+		return w.resetAuthentication(ctx)
 	}
-	return fmt.Errorf("action %s not supported", ctx.Name)
+	return nil, fmt.Errorf("action %s not supported", ctx.Name)
 }
 
-func (w *Webhook) resetAuth(ctx core.TriggerActionContext) error {
+func (w *Webhook) resetAuthentication(ctx core.TriggerActionContext) (map[string]any, error) {
 	var metadata Metadata
 	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
-		return fmt.Errorf("failed to parse metadata: %w", err)
+		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
 	var config Configuration
 	err = mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+		return nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	preserveHeaderKeyName := metadata.HeaderKeyName
-	if metadata.Authentication == "headerkey" && preserveHeaderKeyName == "" {
-		preserveHeaderKeyName = config.HeaderKeyName
-	}
-
-	metadata.SignatureKey = ""
-	metadata.HeaderKeyName = ""
-	metadata.HeaderKeyValue = ""
-	config.SignatureKey = ""
-	config.HeaderKeyName = ""
-	config.HeaderKeyValue = ""
-
+	plainKey, err := []byte{}, nil
 	switch metadata.Authentication {
 	case "signature":
-		key, err := generateSignatureKey()
-		if err != nil {
-			return fmt.Errorf("failed to generate signature key: %w", err)
-		}
-		metadata.SignatureKey = key
-		config.SignatureKey = key
+		plainKey, _, err = ctx.WebhookContext.ResetSecret()
+	case "headerkey":
+		plainKey, _, err = ctx.WebhookContext.ResetSecret()
 	default:
-		return fmt.Errorf("unsupported authentication method: %s", metadata.Authentication)
+		return nil, fmt.Errorf("unsupported authentication method: %s", metadata.Authentication)
 	}
 
-	err = ctx.MetadataContext.Set(metadata)
 	if err != nil {
-		return fmt.Errorf("failed to set metadata: %w", err)
+		return nil, fmt.Errorf("failed to reset authentication: %w", err)
 	}
 
-	triggerCtx := core.TriggerContext{
-		Logger:                 ctx.Logger,
-		Configuration:          ctx.Configuration,
-		MetadataContext:        ctx.MetadataContext,
-		RequestContext:         ctx.RequestContext,
-		EventContext:           ctx.EventContext,
-		WebhookContext:         ctx.WebhookContext,
-		IntegrationContext:     nil,
-		AppInstallationContext: ctx.AppInstallationContext,
+	result := map[string]any{
+		"secret": string(plainKey),
 	}
 
-	return updateTriggerConfiguration(triggerCtx, config)
+	return result, nil
 }
 
 func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
@@ -321,6 +231,11 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	err := mapstructure.Decode(ctx.Configuration, &metadata)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to parse configuration: %w", err)
+	}
+
+	secret, err := ctx.WebhookContext.GetSecret()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
 	}
 
 	switch metadata.Authentication {
@@ -335,7 +250,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 			return http.StatusForbidden, fmt.Errorf("invalid signature format")
 		}
 
-		if err := crypto.VerifySignature([]byte(metadata.SignatureKey), ctx.Body, signature); err != nil {
+		if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
 			return http.StatusForbidden, fmt.Errorf("invalid signature")
 		}
 	case "headerkey":
@@ -344,7 +259,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 			return http.StatusUnauthorized, fmt.Errorf("missing Header Key header: %s", metadata.HeaderKeyName)
 		}
 
-		if headerKeyHeader != metadata.HeaderKeyValue {
+		if headerKeyHeader != string(secret) {
 			return http.StatusUnauthorized, fmt.Errorf("invalid Header Key")
 		}
 	}
@@ -366,15 +281,6 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	return http.StatusOK, nil
-}
-
-func generateSignatureKey() (string, error) {
-	key := make([]byte, 32)
-	_, err := rand.Read(key)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(key), nil
 }
 
 func getWebhooksBaseURL() string {

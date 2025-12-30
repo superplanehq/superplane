@@ -34,6 +34,15 @@ func (w *WebhookContext) GetSecret() ([]byte, error) {
 	return []byte(w.Secret), nil
 }
 
+func (w *WebhookContext) ResetSecret() ([]byte, []byte, error) {
+	return []byte(w.Secret), []byte(w.Secret), nil
+}
+
+func (w *WebhookContext) SetSecret(secret []byte) error {
+	w.Secret = string(secret)
+	return nil
+}
+
 func (w *WebhookContext) Setup(options *core.WebhookSetupOptions) (*uuid.UUID, error) {
 	id := uuid.New()
 	return &id, nil

@@ -128,8 +128,8 @@ func (p *OnPullRequest) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (p *OnPullRequest) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (p *OnPullRequest) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
