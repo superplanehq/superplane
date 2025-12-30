@@ -52,7 +52,7 @@ function App() {
           <BrowserRouter>
             <Routes>
               {/* Organization-scoped protected routes */}
-              <Route path=":organizationId" element={withAuthAndNavigation(HomePage)} />
+              <Route path=":organizationId" element={withAuthOnly(HomePage)} />
               <Route path=":organizationId/custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
               <Route path=":organizationId/workflows/:workflowId" element={withAuthOnly(WorkflowPageV2)} />
               <Route
