@@ -26,13 +26,11 @@ type Webhook struct{}
 type Metadata struct {
 	URL            string `json:"url"`
 	Authentication string `json:"authentication"`
-	HeaderKeyName  string `json:"headerKeyName,omitempty"`
 }
 
 type Configuration struct {
 	URL            string `json:"url"`
 	Authentication string `json:"authentication"`
-	HeaderKeyName  string `json:"headerKeyName,omitempty"`
 }
 
 func (w *Webhook) Name() string {
@@ -70,33 +68,14 @@ func (w *Webhook) Configuration() []configuration.Field {
 			Label:    "Authentication",
 			Type:     configuration.FieldTypeSelect,
 			Required: true,
-			Default:  "none",
+			Default:  "signature",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "None", Value: "none"},
 						{Label: "Signature (HMAC)", Value: "signature"},
-						{Label: "Header Key", Value: "headerkey"},
+						{Label: "Bearer Token", Value: "bearer"},
+						{Label: "None (unsafe)", Value: "none"},
 					},
-				},
-			},
-		},
-		{
-			Name:        "headerKeyName",
-			Label:       "Header Key Header Name",
-			Type:        configuration.FieldTypeString,
-			Default:     "X-API-Key",
-			Description: "Name of the header containing the Header Key",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "authentication",
-					Values: []string{"headerkey"},
-				},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{
-					Field:  "authentication",
-					Values: []string{"headerkey"},
 				},
 			},
 		},
@@ -163,7 +142,6 @@ func updateTriggerConfiguration(ctx core.TriggerContext, config Configuration) e
 	configMap := map[string]any{
 		"url":            config.URL,
 		"authentication": config.Authentication,
-		"headerKeyName":  config.HeaderKeyName,
 	}
 
 	return nodeMetadataCtx.UpdateConfiguration(configMap)
@@ -205,7 +183,7 @@ func (w *Webhook) resetAuthentication(ctx core.TriggerActionContext) (map[string
 	switch metadata.Authentication {
 	case "signature":
 		plainKey, _, err = ctx.WebhookContext.ResetSecret()
-	case "headerkey":
+	case "bearer":
 		plainKey, _, err = ctx.WebhookContext.ResetSecret()
 	default:
 		return nil, fmt.Errorf("unsupported authentication method: %s", metadata.Authentication)
@@ -253,15 +231,18 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
 			return http.StatusForbidden, fmt.Errorf("invalid signature")
 		}
-	case "headerkey":
-		headerKeyHeader := ctx.Headers.Get(metadata.HeaderKeyName)
-		if headerKeyHeader == "" {
-			return http.StatusUnauthorized, fmt.Errorf("missing Header Key header: %s", metadata.HeaderKeyName)
+	case "bearer":
+		authHeader := ctx.Headers.Get("Authorization")
+		if authHeader == "" {
+			return http.StatusUnauthorized, fmt.Errorf("missing Authorization header")
 		}
 
-		if headerKeyHeader != string(secret) {
-			return http.StatusUnauthorized, fmt.Errorf("invalid Header Key")
+		expectedToken := "Bearer " + string(secret)
+		if authHeader != expectedToken {
+			return http.StatusUnauthorized, fmt.Errorf("invalid Bearer token")
 		}
+
+		ctx.Headers.Set("Authorization", "Bearer ********")
 	}
 
 	var parsedData any

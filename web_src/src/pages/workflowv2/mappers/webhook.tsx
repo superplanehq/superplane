@@ -19,14 +19,11 @@ interface WebhookConfiguration {
   url?: string;
   authentication?: string;
   signatureKey?: string;
-  headerKeyName?: string;
-  headerKeyValue?: string;
 }
 
 interface WebhookMetadata {
   url?: string;
   authentication?: string;
-  headerKeyName?: string;
 }
 
 function formatAuthenticationMethod(auth: string): string {
@@ -35,8 +32,8 @@ function formatAuthenticationMethod(auth: string): string {
       return "No authentication";
     case "signature":
       return "HMAC signature";
-    case "headerkey":
-      return "Header key";
+    case "bearer":
+      return "Bearer token";
     default:
       return "Unknown authentication";
   }
@@ -90,8 +87,10 @@ export const webhookTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
     const webhookData = event.data?._webhook as WebhookEventData | undefined;
+    const receivedOn = (event.data?.["timestamp"] as string) || event.createdAt;
     const values: Record<string, string> = {
-      Timestamp: (event.data?.["timestamp"] as string) || event.createdAt || "n/a",
+      "Received on": receivedOn ? new Date(receivedOn).toLocaleString() : "n/a",
+      Response: "200",
     };
 
     if (webhookData) {
@@ -205,13 +204,13 @@ const ResetAuthButton: React.FC<{
           successDescription:
             "Please update your webhook client with the new signature key. This will only be shown once.",
         };
-      case "headerkey":
+      case "bearer":
         return {
-          buttonText: "Reset Header Token",
-          resettingText: "Resetting Header Token...",
-          successTitle: "New header token generated",
+          buttonText: "Reset Bearer Token",
+          resettingText: "Resetting Bearer Token...",
+          successTitle: "New bearer token generated",
           successDescription:
-            "Please update your webhook client with the new header token. This will only be shown once.",
+            "Please update your webhook client with the new bearer token. This will only be shown once.",
         };
       default:
         return {
@@ -339,21 +338,19 @@ curl -X POST \\
   ${webhookUrl}`;
           break;
 
-        case "headerkey": {
-          title = "Header Key Authentication";
-          description = "Use header key to authenticate your webhook requests.";
-          const keyName = config?.headerKeyName || "X-API-Key";
-          const keyValue = secret || "<your-key>";
-          code = `export HEADER_KEY="${keyValue}"
+        case "bearer":
+          title = "Bearer Token Authentication";
+          description = "Use bearer token to authenticate your webhook requests.";
+          signatureKey = secret || "<your-bearer-token>";
+          code = `export BEARER_TOKEN="${signatureKey}"
 export PAYLOAD='{"hello":"world"}'
 
 curl -X POST \\
-  -H "${keyName}: $HEADER_KEY" \\
+  -H "Authorization: Bearer $BEARER_TOKEN" \\
   -H "Content-Type: application/json" \\
   --data "$PAYLOAD" \\
   ${webhookUrl}`;
           break;
-        }
 
         default:
           title = "No Authentication";
