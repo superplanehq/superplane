@@ -16,9 +16,7 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { workflowKeys } from "@/hooks/useWorkflowData";
 
 interface WebhookConfiguration {
-  url?: string;
   authentication?: string;
-  signatureKey?: string;
 }
 
 interface WebhookMetadata {
@@ -375,11 +373,33 @@ curl -X POST \\
           <div>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{title}</span>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{description}</p>
-            <div className="relative group mt-2">
-              <pre className="text-sm text-gray-800 dark:text-gray-100 border-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-md font-mono whitespace-pre overflow-x-auto">
-                {code}
-              </pre>
-              <CopyCodeButton code={code} />
+
+            {/* Webhook URL Copy Field */}
+            <div className="mt-3">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                Webhook URL
+              </label>
+              <div className="relative group mt-1">
+                <input
+                  type="text"
+                  value={webhookUrl}
+                  readOnly
+                  className="w-full text-sm text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md p-2 pr-8 font-mono"
+                />
+                <CopyCodeButton code={webhookUrl} />
+              </div>
+            </div>
+
+            <div className="relative group mt-3">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                Code Example
+              </label>
+              <div className="relative group mt-1">
+                <pre className="text-sm text-gray-800 dark:text-gray-100 border-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-md font-mono whitespace-pre overflow-x-auto">
+                  {code}
+                </pre>
+                <CopyCodeButton code={code} />
+              </div>
             </div>
             <ResetAuthButton
               nodeId={node.id!}
