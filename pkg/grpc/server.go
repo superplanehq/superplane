@@ -116,7 +116,7 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
-	workflowService := NewWorkflowService(authService, registry, encryptor, baseURL+basePath)
+	workflowService := NewWorkflowService(authService, registry, encryptor, webhooksBaseURL+basePath)
 	pbWorkflows.RegisterWorkflowsServer(grpcServer, workflowService)
 
 	applicationService := NewApplicationService(encryptor, registry)
