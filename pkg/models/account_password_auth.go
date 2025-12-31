@@ -66,4 +66,3 @@ func (a *AccountPasswordAuth) UpdatePasswordHashInTransaction(tx *gorm.DB, passw
 	a.UpdatedAt = time.Now()
 	return tx.Save(a).Error
 }
-
