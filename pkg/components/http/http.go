@@ -2,13 +2,16 @@ package http
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -32,15 +35,26 @@ type KeyValue struct {
 }
 
 type Spec struct {
-	Method       string      `json:"method"`
-	URL          string      `json:"url"`
-	Headers      *[]Header   `json:"headers,omitempty"`
-	ContentType  *string     `json:"contentType,omitempty"`
-	JSON         *any        `json:"json,omitempty"`
-	XML          *string     `json:"xml,omitempty"`
-	Text         *string     `json:"text,omitempty"`
-	FormData     *[]KeyValue `json:"formData,omitempty"`
-	SuccessCodes *string     `json:"successCodes,omitempty"`
+	Method          string      `json:"method"`
+	URL             string      `json:"url"`
+	Headers         *[]Header   `json:"headers,omitempty"`
+	ContentType     *string     `json:"contentType,omitempty"`
+	JSON            *any        `json:"json,omitempty"`
+	XML             *string     `json:"xml,omitempty"`
+	Text            *string     `json:"text,omitempty"`
+	FormData        *[]KeyValue `json:"formData,omitempty"`
+	SuccessCodes    *string     `json:"successCodes,omitempty"`
+	TimeoutStrategy *string     `json:"timeoutStrategy,omitempty"`
+	TimeoutSeconds  *int        `json:"timeoutSeconds,omitempty"`
+	Retries         *int        `json:"retries,omitempty"`
+}
+
+type RetryMetadata struct {
+	Attempt         int    `json:"attempt"`
+	MaxRetries      int    `json:"maxRetries"`
+	TimeoutStrategy string `json:"timeoutStrategy"`
+	TimeoutSeconds  int    `json:"timeoutSeconds"`
+	LastError       string `json:"lastError,omitempty"`
 }
 
 type HTTP struct{}
@@ -276,15 +290,75 @@ func (e *HTTP) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "timeoutStrategy",
+			Type:        configuration.FieldTypeTogglableSelect,
+			Label:       "Set Timeout and Retries",
+			Required:    false,
+			Description: "Configure timeout and retry behavior for failed requests",
+			TypeOptions: &configuration.TypeOptions{
+				TogglableSelect: &configuration.TogglableSelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Fixed", Value: "fixed"},
+						{Label: "Exponential", Value: "exponential"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "timeoutSeconds",
+			Type:        configuration.FieldTypeNumber,
+			Label:       "Timeout (seconds)",
+			Description: "Timeout in seconds for each request attempt",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "timeoutStrategy", Values: []string{"fixed", "exponential"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "timeoutStrategy", Values: []string{"fixed", "exponential"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { min := 1; return &min }(),
+					Max: func() *int { max := 300; return &max }(),
+				},
+			},
+		},
+		{
+			Name:        "retries",
+			Type:        configuration.FieldTypeNumber,
+			Label:       "Retries",
+			Description: "Number of retry attempts. Wait longer after each failed attempt (timeout capped to 120s)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "timeoutStrategy", Values: []string{"fixed", "exponential"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "timeoutStrategy", Values: []string{"fixed", "exponential"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { min := 0; return &min }(),
+					Max: func() *int { max := 10; return &max }(),
+				},
+			},
+		},
 	}
 }
 
 func (e *HTTP) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name: "retryRequest",
+		},
+	}
 }
 
 func (e *HTTP) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("http does not support actions")
+	switch ctx.Name {
+	case "retryRequest":
+		return e.handleRetryRequest(ctx)
+	default:
+		return fmt.Errorf("unknown action: %s", ctx.Name)
+	}
 }
 
 func (e *HTTP) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -298,27 +372,141 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	// Serialize payload based on content type
+	retryMetadata := RetryMetadata{
+		Attempt:         0,
+		MaxRetries:      0,
+		TimeoutStrategy: "fixed",
+		TimeoutSeconds:  30,
+	}
+
+	if spec.TimeoutStrategy != nil && *spec.TimeoutStrategy != "" {
+		retryMetadata.TimeoutStrategy = *spec.TimeoutStrategy
+	}
+
+	if spec.TimeoutSeconds != nil {
+		retryMetadata.TimeoutSeconds = *spec.TimeoutSeconds
+	}
+
+	if spec.Retries != nil {
+		retryMetadata.MaxRetries = *spec.Retries
+	}
+
+	err = ctx.MetadataContext.Set(retryMetadata)
+	if err != nil {
+		return err
+	}
+
+	return e.executeHTTPRequest(ctx, spec, retryMetadata)
+}
+
+func (e *HTTP) executeHTTPRequest(ctx core.ExecutionContext, spec Spec, retryMetadata RetryMetadata) error {
+	currentTimeout := e.calculateTimeoutForAttempt(retryMetadata.TimeoutStrategy, retryMetadata.TimeoutSeconds, retryMetadata.Attempt)
+
+	resp, err := e.executeRequest(spec, currentTimeout)
+	if err != nil {
+		if retryMetadata.Attempt < retryMetadata.MaxRetries {
+			return e.scheduleRetry(ctx, err.Error(), retryMetadata)
+		}
+
+		return e.handleRequestError(ctx, err, retryMetadata.Attempt+1)
+	}
+
+	var isSuccess bool
+	if spec.SuccessCodes != nil && *spec.SuccessCodes != "" {
+		isSuccess = e.matchesSuccessCode(resp.StatusCode, *spec.SuccessCodes)
+	} else {
+		isSuccess = e.matchesSuccessCode(resp.StatusCode, "2xx")
+	}
+
+	if !isSuccess && retryMetadata.Attempt < retryMetadata.MaxRetries {
+
+		return e.scheduleRetry(ctx, fmt.Sprintf("HTTP status %d", resp.StatusCode), retryMetadata)
+	}
+
+	return e.processResponse(ctx, resp, spec)
+}
+
+func (e *HTTP) scheduleRetry(ctx core.ExecutionContext, lastError string, retryMetadata RetryMetadata) error {
+	retryMetadata.Attempt++
+	retryMetadata.LastError = lastError
+
+	err := ctx.MetadataContext.Set(retryMetadata)
+	if err != nil {
+		return err
+	}
+
+	return ctx.RequestContext.ScheduleActionCall("retryRequest", map[string]any{}, 1*time.Second)
+}
+
+func (e *HTTP) handleRetryRequest(ctx core.ActionContext) error {
+	if ctx.ExecutionStateContext.IsFinished() {
+		return nil
+	}
+
+	metadata := ctx.MetadataContext.Get()
+
+	var retryMetadata RetryMetadata
+	err := mapstructure.Decode(metadata, &retryMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode retry metadata: %w", err)
+	}
+
+	spec := Spec{}
+	err = mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return err
+	}
+
+	execCtx := core.ExecutionContext{
+		Configuration:         ctx.Configuration,
+		ExecutionStateContext: ctx.ExecutionStateContext,
+		MetadataContext:       ctx.MetadataContext,
+		RequestContext:        ctx.RequestContext,
+		AuthContext:           ctx.AuthContext,
+	}
+
+	return e.executeHTTPRequest(execCtx, spec, retryMetadata)
+}
+
+func (e *HTTP) calculateTimeoutForAttempt(strategy string, timeoutSeconds int, attempt int) time.Duration {
+	baseTimeout := time.Duration(timeoutSeconds) * time.Second
+
+	if strategy == "exponential" {
+
+		timeout := time.Duration(float64(baseTimeout) * math.Pow(2, float64(attempt)))
+		maxTimeout := 120 * time.Second
+		if timeout > maxTimeout {
+			return maxTimeout
+		}
+		return timeout
+	}
+
+	return baseTimeout
+}
+
+func (e *HTTP) executeRequest(spec Spec, timeout time.Duration) (*http.Response, error) {
 	var body io.Reader
 	var contentType string
+	var err error
 	if spec.ContentType != nil && (spec.Method == "POST" || spec.Method == "PUT" || spec.Method == "PATCH") {
 		body, contentType, err = e.serializePayload(spec)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	req, err := http.NewRequest(spec.Method, spec.URL, body)
+	reqCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, spec.Method, spec.URL, body)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set Content-Type if we have one
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
 
-	// Apply custom headers if provided (can override Content-Type)
 	if spec.Headers != nil {
 		for _, header := range *spec.Headers {
 			req.Header.Set(header.Name, header.Value)
@@ -327,40 +515,51 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		// Set metadata result to "error" for network/connection failures
-		if ctx.MetadataContext != nil {
-			ctx.MetadataContext.Set(map[string]any{
-				"result": "error",
-			})
-		}
-
-		// Emit error event for network/connection failures
-		errorResponse := map[string]any{
-			"error": err.Error(),
-		}
-		emitErr := ctx.ExecutionStateContext.Emit(
-			core.DefaultOutputChannel.Name,
-			"http.request.error",
-			[]any{errorResponse},
-		)
-		if emitErr != nil {
-			return fmt.Errorf("request failed: %w (and failed to emit event: %v)", err, emitErr)
-		}
-		return fmt.Errorf("request failed: %w", err)
+		return nil, err
 	}
 
+	return resp, nil
+}
+
+func (e *HTTP) handleRequestError(ctx core.ExecutionContext, err error, totalAttempts int) error {
+	if ctx.MetadataContext != nil {
+		ctx.MetadataContext.Set(map[string]any{
+			"result": "error",
+		})
+	}
+
+	errorResponse := map[string]any{
+		"error":    err.Error(),
+		"attempts": totalAttempts,
+	}
+	emitErr := ctx.ExecutionStateContext.Emit(
+		core.DefaultOutputChannel.Name,
+		"http.request.error",
+		[]any{errorResponse},
+	)
+	if emitErr != nil {
+		return fmt.Errorf("request failed after %d attempts: %w (and failed to emit event: %v)", totalAttempts, err, emitErr)
+	}
+
+	err = ctx.ExecutionStateContext.Fail("HTTP request failed", fmt.Sprintf("Request failed after %d attempts: %v", totalAttempts, err))
+	if err != nil {
+		return fmt.Errorf("request failed after %d attempts: %w (and failed to mark execution as failed: %v)", totalAttempts, err, err)
+	}
+
+	return nil
+}
+
+func (e *HTTP) processResponse(ctx core.ExecutionContext, resp *http.Response, spec Spec) error {
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		// Set metadata result to "error" for response reading failures
 		if ctx.MetadataContext != nil {
 			ctx.MetadataContext.Set(map[string]any{
 				"result": "error",
 			})
 		}
 
-		// Emit error event for response reading failures
 		errorResponse := map[string]any{
 			"status": resp.StatusCode,
 			"error":  fmt.Sprintf("failed to read response body: %v", err),
@@ -378,31 +577,27 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 
 	var bodyData any
 	if len(respBody) > 0 {
-		// Try to parse as JSON, but don't fail if it's not JSON
 		err := json.Unmarshal(respBody, &bodyData)
 		if err != nil {
-			// If not valid JSON, store as string
+
 			bodyData = string(respBody)
 		}
 	}
 
-	// Build response with status, headers, and body
 	response := map[string]any{
 		"status":  resp.StatusCode,
 		"headers": resp.Header,
 		"body":    bodyData,
 	}
 
-	// Check if status code matches success codes
 	var isSuccess bool
 	if spec.SuccessCodes != nil && *spec.SuccessCodes != "" {
 		isSuccess = e.matchesSuccessCode(resp.StatusCode, *spec.SuccessCodes)
 	} else {
-		// Default behavior: 2xx is success
+
 		isSuccess = e.matchesSuccessCode(resp.StatusCode, "2xx")
 	}
 
-	// Set metadata result based on success/failure
 	var metadataResult string
 	if isSuccess {
 		metadataResult = "success"
@@ -415,10 +610,14 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		})
 	}
 
-	// Emit event with response data
 	eventType := "http.request.finished"
 	if !isSuccess {
 		eventType = "http.request.failed"
+	}
+
+	if !isSuccess {
+		ctx.ExecutionStateContext.Fail("HTTP request failed", fmt.Sprintf("HTTP request failed with status %d", resp.StatusCode))
+		return nil
 	}
 
 	err = ctx.ExecutionStateContext.Emit(
@@ -426,31 +625,23 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		eventType,
 		[]any{response},
 	)
+
 	if err != nil {
 		return err
-	}
-
-	// Return error if request failed to mark execution as failed
-	if !isSuccess {
-		return fmt.Errorf("HTTP request failed with status %d", resp.StatusCode)
 	}
 
 	return nil
 }
 
-// matchesSuccessCode checks if the given status code matches any of the success code patterns
 func (e *HTTP) matchesSuccessCode(statusCode int, successCodes string) bool {
-	// Default to 2xx if not specified
 	if successCodes == "" {
 		successCodes = "2xx"
 	}
 
-	// Split by comma and trim spaces
 	codes := strings.Split(successCodes, ",")
 	for _, code := range codes {
 		code = strings.TrimSpace(code)
 
-		// Handle wildcard patterns like 2xx, 3xx, etc.
 		if strings.HasSuffix(code, "xx") {
 			prefix := strings.TrimSuffix(code, "xx")
 			statusStr := strconv.Itoa(statusCode)
@@ -458,7 +649,6 @@ func (e *HTTP) matchesSuccessCode(statusCode int, successCodes string) bool {
 				return true
 			}
 		} else {
-			// Handle specific status codes like 200, 201, etc.
 			expectedCode, err := strconv.Atoi(code)
 			if err == nil && statusCode == expectedCode {
 				return true

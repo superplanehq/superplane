@@ -5,13 +5,26 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+// Helper function to create execution context for tests
+func createExecutionContext(config map[string]any) (core.ExecutionContext, *contexts.ExecutionStateContext, *contexts.MetadataContext) {
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+	return core.ExecutionContext{
+		Configuration:         config,
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
+	}, stateCtx, metadataCtx
+}
 
 func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
 	h := &HTTP{}
@@ -174,14 +187,10 @@ func TestHTTP__Execute__GET(t *testing.T) {
 	//
 	// Execute component
 	//
-	stateCtx := &contexts.ExecutionStateContext{}
-	ctx := core.ExecutionContext{
-		Configuration: map[string]any{
-			"method": "GET",
-			"url":    server.URL + "/test",
-		},
-		ExecutionStateContext: stateCtx,
-	}
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL + "/test",
+	})
 
 	err := h.Execute(ctx)
 	assert.NoError(t, err)
@@ -232,17 +241,13 @@ func TestHTTP__Execute__POST_JSON(t *testing.T) {
 	// Execute component
 	//
 	h := &HTTP{}
-	stateCtx := &contexts.ExecutionStateContext{}
 
-	ctx := core.ExecutionContext{
-		Configuration: map[string]any{
-			"method":      "POST",
-			"url":         server.URL,
-			"contentType": "application/json",
-			"json":        map[string]any{"foo": "bar"},
-		},
-		ExecutionStateContext: stateCtx,
-	}
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method":      "POST",
+		"url":         server.URL,
+		"contentType": "application/json",
+		"json":        map[string]any{"foo": "bar"},
+	})
 
 	err := h.Execute(ctx)
 	assert.NoError(t, err)
@@ -282,17 +287,13 @@ func TestHTTP__Execute__POST_XML(t *testing.T) {
 	// Execute component
 	//
 	h := &HTTP{}
-	stateCtx := &contexts.ExecutionStateContext{}
 
-	ctx := core.ExecutionContext{
-		Configuration: map[string]any{
-			"method":      "POST",
-			"url":         server.URL,
-			"contentType": "application/xml",
-			"xml":         xmlPayload,
-		},
-		ExecutionStateContext: stateCtx,
-	}
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method":      "POST",
+		"url":         server.URL,
+		"contentType": "application/xml",
+		"xml":         xmlPayload,
+	})
 
 	err := h.Execute(ctx)
 	assert.NoError(t, err)
@@ -334,17 +335,13 @@ func TestHTTP__Execute__POST_PlainText(t *testing.T) {
 	// Execute component
 	//
 	h := &HTTP{}
-	stateCtx := &contexts.ExecutionStateContext{}
 
-	ctx := core.ExecutionContext{
-		Configuration: map[string]any{
-			"method":      "POST",
-			"url":         server.URL,
-			"contentType": "text/plain",
-			"text":        textPayload,
-		},
-		ExecutionStateContext: stateCtx,
-	}
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method":      "POST",
+		"url":         server.URL,
+		"contentType": "text/plain",
+		"text":        textPayload,
+	})
 
 	err := h.Execute(ctx)
 	assert.NoError(t, err)
@@ -373,20 +370,16 @@ func TestHTTP__Execute__POST_FormData(t *testing.T) {
 	// Execute component
 	//
 	h := &HTTP{}
-	stateCtx := &contexts.ExecutionStateContext{}
 
-	ctx := core.ExecutionContext{
-		Configuration: map[string]any{
-			"method":      "POST",
-			"url":         server.URL,
-			"contentType": "application/x-www-form-urlencoded",
-			"formData": []map[string]any{
-				{"key": "username", "value": "john"},
-				{"key": "password", "value": "secret123"},
-			},
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method":      "POST",
+		"url":         server.URL,
+		"contentType": "application/x-www-form-urlencoded",
+		"formData": []map[string]any{
+			{"key": "username", "value": "john"},
+			{"key": "password", "value": "secret123"},
 		},
-		ExecutionStateContext: stateCtx,
-	}
+	})
 
 	err := h.Execute(ctx)
 	assert.NoError(t, err)
@@ -412,20 +405,16 @@ func TestHTTP__Execute__WithCustomHeaders(t *testing.T) {
 	// Execute component
 	//
 	h := &HTTP{}
-	stateCtx := &contexts.ExecutionStateContext{}
 
-	ctx := core.ExecutionContext{
-		Configuration: map[string]any{
-			"method": "GET",
-			"url":    server.URL,
-			"headers": []map[string]any{
-				{"name": "Authorization", "value": "Bearer token123"},
-				{"name": "Accept", "value": "application/json"},
-				{"name": "User-Agent", "value": "CustomAgent/1.0"},
-			},
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"headers": []map[string]any{
+			{"name": "Authorization", "value": "Bearer token123"},
+			{"name": "Accept", "value": "application/json"},
+			{"name": "User-Agent", "value": "CustomAgent/1.0"},
 		},
-		ExecutionStateContext: stateCtx,
-	}
+	})
 
 	err := h.Execute(ctx)
 	assert.NoError(t, err)
@@ -447,20 +436,16 @@ func TestHTTP__Execute__HeadersOverrideContentType(t *testing.T) {
 	// Execute component
 	//
 	h := &HTTP{}
-	stateCtx := &contexts.ExecutionStateContext{}
 
-	ctx := core.ExecutionContext{
-		Configuration: map[string]any{
-			"method":      "POST",
-			"url":         server.URL,
-			"contentType": "application/json",
-			"json":        map[string]any{"test": "data"},
-			"headers": []map[string]any{
-				{"name": "Content-Type", "value": "application/custom"},
-			},
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method":      "POST",
+		"url":         server.URL,
+		"contentType": "application/json",
+		"json":        map[string]any{"test": "data"},
+		"headers": []map[string]any{
+			{"name": "Content-Type", "value": "application/custom"},
 		},
-		ExecutionStateContext: stateCtx,
-	}
+	})
 
 	err := h.Execute(ctx)
 	assert.NoError(t, err)
@@ -481,15 +466,11 @@ func TestHTTP__Execute__NonJSONResponse(t *testing.T) {
 	// Execute component
 	//
 	h := &HTTP{}
-	stateCtx := &contexts.ExecutionStateContext{}
 
-	ctx := core.ExecutionContext{
-		Configuration: map[string]any{
-			"method": "GET",
-			"url":    server.URL,
-		},
-		ExecutionStateContext: stateCtx,
-	}
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+	})
 
 	err := h.Execute(ctx)
 	assert.NoError(t, err)
@@ -518,15 +499,11 @@ func TestHTTP__Execute__EmptyResponse(t *testing.T) {
 	// Execute component
 	//
 	h := &HTTP{}
-	stateCtx := &contexts.ExecutionStateContext{}
 
-	ctx := core.ExecutionContext{
-		Configuration: map[string]any{
-			"method": "DELETE",
-			"url":    server.URL,
-		},
-		ExecutionStateContext: stateCtx,
-	}
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "DELETE",
+		"url":    server.URL,
+	})
 
 	err := h.Execute(ctx)
 	assert.NoError(t, err)
@@ -557,42 +534,562 @@ func TestHTTP__Execute__HTTPError(t *testing.T) {
 	// Component should fail on HTTP errors (non-2xx by default)
 	//
 	h := &HTTP{}
-	stateCtx := &contexts.ExecutionStateContext{}
 
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+	})
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.False(t, stateCtx.Passed)
+
+	// The failed request should set failure state but no event is emitted
+	// because the function returns early after calling Fail()
+}
+
+func TestHTTP__Execute__InvalidURL(t *testing.T) {
+	h := &HTTP{}
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    "://invalid-url",
+	})
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.False(t, stateCtx.Passed)
+}
+
+func TestHTTP__Setup__TimeoutAndRetryConfiguration(t *testing.T) {
+	h := &HTTP{}
+
+	tests := []struct {
+		name   string
+		config map[string]any
+	}{
+		{
+			name: "timeout strategy with valid configuration",
+			config: map[string]any{
+				"method":          "GET",
+				"url":             "https://api.example.com",
+				"timeoutStrategy": "fixed",
+				"timeoutSeconds":  30,
+				"retries":         3,
+			},
+		},
+		{
+			name: "exponential timeout strategy",
+			config: map[string]any{
+				"method":          "GET",
+				"url":             "https://api.example.com",
+				"timeoutStrategy": "exponential",
+				"timeoutSeconds":  5,
+				"retries":         2,
+			},
+		},
+		{
+			name: "without timeout strategy (default behavior)",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := h.Setup(core.SetupContext{Configuration: tt.config})
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestHTTP__Execute__WithoutRetryStrategy(t *testing.T) {
+	h := &HTTP{}
+
+	//
+	// Create test server that succeeds immediately
+	//
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"result": "success"})
+	}))
+	defer server.Close()
+
+	//
+	// Execute component without timeout strategy
+	//
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
 	ctx := core.ExecutionContext{
 		Configuration: map[string]any{
 			"method": "GET",
 			"url":    server.URL,
 		},
 		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
 	}
 
 	err := h.Execute(ctx)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "HTTP request failed with status 404")
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
 
-	//
-	// Verify status code is captured and failed event is emitted
-	//
-	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
-	assert.Equal(t, stateCtx.Type, "http.request.failed")
-	response := stateCtx.Payloads[0].(map[string]any)
-	assert.Equal(t, 404, response["status"])
+	// Verify metadata contains retry information even without strategy
+	metadata := metadataCtx.Get()
+	assert.NotNil(t, metadata)
 }
 
-func TestHTTP__Execute__InvalidURL(t *testing.T) {
+func TestHTTP__Execute__FixedTimeoutStrategy_Success(t *testing.T) {
 	h := &HTTP{}
+
+	//
+	// Create test server that succeeds on first attempt
+	//
+	var requestCount int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requestCount, 1)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"result": "success"})
+	}))
+	defer server.Close()
+
+	//
+	// Execute component with fixed timeout strategy
+	//
 	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+	ctx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"method":          "GET",
+			"url":             server.URL,
+			"timeoutStrategy": "fixed",
+			"timeoutSeconds":  5,
+			"retries":         2,
+		},
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
+	}
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+
+	// Should only make one request since it succeeds
+	assert.Equal(t, int32(1), atomic.LoadInt32(&requestCount))
+
+	// Verify response
+	assert.Equal(t, stateCtx.Type, "http.request.finished")
+	response := stateCtx.Payloads[0].(map[string]any)
+	assert.Equal(t, 200, response["status"])
+}
+
+func TestHTTP__Execute__ExponentialTimeoutStrategy_Success(t *testing.T) {
+	h := &HTTP{}
+
+	//
+	// Create test server that succeeds on first attempt
+	//
+	var requestCount int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requestCount, 1)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"result": "success"})
+	}))
+	defer server.Close()
+
+	//
+	// Execute component with exponential timeout strategy
+	//
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+	ctx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"method":          "GET",
+			"url":             server.URL,
+			"timeoutStrategy": "exponential",
+			"timeoutSeconds":  2,
+			"retries":         3,
+		},
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
+	}
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+
+	// Should only make one request since it succeeds
+	assert.Equal(t, int32(1), atomic.LoadInt32(&requestCount))
+}
+
+func TestHTTP__HandleAction__RetryRequest_SuccessOnRetry(t *testing.T) {
+	h := &HTTP{}
+
+	//
+	// Create test server that fails first time, succeeds on retry
+	//
+	var requestCount int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count := atomic.AddInt32(&requestCount, 1)
+		if count == 1 {
+			// Fail first request
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			// Succeed on retry
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"result": "success on retry"})
+		}
+	}))
+	defer server.Close()
+
+	//
+	// Execute initial request (should fail and schedule retry)
+	//
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+	requestCtx := &contexts.RequestContext{}
 
 	ctx := core.ExecutionContext{
 		Configuration: map[string]any{
-			"method": "GET",
-			"url":    "://invalid-url",
+			"method":          "GET",
+			"url":             server.URL,
+			"timeoutStrategy": "fixed",
+			"timeoutSeconds":  1,
+			"retries":         1,
 		},
 		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
+		RequestContext:        requestCtx,
 	}
 
 	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.False(t, stateCtx.Finished)
+
+	assert.Equal(t, "retryRequest", requestCtx.Action)
+	assert.Equal(t, 1*time.Second, requestCtx.Duration)
+
+	actionCtx := core.ActionContext{
+		Name:                  "retryRequest",
+		Configuration:         ctx.Configuration,
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
+		RequestContext:        requestCtx,
+	}
+
+	err = h.HandleAction(actionCtx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+
+	// Should have made 2 requests total
+	assert.Equal(t, int32(2), atomic.LoadInt32(&requestCount))
+
+	// Verify final response
+	assert.Equal(t, stateCtx.Type, "http.request.finished")
+}
+
+func TestHTTP__HandleAction__RetryRequest_ExhaustedRetries(t *testing.T) {
+	h := &HTTP{}
+
+	var requestCount int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requestCount, 1)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "server error"})
+	}))
+	defer server.Close()
+
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+	requestCtx := &contexts.RequestContext{}
+
+	ctx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"method":          "GET",
+			"url":             server.URL,
+			"timeoutStrategy": "fixed",
+			"timeoutSeconds":  1,
+			"retries":         2,
+		},
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
+		RequestContext:        requestCtx,
+	}
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+
+	actionCtx := core.ActionContext{
+		Name:                  "retryRequest",
+		Configuration:         ctx.Configuration,
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
+		RequestContext:        &contexts.RequestContext{},
+	}
+
+	err = h.HandleAction(actionCtx)
+	assert.NoError(t, err)
+
+	actionCtx.RequestContext = &contexts.RequestContext{}
+	err = h.HandleAction(actionCtx)
+	assert.NoError(t, err)
+	assert.False(t, stateCtx.Passed)
+
+	// Should have made 3 requests total (initial + 2 retries)
+	assert.Equal(t, int32(3), atomic.LoadInt32(&requestCount))
+}
+
+func TestHTTP__CalculateTimeoutForAttempt__Fixed(t *testing.T) {
+	h := &HTTP{}
+
+	// Fixed strategy should always return the base timeout
+	timeout1 := h.calculateTimeoutForAttempt("fixed", 5, 0)
+	timeout2 := h.calculateTimeoutForAttempt("fixed", 5, 1)
+	timeout3 := h.calculateTimeoutForAttempt("fixed", 5, 2)
+
+	assert.Equal(t, 5*time.Second, timeout1)
+	assert.Equal(t, 5*time.Second, timeout2)
+	assert.Equal(t, 5*time.Second, timeout3)
+}
+
+func TestHTTP__CalculateTimeoutForAttempt__Exponential(t *testing.T) {
+	h := &HTTP{}
+
+	// Exponential strategy: timeout * 2^attempt
+	timeout0 := h.calculateTimeoutForAttempt("exponential", 5, 0)
+	timeout1 := h.calculateTimeoutForAttempt("exponential", 5, 1)
+	timeout2 := h.calculateTimeoutForAttempt("exponential", 5, 2)
+
+	assert.Equal(t, 5*time.Second, timeout0)
+	assert.Equal(t, 10*time.Second, timeout1)
+	assert.Equal(t, 20*time.Second, timeout2)
+
+	// Test capping at 120 seconds
+	timeout5 := h.calculateTimeoutForAttempt("exponential", 30, 5)
+	assert.Equal(t, 120*time.Second, timeout5)
+}
+
+func TestHTTP__Actions__ReturnsRetryAction(t *testing.T) {
+	h := &HTTP{}
+	actions := h.Actions()
+
+	assert.Len(t, actions, 1)
+	assert.Equal(t, "retryRequest", actions[0].Name)
+}
+
+func TestHTTP__HandleAction__UnknownAction(t *testing.T) {
+	h := &HTTP{}
+
+	ctx := core.ActionContext{
+		Name: "unknownAction",
+	}
+
+	err := h.HandleAction(ctx)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to create request")
+	assert.Contains(t, err.Error(), "unknown action: unknownAction")
+}
+
+func TestHTTP__RetryProgression_ExponentialStrategy(t *testing.T) {
+	h := &HTTP{}
+
+	//
+	// Create test server that fails exactly 3 times, then succeeds
+	//
+	var requestCount int32
+	var requestTimes []time.Time
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count := atomic.AddInt32(&requestCount, 1)
+		requestTimes = append(requestTimes, time.Now())
+
+		if count <= 3 {
+			// Fail first 3 requests
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			// Succeed on 4th request
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"result": "success after retries"})
+		}
+	}))
+	defer server.Close()
+
+	//
+	// Execute with exponential strategy (3 retries)
+	//
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+	requestCtx := &contexts.RequestContext{}
+
+	ctx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"method":          "GET",
+			"url":             server.URL,
+			"timeoutStrategy": "exponential",
+			"timeoutSeconds":  2,
+			"retries":         3,
+		},
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
+		RequestContext:        requestCtx,
+	}
+
+	// Execute initial request (should fail and schedule retry)
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "retryRequest", requestCtx.Action)
+
+	requestCtx1 := &contexts.RequestContext{}
+	actionCtx := core.ActionContext{
+		Name:                  "retryRequest",
+		Configuration:         ctx.Configuration,
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
+		RequestContext:        requestCtx1,
+	}
+
+	err = h.HandleAction(actionCtx)
+	assert.NoError(t, err)
+	assert.Equal(t, "retryRequest", requestCtx1.Action)
+
+	requestCtx2 := &contexts.RequestContext{}
+	actionCtx.RequestContext = requestCtx2
+	err = h.HandleAction(actionCtx)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "retryRequest", requestCtx2.Action)
+
+	requestCtx3 := &contexts.RequestContext{}
+	actionCtx.RequestContext = requestCtx3
+	err = h.HandleAction(actionCtx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+
+	// Verify all attempts were made
+	assert.Equal(t, int32(4), atomic.LoadInt32(&requestCount))
+
+	// Verify final response
+	assert.Equal(t, "http.request.finished", stateCtx.Type)
+	response := stateCtx.Payloads[0].(map[string]any)
+	assert.Equal(t, 200, response["status"])
+}
+
+func TestHTTP__RetryProgression_NetworkError(t *testing.T) {
+	h := &HTTP{}
+
+	//
+	// Test retry on network errors (not just HTTP status errors)
+	//
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+	requestCtx := &contexts.RequestContext{}
+
+	ctx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"method":          "GET",
+			"url":             "http://invalid-host-that-does-not-exist.com",
+			"timeoutStrategy": "fixed",
+			"timeoutSeconds":  1,
+			"retries":         2,
+		},
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
+		RequestContext:        requestCtx,
+	}
+
+	// Execute initial request (should fail with network error and schedule retry)
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+
+	// Verify retry is scheduled
+	assert.Equal(t, "retryRequest", requestCtx.Action)
+	assert.Equal(t, 1*time.Second, requestCtx.Duration)
+
+	// Simulate retries until exhaustion
+	for i := 0; i < 2; i++ {
+		actionCtx := core.ActionContext{
+			Name:                  "retryRequest",
+			Configuration:         ctx.Configuration,
+			ExecutionStateContext: stateCtx,
+			MetadataContext:       metadataCtx,
+			RequestContext:        &contexts.RequestContext{},
+		}
+
+		if i == 1 {
+			// Last retry should fail but return nil
+			err = h.HandleAction(actionCtx)
+			assert.NoError(t, err)
+			assert.False(t, stateCtx.Passed)
+		} else {
+			// Earlier retries should schedule next retry
+			err = h.HandleAction(actionCtx)
+			assert.NoError(t, err)
+		}
+	}
+}
+
+func TestHTTP__RetryMetadata_Progression(t *testing.T) {
+	h := &HTTP{}
+
+	//
+	// Test that retry metadata correctly tracks attempts
+	//
+	var requestCount int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requestCount, 1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+
+	ctx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"method":          "GET",
+			"url":             server.URL,
+			"timeoutStrategy": "fixed",
+			"timeoutSeconds":  1,
+			"retries":         2,
+		},
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
+		RequestContext:        &contexts.RequestContext{},
+	}
+
+	// Execute initial request (attempt 0)
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+
+	// Check initial metadata
+	metadata := metadataCtx.Get()
+	retryMeta := metadata.(RetryMetadata)
+	assert.Equal(t, 1, retryMeta.Attempt)
+	assert.Equal(t, 2, retryMeta.MaxRetries)
+	assert.Equal(t, "fixed", retryMeta.TimeoutStrategy)
+	assert.Equal(t, "HTTP status 500", retryMeta.LastError)
+
+	// Simulate first retry (attempt 1)
+	actionCtx := core.ActionContext{
+		Name:                  "retryRequest",
+		Configuration:         ctx.Configuration,
+		ExecutionStateContext: stateCtx,
+		MetadataContext:       metadataCtx,
+		RequestContext:        &contexts.RequestContext{},
+	}
+
+	err = h.HandleAction(actionCtx)
+	assert.NoError(t, err)
+
+	metadata = metadataCtx.Get()
+	retryMeta = metadata.(RetryMetadata)
+	assert.Equal(t, 2, retryMeta.Attempt)
+	assert.Equal(t, "HTTP status 500", retryMeta.LastError)
+
+	actionCtx.RequestContext = &contexts.RequestContext{}
+	err = h.HandleAction(actionCtx)
+	assert.NoError(t, err)
+	assert.False(t, stateCtx.Passed)
+
+	assert.Equal(t, int32(3), atomic.LoadInt32(&requestCount))
 }
