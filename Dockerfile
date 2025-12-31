@@ -76,13 +76,15 @@ FROM base AS builder
 
 ARG BASE_URL=https://app.superplane.com
 ARG VITE_ENABLE_CUSTOM_COMPONENTS=false
+ARG VITE_RBAC_ENABLED=false
+
 
 WORKDIR /app
 RUN rm -rf build && go build -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
 RUN npm install
-RUN VITE_BASE_URL=$BASE_URL VITE_ENABLE_CUSTOM_COMPONENTS=$VITE_ENABLE_CUSTOM_COMPONENTS npm run build
+RUN VITE_BASE_URL=$BASE_URL VITE_ENABLE_CUSTOM_COMPONENTS=$VITE_ENABLE_CUSTOM_COMPONENTS VITE_RBAC_ENABLED=$VITE_RBAC_ENABLED npm run build
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Runner stage to run the application.

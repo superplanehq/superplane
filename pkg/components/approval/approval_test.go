@@ -25,6 +25,7 @@ func TestApproval_OutputChannels(t *testing.T) {
 	assert.Equal(t, "At least one actor rejected (after everyone responded)", channels[1].Description)
 }
 
+// TODO: Add tests for role and group approval when RBAC is enabled
 func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 	approval := &Approval{}
 
@@ -62,6 +63,7 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 	assert.Equal(t, ChannelApproved, stateCtx.Channel)
 }
 
+// TODO: Add tests for role and group approval when RBAC is enabled
 func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 	approval := &Approval{}
 
@@ -100,6 +102,7 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 	assert.Equal(t, ChannelRejected, stateCtx.Channel)
 }
 
+// TODO: Add tests for role and group approval when RBAC is enabled
 func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 	approval := &Approval{}
 
@@ -238,6 +241,7 @@ func TestMetadata_Completed(t *testing.T) {
 	})
 }
 
+// TODO: Add tests for role and group approval when RBAC is enabled
 func TestApproval_Execute(t *testing.T) {
 	approval := &Approval{}
 
@@ -301,6 +305,7 @@ func TestApproval_Execute(t *testing.T) {
 	})
 }
 
+// TODO: Add tests for role and group configuration validation when RBAC is enabled
 func TestApproval_Configuration_Validation(t *testing.T) {
 	approval := &Approval{}
 	config := approval.Configuration()

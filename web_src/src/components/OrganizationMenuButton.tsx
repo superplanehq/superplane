@@ -1,6 +1,7 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { useAccount } from "@/contexts/AccountContext";
 import { useOrganization } from "@/hooks/useOrganizationData";
+import { isRBACEnabled } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
@@ -92,8 +93,12 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
       Icon: Building,
     },
     { label: "Members", href: organizationId ? `/${organizationId}/settings/members` : "#", Icon: UserIcon },
-    { label: "Groups", href: organizationId ? `/${organizationId}/settings/groups` : "#", Icon: Users },
-    { label: "Roles", href: organizationId ? `/${organizationId}/settings/roles` : "#", Icon: Shield },
+    ...(isRBACEnabled()
+      ? [
+          { label: "Groups", href: organizationId ? `/${organizationId}/settings/groups` : "#", Icon: Users },
+          { label: "Roles", href: organizationId ? `/${organizationId}/settings/roles` : "#", Icon: Shield },
+        ]
+      : []),
     {
       label: "Integrations",
       href: organizationId ? `/${organizationId}/settings/integrations` : "#",
