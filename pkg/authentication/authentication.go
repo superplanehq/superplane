@@ -404,13 +404,6 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Redirect
 	redirectURL := getRedirectURL(r)
-	if redirectURL == "/" {
-		// If no redirect parameter, try to redirect to user's first organization
-		organizations, err := models.FindOrganizationsForAccount(account.Email)
-		if err == nil && len(organizations) > 0 {
-			redirectURL = "/" + organizations[0].ID.String()
-		}
-	}
 	// Use StatusSeeOther (303) instead of StatusTemporaryRedirect (307) for POST requests
 	// This ensures the browser uses GET for the redirect, not POST
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
