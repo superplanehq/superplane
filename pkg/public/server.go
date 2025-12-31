@@ -99,7 +99,8 @@ func NewServer(
 ) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup)
+	passwordLoginEnabled := os.Getenv("ENABLE_PASSWORD_LOGIN") == "yes"
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup, passwordLoginEnabled)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 

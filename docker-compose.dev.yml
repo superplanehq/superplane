@@ -62,6 +62,7 @@ services:
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Superplane}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@notifications.superplane.com}
       BLOCK_SIGNUP: ${BLOCK_SIGNUP:-no}
+      ENABLE_PASSWORD_LOGIN: "yes"
       OTEL_ENABLED: "yes"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"

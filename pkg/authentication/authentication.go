@@ -30,12 +30,13 @@ import (
 const SignupDisabledError = "signup is currently disabled"
 
 type Handler struct {
-	jwtSigner   *jwt.Signer
-	authService authorization.Authorization
-	encryptor   crypto.Encryptor
-	isDev       bool
-	templateDir string
-	blockSignup bool
+	jwtSigner            *jwt.Signer
+	authService          authorization.Authorization
+	encryptor            crypto.Encryptor
+	isDev                bool
+	templateDir          string
+	blockSignup          bool
+	passwordLoginEnabled bool
 }
 
 type ProviderConfig struct {
@@ -44,14 +45,15 @@ type ProviderConfig struct {
 	CallbackURL string
 }
 
-func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string, templateDir string, blockSignup bool) *Handler {
+func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string, templateDir string, blockSignup bool, passwordLoginEnabled bool) *Handler {
 	return &Handler{
-		jwtSigner:   jwtSigner,
-		encryptor:   encryptor,
-		authService: authService,
-		isDev:       appEnv == "development",
-		templateDir: templateDir,
-		blockSignup: blockSignup,
+		jwtSigner:            jwtSigner,
+		encryptor:            encryptor,
+		authService:          authService,
+		isDev:                appEnv == "development",
+		templateDir:          templateDir,
+		blockSignup:          blockSignup,
+		passwordLoginEnabled: passwordLoginEnabled,
 	}
 }
 
@@ -86,6 +88,9 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 func (a *Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/logout", a.handleLogout).Methods("GET")
 	router.HandleFunc("/login", a.handleLoginPage).Methods("GET")
+	if a.passwordLoginEnabled {
+		router.HandleFunc("/login", a.handlePasswordLogin).Methods("POST")
+	}
 
 	//
 	// If we are running the application locally,
@@ -312,11 +317,13 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	redirectParam := r.URL.Query().Get("redirect")
 
 	data := struct {
-		Providers     []string
-		RedirectParam string
+		Providers            []string
+		RedirectParam        string
+		PasswordLoginEnabled bool
 	}{
-		Providers:     providerNames,
-		RedirectParam: redirectParam,
+		Providers:            providerNames,
+		RedirectParam:        redirectParam,
+		PasswordLoginEnabled: a.passwordLoginEnabled,
 	}
 
 	err = t.Execute(w, data)
@@ -324,6 +331,80 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 		log.Errorf("Error executing login template: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
+}
+
+func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
+	if !a.passwordLoginEnabled {
+		http.Error(w, "Password login is not enabled", http.StatusForbidden)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+
+	if email == "" || password == "" {
+		http.Error(w, "Email and password are required", http.StatusBadRequest)
+		return
+	}
+
+	// Find account by email
+	account, err := models.FindAccountByEmail(email)
+	if err != nil {
+		log.Warnf("Login attempt with invalid email: %s", email)
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	// Find password auth for this account
+	passwordAuth, err := models.FindAccountPasswordAuthByAccountID(account.ID)
+	if err != nil {
+		log.Warnf("Login attempt for account without password auth: %s", email)
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	// Verify password
+	if !crypto.VerifyPassword(passwordAuth.PasswordHash, password) {
+		log.Warnf("Invalid password attempt for account: %s", email)
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	// Accept pending invitations
+	err = a.acceptPendingInvitations(account)
+	if err != nil {
+		log.Errorf("Error accepting pending invitations for %s: %v", account.Email, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Generate JWT token
+	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
+	if err != nil {
+		log.Errorf("Failed to generate token for password login: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Set cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "account_token",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(24 * time.Hour.Seconds()),
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Redirect
+	redirectURL := getRedirectURL(r)
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {
