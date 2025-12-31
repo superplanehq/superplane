@@ -90,6 +90,20 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				return
 			}
 
+			// Allow login-related paths without authentication
+			if strings.HasPrefix(r.URL.Path, "/login") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Allow static assets and Vite dev server paths without authentication
+			// These are needed for the React app to load in development
+			path := r.URL.Path
+			if strings.HasPrefix(path, "/@") || strings.HasPrefix(path, "/src/") || strings.HasPrefix(path, "/node_modules/") || strings.HasPrefix(path, "/assets/") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			accountID, err := getAccountFromCookie(r, jwtSigner)
 			if err != nil {
 				authentication.ClearAccountCookie(w, r)
