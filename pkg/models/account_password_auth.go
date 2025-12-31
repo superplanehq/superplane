@@ -16,6 +16,10 @@ type AccountPasswordAuth struct {
 	UpdatedAt    time.Time
 }
 
+func (AccountPasswordAuth) TableName() string {
+	return "account_password_auth"
+}
+
 func CreateAccountPasswordAuth(accountID uuid.UUID, passwordHash string) (*AccountPasswordAuth, error) {
 	return CreateAccountPasswordAuthInTransaction(database.Conn(), accountID, passwordHash)
 }

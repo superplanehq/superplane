@@ -22,6 +22,20 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.assertRedirectedToOrganizationHome()
 		steps.assertOwnerSetupIsNoLongerRequired()
 	})
+
+	t.Run("can login with email and password after owner setup", func(t *testing.T) {
+		steps.start()
+		steps.visitSetupPage()
+		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
+		steps.assertOwnerAndOrganizationCreated()
+		steps.assertRedirectedToOrganizationHome()
+		steps.clearCookies()
+		steps.visitLoginPage()
+		steps.clickEmailPasswordLogin()
+		steps.fillInEmailAndPassword("owner@example.com", "Password1")
+		steps.submitLoginForm()
+		steps.assertRedirectedToOrganizationHome()
+	})
 }
 
 type ownerSetupSteps struct {
@@ -81,4 +95,29 @@ func (s *ownerSetupSteps) assertRedirectedToOrganizationHome() {
 func (s *ownerSetupSteps) assertOwnerSetupIsNoLongerRequired() {
 	required := middleware.IsOwnerSetupRequired()
 	assert.False(s.t, required, "owner setup should no longer be required after completion")
+}
+
+func (s *ownerSetupSteps) clearCookies() {
+	err := s.session.Page().Context().ClearCookies()
+	assert.NoError(s.t, err, "clear cookies")
+}
+
+func (s *ownerSetupSteps) visitLoginPage() {
+	s.session.Visit("/login")
+	s.session.Sleep(500) // wait for page load
+}
+
+func (s *ownerSetupSteps) clickEmailPasswordLogin() {
+	s.session.Click(q.Text("Email & Password"))
+	s.session.Sleep(500) // wait for navigation
+}
+
+func (s *ownerSetupSteps) fillInEmailAndPassword(email, password string) {
+	s.session.FillIn(q.Locator(`input[type="email"]`), email)
+	s.session.FillIn(q.Locator(`input[type="password"]`), password)
+}
+
+func (s *ownerSetupSteps) submitLoginForm() {
+	s.session.Click(q.Text("Sign in"))
+	s.session.Sleep(1000) // wait for redirect
 }
