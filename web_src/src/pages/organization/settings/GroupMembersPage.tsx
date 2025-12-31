@@ -160,9 +160,9 @@ export function GroupMembersPage() {
 
   const getSortIcon = (columnKey: string) => {
     if (sortConfig.key !== columnKey) {
-      return "unfold_more";
+      return "chevrons-up-down";
     }
-    return sortConfig.direction === "asc" ? "keyboard_arrow_up" : "keyboard_arrow_down";
+    return sortConfig.direction === "asc" ? "chevron-up" : "chevron-down";
   };
 
   const handleRemoveMember = async (userId: string) => {
@@ -399,7 +399,7 @@ export function GroupMembersPage() {
                 {loadingRoles
                   ? "Loading..."
                   : roles.find((role) => role.metadata?.name === group?.spec?.role)?.spec?.displayName || "Member"}
-                <Icon name="keyboard_arrow_down" />
+                <Icon name="chevron-down" />
               </DropdownButton>
               <DropdownMenu>
                 {roles.map((role) => (
@@ -412,7 +412,7 @@ export function GroupMembersPage() {
             </Dropdown>
             <Dropdown>
               <DropdownButton aria-label="More options" disabled={deleteGroupMutation.isPending}>
-                <Icon name="more_vert" size="sm" />
+                <Icon name="ellipsis-vertical" size="sm" />
               </DropdownButton>
               <DropdownMenu>
                 <DropdownItem onClick={handleDeleteGroup} className="text-red-600 dark:text-red-400">
@@ -499,7 +499,7 @@ export function GroupMembersPage() {
                       <div className="flex justify-end">
                         <Dropdown>
                           <DropdownButton className="flex items-center gap-2 text-sm">
-                            <Icon name="more_vert" size="sm" />
+                            <Icon name="ellipsis-vertical" size="sm" />
                           </DropdownButton>
                           <DropdownMenu>
                             <DropdownItem onClick={() => handleRemoveMember(member.metadata!.id!)}>
