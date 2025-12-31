@@ -68,7 +68,7 @@ services:
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
-      VITE_RBAC_ENABLED: "false"
+      VITE_RBAC_ENABLED: "true"
 
     ports:
       - 5173:5173
