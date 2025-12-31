@@ -6,6 +6,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -56,6 +57,17 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		var err error
 
 		account, err = models.CreateAccountInTransaction(tx, fullName, req.Email)
+		if err != nil {
+			return err
+		}
+
+		// Hash and store password
+		passwordHash, err := crypto.HashPassword(req.Password)
+		if err != nil {
+			return err
+		}
+
+		_, err = models.CreateAccountPasswordAuthInTransaction(tx, account.ID, passwordHash)
 		if err != nil {
 			return err
 		}

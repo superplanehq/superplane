@@ -39,13 +39,16 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
         const response = await fetch("/account", {
           method: "GET",
           credentials: "include",
+          redirect: "manual", // Don't follow redirects, check status code instead
         });
 
-        if (response.ok) {
+        if (response.status === 200) {
           const accountData = await response.json();
           setAccount(accountData);
         }
+        // If response is not 200 (e.g., 307 redirect, 401, etc.), user is not authenticated
       } catch (error) {
+        // Network errors or other unexpected errors
         console.error("Failed to fetch account:", error);
       } finally {
         setLoading(false);

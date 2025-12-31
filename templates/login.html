@@ -69,6 +69,13 @@
         .login-btn.google:hover {
             background: #5472a3;
         }
+        .login-btn.email {
+            background: #6584b4;
+            color: #1e2938;
+        }
+        .login-btn.email:hover {
+            background: #5472a3;
+        }
         .provider-icon {
             width: 20px;
             height: 20px;
@@ -85,7 +92,9 @@
 
         </div>
 
+        {{if gt (len .Providers) 0}}
         <div class="subtitle">Continue with</div>
+        {{end}}
 
         {{range .Providers}}
         <a href="/auth/{{.}}{{if $.RedirectParam}}?redirect={{$.RedirectParam}}{{end}}" class="login-btn {{.}}">
@@ -105,6 +114,15 @@
             {{end}}
         </a>
     {{end}}
+
+        {{if .PasswordLoginEnabled}}
+        <a href="/login/email{{if .RedirectParam}}?redirect={{.RedirectParam}}{{end}}" class="login-btn email">
+            <svg class="provider-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+            </svg>
+            Email & Password
+        </a>
+        {{end}}
     </div>
 </body>
 </html>
