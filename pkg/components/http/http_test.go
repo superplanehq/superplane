@@ -32,7 +32,6 @@ func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
 			config: map[string]any{
 				"method":      "POST",
 				"url":         "https://api.example.com",
-				"sendBody":    true,
 				"contentType": "application/json",
 				"json":        map[string]any{"key": "value"},
 			},
@@ -42,7 +41,6 @@ func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
 			config: map[string]any{
 				"method":      "POST",
 				"url":         "https://api.example.com",
-				"sendBody":    true,
 				"contentType": "application/xml",
 				"xml":         "<root><element>value</element></root>",
 			},
@@ -52,7 +50,6 @@ func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
 			config: map[string]any{
 				"method":      "POST",
 				"url":         "https://api.example.com",
-				"sendBody":    true,
 				"contentType": "text/plain",
 				"text":        "plain text content",
 			},
@@ -62,7 +59,6 @@ func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
 			config: map[string]any{
 				"method":      "POST",
 				"url":         "https://api.example.com",
-				"sendBody":    true,
 				"contentType": "application/x-www-form-urlencoded",
 				"formData":    []map[string]any{{"key": "username", "value": "john"}},
 			},
@@ -70,10 +66,9 @@ func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
 		{
 			name: "with headers",
 			config: map[string]any{
-				"method":      "POST",
-				"url":         "https://api.example.com",
-				"sendHeaders": true,
-				"headers":     []map[string]any{{"name": "Authorization", "value": "Bearer token"}},
+				"method":  "POST",
+				"url":     "https://api.example.com",
+				"headers": []map[string]any{{"name": "Authorization", "value": "Bearer token"}},
 			},
 		},
 	}
@@ -105,20 +100,19 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 			expectErr: "method is required",
 		},
 		{
-			name: "sendBody without contentType",
+			name: "contentType with missing payload",
 			config: map[string]any{
-				"method":   "POST",
-				"url":      "https://api.example.com",
-				"sendBody": true,
+				"method":      "POST",
+				"url":         "https://api.example.com",
+				"contentType": "application/json",
 			},
-			expectErr: "content type is required when sending a body",
+			expectErr: "json is required",
 		},
 		{
 			name: "JSON contentType without json field",
 			config: map[string]any{
 				"method":      "POST",
 				"url":         "https://api.example.com",
-				"sendBody":    true,
 				"contentType": "application/json",
 			},
 			expectErr: "json is required",
@@ -128,7 +122,6 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 			config: map[string]any{
 				"method":      "POST",
 				"url":         "https://api.example.com",
-				"sendBody":    true,
 				"contentType": "application/xml",
 			},
 			expectErr: "xml is required",
@@ -138,7 +131,6 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 			config: map[string]any{
 				"method":      "POST",
 				"url":         "https://api.example.com",
-				"sendBody":    true,
 				"contentType": "text/plain",
 			},
 			expectErr: "text is required",
@@ -148,7 +140,6 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 			config: map[string]any{
 				"method":      "POST",
 				"url":         "https://api.example.com",
-				"sendBody":    true,
 				"contentType": "application/x-www-form-urlencoded",
 			},
 			expectErr: "form data is required",
@@ -247,7 +238,6 @@ func TestHTTP__Execute__POST_JSON(t *testing.T) {
 		Configuration: map[string]any{
 			"method":      "POST",
 			"url":         server.URL,
-			"sendBody":    true,
 			"contentType": "application/json",
 			"json":        map[string]any{"foo": "bar"},
 		},
@@ -298,7 +288,6 @@ func TestHTTP__Execute__POST_XML(t *testing.T) {
 		Configuration: map[string]any{
 			"method":      "POST",
 			"url":         server.URL,
-			"sendBody":    true,
 			"contentType": "application/xml",
 			"xml":         xmlPayload,
 		},
@@ -351,7 +340,6 @@ func TestHTTP__Execute__POST_PlainText(t *testing.T) {
 		Configuration: map[string]any{
 			"method":      "POST",
 			"url":         server.URL,
-			"sendBody":    true,
 			"contentType": "text/plain",
 			"text":        textPayload,
 		},
@@ -391,7 +379,6 @@ func TestHTTP__Execute__POST_FormData(t *testing.T) {
 		Configuration: map[string]any{
 			"method":      "POST",
 			"url":         server.URL,
-			"sendBody":    true,
 			"contentType": "application/x-www-form-urlencoded",
 			"formData": []map[string]any{
 				{"key": "username", "value": "john"},
@@ -429,9 +416,8 @@ func TestHTTP__Execute__WithCustomHeaders(t *testing.T) {
 
 	ctx := core.ExecutionContext{
 		Configuration: map[string]any{
-			"method":      "GET",
-			"url":         server.URL,
-			"sendHeaders": true,
+			"method": "GET",
+			"url":    server.URL,
 			"headers": []map[string]any{
 				{"name": "Authorization", "value": "Bearer token123"},
 				{"name": "Accept", "value": "application/json"},
@@ -467,10 +453,8 @@ func TestHTTP__Execute__HeadersOverrideContentType(t *testing.T) {
 		Configuration: map[string]any{
 			"method":      "POST",
 			"url":         server.URL,
-			"sendBody":    true,
 			"contentType": "application/json",
 			"json":        map[string]any{"test": "data"},
-			"sendHeaders": true,
 			"headers": []map[string]any{
 				{"name": "Content-Type", "value": "application/custom"},
 			},

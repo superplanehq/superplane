@@ -31,6 +31,9 @@ message TypeOptions {
   optional DateTypeOptions date = 9;
   optional DateTimeTypeOptions datetime = 10;
   optional AnyPredicateListTypeOptions any_predicate_list = 11;
+  optional TogglableStringTypeOptions togglable_string = 12;
+  optional TogglableSelectTypeOptions togglable_select = 13;
+  optional TogglableListTypeOptions togglable_list = 14;
 }
 
 message NumberTypeOptions {
@@ -103,4 +106,17 @@ message ValidationRule {
 
 message AnyPredicateListTypeOptions {
   repeated SelectOption operators = 1;
+}
+
+message TogglableStringTypeOptions {
+  optional string placeholder = 1;
+}
+
+message TogglableSelectTypeOptions {
+  repeated SelectOption options = 1;
+}
+
+message TogglableListTypeOptions {
+  ListItemDefinition item_definition = 1;
+  optional string item_label = 2;
 }

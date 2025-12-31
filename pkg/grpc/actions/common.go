@@ -244,6 +244,58 @@ func anyPredicateListTypeOptionsToProto(opts *configuration.AnyPredicateListType
 	return pbOpts
 }
 
+func togglableStringTypeOptionsToProto(opts *configuration.TogglableStringTypeOptions) *configpb.TogglableStringTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.TogglableStringTypeOptions{}
+	if opts.Placeholder != "" {
+		pbOpts.Placeholder = &opts.Placeholder
+	}
+	return pbOpts
+}
+
+func togglableSelectTypeOptionsToProto(opts *configuration.TogglableSelectTypeOptions) *configpb.TogglableSelectTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.TogglableSelectTypeOptions{
+		Options: make([]*configpb.SelectOption, len(opts.Options)),
+	}
+	for i, opt := range opts.Options {
+		pbOpts.Options[i] = &configpb.SelectOption{
+			Label: opt.Label,
+			Value: opt.Value,
+		}
+	}
+	return pbOpts
+}
+
+func togglableListTypeOptionsToProto(opts *configuration.TogglableListTypeOptions) *configpb.TogglableListTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.TogglableListTypeOptions{}
+	if opts.ItemLabel != "" {
+		pbOpts.ItemLabel = &opts.ItemLabel
+	}
+	if opts.ItemDefinition != nil {
+		pbOpts.ItemDefinition = &configpb.ListItemDefinition{
+			Type: opts.ItemDefinition.Type,
+		}
+		if len(opts.ItemDefinition.Schema) > 0 {
+			pbOpts.ItemDefinition.Schema = make([]*configpb.Field, len(opts.ItemDefinition.Schema))
+			for i, schemaField := range opts.ItemDefinition.Schema {
+				pbOpts.ItemDefinition.Schema[i] = ConfigurationFieldToProto(schemaField)
+			}
+		}
+	}
+	return pbOpts
+}
+
 func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 	if opts == nil {
 		return nil
@@ -261,6 +313,9 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 		Time:             timeTypeOptionsToProto(opts.Time),
 		Date:             dateTypeOptionsToProto(opts.Date),
 		Datetime:         dateTimeTypeOptionsToProto(opts.DateTime),
+		TogglableString:  togglableStringTypeOptionsToProto(opts.TogglableString),
+		TogglableSelect:  togglableSelectTypeOptionsToProto(opts.TogglableSelect),
+		TogglableList:    togglableListTypeOptionsToProto(opts.TogglableList),
 	}
 }
 
@@ -480,6 +535,58 @@ func protoToAnyPredicateListTypeOptions(pbOpts *configpb.AnyPredicateListTypeOpt
 	return opts
 }
 
+func protoToTogglableStringTypeOptions(pbOpts *configpb.TogglableStringTypeOptions) *configuration.TogglableStringTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.TogglableStringTypeOptions{}
+	if pbOpts.Placeholder != nil {
+		opts.Placeholder = *pbOpts.Placeholder
+	}
+	return opts
+}
+
+func protoToTogglableSelectTypeOptions(pbOpts *configpb.TogglableSelectTypeOptions) *configuration.TogglableSelectTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.TogglableSelectTypeOptions{
+		Options: make([]configuration.FieldOption, len(pbOpts.Options)),
+	}
+	for i, pbOpt := range pbOpts.Options {
+		opts.Options[i] = configuration.FieldOption{
+			Label: pbOpt.Label,
+			Value: pbOpt.Value,
+		}
+	}
+	return opts
+}
+
+func protoToTogglableListTypeOptions(pbOpts *configpb.TogglableListTypeOptions) *configuration.TogglableListTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.TogglableListTypeOptions{}
+	if pbOpts.ItemLabel != nil {
+		opts.ItemLabel = *pbOpts.ItemLabel
+	}
+	if pbOpts.ItemDefinition != nil {
+		opts.ItemDefinition = &configuration.ListItemDefinition{
+			Type: pbOpts.ItemDefinition.Type,
+		}
+		if len(pbOpts.ItemDefinition.Schema) > 0 {
+			opts.ItemDefinition.Schema = make([]configuration.Field, len(pbOpts.ItemDefinition.Schema))
+			for i, pbSchemaField := range pbOpts.ItemDefinition.Schema {
+				opts.ItemDefinition.Schema[i] = ProtoToConfigurationField(pbSchemaField)
+			}
+		}
+	}
+	return opts
+}
+
 func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions {
 	if pbOpts == nil {
 		return nil
@@ -497,6 +604,9 @@ func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions
 		Time:             protoToTimeTypeOptions(pbOpts.Time),
 		Date:             protoToDateTypeOptions(pbOpts.Date),
 		DateTime:         protoToDateTimeTypeOptions(pbOpts.Datetime),
+		TogglableString:  protoToTogglableStringTypeOptions(pbOpts.TogglableString),
+		TogglableSelect:  protoToTogglableSelectTypeOptions(pbOpts.TogglableSelect),
+		TogglableList:    protoToTogglableListTypeOptions(pbOpts.TogglableList),
 	}
 }
 

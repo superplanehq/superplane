@@ -31,6 +31,9 @@ type ConfigurationTypeOptions struct {
 	Date             *ConfigurationDateTypeOptions             `json:"date,omitempty"`
 	Datetime         *ConfigurationDateTimeTypeOptions         `json:"datetime,omitempty"`
 	AnyPredicateList *ConfigurationAnyPredicateListTypeOptions `json:"anyPredicateList,omitempty"`
+	TogglableString  *ConfigurationTogglableStringTypeOptions  `json:"togglableString,omitempty"`
+	TogglableSelect  *ConfigurationTogglableSelectTypeOptions  `json:"togglableSelect,omitempty"`
+	TogglableList    *ConfigurationTogglableListTypeOptions    `json:"togglableList,omitempty"`
 }
 
 // NewConfigurationTypeOptions instantiates a new ConfigurationTypeOptions object
@@ -402,6 +405,102 @@ func (o *ConfigurationTypeOptions) SetAnyPredicateList(v ConfigurationAnyPredica
 	o.AnyPredicateList = &v
 }
 
+// GetTogglableString returns the TogglableString field value if set, zero value otherwise.
+func (o *ConfigurationTypeOptions) GetTogglableString() ConfigurationTogglableStringTypeOptions {
+	if o == nil || IsNil(o.TogglableString) {
+		var ret ConfigurationTogglableStringTypeOptions
+		return ret
+	}
+	return *o.TogglableString
+}
+
+// GetTogglableStringOk returns a tuple with the TogglableString field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationTypeOptions) GetTogglableStringOk() (*ConfigurationTogglableStringTypeOptions, bool) {
+	if o == nil || IsNil(o.TogglableString) {
+		return nil, false
+	}
+	return o.TogglableString, true
+}
+
+// HasTogglableString returns a boolean if a field has been set.
+func (o *ConfigurationTypeOptions) HasTogglableString() bool {
+	if o != nil && !IsNil(o.TogglableString) {
+		return true
+	}
+
+	return false
+}
+
+// SetTogglableString gets a reference to the given ConfigurationTogglableStringTypeOptions and assigns it to the TogglableString field.
+func (o *ConfigurationTypeOptions) SetTogglableString(v ConfigurationTogglableStringTypeOptions) {
+	o.TogglableString = &v
+}
+
+// GetTogglableSelect returns the TogglableSelect field value if set, zero value otherwise.
+func (o *ConfigurationTypeOptions) GetTogglableSelect() ConfigurationTogglableSelectTypeOptions {
+	if o == nil || IsNil(o.TogglableSelect) {
+		var ret ConfigurationTogglableSelectTypeOptions
+		return ret
+	}
+	return *o.TogglableSelect
+}
+
+// GetTogglableSelectOk returns a tuple with the TogglableSelect field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationTypeOptions) GetTogglableSelectOk() (*ConfigurationTogglableSelectTypeOptions, bool) {
+	if o == nil || IsNil(o.TogglableSelect) {
+		return nil, false
+	}
+	return o.TogglableSelect, true
+}
+
+// HasTogglableSelect returns a boolean if a field has been set.
+func (o *ConfigurationTypeOptions) HasTogglableSelect() bool {
+	if o != nil && !IsNil(o.TogglableSelect) {
+		return true
+	}
+
+	return false
+}
+
+// SetTogglableSelect gets a reference to the given ConfigurationTogglableSelectTypeOptions and assigns it to the TogglableSelect field.
+func (o *ConfigurationTypeOptions) SetTogglableSelect(v ConfigurationTogglableSelectTypeOptions) {
+	o.TogglableSelect = &v
+}
+
+// GetTogglableList returns the TogglableList field value if set, zero value otherwise.
+func (o *ConfigurationTypeOptions) GetTogglableList() ConfigurationTogglableListTypeOptions {
+	if o == nil || IsNil(o.TogglableList) {
+		var ret ConfigurationTogglableListTypeOptions
+		return ret
+	}
+	return *o.TogglableList
+}
+
+// GetTogglableListOk returns a tuple with the TogglableList field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationTypeOptions) GetTogglableListOk() (*ConfigurationTogglableListTypeOptions, bool) {
+	if o == nil || IsNil(o.TogglableList) {
+		return nil, false
+	}
+	return o.TogglableList, true
+}
+
+// HasTogglableList returns a boolean if a field has been set.
+func (o *ConfigurationTypeOptions) HasTogglableList() bool {
+	if o != nil && !IsNil(o.TogglableList) {
+		return true
+	}
+
+	return false
+}
+
+// SetTogglableList gets a reference to the given ConfigurationTogglableListTypeOptions and assigns it to the TogglableList field.
+func (o *ConfigurationTypeOptions) SetTogglableList(v ConfigurationTogglableListTypeOptions) {
+	o.TogglableList = &v
+}
+
 func (o ConfigurationTypeOptions) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -444,6 +543,15 @@ func (o ConfigurationTypeOptions) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.AnyPredicateList) {
 		toSerialize["anyPredicateList"] = o.AnyPredicateList
+	}
+	if !IsNil(o.TogglableString) {
+		toSerialize["togglableString"] = o.TogglableString
+	}
+	if !IsNil(o.TogglableSelect) {
+		toSerialize["togglableSelect"] = o.TogglableSelect
+	}
+	if !IsNil(o.TogglableList) {
+		toSerialize["togglableList"] = o.TogglableList
 	}
 	return toSerialize, nil
 }

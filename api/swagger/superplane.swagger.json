@@ -3311,6 +3311,37 @@
         }
       }
     },
+    "ConfigurationTogglableListTypeOptions": {
+      "type": "object",
+      "properties": {
+        "itemDefinition": {
+          "$ref": "#/definitions/ConfigurationListItemDefinition"
+        },
+        "itemLabel": {
+          "type": "string"
+        }
+      }
+    },
+    "ConfigurationTogglableSelectTypeOptions": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationSelectOption"
+          }
+        }
+      }
+    },
+    "ConfigurationTogglableStringTypeOptions": {
+      "type": "object",
+      "properties": {
+        "placeholder": {
+          "type": "string"
+        }
+      }
+    },
     "ConfigurationTypeOptions": {
       "type": "object",
       "properties": {
@@ -3346,6 +3377,15 @@
         },
         "anyPredicateList": {
           "$ref": "#/definitions/ConfigurationAnyPredicateListTypeOptions"
+        },
+        "togglableString": {
+          "$ref": "#/definitions/ConfigurationTogglableStringTypeOptions"
+        },
+        "togglableSelect": {
+          "$ref": "#/definitions/ConfigurationTogglableSelectTypeOptions"
+        },
+        "togglableList": {
+          "$ref": "#/definitions/ConfigurationTogglableListTypeOptions"
         }
       }
     },

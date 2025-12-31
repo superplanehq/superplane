@@ -214,6 +214,19 @@ export type ConfigurationTimeTypeOptions = {
   format?: string;
 };
 
+export type ConfigurationTogglableListTypeOptions = {
+  itemDefinition?: ConfigurationListItemDefinition;
+  itemLabel?: string;
+};
+
+export type ConfigurationTogglableSelectTypeOptions = {
+  options?: Array<ConfigurationSelectOption>;
+};
+
+export type ConfigurationTogglableStringTypeOptions = {
+  placeholder?: string;
+};
+
 export type ConfigurationTypeOptions = {
   number?: ConfigurationNumberTypeOptions;
   select?: ConfigurationSelectTypeOptions;
@@ -226,6 +239,9 @@ export type ConfigurationTypeOptions = {
   date?: ConfigurationDateTypeOptions;
   datetime?: ConfigurationDateTimeTypeOptions;
   anyPredicateList?: ConfigurationAnyPredicateListTypeOptions;
+  togglableString?: ConfigurationTogglableStringTypeOptions;
+  togglableSelect?: ConfigurationTogglableSelectTypeOptions;
+  togglableList?: ConfigurationTogglableListTypeOptions;
 };
 
 export type ConfigurationValidationRule = {
