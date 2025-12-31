@@ -82,7 +82,7 @@ const Navigation: React.FC = () => {
               <DropdownSection>
                 <DropdownItem href={`/${organizationId}/settings/profile`}>
                   <span className="flex items-center gap-x-2">
-                    <Icon name="person" data-slot="icon" size="sm" />
+                    <Icon name="user-circle" data-slot="icon" size="sm" />
                     <DropdownLabel>Profile</DropdownLabel>
                   </span>
                 </DropdownItem>
@@ -111,21 +111,21 @@ const Navigation: React.FC = () => {
                 <DropdownSection>
                   <DropdownItem href={`/${organizationId}/settings/general`}>
                     <span className="flex items-center gap-x-2">
-                      <Icon name="business" data-slot="icon" size="sm" />
+                      <Icon name="building-2" data-slot="icon" size="sm" />
                       <DropdownLabel>Organization Settings</DropdownLabel>
                     </span>
                   </DropdownItem>
 
                   <DropdownItem href={`/${organizationId}/settings/members`}>
                     <span className="flex items-center gap-x-2">
-                      <Icon name="person" data-slot="icon" size="sm" />
+                      <Icon name="user" data-slot="icon" size="sm" />
                       <DropdownLabel>Members</DropdownLabel>
                     </span>
                   </DropdownItem>
 
                   <DropdownItem href={`/${organizationId}/settings/groups`}>
                     <span className="flex items-center gap-x-2">
-                      <Icon name="group" data-slot="icon" size="sm" />
+                      <Icon name="users" data-slot="icon" size="sm" />
                       <DropdownLabel>Groups</DropdownLabel>
                     </span>
                   </DropdownItem>
@@ -140,14 +140,14 @@ const Navigation: React.FC = () => {
 
                   <DropdownItem href={`/${organizationId}/settings/integrations`}>
                     <span className="flex items-center gap-x-2">
-                      <Icon name="integration_instructions" data-slot="icon" size="sm" />
+                      <Icon name="plug" data-slot="icon" size="sm" />
                       <DropdownLabel>Integrations</DropdownLabel>
                     </span>
                   </DropdownItem>
 
                   <DropdownItem href="/">
                     <span className="flex items-center gap-x-2">
-                      <Icon name="swap_horiz" data-slot="icon" size="sm" />
+                      <Icon name="arrow-left-right" data-slot="icon" size="sm" />
                       <DropdownLabel>Change organization</DropdownLabel>
                     </span>
                   </DropdownItem>
@@ -165,7 +165,7 @@ const Navigation: React.FC = () => {
                   }}
                 >
                   <span className="flex items-center gap-x-2">
-                    <Icon name="logout" data-slot="icon" size="sm" />
+                    <Icon name="log-out" data-slot="icon" size="sm" />
                     <DropdownLabel>Sign Out</DropdownLabel>
                   </span>
                 </DropdownItem>

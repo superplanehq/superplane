@@ -155,7 +155,7 @@ export function AddMembersSection({
           }}
         </MultiCombobox>
         <Button type="submit" disabled={selectedUsers.length === 0 || isLoading || disabled}>
-          <Icon name="add" size="sm" />
+          <Icon name="plus" size="sm" />
           {isLoading ? "Adding..." : "Add"}
         </Button>
       </form>
