@@ -38,6 +38,19 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: account_password_auth; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.account_password_auth (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    account_id uuid NOT NULL,
+    password_hash character varying(255) NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: account_providers; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -446,6 +459,22 @@ ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.
 
 
 --
+-- Name: account_password_auth account_password_auth_account_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_password_auth
+    ADD CONSTRAINT account_password_auth_account_id_key UNIQUE (account_id);
+
+
+--
+-- Name: account_password_auth account_password_auth_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_password_auth
+    ADD CONSTRAINT account_password_auth_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: account_providers account_providers_account_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -707,6 +736,13 @@ ALTER TABLE ONLY public.workflows
 
 ALTER TABLE ONLY public.workflows
     ADD CONSTRAINT workflows_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_account_password_auth_account_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_password_auth_account_id ON public.account_password_auth USING btree (account_id);
 
 
 --
@@ -973,6 +1009,14 @@ CREATE INDEX idx_workflows_deleted_at ON public.workflows USING btree (deleted_a
 --
 
 CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (organization_id);
+
+
+--
+-- Name: account_password_auth account_password_auth_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_password_auth
+    ADD CONSTRAINT account_password_auth_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id) ON DELETE CASCADE;
 
 
 --
@@ -1263,7 +1307,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251219105910	f
+20251231112927	f
 \.
 
 

@@ -69,66 +69,17 @@
         .login-btn.google:hover {
             background: #5472a3;
         }
+        .login-btn.email {
+            background: #6584b4;
+            color: #1e2938;
+        }
+        .login-btn.email:hover {
+            background: #5472a3;
+        }
         .provider-icon {
             width: 20px;
             height: 20px;
             margin-right: 8px;
-        }
-        .password-form {
-            width: 80%;
-            margin: 0 auto 1.5rem;
-            text-align: left;
-        }
-        .password-form input {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 12px;
-            border-radius: 8px;
-            border: 1px solid #3d4859;
-            background: #2a3441;
-            color: #F9FAFC;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-        .password-form input:focus {
-            outline: none;
-            border-color: #6584b4;
-        }
-        .password-form button {
-            width: 100%;
-            padding: 12px 24px;
-            border-radius: 8px;
-            border: none;
-            background: #6584b4;
-            color: #1e2938;
-            font-weight: 500;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .password-form button:hover {
-            background: #5472a3;
-        }
-        .divider {
-            color: #94a9ca;
-            margin: 1.5rem 0;
-            text-align: center;
-            position: relative;
-        }
-        .divider::before,
-        .divider::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            width: 40%;
-            height: 1px;
-            background: #3d4859;
-        }
-        .divider::before {
-            left: 0;
-        }
-        .divider::after {
-            right: 0;
         }
     </style>
 </head>
@@ -140,18 +91,6 @@
             </svg>
 
         </div>
-
-        {{if .PasswordLoginEnabled}}
-        <form method="POST" action="/login{{if .RedirectParam}}?redirect={{.RedirectParam}}{{end}}" class="password-form">
-            <input type="email" name="email" placeholder="Email" required autocomplete="email">
-            <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
-            <button type="submit">Sign in</button>
-        </form>
-        {{end}}
-
-        {{if and .PasswordLoginEnabled (gt (len .Providers) 0)}}
-        <div class="divider">or</div>
-        {{end}}
 
         {{if gt (len .Providers) 0}}
         <div class="subtitle">Continue with</div>
@@ -175,6 +114,15 @@
             {{end}}
         </a>
     {{end}}
+
+        {{if .PasswordLoginEnabled}}
+        <a href="/login/email{{if .RedirectParam}}?redirect={{.RedirectParam}}{{end}}" class="login-btn email">
+            <svg class="provider-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+            </svg>
+            Email & Password
+        </a>
+        {{end}}
     </div>
 </body>
 </html>
