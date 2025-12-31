@@ -46,12 +46,11 @@ const EmailLogin: React.FC = () => {
         return;
       }
 
-      // Redirect to the redirect URL or home
-      if (redirectParam) {
-        window.location.href = redirectParam;
-      } else {
-        window.location.href = "/";
-      }
+      // Redirect to the final URL after server redirect
+      // The server redirects to the organization home or the redirect param
+      // response.url contains the final URL after following redirects
+      const finalURL = response.url || redirectParam || "/";
+      window.location.href = finalURL;
     } catch (err) {
       setError("Network error occurred");
       setLoading(false);

@@ -411,7 +411,9 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 			redirectURL = "/" + organizations[0].ID.String()
 		}
 	}
-	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+	// Use StatusSeeOther (303) instead of StatusTemporaryRedirect (307) for POST requests
+	// This ensures the browser uses GET for the redirect, not POST
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {
