@@ -46,10 +46,33 @@ const EmailLogin: React.FC = () => {
         return;
       }
 
-      // Redirect to the final URL after server redirect
-      // The server redirects to the organization home or the redirect param
-      // response.url contains the final URL after following redirects
-      const finalURL = response.url || redirectParam || "/";
+      // If there's a redirect param, use it
+      if (redirectParam) {
+        window.location.href = redirectParam;
+        return;
+      }
+
+      // If no redirect param, check if user has exactly one organization
+      // and redirect to it automatically
+      try {
+        const orgsResponse = await fetch("/organizations", {
+          credentials: "include",
+        });
+
+        if (orgsResponse.ok) {
+          const organizations = await orgsResponse.json();
+          if (organizations.length === 1) {
+            // User has exactly one organization, redirect to it
+            window.location.href = `/${organizations[0].id}`;
+            return;
+          }
+        }
+      } catch (err) {
+        // If fetching organizations fails, fall through to default redirect
+      }
+
+      // Default: redirect to home (organization select page)
+      const finalURL = response.url || "/";
       window.location.href = finalURL;
     } catch (err) {
       setError("Network error occurred");
