@@ -128,7 +128,7 @@ export const GitHubIntegrationFlow: Story = {
               </>
             ) : (
               <>
-                <Icon name="add" size="sm" />
+                <Icon name="plus" size="sm" />
                 Create Integration
               </>
             )}
@@ -251,7 +251,7 @@ export const SemaphoreIntegrationFlow: Story = {
               </>
             ) : (
               <>
-                <Icon name="add" size="sm" />
+                <Icon name="plus" size="sm" />
                 Create Integration
               </>
             )}

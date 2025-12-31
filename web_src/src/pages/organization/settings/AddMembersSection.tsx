@@ -166,7 +166,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                 onClick={handleExistingMembersSubmit}
                 disabled={selectedMembers.size === 0 || isInviting}
               >
-                <Icon name="add" size="sm" />
+                <Icon name="plus" size="sm" />
                 {isInviting
                   ? "Adding..."
                   : `Add ${selectedMembers.size} member${selectedMembers.size === 1 ? "" : "s"}`}

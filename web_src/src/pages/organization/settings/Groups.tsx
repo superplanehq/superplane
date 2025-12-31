@@ -97,9 +97,9 @@ export function Groups({ organizationId }: GroupsProps) {
 
   const getSortIcon = (columnKey: string) => {
     if (sortConfig.key !== columnKey) {
-      return "unfold_more";
+      return "chevrons-up-down";
     }
-    return sortConfig.direction === "asc" ? "keyboard_arrow_up" : "keyboard_arrow_down";
+    return sortConfig.direction === "asc" ? "chevron-up" : "chevron-down";
   };
 
   const filteredAndSortedGroups = useMemo(() => {
@@ -173,7 +173,7 @@ export function Groups({ organizationId }: GroupsProps) {
             />
           </InputGroup>
           <Button className="flex items-center" onClick={handleCreateGroup}>
-            <Icon name="add" />
+            <Icon name="plus" />
             Create New Group
           </Button>
         </div>
@@ -274,7 +274,7 @@ export function Groups({ organizationId }: GroupsProps) {
                               ? "Updating..."
                               : roles.find((r) => r?.metadata?.name === group.spec?.role)?.spec?.displayName ||
                                 "Select Role"}
-                            <Icon name="keyboard_arrow_down" />
+                            <Icon name="chevron-down" />
                           </DropdownButton>
                           <DropdownMenu>
                             {roles.map((role) => (
@@ -293,7 +293,7 @@ export function Groups({ organizationId }: GroupsProps) {
                         <div className="flex justify-end">
                           <Dropdown>
                             <DropdownButton disabled={deleteGroupMutation.isPending}>
-                              <Icon name="more_vert" size="sm" />
+                              <Icon name="ellipsis-vertical" size="sm" />
                             </DropdownButton>
                             <DropdownMenu>
                               <DropdownItem onClick={() => handleViewMembers(group.metadata!.name!)}>
