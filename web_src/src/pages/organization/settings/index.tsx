@@ -22,6 +22,7 @@ import { Members } from "./Members";
 import { Integrations } from "./Integrations";
 import { Applications } from "./Applications";
 import { ApplicationDetails } from "./ApplicationDetails";
+import { isRBACEnabled } from "@/lib/env";
 
 export function OrganizationSettings() {
   const navigate = useNavigate();
@@ -73,8 +74,12 @@ export function OrganizationSettings() {
     { id: "profile", label: "Profile", icon: "person" },
     { id: "general", label: "General", icon: "settings" },
     { id: "members", label: "Members", icon: "group" },
-    { id: "groups", label: "Groups", icon: "group" },
-    { id: "roles", label: "Roles", icon: "admin_panel_settings" },
+    ...(isRBACEnabled()
+      ? [
+          { id: "groups", label: "Groups", icon: "group" },
+          { id: "roles", label: "Roles", icon: "admin_panel_settings" },
+        ]
+      : []),
     { id: "integrations", label: "Integrations", icon: "integration_instructions" },
     { id: "applications", label: "Applications", icon: "apps" },
   ];

@@ -238,7 +238,8 @@ func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, acc
 			return err
 		}
 
-		err = a.authService.AssignRole(user.ID.String(), models.RoleOrgViewer, invitation.OrganizationID.String(), models.DomainTypeOrganization)
+		// TODO: Rollback to member once RBAC is fully available
+		err = a.authService.AssignRole(user.ID.String(), models.RoleOrgOwner, invitation.OrganizationID.String(), models.DomainTypeOrganization)
 		if err != nil {
 			return err
 		}

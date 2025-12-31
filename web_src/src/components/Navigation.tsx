@@ -18,6 +18,7 @@ import { useOrganization } from "../hooks/useOrganizationData";
 import { useAccount } from "../contexts/AccountContext";
 import { useParams } from "react-router-dom";
 import SuperplaneLogo from "@/assets/superplane.svg";
+import { isRBACEnabled } from "@/lib/env";
 
 const Navigation: React.FC = () => {
   const { account } = useAccount();
@@ -128,12 +129,14 @@ const Navigation: React.FC = () => {
                       <DropdownLabel>Groups</DropdownLabel>
                     </span>
                   </DropdownItem>
-                  <DropdownItem href={`/${organizationId}/settings/roles`}>
-                    <span className="flex items-center gap-x-2">
-                      <Icon name="shield" data-slot="icon" size="sm" />
-                      <DropdownLabel>Roles</DropdownLabel>
-                    </span>
-                  </DropdownItem>
+                  {isRBACEnabled() && (
+                    <DropdownItem href={`/${organizationId}/settings/roles`}>
+                      <span className="flex items-center gap-x-2">
+                        <Icon name="shield" data-slot="icon" size="sm" />
+                        <DropdownLabel>Roles</DropdownLabel>
+                      </span>
+                    </DropdownItem>
+                  )}
 
                   <DropdownItem href={`/${organizationId}/settings/integrations`}>
                     <span className="flex items-center gap-x-2">
