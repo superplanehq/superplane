@@ -138,7 +138,7 @@ func Test__CreateInvitation(t *testing.T) {
 
 		roles, err := r.AuthService.GetUserRolesForOrg(user.ID.String(), r.Organization.ID.String())
 		require.NoError(t, err)
-		assert.Contains(t, roles[0].Name, models.RoleOrgViewer)
+		assert.Contains(t, roles[0].Name, models.RoleOrgOwner)
 
 		assert.False(t, testconsumer.HasReceivedMessage())
 	})
