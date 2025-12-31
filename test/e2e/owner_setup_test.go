@@ -61,7 +61,24 @@ func (s *ownerSetupSteps) fillInOwnerDetailsAndSubmit(email, firstName, lastName
 	s.session.FillIn(q.Locator(`input[placeholder="Last name"]`), lastName)
 	s.session.FillIn(q.Locator(`input[placeholder="Password"]`), password)
 	s.session.Click(q.Text("Next"))
-	s.session.Sleep(500) // wait for redirect
+	// Poll for setup to complete - wait for organization to be created in database
+	s.waitForSetupToComplete()
+}
+
+func (s *ownerSetupSteps) waitForSetupToComplete() {
+	// Poll for up to 10 seconds, checking every 200ms
+	for i := 0; i < 50; i++ {
+		var orgCount int64
+		err := database.Conn().Model(&models.Organization{}).Count(&orgCount).Error
+		if err == nil && orgCount > 0 {
+			// Setup completed - give it a moment for redirect
+			s.session.Sleep(500)
+			return
+		}
+		s.session.Sleep(200)
+	}
+	// If we get here, setup didn't complete in time
+	s.t.Log("Warning: Setup may not have completed - proceeding with assertions")
 }
 
 func (s *ownerSetupSteps) assertOwnerAndOrganizationCreated() {
