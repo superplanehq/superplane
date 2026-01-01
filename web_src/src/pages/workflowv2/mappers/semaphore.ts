@@ -17,6 +17,7 @@ import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from ".";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { formatTimeAgo } from "@/utils/date";
 
 interface ExecutionMetadata {
   workflow?: {
@@ -122,6 +123,10 @@ export const semaphoreMapper: ComponentBaseMapper = {
       specs: getSemaphoreSpecs(node),
       eventStateMap: SEMAPHORE_STATE_MAP,
     };
+  },
+  subtitle(_node, execution) {
+    if (!execution?.createdAt) return "";
+    return formatTimeAgo(new Date(execution.createdAt));
   },
 };
 
