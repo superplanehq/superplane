@@ -111,6 +111,8 @@ export interface CanvasPageProps {
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
+  isAutoSaveEnabled?: boolean;
+  onToggleAutoSave?: () => void;
   // Undo functionality
   onUndo?: () => void;
   canUndo?: boolean;
@@ -608,6 +610,8 @@ function CanvasPage(props: CanvasPageProps) {
           unsavedMessage={props.unsavedMessage}
           saveIsPrimary={props.saveIsPrimary}
           saveButtonHidden={props.saveButtonHidden}
+          isAutoSaveEnabled={props.isAutoSaveEnabled}
+          onToggleAutoSave={props.onToggleAutoSave}
         />
       </div>
 
@@ -649,6 +653,14 @@ function CanvasPage(props: CanvasPageProps) {
               highlightedNodeIds={highlightedNodeIds}
               workflowNodes={props.workflowNodes}
               setCurrentTab={setCurrentTab}
+              onUndo={props.onUndo}
+              canUndo={props.canUndo}
+              organizationId={props.organizationId}
+              unsavedMessage={props.unsavedMessage}
+              saveIsPrimary={props.saveIsPrimary}
+              saveButtonHidden={props.saveButtonHidden}
+              isAutoSaveEnabled={props.isAutoSaveEnabled}
+              onToggleAutoSave={props.onToggleAutoSave}
             />
           </ReactFlowProvider>
 
@@ -951,6 +963,8 @@ function CanvasContentHeader({
   unsavedMessage,
   saveIsPrimary,
   saveButtonHidden,
+  isAutoSaveEnabled,
+  onToggleAutoSave,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -960,6 +974,8 @@ function CanvasContentHeader({
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
+  isAutoSaveEnabled?: boolean;
+  onToggleAutoSave?: () => void;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -987,6 +1003,8 @@ function CanvasContentHeader({
       unsavedMessage={unsavedMessage}
       saveIsPrimary={saveIsPrimary}
       saveButtonHidden={saveButtonHidden}
+      isAutoSaveEnabled={isAutoSaveEnabled}
+      onToggleAutoSave={onToggleAutoSave}
     />
   );
 }
@@ -1018,6 +1036,14 @@ function CanvasContent({
   highlightedNodeIds,
   workflowNodes,
   setCurrentTab,
+  onUndo,
+  canUndo,
+  organizationId,
+  unsavedMessage,
+  saveIsPrimary,
+  saveButtonHidden,
+  isAutoSaveEnabled,
+  onToggleAutoSave,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1049,6 +1075,14 @@ function CanvasContent({
   highlightedNodeIds: Set<string>;
   workflowNodes?: ComponentsNode[];
   setCurrentTab?: (tab: "latest" | "settings") => void;
+  onUndo?: () => void;
+  canUndo?: boolean;
+  organizationId?: string;
+  unsavedMessage?: string;
+  saveIsPrimary?: boolean;
+  saveButtonHidden?: boolean;
+  isAutoSaveEnabled?: boolean;
+  onToggleAutoSave?: () => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1459,7 +1493,20 @@ function CanvasContent({
   return (
     <>
       {/* Header */}
-      {!hideHeader && <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} />}
+      {!hideHeader && (
+        <Header
+          breadcrumbs={state.breadcrumbs}
+          onSave={onSave ? handleSave : undefined}
+          onUndo={onUndo}
+          canUndo={canUndo}
+          organizationId={organizationId}
+          unsavedMessage={unsavedMessage}
+          saveIsPrimary={saveIsPrimary}
+          saveButtonHidden={saveButtonHidden}
+          isAutoSaveEnabled={isAutoSaveEnabled}
+          onToggleAutoSave={onToggleAutoSave}
+        />
+      )}
 
       <div className={hideHeader ? "h-full" : "pt-12 h-full"}>
         <div className="h-full w-full">

@@ -303,9 +303,7 @@ export const webhookCustomFieldRenderer: CustomFieldRenderer = {
     const metadata = node.metadata as WebhookMetadata | undefined;
     const config = configuration as WebhookConfiguration | undefined;
     const authMethod = config?.authentication || "none";
-    const webhookUrl =
-      metadata?.url ||
-      "https://app.superplane.com/3ee1aa47-3a60-4c1f-b645-0b9859ab91f8/workflows/8d4dbb35-0034-499f-81da-226da05452e2/webhook/somestring-or-something";
+    const webhookUrl = metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
 
     // State to track the currently displayed secret
     // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -401,16 +399,22 @@ curl -X POST \\
                 <CopyCodeButton code={code} />
               </div>
             </div>
-            <ResetAuthButton
-              nodeId={node.id!}
-              authMethod={authMethod}
-              onSuccess={(newSecret) => {
-                // Update the displayed code with the new secret
-                setCurrentSecret(newSecret);
-                // Auto-hide the secret from the code after 30 seconds for security
-                setTimeout(() => setCurrentSecret(null), 30000);
-              }}
-            />
+            {metadata?.url ? (
+              <ResetAuthButton
+                nodeId={node.id!}
+                authMethod={authMethod}
+                onSuccess={(newSecret) => {
+                  // Update the displayed code with the new secret
+                  setCurrentSecret(newSecret);
+                  // Auto-hide the secret from the code after 30 seconds for security
+                  setTimeout(() => setCurrentSecret(null), 30000);
+                }}
+              />
+            ) : (
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Save the canvas to generate a webhook URL and to be able of generating authentication secrets
+              </p>
+            )}
           </div>
         </div>
       </div>
