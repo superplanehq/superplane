@@ -2,6 +2,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { resolveIcon } from "@/lib/utils";
 import { Undo2 } from "lucide-react";
 import { Button } from "../button";
+import { Switch } from "../switch";
 
 export interface BreadcrumbItem {
   label: string;
@@ -23,6 +24,8 @@ interface HeaderProps {
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
+  isAutoSaveEnabled?: boolean;
+  onToggleAutoSave?: () => void;
 }
 
 export function Header({
@@ -35,6 +38,8 @@ export function Header({
   unsavedMessage,
   saveIsPrimary,
   saveButtonHidden,
+  isAutoSaveEnabled,
+  onToggleAutoSave,
 }: HeaderProps) {
   return (
     <>
@@ -108,12 +113,20 @@ export function Header({
             })}
           </div>
 
-          {/* Right side - Save button */}
+          {/* Right side - Auto-save toggle and Save button */}
           <div className="flex items-center gap-3">
             {unsavedMessage && (
               <span className="text-xs font-medium text-yellow-700 bg-orange-100 px-2 py-1 rounded hidden sm:inline">
                 {unsavedMessage}
               </span>
+            )}
+            {onToggleAutoSave && (
+              <div className="flex items-center gap-2">
+                <label htmlFor="auto-save-toggle" className="text-xs text-gray-600 hidden sm:inline">
+                  Auto-save
+                </label>
+                <Switch id="auto-save-toggle" checked={isAutoSaveEnabled} onCheckedChange={onToggleAutoSave} />
+              </div>
             )}
             {onUndo && canUndo && (
               <Button onClick={onUndo} size="sm" variant="outline">
