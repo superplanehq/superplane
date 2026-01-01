@@ -157,11 +157,12 @@ func (e *HTTP) Configuration() []configuration.Field {
 		{
 			Name:        "headers",
 			Label:       "Headers",
-			Type:        configuration.FieldTypeTogglableList,
+			Type:        configuration.FieldTypeList,
 			Required:    false,
+			Togglable:   true,
 			Description: "Custom headers to send with this request",
 			TypeOptions: &configuration.TypeOptions{
-				TogglableList: &configuration.TogglableListTypeOptions{
+				List: &configuration.ListTypeOptions{
 					ItemLabel: "Header",
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
@@ -188,14 +189,15 @@ func (e *HTTP) Configuration() []configuration.Field {
 		{
 			Name:        "contentType",
 			Label:       "Content Type",
-			Type:        configuration.FieldTypeTogglableSelect,
+			Type:        configuration.FieldTypeSelect,
 			Required:    false,
+			Togglable:   true,
 			Description: "The content type of the request body",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "method", Values: []string{"POST", "PUT", "PATCH"}},
 			},
 			TypeOptions: &configuration.TypeOptions{
-				TogglableSelect: &configuration.TogglableSelectTypeOptions{
+				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{Label: "JSON", Value: "application/json"},
 						{Label: "Form Data", Value: "application/x-www-form-urlencoded"},
@@ -280,24 +282,21 @@ func (e *HTTP) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "successCodes",
-			Type:        configuration.FieldTypeTogglableString,
+			Type:        configuration.FieldTypeString,
 			Label:       "Success Codes",
 			Required:    false,
+			Togglable:   true,
 			Description: "Comma-separated list of success status codes (e.g., 200, 201, 2xx). Leave empty for default 2xx behavior",
-			TypeOptions: &configuration.TypeOptions{
-				TogglableString: &configuration.TogglableStringTypeOptions{
-					Placeholder: "2xx, 3xx",
-				},
-			},
 		},
 		{
 			Name:        "timeoutStrategy",
-			Type:        configuration.FieldTypeTogglableSelect,
+			Type:        configuration.FieldTypeSelect,
 			Label:       "Set Timeout and Retries",
 			Required:    false,
+			Togglable:   true,
 			Description: "Configure timeout and retry behavior for failed requests",
 			TypeOptions: &configuration.TypeOptions{
-				TogglableSelect: &configuration.TogglableSelectTypeOptions{
+				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{Label: "Fixed", Value: "fixed"},
 						{Label: "Exponential", Value: "exponential"},

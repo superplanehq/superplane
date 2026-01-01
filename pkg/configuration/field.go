@@ -4,22 +4,19 @@ const (
 	/*
 	 * Basic field types
 	 */
-	FieldTypeString          = "string"
-	FieldTypeText            = "text"
-	FieldTypeXML             = "xml"
-	FieldTypeNumber          = "number"
-	FieldTypeBool            = "boolean"
-	FieldTypeSelect          = "select"
-	FieldTypeMultiSelect     = "multi-select"
-	FieldTypeList            = "list"
-	FieldTypeObject          = "object"
-	FieldTypeTime            = "time"
-	FieldTypeDate            = "date"
-	FieldTypeDateTime        = "datetime"
-	FieldTypeTimezone        = "timezone"
-	FieldTypeTogglableString = "togglable-string"
-	FieldTypeTogglableSelect = "togglable-select"
-	FieldTypeTogglableList   = "togglable-list"
+	FieldTypeString      = "string"
+	FieldTypeText        = "text"
+	FieldTypeXML         = "xml"
+	FieldTypeNumber      = "number"
+	FieldTypeBool        = "boolean"
+	FieldTypeSelect      = "select"
+	FieldTypeMultiSelect = "multi-select"
+	FieldTypeList        = "list"
+	FieldTypeObject      = "object"
+	FieldTypeTime        = "time"
+	FieldTypeDate        = "date"
+	FieldTypeDateTime    = "datetime"
+	FieldTypeTimezone    = "timezone"
 
 	/*
 	 * Special field types
@@ -58,6 +55,7 @@ type Field struct {
 	Description string `json:"description"`
 	Required    bool   `json:"required"`
 	Default     any    `json:"default"`
+	Togglable   bool   `json:"togglable"`
 
 	/*
 	 * Whether the field is sensitive (e.g., password, API token)
@@ -107,9 +105,6 @@ type TypeOptions struct {
 	DayInYear        *DayInYearTypeOptions        `json:"day_in_year,omitempty"`
 	Cron             *CronTypeOptions             `json:"cron,omitempty"`
 	Timezone         *TimezoneTypeOptions         `json:"timezone,omitempty"`
-	TogglableString  *TogglableStringTypeOptions  `json:"togglable_string,omitempty"`
-	TogglableSelect  *TogglableSelectTypeOptions  `json:"togglable_select,omitempty"`
-	TogglableList    *TogglableListTypeOptions    `json:"togglable_list,omitempty"`
 }
 
 /*
@@ -167,28 +162,6 @@ type CronTypeOptions struct {
  */
 type TimezoneTypeOptions struct {
 	// Could add supported timezones list here if needed in the future
-}
-
-/*
- * TogglableStringTypeOptions specifies options for togglable string fields
- */
-type TogglableStringTypeOptions struct {
-	Placeholder string `json:"placeholder,omitempty"` // Placeholder text when field is enabled
-}
-
-/*
- * TogglableSelectTypeOptions specifies options for togglable select fields
- */
-type TogglableSelectTypeOptions struct {
-	Options []FieldOption `json:"options"` // Available options for the select field
-}
-
-/*
- * TogglableListTypeOptions specifies options for togglable list fields
- */
-type TogglableListTypeOptions struct {
-	ItemLabel      string              `json:"item_label,omitempty"` // Label for list items
-	ItemDefinition *ListItemDefinition `json:"item_definition"`      // Structure of list items
 }
 
 /*

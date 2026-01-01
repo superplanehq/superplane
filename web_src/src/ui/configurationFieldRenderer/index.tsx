@@ -24,9 +24,6 @@ import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
-import { TogglableStringFieldRenderer } from "./TogglableStringFieldRenderer";
-import { TogglableSelectFieldRenderer } from "./TogglableSelectFieldRenderer";
-import { TogglableListFieldRenderer } from "./TogglableListFieldRenderer";
 import { isFieldVisible, isFieldRequired, validateFieldForSubmission } from "../../utils/components";
 import { ValidationError } from "./types";
 import { AuthorizationDomainType } from "@/api-client";
@@ -265,23 +262,6 @@ export const ConfigurationFieldRenderer = ({
 
       case "timezone":
         return <TimezoneFieldRenderer {...commonProps} />;
-
-      case "togglable-string":
-        return <TogglableStringFieldRenderer {...commonProps} />;
-
-      case "togglable-select":
-        return <TogglableSelectFieldRenderer {...commonProps} />;
-
-      case "togglable-list":
-        return (
-          <TogglableListFieldRenderer
-            {...commonProps}
-            domainId={domainId}
-            domainType={domainType}
-            validationErrors={validationErrors}
-            fieldPath={fieldPath || field.name}
-          />
-        );
 
       default:
         // Fallback to text input

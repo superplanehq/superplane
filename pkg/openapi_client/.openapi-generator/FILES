@@ -60,9 +60,6 @@ docs/ConfigurationResourceTypeOptions.md
 docs/ConfigurationSelectOption.md
 docs/ConfigurationSelectTypeOptions.md
 docs/ConfigurationTimeTypeOptions.md
-docs/ConfigurationTogglableListTypeOptions.md
-docs/ConfigurationTogglableSelectTypeOptions.md
-docs/ConfigurationTogglableStringTypeOptions.md
 docs/ConfigurationTypeOptions.md
 docs/ConfigurationValidationRule.md
 docs/ConfigurationVisibilityCondition.md
@@ -237,9 +234,6 @@ model_configuration_resource_type_options.go
 model_configuration_select_option.go
 model_configuration_select_type_options.go
 model_configuration_time_type_options.go
-model_configuration_togglable_list_type_options.go
-model_configuration_togglable_select_type_options.go
-model_configuration_togglable_string_type_options.go
 model_configuration_type_options.go
 model_configuration_validation_rule.go
 model_configuration_visibility_condition.go

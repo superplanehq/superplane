@@ -462,17 +462,6 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeTimezone:
 		return validateTimezone(field, value)
-
-	case FieldTypeTogglableString:
-		if _, ok := value.(string); !ok {
-			return fmt.Errorf("must be a string")
-		}
-
-	case FieldTypeTogglableSelect:
-		return validateTogglableSelect(field, value)
-
-	case FieldTypeTogglableList:
-		return validateTogglableList(field, value)
 	}
 
 	return nil
@@ -745,74 +734,6 @@ func compareDayInYearValues(valueDayOfYear, compareDayOfYear int, valueStr, comp
 	default:
 		return fmt.Errorf("unknown validation rule type: %s", rule.Type)
 	}
-	return nil
-}
-
-func validateTogglableSelect(field Field, value any) error {
-	selected, ok := value.(string)
-	if !ok {
-		return fmt.Errorf("must be a string")
-	}
-
-	if field.TypeOptions == nil || field.TypeOptions.TogglableSelect == nil {
-		return nil
-	}
-
-	options := field.TypeOptions.TogglableSelect
-	if len(options.Options) == 0 {
-		return nil
-	}
-
-	valid := slices.ContainsFunc(options.Options, func(opt FieldOption) bool {
-		return opt.Value == selected
-	})
-
-	if !valid {
-		validValues := make([]string, len(options.Options))
-		for i, opt := range options.Options {
-			validValues[i] = opt.Value
-		}
-
-		return fmt.Errorf("must be one of: %s", strings.Join(validValues, ", "))
-	}
-
-	return nil
-}
-
-func validateTogglableList(field Field, value any) error {
-	list, ok := value.([]any)
-	if !ok {
-		return fmt.Errorf("must be a list of values")
-	}
-
-	if field.Required && len(list) == 0 {
-		return fmt.Errorf("must contain at least one item")
-	}
-
-	if field.TypeOptions.TogglableList == nil {
-		return nil
-	}
-
-	listOptions := field.TypeOptions.TogglableList
-	if listOptions.ItemDefinition == nil {
-		return nil
-	}
-
-	itemDef := listOptions.ItemDefinition
-	for i, item := range list {
-		if itemDef.Type == FieldTypeObject && len(itemDef.Schema) > 0 {
-			itemMap, ok := item.(map[string]any)
-			if !ok {
-				return fmt.Errorf("item at index %d must be an object", i)
-			}
-
-			err := ValidateConfiguration(itemDef.Schema, itemMap)
-			if err != nil {
-				return fmt.Errorf("item at index %d: %w", i, err)
-			}
-		}
-	}
-
 	return nil
 }
 

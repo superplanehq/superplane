@@ -255,14 +255,6 @@ func ProtoToConfiguration(config []*configpb.Field) ([]configuration.Field, erro
 				if field.TypeOptions.Integration == nil || field.TypeOptions.Integration.Type == "" {
 					return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: integration type is required for integration type", field.Name)
 				}
-			case configuration.FieldTypeTogglableSelect:
-				if field.TypeOptions.TogglableSelect == nil || len(field.TypeOptions.TogglableSelect.Options) == 0 {
-					return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: options are required for togglable_select type", field.Name)
-				}
-			case configuration.FieldTypeTogglableList:
-				if field.TypeOptions.TogglableList == nil || field.TypeOptions.TogglableList.ItemDefinition == nil {
-					return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: item definition is required for togglable_list type", field.Name)
-				}
 			}
 		}
 
