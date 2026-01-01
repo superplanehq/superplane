@@ -3184,6 +3184,9 @@
         },
         "sensitive": {
           "type": "boolean"
+        },
+        "togglable": {
+          "type": "boolean"
         }
       }
     },

@@ -32,6 +32,7 @@ type ConfigurationField struct {
 	ValidationRules      []ConfigurationValidationRule      `json:"validationRules,omitempty"`
 	Placeholder          *string                            `json:"placeholder,omitempty"`
 	Sensitive            *bool                              `json:"sensitive,omitempty"`
+	Togglable            *bool                              `json:"togglable,omitempty"`
 }
 
 // NewConfigurationField instantiates a new ConfigurationField object
@@ -435,6 +436,38 @@ func (o *ConfigurationField) SetSensitive(v bool) {
 	o.Sensitive = &v
 }
 
+// GetTogglable returns the Togglable field value if set, zero value otherwise.
+func (o *ConfigurationField) GetTogglable() bool {
+	if o == nil || IsNil(o.Togglable) {
+		var ret bool
+		return ret
+	}
+	return *o.Togglable
+}
+
+// GetTogglableOk returns a tuple with the Togglable field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationField) GetTogglableOk() (*bool, bool) {
+	if o == nil || IsNil(o.Togglable) {
+		return nil, false
+	}
+	return o.Togglable, true
+}
+
+// HasTogglable returns a boolean if a field has been set.
+func (o *ConfigurationField) HasTogglable() bool {
+	if o != nil && !IsNil(o.Togglable) {
+		return true
+	}
+
+	return false
+}
+
+// SetTogglable gets a reference to the given bool and assigns it to the Togglable field.
+func (o *ConfigurationField) SetTogglable(v bool) {
+	o.Togglable = &v
+}
+
 func (o ConfigurationField) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -480,6 +513,9 @@ func (o ConfigurationField) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Sensitive) {
 		toSerialize["sensitive"] = o.Sensitive
+	}
+	if !IsNil(o.Togglable) {
+		toSerialize["togglable"] = o.Togglable
 	}
 	return toSerialize, nil
 }

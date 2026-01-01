@@ -17,6 +17,7 @@ message Field {
   repeated ValidationRule validation_rules = 10;
   optional string placeholder = 11;
   optional bool sensitive = 12;
+  optional bool togglable = 13;
 }
 
 message TypeOptions {

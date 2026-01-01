@@ -163,6 +163,7 @@ export type ConfigurationField = {
   validationRules?: Array<ConfigurationValidationRule>;
   placeholder?: string;
   sensitive?: boolean;
+  togglable?: boolean;
 };
 
 export type ConfigurationIntegrationTypeOptions = {

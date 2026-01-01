@@ -272,6 +272,7 @@ func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
 		Description: field.Description,
 		Required:    field.Required,
 		Sensitive:   &field.Sensitive,
+		Togglable:   &field.Togglable,
 		TypeOptions: typeOptionsToProto(field.TypeOptions),
 	}
 

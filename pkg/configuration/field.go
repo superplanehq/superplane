@@ -55,6 +55,7 @@ type Field struct {
 	Description string `json:"description"`
 	Required    bool   `json:"required"`
 	Default     any    `json:"default"`
+	Togglable   bool   `json:"togglable"`
 
 	/*
 	 * Whether the field is sensitive (e.g., password, API token)
