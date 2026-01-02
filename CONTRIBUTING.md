@@ -57,5 +57,7 @@ When the process completes, you can access the SuperPlane at [http://localhost:8
 
 ## Additional Development Resources
 
+- **[Pull Requests Guide](docs/contributing/pull-requests.md)** - Complete guide on creating pull requests, including title format rules and best practices
+- **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
 - **[Product Docs](https://docs.superplane.com)** - Complete product documentation and user guides
 - **[Discord](https://discord.gg/KC78eCNsnw)** - Join our Discord community for discussions, questions, and collaboration
