@@ -287,7 +287,7 @@ function CategorySection({
 
   return (
     <details className="flex-1 px-5 mb-5" open>
-      <summary className="relative cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 mb-3 flex items-center gap-1 [&::-webkit-details-marker]:hidden [&::marker]:hidden before:absolute before:inset-x-0 before:top-1/2 before:-translate-y-1/2 before:h-px before:bg-slate-300 dark:before:bg-gray-800 before:content-[''] before:transform">
+      <summary className="relative cursor-pointer hover:text-gray-500 dark:hover:text-gray-300 mb-3 flex items-center gap-1 [&::-webkit-details-marker]:hidden [&::marker]:hidden before:absolute before:inset-x-0 before:top-1/2 before:-translate-y-1/2 before:h-px before:bg-slate-300 dark:before:bg-gray-800 before:content-[''] before:transform">
         <span className="relative z-10 flex items-center gap-1 bg-white dark:bg-gray-900 pr-3">
           <ChevronRight className="h-3 w-3 transition-transform [[details[open]]>&]:rotate-90" />
           <span className="text-[13px] text-gray-500 font-medium pl-1">{category.name}</span>

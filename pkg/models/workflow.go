@@ -200,3 +200,34 @@ func LockWorkflow(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
 
 	return &workflow, nil
 }
+
+func CountWorkflowsByOrganizationIDs(orgIDs []string) (map[string]int64, error) {
+	counts := make(map[string]int64)
+	if len(orgIDs) == 0 {
+		return counts, nil
+	}
+
+	type row struct {
+		OrganizationID string
+		Count          int64
+	}
+
+	var rows []row
+	err := database.Conn().
+		Table("workflows").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Where("organization_id IN ?", orgIDs).
+		Group("organization_id").
+		Scan(&rows).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, r := range rows {
+		counts[r.OrganizationID] = r.Count
+	}
+
+	return counts, nil
+}

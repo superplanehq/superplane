@@ -115,7 +115,7 @@ const OwnerSetup: React.FC = () => {
       <div className="max-w-lg w-full bg-white dark:bg-zinc-900 rounded-lg shadow-xl p-8">
         <div className="text-center mb-8">
           <h4 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Set up owner account</h4>
-          <Text className="text-gray-600 dark:text-gray-400">Create an account for this SuperPlane instance.</Text>
+          <Text className="text-gray-500 dark:text-gray-400">Create an account for this SuperPlane instance.</Text>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

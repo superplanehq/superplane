@@ -151,19 +151,19 @@ export function CustomComponentConfigurationSidebar({
                           Type: {field.type} {field.required && "(required)"}
                         </p>
                         {field.description && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{field.description}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{field.description}</p>
                         )}
                         {field.type === "select" &&
                           field.typeOptions?.select?.options &&
                           field.typeOptions.select.options.length > 0 && (
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                               Options: {field.typeOptions.select.options.map((opt: any) => opt.label).join(", ")}
                             </p>
                           )}
                         {field.type === "multi_select" &&
                           field.typeOptions?.multiSelect?.options &&
                           field.typeOptions.multiSelect.options.length > 0 && (
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                               Options: {field.typeOptions.multiSelect.options.map((opt: any) => opt.label).join(", ")}
                             </p>
                           )}

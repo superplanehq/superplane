@@ -1,6 +1,6 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Box, GitBranch, LayoutGrid, List, MoreVertical, Plus, Search, Trash2 } from "lucide-react";
+import { Box, GitBranch, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CreateCanvasModal } from "../../components/CreateCanvasModal";
@@ -8,21 +8,21 @@ import { CreateCustomComponentModal } from "../../components/CreateCustomCompone
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../../components/Dialog/dialog";
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "../../components/Dropdown/dropdown";
 import { Heading } from "../../components/Heading/heading";
+import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 import { useBlueprints, useDeleteBlueprint } from "../../hooks/useBlueprintData";
 import { useDeleteWorkflow, useWorkflows } from "../../hooks/useWorkflowData";
-import { cn, resolveIcon } from "../../lib/utils";
+import { resolveIcon } from "../../lib/utils";
 import { isCustomComponentsEnabled } from "../../lib/env";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 
 import { Button } from "@/components/ui/button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
 import { useCreateCustomComponentModalState } from "./useCreateCustomComponentModalState";
+import type { ComponentsEdge, ComponentsNode } from "@/api-client";
 
 type TabType = "canvases" | "custom-components";
-type ViewMode = "grid" | "list";
-
 interface BlueprintCardData {
   id: string;
   name: string;
@@ -39,13 +39,14 @@ interface WorkflowCardData {
   createdAt: string;
   type: "workflow";
   createdBy?: { id?: string; name?: string };
+  nodes?: ComponentsNode[];
+  edges?: ComponentsEdge[];
 }
 
 const HomePage = () => {
   usePageTitle(["Home"]);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [activeTab, setActiveTab] = useState<TabType>("canvases");
 
   const canvasModalState = useCreateCanvasModalState();
@@ -70,11 +71,16 @@ const HomePage = () => {
   const blueprintError = blueprintApiError ? "Failed to fetch Bundles. Please try again later." : null;
   const workflowError = workflowApiError ? "Failed to fetch workflows. Please try again later." : null;
 
+  const formatDate = (value?: string) => {
+    if (!value) return "Unknown";
+    return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
+
   const blueprints: BlueprintCardData[] = (blueprintsData || []).map((blueprint: any) => ({
     id: blueprint.id!,
     name: blueprint.name!,
     description: blueprint.description,
-    createdAt: blueprint.createdAt ? new Date(blueprint.createdAt).toLocaleDateString() : "Unknown",
+    createdAt: formatDate(blueprint.createdAt),
     type: "blueprint" as const,
     createdBy: blueprint.createdBy,
   }));
@@ -83,9 +89,11 @@ const HomePage = () => {
     id: workflow.metadata?.id!,
     name: workflow.metadata?.name!,
     description: workflow.metadata?.description,
-    createdAt: workflow.metadata?.createdAt ? new Date(workflow.metadata.createdAt).toLocaleDateString() : "Unknown",
+    createdAt: formatDate(workflow.metadata?.createdAt),
     type: "workflow" as const,
     createdBy: workflow.metadata?.createdBy,
+    nodes: workflow.spec?.nodes || [],
+    edges: workflow.spec?.edges || [],
   }));
 
   const filteredBlueprints = blueprints.filter((blueprint) => {
@@ -151,7 +159,6 @@ const HomePage = () => {
 
             <div className="flex flex-col sm:flex-row gap-4 mb-6 justify-between">
               <SearchBar activeTab={activeTab} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-              <ViewModeToggle viewMode={viewMode} setViewMode={setViewMode} />
             </div>
 
             {isLoading ? (
@@ -161,11 +168,11 @@ const HomePage = () => {
             ) : (
               <Content
                 activeTab={activeTab}
-                viewMode={viewMode}
                 filteredBlueprints={filteredBlueprints}
                 filteredWorkflows={filteredWorkflows}
                 organizationId={organizationId}
                 searchQuery={searchQuery}
+                onEditWorkflow={canvasModalState.onOpenEdit}
               />
             )}
           </div>
@@ -219,34 +226,6 @@ function Tabs({ activeTab, setActiveTab, blueprints, workflows }: TabsProps) {
   );
 }
 
-interface ViewModeToggleProps {
-  viewMode: string;
-  setViewMode: any;
-}
-
-function ViewModeToggle({ viewMode, setViewMode }: ViewModeToggleProps) {
-  return (
-    <div className="flex items-center gap-1">
-      <Button
-        variant={viewMode === "grid" ? "default" : "secondary"}
-        onClick={() => setViewMode("grid")}
-        title="Grid view"
-        size="sm"
-      >
-        <LayoutGrid size={18} />
-      </Button>
-      <Button
-        variant={viewMode === "list" ? "default" : "secondary"}
-        size="sm"
-        onClick={() => setViewMode("list")}
-        title="List view"
-      >
-        <List size={16} />
-      </Button>
-    </div>
-  );
-}
-
 interface SearchBarProps {
   activeTab: string;
   searchQuery: string;
@@ -254,25 +233,18 @@ interface SearchBarProps {
 }
 
 function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
-  const inputStyle = cn(
-    "h-9 w-full pl-10 pr-4 py-2 border border-border dark:border-gray-700",
-    "rounded-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-500",
-    "focus:ring-1 focus:ring-blue-800 focus:border-gray-800",
-  );
-
   const searchPlaceholder = activeTab === "custom-components" ? "Search Bundles..." : "Search canvases...";
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 w-100">
+    <div className="flex items-center gap-2 w-full">
+      <div className="flex-1 max-w-sm">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <Input
             placeholder={searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={inputStyle}
+            className="pl-10"
           />
         </div>
       </div>
@@ -299,7 +271,7 @@ function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
         <Heading level={2} className="!text-2xl mb-1">
           {heading}
         </Heading>
-        <Text className="text-gray-600 dark:text-gray-400">{description}</Text>
+        <Text className="text-gray-800 dark:text-gray-400">{description}</Text>
       </div>
 
       <Button onClick={onNewClick} size="sm">
@@ -328,39 +300,37 @@ function ErrorState({ error }: { error: string }) {
 
 function Content({
   activeTab,
-  viewMode,
   filteredBlueprints,
   filteredWorkflows,
   organizationId,
   searchQuery,
+  onEditWorkflow,
 }: {
   activeTab: TabType;
-  viewMode: ViewMode;
   filteredBlueprints: BlueprintCardData[];
   filteredWorkflows: WorkflowCardData[];
   organizationId: string;
   searchQuery: string;
+  onEditWorkflow: (workflow: WorkflowCardData) => void;
 }) {
   if (activeTab === "canvases") {
     if (filteredWorkflows.length === 0) {
       return <CanvasesEmptyState searchQuery={searchQuery} />;
     }
 
-    if (viewMode === "grid") {
-      return <WorkflowGridView filteredWorkflows={filteredWorkflows} organizationId={organizationId} />;
-    } else {
-      return <WorkflowListView filteredWorkflows={filteredWorkflows} organizationId={organizationId} />;
-    }
+    return (
+      <WorkflowGridView
+        filteredWorkflows={filteredWorkflows}
+        organizationId={organizationId}
+        onEditWorkflow={onEditWorkflow}
+      />
+    );
   } else if (activeTab === "custom-components") {
     if (filteredBlueprints.length === 0) {
       return <CustomComponentsEmptyState searchQuery={searchQuery} />;
     }
 
-    if (viewMode === "grid") {
-      return <BlueprintGridView filteredBlueprints={filteredBlueprints} organizationId={organizationId} />;
-    } else {
-      return <BlueprintListView filteredBlueprints={filteredBlueprints} organizationId={organizationId} />;
-    }
+    return <BlueprintGridView filteredBlueprints={filteredBlueprints} organizationId={organizationId} />;
   }
 
   throw new Error("Invalid activeTab value");
@@ -373,7 +343,7 @@ function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
       <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
         {searchQuery ? "No Bundles found" : "No Bundles yet"}
       </Heading>
-      <Text className="text-gray-600 dark:text-gray-400 mb-6">
+      <Text className="text-gray-500 dark:text-gray-400 mb-6">
         {searchQuery ? "Try adjusting your search criteria." : "Get started by creating your first Bundle."}
       </Text>
     </div>
@@ -387,7 +357,7 @@ function CanvasesEmptyState({ searchQuery }: { searchQuery: string }) {
       <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
         {searchQuery ? "No canvases found" : "No canvases yet"}
       </Heading>
-      <Text className="text-gray-600 dark:text-gray-400 mb-6">
+      <Text className="text-gray-500 dark:text-gray-400 mb-6">
         {searchQuery ? "Try adjusting your search criteria." : "Get started by creating your first canvas."}
       </Text>
     </div>
@@ -397,32 +367,22 @@ function CanvasesEmptyState({ searchQuery }: { searchQuery: string }) {
 interface WorkflowGridViewProps {
   filteredWorkflows: WorkflowCardData[];
   organizationId: string;
+  onEditWorkflow: (workflow: WorkflowCardData) => void;
 }
 
-function WorkflowGridView({ filteredWorkflows, organizationId }: WorkflowGridViewProps) {
+function WorkflowGridView({ filteredWorkflows, organizationId, onEditWorkflow }: WorkflowGridViewProps) {
   const navigate = useNavigate();
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
       {filteredWorkflows.map((workflow) => (
-        <WorkflowCard key={workflow.id} workflow={workflow} organizationId={organizationId} navigate={navigate} />
-      ))}
-    </div>
-  );
-}
-
-interface WorkflowListViewProps {
-  filteredWorkflows: WorkflowCardData[];
-  organizationId: string;
-}
-
-function WorkflowListView({ filteredWorkflows, organizationId }: WorkflowListViewProps) {
-  const navigate = useNavigate();
-
-  return (
-    <div className="space-y-2">
-      {filteredWorkflows.map((workflow) => (
-        <WorkflowListItem key={workflow.id} workflow={workflow} organizationId={organizationId} navigate={navigate} />
+        <WorkflowCard
+          key={workflow.id}
+          workflow={workflow}
+          organizationId={organizationId}
+          navigate={navigate}
+          onEdit={onEditWorkflow}
+        />
       ))}
     </div>
   );
@@ -432,48 +392,65 @@ interface WorkflowCardProps {
   workflow: WorkflowCardData;
   organizationId: string;
   navigate: any;
+  onEdit: (workflow: WorkflowCardData) => void;
 }
 
-function WorkflowCard({ workflow, organizationId, navigate }: WorkflowCardProps) {
+function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCardProps) {
+  const handleNavigate = () => navigate(`/${organizationId}/workflows/${workflow.id}`);
+  const previewNodes = workflow.nodes || [];
+  const previewEdges = workflow.edges || [];
+
   return (
     <div
       key={workflow.id}
-      className="max-h-45 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow"
+      role="button"
+      tabIndex={0}
+      onClick={(event) => {
+        if (event.defaultPrevented) return;
+        handleNavigate();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleNavigate();
+        }
+      }}
+      className="min-h-48 bg-white dark:bg-gray-950 rounded-md outline outline-slate-950/10 hover:shadow-md transition-shadow cursor-pointer"
     >
-      <div className="p-6 flex flex-col justify-between h-full">
-        <div>
-          <div className="flex items-start justify-between gap-3 mb-4">
+      <div className="flex flex-col h-full">
+        <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
+
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-3">
             <div className="flex flex-col flex-1 min-w-0">
-              <button
-                onClick={() => navigate(`/${organizationId}/workflows/${workflow.id}`)}
-                className="block text-left w-full"
+              <Heading
+                level={3}
+                className="!text-lg font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
               >
-                <Heading
-                  level={3}
-                  className="!text-md font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
-                >
-                  {workflow.name}
-                </Heading>
-              </button>
+                <span className="truncate">{workflow.name}</span>
+              </Heading>
             </div>
-            <WorkflowActionsMenu workflow={workflow} organizationId={organizationId} />
+            <WorkflowActionsMenu workflow={workflow} organizationId={organizationId} onEdit={onEdit} />
           </div>
 
-          <div className="mb-4">
-            <Text className="text-sm text-left text-gray-600 dark:text-gray-400 line-clamp-2 mt-2">
-              {workflow.description || "No description"}
-            </Text>
-          </div>
-        </div>
+          {workflow.description ? (
+            <div className="mb-4">
+              <Text className="text-sm !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
+                {workflow.description}
+              </Text>
+            </div>
+          ) : null}
 
-        <div className="flex justify-between items-center">
-          <div className="text-gray-500 text-left">
-            {workflow.createdBy?.name && (
-              <p className="text-xs text-gray-600 dark:text-gray-400 leading-none mb-1">
-                Created by <strong>{workflow.createdBy.name}</strong>
-              </p>
-            )}
-            <p className="text-xs text-gray-600 dark:text-gray-400 leading-none">Created at {workflow.createdAt}</p>
+          <div className="flex justify-between items-center">
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left mt-1">
+              {workflow.createdBy?.name ? (
+                <>
+                  Created by {workflow.createdBy.name}, on {workflow.createdAt}
+                </>
+              ) : (
+                <>Created on {workflow.createdAt}</>
+              )}
+            </p>
           </div>
         </div>
       </div>
@@ -481,37 +458,93 @@ function WorkflowCard({ workflow, organizationId, navigate }: WorkflowCardProps)
   );
 }
 
-function WorkflowListItem({ workflow, organizationId, navigate }: WorkflowCardProps) {
-  return (
-    <div
-      key={workflow.id}
-      className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 hover:shadow-sm transition-shadow p-4"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <button
-          onClick={() => navigate(`/${organizationId}/workflows/${workflow.id}`)}
-          className="block text-left w-full"
-        >
-          <Heading
-            level={3}
-            className="!text-md font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
-          >
-            {workflow.name}
-          </Heading>
-          <Text className="text-sm text-gray-600 dark:text-gray-400">{workflow.description || "No description"}</Text>
-          <Text className="text-xs text-gray-500 mt-2">
-            {workflow.createdBy?.name ? (
-              <>
-                Created by <strong>{workflow.createdBy.name}</strong> · {workflow.createdAt}
-              </>
-            ) : (
-              <>Created at {workflow.createdAt}</>
-            )}
-          </Text>
-        </button>
+interface CanvasMiniMapProps {
+  nodes?: ComponentsNode[];
+  edges?: ComponentsEdge[];
+}
 
-        <WorkflowActionsMenu workflow={workflow} organizationId={organizationId} />
+function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
+  const positionedNodes = nodes.filter(
+    (node) => typeof node.position?.x === "number" && typeof node.position?.y === "number",
+  ) as Array<ComponentsNode & { position: { x: number; y: number } }>;
+
+  if (!positionedNodes.length) {
+    return (
+      <div className="p-4 border-b border-gray-200">
+        <div className="h-28 w-full rounded-sm border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 flex items-center justify-center text-[13px] text-gray-500 dark:text-gray-400">
+          The canvas is empty
+        </div>
       </div>
+    );
+  }
+
+  const xs = positionedNodes.map((node) => node.position.x);
+  const ys = positionedNodes.map((node) => node.position.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const padding = 80;
+  const width = Math.max(maxX - minX, 200) + padding * 2;
+  const height = Math.max(maxY - minY, 200) + padding * 2;
+  const viewBox = `${minX - padding} ${minY - padding} ${width} ${height}`;
+  const nodeWidth = Math.min(Math.max(width * 0.08, 30), 80);
+  const nodeHeight = nodeWidth * 0.45;
+
+  const nodePositions = new Map<string, { x: number; y: number }>();
+  positionedNodes.forEach((node) => {
+    const id = node.id || node.name;
+    if (!id) return;
+    nodePositions.set(id, { x: node.position.x, y: node.position.y });
+  });
+
+  const drawableEdges =
+    edges?.filter(
+      (edge) => edge.sourceId && edge.targetId && nodePositions.has(edge.sourceId) && nodePositions.has(edge.targetId),
+    ) || [];
+
+  return (
+    <div className="p-4 w-full border-b border-gray-200 overflow-hidden">
+      <svg
+        viewBox={viewBox}
+        preserveAspectRatio="xMidYMid meet"
+        className="w-full h-28 text-gray-500 dark:text-gray-400"
+      >
+        {drawableEdges.map((edge) => {
+          const source = nodePositions.get(edge.sourceId!);
+          const target = nodePositions.get(edge.targetId!);
+          if (!source || !target) return null;
+          return (
+            <line
+              key={`${edge.sourceId}-${edge.targetId}`}
+              x1={source.x}
+              y1={source.y}
+              x2={target.x}
+              y2={target.y}
+              stroke="currentColor"
+              strokeWidth={6}
+              strokeLinecap="round"
+              opacity={0.25}
+            />
+          );
+        })}
+        {positionedNodes.map((node) => {
+          const id = node.id || node.name || `${node.position.x}-${node.position.y}`;
+          return (
+            <rect
+              key={id}
+              x={node.position.x - nodeWidth / 2}
+              y={node.position.y - nodeHeight / 2}
+              width={nodeWidth}
+              height={nodeHeight}
+              rx={8}
+              ry={8}
+              fill="#1f2937"
+              opacity={1}
+            />
+          );
+        })}
+      </svg>
     </div>
   );
 }
@@ -519,9 +552,10 @@ function WorkflowListItem({ workflow, organizationId, navigate }: WorkflowCardPr
 interface WorkflowActionsMenuProps {
   workflow: WorkflowCardData;
   organizationId: string;
+  onEdit: (workflow: WorkflowCardData) => void;
 }
 
-function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuProps) {
+function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActionsMenuProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const deleteWorkflowMutation = useDeleteWorkflow(organizationId);
 
@@ -558,6 +592,17 @@ function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuPr
             <MoreVertical size={16} />
           </DropdownButton>
           <DropdownMenu>
+            <DropdownItem
+              onClick={(event: MouseEvent<HTMLElement>) => {
+                event.stopPropagation();
+                onEdit(workflow);
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <Pencil size={16} />
+                Edit
+              </span>
+            </DropdownItem>
             <DropdownItem onClick={openDialog} className="text-red-600 dark:text-red-400">
               <span className="flex items-center gap-2">
                 <Trash2 size={16} />
@@ -570,11 +615,11 @@ function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuPr
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
         <DialogTitle className="text-red-900 dark:text-red-100">Delete canvas</DialogTitle>
-        <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
+        <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
           This action cannot be undone. Are you sure you want to delete this canvas?
         </DialogDescription>
         <DialogBody>
-          <Text className="text-sm text-gray-600 dark:text-gray-400">
+          <Text className="text-sm text-gray-500 dark:text-gray-400">
             Deleting <span className="font-medium text-gray-800 dark:text-gray-100">{workflow.name}</span> will remove
             its automations and history.
           </Text>
@@ -606,6 +651,7 @@ interface BlueprintActionsMenuProps {
 function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMenuProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const deleteBlueprintMutation = useDeleteBlueprint(organizationId);
+  const navigate = useNavigate();
 
   const closeDialog = () => {
     setIsDialogOpen(false);
@@ -640,6 +686,17 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
             <MoreVertical size={16} />
           </DropdownButton>
           <DropdownMenu>
+            <DropdownItem
+              onClick={(event: MouseEvent<HTMLElement>) => {
+                event.stopPropagation();
+                navigate(`/${organizationId}/custom-components/${blueprint.id}`);
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <Pencil size={16} />
+                Edit
+              </span>
+            </DropdownItem>
             <DropdownItem onClick={openDialog} className="text-red-600 dark:text-red-400">
               <span className="flex items-center gap-2">
                 <Trash2 size={16} />
@@ -652,11 +709,11 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
         <DialogTitle className="text-red-900 dark:text-red-100">Delete Bundle</DialogTitle>
-        <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
+        <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
           This action cannot be undone. Are you sure you want to delete this Bundle?
         </DialogDescription>
         <DialogBody>
-          <Text className="text-sm text-gray-600 dark:text-gray-400">
+          <Text className="text-sm text-gray-500 dark:text-gray-400">
             Deleting <span className="font-medium text-gray-800 dark:text-gray-100">{blueprint.name}</span> will
             permanently remove it.
           </Text>
@@ -692,103 +749,61 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
       {filteredBlueprints.map((blueprint) => {
         const IconComponent = resolveIcon("component");
+        const handleNavigate = () => navigate(`/${organizationId}/custom-components/${blueprint.id}`);
         return (
           <div
             key={blueprint.id}
-            className="max-h-45 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow"
+            role="button"
+            tabIndex={0}
+            onClick={(event) => {
+              if (event.defaultPrevented) return;
+              handleNavigate();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                handleNavigate();
+              }
+            }}
+            className="min-h-48 bg-white dark:bg-gray-950 rounded-md outline outline-slate-950/10 dark:border-gray-800 hover:shadow-md transition-shadow cursor-pointer"
           >
             <div className="p-6 flex flex-col justify-between h-full">
               <div>
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    <IconComponent size={24} className="text-gray-600 dark:text-gray-400" />
+                    <IconComponent size={16} className="text-gray-800 dark:text-gray-400" />
                     <div className="flex flex-col flex-1 min-w-0">
-                      <button
-                        onClick={() => navigate(`/${organizationId}/custom-components/${blueprint.id}`)}
-                        className="block text-left w-full"
+                      <Heading
+                        level={3}
+                        className="!text-lg font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
                       >
-                        <Heading
-                          level={3}
-                          className="!text-md font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
-                        >
-                          {blueprint.name}
-                        </Heading>
-                      </button>
+                        {blueprint.name}
+                      </Heading>
                     </div>
                   </div>
                   <BlueprintActionsMenu blueprint={blueprint} organizationId={organizationId} />
                 </div>
 
-                <div className="mb-4">
-                  <Text className="text-sm text-left text-gray-600 dark:text-gray-400 line-clamp-2 mt-2">
-                    {blueprint.description || "No description"}
-                  </Text>
-                </div>
+                {blueprint.description ? (
+                  <div className="mb-4">
+                    <Text className="text-sm text-left text-gray-800 dark:text-gray-400 line-clamp-3">
+                      {blueprint.description}
+                    </Text>
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex justify-between items-center">
-                <div className="text-gray-500 text-left">
-                  {blueprint.createdBy?.name && (
-                    <p className="text-xs text-gray-600 dark:text-gray-400 leading-none mb-1">
-                      Created by <strong>{blueprint.createdBy.name}</strong>
-                    </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left">
+                  {blueprint.createdBy?.name ? (
+                    <>
+                      By {blueprint.createdBy.name}, created on {blueprint.createdAt}
+                    </>
+                  ) : (
+                    <>Created on {blueprint.createdAt}</>
                   )}
-                  <p className="text-xs text-gray-600 dark:text-gray-400 leading-none">
-                    Created at {blueprint.createdAt}
-                  </p>
-                </div>
+                </p>
               </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function BlueprintListView({ filteredBlueprints, organizationId }: BlueprintGridViewProps) {
-  const navigate = useNavigate();
-
-  return (
-    <div className="space-y-2">
-      {filteredBlueprints.map((blueprint) => {
-        const IconComponent = resolveIcon("component");
-        return (
-          <div
-            key={blueprint.id}
-            className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 hover:shadow-sm transition-shadow p-4"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <button
-                onClick={() => navigate(`/${organizationId}/custom-components/${blueprint.id}`)}
-                className="block text-left w-full"
-              >
-                <div className="flex items-center gap-3">
-                  <IconComponent size={24} className="text-gray-600 dark:text-gray-400" />
-                  <div className="flex-1">
-                    <Heading
-                      level={3}
-                      className="!text-md font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
-                    >
-                      {blueprint.name}
-                    </Heading>
-                    <Text className="text-sm text-gray-600 dark:text-gray-400">
-                      {blueprint.description || "No description"}
-                    </Text>
-                    <Text className="text-xs text-gray-500 mt-2">
-                      {blueprint.createdBy?.name ? (
-                        <>
-                          Created by <strong>{blueprint.createdBy.name}</strong> · {blueprint.createdAt}
-                        </>
-                      ) : (
-                        <>Created at {blueprint.createdAt}</>
-                      )}
-                    </Text>
-                  </div>
-                </div>
-              </button>
-
-              <BlueprintActionsMenu blueprint={blueprint} organizationId={organizationId} />
             </div>
           </div>
         );

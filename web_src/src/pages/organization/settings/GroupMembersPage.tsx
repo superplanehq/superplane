@@ -24,7 +24,7 @@ import {
   useRemoveUserFromGroup,
   useUpdateGroup,
 } from "../../../hooks/useOrganizationData";
-import { Button } from "../../../ui/button";
+import { Button } from "@/components/ui/button";
 import { AddMembersSection, AddMembersSectionRef } from "./AddMembersSection";
 
 export function GroupMembersPage() {
@@ -280,7 +280,7 @@ export function GroupMembersPage() {
         />
       </div>
 
-      <div className="bg-gray-100 dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6 space-y-6">
+      <div className="bg-gray-100 dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
         {/* Group header */}
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3">
@@ -377,7 +377,7 @@ export function GroupMembersPage() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Subheading level={3} className="text-lg !font-normal text-gray-600 dark:text-gray-400">
+                    <Subheading level={3} className="text-lg !font-normal text-gray-500 dark:text-gray-400">
                       {group?.spec?.description || "No description"}
                     </Subheading>
                     <Button
@@ -434,7 +434,7 @@ export function GroupMembersPage() {
         />
 
         {/* Group members table */}
-        <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+        <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
           <div className="px-6 pt-6 pb-4">
             <div className="flex items-center justify-between">
               <InputGroup>

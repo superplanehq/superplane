@@ -10,7 +10,7 @@ export function Heading({ className, level = 1, ...props }: HeadingProps) {
   return (
     <Element
       {...props}
-      className={twMerge("text-2xl/8 font-semibold text-gray-950 sm:text-xl/8 dark:text-white", className)}
+      className={twMerge("text-xl/8 font-medium text-gray-800 sm:text-xl/8 dark:text-white", className)}
     />
   );
 }

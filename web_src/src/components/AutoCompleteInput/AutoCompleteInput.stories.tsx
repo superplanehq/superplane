@@ -140,7 +140,7 @@ export const Controlled: Story = {
     return (
       <div className="space-y-4">
         <AutoCompleteInput {...args} value={value} onChange={setValue} />
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-gray-500">
           Current value: <code className="bg-gray-100 px-1 py-0.5 rounded">{value}</code>
         </div>
       </div>

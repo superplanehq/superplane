@@ -7,7 +7,6 @@ import "./App.css";
 
 // Import pages
 import AuthGuard from "./components/AuthGuard";
-import Navigation from "./components/Navigation";
 import { AccountProvider } from "./contexts/AccountContext";
 import { isCustomComponentsEnabled } from "./lib/env";
 import EmailLogin from "./pages/auth/EmailLogin";
@@ -30,14 +29,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-// Helper function to wrap components with Navigation and Auth Guard
-const withAuthAndNavigation = (Component: React.ComponentType) => (
-  <AuthGuard>
-    <Navigation />
-    <Component />
-  </AuthGuard>
-);
 
 const withAuthOnly = (Component: React.ComponentType) => (
   <AuthGuard>
@@ -63,7 +54,7 @@ function App() {
                 path=":organizationId/workflows/:workflowId/nodes/:nodeId/:executionId"
                 element={withAuthOnly(NodeRunPage)}
               />
-              <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
+              <Route path=":organizationId/settings/*" element={withAuthOnly(OrganizationSettings)} />
               {/* Organization selection and creation */}
               <Route path="login/email" element={<EmailLogin />} />
               <Route path="create" element={<OrganizationCreate />} />

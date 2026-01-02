@@ -8,7 +8,7 @@ import {
   useUpdateApplication,
   useUninstallApplication,
 } from "@/hooks/useApplications";
-import { Button } from "@/ui/button";
+import { Button } from "@/components/ui/button";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Alert, AlertDescription } from "@/ui/alert";
@@ -121,7 +121,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
         <div className="flex items-center gap-4 mb-6">
           <button
             onClick={() => navigate(`/${organizationId}/settings/applications`)}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -140,14 +140,14 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
         <div className="flex items-center gap-4 mb-6">
           <button
             onClick={() => navigate(`/${organizationId}/settings/applications`)}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h4 className="text-2xl font-semibold">Application Details</h4>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
-          <p className="text-gray-600 dark:text-gray-400">Application installation not found</p>
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+          <p className="text-gray-500 dark:text-gray-400">Application installation not found</p>
         </div>
       </div>
     );
@@ -158,19 +158,19 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
       <div className="flex items-center gap-4 mb-6">
         <button
           onClick={() => navigate(`/${organizationId}/settings/applications`)}
-          className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
+          className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
         {appDefinition?.icon &&
           (() => {
             const AppIcon = resolveIcon(appDefinition.icon);
-            return <AppIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />;
+            return <AppIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />;
           })()}
         <div className="flex-1">
           <h4 className="text-2xl font-semibold">{installation.metadata?.name || installation.spec?.appName}</h4>
           {installation.spec?.appName && installation.metadata?.name !== installation.spec?.appName && (
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Application: {installation.spec.appName}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Application: {installation.spec.appName}</p>
           )}
         </div>
       </div>
@@ -182,7 +182,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
             <div className="p-6">
               <h2 className="text-lg font-medium mb-4">Installation Details</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -205,7 +205,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
                       (installation.status?.state || "unknown").slice(1)}
                   </span>
                   {installation.status?.stateDescription && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                       {installation.status.stateDescription}
                     </p>
                   )}
@@ -215,12 +215,12 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
           </div>
 
           {/* Used By */}
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
             <div className="p-6">
               <h2 className="text-lg font-medium mb-4">Used By</h2>
               {workflowGroups.length > 0 ? (
                 <>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
                     This app installation is currently used in the following canvases:
                   </p>
                   <div className="space-y-2">
@@ -228,13 +228,13 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
                       <button
                         key={group.workflowId}
                         onClick={() => window.open(`/${organizationId}/workflows/${group.workflowId}`, "_blank")}
-                        className="w-full flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+                        className="w-full flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
                       >
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
                             Canvas: {group.workflowName}
                           </p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             Used in {group.nodes.length} node{group.nodes.length !== 1 ? "s" : ""}:{" "}
                             {group.nodes.map((node) => node.nodeName).join(", ")}
                           </p>
@@ -245,7 +245,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                   This app installation is not used in any workflow yet.
                 </p>
               )}
@@ -256,7 +256,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
           <div className="bg-white dark:bg-gray-900 rounded-lg border border-red-200 dark:border-red-800">
             <div className="p-6">
               <h2 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">Danger Zone</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Once you uninstall this application, all its data will be permanently deleted. This action cannot be
                 undone.
               </p>
@@ -273,7 +273,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
         </TabsContent>
 
         <TabsContent value="configuration">
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
             <div className="p-6">
               {installation?.status?.browserAction && (
                 <Alert className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
@@ -342,10 +342,10 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-800 max-w-md w-full mx-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-300 dark:border-gray-800 max-w-md w-full mx-4">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">Uninstall Application</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                 Are you sure you want to uninstall <strong>{installation?.metadata?.name}</strong>? This action cannot
                 be undone and all data will be permanently deleted.
               </p>

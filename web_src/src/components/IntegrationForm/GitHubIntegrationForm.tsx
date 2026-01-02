@@ -112,7 +112,7 @@ export function GitHubIntegrationForm({
                     Click <strong>Generate token</strong>, then copy and paste it here
                   </li>
                 </ol>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                   Tip: You can manage, rotate, or revoke tokens anytime in your{" "}
                   <a
                     className="text-blue-600 dark:text-blue-400 underline!"

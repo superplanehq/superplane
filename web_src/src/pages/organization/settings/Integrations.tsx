@@ -6,7 +6,7 @@ import type { IntegrationsIntegration } from "../../../api-client/types.gen";
 import { Icon } from "../../../components/Icon";
 import { IntegrationModal } from "../../../components/IntegrationZeroState/IntegrationModal";
 import { useIntegrations } from "../../../hooks/useIntegrations";
-import { Button } from "../../../ui/button";
+import { Button } from "@/components/ui/button";
 
 interface IntegrationsProps {
   organizationId: string;
@@ -60,7 +60,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   if (integrationsLoading) {
     return (
       <div className="pt-6">
-        <h1 className="text-2xl font-semibold mb-6">Integrations</h1>
         <div className="flex justify-center items-center h-32">
           <p className="text-gray-500 dark:text-gray-400">Loading integrations...</p>
         </div>
@@ -70,13 +69,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
   return (
     <div className="pt-6">
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Integrations</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">Manage integrations for your organization</p>
-        </div>
-      </div>
-
       {/* Deprecation Warning */}
       <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
         <div className="flex items-start gap-3">
@@ -101,13 +93,13 @@ export function Integrations({ organizationId }: IntegrationsProps) {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
         <div className="p-6">
           {integrations.length === 0 ? (
             <div className="text-center py-12">
               <Icon name="integration_instructions" size="lg" className="text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-2">No integrations yet</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
+              <p className="text-gray-500 dark:text-gray-400 mb-6">
                 Connect external services to streamline your workflow
               </p>
               <Button onClick={handleAddIntegrationClick} className="flex items-center gap-2">
@@ -129,7 +121,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                 {integrations.map((integration) => (
                   <div
                     key={integration.metadata?.id}
-                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+                    className="border border-gray-300 dark:border-gray-700 rounded-lg p-4"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -142,7 +134,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         </div>
                         <div>
                           <h3 className="font-medium text-gray-800 dark:text-gray-100">{integration.metadata?.name}</h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">{integration.spec?.url}</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">{integration.spec?.url}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -170,7 +162,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       {/* Integration Type Selector */}
       {isIntegrationSelectorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-800 max-w-md w-full mx-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-300 dark:border-gray-800 max-w-md w-full mx-4">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">Select Integration Type</h3>
@@ -186,14 +178,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                   <button
                     key={type.id}
                     onClick={() => handleCreateIntegration(type.id)}
-                    className="w-full flex items-center gap-3 p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    className="w-full flex items-center gap-3 p-4 text-left border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                   >
                     <div className="flex-shrink-0">
                       <img src={type.icon} alt={type.name} className="w-5" />
                     </div>
                     <div>
                       <h4 className="font-medium text-gray-800 dark:text-gray-100">{type.name}</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         {type.id === "github" ? "Connect to GitHub repositories" : "Connect to Semaphore CI/CD"}
                       </p>
                     </div>

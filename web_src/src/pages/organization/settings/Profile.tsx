@@ -6,7 +6,7 @@ import { Heading } from "../../../components/Heading/heading";
 import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
-import { Button } from "../../../ui/button";
+import { Button } from "@/components/ui/button";
 import { withOrganizationHeader } from "../../../utils/withOrganizationHeader";
 
 export function Profile() {
@@ -91,7 +91,7 @@ export function Profile() {
       </Heading>
       <div className="space-y-6">
         {/* Profile Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-300 dark:border-gray-700 p-6">
           <div className="space-y-6">
             {/* User Avatar and Basic Info */}
             <div className="flex items-center space-x-4">
@@ -135,19 +135,19 @@ export function Profile() {
         <Heading level={2} className="text-lg text-left font-medium text-gray-800 dark:text-white mb-4">
           API Token
         </Heading>
-        <Text className="text-gray-600 text-left dark:text-gray-400 text-sm">
+        <Text className="text-gray-500 text-left dark:text-gray-400 text-sm">
           Use this token to authenticate API requests to Superplane. Keep your token secure and do not share it.
         </Text>
 
         {/* API Token Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-300 dark:border-gray-700 p-6">
           <div className="space-y-4">
             {/* Token Status */}
             <div className="flex items-center gap-2">
               {!user.hasToken && (
                 <>
                   <Icon name="error" className="text-gray-500 dark:text-gray-400 text-lg" />
-                  <Text className="text-sm font-medium text-gray-600 dark:text-gray-400">No API token generated</Text>
+                  <Text className="text-sm font-medium text-gray-500 dark:text-gray-400">No API token generated</Text>
                 </>
               )}
             </div>

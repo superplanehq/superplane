@@ -6,7 +6,7 @@ import {
   useInstalledApplications,
   useInstallApplication,
 } from "../../../hooks/useApplications";
-import { Button } from "@/ui/button";
+import { Button } from "@/components/ui/button";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { ApplicationsApplicationDefinition } from "../../../api-client/types.gen";
 import { resolveIcon } from "@/lib/utils";
@@ -77,7 +77,6 @@ export function Applications({ organizationId }: ApplicationsProps) {
   if (isLoading) {
     return (
       <div className="pt-6">
-        <h1 className="text-2xl font-semibold mb-6">Applications</h1>
         <div className="flex justify-center items-center h-32">
           <p className="text-gray-500 dark:text-gray-400">Loading applications...</p>
         </div>
@@ -87,17 +86,11 @@ export function Applications({ organizationId }: ApplicationsProps) {
 
   return (
     <div className="pt-6">
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h4 className="text-2xl font-semibold">Applications</h4>
-        </div>
-      </div>
-
       {/* Installed Applications */}
       {installedApps.length > 0 && (
         <div className="mb-8">
           <h2 className="text-lg font-medium mb-4">Installed</h2>
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
             <table className="w-full table-fixed">
               <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <tr>
@@ -129,7 +122,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                         onClick={() => navigate(`/${organizationId}/settings/applications/${app.metadata?.id}`)}
                         className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
                       >
-                        <td className="px-3 py-2 text-xs font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                        <td className="px-3 py-2 text-xs font-mono text-gray-500 dark:text-gray-400 whitespace-nowrap">
                           {app.metadata?.id}
                         </td>
                         <td className="px-3 py-2 truncate">
@@ -152,7 +145,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                               : "Unknown"}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 truncate">
+                        <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 truncate">
                           <div className="flex items-center gap-2">
                             <AppIcon className="w-4 h-4" />
                             <span>{appLabel}</span>
@@ -170,39 +163,49 @@ export function Applications({ organizationId }: ApplicationsProps) {
       {/* Available Applications */}
       <div>
         <h2 className="text-lg font-medium mb-4">Available</h2>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+        <div className="bg-gray-100 dark:bg-gray-900 rounded-lg">
           <div className="p-6">
             {availableApps.length === 0 ? (
               <div className="text-center py-12">
                 <AppWindow className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-2">No applications available</h3>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-gray-500 dark:text-gray-400">
                   There are currently no applications available to install
                 </p>
               </div>
             ) : (
-              <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              <div className="grid gap-6 md:grid-cols-2">
                 {availableApps.map((app) => {
                   const Icon = resolveIcon(app.icon);
                   return (
                     <div
                       key={app.name}
-                      className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:shadow-md transition-shadow"
+                      className="bg-white min-h-40 border border-gray-300 dark:border-gray-700 rounded-md p-3 hover:shadow-md transition-shadow flex flex-col h-full"
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Icon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                          <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                            {app.label || app.name}
-                          </h3>
+                      <div className="flex-1 flex flex-col">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                              {app.label || app.name}
+                            </h3>
+                          </div>
                         </div>
+
+                        {app.description ? (
+                          <p className="text-sm text-gray-800 dark:text-gray-400 mb-3 line-clamp-3">
+                            {app.description}
+                          </p>
+                        ) : (
+                          <div className="mb-3" />
+                        )}
                       </div>
 
-                      {app.description && (
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{app.description}</p>
-                      )}
-
-                      <Button color="blue" onClick={() => handleInstallClick(app)} className="w-full text-sm py-1.5">
+                      <Button
+                        color="blue"
+                        onClick={() => handleInstallClick(app)}
+                        className="w-full text-sm py-1.5 mt-auto"
+                      >
                         Install
                       </Button>
                     </div>
@@ -221,11 +224,11 @@ export function Applications({ organizationId }: ApplicationsProps) {
           const ModalIcon = resolveIcon(selectedApplication.icon);
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-800 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+              <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-300 dark:border-gray-800 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                      <ModalIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                      <ModalIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
                       <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
                         Install {selectedApplication.label || selectedApplication.name}
                       </h3>

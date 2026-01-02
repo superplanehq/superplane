@@ -9,9 +9,7 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from "../../../components/Dropdown/dropdown";
-import { Heading } from "../../../components/Heading/heading";
 import { Icon } from "../../../components/Icon";
-import { Input, InputGroup } from "../../../components/Input/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { Text } from "../../../components/Text/text";
 import { Textarea } from "../../../components/Textarea/textarea";
@@ -59,7 +57,6 @@ interface MembersProps {
 }
 
 export function Members({ organizationId }: MembersProps) {
-  const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
     key: keyof UnifiedMember | null;
     direction: "asc" | "desc";
@@ -199,16 +196,7 @@ export function Members({ organizationId }: MembersProps) {
     } else if (activeTab === "invited") {
       filtered = sorted.filter((member) => member.type === "invitation");
     }
-
-    // Apply search filter
-    if (!searchTerm) return filtered;
-
-    return filtered.filter(
-      (member) =>
-        member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.role.toLowerCase().includes(searchTerm.toLowerCase()),
-    );
+    return filtered;
   };
 
   const handleRoleChange = async (memberId: string, newRoleName: string) => {
@@ -306,12 +294,6 @@ export function Members({ organizationId }: MembersProps) {
 
   return (
     <div className="space-y-6 pt-6">
-      <div className="flex items-center justify-between">
-        <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white">
-          Members
-        </Heading>
-      </div>
-
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
           <p>{error instanceof Error ? error.message : "Failed to fetch data"}</p>
@@ -319,7 +301,7 @@ export function Members({ organizationId }: MembersProps) {
       )}
 
       {/* Send Invitations Section */}
-      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
+      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">Invite new members</Text>
@@ -359,18 +341,18 @@ export function Members({ organizationId }: MembersProps) {
       </div>
 
       {/* Members List */}
-      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4">
               {/* Tab Navigation */}
-              <div className="flex border border-gray-200 dark:border-gray-700 rounded-lg p-1">
+              <div className="flex border border-gray-300 dark:border-gray-700 rounded-lg p-1">
                 <button
                   onClick={() => setActiveTab("all")}
                   className={`px-3 py-1 text-sm rounded-md transition-colors ${
                     activeTab === "all"
                       ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-white"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
                   }`}
                 >
                   All ({totalCount})
@@ -380,7 +362,7 @@ export function Members({ organizationId }: MembersProps) {
                   className={`px-3 py-1 text-sm rounded-md transition-colors ${
                     activeTab === "active"
                       ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-white"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
                   }`}
                 >
                   Active ({activeCount})
@@ -390,24 +372,13 @@ export function Members({ organizationId }: MembersProps) {
                   className={`px-3 py-1 text-sm rounded-md transition-colors ${
                     activeTab === "invited"
                       ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-white"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
                   }`}
                 >
                   Invited ({invitedCount})
                 </button>
               </div>
             </div>
-
-            <InputGroup>
-              <Input
-                name="search"
-                placeholder="Search members…"
-                aria-label="Search"
-                className="w-xs"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </InputGroup>
           </div>
         </div>
 
@@ -541,12 +512,8 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell colSpan={5} className="text-center py-8">
                       <div className="text-gray-500 dark:text-gray-400">
                         <Icon name="search" className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                        <p className="text-lg font-medium text-gray-800 dark:text-white mb-2">
-                          {searchTerm ? "No members found" : "No members yet"}
-                        </p>
-                        <p className="text-sm">
-                          {searchTerm ? "Try adjusting your search criteria" : "Add members to get started"}
-                        </p>
+                        <p className="text-lg font-medium text-gray-800 dark:text-white mb-2">No members yet</p>
+                        <p className="text-sm">Add members to get started</p>
                       </div>
                     </TableCell>
                   </TableRow>

@@ -92,7 +92,7 @@ export function SemaphoreIntegrationForm({
                       <li>Generate an API Token for the Service Account.</li>
                       <li>Copy the token and paste it below.</li>
                     </ol>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                       <strong>Note:</strong> You may need <strong>Admin</strong> organization role to create Service
                       Accounts. Service Accounts allow secure workspace integrations without relying on personal tokens.
                     </p>
@@ -156,7 +156,7 @@ export function SemaphoreIntegrationForm({
                       </ul>
                       <li>Copy and paste the token here.</li>
                     </ol>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                       Tip: You can check your current organization role on the People page of your organization. See the{" "}
                       <a
                         className="text-blue-600 dark:text-blue-400 underline"

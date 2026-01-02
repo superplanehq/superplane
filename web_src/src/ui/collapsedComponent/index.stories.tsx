@@ -121,7 +121,7 @@ const ToggleableCollapsedComponent = (args: CollapsedComponentProps) => {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="text-sm text-gray-600">
+      <div className="text-sm text-gray-500">
         Current state: {isCollapsed ? "Collapsed" : "Expanded"} | View: {isCompactView ? "Compact" : "Detailed"}
       </div>
       <CollapsedComponent

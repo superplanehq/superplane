@@ -20,15 +20,7 @@ export function SidebarHeader({ className, ...props }: React.ComponentPropsWitho
 }
 
 export function SidebarBody({ className, ...props }: React.ComponentPropsWithoutRef<"div">) {
-  return (
-    <div
-      {...props}
-      className={clsx(
-        className,
-        "flex flex-1 flex-col overflow-y-auto p-4 [&>[data-slot=section]+[data-slot=section]]:mt-8",
-      )}
-    />
-  );
+  return <div {...props} className={clsx(className, "flex flex-1 flex-col overflow-y-auto")} />;
 }
 
 export function SidebarFooter({ className, ...props }: React.ComponentPropsWithoutRef<"div">) {
@@ -44,7 +36,7 @@ export function SidebarFooter({ className, ...props }: React.ComponentPropsWitho
 }
 
 export function SidebarSection({ className, ...props }: React.ComponentPropsWithoutRef<"div">) {
-  return <div {...props} data-slot="section" className={clsx(className, "flex flex-col gap-0.5")} />;
+  return <div {...props} data-slot="section" className={clsx(className, "flex flex-col")} />;
 }
 
 export function SidebarDivider({ className, ...props }: React.ComponentPropsWithoutRef<"hr">) {

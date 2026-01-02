@@ -55,8 +55,8 @@ export function Breadcrumbs({ items, className, separator = "/", showDivider = t
               </button>
             ) : (
               // Non-clickable item
-              <span className="text-gray-600 dark:text-gray-400 flex items-center">
-                {item.icon && <Icon name={item.icon} className="text-gray-600 dark:text-gray-400 mr-1" size="sm" />}
+              <span className="text-gray-500 dark:text-gray-400 flex items-center">
+                {item.icon && <Icon name={item.icon} className="text-gray-500 dark:text-gray-400 mr-1" size="sm" />}
                 {item.label}
               </span>
             )}

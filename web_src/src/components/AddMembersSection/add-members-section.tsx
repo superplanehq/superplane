@@ -66,7 +66,7 @@ export function AddMembersSection({
       <div className="flex items-center justify-between mb-4">
         <div>
           <Text className="font-semibold text-gray-800 dark:text-white mb-1">Add Members</Text>
-          <Text className="text-sm text-gray-600 dark:text-gray-400">
+          <Text className="text-sm text-gray-500 dark:text-gray-400">
             Search organization members, pending invites, or invite new users
           </Text>
         </div>
@@ -116,12 +116,12 @@ export function AddMembersSection({
               <div className="group w-full flex items-center">
                 {isCustomEmailSuggestion ? (
                   isSelected ? (
-                    <span className="material-symbols-outlined text-xs! text-gray-600 dark:text-gray-400 ml-1">
+                    <span className="material-symbols-outlined text-xs! text-gray-500 dark:text-gray-400 ml-1">
                       mail
                     </span>
                   ) : (
                     <div className="flex items-center justify-center size-8 bg-gray-100 dark:bg-gray-800 rounded-full">
-                      <Icon name="mail" size="md" className="text-gray-600 dark:text-gray-400" />
+                      <Icon name="mail" size="md" className="text-gray-500 dark:text-gray-400" />
                     </div>
                   )
                 ) : (
@@ -135,14 +135,14 @@ export function AddMembersSection({
                       {isCustomEmailSuggestion ? (
                         <>
                           <span className="font-medium">{user.email}</span>
-                          <span className="text-sm text-gray-600 dark:text-gray-400 group-hover:text-white">
+                          <span className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white">
                             Invite to organization and add to canvas
                           </span>
                         </>
                       ) : (
                         <>
                           <span className="font-medium">{user.name || "Unknown"}</span>
-                          <span className="text-sm text-gray-600 dark:text-gray-400 group-hover:text-white">
+                          <span className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white">
                             {user.email}
                           </span>
                         </>

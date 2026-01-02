@@ -15,7 +15,7 @@ import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
 import { useCreateGroup, useOrganizationRoles } from "../../../hooks/useOrganizationData";
-import { Button } from "../../../ui/button";
+import { Button } from "@/components/ui/button";
 
 export function CreateGroupPage() {
   const navigate = useNavigate();
@@ -93,7 +93,7 @@ export function CreateGroupPage() {
             <Heading level={2} className="mb-2">
               Create New Group
             </Heading>
-            <Text className="text-gray-600 dark:text-gray-400">
+            <Text className="text-gray-500 dark:text-gray-400">
               Create a group to organize members and assign roles
             </Text>
           </div>
@@ -101,7 +101,7 @@ export function CreateGroupPage() {
 
         {/* Create Group Form */}
         <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
+          <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
                 <p className="text-sm">{error}</p>

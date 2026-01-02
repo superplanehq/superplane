@@ -115,7 +115,7 @@ function TabItem({
 
       "px-3 py-2 rounded-md": variant === "pills",
       "bg-white text-gray-800 shadow-sm dark:bg-gray-700 dark:text-white": variant === "pills" && isActive,
-      "text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white":
+      "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white":
         variant === "pills" && !isActive && !isDisabled,
 
       "px-3 py-3 relative": variant === "underline" || variant === "dark-underline",
@@ -142,7 +142,7 @@ function TabItem({
       {tab.icon && <span className="flex-shrink-0 w-4 h-4">{tab.icon}</span>}
       <span className="leading-none whitespace-nowrap text-center w-full">{tab.label}</span>
       {tab.count && tab.count > 0 && (
-        <span className="inline-flex items-center justify-center text-xs font-medium rounded-full min-w-[1.25rem] h-5 px-1.5 bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+        <span className="inline-flex items-center justify-center text-xs font-medium rounded-full min-w-[1.25rem] h-5 px-1.5 bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300">
           {tab.count > 99 ? "99+" : tab.count}
         </span>
       )}
