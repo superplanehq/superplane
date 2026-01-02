@@ -137,8 +137,8 @@ func (s *ComponentSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Click(q.TestID("field-mode-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Exclude Range")`))
 
-	s.session.FillIn(q.Locator("input[data-testid='time-field-startTime']"), "00:00")
-	s.session.FillIn(q.Locator("input[data-testid='time-field-endTime']"), "23:59")
+	s.session.FillIn(q.Locator("input[data-testid='time-field-starttime']"), "00:00")
+	s.session.FillIn(q.Locator("input[data-testid='time-field-endtime']"), "23:59")
 
 	s.session.Click(q.TestID("field-timezone-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
