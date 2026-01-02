@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useCreateWorkflow, useUpdateWorkflow } from "../../hooks/useWorkflowData";
+import type { ComponentsEdge, ComponentsNode } from "@/api-client";
 
 type ModalMode = "create" | "edit";
 
@@ -9,6 +10,8 @@ type WorkflowSummary = {
   id: string;
   name: string;
   description?: string;
+  nodes?: ComponentsNode[];
+  edges?: ComponentsEdge[];
 };
 
 export function useCreateCanvasModalState() {
@@ -33,6 +36,8 @@ export function useCreateCanvasModalState() {
       await updateMutation.mutateAsync({
         name: data.name,
         description: data.description,
+        nodes: modalState.workflow?.nodes,
+        edges: modalState.workflow?.edges,
       });
       onClose();
       return;

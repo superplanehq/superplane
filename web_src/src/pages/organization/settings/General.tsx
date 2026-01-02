@@ -1,4 +1,3 @@
-import { Textarea } from "@/components/Textarea/textarea";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import type { OrganizationsOrganization } from "../../../api-client/types.gen";
@@ -15,7 +14,6 @@ interface GeneralProps {
 export function General({ organization }: GeneralProps) {
   const { organizationId } = useParams<{ organizationId: string }>();
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [organizationDescription, setOrganizationDescription] = useState(organization.metadata?.description || "");
   const [name, setName] = useState(organization.metadata?.name || "");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -35,7 +33,6 @@ export function General({ organization }: GeneralProps) {
 
       await updateOrganizationMutation.mutateAsync({
         name: name,
-        description: organizationDescription,
       });
 
       setSaveMessage("Organization updated successfully");
@@ -73,16 +70,6 @@ export function General({ organization }: GeneralProps) {
           <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Organization Name</Label>
           <Input type="text" value={name} onChange={(e) => setName(e.target.value)} className="max-w-lg" />
         </Field>
-        <Field>
-          <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</Label>
-          <Textarea
-            className="bg-white dark:bg-gray-950 rounded-lg dark:border-gray-800 max-w-xl"
-            placeholder="Enter organization description"
-            value={organizationDescription}
-            onChange={(e) => setOrganizationDescription(e.target.value)}
-          />
-        </Field>
-
         <div className="flex items-center gap-4">
           <Button
             type="button"

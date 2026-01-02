@@ -424,7 +424,7 @@ function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCa
         <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
 
         <div className="p-4">
-          <div className="flex items-start justify-between gap-3 mb-1">
+          <div className="flex items-start justify-between gap-3">
             <div className="flex flex-col flex-1 min-w-0">
               <Heading
                 level={3}
@@ -438,14 +438,14 @@ function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCa
 
           {workflow.description ? (
             <div className="mb-4">
-              <Text className="text-sm text-left text-gray-500 dark:text-gray-400 line-clamp-2 mt-2">
+              <Text className="text-sm !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
                 {workflow.description}
               </Text>
             </div>
           ) : null}
 
           <div className="flex justify-between items-center">
-            <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-none text-left">
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left mt-1">
               {workflow.createdBy?.name ? (
                 <>
                   Created by {workflow.createdBy.name}, on {workflow.createdAt}
@@ -790,7 +790,7 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
 
                 {blueprint.description ? (
                   <div className="mb-4">
-                    <Text className="text-sm text-left text-gray-500 dark:text-gray-400 line-clamp-2 mt-2">
+                    <Text className="text-sm text-left text-gray-800 dark:text-gray-400 line-clamp-3">
                       {blueprint.description}
                     </Text>
                   </div>

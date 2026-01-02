@@ -44,7 +44,7 @@ export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasC
             </div>
 
             <div className="mb-4">
-              <Text className="text-sm text-left text-gray-600 dark:text-gray-400 line-clamp-2 mt-2">
+              <Text className="text-sm text-left text-gray-600 dark:text-gray-400 line-clamp-3 mt-2">
                 {canvas.description || ""}
               </Text>
             </div>

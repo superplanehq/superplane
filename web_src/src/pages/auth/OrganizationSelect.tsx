@@ -8,7 +8,6 @@ import { useAccount } from "../../contexts/AccountContext";
 interface Organization {
   id: string;
   name: string;
-  description?: string;
   canvasCount?: number;
   memberCount?: number;
 }
@@ -106,24 +105,30 @@ const OrganizationSelect: React.FC = () => {
             {organizations.map((org) => (
               <div
                 key={org.id}
-                className="h-48 bg-white dark:bg-gray-900 rounded-md shadow-sm p-6 outline outline-slate-950/10 hover:outline-slate-950/15 hover:shadow-md transition-colors cursor-pointer flex flex-col justify-between"
+                className="h-48 bg-white dark:bg-gray-900 rounded-md shadow-sm p-6 outline outline-slate-950/10 hover:outline-slate-950/15 hover:shadow-md transition-colors cursor-pointer"
                 onClick={() => handleOrganizationSelect(org)}
               >
-                <div className="flex items-center gap-2 mb-2 text-gray-800 dark:text-white">
-                  <Building size={16} />
-                  <h4 className="text-lg font-semibold truncate">{org.name}</h4>
-                </div>
-                <Text className="text-sm text-left text-gray-500 dark:text-gray-400 truncate">{org.description}</Text>
-                <div className="mt-3 text-sm font-medium text-gray-500 dark:text-gray-400 flex flex-col gap-1">
-                  <div className="flex items-center gap-1.5">
-                    <Palette size={16} />
-                    {formatCount(org.canvasCount ?? 0, "canvas")}
+
+                <div className="flex flex-col h-full justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1 text-gray-800 dark:text-white">
+                      <Building size={16} />
+                      <h4 className="text-lg font-medium truncate">{org.name}</h4>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <User size={16} />
-                    {formatCount(org.memberCount ?? 0, "member")}
+
+                  <div className="mt-3 text-sm font-medium text-gray-500 dark:text-gray-400 flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <Palette size={16} />
+                      {formatCount(org.canvasCount ?? 0, "canvas")}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <User size={16} />
+                      {formatCount(org.memberCount ?? 0, "member")}
+                    </div>
                   </div>
                 </div>
+
               </div>
             ))}
 
@@ -132,7 +137,7 @@ const OrganizationSelect: React.FC = () => {
               onClick={() => navigate("/create")}
             >
               <div className="flex items-center">
-                <h4 className="text-sm font-semibold text-gray-800 text-center">+ Create new</h4>
+                <h4 className="text-lg font-medium text-gray-800 text-center">+ Create new</h4>
               </div>
               <Text className="text-[13px] text-gray-500 font-medium text-center">
                 Start fresh with a new organization
