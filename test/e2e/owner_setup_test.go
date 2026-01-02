@@ -60,6 +60,7 @@ func (s *ownerSetupSteps) fillInOwnerDetailsAndSubmit(email, firstName, lastName
 	s.session.FillIn(q.Locator(`input[placeholder="First name"]`), firstName)
 	s.session.FillIn(q.Locator(`input[placeholder="Last name"]`), lastName)
 	s.session.FillIn(q.Locator(`input[placeholder="Password"]`), password)
+	s.session.FillIn(q.Locator(`input[placeholder="Confirm password"]`), password)
 	s.session.Click(q.Text("Next"))
 	// Poll for setup to complete - wait for organization to be created in database
 	s.waitForSetupToComplete()
