@@ -1,4 +1,3 @@
-import SuperplaneLogo from "@/assets/superplane.svg";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Text } from "../../components/Text/text";

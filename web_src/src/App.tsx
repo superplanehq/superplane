@@ -7,7 +7,6 @@ import "./App.css";
 
 // Import pages
 import AuthGuard from "./components/AuthGuard";
-import Navigation from "./components/Navigation";
 import { AccountProvider } from "./contexts/AccountContext";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
@@ -28,14 +27,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-// Helper function to wrap components with Navigation and Auth Guard
-const withAuthAndNavigation = (Component: React.ComponentType) => (
-  <AuthGuard>
-    <Navigation />
-    <Component />
-  </AuthGuard>
-);
 
 const withAuthOnly = (Component: React.ComponentType) => (
   <AuthGuard>
