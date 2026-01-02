@@ -3,6 +3,7 @@ import { onPushTriggerRenderer } from "./on_push";
 import { onPullRequestTriggerRenderer } from "./on_pull_request";
 import { onIssueTriggerRenderer } from "./on_issue";
 import { onReleaseTriggerRenderer } from "./on_release";
+import { onTagCreatedTriggerRenderer } from "./on_tag_created";
 import { baseActionMapper } from "./base";
 import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper } from "./run_workflow";
 
@@ -24,4 +25,5 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   onPullRequest: onPullRequestTriggerRenderer,
   onIssue: onIssueTriggerRenderer,
   onRelease: onReleaseTriggerRenderer,
+  onTagCreated: onTagCreatedTriggerRenderer,
 };

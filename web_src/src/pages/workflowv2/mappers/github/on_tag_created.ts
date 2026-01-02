@@ -7,41 +7,42 @@ import { BaseNodeMetadata } from "./base";
 import { Predicate, createGithubMetadataItems } from "./utils";
 
 interface GithubConfiguration {
-  refs: Predicate[];
+  repository: string;
+  tags: Predicate[];
 }
 
-interface PushEventData {
-  head_commit?: {
-    message?: string;
-    id?: string;
-    author?: {
-      name?: string;
-      email?: string;
-      username: string;
-    };
+interface TagCreatedEventData {
+  ref?: string;
+  ref_type?: string;
+  repository?: {
+    name?: string;
+    full_name?: string;
+  };
+  sender?: {
+    login?: string;
   };
 }
 
 /**
- * Renderer for the "github.onPush" trigger
+ * Renderer for the "github.onTagCreated" trigger
  */
-export const onPushTriggerRenderer: TriggerRenderer = {
+export const onTagCreatedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as PushEventData;
+    const eventData = event.data?.data as TagCreatedEventData;
 
     return {
-      title: eventData?.head_commit?.message || "",
-      subtitle: eventData?.head_commit?.id || "",
+      title: eventData?.ref ? `Tag: ${eventData.ref}` : "Tag Created",
+      subtitle: eventData?.repository?.full_name || "",
     };
   },
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as PushEventData;
+    const eventData = lastEvent.data?.data as TagCreatedEventData;
 
     return {
-      Commit: eventData?.head_commit?.message || "",
-      SHA: eventData?.head_commit?.id || "",
-      Author: eventData?.head_commit?.author?.name || "",
+      Tag: eventData?.ref || "",
+      Repository: eventData?.repository?.full_name || "",
+      Sender: eventData?.sender?.login || "",
     };
   },
 
@@ -56,14 +57,14 @@ export const onPushTriggerRenderer: TriggerRenderer = {
       iconColor: getColorClass(trigger.color),
       headerColor: getBackgroundColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),
-      metadata: createGithubMetadataItems(metadata?.repository?.name, configuration?.refs),
+      metadata: createGithubMetadataItems(metadata?.repository?.name, configuration?.tags),
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as PushEventData;
+      const eventData = lastEvent.data?.data as TagCreatedEventData;
       props.lastEventData = {
-        title: eventData?.head_commit?.message || "",
-        subtitle: eventData?.head_commit?.id || "",
+        title: eventData?.ref ? `Tag: ${eventData.ref}` : "Tag Created",
+        subtitle: eventData?.repository?.full_name || "",
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,
