@@ -1,5 +1,6 @@
 import React from "react";
 import { Label } from "../label";
+import { Switch } from "@/ui/switch";
 import { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
 import { TextFieldRenderer } from "./TextFieldRenderer";
@@ -52,6 +53,36 @@ export const ConfigurationFieldRenderer = ({
   realtimeValidationErrors,
   enableRealtimeValidation = false,
 }: ConfigurationFieldRendererProps) => {
+  const isTogglable = field.togglable === true;
+  const isEnabled = isTogglable ? value !== null && value !== undefined : true;
+
+  const handleToggleChange = React.useCallback(
+    (checked: boolean) => {
+      if (!isTogglable) return;
+
+      if (checked) {
+        const defaultVal = field.defaultValue;
+        if (field.type === "select" && field.typeOptions?.select?.options) {
+          const selectOptions = field.typeOptions.select.options;
+          const initialValue =
+            defaultVal && selectOptions.some((opt) => opt.value === defaultVal)
+              ? defaultVal
+              : selectOptions.length > 0
+                ? selectOptions[0].value
+                : "";
+          onChange(initialValue);
+        } else if (field.type === "list") {
+          onChange([]);
+        } else {
+          onChange(defaultVal || (field.type === "number" ? 0 : ""));
+        }
+      } else {
+        onChange(null);
+      }
+    },
+    [isTogglable, field, onChange],
+  );
+
   // Check visibility conditions
   const isVisible = React.useMemo(() => {
     return isFieldVisible(field, allValues);
@@ -274,7 +305,14 @@ export const ConfigurationFieldRenderer = ({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          {renderField()}
+          {isTogglable && (
+            <Switch
+              checked={isEnabled}
+              onCheckedChange={handleToggleChange}
+              className={`${hasFieldError ? "border-red-500 border-2" : ""}`}
+            />
+          )}
+          {isEnabled && renderField()}
           <Label className={`text-left cursor-pointer ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
             {field.label || field.name}
             {isRequired && <span className="text-red-500 ml-1">*</span>}
@@ -313,21 +351,32 @@ export const ConfigurationFieldRenderer = ({
   // For all other field types, render label above field
   return (
     <div className="space-y-2">
-      <Label className={`block text-left ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
-        {field.label || field.name}
-        {isRequired && <span className="text-red-500 ml-1">*</span>}
-        {hasFieldError &&
-          ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
-            (!enableRealtimeValidation &&
-              validationErrors &&
-              isRequired &&
-              (value === undefined || value === null || value === ""))) && (
-            <span className="text-red-500 text-xs ml-2">- required field</span>
-          )}
-      </Label>
-      <div className="flex items-center gap-2">
-        <div className="flex-1">{renderField()}</div>
+      <div className="flex items-center gap-3">
+        {isTogglable && (
+          <Switch
+            checked={isEnabled}
+            onCheckedChange={handleToggleChange}
+            className={`${hasFieldError ? "border-red-500 border-2" : ""}`}
+          />
+        )}
+        <Label className={`block text-left ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
+          {field.label || field.name}
+          {isRequired && <span className="text-red-500 ml-1">*</span>}
+          {hasFieldError &&
+            ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
+              (!enableRealtimeValidation &&
+                validationErrors &&
+                isRequired &&
+                (value === undefined || value === null || value === ""))) && (
+              <span className="text-red-500 text-xs ml-2">- required field</span>
+            )}
+        </Label>
       </div>
+      {isEnabled && (
+        <div className="flex items-center gap-2">
+          <div className="flex-1">{renderField()}</div>
+        </div>
+      )}
 
       {/* Display validation errors */}
       {allFieldErrors.length > 0 && (
