@@ -456,7 +456,6 @@ function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCa
             </p>
           </div>
         </div>
-
       </div>
     </div>
   );
