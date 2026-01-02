@@ -4,7 +4,7 @@ Thank you for your interest in contributing to SuperPlane! We welcome
 contributions from the community.
 
 Before starting your contribution, especially for core features, we encourage
-you to reach out to us on Discord. This allows us to ensure that your proposed
+you to reach out to us on [Discord](https://discord.gg/KC78eCNsnw). This allows us to ensure that your proposed
 feature aligns with the project's roadmap and goals. Developers are the key to
 making SuperPlane the best platform it can be, and we value input from the
 community.
@@ -63,9 +63,24 @@ When the process completes, you can access the SuperPlane UI at [http://localhos
 - **[Development Workflow](docs/contributing/development-workflow.md)** - Day-to-day workflow for making contributions
 - **[Pull Requests](docs/contributing/pull-requests.md)** - Submitting and reviewing pull requests
 
+### Architecture & Reference
+
+- **[Architecture](docs/contributing/architecture.md)** - System architecture and design patterns
+- **[API Documentation](https://app.superplane.com/api/v1/docs)** - REST API reference
+- **[Security](docs/concepts/integrations-security.md)** - Security features and best practices
+- **[Release Process](release/)** - Release scripts and procedures
+
 ### Building Components
 
 - **[Applications](docs/development/applications.md)** - Building applications on top of Superplane
 - **[Component Implementations](docs/development/component-implementations.md)** - Patterns and best practices for implementing components
 - **[Component Customization](docs/development/component-customization.md)** - Customizing existing components
 - **[E2E Tests](docs/development/e2e_tests.md)** - Writing and running end-to-end tests
+
+### Product Documentation
+
+- **[Product Docs](https://docs.superplane.com)** - Complete product documentation and user guides
+
+### Community
+
+- **[Discord](https://discord.gg/KC78eCNsnw)** - Join our Discord community for discussions, questions, and collaboration
