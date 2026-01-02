@@ -1,10 +1,8 @@
-import debounce from "lodash.debounce";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { RolesRole } from "../../../api-client/types.gen";
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "../../../components/Dropdown/dropdown";
 import { Icon } from "../../../components/Icon";
-import { Input, InputGroup } from "../../../components/Input/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { useDeleteRole, useOrganizationRoles } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
@@ -15,7 +13,6 @@ interface RolesProps {
 
 export function Roles({ organizationId }: RolesProps) {
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
   const [sortConfig, setSortConfig] = useState<{
     key: string | null;
     direction: "asc" | "desc";
@@ -23,8 +20,6 @@ export function Roles({ organizationId }: RolesProps) {
     key: null,
     direction: "asc",
   });
-
-  const setDebouncedSearch = debounce((search: string) => setSearch(search), 500);
 
   // Use React Query hooks for data fetching
   const { data: roles = [], isLoading: loadingRoles, error } = useOrganizationRoles(organizationId);
@@ -111,16 +106,8 @@ export function Roles({ organizationId }: RolesProps) {
   };
 
   const filteredAndSortedRoles = useMemo(() => {
-    const filtered = roles.filter((role) => {
-      if (search === "") {
-        return true;
-      }
-      // Search by display name if available, otherwise by name
-      const searchText = role.spec?.displayName || role.metadata?.name || "";
-      return searchText.toLowerCase().includes(search.toLowerCase());
-    });
-    return getSortedData(filtered);
-  }, [roles, search, sortConfig]);
+    return getSortedData(roles);
+  }, [roles, sortConfig]);
 
   return (
     <div className="space-y-6 pt-6">
@@ -131,16 +118,7 @@ export function Roles({ organizationId }: RolesProps) {
       )}
 
       <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
-        <div className="px-6 pt-6 pb-4 flex items-center justify-between">
-          <InputGroup>
-            <Input
-              name="search"
-              placeholder="Search Roles…"
-              aria-label="Search"
-              className="w-xs"
-              onChange={(e) => setDebouncedSearch(e.target.value)}
-            />
-          </InputGroup>
+        <div className="px-6 pt-6 pb-4 flex items-center justify-start">
           <Button className="flex items-center" onClick={handleCreateRole}>
             <Icon name="add" />
             New Organization Role

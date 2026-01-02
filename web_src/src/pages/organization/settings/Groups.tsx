@@ -1,5 +1,4 @@
 import { formatRelativeTime } from "@/utils/timezone";
-import debounce from "lodash.debounce";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Avatar } from "../../../components/Avatar/avatar";
@@ -12,7 +11,6 @@ import {
   DropdownMenu,
 } from "../../../components/Dropdown/dropdown";
 import { Icon } from "../../../components/Icon";
-import { Input, InputGroup } from "../../../components/Input/input";
 import { Link } from "../../../components/Link/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import {
@@ -29,7 +27,6 @@ interface GroupsProps {
 
 export function Groups({ organizationId }: GroupsProps) {
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
   const [sortConfig, setSortConfig] = useState<{
     key: string | null;
     direction: "asc" | "desc";
@@ -37,8 +34,6 @@ export function Groups({ organizationId }: GroupsProps) {
     key: null,
     direction: "asc",
   });
-
-  const setDebouncedSearch = debounce(setSearch, 300);
 
   // Use React Query hooks for data fetching
   const { data: groups = [], isLoading: loadingGroups, error: groupsError } = useOrganizationGroups(organizationId);
@@ -102,16 +97,11 @@ export function Groups({ organizationId }: GroupsProps) {
   };
 
   const filteredAndSortedGroups = useMemo(() => {
-    const filtered = groups.filter((group) => {
-      if (search === "") {
-        return true;
-      }
-      return group.metadata?.name?.toLowerCase().includes(search.toLowerCase());
-    });
+    const source = groups;
 
-    if (!sortConfig.key) return filtered;
+    if (!sortConfig.key) return source;
 
-    return [...filtered].sort((a, b) => {
+    return [...source].sort((a, b) => {
       let aValue: string | number;
       let bValue: string | number;
 
@@ -144,7 +134,7 @@ export function Groups({ organizationId }: GroupsProps) {
       }
       return 0;
     });
-  }, [groups, search, sortConfig]);
+  }, [groups, sortConfig]);
 
   return (
     <div className="space-y-6 pt-6">
@@ -155,16 +145,7 @@ export function Groups({ organizationId }: GroupsProps) {
       )}
 
       <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
-        <div className="px-6 pt-6 pb-4 flex items-center justify-between">
-          <InputGroup>
-            <Input
-              name="search"
-              placeholder="Search Groups…"
-              aria-label="Search"
-              className="w-xs"
-              onChange={(e) => setDebouncedSearch(e.target.value)}
-            />
-          </InputGroup>
+        <div className="px-6 pt-6 pb-4 flex items-center justify-start">
           <Button className="flex items-center" onClick={handleCreateGroup}>
             <Icon name="add" />
             Create New Group

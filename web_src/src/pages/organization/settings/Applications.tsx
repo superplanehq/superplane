@@ -163,7 +163,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
       {/* Available Applications */}
       <div>
         <h2 className="text-lg font-medium mb-4">Available</h2>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
+        <div className="bg-gray-100 dark:bg-gray-900 rounded-lg">
           <div className="p-6">
             {availableApps.length === 0 ? (
               <div className="text-center py-12">
@@ -174,28 +174,38 @@ export function Applications({ organizationId }: ApplicationsProps) {
                 </p>
               </div>
             ) : (
-              <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              <div className="grid gap-6 md:grid-cols-2">
                 {availableApps.map((app) => {
                   const Icon = resolveIcon(app.icon);
                   return (
                     <div
                       key={app.name}
-                      className="border border-gray-300 dark:border-gray-700 rounded-lg p-3 hover:shadow-md transition-shadow"
+                      className="bg-white min-h-40 border border-gray-300 dark:border-gray-700 rounded-md p-3 hover:shadow-md transition-shadow flex flex-col h-full"
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                          <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                            {app.label || app.name}
-                          </h3>
+                      <div className="flex-1 flex flex-col">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                              {app.label || app.name}
+                            </h3>
+                          </div>
                         </div>
+
+                        {app.description ? (
+                          <p className="text-sm text-gray-800 dark:text-gray-400 mb-3 line-clamp-3">
+                            {app.description}
+                          </p>
+                        ) : (
+                          <div className="mb-3" />
+                        )}
                       </div>
 
-                      {app.description && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{app.description}</p>
-                      )}
-
-                      <Button color="blue" onClick={() => handleInstallClick(app)} className="w-full text-sm py-1.5">
+                      <Button
+                        color="blue"
+                        onClick={() => handleInstallClick(app)}
+                        className="w-full text-sm py-1.5 mt-auto"
+                      >
                         Install
                       </Button>
                     </div>

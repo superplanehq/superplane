@@ -1,6 +1,6 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Box, GitBranch, MoreVertical, Palette, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Box, GitBranch, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CreateCanvasModal } from "../../components/CreateCanvasModal";
@@ -19,6 +19,7 @@ import { showErrorToast, showSuccessToast } from "../../utils/toast";
 import { Button } from "@/components/ui/button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
 import { useCreateCustomComponentModalState } from "./useCreateCustomComponentModalState";
+import type { ComponentsEdge, ComponentsNode } from "@/api-client";
 
 type TabType = "canvases" | "custom-components";
 interface BlueprintCardData {
@@ -37,6 +38,8 @@ interface WorkflowCardData {
   createdAt: string;
   type: "workflow";
   createdBy?: { id?: string; name?: string };
+  nodes?: ComponentsNode[];
+  edges?: ComponentsEdge[];
 }
 
 const HomePage = () => {
@@ -87,6 +90,8 @@ const HomePage = () => {
     createdAt: formatDate(workflow.metadata?.createdAt),
     type: "workflow" as const,
     createdBy: workflow.metadata?.createdBy,
+    nodes: workflow.spec?.nodes || [],
+    edges: workflow.spec?.edges || [],
   }));
 
   const filteredBlueprints = blueprints.filter((blueprint) => {
@@ -395,6 +400,8 @@ interface WorkflowCardProps {
 
 function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCardProps) {
   const handleNavigate = () => navigate(`/${organizationId}/workflows/${workflow.id}`);
+  const previewNodes = workflow.nodes || [];
+  const previewEdges = workflow.edges || [];
 
   return (
     <div
@@ -413,18 +420,17 @@ function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCa
       }}
       className="min-h-48 bg-white dark:bg-gray-950 rounded-md outline outline-slate-950/10 hover:shadow-md transition-shadow cursor-pointer"
     >
-      <div className="p-6 flex flex-col justify-between h-full">
-        <div>
-          <div className="flex items-start justify-between gap-3 mb-4">
+      <div className="flex flex-col h-full">
+        <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
+
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-3 mb-1">
             <div className="flex flex-col flex-1 min-w-0">
               <Heading
                 level={3}
-                className="!text-lg font-semibold text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                className="!text-lg font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
               >
-                <span className="flex items-center gap-2">
-                  <Palette className="text-gray-800" size={16} />
-                  <span className="truncate">{workflow.name}</span>
-                </span>
+                <span className="truncate">{workflow.name}</span>
               </Heading>
             </div>
             <WorkflowActionsMenu workflow={workflow} organizationId={organizationId} onEdit={onEdit} />
@@ -437,20 +443,112 @@ function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCa
               </Text>
             </div>
           ) : null}
+
+          <div className="flex justify-between items-center">
+            <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-none text-left">
+              {workflow.createdBy?.name ? (
+                <>
+                  Created by {workflow.createdBy.name}, on {workflow.createdAt}
+                </>
+              ) : (
+                <>Created on {workflow.createdAt}</>
+              )}
+            </p>
+          </div>
         </div>
 
-        <div className="flex justify-between items-center">
-          <p className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left">
-            {workflow.createdBy?.name ? (
-              <>
-                Created by {workflow.createdBy.name}, on {workflow.createdAt}
-              </>
-            ) : (
-              <>Created on {workflow.createdAt}</>
-            )}
-          </p>
+      </div>
+    </div>
+  );
+}
+
+interface CanvasMiniMapProps {
+  nodes?: ComponentsNode[];
+  edges?: ComponentsEdge[];
+}
+
+function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
+  const positionedNodes = nodes.filter(
+    (node) => typeof node.position?.x === "number" && typeof node.position?.y === "number",
+  ) as Array<ComponentsNode & { position: { x: number; y: number } }>;
+
+  if (!positionedNodes.length) {
+    return (
+      <div className="p-4 border-b border-gray-200">
+        <div className="h-28 w-full rounded-sm border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 flex items-center justify-center text-[13px] text-gray-500 dark:text-gray-400">
+          The canvas is empty
         </div>
       </div>
+    );
+  }
+
+  const xs = positionedNodes.map((node) => node.position.x);
+  const ys = positionedNodes.map((node) => node.position.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const padding = 80;
+  const width = Math.max(maxX - minX, 200) + padding * 2;
+  const height = Math.max(maxY - minY, 200) + padding * 2;
+  const viewBox = `${minX - padding} ${minY - padding} ${width} ${height}`;
+  const nodeWidth = Math.min(Math.max(width * 0.08, 30), 80);
+  const nodeHeight = nodeWidth * 0.45;
+
+  const nodePositions = new Map<string, { x: number; y: number }>();
+  positionedNodes.forEach((node) => {
+    const id = node.id || node.name;
+    if (!id) return;
+    nodePositions.set(id, { x: node.position.x, y: node.position.y });
+  });
+
+  const drawableEdges =
+    edges?.filter(
+      (edge) => edge.sourceId && edge.targetId && nodePositions.has(edge.sourceId) && nodePositions.has(edge.targetId),
+    ) || [];
+
+  return (
+    <div className="p-4 w-full border-b border-gray-200 overflow-hidden">
+      <svg
+        viewBox={viewBox}
+        preserveAspectRatio="xMidYMid meet"
+        className="w-full h-28 text-gray-500 dark:text-gray-400"
+      >
+        {drawableEdges.map((edge) => {
+          const source = nodePositions.get(edge.sourceId!);
+          const target = nodePositions.get(edge.targetId!);
+          if (!source || !target) return null;
+          return (
+            <line
+              key={`${edge.sourceId}-${edge.targetId}`}
+              x1={source.x}
+              y1={source.y}
+              x2={target.x}
+              y2={target.y}
+              stroke="currentColor"
+              strokeWidth={6}
+              strokeLinecap="round"
+              opacity={0.25}
+            />
+          );
+        })}
+        {positionedNodes.map((node) => {
+          const id = node.id || node.name || `${node.position.x}-${node.position.y}`;
+          return (
+            <rect
+              key={id}
+              x={node.position.x - nodeWidth / 2}
+              y={node.position.y - nodeHeight / 2}
+              width={nodeWidth}
+              height={nodeHeight}
+              rx={8}
+              ry={8}
+              fill="#1f2937"
+              opacity={1}
+            />
+          );
+        })}
+      </svg>
     </div>
   );
 }
@@ -681,7 +779,7 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
                     <div className="flex flex-col flex-1 min-w-0">
                       <Heading
                         level={3}
-                        className="!text-lg font-semibold text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                        className="!text-lg font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
                       >
                         {blueprint.name}
                       </Heading>

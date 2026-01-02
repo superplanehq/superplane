@@ -10,7 +10,6 @@ import {
   DropdownMenu,
 } from "../../../components/Dropdown/dropdown";
 import { Icon } from "../../../components/Icon";
-import { Input, InputGroup } from "../../../components/Input/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { Text } from "../../../components/Text/text";
 import { Textarea } from "../../../components/Textarea/textarea";
@@ -57,7 +56,6 @@ interface MembersProps {
 }
 
 export function Members({ organizationId }: MembersProps) {
-  const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
     key: keyof UnifiedMember | null;
     direction: "asc" | "desc";
@@ -197,16 +195,7 @@ export function Members({ organizationId }: MembersProps) {
     } else if (activeTab === "invited") {
       filtered = sorted.filter((member) => member.type === "invitation");
     }
-
-    // Apply search filter
-    if (!searchTerm) return filtered;
-
-    return filtered.filter(
-      (member) =>
-        member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.role.toLowerCase().includes(searchTerm.toLowerCase()),
-    );
+    return filtered;
   };
 
   const handleRoleChange = async (memberId: string, newRoleName: string) => {
@@ -389,17 +378,6 @@ export function Members({ organizationId }: MembersProps) {
                 </button>
               </div>
             </div>
-
-            <InputGroup>
-              <Input
-                name="search"
-                placeholder="Search members…"
-                aria-label="Search"
-                className="w-xs"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </InputGroup>
           </div>
         </div>
 
@@ -526,12 +504,8 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell colSpan={5} className="text-center py-8">
                       <div className="text-gray-500 dark:text-gray-400">
                         <Icon name="search" className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                        <p className="text-lg font-medium text-gray-800 dark:text-white mb-2">
-                          {searchTerm ? "No members found" : "No members yet"}
-                        </p>
-                        <p className="text-sm">
-                          {searchTerm ? "Try adjusting your search criteria" : "Add members to get started"}
-                        </p>
+                        <p className="text-lg font-medium text-gray-800 dark:text-white mb-2">No members yet</p>
+                        <p className="text-sm">Add members to get started</p>
                       </div>
                     </TableCell>
                   </TableRow>

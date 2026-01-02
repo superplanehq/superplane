@@ -34,7 +34,7 @@ export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasC
                   <Link to={`/${organizationId}/canvas/${canvas.id}`} className="block text-left w-full">
                     <Heading
                       level={3}
-                      className="!text-md font-semibold text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                      className="!text-md font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
                     >
                       {canvas.name}
                     </Heading>
