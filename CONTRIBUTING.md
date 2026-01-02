@@ -59,7 +59,13 @@ When the process completes, you can access the SuperPlane at [http://localhost:8
 
 ## Additional Development Resources
 
+### Overview
+
 - **[Product Docs](https://docs.superplane.com)** - Complete product documentation and user guides
+- **[Architecture Overview](docs/contributing/architecture.md)** - High-level system architecture and codebase structure
+
+### Contributing
+
 - **[Discord](https://discord.gg/KC78eCNsnw)** - Join our Discord community for discussions, questions, and collaboration
 - **[Issue Tracking](docs/contributing/issue-tracking.md)** - How to report bugs, use the SuperPlane Board, and understand issue types
 - **[Pull Requests](docs/contributing/pull-requests.md)** - How to create pull-requests
@@ -69,7 +75,7 @@ When the process completes, you can access the SuperPlane at [http://localhost:8
 ### Adding new integrations to SuperPlane
 
 - **[Integrations](docs/contributing/applications.md)** — Instructions for adding new third-party integrations to SuperPlane
-- **[Component Implementation](docs/development/component-implementations.md)** — Architecture, best practices, and step-by-step instructions for creating new components or triggers
-- **[Component Customization](docs/development/component-customization.md)** — Guide for customizing existing components or building adjustable, user-specific behaviors
-- **[Connecting to Third-Party Services during Development](docs/contributing/connecting-to-3rdparty-services-from-development.md)** — Guide for connecting to third-party services during development (ngrok tunnel)
+- **[Component Implementation](docs/development/component-implementations.md)** — Step-by-step instructions for creating new components or triggers
+- **[Component Customization](docs/development/component-customization.md)** — Guide for customizing existing components or building behaviors
 - **[Integrations Board](https://github.com/orgs/superplanehq/projects/2/views/17)** — View all integration-related work on the SuperPlane Board
+- **[Connecting to Third-Party Services during Development](docs/contributing/connecting-to-3rdparty-services-from-development.md)**
