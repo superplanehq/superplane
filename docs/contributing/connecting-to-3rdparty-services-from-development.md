@@ -6,6 +6,8 @@ expose it via a tunnel so external services can deliver webhooks.
 
 ### 1. Install and Authenticate ngrok
 
+Install [ngrok](https://ngrok.com/):
+
 ```bash
 # Install (macOS)
 brew install ngrok
