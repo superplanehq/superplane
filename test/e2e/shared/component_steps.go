@@ -100,10 +100,10 @@ func (s *ComponentSteps) AddWait(name string, pos models.Position, duration int,
 	s.session.Sleep(300)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
-	valueInput := q.Locator(`label:has-text("How long should I wait?") + div input[type="number"]`)
+	valueInput := q.Locator(`label:has-text("How long should I wait?")~div input[type="number"]`)
 	s.session.FillIn(valueInput, strconv.Itoa(duration))
 
-	unitTrigger := q.Locator(`label:has-text("Unit") + div button`)
+	unitTrigger := q.TestID("field-unit-select")
 	s.session.Click(unitTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + unit + `")`))
 
@@ -134,13 +134,13 @@ func (s *ComponentSteps) AddTimeGate(name string, pos models.Position) {
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
-	s.session.Click(q.Locator(`label:has-text("Mode") + div button`))
+	s.session.Click(q.TestID("field-mode-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Exclude Range")`))
 
-	s.session.FillIn(q.Locator(`label:has-text("Start Time") + div input[type="time"]`), "00:00")
-	s.session.FillIn(q.Locator(`label:has-text("End Time") + div input[type="time"]`), "23:59")
+	s.session.FillIn(q.Locator("input[data-testid='time-field-starttime']"), "00:00")
+	s.session.FillIn(q.Locator("input[data-testid='time-field-endtime']"), "23:59")
 
-	s.session.Click(q.Locator(`label:has-text("Timezone") + div button`))
+	s.session.Click(q.TestID("field-timezone-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
 
 	s.session.Click(q.TestID("save-node-button"))

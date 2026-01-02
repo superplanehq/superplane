@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -638,6 +639,13 @@ func TestHTTP__Execute__WithoutRetryStrategy(t *testing.T) {
 	// Verify metadata contains retry information even without strategy
 	metadata := metadataCtx.Get()
 	assert.NotNil(t, metadata)
+
+	var retryMeta RetryMetadata
+	err = mapstructure.Decode(metadata, &retryMeta)
+	require.NoError(t, err)
+	assert.Equal(t, "success", retryMeta.Result)
+	assert.Equal(t, 200, retryMeta.FinalStatus)
+	assert.Equal(t, 0, retryMeta.TotalRetries)
 }
 
 func TestHTTP__Execute__FixedTimeoutStrategy_Success(t *testing.T) {
@@ -787,6 +795,15 @@ func TestHTTP__HandleAction__RetryRequest_SuccessOnRetry(t *testing.T) {
 
 	// Verify final response
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
+
+	// Verify metadata shows successful completion after retry
+	metadata := metadataCtx.Get()
+	var retryMeta RetryMetadata
+	err = mapstructure.Decode(metadata, &retryMeta)
+	require.NoError(t, err)
+	assert.Equal(t, "success", retryMeta.Result)
+	assert.Equal(t, 200, retryMeta.FinalStatus)
+	assert.Equal(t, 1, retryMeta.TotalRetries)
 }
 
 func TestHTTP__HandleAction__RetryRequest_ExhaustedRetries(t *testing.T) {
@@ -838,6 +855,15 @@ func TestHTTP__HandleAction__RetryRequest_ExhaustedRetries(t *testing.T) {
 
 	// Should have made 3 requests total (initial + 2 retries)
 	assert.Equal(t, int32(3), atomic.LoadInt32(&requestCount))
+
+	// Verify metadata shows failure after exhausted retries
+	metadata := metadataCtx.Get()
+	var retryMeta RetryMetadata
+	err = mapstructure.Decode(metadata, &retryMeta)
+	require.NoError(t, err)
+	assert.Equal(t, "failed", retryMeta.Result)
+	assert.Equal(t, 500, retryMeta.FinalStatus)
+	assert.Equal(t, 2, retryMeta.TotalRetries)
 }
 
 func TestHTTP__CalculateTimeoutForAttempt__Fixed(t *testing.T) {
@@ -972,6 +998,15 @@ func TestHTTP__RetryProgression_ExponentialStrategy(t *testing.T) {
 	assert.Equal(t, "http.request.finished", stateCtx.Type)
 	response := stateCtx.Payloads[0].(map[string]any)
 	assert.Equal(t, 200, response["status"])
+
+	// Verify metadata shows success after 3 retries
+	metadata := metadataCtx.Get()
+	var retryMeta RetryMetadata
+	err = mapstructure.Decode(metadata, &retryMeta)
+	require.NoError(t, err)
+	assert.Equal(t, "success", retryMeta.Result)
+	assert.Equal(t, 200, retryMeta.FinalStatus)
+	assert.Equal(t, 3, retryMeta.TotalRetries)
 }
 
 func TestHTTP__RetryProgression_NetworkError(t *testing.T) {
@@ -1063,8 +1098,11 @@ func TestHTTP__RetryMetadata_Progression(t *testing.T) {
 
 	// Check initial metadata
 	metadata := metadataCtx.Get()
-	retryMeta := metadata.(RetryMetadata)
+	var retryMeta RetryMetadata
+	err = mapstructure.Decode(metadata, &retryMeta)
+	require.NoError(t, err)
 	assert.Equal(t, 1, retryMeta.Attempt)
+	assert.Equal(t, 1, retryMeta.TotalRetries)
 	assert.Equal(t, 2, retryMeta.MaxRetries)
 	assert.Equal(t, "fixed", retryMeta.TimeoutStrategy)
 	assert.Equal(t, "HTTP status 500", retryMeta.LastError)
@@ -1082,8 +1120,10 @@ func TestHTTP__RetryMetadata_Progression(t *testing.T) {
 	assert.NoError(t, err)
 
 	metadata = metadataCtx.Get()
-	retryMeta = metadata.(RetryMetadata)
+	err = mapstructure.Decode(metadata, &retryMeta)
+	require.NoError(t, err)
 	assert.Equal(t, 2, retryMeta.Attempt)
+	assert.Equal(t, 2, retryMeta.TotalRetries)
 	assert.Equal(t, "HTTP status 500", retryMeta.LastError)
 
 	actionCtx.RequestContext = &contexts.RequestContext{}

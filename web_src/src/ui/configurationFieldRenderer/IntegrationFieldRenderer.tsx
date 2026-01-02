@@ -2,6 +2,7 @@ import React from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { AuthorizationDomainType, ConfigurationField } from "../../api-client";
+import { toTestId } from "@/utils/testID";
 
 interface IntegrationFieldRendererProps {
   field: ConfigurationField;
@@ -58,7 +59,7 @@ export const IntegrationFieldRenderer = ({
 
   return (
     <Select value={value ?? ""} onValueChange={(val) => onChange(val || undefined)}>
-      <SelectTrigger className="w-full">
+      <SelectTrigger className="w-full" data-testid={toTestId(`integration-field-${field.name}`)}>
         <SelectValue placeholder={`Select ${integrationType} integration`} />
       </SelectTrigger>
       <SelectContent>

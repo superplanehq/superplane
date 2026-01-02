@@ -1,6 +1,7 @@
 import React from "react";
 import { Input } from "../input";
 import { FieldRendererProps } from "./types";
+import { toTestId } from "@/utils/testID";
 
 export const DateFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
@@ -33,6 +34,7 @@ export const DateFieldRenderer: React.FC<FieldRendererProps> = ({
       className={hasError ? "border-red-500 border-2" : ""}
       min={getDateConstraints.min}
       max={getDateConstraints.max}
+      data-testid={toTestId(`date-field-${field.name}`)}
     />
   );
 };

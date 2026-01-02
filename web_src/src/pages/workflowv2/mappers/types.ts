@@ -61,6 +61,8 @@ export interface ComponentBaseMapper {
     execution: WorkflowsWorkflowNodeExecution,
     additionalData?: unknown,
   ): string | React.ReactNode;
+
+  getExecutionDetails?(execution: WorkflowsWorkflowNodeExecution, node: ComponentsNode): Record<string, string>;
 }
 
 /**

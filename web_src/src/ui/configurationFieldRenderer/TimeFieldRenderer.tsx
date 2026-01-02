@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { Input } from "../input";
 import { FieldRendererProps } from "./types";
+import { toTestId } from "@/utils/testID";
 
 export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
@@ -42,6 +43,7 @@ export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({
       className={hasError ? "border-red-500 border-2" : ""}
       min={getTimeConstraints.min}
       max={getTimeConstraints.max}
+      data-testid={toTestId(`time-field-${field.name}`)}
     />
   );
 };

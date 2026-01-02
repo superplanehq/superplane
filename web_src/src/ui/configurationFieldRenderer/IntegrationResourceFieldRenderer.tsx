@@ -2,6 +2,7 @@ import React from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
 import { useIntegrations, useIntegrationResources } from "@/hooks/useIntegrations";
 import { AuthorizationDomainType, ConfigurationField } from "../../api-client";
+import { toTestId } from "@/utils/testID";
 
 interface IntegrationResourceFieldRendererProps {
   field: ConfigurationField;
@@ -100,7 +101,7 @@ export const IntegrationResourceFieldRenderer = ({
 
   return (
     <Select value={value ?? ""} onValueChange={(val) => onChange(val || undefined)}>
-      <SelectTrigger className="w-full">
+      <SelectTrigger className="w-full" data-testid={toTestId(`integration-resource-field-${field.name}`)}>
         <SelectValue placeholder={`Select ${resourceType}`} />
       </SelectTrigger>
       <SelectContent>

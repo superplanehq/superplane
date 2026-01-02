@@ -13,25 +13,38 @@ import {
 } from "@/api-client";
 import { EventState, EventStateMap } from "../../componentBase";
 import { ChildExecution } from "@/ui/chainItem/ChainItem";
+import { getExecutionDetails } from "@/pages/workflowv2/mappers";
+
 function buildExecutionTabData(
   execution: WorkflowsWorkflowNodeExecution,
-  _workflowNode: ComponentsNode,
+  workflowNode: ComponentsNode,
   _workflowNodes: ComponentsNode[],
 ): { current?: Record<string, any>; payload?: any } {
   const tabData: { current?: Record<string, any>; payload?: any } = {};
 
-  // Current tab: use outputs if available and non-empty, otherwise use metadata
-  const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
-  const dataSource = hasOutputs ? execution.outputs : execution.metadata || {};
-  const flattened = flattenObject(dataSource);
+  let currentData: Record<string, any> = {};
 
-  const currentData = {
-    ...flattened,
-    "Execution ID": execution.id,
-    "Execution State": execution.state?.replace("STATE_", "").toLowerCase(),
-    "Execution Result": execution.result?.replace("RESULT_", "").toLowerCase(),
-    "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
-  };
+  if (workflowNode?.component?.name) {
+    const customDetails = getExecutionDetails(workflowNode.component.name, execution, workflowNode);
+    if (customDetails && Object.keys(customDetails).length > 0) {
+      currentData = { ...customDetails };
+    }
+  }
+
+  // If no custom details, fall back to the original logic
+  if (Object.keys(currentData).length === 0) {
+    const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
+    const dataSource = hasOutputs ? execution.outputs : execution.metadata || {};
+    const flattened = flattenObject(dataSource);
+
+    currentData = {
+      ...flattened,
+      "Execution ID": execution.id,
+      "Execution State": execution.state?.replace("STATE_", "").toLowerCase(),
+      "Execution Result": execution.result?.replace("RESULT_", "").toLowerCase(),
+      "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
+    };
+  }
 
   // Filter out undefined and empty values
   tabData.current = Object.fromEntries(
