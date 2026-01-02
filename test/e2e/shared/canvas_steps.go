@@ -121,14 +121,14 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Sleep(300)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
-	modeSelector := q.Locator(`label:has-text("Wait Mode") + div button`)
+	modeSelector := q.Locator(`label:has-text("Wait Mode"):nth-child(1)~div button`)
 	s.session.Click(modeSelector)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Interval")`))
 
-	valueInput := q.Locator(`label:has-text("Wait for...") + div input`)
+	valueInput := q.Locator(`label:has-text("Wait for...")~div input`)
 	s.session.FillIn(valueInput, strconv.Itoa(duration))
 
-	unitTrigger := q.Locator(`label:has-text("Unit") + div button`)
+	unitTrigger := q.Locator(`label:has-text("Unit")~div button`)
 	s.session.Click(unitTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + unit + `")`))
 
@@ -159,13 +159,13 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
-	s.session.Click(q.Locator(`label:has-text("Mode") + div button`))
+	s.session.Click(q.Locator(`label:has-text("Mode")~div button`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Exclude Range")`))
 
-	s.session.FillIn(q.Locator(`label:has-text("Start Time") + div input[type="time"]`), "00:00")
-	s.session.FillIn(q.Locator(`label:has-text("End Time") + div input[type="time"]`), "23:59")
+	s.session.FillIn(q.Locator(`label:has-text("Start Time")~div input[type="time"]`), "00:00")
+	s.session.FillIn(q.Locator(`label:has-text("End Time")~div input[type="time"]`), "23:59")
 
-	s.session.Click(q.Locator(`label:has-text("Timezone") + div button`))
+	s.session.Click(q.Locator(`label:has-text("Timezone")~div button`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
 
 	s.session.Click(q.TestID("save-node-button"))
