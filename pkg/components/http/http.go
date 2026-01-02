@@ -324,6 +324,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 					Max: func() *int { max := 300; return &max }(),
 				},
 			},
+			Default: "10",
 		},
 		{
 			Name:        "retries",
@@ -342,6 +343,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 					Max: func() *int { max := 10; return &max }(),
 				},
 			},
+			Default: "3",
 		},
 	}
 }
