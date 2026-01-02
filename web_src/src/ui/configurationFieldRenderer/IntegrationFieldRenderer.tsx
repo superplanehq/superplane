@@ -58,7 +58,7 @@ export const IntegrationFieldRenderer = ({
 
   return (
     <Select value={value ?? ""} onValueChange={(val) => onChange(val || undefined)}>
-      <SelectTrigger className="w-full">
+      <SelectTrigger className="w-full" data-testid={`integration-field-${field.name}`}>
         <SelectValue placeholder={`Select ${integrationType} integration`} />
       </SelectTrigger>
       <SelectContent>

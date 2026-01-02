@@ -112,12 +112,12 @@ func (s *GithubTriggerSteps) addGithubTriggerNode() {
 	s.session.FillIn(q.TestID("node-name-input"), "GitHub Trigger")
 
 	// Select the GitHub integration
-	integrationTrigger := q.TestID("field-integration-select")
+	integrationTrigger := q.TestID("integration-field-integration")
 	s.session.Click(integrationTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + s.integrationName + `")`))
 
 	// Select the repository
-	repositoryTrigger := q.TestID("field-repository-select")
+	repositoryTrigger := q.TestID("integration-resource-field-repository")
 	s.session.Click(repositoryTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("front")`))
 

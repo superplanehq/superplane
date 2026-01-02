@@ -100,7 +100,7 @@ export const IntegrationResourceFieldRenderer = ({
 
   return (
     <Select value={value ?? ""} onValueChange={(val) => onChange(val || undefined)}>
-      <SelectTrigger className="w-full">
+      <SelectTrigger className="w-full" data-testid={`integration-resource-field-${field.name}`}>
         <SelectValue placeholder={`Select ${resourceType}`} />
       </SelectTrigger>
       <SelectContent>
