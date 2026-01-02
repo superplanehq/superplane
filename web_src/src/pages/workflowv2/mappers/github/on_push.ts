@@ -4,13 +4,7 @@ import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata } from "./base";
-
-type PredicateType = "equals" | "notEquals" | "matches";
-
-interface Predicate {
-  type: PredicateType;
-  value: string;
-}
+import { Predicate, createGithubMetadataItems } from "./utils";
 
 interface GithubConfiguration {
   refs: Predicate[];
@@ -54,33 +48,6 @@ export const onPushTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as GithubConfiguration;
-    const metadataItems = [];
-
-    if (metadata?.repository?.name) {
-      metadataItems.push({
-        icon: "book",
-        label: metadata.repository.name,
-      });
-    }
-
-    if (configuration?.refs) {
-      metadataItems.push({
-        icon: "funnel",
-        label: configuration.refs
-          .map((ref) => {
-            if (ref.type === "equals") {
-              return `=${ref.value}`;
-            }
-            if (ref.type === "notEquals") {
-              return `!=${ref.value}`;
-            }
-            if (ref.type === "matches") {
-              return `~${ref.value}`;
-            }
-          })
-          .join(", "),
-      });
-    }
 
     const props: TriggerProps = {
       title: node.name!,
@@ -89,7 +56,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
       iconColor: getColorClass(trigger.color),
       headerColor: getBackgroundColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),
-      metadata: metadataItems,
+      metadata: createGithubMetadataItems(metadata?.repository?.name, configuration?.refs),
     };
 
     if (lastEvent) {
