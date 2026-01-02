@@ -147,7 +147,7 @@ export function OrganizationSettings() {
   > = {
     general: {
       title: "Settings",
-      description: "Manage your organization name, description, and other core preferences.",
+      description: "Manage your organization basics.",
     },
     members: {
       title: "Members",

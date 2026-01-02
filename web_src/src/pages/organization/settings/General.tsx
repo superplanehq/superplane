@@ -64,7 +64,7 @@ export function General({ organization }: GeneralProps) {
     }
   };
   return (
-    <div className="space-y-6 pt-6 text-left">
+    <div className="space-y-16 pt-6 text-left">
       <Fieldset className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
         <Field>
           <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Organization Name</Label>
@@ -87,12 +87,12 @@ export function General({ organization }: GeneralProps) {
         </div>
       </Fieldset>
 
-      <Fieldset className="bg-white dark:bg-gray-950 rounded-lg border border-red-500 dark:border-red-800 p-6 space-y-4">
+      <Fieldset className="bg-red-50 border border-red-300 rounded-lg p-6 space-y-4">
         <div>
           <Heading level={3} className="!text-base text-red-500 dark:text-red-400">
             Delete Organization
           </Heading>
-          <p className="text-sm max-w-prose text-gray-800 dark:text-red-300 mt-2">
+          <p className="text-sm max-w-prose text-gray-800 dark:text-red-300 mt-2 mb-6">
             Deleting your organization is permanent and will remove all canvases, members, and settings. This action
             cannot be undone.
           </p>
