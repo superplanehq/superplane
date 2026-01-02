@@ -83,7 +83,7 @@ export const InteractiveToggle: Story = {
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
             <h3 className="text-lg font-semibold">Interactive Component</h3>
-            <p className="text-sm text-gray-600">Status: {isActive ? "Active" : "Inactive"}</p>
+            <p className="text-sm text-gray-500">Status: {isActive ? "Active" : "Inactive"}</p>
           </div>
           <SidebarActionsDropdown
             onRun={() => {
@@ -132,7 +132,7 @@ export const InContext: Story = {
           <SidebarActionsDropdown {...args} />
         </div>
         <div className="p-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-500">
             This shows how the dropdown looks in a typical sidebar header context.
           </p>
         </div>

@@ -79,7 +79,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
         </div>
       </div>
       {showItems && childEventsInfo.items && childEventsInfo.items.length > 0 && (
-        <div className="flex flex-col items-start justify-between pl-7 py-1 text-gray-600 w-full">
+        <div className="flex flex-col items-start justify-between pl-7 py-1 text-gray-500 w-full">
           {childEventsInfo.items.map((item, idx) => {
             const Icon =
               item.state === "processed"

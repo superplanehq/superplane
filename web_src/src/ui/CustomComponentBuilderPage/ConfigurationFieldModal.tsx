@@ -235,7 +235,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                 <Label className="block text-sm font-medium">Number Constraints</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="block text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">
+                    <Label className="block text-xs font-medium mb-1 text-gray-500 dark:text-gray-400">
                       Minimum Value
                     </Label>
                     <Input
@@ -258,7 +258,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                     />
                   </div>
                   <div>
-                    <Label className="block text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">
+                    <Label className="block text-xs font-medium mb-1 text-gray-500 dark:text-gray-400">
                       Maximum Value
                     </Label>
                     <Input

@@ -59,7 +59,7 @@ function App() {
                 path=":organizationId/workflows/:workflowId/nodes/:nodeId/:executionId"
                 element={withAuthOnly(NodeRunPage)}
               />
-              <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
+              <Route path=":organizationId/settings/*" element={withAuthOnly(OrganizationSettings)} />
               {/* Organization selection and creation */}
               <Route path="create" element={<OrganizationCreate />} />
               <Route path="setup" element={<OwnerSetup />} />

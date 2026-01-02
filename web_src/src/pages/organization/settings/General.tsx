@@ -6,7 +6,7 @@ import { Field, Fieldset, Label } from "../../../components/Fieldset/fieldset";
 import { Heading } from "../../../components/Heading/heading";
 import { Input } from "../../../components/Input/input";
 import { useDeleteOrganization, useUpdateOrganization } from "../../../hooks/useOrganizationData";
-import { Button } from "../../../ui/button";
+import { Button } from "@/components/ui/button";
 
 interface GeneralProps {
   organization: OrganizationsOrganization;
@@ -68,10 +68,7 @@ export function General({ organization }: GeneralProps) {
   };
   return (
     <div className="space-y-6 pt-6 text-left">
-      <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white">
-        General
-      </Heading>
-      <Fieldset className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6 space-y-6 max-w-xl">
+      <Fieldset className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
         <Field>
           <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Organization Name</Label>
           <Input type="text" value={name} onChange={(e) => setName(e.target.value)} className="max-w-lg" />
@@ -91,7 +88,7 @@ export function General({ organization }: GeneralProps) {
             type="button"
             onClick={handleSave}
             disabled={updateOrganizationMutation.isPending}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="max-w-48"
           >
             {updateOrganizationMutation.isPending ? "Saving..." : "Save Changes"}
           </Button>
@@ -103,12 +100,12 @@ export function General({ organization }: GeneralProps) {
         </div>
       </Fieldset>
 
-      <Fieldset className="bg-white dark:bg-gray-950 rounded-lg border border-red-200 dark:border-red-800 p-6 space-y-4 max-w-xl">
+      <Fieldset className="bg-white dark:bg-gray-950 rounded-lg border border-red-500 dark:border-red-800 p-6 space-y-4">
         <div>
-          <Heading level={3} className="text-xl text-red-700 dark:text-red-400">
+          <Heading level={3} className="!text-base text-red-500 dark:text-red-400">
             Delete Organization
           </Heading>
-          <p className="text-sm text-red-600 dark:text-red-300 mt-2">
+          <p className="text-sm max-w-prose text-gray-800 dark:text-red-300 mt-2">
             Deleting your organization is permanent and will remove all canvases, members, and settings. This action
             cannot be undone.
           </p>

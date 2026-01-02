@@ -71,7 +71,7 @@ export const Default: Story = {
         customComponentName={blueprintName}
         breadcrumbs={[
           { label: "Bundles" },
-          { label: blueprintName, iconSlug: "component", iconColor: "text-gray-600" },
+          { label: blueprintName, iconSlug: "component", iconColor: "text-gray-500" },
         ]}
         metadata={{
           name: blueprintName,
@@ -139,7 +139,7 @@ export const EmptyBlueprint: Story = {
         customComponentName={blueprintName}
         breadcrumbs={[
           { label: "Bundles" },
-          { label: blueprintName, iconSlug: "component", iconColor: "text-gray-600" },
+          { label: blueprintName, iconSlug: "component", iconColor: "text-gray-500" },
         ]}
         metadata={{
           name: blueprintName,

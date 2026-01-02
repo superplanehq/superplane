@@ -25,7 +25,7 @@ export interface CanvasCardProps {
 export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasCardProps) => {
   if (variant === "grid") {
     return (
-      <div className="max-h-45 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow group">
+      <div className="max-h-45 bg-white dark:bg-gray-950 rounded-md outline outline-slate-950/10 dark:border-gray-800 hover:shadow-md transition-shadow group">
         <div className="p-6 flex flex-col justify-between h-full">
           <div>
             <div className="flex items-start mb-4">
@@ -34,7 +34,7 @@ export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasC
                   <Link to={`/${organizationId}/canvas/${canvas.id}`} className="block text-left w-full">
                     <Heading
                       level={3}
-                      className="!text-md font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                      className="!text-md font-semibold text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
                     >
                       {canvas.name}
                     </Heading>
@@ -81,7 +81,7 @@ export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasC
                 <Link to={`/${organizationId}/canvas/${canvas.id}`} className="block text-left">
                   <Heading
                     level={3}
-                    className="text-base font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate max-w-[40vw]"
+                    className="text-base font-semibold text-gray-800 transition-colors truncate max-w-[40vw]"
                   >
                     {canvas.name}
                   </Heading>

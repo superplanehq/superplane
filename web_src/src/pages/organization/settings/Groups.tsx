@@ -11,7 +11,6 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from "../../../components/Dropdown/dropdown";
-import { Heading } from "../../../components/Heading/heading";
 import { Icon } from "../../../components/Icon";
 import { Input, InputGroup } from "../../../components/Input/input";
 import { Link } from "../../../components/Link/link";
@@ -22,7 +21,7 @@ import {
   useOrganizationRoles,
   useUpdateGroup,
 } from "../../../hooks/useOrganizationData";
-import { Button } from "../../../ui/button";
+import { Button } from "@/components/ui/button";
 
 interface GroupsProps {
   organizationId: string;
@@ -149,19 +148,13 @@ export function Groups({ organizationId }: GroupsProps) {
 
   return (
     <div className="space-y-6 pt-6">
-      <div className="flex items-center justify-between">
-        <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white">
-          Groups
-        </Heading>
-      </div>
-
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
           <p>{error instanceof Error ? error.message : "Failed to fetch data"}</p>
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
         <div className="px-6 pt-6 pb-4 flex items-center justify-between">
           <InputGroup>
             <Input
@@ -255,12 +248,12 @@ export function Groups({ organizationId }: GroupsProps) {
                       </TableCell>
 
                       <TableCell>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
                           {formatRelativeTime(group.metadata?.createdAt)}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
                           {group.status?.membersCount || 0} member{group.status?.membersCount === 1 ? "" : "s"}
                         </span>
                       </TableCell>

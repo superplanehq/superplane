@@ -484,7 +484,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                       size: 24,
                       className: "text-gray-400",
                     })}
-                    <div className="text-sm font-medium text-gray-600">No Executions Found</div>
+                    <div className="text-sm font-medium text-gray-500">No Executions Found</div>
                     <div className="text-xs text-gray-500">
                       This trigger event doesn't have any associated executions yet.
                     </div>

@@ -75,7 +75,7 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit }: 
             Emit Event
           </DialogTitle>
 
-          <div className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
             Manually emit an output event for node: <strong>{nodeName}</strong>
           </div>
 

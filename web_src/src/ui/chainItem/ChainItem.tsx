@@ -198,11 +198,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                     <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
                       {React.createElement(resolveIcon(child.componentIcon), {
                         size: 14,
-                        className: "text-gray-600",
+                        className: "text-gray-500",
                       })}
                     </div>
                   )}
-                  <span className="text-sm text-gray-600 truncate flex-1">{child.name}</span>
+                  <span className="text-sm text-gray-500 truncate flex-1">{child.name}</span>
                 </div>
                 <div
                   className={`capitalize text-xs py-[1px] px-[3px] rounded flex items-center justify-center flex-shrink-0 ${

@@ -30,7 +30,7 @@ export function Dialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center">
       <div className="fixed inset-0 bg-gray-950/25 dark:bg-gray-950/50" onClick={onClose} />
       <div
         className={clsx(
@@ -57,7 +57,7 @@ export function DialogTitle({ className, ...props }: React.ComponentPropsWithout
 }
 
 export function DialogDescription({ className, ...props }: React.ComponentPropsWithoutRef<"div">) {
-  return <div {...props} className={clsx(className, "mt-2 text-pretty text-gray-600 dark:text-gray-400")} />;
+  return <div {...props} className={clsx(className, "mt-2 text-pretty text-gray-500 dark:text-gray-400")} />;
 }
 
 export function DialogBody({ className, ...props }: React.ComponentPropsWithoutRef<"div">) {

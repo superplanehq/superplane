@@ -20,7 +20,7 @@ import { getComponentBaseMapper } from "../workflowv2/mappers";
 const elk = new ELK();
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
-const BUNDLE_ICON_COLOR_CLASS = "text-gray-600";
+const BUNDLE_ICON_COLOR_CLASS = "text-gray-500";
 
 const getLayoutedElements = async (nodes: Node[], edges: Edge[]) => {
   const graph = {

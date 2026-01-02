@@ -5,7 +5,7 @@ import { Icon } from "../../../components/Icon";
 import { Input, InputGroup } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
 import { useAddUserToGroup, useOrganizationGroupUsers, useOrganizationUsers } from "../../../hooks/useOrganizationData";
-import { Button } from "../../../ui/button";
+import { Button } from "@/components/ui/button";
 
 interface AddMembersSectionProps {
   showRoleSelection?: boolean;
@@ -124,7 +124,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
     return (
       <div
-        className={`bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6 ${className}`}
+        className={`bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6 ${className}`}
       >
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -179,7 +179,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
               <p className="text-gray-500 dark:text-gray-400">Loading members...</p>
             </div>
           ) : (
-            <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+            <div className="max-h-96 overflow-y-auto border border-gray-300 dark:border-gray-700 rounded-lg">
               {getFilteredExistingMembers().length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-500 dark:text-gray-400">

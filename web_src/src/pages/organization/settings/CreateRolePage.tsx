@@ -8,7 +8,7 @@ import { Description, Label } from "../../../components/Fieldset/fieldset";
 import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
 import { useCreateRole, useRole, useUpdateRole } from "../../../hooks/useOrganizationData";
-import { Button } from "../../../ui/button";
+import { Button } from "@/components/ui/button";
 
 interface Permission {
   id: string;
@@ -346,7 +346,7 @@ export function CreateRolePage() {
               <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">
                 {isEditMode ? "Edit Organization Role" : "Create New Organization Role"}
               </Heading>
-              <Text className="text-gray-600 dark:text-gray-400">
+              <Text className="text-gray-500 dark:text-gray-400">
                 {isEditMode
                   ? "Update the role with specific organization permissions."
                   : "Define a custom role with specific organization permissions."}
@@ -358,13 +358,13 @@ export function CreateRolePage() {
         {/* Role Form */}
         <div className="space-y-6">
           {isLoading ? (
-            <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
+            <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
               <div className="flex justify-center items-center h-32">
                 <p className="text-gray-500 dark:text-gray-400">Loading role data...</p>
               </div>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
+            <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
               {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
                   <p className="text-sm">{error instanceof Error ? error.message : "Failed to load role data"}</p>
@@ -413,7 +413,7 @@ export function CreateRolePage() {
                   <h2 className="text-base font-semibold text-gray-800 dark:text-white mb-2">
                     Organization Permissions
                   </h2>
-                  <Text className="text-sm text-gray-600 dark:text-gray-400">
+                  <Text className="text-sm text-gray-500 dark:text-gray-400">
                     Select the permissions this role should have within the organization.
                   </Text>
                 </div>

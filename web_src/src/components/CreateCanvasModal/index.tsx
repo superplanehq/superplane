@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { showErrorToast } from "../../utils/toast";
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../Dialog/dialog";
 import { Field, Label } from "../Fieldset/fieldset";
@@ -12,15 +12,32 @@ interface CreateCanvasModalProps {
   onClose: () => void;
   onSubmit: (data: { name: string; description?: string }) => Promise<void>;
   isLoading?: boolean;
+  initialData?: { name: string; description?: string };
+  mode?: "create" | "edit";
 }
 
 const MAX_CANVAS_NAME_LENGTH = 50;
 const MAX_CANVAS_DESCRIPTION_LENGTH = 200;
 
-export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false }: CreateCanvasModalProps) {
+export function CreateCanvasModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  isLoading = false,
+  initialData,
+  mode = "create",
+}: CreateCanvasModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [nameError, setNameError] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setName(initialData?.name ?? "");
+      setDescription(initialData?.description ?? "");
+      setNameError("");
+    }
+  }, [isOpen, initialData?.name, initialData?.description]);
 
   const handleClose = () => {
     setName("");
@@ -67,9 +84,11 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
 
   return (
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
-      <DialogTitle>New canvas</DialogTitle>
+      <DialogTitle>{mode === "edit" ? "Edit canvas" : "New canvas"}</DialogTitle>
       <DialogDescription className="text-sm">
-        Create a new canvas to orchestrate your DevOps work. You can tweak the details any time.
+        {mode === "edit"
+          ? "Update the canvas details to keep things clear for your teammates."
+          : "Create a new canvas to orchestrate your DevOps work. You can tweak the details any time."}
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
         <Icon name="close" size="sm" />
@@ -130,7 +149,13 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
           disabled={!name.trim() || isLoading || !!nameError}
           className="flex items-center gap-2"
         >
-          {isLoading ? "Creating canvas..." : "Create canvas"}
+          {mode === "edit"
+            ? isLoading
+              ? "Saving..."
+              : "Save changes"
+            : isLoading
+              ? "Creating canvas..."
+              : "Create canvas"}
         </Button>
       </DialogActions>
     </Dialog>

@@ -3,12 +3,11 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { RolesRole } from "../../../api-client/types.gen";
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "../../../components/Dropdown/dropdown";
-import { Heading } from "../../../components/Heading/heading";
 import { Icon } from "../../../components/Icon";
 import { Input, InputGroup } from "../../../components/Input/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { useDeleteRole, useOrganizationRoles } from "../../../hooks/useOrganizationData";
-import { Button } from "../../../ui/button";
+import { Button } from "@/components/ui/button";
 
 interface RolesProps {
   organizationId: string;
@@ -125,20 +124,13 @@ export function Roles({ organizationId }: RolesProps) {
 
   return (
     <div className="space-y-6 pt-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white mb-1">
-            Roles
-          </Heading>
-        </div>
-      </div>
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
           <p>{error instanceof Error ? error.message : "Failed to fetch roles"}</p>
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
         <div className="px-6 pt-6 pb-4 flex items-center justify-between">
           <InputGroup>
             <Input

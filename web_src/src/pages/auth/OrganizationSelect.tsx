@@ -65,7 +65,7 @@ const OrganizationSelect: React.FC = () => {
       <div className="min-h-screen bg-slate-100 p-8">
         <div className="flex flex-col items-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500"></div>
-          <Text className="text-gray-600 dark:text-gray-400">Loading...</Text>
+          <Text className="text-gray-500 dark:text-gray-400">Loading...</Text>
         </div>
       </div>
     );
@@ -113,7 +113,7 @@ const OrganizationSelect: React.FC = () => {
                   <Building size={16} />
                   <h4 className="text-lg font-semibold truncate">{org.name}</h4>
                 </div>
-                <Text className="text-sm text-left text-gray-600 dark:text-gray-400 truncate">{org.description}</Text>
+                <Text className="text-sm text-left text-gray-500 dark:text-gray-400 truncate">{org.description}</Text>
                 <div className="mt-3 text-sm font-medium text-gray-500 dark:text-gray-400 flex flex-col gap-1">
                   <div className="flex items-center gap-1.5">
                     <Palette size={16} />

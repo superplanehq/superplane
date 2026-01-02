@@ -87,7 +87,7 @@ export const SingleFilter: Story = {
   },
   render: (args) => (
     <div className="p-8">
-      <p className="mb-4 text-sm text-gray-600">Hover over the badge below to see the tooltip:</p>
+      <p className="mb-4 text-sm text-gray-500">Hover over the badge below to see the tooltip:</p>
       <SpecsTooltip {...args}>
         <div>
           <MockSpecsBadge count={args.specValues.length} title={args.specTitle} />
@@ -105,7 +105,7 @@ export const MultipleFilters: Story = {
   },
   render: (args) => (
     <div className="p-8">
-      <p className="mb-4 text-sm text-gray-600">Hover over the badge below to see the tooltip with multiple filters:</p>
+      <p className="mb-4 text-sm text-gray-500">Hover over the badge below to see the tooltip with multiple filters:</p>
       <SpecsTooltip {...args}>
         <div>
           <MockSpecsBadge count={args.specValues.length} title={args.specTitle} />
@@ -122,7 +122,7 @@ export const Conditions: Story = {
   },
   render: (args) => (
     <div className="p-8">
-      <p className="mb-4 text-sm text-gray-600">Hover over the badge below to see conditions tooltip:</p>
+      <p className="mb-4 text-sm text-gray-500">Hover over the badge below to see conditions tooltip:</p>
       <SpecsTooltip {...args}>
         <div>
           <MockSpecsBadge count={args.specValues.length} title={args.specTitle} />
@@ -139,7 +139,7 @@ export const WithTextChild: Story = {
   },
   render: (args) => (
     <div className="p-8">
-      <p className="mb-4 text-sm text-gray-600">Tooltip can wrap any child element:</p>
+      <p className="mb-4 text-sm text-gray-500">Tooltip can wrap any child element:</p>
       <SpecsTooltip {...args}>
         <span className="text-blue-600 cursor-pointer underline">
           View {args.specValues.length} {args.specTitle}

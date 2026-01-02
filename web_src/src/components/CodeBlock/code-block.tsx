@@ -31,7 +31,7 @@ export function CodeBlock({ children, className = "" }: CodeBlockProps) {
           e.stopPropagation();
           handleCopy();
         }}
-        className="absolute! top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-400"
+        className="absolute! top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400"
         title={copied ? "Copied!" : "Copy to clipboard"}
       >
         <Icon name={copied ? "check" : "content_copy"} size="sm" />
