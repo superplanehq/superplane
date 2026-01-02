@@ -124,8 +124,8 @@ func (t *OnTagCreated) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (t *OnTagCreated) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (t *OnTagCreated) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (t *OnTagCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
