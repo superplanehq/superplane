@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
 import { FieldRendererProps } from "./types";
+import { toTestId } from "@/utils/testID";
 
 export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
   const selectOptions = field.typeOptions?.select?.options ?? [];
@@ -16,7 +17,7 @@ export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
     }
   }, [value, field.defaultValue, onChange]);
 
-  const testId = field.name ? `field-${field.name}-select` : undefined;
+  const testId = field.name ? toTestId(`field-${field.name}-select`) : undefined;
 
   return (
     <Select

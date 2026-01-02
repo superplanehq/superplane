@@ -1,6 +1,7 @@
 import React from "react";
 import { Input } from "../input";
 import { FieldRendererProps } from "./types";
+import { toTestId } from "@/utils/testID";
 
 export const StringFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
   return (
@@ -10,7 +11,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder={field.placeholder || ""}
       className={hasError ? "border-red-500 border-2" : ""}
-      data-testid={`string-field-${field.name}`}
+      data-testid={toTestId(`string-field-${field.name}`)}
     />
   );
 };
