@@ -1,83 +1,46 @@
 # Superplane
 
-**Cross-platform DevOps workflow orchestration that connects your tools, automates your processes, and gives you complete visibility.**
+SuperPlane is an AI-native DevOps control plane. Our mission is to build the
+platform teams use to ship and manage software in the AI era.
 
-## Table of Contents
+Agents are helping us write an order of magnitude more code, while systems have
+become too complex for human-driven ops alone. We're rethinking DevOps from
+first principles for the AI era: a single control layer where engineers and
+agents safely collaborate.
 
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [Quick Start](#quick-start)
-- [Documentation](#documentation)
+## Key Capabilities
 
----
-
-## Overview
-
-Superplane creates a control layer above your existing DevOps tools, letting you orchestrate workflows across multiple platforms from one place. Instead of writing custom scripts and managing workflows separately in each tool, you build visual workflows that coordinate everything automatically.
-
----
-
-## Key Features
-
-- **Cross-Platform Integration** - Connect GitHub, Semaphore, CI/CD platforms, and custom webhooks in unified workflows
-- **Event-Driven Automation** - Respond to pushes, deployments, alerts, and custom triggers automatically
-- **Visual Workflow Builder** - See your entire DevOps process at a glance with real-time status updates
-- **Enterprise Security** - Encrypted secrets, role-based access, complete audit trails
-- **Centralized Monitoring** - Single dashboard for all your DevOps activities across tools
-- **Flexible Deployment** - Cloud-hosted, self-hosted, or local development options
-
----
+- **AI-Native Architecture** - Built from the ground up for the AI era, enabling seamless collaboration between engineers and AI agents to manage increasingly complex DevOps systems
+- **Cross-Platform Workflow Orchestration** - Connect and coordinate workflows across multiple DevOps tools, platforms, and services from a single interface
+- **Event-Driven Automation** - Build workflows that automatically respond to code pushes, deployments, alerts, and custom triggers
+- **Visual Workflow Builder** - Design and manage complex DevOps processes with an intuitive visual interface and real-time status updates
+- **Operational Knowledge Centralization** - Create living documentation of your DevOps processes that's easy to understand and maintain
 
 ## Quick Start
 
-Get your first workflow running in 10 minutes:
-
-### Option 1: Cloud (Recommended)
-1. Sign up at [app.superplane.com](https://app.superplane.com)
-2. Create your first Canvas (workspace)
-3. Connect a tool (GitHub, Semaphore, etc.)
-4. Build a workflow using the visual editor
-
-### Option 2: Try Locally
-```bash
-# Clone and start Superplane locally
-git clone https://github.com/your-org/superplane
-cd superplane
-# Setup the environment (first time)
-make dev.setup && make dev.start
-
-# Open http://localhost:8000
-
-# Update DB after changes
-
-make db.migrate DB_NAME=superplane_dev
+The fastest way to try SuperPlane is to run the latest version of the SuperPlane
+Docker container on your own machine. You'll have a working SuperPlane instance
+in less than a minute, without provisioning any cloud infrastructure.
 
 ```
+docker run --rm -p 3000:3000 -v spdata:/app/data -ti ghcr.io/superplanehq/superplane-demo:stable
+```
 
-→ [Complete Quick Start Guide](docs/getting-started/quick-start.md)
+## Production Installation
 
----
+For a permanent, production-ready installation, SuperPlane can be deployed on a
+single host or on Kubernetes. The single-host installation is ideal for smaller
+deployments and provides automatic SSL certificate management. Kubernetes
+deployment offers better scalability and high availability for larger teams.
 
-## Documentation
+- **[Single Host Installation](https://docs.superplane.com/installation/single-host/aws-ec2/)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
+- **[Kubernetes Installation](https://docs.superplane.com/installation/kubernetes/gke/)** - Deploy on GKE, EKS, or any Kubernetes cluster
 
-### Getting Started
-- **[What is Superplane?](docs/getting-started/what-is-superplane.md)** - Learn how Superplane solves DevOps integration challenges
-- **[Quick Start Guide](docs/getting-started/quick-start.md)** - Get running in 10 minutes with 3 progressive levels
-- **[Core Concepts](docs/getting-started/core-concepts.md)** - Understand Canvases, Components, and Workflows
+## Contributing
 
-### Installation
-- **[Local Development](docs/installation/local-development.md)** - Set up and run locally
-- **[Tunnels](docs/installation/tunnels.md)** - Configure tunnels for local webhook testing
+Found a bug or have a feature idea? Check our **[Contributing Guide](CONTRIBUTING.md)** to get started.
 
-### Core Concepts
-- **[Canvas & Workflows](docs/concepts/canvas-and-workflows.md)** - Workspaces and workflow organization
-- **[Components](docs/concepts/components.md)** - Event sources, stages, and executors
-- **[Events & Data Flow](docs/concepts/events-and-data.md)** - How data moves through workflows
-- **[Integrations & Security](docs/concepts/integrations-security.md)** - Connecting external tools and managing secrets
+## Get In Contact
 
-### Reference
-- **[CLI Reference](docs/reference/cli.md)** - Command-line tool documentation
-- **[API Documentation](https://app.superplane.com/api/v1/docs)** - REST API reference
-
-### Examples
-- **[YAML Examples](docs/examples/)** - Sample configurations for Canvas, Stages, Event Sources, and Secrets
+- **[Discord](https://discord.gg/KC78eCNsnw)** - Join our community for discussions, questions, and collaboration
+- **[X](https://x.com/superplanehq)** - Follow us for updates and announcements
