@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -12,10 +11,6 @@ import (
 )
 
 type OnTagCreated struct{}
-
-type OnTagCreatedMetadata struct {
-	Repository *Repository `json:"repository"`
-}
 
 type OnTagCreatedConfiguration struct {
 	Repository string                    `json:"repository"`
@@ -71,47 +66,19 @@ func (t *OnTagCreated) Configuration() []configuration.Field {
 }
 
 func (t *OnTagCreated) Setup(ctx core.TriggerContext) error {
-	var metadata OnTagCreatedMetadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := ensureRepoInMetadata(
+		ctx.MetadataContext,
+		ctx.AppInstallationContext,
+		ctx.Configuration,
+	)
+
 	if err != nil {
-		return fmt.Errorf("failed to parse metadata: %w", err)
+		return err
 	}
 
-	//
-	// If metadata is set, it means the trigger was already setup
-	//
-	if metadata.Repository != nil {
-		return nil
-	}
-
-	config := OnTagCreatedConfiguration{}
-	err = mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
+	var config OnTagCreatedConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	if config.Repository == "" {
-		return fmt.Errorf("repository is required")
-	}
-
-	appMetadata := Metadata{}
-	err = mapstructure.Decode(ctx.AppInstallationContext.GetMetadata(), &appMetadata)
-	if err != nil {
-		return fmt.Errorf("error decoding app installation metadata: %v", err)
-	}
-
-	repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r Repository) bool {
-		return r.Name == config.Repository
-	})
-
-	if repoIndex == -1 {
-		return fmt.Errorf("repository %s is not accessible to app installation", config.Repository)
-	}
-
-	metadata.Repository = &appMetadata.Repositories[repoIndex]
-	err = ctx.MetadataContext.Set(metadata)
-	if err != nil {
-		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
 	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
@@ -163,9 +130,6 @@ func (t *OnTagCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 		return http.StatusOK, nil
 	}
 
-	//
-	// Extract tag name from ref field
-	//
 	ref, ok := data["ref"]
 	if !ok {
 		return http.StatusBadRequest, fmt.Errorf("missing ref")
@@ -176,9 +140,6 @@ func (t *OnTagCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 		return http.StatusBadRequest, fmt.Errorf("invalid ref")
 	}
 
-	//
-	// Match tag name against configured predicates
-	//
 	if !configuration.MatchesAnyPredicate(config.Tags, r) {
 		return http.StatusOK, nil
 	}
