@@ -73,7 +73,10 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
           <span>{currentState}</span>
         </div>
         {section.eventSubtitle && (
-          <span className="text-[13px] font-medium truncate flex-shrink-0 max-w-[40%] text-gray-950/50">
+          <span
+            title={String(section.eventSubtitle)}
+            className="text-[13px] font-medium truncate flex-shrink-0 max-w-[50%] text-gray-950/50"
+          >
             {section.showAutomaticTime && durationText ? durationText : section.eventSubtitle}
           </span>
         )}

@@ -8,6 +8,8 @@ import { ComponentBaseMapper, EventStateRegistry } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventStateMap, EventState } from "@/ui/componentBase";
 import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
+import { formatTimeAgo } from "@/utils/date";
+import { getTriggerRenderer } from ".";
 
 // Custom state map for HTTP component with error state
 const HTTP_EVENT_STATE_MAP: EventStateMap = {
@@ -63,9 +65,8 @@ const httpStateFunction = (execution: WorkflowsWorkflowNodeExecution): EventStat
     return "running";
   }
 
-  // Check metadata result for success/failed/error distinction
   if (execution.state === "STATE_FINISHED") {
-    const metadata = execution.metadata as Record<string, any> | undefined;
+    const metadata = execution.metadata as Record<string, unknown> | undefined;
 
     if (metadata?.result === "success") {
       return "success";
@@ -95,7 +96,7 @@ export const HTTP_STATE_REGISTRY: EventStateRegistry = {
 
 export const httpMapper: ComponentBaseMapper = {
   props(
-    _: ComponentsNode[],
+    nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
@@ -109,22 +110,199 @@ export const httpMapper: ComponentBaseMapper = {
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
       title: node.name!,
-      eventSections: lastExecutions[0] ? getHTTPEventSections(lastExecutions[0], httpStateFunction) : undefined,
+      eventSections: lastExecutions[0] ? getHTTPEventSections(nodes, lastExecutions[0], httpStateFunction) : undefined,
       includeEmptyState: !lastExecutions[0],
       metadata: getHTTPMetadataList(node),
       specs: getHTTPSpecs(node),
       eventStateMap: HTTP_EVENT_STATE_MAP,
     };
   },
+
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
+    const details: Record<string, string> = {};
+    const metadata = execution.metadata as Record<string, unknown> | undefined;
+
+    if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
+      details["Response"] = metadata.finalStatus.toString();
+    } else {
+      const outputs = execution.outputs as Record<string, unknown>;
+      const defaultArray = outputs?.default as unknown[];
+      const response = defaultArray?.[0] as {
+        data?: {
+          status?: number;
+        };
+      };
+      if (response?.data?.status) {
+        details["Response"] = response.data.status.toString();
+      }
+    }
+
+    if (metadata?.totalRetries !== undefined && metadata.totalRetries !== null) {
+      details["Retries"] = metadata.totalRetries.toString();
+    }
+
+    if (execution.createdAt && execution.updatedAt) {
+      const startTime = new Date(execution.createdAt);
+      const endTime = new Date(execution.updatedAt);
+      const durationMs = endTime.getTime() - startTime.getTime();
+
+      if (durationMs < 1000) {
+        details["Duration"] = `${durationMs}ms`;
+      } else if (durationMs < 60000) {
+        details["Duration"] = `${Math.round(durationMs / 1000)} seconds`;
+      } else {
+        const minutes = Math.floor(durationMs / 60000);
+        const seconds = Math.round((durationMs % 60000) / 1000);
+        details["Duration"] = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+      }
+    }
+
+    // Time finished
+    if (execution.updatedAt) {
+      const finishedTime = new Date(execution.updatedAt);
+      details["Time Finished"] = finishedTime.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      });
+    }
+
+    return details;
+  },
+
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    const state = httpStateFunction(execution);
+
+    // For running state, show duration
+    if (state === "running") {
+      if (execution.createdAt) {
+        const startTime = new Date(execution.createdAt);
+        const now = new Date();
+        const durationMs = now.getTime() - startTime.getTime();
+
+        if (durationMs < 60000) {
+          return `Running for: ${Math.floor(durationMs / 1000)}s`;
+        } else {
+          const minutes = Math.floor(durationMs / 60000);
+          return `Running for: ${minutes}m`;
+        }
+      }
+      return "Running...";
+    }
+
+    // For success/failed states, show response code and time
+    if (state === "success" || state === "failed") {
+      const metadata = execution.metadata as Record<string, unknown> | undefined;
+      let responseCode: string | null = null;
+
+      // Try to get response code from metadata first
+      if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
+        responseCode = metadata.finalStatus.toString();
+      } else {
+        // Fallback to outputs
+        const outputs = execution.outputs as Record<string, unknown>;
+        const defaultArray = outputs?.default as unknown[];
+        const response = defaultArray?.[0] as {
+          data?: { status?: number };
+        };
+        if (response?.data?.status) {
+          responseCode = response.data.status.toString();
+        }
+      }
+
+      const timeAgo = execution.updatedAt ? formatTimeAgo(new Date(execution.updatedAt)) : "";
+
+      if (responseCode && timeAgo) {
+        return `Response: ${responseCode} · ${timeAgo}`;
+      } else if (responseCode) {
+        return `Response: ${responseCode}`;
+      } else if (timeAgo) {
+        return timeAgo;
+      }
+    }
+
+    // Fallback: just show time ago
+    if (execution.updatedAt) {
+      return formatTimeAgo(new Date(execution.updatedAt));
+    }
+
+    return "";
+  },
 };
 
 function getHTTPMetadataList(node: ComponentsNode): MetadataItem[] {
   const metadata: Array<{ icon: string; label: string }> = [];
 
+  // Method and URL
   if (node.configuration?.url && node.configuration.method) {
     metadata.push({
       icon: "link",
       label: `${node.configuration.method} ${node.configuration.url}`,
+    });
+  }
+
+  // Request body information
+  const contentType = node.configuration?.contentType;
+  if (
+    contentType &&
+    node.configuration &&
+    (node.configuration.method === "POST" ||
+      node.configuration.method === "PUT" ||
+      node.configuration.method === "PATCH")
+  ) {
+    let bodyLabel = "";
+
+    switch (contentType) {
+      case "application/json":
+        bodyLabel = "JSON body";
+        break;
+      case "application/xml":
+        bodyLabel = "XML body";
+        break;
+      case "text/plain":
+        bodyLabel = "Text body";
+        break;
+      case "application/x-www-form-urlencoded":
+        bodyLabel = "Form data";
+        break;
+      default:
+        bodyLabel = "Request body";
+    }
+
+    metadata.push({
+      icon: "code",
+      label: bodyLabel,
+    });
+  }
+
+  // Headers count
+  const headers = node.configuration?.headers as Array<{ name: string; value: string }> | undefined;
+  if (headers && headers.length > 0) {
+    metadata.push({
+      icon: "code",
+      label: `${headers.length} header${headers.length === 1 ? "" : "s"}`,
+    });
+  }
+
+  // Retry configuration
+  const timeoutStrategy = node.configuration?.timeoutStrategy;
+  const retries = node.configuration?.retries as number | undefined;
+  const timeoutSeconds = node.configuration?.timeoutSeconds as number | undefined;
+
+  if (timeoutStrategy && retries !== undefined && timeoutSeconds !== undefined) {
+    const retriesText = retries === 0 ? "No retries" : `${retries} ${retries === 1 ? "retry" : "retries"}`;
+    metadata.push({
+      icon: "bolt",
+      label: `${retriesText}, with ${timeoutSeconds}s timeout`,
+    });
+  } else if (retries !== undefined && retries > 0) {
+    metadata.push({
+      icon: "bolt",
+      label: `${retries} ${retries === 1 ? "retry" : "retries"}`,
     });
   }
 
@@ -139,7 +317,7 @@ function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 
   // Show payload based on content type if sendBody is enabled
   if (sendBody) {
-    let payload: any = null;
+    let payload: unknown = null;
     let payloadIcon = "file-json";
     let payloadTitle = "payload";
     let tooltipContentType: "json" | "xml" | "text" = "json";
@@ -241,30 +419,76 @@ function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 }
 
 function getHTTPEventSections(
+  nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution,
   stateFunction: (execution: WorkflowsWorkflowNodeExecution) => EventState,
 ): EventSection[] {
-  const outputs = execution.outputs as Record<string, unknown>;
-  const defaultArray = outputs?.default as unknown[];
-  const response = defaultArray?.[0] as { data?: { status?: string; error?: string } };
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
-  // Determine event title based on response
-  let eventTitle = "Running...";
-  if (execution.state === "STATE_FINISHED") {
-    if (response?.data?.error) {
-      eventTitle = `Error: ${response.data.error}`;
-    } else if (response?.data?.status) {
-      eventTitle = `Status: ${response.data.status}`;
-    } else {
-      eventTitle = "Request completed";
+  const generateEventSubtitle = (): string => {
+    const state = stateFunction(execution);
+
+    if (state === "running") {
+      if (execution.createdAt) {
+        const startTime = new Date(execution.createdAt);
+        const now = new Date();
+        const durationMs = now.getTime() - startTime.getTime();
+
+        if (durationMs < 60000) {
+          return `Running for: ${Math.floor(durationMs / 1000)}s`;
+        } else {
+          const minutes = Math.floor(durationMs / 60000);
+          return `Running for: ${minutes}m`;
+        }
+      }
+      return "Running...";
     }
-  }
+
+    if (state === "success" || state === "failed") {
+      const metadata = execution.metadata as Record<string, unknown> | undefined;
+      let responseCode: string | null = null;
+
+      if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
+        responseCode = metadata.finalStatus.toString();
+      } else {
+        const outputs = execution.outputs as Record<string, unknown>;
+        const defaultArray = outputs?.default as unknown[];
+        const response = defaultArray?.[0] as {
+          data?: { status?: number };
+        };
+        if (response?.data?.status) {
+          responseCode = response.data.status.toString();
+        }
+      }
+
+      const timeAgo = execution.updatedAt ? formatTimeAgo(new Date(execution.updatedAt)) : "";
+
+      if (responseCode && timeAgo) {
+        return `Response: ${responseCode} · ${timeAgo}`;
+      } else if (responseCode) {
+        return `Response: ${responseCode}`;
+      } else if (timeAgo) {
+        return timeAgo;
+      }
+    }
+
+    // Fallback: just show time ago
+    if (execution.updatedAt) {
+      return formatTimeAgo(new Date(execution.updatedAt));
+    }
+
+    return "";
+  };
 
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
-    eventTitle,
+    eventTitle: title,
+    eventSubtitle: generateEventSubtitle(),
     eventState: stateFunction(execution),
     eventId: execution.rootEvent?.id,
+    showAutomaticTime: stateFunction(execution) === "running", // Show live timer for running state
   };
 
   return [eventSection];

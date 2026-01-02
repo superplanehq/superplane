@@ -5,6 +5,7 @@ import {
   EventStateRegistry,
   CustomFieldRenderer,
 } from "./types";
+import { ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
 import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
@@ -171,4 +172,30 @@ export function getState(componentName: string) {
  */
 export function getCustomFieldRenderer(componentName: string): CustomFieldRenderer | undefined {
   return customFieldRenderers[componentName];
+}
+
+/**
+ * Get the execution details for a component execution.
+ * Returns undefined if no specific execution details function is registered.
+ */
+export function getExecutionDetails(
+  componentName: string,
+  execution: WorkflowsWorkflowNodeExecution,
+  node: ComponentsNode,
+): Record<string, string> | undefined {
+  const parts = componentName?.split(".");
+  let mapper: ComponentBaseMapper | undefined;
+
+  if (parts?.length === 1) {
+    mapper = componentBaseMappers[componentName];
+  } else {
+    const appName = parts[0];
+    const appMapper = appMappers[appName];
+    if (appMapper) {
+      const componentNamePart = parts[1];
+      mapper = appMapper[componentNamePart];
+    }
+  }
+
+  return mapper?.getExecutionDetails?.(execution, node);
 }

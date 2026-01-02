@@ -55,6 +55,9 @@ type RetryMetadata struct {
 	TimeoutStrategy string `json:"timeoutStrategy"`
 	TimeoutSeconds  int    `json:"timeoutSeconds"`
 	LastError       string `json:"lastError,omitempty"`
+	TotalRetries    int    `json:"totalRetries"`
+	FinalStatus     int    `json:"finalStatus,omitempty"`
+	Result          string `json:"result"`
 }
 
 type HTTP struct{}
@@ -376,6 +379,8 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		MaxRetries:      0,
 		TimeoutStrategy: "fixed",
 		TimeoutSeconds:  30,
+		TotalRetries:    0,
+		Result:          "pending",
 	}
 
 	if spec.TimeoutStrategy != nil && *spec.TimeoutStrategy != "" {
@@ -427,6 +432,7 @@ func (e *HTTP) executeHTTPRequest(ctx core.ExecutionContext, spec Spec, retryMet
 
 func (e *HTTP) scheduleRetry(ctx core.ExecutionContext, lastError string, retryMetadata RetryMetadata) error {
 	retryMetadata.Attempt++
+	retryMetadata.TotalRetries++
 	retryMetadata.LastError = lastError
 
 	err := ctx.MetadataContext.Set(retryMetadata)
@@ -521,10 +527,16 @@ func (e *HTTP) executeRequest(spec Spec, timeout time.Duration) (*http.Response,
 }
 
 func (e *HTTP) handleRequestError(ctx core.ExecutionContext, err error, totalAttempts int) error {
+	// Get current metadata and update with final result
+	metadata := ctx.MetadataContext.Get()
+	var retryMetadata RetryMetadata
+	mapstructure.Decode(metadata, &retryMetadata)
+
+	retryMetadata.Result = "error"
+	retryMetadata.LastError = err.Error()
+
 	if ctx.MetadataContext != nil {
-		ctx.MetadataContext.Set(map[string]any{
-			"result": "error",
-		})
+		ctx.MetadataContext.Set(retryMetadata)
 	}
 
 	errorResponse := map[string]any{
@@ -553,10 +565,17 @@ func (e *HTTP) processResponse(ctx core.ExecutionContext, resp *http.Response, s
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		// Get current metadata and update with final result
+		metadata := ctx.MetadataContext.Get()
+		var retryMetadata RetryMetadata
+		mapstructure.Decode(metadata, &retryMetadata)
+
+		retryMetadata.Result = "error"
+		retryMetadata.FinalStatus = resp.StatusCode
+		retryMetadata.LastError = fmt.Sprintf("failed to read response body: %v", err)
+
 		if ctx.MetadataContext != nil {
-			ctx.MetadataContext.Set(map[string]any{
-				"result": "error",
-			})
+			ctx.MetadataContext.Set(retryMetadata)
 		}
 
 		errorResponse := map[string]any{
@@ -597,16 +616,20 @@ func (e *HTTP) processResponse(ctx core.ExecutionContext, resp *http.Response, s
 		isSuccess = e.matchesSuccessCode(resp.StatusCode, "2xx")
 	}
 
-	var metadataResult string
+	// Get current metadata and update with final result
+	metadata := ctx.MetadataContext.Get()
+	var retryMetadata RetryMetadata
+	mapstructure.Decode(metadata, &retryMetadata)
+
+	retryMetadata.FinalStatus = resp.StatusCode
 	if isSuccess {
-		metadataResult = "success"
+		retryMetadata.Result = "success"
 	} else {
-		metadataResult = "failed"
+		retryMetadata.Result = "failed"
 	}
+
 	if ctx.MetadataContext != nil {
-		ctx.MetadataContext.Set(map[string]any{
-			"result": metadataResult,
-		})
+		ctx.MetadataContext.Set(retryMetadata)
 	}
 
 	eventType := "http.request.finished"
