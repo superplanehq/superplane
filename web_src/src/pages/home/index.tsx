@@ -13,7 +13,7 @@ import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 import { useBlueprints, useDeleteBlueprint } from "../../hooks/useBlueprintData";
 import { useDeleteWorkflow, useWorkflows } from "../../hooks/useWorkflowData";
-import { cn, resolveIcon } from "../../lib/utils";
+import { resolveIcon } from "../../lib/utils";
 import { isCustomComponentsEnabled } from "../../lib/env";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 
