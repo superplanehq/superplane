@@ -203,6 +203,9 @@ import type {
   WorkflowsDeleteNodeQueueItemData,
   WorkflowsDeleteNodeQueueItemResponse2,
   WorkflowsDeleteNodeQueueItemError,
+  WorkflowsInvokeNodeTriggerActionData,
+  WorkflowsInvokeNodeTriggerActionResponse2,
+  WorkflowsInvokeNodeTriggerActionError,
 } from "./types.gen";
 import { client as _heyApiClient } from "./client.gen";
 
@@ -1367,5 +1370,26 @@ export const workflowsDeleteNodeQueueItem = <ThrowOnError extends boolean = true
   >({
     url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue/{itemId}",
     ...options,
+  });
+};
+
+/**
+ * Invoke trigger action
+ * Invokes a custom action on a workflow node trigger
+ */
+export const workflowsInvokeNodeTriggerAction = <ThrowOnError extends boolean = true>(
+  options: Options<WorkflowsInvokeNodeTriggerActionData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).post<
+    WorkflowsInvokeNodeTriggerActionResponse2,
+    WorkflowsInvokeNodeTriggerActionError,
+    ThrowOnError
+  >({
+    url: "/api/v1/workflows/{workflowId}/triggers/{nodeId}/actions/{actionName}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
   });
 };

@@ -100,9 +100,9 @@ export function Roles({ organizationId }: RolesProps) {
 
   const getSortIcon = (columnKey: string) => {
     if (sortConfig.key !== columnKey) {
-      return "unfold_more";
+      return "chevrons-up-down";
     }
-    return sortConfig.direction === "asc" ? "keyboard_arrow_up" : "keyboard_arrow_down";
+    return sortConfig.direction === "asc" ? "chevron-up" : "chevron-down";
   };
 
   const filteredAndSortedRoles = useMemo(() => {
@@ -120,7 +120,7 @@ export function Roles({ organizationId }: RolesProps) {
       <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
         <div className="px-6 pt-6 pb-4 flex items-center justify-start">
           <Button className="flex items-center" onClick={handleCreateRole}>
-            <Icon name="add" />
+            <Icon name="plus" />
             New Organization Role
           </Button>
         </div>
@@ -177,7 +177,7 @@ export function Roles({ organizationId }: RolesProps) {
                             ) : (
                               <Dropdown>
                                 <DropdownButton disabled={deleteRoleMutation.isPending}>
-                                  <Icon name="more_vert" size="sm" />
+                                  <Icon name="ellipsis-vertical" size="sm" />
                                 </DropdownButton>
                                 <DropdownMenu>
                                   <DropdownItem onClick={() => handleEditRole(role)}>

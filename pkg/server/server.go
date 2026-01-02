@@ -34,6 +34,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
 	_ "github.com/superplanehq/superplane/pkg/triggers/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
+	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
 )
 
 func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, authService authorization.Authorization) {
@@ -91,9 +92,8 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	if os.Getenv("START_WEBHOOK_PROVISIONER") == "yes" {
 		log.Println("Starting Webhook Provisioner")
 
-		url := getWebhooksBaseURL()
-
-		w := workers.NewWebhookProvisioner(url, encryptor, registry)
+		webhookBaseURL := getWebhookBaseURL(baseURL)
+		w := workers.NewWebhookProvisioner(webhookBaseURL, encryptor, registry)
 		go w.Start(context.Background())
 	}
 
@@ -119,24 +119,20 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	}
 }
 
-func startInternalAPI(baseURL string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
+func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(baseURL, encryptor, authService, registry, lookupInternalAPIPort())
+	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, lookupInternalAPIPort())
 }
 
-func startPublicAPI(baseURL string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
+func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
 	log.Println("Starting Public API with integrated Web Server")
-
-	basePath := os.Getenv("PUBLIC_API_BASE_PATH")
-	if basePath == "" {
-		panic("PUBLIC_API_BASE_PATH must be set")
-	}
 
 	appEnv := os.Getenv("APP_ENV")
 	templateDir := os.Getenv("TEMPLATE_DIR")
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
 
-	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, baseURL, appEnv, templateDir, authService, blockSignup)
+	webhooksBaseURL := getWebhookBaseURL(baseURL)
+	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}
@@ -270,6 +266,11 @@ func Start() {
 		panic("BASE_URL must be set")
 	}
 
+	basePath := os.Getenv("PUBLIC_API_BASE_PATH")
+	if basePath == "" {
+		panic("PUBLIC_API_BASE_PATH must be set")
+	}
+
 	// Sync missing default roles on startup
 	log.Info("Syncing default permissions for all organizations and canvases...")
 	if err := authService.CheckAndSyncMissingPermissions(); err != nil {
@@ -286,11 +287,12 @@ func Start() {
 	registry := registry.NewRegistry(encryptorInstance)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(baseURL, encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
+		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(baseURL, encryptorInstance, authService, registry)
+		webhooksBaseURL := getWebhookBaseURL(baseURL)
+		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, registry)
 	}
 
 	startWorkers(jwtSigner, encryptorInstance, registry, baseURL, authService)
@@ -300,13 +302,14 @@ func Start() {
 	select {}
 }
 
-func getWebhooksBaseURL() string {
-	// This allows for setting up a fake base URL for webhooks in e2e tests
-	baseURL := os.Getenv("WEBHOOKS_BASE_URL")
-
-	if baseURL == "" {
-		baseURL = os.Getenv("BASE_URL")
+// getWebhookBaseURL returns the webhook base URL, using the same pattern as SyncContext.
+// Use WEBHOOKS_BASE_URL if set, otherwise fall back to baseURL.
+// This allows e2e tests to use a fake/mock webhook URL, and local installations to use a different
+// URL for webhooks (e.g., a tunnel URL) when the base app is running on localhost.
+func getWebhookBaseURL(baseURL string) string {
+	webhookBaseURL := os.Getenv("WEBHOOKS_BASE_URL")
+	if webhookBaseURL == "" {
+		webhookBaseURL = baseURL
 	}
-
-	return baseURL
+	return webhookBaseURL
 }

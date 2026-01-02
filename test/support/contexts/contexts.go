@@ -34,8 +34,22 @@ func (w *WebhookContext) GetSecret() ([]byte, error) {
 	return []byte(w.Secret), nil
 }
 
-func (w *WebhookContext) Setup(options *core.WebhookSetupOptions) error {
+func (w *WebhookContext) ResetSecret() ([]byte, []byte, error) {
+	return []byte(w.Secret), []byte(w.Secret), nil
+}
+
+func (w *WebhookContext) SetSecret(secret []byte) error {
+	w.Secret = string(secret)
 	return nil
+}
+
+func (w *WebhookContext) Setup(options *core.WebhookSetupOptions) (string, error) {
+	id := uuid.New()
+	return id.String(), nil
+}
+
+func (w *WebhookContext) GetBaseURL() string {
+	return "http://localhost:3000/api/v1"
 }
 
 type MetadataContext struct {

@@ -2,12 +2,88 @@ package github
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"slices"
 	"strings"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 )
+
+type Repository struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+type NodeMetadata struct {
+	Repository *Repository `json:"repository"`
+}
+
+func ensureRepoInMetadata(ctx core.MetadataContext, app core.AppInstallationContext, configuration any) error {
+	var nodeMetadata NodeMetadata
+	err := mapstructure.Decode(ctx.Get(), &nodeMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode node metadata: %w", err)
+	}
+
+	//
+	// If metadata is already set, skip setup
+	//
+	if nodeMetadata.Repository != nil {
+		return nil
+	}
+
+	repository := getRepositoryFromConfiguration(configuration)
+	if repository == "" {
+		return fmt.Errorf("repository is required")
+	}
+
+	//
+	// Validate that the app has access to this repository
+	//
+	var appMetadata Metadata
+	if err := mapstructure.Decode(app.GetMetadata(), &appMetadata); err != nil {
+		return fmt.Errorf("failed to decode application metadata: %w", err)
+	}
+
+	repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r Repository) bool {
+		return r.Name == repository
+	})
+
+	if repoIndex == -1 {
+		return fmt.Errorf("repository %s is not accessible to app installation", repository)
+	}
+
+	return ctx.Set(NodeMetadata{
+		Repository: &appMetadata.Repositories[repoIndex],
+	})
+}
+
+func getRepositoryFromConfiguration(c any) string {
+	log.Printf("%v", c)
+	configMap, ok := c.(map[string]any)
+	if !ok {
+		log.Printf("A")
+		return ""
+	}
+
+	r, ok := configMap["repository"]
+	if !ok {
+		log.Printf("B")
+		return ""
+	}
+
+	repository, ok := r.(string)
+	if !ok {
+		log.Printf("C")
+		return ""
+	}
+
+	return repository
+}
 
 func verifySignature(ctx core.WebhookRequestContext, expectedType string) (int, error) {
 	signature := ctx.Headers.Get("X-Hub-Signature-256")

@@ -3,14 +3,7 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
-
-interface OnIssueMetadata {
-  repository: {
-    id: string;
-    name: string;
-    url: string;
-  };
-}
+import { BaseNodeMetadata } from "./base";
 
 interface OnIssueConfiguration {
   actions: string[];
@@ -57,7 +50,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
   },
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
-    const metadata = node.metadata as unknown as OnIssueMetadata;
+    const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnIssueConfiguration;
     const metadataItems = [];
 

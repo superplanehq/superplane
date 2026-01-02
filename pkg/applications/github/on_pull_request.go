@@ -3,6 +3,7 @@ package github
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"slices"
 
@@ -13,13 +14,9 @@ import (
 
 type OnPullRequest struct{}
 
-type OnPullRequestMetadata struct {
-	Repository *Repository `json:"repository"`
-}
-
 type OnPullRequestConfiguration struct {
-	Repository string   `json:"repository"`
-	Actions    []string `json:"action"`
+	Repository string   `json:"repository" mapstructure:"repository"`
+	Actions    []string `json:"actions" mapstructure:"actions"`
 }
 
 func (p *OnPullRequest) Name() string {
@@ -75,47 +72,19 @@ func (p *OnPullRequest) Configuration() []configuration.Field {
 }
 
 func (p *OnPullRequest) Setup(ctx core.TriggerContext) error {
-	var metadata OnPullRequestMetadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := ensureRepoInMetadata(
+		ctx.MetadataContext,
+		ctx.AppInstallationContext,
+		ctx.Configuration,
+	)
+
 	if err != nil {
-		return fmt.Errorf("failed to parse metadata: %w", err)
+		return err
 	}
 
-	//
-	// If metadata is set, it means the trigger was already setup
-	//
-	if metadata.Repository != nil {
-		return nil
-	}
-
-	config := OnPullRequestConfiguration{}
-	err = mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
+	var config OnPullRequestConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	if config.Repository == "" {
-		return fmt.Errorf("repository is required")
-	}
-
-	appMetadata := Metadata{}
-	err = mapstructure.Decode(ctx.AppInstallationContext.GetMetadata(), &appMetadata)
-	if err != nil {
-		return fmt.Errorf("error decoding app installation metadata: %v", err)
-	}
-
-	repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r Repository) bool {
-		return r.Name == config.Repository
-	})
-
-	if repoIndex == -1 {
-		return fmt.Errorf("repository %s is not accessible to app installation", config.Repository)
-	}
-
-	metadata.Repository = &appMetadata.Repositories[repoIndex]
-	err = ctx.MetadataContext.Set(metadata)
-	if err != nil {
-		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
 	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
@@ -128,8 +97,8 @@ func (p *OnPullRequest) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (p *OnPullRequest) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (p *OnPullRequest) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
@@ -168,6 +137,8 @@ func whitelistedAction(data map[string]any, allowed []string) bool {
 	if !ok {
 		return false
 	}
+
+	log.Printf("Allowed: %v, action: %v", allowed, action)
 
 	return slices.Contains(allowed, action.(string))
 }

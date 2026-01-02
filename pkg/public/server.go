@@ -72,6 +72,7 @@ type Server struct {
 	Router                *mux.Router
 	BasePath              string
 	BaseURL               string
+	WebhooksBaseURL       string
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
 	isDev                 bool
@@ -89,6 +90,7 @@ func NewServer(
 	oidcVerifier *crypto.OIDCVerifier,
 	basePath string,
 	baseURL string,
+	webhooksBaseURL string,
 	appEnv string,
 	templateDir string,
 	authorizationService authorization.Authorization,
@@ -97,12 +99,14 @@ func NewServer(
 ) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup)
+	passwordLoginEnabled := os.Getenv("ENABLE_PASSWORD_LOGIN") == "yes"
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup, passwordLoginEnabled)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
 	server := &Server{
 		BaseURL:               baseURL,
+		WebhooksBaseURL:       webhooksBaseURL,
 		BasePath:              basePath,
 		wsHub:                 ws.NewHub(),
 		authHandler:           authHandler,
@@ -428,11 +432,12 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	app.HandleRequest(core.HTTPRequestContext{
-		Logger:         logging.ForAppInstallation(*appInstallation),
-		Request:        r,
-		Response:       w,
-		BaseURL:        s.BaseURL,
-		OrganizationID: appInstallation.OrganizationID.String(),
+		Logger:          logging.ForAppInstallation(*appInstallation),
+		Request:         r,
+		Response:        w,
+		BaseURL:         s.BaseURL,
+		WebhooksBaseURL: s.WebhooksBaseURL,
+		OrganizationID:  appInstallation.OrganizationID.String(),
 		AppInstallation: contexts.NewAppInstallationContext(
 			database.Conn(),
 			nil,
@@ -724,7 +729,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		WorkflowID:     node.WorkflowID.String(),
 		NodeID:         node.NodeID,
 		Configuration:  node.Configuration.Data(),
-		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node),
+		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		EventContext:   contexts.NewEventContext(tx, &node),
 	})
 }
@@ -743,7 +748,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		WorkflowID:     node.WorkflowID.String(),
 		NodeID:         node.NodeID,
 		Configuration:  node.Configuration.Data(),
-		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node),
+		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		EventContext:   contexts.NewEventContext(tx, &node),
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)

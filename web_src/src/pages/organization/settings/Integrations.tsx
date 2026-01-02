@@ -72,7 +72,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       {/* Deprecation Warning */}
       <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
         <div className="flex items-start gap-3">
-          <Icon name="warning" size="sm" className="text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+          <Icon name="triangle-alert" size="sm" className="text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-1">
               Integrations are deprecated
@@ -103,7 +103,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                 Connect external services to streamline your workflow
               </p>
               <Button onClick={handleAddIntegrationClick} className="flex items-center gap-2">
-                <Icon name="add" size="sm" />
+                <Icon name="plus" size="sm" />
                 Add Integration
               </Button>
             </div>
@@ -112,7 +112,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium">Organization Integrations</h2>
                 <Button onClick={handleAddIntegrationClick} className="flex items-center gap-2">
-                  <Icon name="add" size="sm" />
+                  <Icon name="plus" size="sm" />
                   Add Integration
                 </Button>
               </div>

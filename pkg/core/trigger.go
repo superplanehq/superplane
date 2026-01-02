@@ -62,7 +62,7 @@ type Trigger interface {
 	/*
 	 * Execution a custom action - defined in Actions() for a trigger.
 	 */
-	HandleAction(ctx TriggerActionContext) error
+	HandleAction(ctx TriggerActionContext) (map[string]any, error)
 }
 
 type TriggerContext struct {
@@ -116,6 +116,8 @@ type WebhookRequestContext struct {
 }
 
 type WebhookContext interface {
-	Setup(options *WebhookSetupOptions) error
+	Setup(options *WebhookSetupOptions) (string, error)
 	GetSecret() ([]byte, error)
+	ResetSecret() ([]byte, []byte, error)
+	GetBaseURL() string
 }

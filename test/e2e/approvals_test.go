@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/test/e2e/shared"
 )
 
+// TODO: Add e2e tests for role and group approval when RBAC is enabled
 func TestApprovals(t *testing.T) {
 	steps := &ApprovalSteps{t: t}
 
@@ -68,6 +69,7 @@ func (s *ApprovalSteps) verifyApprovalSavedToDB(nodeName string) {
 	require.NotNil(s.t, node, "approval node not found in DB")
 }
 
+// TODO: Update to test role and group configuration when RBAC is enabled
 func (s *ApprovalSteps) verifyApprovalConfigurationPersisted() {
 	node := s.canvas.GetNodeFromDB("ReleaseApproval")
 	require.NotNil(s.t, node, "approval node not found in DB")

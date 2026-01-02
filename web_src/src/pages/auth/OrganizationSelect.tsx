@@ -1,6 +1,6 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { Building, Palette, User } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";

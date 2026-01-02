@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -19,7 +20,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func CancelExecution(ctx context.Context, authService authorization.Authorization, organizationID string, registry *registry.Registry, workflowID, executionID uuid.UUID) (*pb.CancelExecutionResponse, error) {
+func CancelExecution(ctx context.Context, authService authorization.Authorization, encryptor crypto.Encryptor, organizationID string, registry *registry.Registry, workflowID, executionID uuid.UUID) (*pb.CancelExecutionResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	var user *models.User
 	if userIsSet {
@@ -47,7 +48,7 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 			return status.Error(codes.NotFound, "Node not found for execution")
 		}
 
-		err = cancelExecutionInTransaction(tx, authService, organizationID, registry, execution, node, user)
+		err = cancelExecutionInTransaction(tx, authService, encryptor, organizationID, registry, execution, node, user)
 
 		if err != nil {
 			return status.Error(codes.Internal, "It was not possible to cancel the execution")
@@ -63,9 +64,9 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 	return &pb.CancelExecutionResponse{}, nil
 }
 
-func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authorization, organizationID string, registry *registry.Registry, execution *models.WorkflowNodeExecution, node *models.WorkflowNode, user *models.User) error {
+func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authorization, encryptor crypto.Encryptor, organizationID string, registry *registry.Registry, execution *models.WorkflowNodeExecution, node *models.WorkflowNode, user *models.User) error {
 	if node.Type == models.NodeTypeBlueprint {
-		err := cancelChildExecutions(tx, authService, organizationID, registry, execution, user)
+		err := cancelChildExecutions(tx, authService, organizationID, encryptor, registry, execution, user)
 		if err != nil {
 			log.Errorf("failed to cancel child executions for %s: %v", execution.ID.String(), err)
 			return err
@@ -81,6 +82,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 				return err
 			}
 
+			logger := logging.ForExecution(execution, nil)
 			ctx := core.ExecutionContext{
 				ID:                    execution.ID,
 				WorkflowID:            execution.WorkflowID.String(),
@@ -90,9 +92,20 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 				RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
 				AuthContext:           contexts.NewAuthContext(tx, uuid.MustParse(organizationID), authService, user),
 				IntegrationContext:    contexts.NewIntegrationContext(tx, registry),
-				Logger:                logging.ForExecution(execution, nil),
 			}
 
+			if node.AppInstallationID != nil {
+				appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+				if err != nil {
+					logger.Errorf("error finding app installation: %v", err)
+					return status.Error(codes.Internal, "error building context")
+				}
+
+				logger = logging.WithAppInstallation(logger, *appInstallation)
+				ctx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
+			}
+
+			ctx.Logger = logger
 			if err := component.Cancel(ctx); err != nil {
 				log.Errorf("failed to cancel component execution %s: %v", execution.ID.String(), err)
 			}
@@ -102,7 +115,15 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 	return execution.CancelInTransaction(tx)
 }
 
-func cancelChildExecutions(tx *gorm.DB, authService authorization.Authorization, organizationID string, registry *registry.Registry, parentExecution *models.WorkflowNodeExecution, user *models.User) error {
+func cancelChildExecutions(
+	tx *gorm.DB,
+	authService authorization.Authorization,
+	organizationID string,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	parentExecution *models.WorkflowNodeExecution,
+	user *models.User,
+) error {
 	childExecutions, err := models.FindChildExecutionsInTransaction(
 		tx,
 		parentExecution.ID,
@@ -144,7 +165,7 @@ func cancelChildExecutions(tx *gorm.DB, authService authorization.Authorization,
 			return err
 		}
 
-		err = cancelExecutionInTransaction(tx, authService, organizationID, registry, &childExecution, childNode, user)
+		err = cancelExecutionInTransaction(tx, authService, encryptor, organizationID, registry, &childExecution, childNode, user)
 		if err != nil {
 			log.Errorf("failed to cancel child execution %s: %v", childExecution.ID.String(), err)
 			return err

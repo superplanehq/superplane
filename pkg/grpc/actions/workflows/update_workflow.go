@@ -22,7 +22,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, organizationID string, id string, pbWorkflow *pb.Workflow) (*pb.UpdateWorkflowResponse, error) {
+func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, organizationID string, id string, pbWorkflow *pb.Workflow, webhookBaseURL string) (*pb.UpdateWorkflowResponse, error) {
 	workflowID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid workflow id: %v", err)
@@ -77,7 +77,7 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 			}
 
 			if workflowNode.State == models.WorkflowNodeStateReady {
-				err = setupNode(ctx, tx, encryptor, registry, *workflowNode)
+				err = setupNode(ctx, tx, encryptor, registry, *workflowNode, webhookBaseURL)
 				if err != nil {
 					workflowNode.State = models.WorkflowNodeStateError
 					errorMsg := err.Error()
@@ -208,10 +208,10 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 	return &workflowNode, nil
 }
 
-func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode) error {
+func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode, webhookBaseURL string) error {
 	switch node.Type {
 	case models.NodeTypeTrigger:
-		return setupTrigger(ctx, tx, encryptor, registry, node)
+		return setupTrigger(ctx, tx, encryptor, registry, node, webhookBaseURL)
 	case models.NodeTypeComponent:
 		return setupComponent(tx, encryptor, registry, node)
 	}
@@ -219,7 +219,7 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 	return nil
 }
 
-func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode) error {
+func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode, webhookBaseURL string) error {
 	ref := node.Ref.Data()
 	trigger, err := registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -233,7 +233,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
 		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
 		EventContext:       contexts.NewEventContext(tx, &node),
-		WebhookContext:     contexts.NewWebhookContext(ctx, tx, encryptor, &node),
+		WebhookContext:     contexts.NewWebhookContext(ctx, tx, encryptor, &node, webhookBaseURL),
 	}
 
 	if node.AppInstallationID != nil {

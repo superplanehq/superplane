@@ -154,7 +154,7 @@ export function Profile() {
 
             <div className="flex items-center gap-4">
               <Button onClick={handleRegenerateToken} disabled={regeneratingToken} className="flex items-center gap-2">
-                <Icon name="refresh" />
+                <Icon name="refresh-ccw" />
                 {regeneratingToken ? "Regenerating..." : user.hasToken ? "Regenerate Token" : "Generate Token"}
               </Button>
 
@@ -183,7 +183,7 @@ export function Profile() {
                     <Icon name={tokenVisible ? "visibility_off" : "visibility"} />
                   </Button>
                   <Button variant="secondary" onClick={copyToken} className="flex items-center gap-1">
-                    <Icon name="content_copy" />
+                    <Icon name="copy" />
                     Copy
                   </Button>
                 </div>

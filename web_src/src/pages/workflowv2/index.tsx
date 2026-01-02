@@ -73,6 +73,7 @@ import { SidebarEvent } from "@/ui/componentSidebar/types";
 
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
+const CANVAS_AUTO_SAVE_STORAGE_KEY = "canvas-auto-save-enabled";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -145,6 +146,15 @@ export function WorkflowPageV2() {
   // Track unsaved changes on the canvas
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasNonPositionalUnsavedChanges, setHasNonPositionalUnsavedChanges] = useState(false);
+
+  // Auto-save toggle state
+  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem(CANVAS_AUTO_SAVE_STORAGE_KEY);
+      return stored !== null ? JSON.parse(stored) : true; // Default to enabled
+    }
+    return true;
+  });
 
   // Revert functionality - track initial workflow snapshot
   const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<WorkflowsWorkflow | null>(null);
@@ -228,6 +238,14 @@ export function WorkflowPageV2() {
     }
   }, [initialWorkflowSnapshot, organizationId, workflowId, queryClient]);
 
+  const handleToggleAutoSave = useCallback(() => {
+    const newValue = !isAutoSaveEnabled;
+    setIsAutoSaveEnabled(newValue);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CANVAS_AUTO_SAVE_STORAGE_KEY, JSON.stringify(newValue));
+    }
+  }, [isAutoSaveEnabled]);
+
   /**
    * Ref to track pending position updates that need to be auto-saved.
    * Maps node ID to its updated position.
@@ -249,6 +267,12 @@ export function WorkflowPageV2() {
         if (positionUpdates.size === 0) return;
 
         try {
+          // Check if auto-save is disabled
+          if (!isAutoSaveEnabled) {
+            console.log("Skipping position auto-save because auto-save is disabled");
+            return;
+          }
+
           // Check if there are unsaved structural changes
           // If so, skip auto-save to avoid saving those changes accidentally
           if (hasNonPositionalUnsavedChanges) {
@@ -328,7 +352,14 @@ export function WorkflowPageV2() {
           // Don't show error toast for auto-save failures to avoid being intrusive
         }
       }, 300),
-    [organizationId, workflowId, updateWorkflowMutation, queryClient, hasNonPositionalUnsavedChanges],
+    [
+      organizationId,
+      workflowId,
+      updateWorkflowMutation,
+      queryClient,
+      hasNonPositionalUnsavedChanges,
+      isAutoSaveEnabled,
+    ],
   );
 
   const handleNodeWebsocketEvent = useCallback(
@@ -736,10 +767,22 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      // Save to server immediately
-      await handleSaveWorkflow(updatedWorkflow);
+      if (isAutoSaveEnabled) {
+        await handleSaveWorkflow(updatedWorkflow);
+      } else {
+        markUnsavedChange("structural");
+      }
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      isAutoSaveEnabled,
+      markUnsavedChange,
+    ],
   );
 
   const generateNodeId = (blockName: string, nodeName: string) => {
@@ -822,13 +865,25 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      // Save to server immediately
-      await handleSaveWorkflow(updatedWorkflow);
+      if (isAutoSaveEnabled) {
+        await handleSaveWorkflow(updatedWorkflow);
+      } else {
+        markUnsavedChange("structural");
+      }
 
       // Return the new node ID
       return newNodeId;
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      isAutoSaveEnabled,
+      markUnsavedChange,
+    ],
   );
 
   const handlePlaceholderAdd = useCallback(
@@ -873,11 +928,25 @@ export function WorkflowPageV2() {
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      await handleSaveWorkflow(updatedWorkflow);
+
+      if (isAutoSaveEnabled) {
+        await handleSaveWorkflow(updatedWorkflow);
+      } else {
+        markUnsavedChange("structural");
+      }
 
       return newNodeId;
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      isAutoSaveEnabled,
+      markUnsavedChange,
+    ],
   );
 
   const handlePlaceholderConfigure = useCallback(
@@ -965,9 +1034,23 @@ export function WorkflowPageV2() {
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      await handleSaveWorkflow(updatedWorkflow);
+
+      if (isAutoSaveEnabled) {
+        await handleSaveWorkflow(updatedWorkflow);
+      } else {
+        markUnsavedChange("structural");
+      }
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, handleSaveWorkflow],
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      isAutoSaveEnabled,
+      markUnsavedChange,
+    ],
   );
 
   const handleEdgeCreate = useCallback(
@@ -1109,13 +1192,25 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      // Track position update for auto-save
-      pendingPositionUpdatesRef.current.set(nodeId, roundedPosition);
+      if (isAutoSaveEnabled) {
+        pendingPositionUpdatesRef.current.set(nodeId, roundedPosition);
 
-      // Trigger auto-save with debounce (no unsaved changes notification)
-      debouncedAutoSave();
+        debouncedAutoSave();
+      } else {
+        saveWorkflowSnapshot(workflow);
+        markUnsavedChange("position");
+      }
     },
-    [workflow, organizationId, workflowId, queryClient, debouncedAutoSave],
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      queryClient,
+      debouncedAutoSave,
+      isAutoSaveEnabled,
+      saveWorkflowSnapshot,
+      markUnsavedChange,
+    ],
   );
 
   const handleNodeCollapseChange = useCallback(
@@ -1470,6 +1565,8 @@ export function WorkflowPageV2() {
       saveButtonHidden={!hasUnsavedChanges}
       onUndo={handleRevert}
       canUndo={initialWorkflowSnapshot !== null}
+      isAutoSaveEnabled={isAutoSaveEnabled}
+      onToggleAutoSave={handleToggleAutoSave}
       runDisabled={hasRunBlockingChanges}
       runDisabledTooltip={hasRunBlockingChanges ? "Save canvas changes before running" : undefined}
       onCancelQueueItem={onCancelQueueItem}
@@ -1829,7 +1926,6 @@ function prepareNode(
       return prepareComponentNode(
         nodes,
         node,
-        blueprints,
         components,
         nodeExecutionsMap,
         nodeQueueItemsMap,
@@ -1843,7 +1939,6 @@ function prepareNode(
 function prepareComponentNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
-  blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
@@ -1886,48 +1981,20 @@ function prepareComponentNode(
   const componentNameParts = node.component?.name?.split(".") || [];
   const componentName = componentNameParts[0];
 
-  switch (componentName) {
-    case "approval":
-    case "noop":
-    case "http":
-    case "semaphore":
-    case "time_gate":
-    case "filter":
-    case "if":
-    case "wait":
-      return prepareComponentBaseNode(
-        nodes,
-        node,
-        components,
-        nodeExecutionsMap,
-        nodeQueueItemsMap,
-        workflowId,
-        queryClient,
-        organizationId || "",
-      );
-    case "merge":
-      return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
+  if (componentName == "merge") {
+    return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
   }
 
-  //
-  // TODO: render other component-type nodes as composites for now
-  // For generic components, we need to get outputChannels from component metadata
-  //
-  const componentMetadata = components.find((c) => c.name === node.component?.name);
-  const compositeNode = prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
-
-  // Override outputChannels with component metadata if available
-  if (componentMetadata?.outputChannels) {
-    return {
-      ...compositeNode,
-      data: {
-        ...compositeNode.data,
-        outputChannels: componentMetadata.outputChannels.map((c) => c.name!),
-      },
-    };
-  }
-
-  return compositeNode;
+  return prepareComponentBaseNode(
+    nodes,
+    node,
+    components,
+    nodeExecutionsMap,
+    nodeQueueItemsMap,
+    workflowId,
+    queryClient,
+    organizationId || "",
+  );
 }
 
 function prepareComponentBaseNode(

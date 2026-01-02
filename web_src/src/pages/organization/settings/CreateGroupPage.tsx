@@ -156,7 +156,7 @@ export function CreateGroupPage() {
                           to={`/${orgId}/settings/create-role`}
                           className="inline-flex items-center gap-1 mt-2 text-yellow-800 dark:text-yellow-200 hover:text-yellow-900 dark:hover:text-yellow-100 font-medium"
                         >
-                          <Icon name="add" size="sm" />
+                          <Icon name="plus" size="sm" />
                           Create Role
                         </Link>
                       </div>
@@ -166,7 +166,7 @@ export function CreateGroupPage() {
                   <Dropdown>
                     <DropdownButton className="flex items-center gap-2 text-sm justify-between">
                       {roles.find((r) => r.metadata?.name === selectedRole)?.spec?.displayName || "Select Role"}
-                      <Icon name="keyboard_arrow_down" />
+                      <Icon name="chevron-down" />
                     </DropdownButton>
                     <DropdownMenu>
                       {roles.map((role) => (

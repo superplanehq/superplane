@@ -50,9 +50,9 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    []byte(`{"ref":"refs/heads/main"}`),
 			Headers: headers,
-			Configuration: OnPushConfiguration{
-				Repository: "test",
-				Refs: []configuration.Predicate{
+			Configuration: map[string]any{
+				"repository": "test",
+				"refs": []configuration.Predicate{
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
 			},
@@ -80,9 +80,9 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Configuration: OnPushConfiguration{
-				Repository: "test",
-				Refs: []configuration.Predicate{
+			Configuration: map[string]any{
+				"repository": "test",
+				"refs": []configuration.Predicate{
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
 			},
@@ -111,9 +111,9 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Configuration: OnPushConfiguration{
-				Repository: "test",
-				Refs: []configuration.Predicate{
+			Configuration: map[string]any{
+				"repository": "test",
+				"refs": []configuration.Predicate{
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
 			},
@@ -142,9 +142,9 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Configuration: OnPushConfiguration{
-				Repository: "test",
-				Refs: []configuration.Predicate{
+			Configuration: map[string]any{
+				"repository": "test",
+				"refs": []configuration.Predicate{
 					{Type: configuration.PredicateTypeNotEquals, Value: "refs/heads/main"},
 				},
 			},
@@ -173,9 +173,9 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Configuration: OnPushConfiguration{
-				Repository: "test",
-				Refs: []configuration.Predicate{
+			Configuration: map[string]any{
+				"repository": "test",
+				"refs": []configuration.Predicate{
 					{Type: configuration.PredicateTypeMatches, Value: "refs/heads/feat/*"},
 				},
 			},
@@ -204,9 +204,9 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
-			Configuration: OnPushConfiguration{
-				Repository: "test",
-				Refs: []configuration.Predicate{
+			Configuration: map[string]any{
+				"repository": "test",
+				"refs": []configuration.Predicate{
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
 			},
@@ -229,7 +229,7 @@ func Test__OnPush__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			AppInstallationContext: appCtx,
 			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          OnPushConfiguration{Repository: ""},
+			Configuration:          map[string]any{"repository": ""},
 		})
 
 		require.ErrorContains(t, err, "repository is required")
@@ -244,7 +244,7 @@ func Test__OnPush__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			AppInstallationContext: appCtx,
 			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          OnPushConfiguration{Repository: "world"},
+			Configuration:          map[string]any{"repository": "world"},
 		})
 
 		require.ErrorContains(t, err, "repository world is not accessible to app installation")
@@ -261,10 +261,10 @@ func Test__OnPush__Setup(t *testing.T) {
 		require.NoError(t, trigger.Setup(core.TriggerContext{
 			AppInstallationContext: appCtx,
 			MetadataContext:        &nodeMetadataCtx,
-			Configuration:          OnPushConfiguration{Repository: "hello"},
+			Configuration:          map[string]any{"repository": "hello"},
 		}))
 
-		require.Equal(t, nodeMetadataCtx.Get(), OnPushMetadata{Repository: &helloRepo})
+		require.Equal(t, nodeMetadataCtx.Get(), NodeMetadata{Repository: &helloRepo})
 		require.Len(t, appCtx.WebhookRequests, 1)
 
 		webhookRequest := appCtx.WebhookRequests[0].(WebhookConfiguration)

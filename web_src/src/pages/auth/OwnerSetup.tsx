@@ -8,14 +8,65 @@ const OwnerSetup: React.FC = () => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const isEmailValid = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const isPasswordValid = (password: string) => {
+    if (password.length < 8) return false;
+    if (!/[0-9]/.test(password)) return false;
+    if (!/[A-Z]/.test(password)) return false;
+    return true;
+  };
+
+  const validateAllFields = () => {
+    const errors: Record<string, string> = {};
+
+    if (!email.trim()) {
+      errors.email = "Email is required.";
+    } else if (!isEmailValid(email.trim())) {
+      errors.email = "Please enter a valid email address.";
+    }
+
+    if (!firstName.trim()) {
+      errors.firstName = "First name is required.";
+    }
+
+    if (!lastName.trim()) {
+      errors.lastName = "Last name is required.";
+    }
+
+    if (!password) {
+      errors.password = "Password is required.";
+    } else if (!isPasswordValid(password)) {
+      errors.password = "Password must be 8+ characters with at least 1 number and 1 capital letter.";
+    }
+
+    if (!confirmPassword) {
+      errors.confirmPassword = "Please confirm your password.";
+    } else if (confirmPassword !== password) {
+      errors.confirmPassword = "Passwords do not match.";
+    }
+
+    setFieldErrors(errors);
+    return errors;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
 
-    if (!email.trim() || !firstName.trim() || !lastName.trim() || !password) {
-      setError("All fields are required.");
+    // Validate all fields synchronously
+    const errors = validateAllFields();
+
+    // Check if there are any errors
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
@@ -84,8 +135,10 @@ const OwnerSetup: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
+                className={fieldErrors.email ? "border-red-500" : ""}
               />
             </InputGroup>
+            {fieldErrors.email && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.email}</p>}
           </div>
 
           <div>
@@ -98,8 +151,12 @@ const OwnerSetup: React.FC = () => {
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="First name"
+                className={fieldErrors.firstName ? "border-red-500" : ""}
               />
             </InputGroup>
+            {fieldErrors.firstName && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.firstName}</p>
+            )}
           </div>
 
           <div>
@@ -112,8 +169,12 @@ const OwnerSetup: React.FC = () => {
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="Last name"
+                className={fieldErrors.lastName ? "border-red-500" : ""}
               />
             </InputGroup>
+            {fieldErrors.lastName && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.lastName}</p>
+            )}
           </div>
 
           <div>
@@ -126,11 +187,34 @@ const OwnerSetup: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
+                className={fieldErrors.password ? "border-red-500" : ""}
               />
             </InputGroup>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              8+ characters, at least 1 number and 1 capital letter
-            </p>
+            {fieldErrors.password ? (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.password}</p>
+            ) : (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                8+ characters, at least 1 number and 1 capital letter
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
+              Confirm Password <span className="text-red-500">*</span>
+            </label>
+            <InputGroup>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm password"
+                className={fieldErrors.confirmPassword ? "border-red-500" : ""}
+              />
+            </InputGroup>
+            {fieldErrors.confirmPassword && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.confirmPassword}</p>
+            )}
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>

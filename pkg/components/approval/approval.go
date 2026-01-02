@@ -299,8 +299,9 @@ func (a *Approval) Configuration() []configuration.Field {
 									Select: &configuration.SelectTypeOptions{
 										Options: []configuration.FieldOption{
 											{Value: "user", Label: "User"},
-											{Value: "role", Label: "Role"},
-											{Value: "group", Label: "Group"},
+											// TODO: Uncomment after RBAC definitive implementation
+											// {Value: "role", Label: "Role"},
+											// {Value: "group", Label: "Group"},
 										},
 									},
 								},

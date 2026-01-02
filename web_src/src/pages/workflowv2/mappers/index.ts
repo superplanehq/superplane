@@ -8,6 +8,7 @@ import {
 import { defaultTriggerRenderer } from "./default";
 import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
+import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
 import { noopMapper } from "./noop";
 import { ifMapper } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
@@ -17,7 +18,11 @@ import {
   triggerRenderers as semaphoreTriggerRenderers,
   eventStateRegistry as semaphoreEventStateRegistry,
 } from "./semaphore/index";
-import { componentMappers as githubComponentMappers, triggerRenderers as githubTriggerRenderers } from "./github/index";
+import {
+  componentMappers as githubComponentMappers,
+  triggerRenderers as githubTriggerRenderers,
+  eventStateRegistry as githubEventStateRegistry,
+} from "./github/index";
 import { timeGateMapper } from "./timegate";
 import { filterMapper } from "./filter";
 import { waitCustomFieldRenderer, waitMapper } from "./wait";
@@ -31,6 +36,7 @@ import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 const triggerRenderers: Record<string, TriggerRenderer> = {
   github: githubTriggerRenderer,
   schedule: scheduleTriggerRenderer,
+  webhook: webhookTriggerRenderer,
 };
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
@@ -56,6 +62,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
   semaphore: semaphoreEventStateRegistry,
+  github: githubEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -71,6 +78,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {
   schedule: scheduleCustomFieldRenderer,
   wait: waitCustomFieldRenderer,
+  webhook: webhookCustomFieldRenderer,
 };
 
 /**

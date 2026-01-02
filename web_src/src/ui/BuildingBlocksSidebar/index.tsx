@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { resolveIcon } from "@/lib/utils";
+import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { ChevronRight, GripVerticalIcon, Plus, Search, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -122,7 +123,14 @@ export function BuildingBlocksSidebar({
     Bundles: 2,
   };
 
-  const sortedCategories = [...(blocks || [])].sort((a, b) => {
+  const filteredCategories = (blocks || []).filter((category) => {
+    if (category.name === "Bundles" && !isCustomComponentsEnabled()) {
+      return false;
+    }
+    return true;
+  });
+
+  const sortedCategories = [...filteredCategories].sort((a, b) => {
     const aOrder = categoryOrder[a.name] ?? Infinity;
     const bOrder = categoryOrder[b.name] ?? Infinity;
 

@@ -8,6 +8,8 @@ import "./App.css";
 // Import pages
 import AuthGuard from "./components/AuthGuard";
 import { AccountProvider } from "./contexts/AccountContext";
+import { isCustomComponentsEnabled } from "./lib/env";
+import EmailLogin from "./pages/auth/EmailLogin";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
@@ -44,7 +46,9 @@ function App() {
             <Routes>
               {/* Organization-scoped protected routes */}
               <Route path=":organizationId" element={withAuthOnly(HomePage)} />
-              <Route path=":organizationId/custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
+              {isCustomComponentsEnabled() && (
+                <Route path=":organizationId/custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
+              )}
               <Route path=":organizationId/workflows/:workflowId" element={withAuthOnly(WorkflowPageV2)} />
               <Route
                 path=":organizationId/workflows/:workflowId/nodes/:nodeId/:executionId"
@@ -52,6 +56,7 @@ function App() {
               />
               <Route path=":organizationId/settings/*" element={withAuthOnly(OrganizationSettings)} />
               {/* Organization selection and creation */}
+              <Route path="login/email" element={<EmailLogin />} />
               <Route path="create" element={<OrganizationCreate />} />
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="" element={<OrganizationSelect />} />

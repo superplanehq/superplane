@@ -22,7 +22,8 @@ import {
   useRemoveInvitation,
   useRemoveOrganizationSubject,
 } from "../../../hooks/useOrganizationData";
-import { Button } from "@/components/ui/button";
+import { Button } from "../../../ui/button";
+import { isRBACEnabled } from "@/lib/env";
 
 interface Member {
   id: string;
@@ -159,9 +160,9 @@ export function Members({ organizationId }: MembersProps) {
 
   const getSortIcon = (columnKey: keyof UnifiedMember) => {
     if (sortConfig.key !== columnKey) {
-      return "unfold_more";
+      return "chevrons-up-down";
     }
-    return sortConfig.direction === "asc" ? "keyboard_arrow_up" : "keyboard_arrow_down";
+    return sortConfig.direction === "asc" ? "chevron-up" : "chevron-down";
   };
 
   const getSortedMembers = () => {
@@ -332,7 +333,7 @@ export function Members({ organizationId }: MembersProps) {
               onClick={handleEmailsSubmit}
               disabled={!emailsInput.trim() || isInviting}
             >
-              <Icon name="add" size="sm" />
+              <Icon name="plus" size="sm" />
               {isInviting ? "Sending..." : "Send Invitations"}
             </Button>
           </div>
@@ -408,15 +409,17 @@ export function Members({ organizationId }: MembersProps) {
                       <Icon name={getSortIcon("email")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
-                  <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                    onClick={() => handleSort("role")}
-                  >
-                    <div className="flex items-center gap-2">
-                      Role
-                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
-                    </div>
-                  </TableHeader>
+                  {isRBACEnabled() && (
+                    <TableHeader
+                      className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      onClick={() => handleSort("role")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Role
+                        <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
+                      </div>
+                    </TableHeader>
+                  )}
                   <TableHeader
                     className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("status")}
@@ -450,47 +453,52 @@ export function Members({ organizationId }: MembersProps) {
                       </div>
                     </TableCell>
                     <TableCell>{member.email}</TableCell>
-                    <TableCell>
-                      {member.type === "member" ? (
-                        <Dropdown>
-                          <DropdownButton className="flex items-center gap-2 text-sm">
-                            {member.role}
-                            <Icon name="keyboard_arrow_down" />
-                          </DropdownButton>
-                          <DropdownMenu>
-                            {organizationRoles.map((role) => (
-                              <DropdownItem
-                                key={role.metadata?.name}
-                                onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
-                                disabled={loadingRoles}
-                              >
-                                <DropdownLabel>{role.spec?.displayName || role.metadata?.name}</DropdownLabel>
-                                {role.spec?.description && (
-                                  <DropdownDescription>{role.spec?.description}</DropdownDescription>
-                                )}
-                              </DropdownItem>
-                            ))}
-                            {loadingRoles && (
-                              <DropdownItem disabled>
-                                <DropdownLabel>Loading roles...</DropdownLabel>
-                              </DropdownItem>
-                            )}
-                          </DropdownMenu>
-                        </Dropdown>
-                      ) : (
-                        <span className="text-sm text-gray-500 dark:text-gray-400">-</span>
-                      )}
-                    </TableCell>
+                    {isRBACEnabled() && (
+                      <TableCell>
+                        {member.type === "member" ? (
+                          <Dropdown>
+                            <DropdownButton className="flex items-center gap-2 text-sm">
+                              {member.role}
+                              <Icon name="chevron-down" />
+                            </DropdownButton>
+                            <DropdownMenu>
+                              {organizationRoles.map((role) => (
+                                <DropdownItem
+                                  key={role.metadata?.name}
+                                  onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
+                                  disabled={loadingRoles}
+                                >
+                                  <DropdownLabel>{role.spec?.displayName || role.metadata?.name}</DropdownLabel>
+                                  {role.spec?.description && (
+                                    <DropdownDescription>{role.spec?.description}</DropdownDescription>
+                                  )}
+                                </DropdownItem>
+                              ))}
+                              {loadingRoles && (
+                                <DropdownItem disabled>
+                                  <DropdownLabel>Loading roles...</DropdownLabel>
+                                </DropdownItem>
+                              )}
+                            </DropdownMenu>
+                          </Dropdown>
+                        ) : (
+                          <span className="text-sm text-gray-500 dark:text-gray-400">-</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>{getStateBadge(member)}</TableCell>
                     <TableCell>
                       <div className="flex justify-end">
                         <Dropdown>
                           <DropdownButton className="flex items-center gap-2 text-sm">
-                            <Icon name="more_vert" size="sm" />
+                            <Icon name="ellipsis-vertical" size="sm" />
                           </DropdownButton>
                           <DropdownMenu>
-                            <DropdownItem onClick={() => handleMemberRemove(member)}>
-                              <Icon name="delete" />
+                            <DropdownItem
+                              className="flex items-center gap-1"
+                              onClick={() => handleMemberRemove(member)}
+                            >
+                              <Icon name="x" size="sm" />
                               {member.type === "member" ? "Remove" : "Cancel invitation"}
                             </DropdownItem>
                           </DropdownMenu>

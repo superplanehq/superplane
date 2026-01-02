@@ -56,16 +56,20 @@ services:
       GOOGLE_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
+      WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Superplane}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@notifications.superplane.com}
       BLOCK_SIGNUP: ${BLOCK_SIGNUP:-no}
+      ENABLE_PASSWORD_LOGIN: "yes"
       OTEL_ENABLED: "yes"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
+      VITE_ENABLE_CUSTOM_COMPONENTS: "true"
+      VITE_RBAC_ENABLED: "true"
 
     ports:
       - 5173:5173
@@ -126,7 +130,6 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
-    container_name: "rabbitmq"
     ports:
       - 5672:5672
       - 15672:15672

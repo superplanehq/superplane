@@ -133,7 +133,7 @@ func (s *Semaphore) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to find project %s: %w", config.Project, err)
 	}
 
-	err = ctx.WebhookContext.Setup(&core.WebhookSetupOptions{
+	_, err = ctx.WebhookContext.Setup(&core.WebhookSetupOptions{
 		IntegrationID: &integrationID,
 		Resource:      resource,
 		Configuration: config,
@@ -158,8 +158,8 @@ func (s *Semaphore) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (s *Semaphore) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (s *Semaphore) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (s *Semaphore) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

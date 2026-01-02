@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -13,19 +12,9 @@ import (
 
 type OnPush struct{}
 
-type OnPushMetadata struct {
-	Repository *Repository `json:"repository"`
-}
-
-type Repository struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
-	URL  string `json:"url"`
-}
-
 type OnPushConfiguration struct {
-	Repository string                    `json:"repository"`
-	Refs       []configuration.Predicate `json:"refs"`
+	Repository string                    `json:"repository" mapstructure:"repository"`
+	Refs       []configuration.Predicate `json:"refs" mapstructure:"refs"`
 }
 
 func (p *OnPush) Name() string {
@@ -77,47 +66,19 @@ func (p *OnPush) Configuration() []configuration.Field {
 }
 
 func (p *OnPush) Setup(ctx core.TriggerContext) error {
-	var metadata OnPushMetadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := ensureRepoInMetadata(
+		ctx.MetadataContext,
+		ctx.AppInstallationContext,
+		ctx.Configuration,
+	)
+
 	if err != nil {
-		return fmt.Errorf("failed to parse metadata: %w", err)
+		return err
 	}
 
-	//
-	// If metadata is set, it means the trigger was already setup
-	//
-	if metadata.Repository != nil {
-		return nil
-	}
-
-	config := OnPushConfiguration{}
-	err = mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
+	var config OnPushConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	if config.Repository == "" {
-		return fmt.Errorf("repository is required")
-	}
-
-	appMetadata := Metadata{}
-	err = mapstructure.Decode(ctx.AppInstallationContext.GetMetadata(), &appMetadata)
-	if err != nil {
-		return fmt.Errorf("error decoding app installation metadata: %v", err)
-	}
-
-	repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r Repository) bool {
-		return r.Name == config.Repository
-	})
-
-	if repoIndex == -1 {
-		return fmt.Errorf("repository %s is not accessible to app installation", config.Repository)
-	}
-
-	metadata.Repository = &appMetadata.Repositories[repoIndex]
-	err = ctx.MetadataContext.Set(metadata)
-	if err != nil {
-		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
 	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
@@ -130,8 +91,8 @@ func (p *OnPush) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (p *OnPush) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (p *OnPush) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

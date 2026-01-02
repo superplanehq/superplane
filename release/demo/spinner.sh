@@ -38,7 +38,9 @@ stop_spinner() {
   kill $SPINNER_PID >/dev/null 2>&1
   # Use printf to clear the line completely (ANSI escape code \033[K)
   printf "\r\033[K"
-  echo "⠸ $SPINNER_MESSAGE"
+  # If a custom message is provided, use it; otherwise use the original spinner message
+  local message="${1:-$SPINNER_MESSAGE}"
+  echo "⠸ $message"
   trap - EXIT
 }
 

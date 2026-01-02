@@ -55,6 +55,7 @@ func (s *TestContext) Start() {
 	os.Setenv("WEBHOOKS_BASE_URL", "https://superplane.sxmoon.com")
 	os.Setenv("APP_ENV", "development")
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
+	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
 
 	s.startVite()
 	s.startAppServer()

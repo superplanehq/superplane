@@ -35,6 +35,7 @@ type Field struct {
 	ValidationRules      []*ValidationRule      `protobuf:"bytes,10,rep,name=validation_rules,json=validationRules,proto3" json:"validation_rules,omitempty"`
 	Placeholder          *string                `protobuf:"bytes,11,opt,name=placeholder,proto3,oneof" json:"placeholder,omitempty"`
 	Sensitive            *bool                  `protobuf:"varint,12,opt,name=sensitive,proto3,oneof" json:"sensitive,omitempty"`
+	Togglable            *bool                  `protobuf:"varint,13,opt,name=togglable,proto3,oneof" json:"togglable,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -149,6 +150,13 @@ func (x *Field) GetPlaceholder() string {
 func (x *Field) GetSensitive() bool {
 	if x != nil && x.Sensitive != nil {
 		return *x.Sensitive
+	}
+	return false
+}
+
+func (x *Field) GetTogglable() bool {
+	if x != nil && x.Togglable != nil {
+		return *x.Togglable
 	}
 	return false
 }
@@ -1049,7 +1057,7 @@ var File_configuration_proto protoreflect.FileDescriptor
 
 const file_configuration_proto_rawDesc = "" +
 	"\n" +
-	"\x13configuration.proto\x12\x18Superplane.Configuration\"\x9e\x05\n" +
+	"\x13configuration.proto\x12\x18Superplane.Configuration\"\xcf\x05\n" +
 	"\x05Field\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12 \n" +
@@ -1063,12 +1071,15 @@ const file_configuration_proto_rawDesc = "" +
 	"\x10validation_rules\x18\n" +
 	" \x03(\v2(.Superplane.Configuration.ValidationRuleR\x0fvalidationRules\x12%\n" +
 	"\vplaceholder\x18\v \x01(\tH\x02R\vplaceholder\x88\x01\x01\x12!\n" +
-	"\tsensitive\x18\f \x01(\bH\x03R\tsensitive\x88\x01\x01B\x10\n" +
+	"\tsensitive\x18\f \x01(\bH\x03R\tsensitive\x88\x01\x01\x12!\n" +
+	"\ttogglable\x18\r \x01(\bH\x04R\ttogglable\x88\x01\x01B\x10\n" +
 	"\x0e_default_valueB\x0f\n" +
 	"\r_type_optionsB\x0e\n" +
 	"\f_placeholderB\f\n" +
 	"\n" +
-	"_sensitive\"\x82\b\n" +
+	"_sensitiveB\f\n" +
+	"\n" +
+	"_togglable\"\x82\b\n" +
 	"\vTypeOptions\x12H\n" +
 	"\x06number\x18\x01 \x01(\v2+.Superplane.Configuration.NumberTypeOptionsH\x00R\x06number\x88\x01\x01\x12H\n" +
 	"\x06select\x18\x02 \x01(\v2+.Superplane.Configuration.SelectTypeOptionsH\x01R\x06select\x88\x01\x01\x12X\n" +
