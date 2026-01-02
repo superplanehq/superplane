@@ -3,6 +3,8 @@
 Thank you for your interest in contributing to SuperPlane! We welcome
 contributions from the community.
 
+## Ways to Get Involved
+
 Before starting your contribution, especially for core features, we encourage
 you to reach out to us on [Discord](https://discord.gg/KC78eCNsnw). This allows
 us to ensure that your proposed feature aligns with the project's roadmap and
@@ -57,7 +59,8 @@ When the process completes, you can access the SuperPlane at [http://localhost:8
 
 ## Additional Development Resources
 
-- **[Pull Requests Guide](docs/contributing/pull-requests.md)** - Complete guide on creating pull requests, including title format rules and best practices
-- **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
 - **[Product Docs](https://docs.superplane.com)** - Complete product documentation and user guides
 - **[Discord](https://discord.gg/KC78eCNsnw)** - Join our Discord community for discussions, questions, and collaboration
+- **[Pull Requests](docs/contributing/pull-requests.md)** - How to create pull-requests
+- **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
+- **[E2E Testing](docs/development/e2e-tests.md)** - Writing, running, and debugging end-to-end tests
