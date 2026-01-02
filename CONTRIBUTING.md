@@ -13,7 +13,7 @@ and we value input from the community.
 
 There are many ways to contribute to SuperPlane:
 
-- **Report bugs** - Help us identify and fix issues
+- **Report bugs** - Help us identify and fix issues (see [Issue Tracking](docs/contributing/issue-tracking.md))
 - **Suggest features** - Share your ideas for new functionality
 - **Write code** - Fix bugs, implement features, or improve existing code
 - **Improve documentation** - Help make our docs clearer and more comprehensive
@@ -61,6 +61,7 @@ When the process completes, you can access the SuperPlane at [http://localhost:8
 
 - **[Product Docs](https://docs.superplane.com)** - Complete product documentation and user guides
 - **[Discord](https://discord.gg/KC78eCNsnw)** - Join our Discord community for discussions, questions, and collaboration
+- **[Issue Tracking](docs/contributing/issue-tracking.md)** - How to report bugs and understand issue types
 - **[Pull Requests](docs/contributing/pull-requests.md)** - How to create pull-requests
 - **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
 - **[E2E Testing](docs/contributing/e2e-tests.md)** - Writing, running, and debugging end-to-end tests
