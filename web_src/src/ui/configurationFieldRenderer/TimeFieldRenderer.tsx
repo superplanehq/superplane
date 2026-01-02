@@ -42,6 +42,7 @@ export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({
       className={hasError ? "border-red-500 border-2" : ""}
       min={getTimeConstraints.min}
       max={getTimeConstraints.max}
+      data-testid={`time-field-${field.name}`}
     />
   );
 };

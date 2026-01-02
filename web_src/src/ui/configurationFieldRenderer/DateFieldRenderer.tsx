@@ -33,6 +33,7 @@ export const DateFieldRenderer: React.FC<FieldRendererProps> = ({
       className={hasError ? "border-red-500 border-2" : ""}
       min={getDateConstraints.min}
       max={getDateConstraints.max}
+      data-testid={`date-field-${field.name}`}
     />
   );
 };

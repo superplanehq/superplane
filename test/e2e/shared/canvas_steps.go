@@ -125,7 +125,7 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Click(modeSelector)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Interval")`))
 
-	valueInput := q.Locator(`label:has-text("Wait for...")~div input`)
+	valueInput := q.TestID("string-field-waitFor")
 	s.session.FillIn(valueInput, strconv.Itoa(duration))
 
 	unitTrigger := q.TestID("field-unit-select")
@@ -162,8 +162,8 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Click(q.TestID("field-mode-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Exclude Range")`))
 
-	s.session.FillIn(q.Locator(`label:has-text("Start Time")~div input[type="time"]`), "00:00")
-	s.session.FillIn(q.Locator(`label:has-text("End Time")~div input[type="time"]`), "23:59")
+	s.session.FillIn(q.TestID("time-field-startTime"), "00:00")
+	s.session.FillIn(q.TestID("time-field-endTime"), "23:59")
 
 	s.session.Click(q.TestID("field-timezone-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))

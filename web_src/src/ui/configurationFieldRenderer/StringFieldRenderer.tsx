@@ -10,6 +10,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder={field.placeholder || ""}
       className={hasError ? "border-red-500 border-2" : ""}
+      data-testid={`string-field-${field.name}`}
     />
   );
 };

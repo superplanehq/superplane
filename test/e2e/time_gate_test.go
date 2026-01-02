@@ -103,8 +103,8 @@ func (s *TimeGateSteps) setDaysTo(days []string) {
 }
 
 func (s *TimeGateSteps) setTimeWindow(start, end string) {
-	startInput := q.Locator(`label:has-text("Start Time")~div input[type="time"]`)
-	endInput := q.Locator(`label:has-text("End Time")~div input[type="time"]`)
+	startInput := q.TestID("time-field-startTime")
+	endInput := q.TestID("time-field-endTime")
 
 	s.session.FillIn(startInput, start)
 	s.session.FillIn(endInput, end)
