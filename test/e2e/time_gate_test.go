@@ -74,13 +74,13 @@ func (s *TimeGateSteps) addTimeGate() {
 }
 
 func (s *TimeGateSteps) setModeToIncludeRange() {
-	modeTrigger := q.Locator(`label:has-text("Mode") + div button`)
+	modeTrigger := q.TestID("field-mode-select")
 	s.session.Click(modeTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Include Range")`))
 }
 
 func (s *TimeGateSteps) setModeToExcludeRange() {
-	modeTrigger := q.Locator(`label:has-text("Mode") + div button`)
+	modeTrigger := q.TestID("field-mode-select")
 	s.session.Click(modeTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Exclude Range")`))
 }
@@ -103,15 +103,15 @@ func (s *TimeGateSteps) setDaysTo(days []string) {
 }
 
 func (s *TimeGateSteps) setTimeWindow(start, end string) {
-	startInput := q.Locator(`label:has-text("Start Time") + div input[type="time"]`)
-	endInput := q.Locator(`label:has-text("End Time") + div input[type="time"]`)
+	startInput := q.Locator(`label:has-text("Start Time")~div input[type="time"]`)
+	endInput := q.Locator(`label:has-text("End Time")~div input[type="time"]`)
 
 	s.session.FillIn(startInput, start)
 	s.session.FillIn(endInput, end)
 }
 
 func (s *TimeGateSteps) setTimezone(timezone string) {
-	timezoneTrigger := q.Locator(`label:has-text("Timezone") + div button`)
+	timezoneTrigger := q.TestID("field-timezone-select")
 	s.session.Click(timezoneTrigger)
 
 	// timezone options in the select use labels like "GMT+0 (London, Dublin, UTC)" or "GMT-5 (New York, Toronto)"

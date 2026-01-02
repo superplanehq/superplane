@@ -16,12 +16,17 @@ export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
     }
   }, [value, field.defaultValue, onChange]);
 
+  const testId = field.name ? `field-${field.name}-select` : undefined;
+
   return (
     <Select
       value={(value as string) ?? (field.defaultValue as string) ?? ""}
       onValueChange={(val) => onChange(val || undefined)}
     >
-      <SelectTrigger className={`w-full ${hasError ? "border-red-500 border-2" : ""}`}>
+      <SelectTrigger
+        className={`w-full ${hasError ? "border-red-500 border-2" : ""}`}
+        data-testid={testId}
+      >
         <SelectValue placeholder={`Select ${field.label || field.name}`} />
       </SelectTrigger>
       <SelectContent className="max-h-60">
