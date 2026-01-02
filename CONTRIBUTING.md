@@ -43,6 +43,11 @@ To begin working with SuperPlane, you'll need to fork and clone the repository:
 1. **Fork** the repository on GitHub to have your own copy.
 2. **Clone** your fork to your local machine:
 
+```bash
+git clone https://github.com/YOUR_USERNAME/superplane.git
+cd superplane
+```
+
 ### Setting Up the Development Environment
 
 Once inside the cloned repository, set up your local environment and start
@@ -72,6 +77,7 @@ When the process completes, you can access the SuperPlane at [http://localhost:8
 - **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
 - **[E2E Testing](docs/contributing/e2e-tests.md)** - Writing, running, and debugging end-to-end tests
 - **[Using AI Agents](docs/contributing/ai-agents.md)** - Guide for using AI agents to help with development tasks
+- **[Quality Standards](docs/contributing/quality.md)** - High-level principles for building maintainable, user-focused products
 
 ### Adding new integrations to SuperPlane
 
