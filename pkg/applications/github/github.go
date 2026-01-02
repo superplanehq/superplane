@@ -103,6 +103,7 @@ func (g *GitHub) Triggers() []core.Trigger {
 		&OnIssue{},
 		&OnRelease{},
 		&OnTagCreated{},
+		&OnBranchCreated{},
 	}
 }
 
