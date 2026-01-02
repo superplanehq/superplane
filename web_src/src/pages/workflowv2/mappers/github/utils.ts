@@ -22,7 +22,7 @@ export function formatPredicate(predicate: Predicate): string {
 
 export function createGithubMetadataItems(
   repositoryName: string | undefined,
-  predicates: Predicate[] | undefined
+  predicates: Predicate[] | undefined,
 ): MetadataItem[] {
   const metadataItems: MetadataItem[] = [];
 

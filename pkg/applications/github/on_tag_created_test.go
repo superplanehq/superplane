@@ -260,7 +260,7 @@ func Test__OnTagCreated__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			AppInstallationContext: appCtx,
 			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          OnTagCreatedConfiguration{Repository: ""},
+			Configuration:          map[string]any{"repository": ""},
 		})
 
 		require.ErrorContains(t, err, "repository is required")
@@ -275,7 +275,7 @@ func Test__OnTagCreated__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			AppInstallationContext: appCtx,
 			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          OnTagCreatedConfiguration{Repository: "world"},
+			Configuration:          map[string]any{"repository": "world"},
 		})
 
 		require.ErrorContains(t, err, "repository world is not accessible to app installation")
@@ -292,10 +292,10 @@ func Test__OnTagCreated__Setup(t *testing.T) {
 		require.NoError(t, trigger.Setup(core.TriggerContext{
 			AppInstallationContext: appCtx,
 			MetadataContext:        &nodeMetadataCtx,
-			Configuration:          OnTagCreatedConfiguration{Repository: "hello"},
+			Configuration:          map[string]any{"repository": "hello"},
 		}))
 
-		require.Equal(t, nodeMetadataCtx.Get(), OnTagCreatedMetadata{Repository: &helloRepo})
+		require.Equal(t, nodeMetadataCtx.Get(), NodeMetadata{Repository: &helloRepo})
 		require.Len(t, appCtx.WebhookRequests, 1)
 
 		webhookRequest := appCtx.WebhookRequests[0].(WebhookConfiguration)
