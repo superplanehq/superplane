@@ -342,7 +342,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-300 dark:border-gray-800 max-w-md w-full mx-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">Uninstall Application</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">

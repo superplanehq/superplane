@@ -87,7 +87,7 @@ export function General({ organization }: GeneralProps) {
         </div>
       </Fieldset>
 
-      <Fieldset className="bg-red-50 border border-red-300 rounded-lg p-6 space-y-4">
+      <Fieldset className="bg-white border border-gray-300 rounded-lg p-6 space-y-4">
         <div>
           <Heading level={3} className="!text-base text-red-500 dark:text-red-400">
             Delete Organization
