@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE workflows ADD COLUMN nodes JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+COMMIT;

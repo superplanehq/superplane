@@ -430,8 +430,7 @@ CREATE TABLE public.workflow_nodes (
     parent_node_id character varying(128),
     deleted_at timestamp with time zone,
     app_installation_id uuid,
-    state_reason character varying(255) DEFAULT NULL::character varying,
-    annotation_text character varying(5000)
+    state_reason character varying(255) DEFAULT NULL::character varying
 );
 
 
@@ -448,7 +447,8 @@ CREATE TABLE public.workflows (
     updated_at timestamp without time zone NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_by uuid,
-    deleted_at timestamp without time zone
+    deleted_at timestamp without time zone,
+    nodes jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
