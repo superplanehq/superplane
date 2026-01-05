@@ -53,12 +53,7 @@ export function BuildingBlocksSidebar({
   if (!isOpen) {
     return (
       <div className="absolute top-4 right-4 z-10 flex gap-2">
-        <Button
-          variant="outline"
-          onClick={onAddNote}
-          aria-label="Add Note"
-          data-testid="add-note-button"
-        >
+        <Button variant="outline" onClick={onAddNote} aria-label="Add Note" data-testid="add-note-button">
           Add Note
         </Button>
         <Button

@@ -861,7 +861,7 @@ function Sidebar({
     if (!state.componentSidebar.selectedNodeId || !workflowNodes) {
       return false;
     }
-    const selectedNode = workflowNodes.find(node => node.id === state.componentSidebar.selectedNodeId);
+    const selectedNode = workflowNodes.find((node) => node.id === state.componentSidebar.selectedNodeId);
     return selectedNode?.type === "TYPE_ANNOTATION";
   }, [state.componentSidebar.selectedNodeId, workflowNodes]);
 

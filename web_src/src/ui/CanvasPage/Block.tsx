@@ -404,7 +404,9 @@ function BlockContent({
     case "merge":
       return <MergeComponent {...(data.merge as MergeComponentProps)} selected={selected} {...actionProps} />;
     case "annotation":
-      return <AnnotationComponent {...(data.annotation as AnnotationComponentProps)} selected={selected} {...actionProps} />;
+      return (
+        <AnnotationComponent {...(data.annotation as AnnotationComponentProps)} selected={selected} {...actionProps} />
+      );
     default:
       throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }

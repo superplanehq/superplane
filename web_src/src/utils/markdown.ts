@@ -29,10 +29,10 @@ export function parseBasicMarkdown(text: string): string {
   html = html.replace(/\n/g, '<br class="leading-none">');
 
   // Remove <br> markers after headings
-  html = html.replace(/###HEADING###<br class="leading-none">/g, '###HEADING###');
+  html = html.replace(/###HEADING###<br class="leading-none">/g, "###HEADING###");
 
   // Remove heading markers
-  html = html.replace(/###HEADING###/g, '');
+  html = html.replace(/###HEADING###/g, "");
 
   return html;
 }
