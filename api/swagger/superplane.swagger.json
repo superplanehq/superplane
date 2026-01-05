@@ -3081,6 +3081,9 @@
         },
         "errorMessage": {
           "type": "string"
+        },
+        "annotationText": {
+          "type": "string"
         }
       }
     },
@@ -3089,7 +3092,8 @@
       "enum": [
         "TYPE_COMPONENT",
         "TYPE_BLUEPRINT",
-        "TYPE_TRIGGER"
+        "TYPE_TRIGGER",
+        "TYPE_ANNOTATION"
       ],
       "default": "TYPE_COMPONENT"
     },

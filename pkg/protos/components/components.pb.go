@@ -28,9 +28,10 @@ const (
 type Node_Type int32
 
 const (
-	Node_TYPE_COMPONENT Node_Type = 0
-	Node_TYPE_BLUEPRINT Node_Type = 1
-	Node_TYPE_TRIGGER   Node_Type = 2
+	Node_TYPE_COMPONENT  Node_Type = 0
+	Node_TYPE_BLUEPRINT  Node_Type = 1
+	Node_TYPE_TRIGGER    Node_Type = 2
+	Node_TYPE_ANNOTATION Node_Type = 3
 )
 
 // Enum value maps for Node_Type.
@@ -39,11 +40,13 @@ var (
 		0: "TYPE_COMPONENT",
 		1: "TYPE_BLUEPRINT",
 		2: "TYPE_TRIGGER",
+		3: "TYPE_ANNOTATION",
 	}
 	Node_Type_value = map[string]int32{
-		"TYPE_COMPONENT": 0,
-		"TYPE_BLUEPRINT": 1,
-		"TYPE_TRIGGER":   2,
+		"TYPE_COMPONENT":  0,
+		"TYPE_BLUEPRINT":  1,
+		"TYPE_TRIGGER":    2,
+		"TYPE_ANNOTATION": 3,
 	}
 )
 
@@ -556,6 +559,7 @@ type Node struct {
 	IsCollapsed     bool                   `protobuf:"varint,10,opt,name=is_collapsed,json=isCollapsed,proto3" json:"is_collapsed,omitempty"`
 	AppInstallation *AppInstallationRef    `protobuf:"bytes,11,opt,name=app_installation,json=appInstallation,proto3" json:"app_installation,omitempty"`
 	ErrorMessage    string                 `protobuf:"bytes,12,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	AnnotationText  string                 `protobuf:"bytes,13,opt,name=annotation_text,json=annotationText,proto3" json:"annotation_text,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -670,6 +674,13 @@ func (x *Node) GetAppInstallation() *AppInstallationRef {
 func (x *Node) GetErrorMessage() string {
 	if x != nil {
 		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *Node) GetAnnotationText() string {
+	if x != nil {
+		return x.AnnotationText
 	}
 	return ""
 }
@@ -1005,7 +1016,7 @@ const file_components_proto_rawDesc = "" +
 	"parameters\x18\x03 \x03(\v2\x1f.Superplane.Configuration.FieldR\n" +
 	"parameters\"`\n" +
 	"\x1cListComponentActionsResponse\x12@\n" +
-	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xa9\x06\n" +
+	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xe7\x06\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x124\n" +
@@ -1019,18 +1030,20 @@ const file_components_proto_rawDesc = "" +
 	"\fis_collapsed\x18\n" +
 	" \x01(\bR\visCollapsed\x12T\n" +
 	"\x10app_installation\x18\v \x01(\v2).Superplane.Components.AppInstallationRefR\x0fappInstallation\x12#\n" +
-	"\rerror_message\x18\f \x01(\tR\ferrorMessage\x1a\"\n" +
+	"\rerror_message\x18\f \x01(\tR\ferrorMessage\x12'\n" +
+	"\x0fannotation_text\x18\r \x01(\tR\x0eannotationText\x1a\"\n" +
 	"\fComponentRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x1a \n" +
 	"\n" +
 	"TriggerRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x1a\x1e\n" +
 	"\fBlueprintRef\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"@\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"U\n" +
 	"\x04Type\x12\x12\n" +
 	"\x0eTYPE_COMPONENT\x10\x00\x12\x12\n" +
 	"\x0eTYPE_BLUEPRINT\x10\x01\x12\x10\n" +
-	"\fTYPE_TRIGGER\x10\x02\"&\n" +
+	"\fTYPE_TRIGGER\x10\x02\x12\x13\n" +
+	"\x0fTYPE_ANNOTATION\x10\x03\"&\n" +
 	"\bPosition\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x05R\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\x05R\x01y\"Z\n" +

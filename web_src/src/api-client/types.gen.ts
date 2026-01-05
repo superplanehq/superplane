@@ -129,9 +129,10 @@ export type ComponentsNode = {
   isCollapsed?: boolean;
   appInstallation?: ComponentsAppInstallationRef;
   errorMessage?: string;
+  annotationText?: string;
 };
 
-export type ComponentsNodeType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER";
+export type ComponentsNodeType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER" | "TYPE_ANNOTATION";
 
 export type ComponentsPosition = {
   x?: number;

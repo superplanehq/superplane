@@ -109,6 +109,7 @@ message Node {
     TYPE_COMPONENT = 0;
     TYPE_BLUEPRINT = 1;
     TYPE_TRIGGER = 2;
+    TYPE_ANNOTATION = 3;
   }
 
   message ComponentRef {
@@ -135,6 +136,7 @@ message Node {
   bool is_collapsed = 10;
   AppInstallationRef app_installation = 11;
   string error_message = 12;
+  string annotation_text = 13;
 }
 
 message Position {

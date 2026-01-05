@@ -32,6 +32,7 @@ type ComponentsNode struct {
 	IsCollapsed     *bool                         `json:"isCollapsed,omitempty"`
 	AppInstallation *ComponentsAppInstallationRef `json:"appInstallation,omitempty"`
 	ErrorMessage    *string                       `json:"errorMessage,omitempty"`
+	AnnotationText  *string                       `json:"annotationText,omitempty"`
 }
 
 // NewComponentsNode instantiates a new ComponentsNode object
@@ -439,6 +440,38 @@ func (o *ComponentsNode) SetErrorMessage(v string) {
 	o.ErrorMessage = &v
 }
 
+// GetAnnotationText returns the AnnotationText field value if set, zero value otherwise.
+func (o *ComponentsNode) GetAnnotationText() string {
+	if o == nil || IsNil(o.AnnotationText) {
+		var ret string
+		return ret
+	}
+	return *o.AnnotationText
+}
+
+// GetAnnotationTextOk returns a tuple with the AnnotationText field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsNode) GetAnnotationTextOk() (*string, bool) {
+	if o == nil || IsNil(o.AnnotationText) {
+		return nil, false
+	}
+	return o.AnnotationText, true
+}
+
+// HasAnnotationText returns a boolean if a field has been set.
+func (o *ComponentsNode) HasAnnotationText() bool {
+	if o != nil && !IsNil(o.AnnotationText) {
+		return true
+	}
+
+	return false
+}
+
+// SetAnnotationText gets a reference to the given string and assigns it to the AnnotationText field.
+func (o *ComponentsNode) SetAnnotationText(v string) {
+	o.AnnotationText = &v
+}
+
 func (o ComponentsNode) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -484,6 +517,9 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.ErrorMessage) {
 		toSerialize["errorMessage"] = o.ErrorMessage
+	}
+	if !IsNil(o.AnnotationText) {
+		toSerialize["annotationText"] = o.AnnotationText
 	}
 	return toSerialize, nil
 }
