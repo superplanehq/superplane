@@ -129,6 +129,7 @@ type Node struct {
 	IsCollapsed       bool           `json:"isCollapsed"`
 	AppInstallationID *string        `json:"appInstallationId,omitempty"`
 	ErrorMessage      *string        `json:"errorMessage,omitempty"`
+	AnnotationText    *string        `json:"annotationText,omitempty"`
 }
 
 type Position struct {

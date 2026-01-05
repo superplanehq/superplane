@@ -15,10 +15,12 @@ const (
 	WorkflowNodeStateReady      = "ready"
 	WorkflowNodeStateProcessing = "processing"
 	WorkflowNodeStateError      = "error"
+	WorkflowNodeStateStatic     = "static"
 
-	NodeTypeTrigger   = "trigger"
-	NodeTypeComponent = "component"
-	NodeTypeBlueprint = "blueprint"
+	NodeTypeTrigger    = "trigger"
+	NodeTypeComponent  = "component"
+	NodeTypeBlueprint  = "blueprint"
+	NodeTypeAnnotation = "annotation"
 )
 
 type WorkflowNode struct {
@@ -34,6 +36,7 @@ type WorkflowNode struct {
 	Configuration     datatypes.JSONType[map[string]any]
 	Metadata          datatypes.JSONType[map[string]any]
 	IsCollapsed       bool
+	AnnotationText    *string
 	WebhookID         *uuid.UUID
 	AppInstallationID *uuid.UUID
 	CreatedAt         *time.Time

@@ -717,6 +717,28 @@ export function WorkflowPageV2() {
         if (triggerApp) {
           appName = triggerApp.name;
         }
+      } else if (node.type === "TYPE_ANNOTATION") {
+        configurationFields = [
+          {
+            name: "annotationText",
+            label: "Content",
+            type: "text",
+            description:
+              "Markdown content for this annotation. Supports **bold**, *italic*, links, and other markdown formatting.",
+            required: false,
+          },
+        ];
+        displayLabel = "Note";
+
+        return {
+          nodeId: node.id!,
+          nodeName: node.name!,
+          displayLabel,
+          configuration: { annotationText: node.annotationText || "" },
+          configurationFields,
+          appName,
+          appInstallationRef: node.appInstallation,
+        };
       }
 
       return {
@@ -745,16 +767,26 @@ export function WorkflowPageV2() {
       saveWorkflowSnapshot(workflow);
 
       // Update the node's configuration, name, and app installation ref in local cache only
-      const updatedNodes = workflow?.spec?.nodes?.map((node) =>
-        node.id === nodeId
-          ? {
+      const updatedNodes = workflow?.spec?.nodes?.map((node) => {
+        if (node.id === nodeId) {
+          // Handle annotation nodes specially - store annotationText in the annotationText field, not configuration
+          if (node.type === "TYPE_ANNOTATION") {
+            return {
               ...node,
-              configuration: updatedConfiguration,
               name: updatedNodeName,
-              appInstallation: appInstallationRef,
-            }
-          : node,
-      );
+              annotationText: updatedConfiguration.annotationText || "",
+            };
+          }
+
+          return {
+            ...node,
+            configuration: updatedConfiguration,
+            name: updatedNodeName,
+            appInstallation: appInstallationRef,
+          };
+        }
+        return node;
+      });
 
       const updatedWorkflow = {
         ...workflow,
@@ -816,7 +848,9 @@ export function WorkflowPageV2() {
             ? "TYPE_TRIGGER"
             : buildingBlock.type === "blueprint"
               ? "TYPE_BLUEPRINT"
-              : "TYPE_COMPONENT",
+              : buildingBlock.name === "annotation"
+                ? "TYPE_ANNOTATION"
+                : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
         appInstallation: appInstallationRef,
         position: position
@@ -831,7 +865,10 @@ export function WorkflowPageV2() {
       };
 
       // Add type-specific reference
-      if (buildingBlock.type === "component") {
+      if (buildingBlock.name === "annotation") {
+        // Annotation nodes don't need component/trigger/blueprint references
+        newNode.annotationText = "";
+      } else if (buildingBlock.type === "component") {
         newNode.component = { name: buildingBlock.name };
       } else if (buildingBlock.type === "trigger") {
         newNode.trigger = { name: buildingBlock.name };
@@ -1922,6 +1959,8 @@ function prepareNode(
       }
 
       return compositeNode;
+    case "TYPE_ANNOTATION":
+      return prepareAnnotationNode(node);
     default:
       return prepareComponentNode(
         nodes,
@@ -1934,6 +1973,24 @@ function prepareNode(
         organizationId,
       );
   }
+}
+
+function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
+  return {
+    id: node.id!,
+    position: { x: node.position?.x!, y: node.position?.y! },
+    data: {
+      type: "annotation",
+      label: node.name || "Annotation",
+      state: "pending" as const,
+      outputChannels: [], // Annotation nodes don't have output channels
+      annotation: {
+        title: node.name || "Annotation",
+        annotationText: node.annotationText || "",
+        collapsed: node.isCollapsed || false,
+      },
+    },
+  };
 }
 
 function prepareComponentNode(

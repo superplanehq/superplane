@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -391,6 +392,308 @@ func TestUpdateWorkflow_NonErroredNodesKeepState(t *testing.T) {
 	assert.Equal(t, models.WorkflowNodeStateReady, erroredNode.State, "errored node should be reset to ready")
 	assert.Nil(t, erroredNode.StateReason, "errored node error reason should be cleared")
 	assert.Equal(t, "Errored Node Updated", erroredNode.Name, "errored node name should be updated")
+}
+
+func TestUpdateWorkflow_AnnotationNodesHandled(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{},
+		[]models.Edge{},
+	)
+
+	annotationText := "This is an annotation describing the workflow"
+	updatedAnnotationText := "This is an updated annotation"
+
+	initialWorkflowPB := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:             "annotation-1",
+					Name:           "Workflow Note",
+					Type:           componentpb.Node_TYPE_ANNOTATION,
+					AnnotationText: annotationText,
+				},
+				{
+					Id:   "component-1",
+					Name: "Regular Component",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	_, err := UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		initialWorkflowPB,
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err, "UpdateWorkflow should succeed with annotation nodes")
+
+	var annotationNode models.WorkflowNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "annotation-1").First(&annotationNode).Error
+	require.NoError(t, err, "should be able to find annotation node")
+	assert.Equal(t, models.NodeTypeAnnotation, annotationNode.Type, "annotation node should have correct type")
+	assert.Equal(t, models.WorkflowNodeStateStatic, annotationNode.State, "annotation node should be static")
+	assert.Nil(t, annotationNode.StateReason, "annotation node should not have error reason")
+	assert.NotNil(t, annotationNode.AnnotationText, "annotation node should have annotation text")
+	assert.Equal(t, annotationText, *annotationNode.AnnotationText, "annotation text should match")
+
+	var componentNode models.WorkflowNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "component-1").First(&componentNode).Error
+	require.NoError(t, err, "should be able to find component node")
+	assert.Equal(t, models.NodeTypeComponent, componentNode.Type, "component node should have correct type")
+
+	updatedWorkflowPB := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:             "annotation-1",
+					Name:           "Workflow Note Updated",
+					Type:           componentpb.Node_TYPE_ANNOTATION,
+					AnnotationText: updatedAnnotationText,
+				},
+				{
+					Id:   "component-1",
+					Name: "Regular Component",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	_, err = UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		updatedWorkflowPB,
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err, "UpdateWorkflow should succeed when updating annotation nodes")
+
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "annotation-1").First(&annotationNode).Error
+	require.NoError(t, err, "should be able to find updated annotation node")
+	assert.Equal(t, "Workflow Note Updated", annotationNode.Name, "annotation node name should be updated")
+	assert.NotNil(t, annotationNode.AnnotationText, "annotation node should still have annotation text")
+	assert.Equal(t, updatedAnnotationText, *annotationNode.AnnotationText, "annotation text should be updated")
+}
+
+func TestUpdateWorkflow_AnnotationNodesCannotConnect(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{},
+		[]models.Edge{},
+	)
+
+	workflowWithAnnotationAsSource := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:             "annotation-1",
+					Name:           "Annotation Note",
+					Type:           componentpb.Node_TYPE_ANNOTATION,
+					AnnotationText: "This is an annotation",
+				},
+				{
+					Id:   "component-1",
+					Name: "Component",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{
+				{
+					SourceId: "annotation-1",
+					TargetId: "component-1",
+					Channel:  "default",
+				},
+			},
+		},
+	}
+
+	_, err := UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		workflowWithAnnotationAsSource,
+		"http://localhost:3000/api/v1",
+	)
+	require.Error(t, err, "UpdateWorkflow should fail when annotation node is used as source")
+	assert.Contains(t, err.Error(), "annotation nodes cannot be used as source nodes")
+
+	workflowWithAnnotationAsTarget := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "component-1",
+					Name: "Component",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+				{
+					Id:             "annotation-1",
+					Name:           "Annotation Note",
+					Type:           componentpb.Node_TYPE_ANNOTATION,
+					AnnotationText: "This is an annotation",
+				},
+			},
+			Edges: []*componentpb.Edge{
+				{
+					SourceId: "component-1",
+					TargetId: "annotation-1",
+					Channel:  "default",
+				},
+			},
+		},
+	}
+
+	_, err = UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		workflowWithAnnotationAsTarget,
+		"http://localhost:3000/api/v1",
+	)
+	require.Error(t, err, "UpdateWorkflow should fail when annotation node is used as target")
+	assert.Contains(t, err.Error(), "annotation nodes cannot be used as target nodes")
+}
+
+func TestUpdateWorkflow_AnnotationTextLengthValidation(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{},
+		[]models.Edge{},
+	)
+
+	longText := strings.Repeat("a", 5001)
+
+	workflowWithLongAnnotation := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:             "annotation-1",
+					Name:           "Long Annotation",
+					Type:           componentpb.Node_TYPE_ANNOTATION,
+					AnnotationText: longText,
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	_, err := UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		workflowWithLongAnnotation,
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err, "UpdateWorkflow should succeed with long annotation text (validation creates node with error)")
+
+	var annotationNode models.WorkflowNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "annotation-1").First(&annotationNode).Error
+	require.NoError(t, err, "should be able to find annotation node")
+	assert.Equal(t, models.WorkflowNodeStateError, annotationNode.State, "annotation node should be in error state")
+	assert.NotNil(t, annotationNode.StateReason, "annotation node should have error reason")
+	assert.Contains(t, *annotationNode.StateReason, "cannot exceed 5000 characters", "error should mention character limit")
+	assert.Nil(t, annotationNode.AnnotationText, "annotation text should not be stored when there's a validation error")
+
+	exactlyMaxText := strings.Repeat("b", 5000)
+
+	workflowWithMaxAnnotation := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:             "annotation-2",
+					Name:           "Max Length Annotation",
+					Type:           componentpb.Node_TYPE_ANNOTATION,
+					AnnotationText: exactlyMaxText,
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	_, err = UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		workflowWithMaxAnnotation,
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err, "UpdateWorkflow should succeed with max length annotation text")
+
+	var maxAnnotationNode models.WorkflowNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "annotation-2").First(&maxAnnotationNode).Error
+	require.NoError(t, err, "should be able to find max annotation node")
+	assert.Equal(t, models.WorkflowNodeStateStatic, maxAnnotationNode.State, "annotation node should be in static state")
+	assert.Nil(t, maxAnnotationNode.StateReason, "annotation node should not have error reason")
+	assert.NotNil(t, maxAnnotationNode.AnnotationText, "annotation node should have annotation text")
+	assert.Equal(t, exactlyMaxText, *maxAnnotationNode.AnnotationText, "annotation text should match")
 }
 
 func TestUpdateWorkflow_ValidationErrorsPersisted(t *testing.T) {

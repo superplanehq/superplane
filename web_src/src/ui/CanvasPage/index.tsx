@@ -492,6 +492,27 @@ function CanvasPage(props: CanvasPageProps) {
     [templateNodeId, state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen],
   );
 
+  const handleAddNote = useCallback(async () => {
+    if (!props.onNodeAdd) return;
+
+    const annotationBlock: BuildingBlock = {
+      name: "annotation",
+      label: "Annotation",
+      type: "component",
+      isLive: true,
+    };
+
+    const newNodeId = await props.onNodeAdd({
+      buildingBlock: annotationBlock,
+      nodeName: "New Note",
+      configuration: {},
+      position: { x: 200, y: 200 },
+    });
+
+    state.componentSidebar.open(newNodeId);
+    setCurrentTab("settings");
+  }, [props, state, setCurrentTab]);
+
   const handleBuildingBlockDrop = useCallback(
     async (block: BuildingBlock, position?: { x: number; y: number }) => {
       // Parse default configuration from building block
@@ -624,6 +645,7 @@ function CanvasPage(props: CanvasPageProps) {
           canvasZoom={canvasZoom}
           disabled={false}
           onBlockClick={handleBuildingBlockClick}
+          onAddNote={handleAddNote}
         />
 
         <div className="flex-1 relative">

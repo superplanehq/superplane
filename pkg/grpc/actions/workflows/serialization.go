@@ -17,6 +17,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+const (
+	MaxAnnotationTextLength = 5000
+)
+
 func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workflow, error) {
 	workflowNodes, err := models.FindWorkflowNodes(workflow.ID)
 	if err != nil {
@@ -52,6 +56,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 			IsCollapsed:       wn.IsCollapsed,
 			AppInstallationID: appInstallationID,
 			ErrorMessage:      errorMessage,
+			AnnotationText:    wn.AnnotationText,
 		})
 	}
 
@@ -188,6 +193,17 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 		if err := validateNodeRef(registry, orgID, node); err != nil {
 			nodeValidationErrors[node.Id] = err.Error()
 		}
+
+		if node.Type == compb.Node_TYPE_ANNOTATION && node.AnnotationText != "" {
+			if len(node.AnnotationText) > MaxAnnotationTextLength {
+				nodeValidationErrors[node.Id] = fmt.Sprintf("annotation text cannot exceed %d characters", MaxAnnotationTextLength)
+			}
+		}
+	}
+
+	nodeTypes := make(map[string]compb.Node_Type)
+	for _, node := range workflow.Spec.Nodes {
+		nodeTypes[node.Id] = node.Type
 	}
 
 	for i, edge := range workflow.Spec.Edges {
@@ -201,6 +217,14 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 
 		if !nodeIDs[edge.TargetId] {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
+		}
+
+		if nodeTypes[edge.SourceId] == compb.Node_TYPE_ANNOTATION {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: annotation nodes cannot be used as source nodes", i)
+		}
+
+		if nodeTypes[edge.TargetId] == compb.Node_TYPE_ANNOTATION {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: annotation nodes cannot be used as target nodes", i)
 		}
 	}
 
@@ -270,6 +294,9 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 		}
 
 		return configuration.ValidateConfiguration(trigger.Configuration(), node.Configuration.AsMap())
+
+	case compb.Node_TYPE_ANNOTATION:
+		return nil
 
 	default:
 		return fmt.Errorf("invalid node type: %s", node.Type)

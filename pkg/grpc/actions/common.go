@@ -568,6 +568,11 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			errorMessage = &node.ErrorMessage
 		}
 
+		var annotationText *string
+		if node.AnnotationText != "" {
+			annotationText = &node.AnnotationText
+		}
+
 		result[i] = models.Node{
 			ID:                node.Id,
 			Name:              node.Name,
@@ -578,6 +583,7 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			IsCollapsed:       node.IsCollapsed,
 			AppInstallationID: appInstallationID,
 			ErrorMessage:      errorMessage,
+			AnnotationText:    annotationText,
 		}
 	}
 	return result
@@ -629,6 +635,10 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
 			result[i].ErrorMessage = *node.ErrorMessage
 		}
+
+		if node.Type == models.NodeTypeAnnotation && node.AnnotationText != nil {
+			result[i].AnnotationText = *node.AnnotationText
+		}
 	}
 
 	return result
@@ -666,6 +676,8 @@ func ProtoToNodeType(nodeType componentpb.Node_Type) string {
 		return models.NodeTypeBlueprint
 	case componentpb.Node_TYPE_TRIGGER:
 		return models.NodeTypeTrigger
+	case componentpb.Node_TYPE_ANNOTATION:
+		return models.NodeTypeAnnotation
 	default:
 		return ""
 	}
@@ -677,6 +689,8 @@ func NodeTypeToProto(nodeType string) componentpb.Node_Type {
 		return componentpb.Node_TYPE_BLUEPRINT
 	case models.NodeTypeTrigger:
 		return componentpb.Node_TYPE_TRIGGER
+	case models.NodeTypeAnnotation:
+		return componentpb.Node_TYPE_ANNOTATION
 	default:
 		return componentpb.Node_TYPE_COMPONENT
 	}
