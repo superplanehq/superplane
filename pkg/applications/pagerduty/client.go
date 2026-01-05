@@ -11,33 +11,56 @@ import (
 )
 
 type Client struct {
-	AccessToken string
-	BaseURL     string
+	AuthType string
+	Token    string
+	BaseURL  string
 }
 
 func NewClient(ctx core.AppInstallationContext) (*Client, error) {
-	// Get access token from secrets
-	secrets, err := ctx.GetSecrets()
+	authType, err := ctx.GetConfig("authType")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get secrets: %v", err)
+		return nil, fmt.Errorf("error finding auth type: %v", err)
 	}
 
-	var accessToken string
-	for _, secret := range secrets {
-		if secret.Name == "accessToken" {
-			accessToken = string(secret.Value)
-			break
+	switch string(authType) {
+	case AuthTypeAPIToken:
+		apiToken, err := ctx.GetConfig("apiToken")
+		if err != nil {
+			return nil, err
 		}
+
+		return &Client{
+			Token:    string(apiToken),
+			AuthType: AuthTypeAPIToken,
+			BaseURL:  "https://api.pagerduty.com",
+		}, nil
+
+	case AuthTypeAppOAuth:
+		secrets, err := ctx.GetSecrets()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get secrets: %v", err)
+		}
+
+		var accessToken string
+		for _, secret := range secrets {
+			if secret.Name == AppAccessToken {
+				accessToken = string(secret.Value)
+				break
+			}
+		}
+
+		if accessToken == "" {
+			return nil, fmt.Errorf("app OAuth access token not found")
+		}
+
+		return &Client{
+			Token:    accessToken,
+			AuthType: AuthTypeAppOAuth,
+			BaseURL:  "https://api.pagerduty.com",
+		}, nil
 	}
 
-	if accessToken == "" {
-		return nil, fmt.Errorf("access token not found")
-	}
-
-	return &Client{
-		AccessToken: accessToken,
-		BaseURL:     "https://api.pagerduty.com",
-	}, nil
+	return nil, fmt.Errorf("unknown auth type %s", authType)
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
@@ -48,7 +71,12 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/vnd.pagerduty+json;version=2")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.AccessToken))
+
+	if c.AuthType == AuthTypeAppOAuth {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
+	} else {
+		req.Header.Set("Authorization", fmt.Sprintf("Token token=%s", c.Token))
+	}
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -68,137 +96,82 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	return responseBody, nil
 }
 
-// User represents a PagerDuty user
-type User struct {
-	ID    string `json:"id"`
-	Type  string `json:"type"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
-
-func (c *Client) GetCurrentUser() (*User, error) {
-	url := fmt.Sprintf("%s/users/me", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		User User `json:"user"`
-	}
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return &response.User, nil
-}
-
-// CreateIncidentRequest represents the request to create an incident
 type CreateIncidentRequest struct {
 	Incident IncidentPayload `json:"incident"`
 }
 
-// IncidentPayload represents the incident data
 type IncidentPayload struct {
-	Type        string           `json:"type"` // "incident"
-	Title       string           `json:"title"`
-	Service     ServiceReference `json:"service"`
-	Urgency     string           `json:"urgency,omitempty"` // "high" or "low"
-	Body        *IncidentBody    `json:"body,omitempty"`
-	Assignments []Assignment     `json:"assignments,omitempty"`
+	Type    string           `json:"type"` // "incident"
+	Title   string           `json:"title"`
+	Service ServiceReference `json:"service"`
+	Urgency string           `json:"urgency,omitempty"` // "high" or "low"
+	Body    *IncidentBody    `json:"body,omitempty"`
 }
 
-// ServiceReference represents a reference to a service
 type ServiceReference struct {
 	ID   string `json:"id"`
 	Type string `json:"type"` // "service_reference"
 }
 
-// IncidentBody represents the incident description
 type IncidentBody struct {
 	Type    string `json:"type"` // "incident_body"
 	Details string `json:"details"`
 }
 
-// Assignment represents an assignment of an incident to a user
-type Assignment struct {
-	Assignee Assignee `json:"assignee"`
-}
+func (c *Client) CreateIncident(title, service, urgency, description string) (any, error) {
+	request := CreateIncidentRequest{
+		Incident: IncidentPayload{
+			Type:    "incident",
+			Title:   title,
+			Urgency: urgency,
+			Service: ServiceReference{
+				ID:   service,
+				Type: "service_reference",
+			},
+		},
+	}
 
-// Assignee represents a user assigned to an incident
-type Assignee struct {
-	ID   string `json:"id"`
-	Type string `json:"type"` // "user_reference"
-}
+	if description != "" {
+		request.Incident.Body = &IncidentBody{
+			Type:    "incident_body",
+			Details: description,
+		}
+	}
 
-// Incident represents a PagerDuty incident
-type Incident struct {
-	ID             string `json:"id"`
-	Type           string `json:"type"`
-	IncidentNumber int    `json:"incident_number"`
-	Title          string `json:"title"`
-	Status         string `json:"status"`
-	Urgency        string `json:"urgency"`
-	HTMLURL        string `json:"html_url"`
-	CreatedAt      string `json:"created_at"`
-}
-
-func (c *Client) CreateIncident(params *CreateIncidentRequest) (*Incident, error) {
-	url := fmt.Sprintf("%s/incidents", c.BaseURL)
-	body, err := json.Marshal(params)
+	body, err := json.Marshal(request)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %v", err)
 	}
 
+	url := fmt.Sprintf("%s/incidents", c.BaseURL)
 	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 
-	var response struct {
-		Incident Incident `json:"incident"`
-	}
+	var response map[string]any
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
-	return &response.Incident, nil
+	return response, nil
 }
 
-// WebhookSubscription represents a PagerDuty webhook subscription
 type WebhookSubscription struct {
-	ID     string   `json:"id"`
-	Type   string   `json:"type"` // "webhook_subscription"
-	Events []string `json:"events"`
+	ID             string         `json:"id"`
+	Events         []string       `json:"events"`
+	DeliveryMethod DeliveryMethod `json:"delivery_method"`
 }
 
-// CreateWebhookSubscription creates a new webhook subscription
-// filterType can be "account_reference", "service_reference", or "team_reference"
-// filterID is the service or team ID (empty for account_reference)
-func (c *Client) CreateWebhookSubscription(url string, events []string, filterType, filterID string) (*WebhookSubscription, error) {
+type DeliveryMethod struct {
+	Type   string `json:"type"`
+	URL    string `json:"url"`
+	Secret string `json:"secret"`
+}
+
+func (c *Client) CreateWebhookSubscription(url string, events []string, filter WebhookFilter) (*WebhookSubscription, error) {
 	apiURL := fmt.Sprintf("%s/webhook_subscriptions", c.BaseURL)
-
-	// Build filter based on type
-	var filter map[string]any
-	if filterType == "service_reference" {
-		filter = map[string]any{
-			"type": "service_reference",
-			"id":   filterID,
-		}
-	} else if filterType == "team_reference" {
-		filter = map[string]any{
-			"type": "team_reference",
-			"id":   filterID,
-		}
-	} else {
-		// Default to account_reference
-		filter = map[string]any{
-			"type": "account_reference",
-		}
-	}
-
 	subscription := map[string]any{
 		"webhook_subscription": map[string]any{
 			"type": "webhook_subscription",
@@ -224,6 +197,7 @@ func (c *Client) CreateWebhookSubscription(url string, events []string, filterTy
 	var response struct {
 		WebhookSubscription WebhookSubscription `json:"webhook_subscription"`
 	}
+
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
@@ -236,4 +210,48 @@ func (c *Client) DeleteWebhookSubscription(id string) error {
 	url := fmt.Sprintf("%s/webhook_subscriptions/%s", c.BaseURL, id)
 	_, err := c.execRequest(http.MethodDelete, url, nil)
 	return err
+}
+
+type Service struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	HTMLURL string `json:"html_url"`
+}
+
+func (c *Client) ListServices() ([]Service, error) {
+	apiURL := fmt.Sprintf("%s/services", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Services []Service `json:"services"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Services, nil
+}
+
+func (c *Client) GetService(id string) (*Service, error) {
+	apiURL := fmt.Sprintf("%s/services/%s", c.BaseURL, id)
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Service Service `json:"service"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Service, nil
 }

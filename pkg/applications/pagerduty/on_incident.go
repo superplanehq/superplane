@@ -16,14 +16,9 @@ import (
 type OnIncident struct{}
 
 type OnIncidentConfiguration struct {
+	Service   string   `json:"service"`
 	Events    []string `json:"events"`
-	ServiceID string   `json:"serviceId"`
-	TeamID    string   `json:"teamId"`
-	Urgency   []string `json:"urgency"`
-}
-
-type OnIncidentMetadata struct{
-	WebhookRegistered bool `json:"webhookRegistered"`
+	Urgencies []string `json:"urgencies"`
 }
 
 func (t *OnIncident) Name() string {
@@ -43,7 +38,7 @@ func (t *OnIncident) Icon() string {
 }
 
 func (t *OnIncident) Color() string {
-	return "red"
+	return "gray"
 }
 
 func (t *OnIncident) Configuration() []configuration.Field {
@@ -53,47 +48,31 @@ func (t *OnIncident) Configuration() []configuration.Field {
 			Label:    "Events",
 			Type:     configuration.FieldTypeMultiSelect,
 			Required: true,
-			Default:  []string{"triggered"},
+			Default:  []string{"incident.triggered"},
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "Triggered", Value: "triggered"},
-						{Label: "Acknowledged", Value: "acknowledged"},
-						{Label: "Resolved", Value: "resolved"},
-						{Label: "Unacknowledged", Value: "unacknowledged"},
-						{Label: "Reopened", Value: "reopened"},
-						{Label: "Reassigned", Value: "reassigned"},
-						{Label: "Delegated", Value: "delegated"},
-						{Label: "Escalated", Value: "escalated"},
-						{Label: "Incident Type Changed", Value: "incident_type.changed"},
-						{Label: "Priority Updated", Value: "priority_updated"},
-						{Label: "Service Updated", Value: "service_updated"},
+						{Label: "Triggered", Value: "incident.triggered"},
+						{Label: "Acknowledged", Value: "incident.acknowledged"},
+						{Label: "Resolved", Value: "incident.resolved"},
 					},
 				},
 			},
 		},
 		{
-			Name:        "serviceId",
-			Label:       "Service ID",
+			Name:        "service",
+			Label:       "Service",
 			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Optional: filter incidents by service ID",
+			Required:    true,
 			Placeholder: "e.g. PXXXXXX",
 		},
 		{
-			Name:        "teamId",
-			Label:       "Team ID",
-			Type:        configuration.FieldTypeString,
+			Name:        "urgencies",
+			Label:       "Urgencies",
+			Type:        configuration.FieldTypeMultiSelect,
 			Required:    false,
-			Description: "Optional: filter incidents by team ID",
-			Placeholder: "e.g. PXXXXXX",
-		},
-		{
-			Name:     "urgency",
-			Label:    "Urgency Filter",
-			Type:     configuration.FieldTypeMultiSelect,
-			Required: false,
-			Description: "Filter incidents by urgency. Leave empty to receive all urgencies.",
+			Default:     []string{"low", "high"},
+			Description: "Filter incidents by urgency",
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -107,14 +86,16 @@ func (t *OnIncident) Configuration() []configuration.Field {
 }
 
 func (t *OnIncident) Setup(ctx core.TriggerContext) error {
-	var metadata OnIncidentMetadata
+	metadata := NodeMetadata{}
 	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
-		return fmt.Errorf("failed to parse metadata: %w", err)
+		return fmt.Errorf("failed to decode metadata: %v", err)
 	}
 
-	// If webhook already registered, nothing to do
-	if metadata.WebhookRegistered {
+	//
+	// If metadata is already set, skip setup
+	//
+	if metadata.Service != nil {
 		return nil
 	}
 
@@ -124,33 +105,44 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	// Build full event names
-	fullEventNames := make([]string, len(config.Events))
-	for i, event := range config.Events {
-		fullEventNames[i] = fmt.Sprintf("incident.%s", event)
+	if len(config.Events) == 0 {
+		return fmt.Errorf("at least one event type must be chosen")
 	}
 
-	// Request webhook from app installation
-	err = ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
-		Events:    fullEventNames,
-		ServiceID: config.ServiceID,
-		TeamID:    config.TeamID,
-	})
+	if config.Service == "" {
+		return fmt.Errorf("service is required")
+	}
+
+	client, err := NewClient(ctx.AppInstallationContext)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	// Mark as registered
-	metadata.WebhookRegistered = true
-	return ctx.MetadataContext.Set(metadata)
+	service, err := client.GetService(config.Service)
+	if err != nil {
+		return fmt.Errorf("error finding service: %v", err)
+	}
+
+	err = ctx.MetadataContext.Set(NodeMetadata{Service: service})
+	if err != nil {
+		return fmt.Errorf("error setting node metadata: %v", err)
+	}
+
+	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+		Events: config.Events,
+		Filter: WebhookFilter{
+			Type: "service_reference",
+			ID:   config.Service,
+		},
+	})
 }
 
 func (t *OnIncident) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (t *OnIncident) HandleAction(ctx core.TriggerActionContext) error {
-	return nil
+func (t *OnIncident) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
@@ -189,18 +181,21 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	// Filter by event type (webhook may be shared and receive more events than this trigger cares about)
-	if !whitelistedEvent(data, config.Events, "incident") {
+	eventType := getEventType(data)
+
+	//
+	// Since the webhook may be shared and receive more events than this trigger cares about,
+	// we need to filter events by their type here.
+	//
+	if !slices.Contains(config.Events, eventType) {
 		return http.StatusOK, nil
 	}
 
-	// Filter by urgency if configured
-	if !filterByUrgency(data, config.Urgency) {
+	if !filterByUrgency(data, config.Urgencies) {
 		return http.StatusOK, nil
 	}
 
-	// Emit event
-	err = ctx.EventContext.Emit("pagerduty.incident", data)
+	err = ctx.EventContext.Emit(fmt.Sprintf("pagerduty.%s", eventType), data)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}
@@ -208,30 +203,21 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	return http.StatusOK, nil
 }
 
-// whitelistedEvent checks if the event type in the payload matches the allowed events
-func whitelistedEvent(data map[string]any, allowed []string, eventPrefix string) bool {
+func getEventType(data map[string]any) string {
 	event, ok := data["event"].(map[string]any)
 	if !ok {
-		return false
+		return ""
 	}
 
 	eventType, ok := event["event_type"].(string)
 	if !ok {
-		return false
+		return ""
 	}
 
-	// Extract sub-event (e.g., "incident.triggered" → "triggered")
-	subEvent := strings.TrimPrefix(eventType, eventPrefix+".")
-
-	return slices.Contains(allowed, subEvent)
+	return eventType
 }
 
-// filterByUrgency checks if the incident urgency matches the allowed urgencies
 func filterByUrgency(data map[string]any, allowed []string) bool {
-	if len(allowed) == 0 {
-		return true // No filter means allow all
-	}
-
 	event, ok := data["event"].(map[string]any)
 	if !ok {
 		return false

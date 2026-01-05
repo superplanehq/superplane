@@ -1,7 +1,9 @@
 package pagerduty
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -12,23 +14,10 @@ import (
 type CreateIncident struct{}
 
 type CreateIncidentSpec struct {
-	ServiceID   string           `json:"serviceId"`
-	Title       string           `json:"title"`
-	Description string           `json:"description"`
-	Urgency     string           `json:"urgency"`
-	Assignments []AssignmentSpec `json:"assignments"`
-}
-
-type AssignmentSpec struct {
-	UserID string `json:"userId"`
-}
-
-type CreateIncidentMetadata struct {
-	IncidentID     string `json:"incidentId"`
-	IncidentNumber int    `json:"incidentNumber"`
-	Status         string `json:"status"`
-	HTMLURL        string `json:"htmlUrl"`
-	CreatedAt      string `json:"createdAt"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Urgency     string `json:"urgency"`
+	Service     string `json:"service"`
 }
 
 func (c *CreateIncident) Name() string {
@@ -48,7 +37,7 @@ func (c *CreateIncident) Icon() string {
 }
 
 func (c *CreateIncident) Color() string {
-	return "red"
+	return "gray"
 }
 
 func (c *CreateIncident) OutputChannels(configuration any) []core.OutputChannel {
@@ -57,14 +46,6 @@ func (c *CreateIncident) OutputChannels(configuration any) []core.OutputChannel 
 
 func (c *CreateIncident) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:        "serviceId",
-			Label:       "Service ID",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "The ID of the PagerDuty service to create incident for",
-			Placeholder: "e.g. PXXXXXX",
-		},
 		{
 			Name:        "title",
 			Label:       "Incident Title",
@@ -75,7 +56,7 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 		{
 			Name:        "description",
 			Label:       "Description",
-			Type:        configuration.FieldTypeText,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Additional details about the incident",
 		},
@@ -95,114 +76,73 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "assignments",
-			Label:    "Assignments",
-			Type:     configuration.FieldTypeList,
-			Required: false,
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "Assignment",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeObject,
-						Schema: []configuration.Field{
-							{
-								Name:        "userId",
-								Label:       "User ID",
-								Type:        configuration.FieldTypeString,
-								Required:    true,
-								Description: "PagerDuty user ID to assign",
-							},
-						},
-					},
-				},
-			},
+			Name:        "service",
+			Label:       "Service",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "The ID of the PagerDuty service to create incident for",
+			Placeholder: "e.g. PXXXXXX",
 		},
 	}
 }
 
 func (c *CreateIncident) Setup(ctx core.SetupContext) error {
-	// Synchronous components typically don't need setup
-	return nil
+	spec := CreateIncidentSpec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return fmt.Errorf("error decoding configuration: %v", err)
+	}
+
+	if spec.Title == "" {
+		return errors.New("title is required")
+	}
+
+	if spec.Urgency == "" {
+		return errors.New("urgency is required")
+	}
+
+	if spec.Service == "" {
+		return errors.New("service is required")
+	}
+
+	client, err := NewClient(ctx.AppInstallationContext)
+	if err != nil {
+		return fmt.Errorf("error creating client: %v", err)
+	}
+
+	service, err := client.GetService(spec.Service)
+	if err != nil {
+		return fmt.Errorf("error finding service: %v", err)
+	}
+
+	return ctx.MetadataContext.Set(NodeMetadata{Service: service})
 }
 
 func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 	spec := CreateIncidentSpec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
-		return ctx.ExecutionStateContext.Fail("configuration error", err.Error())
+		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
 	client, err := NewClient(ctx.AppInstallationContext)
 	if err != nil {
-		return ctx.ExecutionStateContext.Fail("client error", err.Error())
+		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	// Build request
-	request := &CreateIncidentRequest{
-		Incident: IncidentPayload{
-			Type:  "incident",
-			Title: spec.Title,
-			Service: ServiceReference{
-				ID:   spec.ServiceID,
-				Type: "service_reference",
-			},
-			Urgency: spec.Urgency,
-		},
-	}
-
-	// Add description if provided
-	if spec.Description != "" {
-		request.Incident.Body = &IncidentBody{
-			Type:    "incident_body",
-			Details: spec.Description,
-		}
-	}
-
-	// Add assignments if provided
-	if len(spec.Assignments) > 0 {
-		request.Incident.Assignments = make([]Assignment, len(spec.Assignments))
-		for i, assignment := range spec.Assignments {
-			request.Incident.Assignments[i] = Assignment{
-				Assignee: Assignee{
-					ID:   assignment.UserID,
-					Type: "user_reference",
-				},
-			}
-		}
-	}
-
-	// Create incident
-	incident, err := client.CreateIncident(request)
+	incident, err := client.CreateIncident(spec.Title, spec.Service, spec.Urgency, spec.Description)
 	if err != nil {
-		return ctx.ExecutionStateContext.Fail("failed to create incident", err.Error())
+		return fmt.Errorf("failed to create incident: %v", err)
 	}
 
-	ctx.Logger.Infof("Created incident %s", incident.ID)
-
-	// Store incident metadata
-	metadata := CreateIncidentMetadata{
-		IncidentID:     incident.ID,
-		IncidentNumber: incident.IncidentNumber,
-		Status:         incident.Status,
-		HTMLURL:        incident.HTMLURL,
-		CreatedAt:      incident.CreatedAt,
-	}
-
-	err = ctx.MetadataContext.Set(metadata)
-	if err != nil {
-		ctx.Logger.Warnf("Failed to store metadata: %v", err)
-	}
-
-	// Emit success on default channel
 	return ctx.ExecutionStateContext.Emit(
 		core.DefaultOutputChannel.Name,
-		"pagerduty.incident.created",
-		[]any{metadata},
+		"pagerduty.incident",
+		[]any{incident},
 	)
 }
 
 func (c *CreateIncident) Cancel(ctx core.ExecutionContext) error {
-	// Synchronous component, nothing to cancel
 	return nil
 }
 
@@ -215,9 +155,9 @@ func (c *CreateIncident) Actions() []core.Action {
 }
 
 func (c *CreateIncident) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+	return nil
 }
 
 func (c *CreateIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 404, fmt.Errorf("webhooks not supported for this component")
+	return http.StatusOK, nil
 }

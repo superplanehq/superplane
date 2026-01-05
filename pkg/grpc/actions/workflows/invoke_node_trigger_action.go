@@ -85,7 +85,7 @@ func InvokeNodeTriggerAction(
 		Configuration:   node.Configuration.Data(),
 		MetadataContext: contexts.NewNodeMetadataContext(tx, node),
 		RequestContext:  contexts.NewNodeRequestContext(tx, node),
-		WebhookContext:  contexts.NewWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
+		WebhookContext:  contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
 	}
 
 	if node.AppInstallationID != nil {

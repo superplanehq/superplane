@@ -99,22 +99,22 @@ func (s *PanicableApplication) CompareWebhookConfig(a, b any) (result bool, err 
 	return s.underlying.CompareWebhookConfig(a, b)
 }
 
-func (s *PanicableApplication) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (metadata any, err error) {
+func (s *PanicableApplication) SetupWebhook(ctx core.SetupWebhookContext) (metadata any, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("application %s panicked in SetupWebhook(): %v",
 				s.underlying.Name(), r)
 		}
 	}()
-	return s.underlying.SetupWebhook(ctx, options)
+	return s.underlying.SetupWebhook(ctx)
 }
 
-func (s *PanicableApplication) CleanupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (err error) {
+func (s *PanicableApplication) CleanupWebhook(ctx core.CleanupWebhookContext) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("application %s panicked in CleanupWebhook(): %v",
 				s.underlying.Name(), r)
 		}
 	}()
-	return s.underlying.CleanupWebhook(ctx, options)
+	return s.underlying.CleanupWebhook(ctx)
 }

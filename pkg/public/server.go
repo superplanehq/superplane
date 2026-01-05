@@ -736,7 +736,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		WorkflowID:     node.WorkflowID.String(),
 		NodeID:         node.NodeID,
 		Configuration:  node.Configuration.Data(),
-		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
+		WebhookContext: contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		EventContext:   contexts.NewEventContext(tx, &node),
 	})
 }
@@ -755,7 +755,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		WorkflowID:     node.WorkflowID.String(),
 		NodeID:         node.NodeID,
 		Configuration:  node.Configuration.Data(),
-		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
+		WebhookContext: contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		EventContext:   contexts.NewEventContext(tx, &node),
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
