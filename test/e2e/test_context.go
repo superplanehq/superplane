@@ -56,6 +56,7 @@ func (s *TestContext) Start() {
 	os.Setenv("APP_ENV", "development")
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
+	os.Setenv("BLOCK_SIGNUP", "yes")
 
 	s.startVite()
 	s.startAppServer()

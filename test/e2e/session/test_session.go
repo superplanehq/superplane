@@ -331,3 +331,10 @@ func (s *TestSession) ScrollToTheBottomOfPage() {
 
 	time.Sleep(300 * time.Millisecond)
 }
+
+func (s *TestSession) ClearCookies() {
+	s.t.Log("Clearing cookies")
+	if err := s.context.ClearCookies(); err != nil {
+		s.t.Fatalf("clear cookies: %v", err)
+	}
+}
