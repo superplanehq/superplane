@@ -21,10 +21,10 @@ type ComponentsNodeType string
 
 // List of ComponentsNodeType
 const (
-	COMPONENTSNODETYPE_TYPE_COMPONENT  ComponentsNodeType = "TYPE_COMPONENT"
-	COMPONENTSNODETYPE_TYPE_BLUEPRINT  ComponentsNodeType = "TYPE_BLUEPRINT"
-	COMPONENTSNODETYPE_TYPE_TRIGGER    ComponentsNodeType = "TYPE_TRIGGER"
-	COMPONENTSNODETYPE_TYPE_ANNOTATION ComponentsNodeType = "TYPE_ANNOTATION"
+	COMPONENTSNODETYPE_TYPE_COMPONENT ComponentsNodeType = "TYPE_COMPONENT"
+	COMPONENTSNODETYPE_TYPE_BLUEPRINT ComponentsNodeType = "TYPE_BLUEPRINT"
+	COMPONENTSNODETYPE_TYPE_TRIGGER   ComponentsNodeType = "TYPE_TRIGGER"
+	COMPONENTSNODETYPE_TYPE_WIDGET    ComponentsNodeType = "TYPE_WIDGET"
 )
 
 // All allowed values of ComponentsNodeType enum
@@ -32,7 +32,7 @@ var AllowedComponentsNodeTypeEnumValues = []ComponentsNodeType{
 	"TYPE_COMPONENT",
 	"TYPE_BLUEPRINT",
 	"TYPE_TRIGGER",
-	"TYPE_ANNOTATION",
+	"TYPE_WIDGET",
 }
 
 func (v *ComponentsNodeType) UnmarshalJSON(src []byte) error {

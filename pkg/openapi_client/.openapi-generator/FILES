@@ -99,6 +99,7 @@ docs/MeRegenerateTokenResponse.md
 docs/NodeBlueprintRef.md
 docs/NodeComponentRef.md
 docs/NodeTriggerRef.md
+docs/NodeWidgetRef.md
 docs/OrganizationAPI.md
 docs/OrganizationsAppInstallation.md
 docs/OrganizationsAppInstallationMetadata.md
@@ -270,6 +271,7 @@ model_me_regenerate_token_response.go
 model_node_blueprint_ref.go
 model_node_component_ref.go
 model_node_trigger_ref.go
+model_node_widget_ref.go
 model_organizations_app_installation.go
 model_organizations_app_installation_metadata.go
 model_organizations_app_installation_spec.go

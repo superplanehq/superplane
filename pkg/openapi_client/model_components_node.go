@@ -29,10 +29,10 @@ type ComponentsNode struct {
 	Component       *NodeComponentRef             `json:"component,omitempty"`
 	Blueprint       *NodeBlueprintRef             `json:"blueprint,omitempty"`
 	Trigger         *NodeTriggerRef               `json:"trigger,omitempty"`
+	Widget          *NodeWidgetRef                `json:"widget,omitempty"`
 	IsCollapsed     *bool                         `json:"isCollapsed,omitempty"`
 	AppInstallation *ComponentsAppInstallationRef `json:"appInstallation,omitempty"`
 	ErrorMessage    *string                       `json:"errorMessage,omitempty"`
-	AnnotationText  *string                       `json:"annotationText,omitempty"`
 }
 
 // NewComponentsNode instantiates a new ComponentsNode object
@@ -344,6 +344,38 @@ func (o *ComponentsNode) SetTrigger(v NodeTriggerRef) {
 	o.Trigger = &v
 }
 
+// GetWidget returns the Widget field value if set, zero value otherwise.
+func (o *ComponentsNode) GetWidget() NodeWidgetRef {
+	if o == nil || IsNil(o.Widget) {
+		var ret NodeWidgetRef
+		return ret
+	}
+	return *o.Widget
+}
+
+// GetWidgetOk returns a tuple with the Widget field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsNode) GetWidgetOk() (*NodeWidgetRef, bool) {
+	if o == nil || IsNil(o.Widget) {
+		return nil, false
+	}
+	return o.Widget, true
+}
+
+// HasWidget returns a boolean if a field has been set.
+func (o *ComponentsNode) HasWidget() bool {
+	if o != nil && !IsNil(o.Widget) {
+		return true
+	}
+
+	return false
+}
+
+// SetWidget gets a reference to the given NodeWidgetRef and assigns it to the Widget field.
+func (o *ComponentsNode) SetWidget(v NodeWidgetRef) {
+	o.Widget = &v
+}
+
 // GetIsCollapsed returns the IsCollapsed field value if set, zero value otherwise.
 func (o *ComponentsNode) GetIsCollapsed() bool {
 	if o == nil || IsNil(o.IsCollapsed) {
@@ -440,38 +472,6 @@ func (o *ComponentsNode) SetErrorMessage(v string) {
 	o.ErrorMessage = &v
 }
 
-// GetAnnotationText returns the AnnotationText field value if set, zero value otherwise.
-func (o *ComponentsNode) GetAnnotationText() string {
-	if o == nil || IsNil(o.AnnotationText) {
-		var ret string
-		return ret
-	}
-	return *o.AnnotationText
-}
-
-// GetAnnotationTextOk returns a tuple with the AnnotationText field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ComponentsNode) GetAnnotationTextOk() (*string, bool) {
-	if o == nil || IsNil(o.AnnotationText) {
-		return nil, false
-	}
-	return o.AnnotationText, true
-}
-
-// HasAnnotationText returns a boolean if a field has been set.
-func (o *ComponentsNode) HasAnnotationText() bool {
-	if o != nil && !IsNil(o.AnnotationText) {
-		return true
-	}
-
-	return false
-}
-
-// SetAnnotationText gets a reference to the given string and assigns it to the AnnotationText field.
-func (o *ComponentsNode) SetAnnotationText(v string) {
-	o.AnnotationText = &v
-}
-
 func (o ComponentsNode) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -509,6 +509,9 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Trigger) {
 		toSerialize["trigger"] = o.Trigger
 	}
+	if !IsNil(o.Widget) {
+		toSerialize["widget"] = o.Widget
+	}
 	if !IsNil(o.IsCollapsed) {
 		toSerialize["isCollapsed"] = o.IsCollapsed
 	}
@@ -517,9 +520,6 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.ErrorMessage) {
 		toSerialize["errorMessage"] = o.ErrorMessage
-	}
-	if !IsNil(o.AnnotationText) {
-		toSerialize["annotationText"] = o.AnnotationText
 	}
 	return toSerialize, nil
 }

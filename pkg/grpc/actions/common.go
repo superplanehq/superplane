@@ -689,8 +689,8 @@ func NodeTypeToProto(nodeType string) componentpb.Node_Type {
 		return componentpb.Node_TYPE_BLUEPRINT
 	case models.NodeTypeTrigger:
 		return componentpb.Node_TYPE_TRIGGER
-	case models.NodeTypeAnnotation:
-		return componentpb.Node_TYPE_ANNOTATION
+	case models.NodeTypeWidget:
+		return componentpb.Node_TYPE_WIDGET
 	default:
 		return componentpb.Node_TYPE_COMPONENT
 	}

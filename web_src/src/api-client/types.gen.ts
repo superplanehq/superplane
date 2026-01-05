@@ -126,13 +126,13 @@ export type ComponentsNode = {
   component?: NodeComponentRef;
   blueprint?: NodeBlueprintRef;
   trigger?: NodeTriggerRef;
+  widget?: NodeWidgetRef;
   isCollapsed?: boolean;
   appInstallation?: ComponentsAppInstallationRef;
   errorMessage?: string;
-  annotationText?: string;
 };
 
-export type ComponentsNodeType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER" | "TYPE_ANNOTATION";
+export type ComponentsNodeType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER" | "TYPE_WIDGET";
 
 export type ComponentsPosition = {
   x?: number;
@@ -411,6 +411,10 @@ export type NodeComponentRef = {
 };
 
 export type NodeTriggerRef = {
+  name?: string;
+};
+
+export type NodeWidgetRef = {
   name?: string;
 };
 

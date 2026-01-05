@@ -20,6 +20,7 @@ type Workflow struct {
 	CreatedAt      *time.Time
 	UpdatedAt      *time.Time
 	DeletedAt      gorm.DeletedAt `gorm:"index"`
+	Nodes          datatypes.JSONSlice[Node]
 	Edges          datatypes.JSONSlice[Edge]
 }
 
