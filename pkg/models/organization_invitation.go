@@ -78,6 +78,18 @@ func ListInvitationsInState(organizationID string, state string) ([]Organization
 	return invitations, err
 }
 
+func FindPendingInvitationsByEmail(email string) ([]OrganizationInvitation, error) {
+	var invitations []OrganizationInvitation
+
+	err := database.Conn().
+		Where("email = ?", utils.NormalizeEmail(email)).
+		Where("state = ?", InvitationStatePending).
+		Find(&invitations).
+		Error
+
+	return invitations, err
+}
+
 func CreateInvitation(organizationID, invitedBy uuid.UUID, email, state string) (*OrganizationInvitation, error) {
 	return CreateInvitationInTransaction(database.Conn(), organizationID, invitedBy, email, state)
 }

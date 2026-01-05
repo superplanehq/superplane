@@ -90,6 +90,7 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/login", a.handleLoginPage).Methods("GET")
 	if a.passwordLoginEnabled {
 		router.HandleFunc("/login", a.handlePasswordLogin).Methods("POST")
+		router.HandleFunc("/signup", a.handlePasswordSignup).Methods("POST")
 	}
 
 	//
@@ -410,6 +411,122 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
+func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
+	if !a.passwordLoginEnabled {
+		http.Error(w, "Password login is not enabled", http.StatusForbidden)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+	name := r.FormValue("name")
+
+	if email == "" || password == "" {
+		http.Error(w, "Email and password are required", http.StatusBadRequest)
+		return
+	}
+
+	if name == "" {
+		name = email
+	}
+
+	// Check if account already exists
+	_, err := models.FindAccountByEmail(email)
+	if err == nil {
+		log.Warnf("Signup attempt with existing email: %s", email)
+		http.Error(w, "An account with this email already exists", http.StatusConflict)
+		return
+	}
+
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Errorf("Error checking for existing account: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Check if signup is blocked
+	if a.blockSignup {
+		// Check if user has a pending invitation
+		invitations, err := models.FindPendingInvitationsByEmail(email)
+		if err != nil {
+			log.Errorf("Error checking for pending invitations: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if len(invitations) == 0 {
+			log.Warnf("Signup blocked for email without invitation: %s", email)
+			http.Error(w, SignupDisabledError, http.StatusForbidden)
+			return
+		}
+	}
+
+	// Create account and password auth in a transaction
+	var account *models.Account
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		account, err = models.CreateAccountInTransaction(tx, name, email)
+		if err != nil {
+			return err
+		}
+
+		passwordHash, err := crypto.HashPassword(password)
+		if err != nil {
+			return err
+		}
+
+		_, err = models.CreateAccountPasswordAuthInTransaction(tx, account.ID, passwordHash)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Errorf("Error creating account: %v", err)
+		http.Error(w, "Failed to create account", http.StatusInternalServerError)
+		return
+	}
+
+	// Accept pending invitations
+	err = a.acceptPendingInvitations(account)
+	if err != nil {
+		log.Errorf("Error accepting pending invitations for %s: %v", account.Email, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Generate JWT token
+	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
+	if err != nil {
+		log.Errorf("Failed to generate token for password signup: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Set cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "account_token",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(24 * time.Hour.Seconds()),
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Redirect
+	redirectURL := getRedirectURL(r)
+	// Use StatusSeeOther (303) instead of StatusTemporaryRedirect (307) for POST requests
+	// This ensures the browser uses GET for the redirect, not POST
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+}
+
 func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {
 	account, err := models.FindAccountByProvider(gothUser.Provider, gothUser.UserID)
 
@@ -436,8 +553,17 @@ func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Ac
 	}
 
 	if a.blockSignup {
-		log.Warnf("Signup blocked for email: %s", gothUser.Email)
-		return nil, fmt.Errorf(SignupDisabledError)
+		// Check if user has a pending invitation
+		invitations, err := models.FindPendingInvitationsByEmail(gothUser.Email)
+		if err != nil {
+			log.Errorf("Error checking for pending invitations: %v", err)
+			return nil, fmt.Errorf(SignupDisabledError)
+		}
+
+		if len(invitations) == 0 {
+			log.Warnf("Signup blocked for email without invitation: %s", gothUser.Email)
+			return nil, fmt.Errorf(SignupDisabledError)
+		}
 	}
 
 	account, err = models.CreateAccount(gothUser.Name, gothUser.Email)

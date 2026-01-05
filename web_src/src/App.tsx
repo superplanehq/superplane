@@ -13,6 +13,7 @@ import EmailLogin from "./pages/auth/EmailLogin";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
+import SignupWithEmail from "./pages/auth/SignupWithEmail";
 import { CustomComponent } from "./pages/custom-component";
 import HomePage from "./pages/home";
 import NodeRunPage from "./pages/node-run";
@@ -57,6 +58,7 @@ function App() {
               <Route path=":organizationId/settings/*" element={withAuthOnly(OrganizationSettings)} />
               {/* Organization selection and creation */}
               <Route path="login/email" element={<EmailLogin />} />
+              <Route path="signup/email" element={<SignupWithEmail />} />
               <Route path="create" element={<OrganizationCreate />} />
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="" element={<OrganizationSelect />} />
