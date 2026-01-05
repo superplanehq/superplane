@@ -24,6 +24,7 @@ var (
 	registeredComponents   = make(map[string]core.Component)
 	registeredTriggers     = make(map[string]core.Trigger)
 	registeredApplications = make(map[string]core.Application)
+	registeredWidgets      = make(map[string]core.Widget)
 	mu                     sync.RWMutex
 )
 
@@ -45,6 +46,12 @@ func RegisterApplication(name string, i core.Application) {
 	registeredApplications[name] = i
 }
 
+func RegisterWidget(name string, w core.Widget) {
+	mu.Lock()
+	defer mu.Unlock()
+	registeredWidgets[name] = w
+}
+
 type Integration struct {
 	EventHandler       integrations.EventHandler
 	OIDCVerifier       integrations.OIDCVerifier
@@ -58,6 +65,7 @@ type Registry struct {
 	Applications map[string]core.Application
 	Components   map[string]core.Component
 	Triggers     map[string]core.Trigger
+	Widgets      map[string]core.Widget
 }
 
 func NewRegistry(encryptor crypto.Encryptor) *Registry {
@@ -68,6 +76,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 		Components:   map[string]core.Component{},
 		Triggers:     map[string]core.Trigger{},
 		Applications: map[string]core.Application{},
+		Widgets:      map[string]core.Widget{},
 	}
 
 	r.Init()
@@ -107,6 +116,14 @@ func (r *Registry) Init() {
 
 	for name, application := range registeredApplications {
 		r.Applications[name] = NewPanicableApplication(application)
+	}
+
+	//
+	// Widgets are not required to be panicable, since they just carry Configuration data
+	// and no logic is executed.
+	//
+	for name, widget := range registeredWidgets {
+		r.Widgets[name] = widget
 	}
 }
 
@@ -251,6 +268,16 @@ func (r *Registry) GetComponent(name string) (core.Component, error) {
 	}
 
 	return r.GetApplicationComponent(parts[0], name)
+}
+
+func (r *Registry) GetWidget(name string) (core.Widget, error) {
+	widget, ok := r.Widgets[name]
+
+	if !ok {
+		return nil, fmt.Errorf("widget %s nto registered", name)
+	}
+
+	return widget, nil
 }
 
 func (r *Registry) GetApplication(name string) (core.Application, error) {

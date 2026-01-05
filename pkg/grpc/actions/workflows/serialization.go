@@ -56,7 +56,6 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 			IsCollapsed:       wn.IsCollapsed,
 			AppInstallationID: appInstallationID,
 			ErrorMessage:      errorMessage,
-			AnnotationText:    wn.AnnotationText,
 		})
 	}
 
@@ -193,12 +192,6 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 		if err := validateNodeRef(registry, orgID, node); err != nil {
 			nodeValidationErrors[node.Id] = err.Error()
 		}
-
-		if node.Type == compb.Node_TYPE_ANNOTATION && node.AnnotationText != "" {
-			if len(node.AnnotationText) > MaxAnnotationTextLength {
-				nodeValidationErrors[node.Id] = fmt.Sprintf("annotation text cannot exceed %d characters", MaxAnnotationTextLength)
-			}
-		}
 	}
 
 	nodeTypes := make(map[string]compb.Node_Type)
@@ -219,12 +212,12 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
 		}
 
-		if nodeTypes[edge.SourceId] == compb.Node_TYPE_ANNOTATION {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: annotation nodes cannot be used as source nodes", i)
+		if nodeTypes[edge.SourceId] == compb.Node_TYPE_WIDGET {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
 		}
 
-		if nodeTypes[edge.TargetId] == compb.Node_TYPE_ANNOTATION {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: annotation nodes cannot be used as target nodes", i)
+		if nodeTypes[edge.TargetId] == compb.Node_TYPE_WIDGET {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
 		}
 	}
 
@@ -295,8 +288,21 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 
 		return configuration.ValidateConfiguration(trigger.Configuration(), node.Configuration.AsMap())
 
-	case compb.Node_TYPE_ANNOTATION:
-		return nil
+	case compb.Node_TYPE_WIDGET:
+		if node.Widget == nil {
+			return fmt.Errorf("widget reference is required for widget ref type")
+		}
+
+		if node.Widget.Name == "" {
+			return fmt.Errorf("widget name is required")
+		}
+
+		widget, err := findAndValidateWidget(registry, organizationID, node)
+		if err != nil {
+			return err
+		}
+
+		return configuration.ValidateConfiguration(widget.Configuration(), node.Configuration.AsMap())
 
 	default:
 		return fmt.Errorf("invalid node type: %s", node.Type)
@@ -319,6 +325,14 @@ func findAndValidateTrigger(registry *registry.Registry, organizationID string, 
 	}
 
 	return registry.GetApplicationTrigger(parts[0], node.Trigger.Name)
+}
+
+func findAndValidateWidget(registry *registry.Registry, organizationID string, node *compb.Node) (core.Widget, error) {
+	if node.Widget != nil && node.Widget.Name == "" {
+		return nil, fmt.Errorf("widget name is required")
+	}
+
+	return registry.GetWidget(node.Widget.Name)
 }
 
 func findAndValidateComponent(registry *registry.Registry, organizationID string, node *compb.Node) (core.Component, error) {

@@ -35,6 +35,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
+	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
 )
 
 func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, authService authorization.Authorization) {

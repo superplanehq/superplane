@@ -53,6 +53,7 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		existingWorkflow.Description = pbWorkflow.Metadata.Description
 		existingWorkflow.UpdatedAt = &now
 		existingWorkflow.Edges = datatypes.NewJSONSlice(edges)
+		existingWorkflow.Nodes = datatypes.NewJSONSlice(nodes)
 		err := tx.Save(&existingWorkflow).Error
 		if err != nil {
 			return err
@@ -71,14 +72,14 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		// and tracking which nodes we've seen, to delete nodes that are no longer in the workflow at the end.
 		//
 		for _, node := range expandedNodes {
+			// Widgets are not persisted in workflow_nodes table and don't have any logic to execute and to setup.
+			if node.Type == models.NodeTypeWidget {
+				continue
+			}
+
 			workflowNode, err := upsertNode(tx, existingNodes, node, workflowID)
 			if err != nil {
 				return err
-			}
-
-			// Skip setup for annotation nodes - they are text-only and don't participate in workflow execution
-			if workflowNode.Type == models.NodeTypeAnnotation {
-				continue
 			}
 
 			if workflowNode.State == models.WorkflowNodeStateReady {
@@ -148,16 +149,9 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
 			existingNode.State = models.WorkflowNodeStateError
 			existingNode.StateReason = node.ErrorMessage
-			existingNode.AnnotationText = nil
-		} else if existingNode.State == models.WorkflowNodeStateError && node.Type != models.NodeTypeAnnotation {
+		} else if existingNode.State == models.WorkflowNodeStateError {
 			existingNode.State = models.WorkflowNodeStateReady
 			existingNode.StateReason = nil
-			existingNode.AnnotationText = node.AnnotationText
-		} else if node.Type == models.NodeTypeAnnotation && existingNode.State != models.WorkflowNodeStateStatic {
-			existingNode.State = models.WorkflowNodeStateStatic
-			existingNode.AnnotationText = node.AnnotationText
-		} else {
-			existingNode.AnnotationText = node.AnnotationText
 		}
 
 		// Set parent if internal namespaced id
@@ -189,17 +183,10 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 
 	initialState := models.WorkflowNodeStateReady
 	var stateReason *string
-	var annotationText *string
 
 	if node.ErrorMessage != nil && *node.ErrorMessage != "" {
 		initialState = models.WorkflowNodeStateError
 		stateReason = node.ErrorMessage
-		annotationText = nil
-	} else if node.Type == models.NodeTypeAnnotation {
-		initialState = models.WorkflowNodeStateStatic
-		annotationText = node.AnnotationText
-	} else {
-		annotationText = node.AnnotationText
 	}
 
 	workflowNode := models.WorkflowNode{
@@ -215,7 +202,6 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		Position:          datatypes.NewJSONType(node.Position),
 		IsCollapsed:       node.IsCollapsed,
 		Metadata:          datatypes.NewJSONType(node.Metadata),
-		AnnotationText:    annotationText,
 		AppInstallationID: appInstallationID,
 		CreatedAt:         &now,
 		UpdatedAt:         &now,
@@ -235,7 +221,8 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 		return setupTrigger(ctx, tx, encryptor, registry, node, webhookBaseURL)
 	case models.NodeTypeComponent:
 		return setupComponent(tx, encryptor, registry, node)
-	case models.NodeTypeAnnotation:
+	case models.NodeTypeWidget:
+		// Widgets are not persisted and don't have any logic to execute and to setup.
 		return nil
 	}
 

@@ -31,6 +31,8 @@ type ConfigurationTypeOptions struct {
 	Date             *ConfigurationDateTypeOptions             `json:"date,omitempty"`
 	Datetime         *ConfigurationDateTimeTypeOptions         `json:"datetime,omitempty"`
 	AnyPredicateList *ConfigurationAnyPredicateListTypeOptions `json:"anyPredicateList,omitempty"`
+	String           *ConfigurationStringTypeOptions           `json:"string,omitempty"`
+	Text             *ConfigurationTextTypeOptions             `json:"text,omitempty"`
 }
 
 // NewConfigurationTypeOptions instantiates a new ConfigurationTypeOptions object
@@ -402,6 +404,70 @@ func (o *ConfigurationTypeOptions) SetAnyPredicateList(v ConfigurationAnyPredica
 	o.AnyPredicateList = &v
 }
 
+// GetString returns the String field value if set, zero value otherwise.
+func (o *ConfigurationTypeOptions) GetString() ConfigurationStringTypeOptions {
+	if o == nil || IsNil(o.String) {
+		var ret ConfigurationStringTypeOptions
+		return ret
+	}
+	return *o.String
+}
+
+// GetStringOk returns a tuple with the String field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationTypeOptions) GetStringOk() (*ConfigurationStringTypeOptions, bool) {
+	if o == nil || IsNil(o.String) {
+		return nil, false
+	}
+	return o.String, true
+}
+
+// HasString returns a boolean if a field has been set.
+func (o *ConfigurationTypeOptions) HasString() bool {
+	if o != nil && !IsNil(o.String) {
+		return true
+	}
+
+	return false
+}
+
+// SetString gets a reference to the given ConfigurationStringTypeOptions and assigns it to the String field.
+func (o *ConfigurationTypeOptions) SetString(v ConfigurationStringTypeOptions) {
+	o.String = &v
+}
+
+// GetText returns the Text field value if set, zero value otherwise.
+func (o *ConfigurationTypeOptions) GetText() ConfigurationTextTypeOptions {
+	if o == nil || IsNil(o.Text) {
+		var ret ConfigurationTextTypeOptions
+		return ret
+	}
+	return *o.Text
+}
+
+// GetTextOk returns a tuple with the Text field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationTypeOptions) GetTextOk() (*ConfigurationTextTypeOptions, bool) {
+	if o == nil || IsNil(o.Text) {
+		return nil, false
+	}
+	return o.Text, true
+}
+
+// HasText returns a boolean if a field has been set.
+func (o *ConfigurationTypeOptions) HasText() bool {
+	if o != nil && !IsNil(o.Text) {
+		return true
+	}
+
+	return false
+}
+
+// SetText gets a reference to the given ConfigurationTextTypeOptions and assigns it to the Text field.
+func (o *ConfigurationTypeOptions) SetText(v ConfigurationTextTypeOptions) {
+	o.Text = &v
+}
+
 func (o ConfigurationTypeOptions) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -444,6 +510,12 @@ func (o ConfigurationTypeOptions) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.AnyPredicateList) {
 		toSerialize["anyPredicateList"] = o.AnyPredicateList
+	}
+	if !IsNil(o.String) {
+		toSerialize["string"] = o.String
+	}
+	if !IsNil(o.Text) {
+		toSerialize["text"] = o.Text
 	}
 	return toSerialize, nil
 }

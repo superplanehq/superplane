@@ -3310,6 +3310,32 @@
         }
       }
     },
+    "ConfigurationStringTypeOptions": {
+      "type": "object",
+      "properties": {
+        "minLength": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxLength": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "ConfigurationTextTypeOptions": {
+      "type": "object",
+      "properties": {
+        "minLength": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxLength": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
     "ConfigurationTimeTypeOptions": {
       "type": "object",
       "properties": {
@@ -3353,6 +3379,12 @@
         },
         "anyPredicateList": {
           "$ref": "#/definitions/ConfigurationAnyPredicateListTypeOptions"
+        },
+        "string": {
+          "$ref": "#/definitions/ConfigurationStringTypeOptions"
+        },
+        "text": {
+          "$ref": "#/definitions/ConfigurationTextTypeOptions"
         }
       }
     },

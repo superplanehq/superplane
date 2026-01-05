@@ -100,6 +100,42 @@ func numberTypeOptionsToProto(opts *configuration.NumberTypeOptions) *configpb.N
 	return pbOpts
 }
 
+func stringTypeOptionsToProto(opts *configuration.StringTypeOptions) *configpb.StringTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.StringTypeOptions{}
+	if opts.MinLength != nil {
+		minLength := int32(*opts.MinLength)
+		pbOpts.MinLength = &minLength
+	}
+	if opts.MaxLength != nil {
+		maxLength := int32(*opts.MaxLength)
+		pbOpts.MaxLength = &maxLength
+	}
+
+	return pbOpts
+}
+
+func textTypeOptionsToProto(opts *configuration.TextTypeOptions) *configpb.TextTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.TextTypeOptions{}
+	if opts.MinLength != nil {
+		minLength := int32(*opts.MinLength)
+		pbOpts.MinLength = &minLength
+	}
+	if opts.MaxLength != nil {
+		maxLength := int32(*opts.MaxLength)
+		pbOpts.MaxLength = &maxLength
+	}
+
+	return pbOpts
+}
+
 func selectTypeOptionsToProto(opts *configuration.SelectTypeOptions) *configpb.SelectTypeOptions {
 	if opts == nil {
 		return nil
@@ -251,6 +287,8 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 
 	return &configpb.TypeOptions{
 		Number:           numberTypeOptionsToProto(opts.Number),
+		String_:          stringTypeOptionsToProto(opts.String),
+		Text:             textTypeOptionsToProto(opts.Text),
 		Select:           selectTypeOptionsToProto(opts.Select),
 		MultiSelect:      multiSelectTypeOptionsToProto(opts.MultiSelect),
 		Integration:      integrationTypeOptionsToProto(opts.Integration),
@@ -334,6 +372,42 @@ func protoToNumberTypeOptions(pbOpts *configpb.NumberTypeOptions) *configuration
 		max := int(*pbOpts.Max)
 		opts.Max = &max
 	}
+	return opts
+}
+
+func protoToStringTypeOptions(pbOpts *configpb.StringTypeOptions) *configuration.StringTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.StringTypeOptions{}
+	if pbOpts.MinLength != nil {
+		minLength := int(*pbOpts.MinLength)
+		opts.MinLength = &minLength
+	}
+	if pbOpts.MaxLength != nil {
+		maxLength := int(*pbOpts.MaxLength)
+		opts.MaxLength = &maxLength
+	}
+
+	return opts
+}
+
+func protoToTextTypeOptions(pbOpts *configpb.TextTypeOptions) *configuration.TextTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.TextTypeOptions{}
+	if pbOpts.MinLength != nil {
+		minLength := int(*pbOpts.MinLength)
+		opts.MinLength = &minLength
+	}
+	if pbOpts.MaxLength != nil {
+		maxLength := int(*pbOpts.MaxLength)
+		opts.MaxLength = &maxLength
+	}
+
 	return opts
 }
 
@@ -488,6 +562,8 @@ func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions
 
 	return &configuration.TypeOptions{
 		Number:           protoToNumberTypeOptions(pbOpts.Number),
+		String:           protoToStringTypeOptions(pbOpts.String_),
+		Text:             protoToTextTypeOptions(pbOpts.Text),
 		Select:           protoToSelectTypeOptions(pbOpts.Select),
 		MultiSelect:      protoToMultiSelectTypeOptions(pbOpts.MultiSelect),
 		Integration:      protoToIntegrationTypeOptions(pbOpts.Integration),
@@ -568,11 +644,6 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			errorMessage = &node.ErrorMessage
 		}
 
-		var annotationText *string
-		if node.AnnotationText != "" {
-			annotationText = &node.AnnotationText
-		}
-
 		result[i] = models.Node{
 			ID:                node.Id,
 			Name:              node.Name,
@@ -583,7 +654,6 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			IsCollapsed:       node.IsCollapsed,
 			AppInstallationID: appInstallationID,
 			ErrorMessage:      errorMessage,
-			AnnotationText:    annotationText,
 		}
 	}
 	return result
@@ -635,10 +705,6 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
 			result[i].ErrorMessage = *node.ErrorMessage
 		}
-
-		if node.Type == models.NodeTypeAnnotation && node.AnnotationText != nil {
-			result[i].AnnotationText = *node.AnnotationText
-		}
 	}
 
 	return result
@@ -676,8 +742,8 @@ func ProtoToNodeType(nodeType componentpb.Node_Type) string {
 		return models.NodeTypeBlueprint
 	case componentpb.Node_TYPE_TRIGGER:
 		return models.NodeTypeTrigger
-	case componentpb.Node_TYPE_ANNOTATION:
-		return models.NodeTypeAnnotation
+	case componentpb.Node_TYPE_WIDGET:
+		return models.NodeTypeWidget
 	default:
 		return ""
 	}
@@ -826,6 +892,8 @@ func defaultValueToProto(value any) *string {
 func defaultValueFromProto(fieldType, defaultValue string) any {
 	switch fieldType {
 	case configuration.FieldTypeString:
+		fallthrough
+	case configuration.FieldTypeText:
 		fallthrough
 	case configuration.FieldTypeGitRef:
 		fallthrough

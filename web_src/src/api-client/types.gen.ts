@@ -212,6 +212,16 @@ export type ConfigurationSelectTypeOptions = {
   options?: Array<ConfigurationSelectOption>;
 };
 
+export type ConfigurationStringTypeOptions = {
+  minLength?: number;
+  maxLength?: number;
+};
+
+export type ConfigurationTextTypeOptions = {
+  minLength?: number;
+  maxLength?: number;
+};
+
 export type ConfigurationTimeTypeOptions = {
   format?: string;
 };
@@ -228,6 +238,8 @@ export type ConfigurationTypeOptions = {
   date?: ConfigurationDateTypeOptions;
   datetime?: ConfigurationDateTimeTypeOptions;
   anyPredicateList?: ConfigurationAnyPredicateListTypeOptions;
+  string?: ConfigurationStringTypeOptions;
+  text?: ConfigurationTextTypeOptions;
 };
 
 export type ConfigurationValidationRule = {

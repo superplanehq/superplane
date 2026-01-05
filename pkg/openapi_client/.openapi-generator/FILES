@@ -59,6 +59,8 @@ docs/ConfigurationRequiredCondition.md
 docs/ConfigurationResourceTypeOptions.md
 docs/ConfigurationSelectOption.md
 docs/ConfigurationSelectTypeOptions.md
+docs/ConfigurationStringTypeOptions.md
+docs/ConfigurationTextTypeOptions.md
 docs/ConfigurationTimeTypeOptions.md
 docs/ConfigurationTypeOptions.md
 docs/ConfigurationValidationRule.md
@@ -234,6 +236,8 @@ model_configuration_required_condition.go
 model_configuration_resource_type_options.go
 model_configuration_select_option.go
 model_configuration_select_type_options.go
+model_configuration_string_type_options.go
+model_configuration_text_type_options.go
 model_configuration_time_type_options.go
 model_configuration_type_options.go
 model_configuration_validation_rule.go
