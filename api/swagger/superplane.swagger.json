@@ -3073,6 +3073,9 @@
         "trigger": {
           "$ref": "#/definitions/NodeTriggerRef"
         },
+        "widget": {
+          "$ref": "#/definitions/NodeWidgetRef"
+        },
         "isCollapsed": {
           "type": "boolean"
         },
@@ -3080,9 +3083,6 @@
           "$ref": "#/definitions/ComponentsAppInstallationRef"
         },
         "errorMessage": {
-          "type": "string"
-        },
-        "annotationText": {
           "type": "string"
         }
       }
@@ -3093,7 +3093,7 @@
         "TYPE_COMPONENT",
         "TYPE_BLUEPRINT",
         "TYPE_TRIGGER",
-        "TYPE_ANNOTATION"
+        "TYPE_WIDGET"
       ],
       "default": "TYPE_COMPONENT"
     },
@@ -3768,6 +3768,14 @@
       }
     },
     "NodeTriggerRef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "NodeWidgetRef": {
       "type": "object",
       "properties": {
         "name": {
