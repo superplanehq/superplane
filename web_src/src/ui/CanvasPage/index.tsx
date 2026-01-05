@@ -857,6 +857,14 @@ function Sidebar({
     return getSidebarData(state.componentSidebar.selectedNodeId);
   }, [state.componentSidebar.selectedNodeId, getSidebarData]);
 
+  const isAnnotationNode = useMemo(() => {
+    if (!state.componentSidebar.selectedNodeId || !workflowNodes) {
+      return false;
+    }
+    const selectedNode = workflowNodes.find(node => node.id === state.componentSidebar.selectedNodeId);
+    return selectedNode?.type === "TYPE_ANNOTATION";
+  }, [state.componentSidebar.selectedNodeId, workflowNodes]);
+
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
 
@@ -880,8 +888,8 @@ function Sidebar({
     return null;
   }
 
-  // Show loading state when data is being fetched
-  if (sidebarData.isLoading && currentTab === "latest") {
+  // Show loading state when data is being fetched (skip for annotation nodes)
+  if (sidebarData.isLoading && currentTab === "latest" && !isAnnotationNode) {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
     const sidebarWidth = saved ? parseInt(saved, 10) : 450;
 
@@ -909,9 +917,9 @@ function Sidebar({
       nextInQueueEvents={nextInQueueEvents}
       nodeId={state.componentSidebar.selectedNodeId || undefined}
       iconSrc={sidebarData.iconSrc}
-      iconSlug={sidebarData.iconSlug}
-      iconColor={sidebarData.iconColor}
-      iconBackground={sidebarData.iconBackground}
+      iconSlug={isAnnotationNode ? "sticky-note" : sidebarData.iconSlug}
+      iconColor={isAnnotationNode ? "text-yellow-600" : sidebarData.iconColor}
+      iconBackground={isAnnotationNode ? "bg-yellow-100" : sidebarData.iconBackground}
       totalInQueueCount={sidebarData.totalInQueueCount}
       totalInHistoryCount={sidebarData.totalInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
@@ -965,13 +973,15 @@ function Sidebar({
       appName={editingNodeData?.appName}
       appInstallationRef={editingNodeData?.appInstallationRef}
       installedApplications={installedApplications}
-      currentTab={currentTab}
+      currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}
       components={components}
       triggers={triggers}
       blueprints={blueprints}
       onHighlightedNodesChange={onHighlightedNodesChange}
+      hideRunsTab={isAnnotationNode}
+      hideNodeId={isAnnotationNode}
     />
   );
 }

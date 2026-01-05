@@ -105,11 +105,18 @@ const HANDLE_STYLE = {
 function LeftHandle({ data, nodeId }: BlockProps) {
   if (data.type === "trigger" || data.type === "annotation") return null;
 
-  const isCollapsed =
-    (data.type === "composite" && data.composite?.collapsed) ||
-    (data.type === "switch" && data.switch?.collapsed) ||
-    (data.type === "component" && data.component?.collapsed) ||
-    (data.type === "annotation" && data.annotation?.collapsed);
+  const isCollapsed = (() => {
+    switch (data.type) {
+      case "composite":
+        return data.composite?.collapsed;
+      case "switch":
+        return data.switch?.collapsed;
+      case "component":
+        return data.component?.collapsed;
+      default:
+        return false;
+    }
+  })();
 
   // Check if this handle is part of the hovered edge (this is the target)
   const hoveredEdge = (data as any)._hoveredEdge;
@@ -155,12 +162,20 @@ function RightHandle({ data, nodeId }: BlockProps) {
   const isPendingConnection = (data as any).isPendingConnection;
   if (isTemplate || isPendingConnection || data.type === "annotation") return null;
 
-  const isCollapsed =
-    (data.type === "composite" && data.composite?.collapsed) ||
-    (data.type === "trigger" && data.trigger?.collapsed) ||
-    (data.type === "switch" && data.switch?.collapsed) ||
-    (data.type === "component" && data.component?.collapsed) ||
-    (data.type === "annotation" && data.annotation?.collapsed);
+  const isCollapsed = (() => {
+    switch (data.type) {
+      case "composite":
+        return data.composite?.collapsed;
+      case "trigger":
+        return data.trigger?.collapsed;
+      case "switch":
+        return data.switch?.collapsed;
+      case "component":
+        return data.component?.collapsed;
+      default:
+        return false;
+    }
+  })();
 
   const channels = data.outputChannels || ["default"];
 

@@ -70,7 +70,7 @@ export const AnnotationComponent: React.FC<AnnotationComponentProps> = ({
           hideActionsButton={hideActionsButton}
         />
 
-        <div className="px-3 py-3 pt-0 min-h-[80px] text-sm text-gray-800">
+        <div className="px-3 py-3 pt-1 min-h-[80px] text-sm text-gray-800">
           {annotationText ? (
             <div className="text-left prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: parsedContent }} />
           ) : (
