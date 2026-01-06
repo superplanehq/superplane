@@ -37,10 +37,7 @@ export function Breadcrumbs({ items, className, separator = "/", showDivider = t
               </span>
             ) : item.href ? (
               // Clickable link
-              <Link
-                href={item.href}
-                className="text-gray-500 hover:text-gray-800 transition-colors flex items-center"
-              >
+              <Link href={item.href} className="text-gray-500 hover:text-gray-800 transition-colors flex items-center">
                 {item.icon && <Icon name={item.icon} className="text-blue-700 dark:text-blue-400 mr-1" size="sm" />}
                 {item.label}
               </Link>

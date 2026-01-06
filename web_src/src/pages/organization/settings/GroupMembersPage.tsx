@@ -8,7 +8,12 @@ import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
 import { Table, TableBody, TableCell, TableRow } from "../../../components/Table/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useOrganizationGroup, useOrganizationGroupUsers, useRemoveUserFromGroup, useUpdateGroup } from "../../../hooks/useOrganizationData";
+import {
+  useOrganizationGroup,
+  useOrganizationGroupUsers,
+  useRemoveUserFromGroup,
+  useUpdateGroup,
+} from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { AddMembersSection, AddMembersSectionRef } from "./AddMembersSection";
 
@@ -24,14 +29,17 @@ export function GroupMembersPage() {
   const [editedGroupName, setEditedGroupName] = useState("");
 
   // React Query hooks
-  const { data: group, isLoading: loadingGroup, error: groupError, refetch: refetchGroup } = useOrganizationGroup(
-    orgId || "",
-    groupName || "",
-  );
-  const { data: members = [], isLoading: loadingMembers, error: membersError } = useOrganizationGroupUsers(
-    orgId || "",
-    groupName || "",
-  );
+  const {
+    data: group,
+    isLoading: loadingGroup,
+    error: groupError,
+    refetch: refetchGroup,
+  } = useOrganizationGroup(orgId || "", groupName || "");
+  const {
+    data: members = [],
+    isLoading: loadingMembers,
+    error: membersError,
+  } = useOrganizationGroupUsers(orgId || "", groupName || "");
 
   // Mutations
   const updateGroupMutation = useUpdateGroup(orgId || "");

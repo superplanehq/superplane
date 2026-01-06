@@ -114,16 +114,12 @@ export function Profile() {
                 <Text className="text-left text-gray-500 dark:text-gray-400">{user.id}</Text>
               </div>
               <div>
-                <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">
-                  Email Address
-                </Text>
+                <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">Email Address</Text>
                 <Text className="text-left text-gray-500 dark:text-gray-400">{user.email}</Text>
               </div>
 
               <div>
-                <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">
-                  Member Since
-                </Text>
+                <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">Member Since</Text>
                 <Text className="text-left text-gray-500 dark:text-gray-400">
                   {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Not available"}
                 </Text>

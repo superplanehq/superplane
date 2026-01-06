@@ -327,7 +327,11 @@ export function Members({ organizationId }: MembersProps) {
             onChange={(e) => setEmailsInput(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <Button className="flex items-center" onClick={handleEmailsSubmit} disabled={!emailsInput.trim() || isInviting}>
+          <Button
+            className="flex items-center"
+            onClick={handleEmailsSubmit}
+            disabled={!emailsInput.trim() || isInviting}
+          >
             <Icon name="send" />
             {isInviting ? "Sending..." : "Send Invitations"}
           </Button>
