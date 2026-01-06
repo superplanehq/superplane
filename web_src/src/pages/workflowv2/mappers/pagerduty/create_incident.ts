@@ -55,7 +55,7 @@ function metadataList(node: ComponentsNode): MetadataItem[] {
   }
 
   if (configuration.urgency) {
-    metadata.push({ icon: "funnel", label: "Urgency: " + configuration.urgency })
+    metadata.push({ icon: "funnel", label: "Urgency: " + configuration.urgency });
   }
 
   return metadata;

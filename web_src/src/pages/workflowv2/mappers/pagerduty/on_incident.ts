@@ -18,7 +18,7 @@ interface OnIncidentEventData {
     agent?: {
       html_url?: string;
       summary?: string;
-    }
+    };
     data?: {
       id?: string;
       title?: string;
@@ -55,15 +55,15 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
       Status: incident?.status || "",
       Urgency: incident?.urgency || "",
       Service: incident?.service?.summary || "",
-      URL: incident?.html_url || ""
+      URL: incident?.html_url || "",
     };
 
     if (eventData.event?.agent) {
-      values["Agent"] = eventData.event.agent.summary || ""
-      values["Agent URL"] = eventData.event.agent.html_url || ""
+      values["Agent"] = eventData.event.agent.summary || "";
+      values["Agent URL"] = eventData.event.agent.html_url || "";
     }
 
-    return values
+    return values;
   },
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
@@ -81,14 +81,14 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     if (configuration.events) {
       metadataItems.push({
         icon: "funnel",
-        label: `Events: ${configuration.events.join(", ")}`
+        label: `Events: ${configuration.events.join(", ")}`,
       });
     }
 
     if (configuration.urgencies) {
       metadataItems.push({
         icon: "funnel",
-        label: `Urgencies: ${configuration.urgencies.join(", ")}`
+        label: `Urgencies: ${configuration.urgencies.join(", ")}`,
       });
     }
 

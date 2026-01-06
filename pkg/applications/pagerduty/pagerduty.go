@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -176,15 +177,13 @@ func (p *PagerDuty) Sync(ctx core.SyncContext) error {
 	// If App OAuth is used, we need to generate the access token.
 	//
 	if configuration.AuthType == AuthTypeAppOAuth {
-		err := p.generateAppAccessToken(ctx, configuration)
-		if err != nil {
-			return err
-		}
+		return p.appOAuthSync(ctx, configuration)
 	}
 
-	//
-	// Verify that the auth is working by listing the services.
-	//
+	return p.apiTokenSync(ctx)
+}
+
+func (p *PagerDuty) apiTokenSync(ctx core.SyncContext) error {
 	client, err := NewClient(ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("error creating client")
@@ -200,7 +199,7 @@ func (p *PagerDuty) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
-func (p *PagerDuty) generateAppAccessToken(ctx core.SyncContext, configuration Configuration) error {
+func (p *PagerDuty) appOAuthSync(ctx core.SyncContext, configuration Configuration) error {
 	clientSecret, err := ctx.AppInstallation.GetConfig("clientSecret")
 	if err != nil {
 		return err
@@ -229,14 +228,14 @@ func (p *PagerDuty) generateAppAccessToken(ctx core.SyncContext, configuration C
 	data.Set("client_secret", string(clientSecret))
 	data.Set("scope", strings.Join(scopes, " "))
 
-	client := &http.Client{}
+	httpClient := &http.Client{Timeout: 10 * time.Second}
 	r, err := http.NewRequest(http.MethodPost, "https://identity.pagerduty.com/oauth/token", strings.NewReader(data.Encode()))
 	if err != nil {
 		return fmt.Errorf("error creating request: %v", err)
 	}
 
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := client.Do(r)
+	resp, err := httpClient.Do(r)
 	if err != nil {
 		return fmt.Errorf("error executing request: %v", err)
 	}
@@ -258,7 +257,31 @@ func (p *PagerDuty) generateAppAccessToken(ctx core.SyncContext, configuration C
 		return fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	return ctx.AppInstallation.SetSecret(AppAccessToken, []byte(tokenResponse.AccessToken))
+	err = ctx.AppInstallation.SetSecret(AppAccessToken, []byte(tokenResponse.AccessToken))
+	if err != nil {
+		return err
+	}
+
+	//
+	// Verify that the auth is working by listing the services.
+	//
+	client, err := NewClient(ctx.AppInstallation)
+	if err != nil {
+		return fmt.Errorf("error creating client")
+	}
+
+	services, err := client.ListServices()
+	if err != nil {
+		return fmt.Errorf("error determing abilities: %v", err)
+	}
+
+	ctx.AppInstallation.SetMetadata(Metadata{Services: services})
+	ctx.AppInstallation.SetState("ready", "")
+
+	//
+	// Schedule a new sync to refresh the access token before it expires
+	//
+	return ctx.AppInstallation.ScheduleResync(tokenResponse.GetExpiration())
 }
 
 func (p *PagerDuty) HandleRequest(ctx core.HTTPRequestContext) {
@@ -270,6 +293,14 @@ type TokenResponse struct {
 	TokenType   string `json:"token_type"`
 	ExpiresIn   int    `json:"expires_in"`
 	Scope       string `json:"scope"`
+}
+
+func (r *TokenResponse) GetExpiration() time.Duration {
+	if r.ExpiresIn > 0 {
+		return time.Duration(r.ExpiresIn/2) * time.Second
+	}
+
+	return time.Hour
 }
 
 type WebhookConfiguration struct {
