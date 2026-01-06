@@ -8,13 +8,17 @@ if [ "${1-}" = "" ]; then
   exit 1
 fi
 
+if [ "${2-}" = "" ]; then
+  echo "Usage: release/superplane-image/build.sh <version> <arch>"
+  exit 1
+fi
+
 VERSION="$1"
+ARCH="$2"
 
 echo "Building SuperPlane image"
 
-docker buildx build \
-  --progress=quiet \
+docker build \
   --push \
-  --platform linux/amd64,linux/arm64 \
-  -t "ghcr.io/superplanehq/superplane:${VERSION}" \
+  -t "ghcr.io/superplanehq/superplane:${VERSION}-${ARCH}" \
   -f Dockerfile .
