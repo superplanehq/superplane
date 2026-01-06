@@ -13,6 +13,7 @@ VERSION="$1"
 echo "Building SuperPlane demo image"
 
 docker buildx build \
+  --progress=quiet \
   --push \
   --platform linux/amd64,linux/arm64 \
   -t "ghcr.io/superplanehq/superplane-demo:${VERSION}" \
