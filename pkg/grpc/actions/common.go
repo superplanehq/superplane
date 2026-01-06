@@ -688,6 +688,12 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			}
 		}
 
+		if node.Ref.Widget != nil {
+			result[i].Widget = &componentpb.Node_WidgetRef{
+				Name: node.Ref.Widget.Name,
+			}
+		}
+
 		if node.Configuration != nil {
 			result[i].Configuration, _ = structpb.NewStruct(node.Configuration)
 		}
@@ -782,6 +788,12 @@ func ProtoToNodeRef(node *componentpb.Node) models.NodeRef {
 		if node.Trigger != nil {
 			ref.Trigger = &models.TriggerRef{
 				Name: node.Trigger.Name,
+			}
+		}
+	case componentpb.Node_TYPE_WIDGET:
+		if node.Widget != nil {
+			ref.Widget = &models.WidgetRef{
+				Name: node.Widget.Name,
 			}
 		}
 	}

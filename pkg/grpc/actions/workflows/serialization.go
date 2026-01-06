@@ -17,48 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const (
-	MaxAnnotationTextLength = 5000
-)
-
 func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workflow, error) {
-	workflowNodes, err := models.FindWorkflowNodes(workflow.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Only expose top-level nodes (no parents) to the UI
-	nodes := make([]models.Node, 0, len(workflowNodes))
-	for _, wn := range workflowNodes {
-		if wn.ParentNodeID != nil {
-			continue
-		}
-
-		var appInstallationID *string
-		if wn.AppInstallationID != nil {
-			idStr := wn.AppInstallationID.String()
-			appInstallationID = &idStr
-		}
-
-		var errorMessage *string
-		if wn.State == models.WorkflowNodeStateError && wn.StateReason != nil {
-			errorMessage = wn.StateReason
-		}
-
-		nodes = append(nodes, models.Node{
-			ID:                wn.NodeID,
-			Name:              wn.Name,
-			Type:              wn.Type,
-			Ref:               wn.Ref.Data(),
-			Configuration:     wn.Configuration.Data(),
-			Metadata:          wn.Metadata.Data(),
-			Position:          wn.Position.Data(),
-			IsCollapsed:       wn.IsCollapsed,
-			AppInstallationID: appInstallationID,
-			ErrorMessage:      errorMessage,
-		})
-	}
-
 	var createdBy *pb.UserRef
 	if workflow.CreatedBy != nil {
 		idStr := workflow.CreatedBy.String()
@@ -81,7 +40,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 				CreatedBy:      createdBy,
 			},
 			Spec: &pb.Workflow_Spec{
-				Nodes: actions.NodesToProto(nodes),
+				Nodes: actions.NodesToProto(workflow.Nodes),
 				Edges: actions.EdgesToProto(workflow.Edges),
 			},
 			Status: nil,
@@ -142,7 +101,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 			CreatedBy:      createdBy,
 		},
 		Spec: &pb.Workflow_Spec{
-			Nodes: actions.NodesToProto(nodes),
+			Nodes: actions.NodesToProto(workflow.Nodes),
 			Edges: actions.EdgesToProto(workflow.Edges),
 		},
 		Status: &pb.Workflow_Status{

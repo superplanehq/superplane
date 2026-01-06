@@ -274,7 +274,7 @@ func (r *Registry) GetWidget(name string) (core.Widget, error) {
 	widget, ok := r.Widgets[name]
 
 	if !ok {
-		return nil, fmt.Errorf("widget %s nto registered", name)
+		return nil, fmt.Errorf("widget %s not registered", name)
 	}
 
 	return widget, nil
