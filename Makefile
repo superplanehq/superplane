@@ -236,3 +236,11 @@ image.auth:
 image.push:
 	docker tag $(IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
 	docker push $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
+
+#
+# Tag creation
+#
+
+tag.create.patch:
+	./release/create_tag.sh patch
+		
