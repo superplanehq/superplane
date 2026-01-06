@@ -862,7 +862,7 @@ function Sidebar({
       return false;
     }
     const selectedNode = workflowNodes.find((node) => node.id === state.componentSidebar.selectedNodeId);
-    return selectedNode?.type === "TYPE_ANNOTATION";
+    return selectedNode?.type === "TYPE_WIDGET" && selectedNode?.widget?.name === "annotation";
   }, [state.componentSidebar.selectedNodeId, workflowNodes]);
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);

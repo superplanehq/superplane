@@ -4,7 +4,7 @@ import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
 import { CollapsedComponent } from "../collapsedComponent";
 import { StickyNote } from "lucide-react";
-import { parseBasicMarkdown } from "@/utils/markdown";
+import ReactMarkdown from "react-markdown";
 
 export interface AnnotationComponentProps extends ComponentActionsProps {
   title: string;
@@ -52,8 +52,6 @@ export const AnnotationComponent: React.FC<AnnotationComponentProps> = ({
     );
   }
 
-  const parsedContent = annotationText ? parseBasicMarkdown(annotationText) : "";
-
   return (
     <SelectionWrapper selected={selected}>
       <div className="relative flex flex-col outline-1 outline-slate-400 rounded-md w-[23rem] bg-yellow-50 border border-yellow-200">
@@ -72,7 +70,40 @@ export const AnnotationComponent: React.FC<AnnotationComponentProps> = ({
 
         <div className="px-3 py-3 pt-1 min-h-[80px] text-sm text-gray-800">
           {annotationText ? (
-            <div className="text-left prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: parsedContent }} />
+            <div className="text-left prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0">
+              <ReactMarkdown
+                disallowedElements={["script", "iframe", "object", "embed"]}
+                unwrapDisallowed={true}
+                components={{
+                  h1: ({ children }) => <h1 className="text-lg font-bold text-yellow-800">{children}</h1>,
+                  h2: ({ children }) => <h2 className="text-base font-bold text-yellow-800">{children}</h2>,
+                  h3: ({ children }) => <h3 className="text-sm font-bold text-yellow-800">{children}</h3>,
+                  a: ({ href, children }) => {
+                    const safeHref = href && (href.startsWith("http://") || href.startsWith("https://")) ? href : "#";
+                    return (
+                      <a
+                        href={safeHref}
+                        className="text-yellow-700 underline hover:text-yellow-900"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {children}
+                      </a>
+                    );
+                  },
+                  code: ({ children }) => (
+                    <code className="bg-yellow-100 px-1 py-0.5 rounded text-xs font-mono text-yellow-900">
+                      {children}
+                    </code>
+                  ),
+                  pre: ({ children }) => (
+                    <pre className="bg-yellow-100 p-2 rounded text-xs overflow-x-auto">{children}</pre>
+                  ),
+                }}
+              >
+                {annotationText}
+              </ReactMarkdown>
+            </div>
           ) : (
             <div className="text-gray-500 italic flex items-center gap-2">
               <StickyNote size={16} />

@@ -32,6 +32,7 @@ import {
   useTriggers,
   useUpdateWorkflow,
   useWorkflow,
+  useWidgets,
   workflowKeys,
 } from "@/hooks/useWorkflowData";
 import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
@@ -90,6 +91,7 @@ export function WorkflowPageV2() {
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
+  const { data: widgets = [], isLoading: widgetsLoading } = useWidgets();
   const { data: availableApplications = [], isLoading: applicationsLoading } = useAvailableApplications();
   const { data: installedApplications = [] } = useInstalledApplications(organizationId!);
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
@@ -717,24 +719,18 @@ export function WorkflowPageV2() {
         if (triggerApp) {
           appName = triggerApp.name;
         }
-      } else if (node.type === "TYPE_ANNOTATION") {
-        configurationFields = [
-          {
-            name: "annotationText",
-            label: "Content",
-            type: "text",
-            description:
-              "Markdown content for this annotation. Supports **bold**, *italic*, links, and other markdown formatting.",
-            required: false,
-          },
-        ];
-        displayLabel = "Note";
+      } else if (node.type === "TYPE_WIDGET") {
+        const widget = widgets.find((w) => w.name === node.widget?.name);
+        if (widget) {
+          configurationFields = widget.configuration || [];
+          displayLabel = widget.label || "Widget";
+        }
 
         return {
           nodeId: node.id!,
           nodeName: node.name!,
           displayLabel,
-          configuration: { annotationText: node.annotationText || "" },
+          configuration: { text: node.configuration?.text || "" },
           configurationFields,
           appName,
           appInstallationRef: node.appInstallation,
@@ -751,7 +747,7 @@ export function WorkflowPageV2() {
         appInstallationRef: node.appInstallation,
       };
     },
-    [workflow, blueprints, allComponents, allTriggers, availableApplications],
+    [workflow, blueprints, allComponents, allTriggers, availableApplications, widgets],
   );
 
   const handleNodeConfigurationSave = useCallback(
@@ -769,12 +765,12 @@ export function WorkflowPageV2() {
       // Update the node's configuration, name, and app installation ref in local cache only
       const updatedNodes = workflow?.spec?.nodes?.map((node) => {
         if (node.id === nodeId) {
-          // Handle annotation nodes specially - store annotationText in the annotationText field, not configuration
-          if (node.type === "TYPE_ANNOTATION") {
+          // Handle widget nodes like any other node - store in configuration
+          if (node.type === "TYPE_WIDGET") {
             return {
               ...node,
               name: updatedNodeName,
-              annotationText: updatedConfiguration.annotationText || "",
+              configuration: { ...node.configuration, ...updatedConfiguration },
             };
           }
 
@@ -849,7 +845,7 @@ export function WorkflowPageV2() {
             : buildingBlock.type === "blueprint"
               ? "TYPE_BLUEPRINT"
               : buildingBlock.name === "annotation"
-                ? "TYPE_ANNOTATION"
+                ? "TYPE_WIDGET"
                 : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
         appInstallation: appInstallationRef,
@@ -866,8 +862,9 @@ export function WorkflowPageV2() {
 
       // Add type-specific reference
       if (buildingBlock.name === "annotation") {
-        // Annotation nodes don't need component/trigger/blueprint references
-        newNode.annotationText = "";
+        // Annotation nodes are now widgets
+        newNode.widget = { name: "annotation" };
+        newNode.configuration = { text: "" };
       } else if (buildingBlock.type === "component") {
         newNode.component = { name: buildingBlock.name };
       } else if (buildingBlock.type === "trigger") {
@@ -1525,7 +1522,7 @@ export function WorkflowPageV2() {
   );
 
   // Show loading indicator while data is being fetched
-  if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
+  if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading || widgetsLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-3">
@@ -1959,8 +1956,10 @@ function prepareNode(
       }
 
       return compositeNode;
-    case "TYPE_ANNOTATION":
+    case "TYPE_WIDGET":
+      // support other widgets if necessary
       return prepareAnnotationNode(node);
+
     default:
       return prepareComponentNode(
         nodes,
@@ -1986,7 +1985,7 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
       outputChannels: [], // Annotation nodes don't have output channels
       annotation: {
         title: node.name || "Annotation",
-        annotationText: node.annotationText || "",
+        annotationText: node.configuration?.text || "",
         collapsed: node.isCollapsed || false,
       },
     },
