@@ -16,4 +16,4 @@ docker buildx build \
   --push \
   --platform linux/amd64,linux/arm64 \
   -t "ghcr.io/superplanehq/superplane-demo:${VERSION}" \
-  -f release/demo/Dockerfile . \
+  -f release/superplane-demo-image/Dockerfile . \
