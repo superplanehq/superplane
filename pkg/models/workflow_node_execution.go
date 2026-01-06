@@ -21,6 +21,7 @@ const (
 	WorkflowNodeExecutionResultFailed    = "failed"
 	WorkflowNodeExecutionResultCancelled = "cancelled"
 
+	WorkflowNodeExecutionResultReasonOk    = "ok"
 	WorkflowNodeExecutionResultReasonError = "error"
 )
 

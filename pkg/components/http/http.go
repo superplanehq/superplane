@@ -17,6 +17,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -554,7 +555,7 @@ func (e *HTTP) handleRequestError(ctx core.ExecutionContext, err error, totalAtt
 		return fmt.Errorf("request failed after %d attempts: %w (and failed to emit event: %v)", totalAttempts, err, emitErr)
 	}
 
-	err = ctx.ExecutionStateContext.Fail("HTTP request failed", fmt.Sprintf("Request failed after %d attempts: %v", totalAttempts, err))
+	err = ctx.ExecutionStateContext.Fail(models.WorkflowNodeExecutionResultReasonError, fmt.Sprintf("Request failed after %d attempts: %v", totalAttempts, err))
 	if err != nil {
 		return fmt.Errorf("request failed after %d attempts: %w (and failed to mark execution as failed: %v)", totalAttempts, err, err)
 	}
@@ -640,7 +641,7 @@ func (e *HTTP) processResponse(ctx core.ExecutionContext, resp *http.Response, s
 	}
 
 	if !isSuccess {
-		ctx.ExecutionStateContext.Fail("HTTP request failed", fmt.Sprintf("HTTP request failed with status %d", resp.StatusCode))
+		ctx.ExecutionStateContext.Fail(models.WorkflowNodeExecutionResultReasonError, fmt.Sprintf("HTTP request failed with status %d", resp.StatusCode))
 		return nil
 	}
 
