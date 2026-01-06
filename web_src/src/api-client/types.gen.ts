@@ -793,6 +793,23 @@ export type UsersUserStatus = {
   roleAssignments?: Array<UsersUserRoleAssignment>;
 };
 
+export type WidgetsDescribeWidgetResponse = {
+  widget?: WidgetsWidget;
+};
+
+export type WidgetsListWidgetsResponse = {
+  widgets?: Array<WidgetsWidget>;
+};
+
+export type WidgetsWidget = {
+  name?: string;
+  label?: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  configuration?: Array<ConfigurationField>;
+};
+
 export type WorkflowNodeExecutionResult = "RESULT_UNKNOWN" | "RESULT_PASSED" | "RESULT_FAILED" | "RESULT_CANCELLED";
 
 export type WorkflowNodeExecutionResultReason = "RESULT_REASON_OK" | "RESULT_REASON_ERROR";
@@ -2481,6 +2498,58 @@ export type UsersListUserRolesResponses = {
 };
 
 export type UsersListUserRolesResponse2 = UsersListUserRolesResponses[keyof UsersListUserRolesResponses];
+
+export type WidgetsListWidgetsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/v1/widgets";
+};
+
+export type WidgetsListWidgetsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type WidgetsListWidgetsError = WidgetsListWidgetsErrors[keyof WidgetsListWidgetsErrors];
+
+export type WidgetsListWidgetsResponses = {
+  /**
+   * A successful response.
+   */
+  200: WidgetsListWidgetsResponse;
+};
+
+export type WidgetsListWidgetsResponse2 = WidgetsListWidgetsResponses[keyof WidgetsListWidgetsResponses];
+
+export type WidgetsDescribeWidgetData = {
+  body?: never;
+  path: {
+    name: string;
+  };
+  query?: never;
+  url: "/api/v1/widgets/{name}";
+};
+
+export type WidgetsDescribeWidgetErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type WidgetsDescribeWidgetError = WidgetsDescribeWidgetErrors[keyof WidgetsDescribeWidgetErrors];
+
+export type WidgetsDescribeWidgetResponses = {
+  /**
+   * A successful response.
+   */
+  200: WidgetsDescribeWidgetResponse;
+};
+
+export type WidgetsDescribeWidgetResponse2 = WidgetsDescribeWidgetResponses[keyof WidgetsDescribeWidgetResponses];
 
 export type WorkflowsListWorkflowsData = {
   body?: never;

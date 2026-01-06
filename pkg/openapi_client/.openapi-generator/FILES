@@ -14,6 +14,7 @@ api_roles.go
 api_secret.go
 api_trigger.go
 api_users.go
+api_widget.go
 api_workflow.go
 api_workflow_event.go
 api_workflow_node.go
@@ -168,6 +169,10 @@ docs/UsersUserMetadata.md
 docs/UsersUserRoleAssignment.md
 docs/UsersUserSpec.md
 docs/UsersUserStatus.md
+docs/WidgetAPI.md
+docs/WidgetsDescribeWidgetResponse.md
+docs/WidgetsListWidgetsResponse.md
+docs/WidgetsWidget.md
 docs/WorkflowAPI.md
 docs/WorkflowEventAPI.md
 docs/WorkflowNodeAPI.md
@@ -337,6 +342,9 @@ model_users_user_metadata.go
 model_users_user_role_assignment.go
 model_users_user_spec.go
 model_users_user_status.go
+model_widgets_describe_widget_response.go
+model_widgets_list_widgets_response.go
+model_widgets_widget.go
 model_workflow_node_execution_result.go
 model_workflow_node_execution_result_reason.go
 model_workflow_node_execution_state.go
@@ -376,6 +384,7 @@ test/api_roles_test.go
 test/api_secret_test.go
 test/api_trigger_test.go
 test/api_users_test.go
+test/api_widget_test.go
 test/api_workflow_event_test.go
 test/api_workflow_node_execution_test.go
 test/api_workflow_node_test.go

@@ -41,6 +41,9 @@
       "name": "Triggers"
     },
     {
+      "name": "Widgets"
+    },
+    {
       "name": "Blueprints"
     },
     {
@@ -2013,6 +2016,62 @@
         ],
         "tags": [
           "Users"
+        ]
+      }
+    },
+    "/api/v1/widgets": {
+      "get": {
+        "summary": "List widgets",
+        "description": "Returns a list of all available widgets",
+        "operationId": "Widgets_ListWidgets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WidgetsListWidgetsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Widget"
+        ]
+      }
+    },
+    "/api/v1/widgets/{name}": {
+      "get": {
+        "summary": "Describe widget",
+        "description": "Returns a widget by its name",
+        "operationId": "Widgets_DescribeWidget",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WidgetsDescribeWidgetResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Widget"
         ]
       }
     },
@@ -4639,6 +4698,53 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/UsersUserRoleAssignment"
+          }
+        }
+      }
+    },
+    "WidgetsDescribeWidgetResponse": {
+      "type": "object",
+      "properties": {
+        "widget": {
+          "$ref": "#/definitions/WidgetsWidget"
+        }
+      }
+    },
+    "WidgetsListWidgetsResponse": {
+      "type": "object",
+      "properties": {
+        "widgets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WidgetsWidget"
+          }
+        }
+      }
+    },
+    "WidgetsWidget": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationField"
           }
         }
       }
