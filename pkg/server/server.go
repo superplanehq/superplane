@@ -83,6 +83,14 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_APP_INSTALLATION_REQUEST_WORKER") == "yes" {
+		log.Println("Starting App Installation Request Worker")
+
+		webhooksBaseURL := getWebhookBaseURL(baseURL)
+		w := workers.NewAppInstallationRequestWorker(encryptor, registry, baseURL, webhooksBaseURL)
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Workflow Node Queue Worker")
 

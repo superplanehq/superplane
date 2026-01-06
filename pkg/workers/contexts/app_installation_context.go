@@ -92,6 +92,33 @@ func (c *AppInstallationContext) createWebhook(configuration any) error {
 	return nil
 }
 
+func (c *AppInstallationContext) ScheduleResync(interval time.Duration) error {
+	if interval < time.Second {
+		return fmt.Errorf("interval must be bigger than 1s")
+	}
+
+	err := c.completeCurrentRequestForInstallation()
+	if err != nil {
+		return err
+	}
+
+	runAt := time.Now().Add(interval)
+	return c.appInstallation.CreateSyncRequest(c.tx, &runAt)
+}
+
+func (c *AppInstallationContext) completeCurrentRequestForInstallation() error {
+	request, err := models.FindPendingRequestForAppInstallation(c.tx, c.appInstallation.ID)
+	if err == nil {
+		return request.Complete(c.tx)
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+
+	return err
+}
+
 func (c *AppInstallationContext) GetConfig(name string) ([]byte, error) {
 	config := c.appInstallation.Configuration.Data()
 	v, ok := config[name]

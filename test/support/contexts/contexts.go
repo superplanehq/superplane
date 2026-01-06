@@ -72,6 +72,7 @@ type AppInstallationContext struct {
 	BrowserAction    *core.BrowserAction
 	Secrets          map[string]core.InstallationSecret
 	WebhookRequests  []any
+	ResyncRequests   []time.Duration
 }
 
 func (c *AppInstallationContext) ID() uuid.UUID {
@@ -122,6 +123,11 @@ func (c *AppInstallationContext) GetSecrets() ([]core.InstallationSecret, error)
 
 func (c *AppInstallationContext) RequestWebhook(configuration any) error {
 	c.WebhookRequests = append(c.WebhookRequests, configuration)
+	return nil
+}
+
+func (c *AppInstallationContext) ScheduleResync(interval time.Duration) error {
+	c.ResyncRequests = append(c.ResyncRequests, interval)
 	return nil
 }
 
