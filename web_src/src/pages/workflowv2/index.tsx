@@ -1054,7 +1054,7 @@ export function WorkflowPageV2() {
   );
 
   const handleEdgeCreate = useCallback(
-    (sourceId: string, targetId: string, sourceHandle?: string | null) => {
+    async (sourceId: string, targetId: string, sourceHandle?: string | null) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       // Save snapshot before making changes
@@ -1080,13 +1080,27 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      markUnsavedChange("structural");
+
+      if (isAutoSaveEnabled) {
+        await handleSaveWorkflow(updatedWorkflow);
+      } else {
+        markUnsavedChange("structural");
+      }
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      isAutoSaveEnabled,
+      markUnsavedChange,
+    ],
   );
 
   const handleNodeDelete = useCallback(
-    (nodeId: string) => {
+    async (nodeId: string) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       // Save snapshot before making changes
@@ -1109,13 +1123,27 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      markUnsavedChange("structural");
+
+      if (isAutoSaveEnabled) {
+        await handleSaveWorkflow(updatedWorkflow);
+      } else {
+        markUnsavedChange("structural");
+      }
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      isAutoSaveEnabled,
+      markUnsavedChange,
+    ],
   );
 
   const handleEdgeDelete = useCallback(
-    (edgeIds: string[]) => {
+    async (edgeIds: string[]) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       // Save snapshot before making changes
@@ -1152,9 +1180,23 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      markUnsavedChange("structural");
+
+      if (isAutoSaveEnabled) {
+        await handleSaveWorkflow(updatedWorkflow);
+      } else {
+        markUnsavedChange("structural");
+      }
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      isAutoSaveEnabled,
+      markUnsavedChange,
+    ],
   );
 
   /**
@@ -1214,7 +1256,7 @@ export function WorkflowPageV2() {
   );
 
   const handleNodeCollapseChange = useCallback(
-    (nodeId: string) => {
+    async (nodeId: string) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       // Save snapshot before making changes
@@ -1245,9 +1287,23 @@ export function WorkflowPageV2() {
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      markUnsavedChange("structural");
+
+      if (isAutoSaveEnabled) {
+        await handleSaveWorkflow(updatedWorkflow);
+      } else {
+        markUnsavedChange("structural");
+      }
     },
-    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      isAutoSaveEnabled,
+      markUnsavedChange,
+    ],
   );
 
   const handleConfigure = useCallback(
