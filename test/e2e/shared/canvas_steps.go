@@ -71,8 +71,17 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 }
 
 func (s *CanvasSteps) Save() {
-	s.session.Click(q.TestID("save-canvas-button"))
-	s.session.AssertText("Canvas changes saved")
+	saveButton := q.TestID("save-canvas-button")
+	loc := saveButton.Run(s.session)
+
+	if isVisible, _ := loc.IsVisible(); isVisible {
+		s.session.Click(saveButton)
+		s.session.AssertText("Canvas changes saved")
+		s.session.Sleep(500)
+		return
+	}
+
+	// Auto-save may have already persisted the changes.
 	s.session.Sleep(500)
 }
 
