@@ -158,6 +158,12 @@ import type {
   UsersListUserRolesData,
   UsersListUserRolesResponse2,
   UsersListUserRolesError,
+  WidgetsListWidgetsData,
+  WidgetsListWidgetsResponse2,
+  WidgetsListWidgetsError,
+  WidgetsDescribeWidgetData,
+  WidgetsDescribeWidgetResponse2,
+  WidgetsDescribeWidgetError,
   WorkflowsListWorkflowsData,
   WorkflowsListWorkflowsResponse2,
   WorkflowsListWorkflowsError,
@@ -1090,6 +1096,36 @@ export const usersListUserRoles = <ThrowOnError extends boolean = true>(
 ) => {
   return (options.client ?? _heyApiClient).get<UsersListUserRolesResponse2, UsersListUserRolesError, ThrowOnError>({
     url: "/api/v1/users/{userId}/roles",
+    ...options,
+  });
+};
+
+/**
+ * List widgets
+ * Returns a list of all available widgets
+ */
+export const widgetsListWidgets = <ThrowOnError extends boolean = true>(
+  options?: Options<WidgetsListWidgetsData, ThrowOnError>,
+) => {
+  return (options?.client ?? _heyApiClient).get<WidgetsListWidgetsResponse2, WidgetsListWidgetsError, ThrowOnError>({
+    url: "/api/v1/widgets",
+    ...options,
+  });
+};
+
+/**
+ * Describe widget
+ * Returns a widget by its name
+ */
+export const widgetsDescribeWidget = <ThrowOnError extends boolean = true>(
+  options: Options<WidgetsDescribeWidgetData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    WidgetsDescribeWidgetResponse2,
+    WidgetsDescribeWidgetError,
+    ThrowOnError
+  >({
+    url: "/api/v1/widgets/{name}",
     ...options,
   });
 };

@@ -92,6 +92,8 @@ type Field struct {
  */
 type TypeOptions struct {
 	Number           *NumberTypeOptions           `json:"number,omitempty"`
+	String           *StringTypeOptions           `json:"string,omitempty"`
+	Text             *TextTypeOptions             `json:"text,omitempty"`
 	Select           *SelectTypeOptions           `json:"select,omitempty"`
 	MultiSelect      *MultiSelectTypeOptions      `json:"multi_select,omitempty"`
 	Integration      *IntegrationTypeOptions      `json:"integration,omitempty"`
@@ -120,6 +122,19 @@ type ResourceTypeOptions struct {
 type NumberTypeOptions struct {
 	Min *int `json:"min,omitempty"`
 	Max *int `json:"max,omitempty"`
+}
+
+/*
+ * StringTypeOptions specifies constraints for string fields
+ */
+type StringTypeOptions struct {
+	MinLength *int `json:"min_length,omitempty"`
+	MaxLength *int `json:"max_length,omitempty"`
+}
+
+type TextTypeOptions struct {
+	MinLength *int `json:"min_length,omitempty"`
+	MaxLength *int `json:"max_length,omitempty"`
 }
 
 /*
@@ -231,10 +246,13 @@ const (
 	ValidationRuleGreaterThan = "greater_than"
 	ValidationRuleEqual       = "equal"
 	ValidationRuleNotEqual    = "not_equal"
+	ValidationRuleMaxLength   = "max_length"
+	ValidationRuleMinLength   = "min_length"
 )
 
 type ValidationRule struct {
-	Type        string `json:"type"`         // less_than, greater_than, equal, not_equal
-	CompareWith string `json:"compare_with"` // field name to compare with
+	Type        string `json:"type"`         // less_than, greater_than, equal, not_equal, max_length, min_length
+	CompareWith string `json:"compare_with"` // field name to compare with (for field comparisons)
+	Value       any    `json:"value"`        // static value to compare with (for direct validation)
 	Message     string `json:"message"`      // custom error message
 }

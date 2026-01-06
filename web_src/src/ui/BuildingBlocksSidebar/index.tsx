@@ -38,6 +38,7 @@ export interface BuildingBlocksSidebarProps {
   canvasZoom?: number;
   disabled?: boolean;
   onBlockClick?: (block: BuildingBlock) => void;
+  onAddNote?: () => void;
 }
 
 export function BuildingBlocksSidebar({
@@ -47,19 +48,24 @@ export function BuildingBlocksSidebar({
   canvasZoom = 1,
   disabled = false,
   onBlockClick,
+  onAddNote,
 }: BuildingBlocksSidebarProps) {
   if (!isOpen) {
     return (
-      <Button
-        variant="outline"
-        onClick={() => onToggle(true)}
-        aria-label="Open sidebar"
-        data-testid="open-sidebar-button"
-        className="absolute top-4 right-4 z-10"
-      >
-        <Plus size={16} />
-        Components
-      </Button>
+      <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <Button variant="outline" onClick={onAddNote} aria-label="Add Note" data-testid="add-note-button">
+          Add Note
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => onToggle(true)}
+          aria-label="Open sidebar"
+          data-testid="open-sidebar-button"
+        >
+          <Plus size={16} />
+          Components
+        </Button>
+      </div>
     );
   }
 

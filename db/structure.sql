@@ -447,7 +447,8 @@ CREATE TABLE public.workflows (
     updated_at timestamp without time zone NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_by uuid,
-    deleted_at timestamp without time zone
+    deleted_at timestamp without time zone,
+    nodes jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -1307,7 +1308,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251231112927	f
+20260104234939	f
 \.
 
 

@@ -98,6 +98,7 @@ interface ComponentSidebarProps {
   // Settings tab props
   showSettingsTab?: boolean;
   hideRunsTab?: boolean; // Hide the "Runs" tab when showing only settings
+  hideNodeId?: boolean; // Hide the node ID with copy functionality
   currentTab?: "latest" | "settings";
   onTabChange?: (tab: "latest" | "settings") => void;
   nodeConfigMode?: "create" | "edit";
@@ -171,6 +172,7 @@ export const ComponentSidebar = ({
   getExecutionState,
   showSettingsTab = false,
   hideRunsTab = false,
+  hideNodeId = false,
   currentTab = "latest",
   onTabChange,
   nodeConfigMode = "edit",
@@ -451,7 +453,12 @@ export const ComponentSidebar = ({
           }`}
         />
       </div>
-      <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-8 relative border-b-1 border-border">
+      <div
+        className={
+          "flex items-center justify-between gap-3 px-4 pt-3 relative border-b-1 border-border" +
+          (hideNodeId ? " pb-3" : " pb-8")
+        }
+      >
         <div className="flex flex-col items-start gap-3 w-full">
           <div className="flex justify-between gap-3 w-full">
             <div className="flex flex-col gap-0.5">
@@ -461,7 +468,7 @@ export const ComponentSidebar = ({
                 </div>
                 <h2 className="text-base font-semibold">{nodeName}</h2>
               </div>
-              {nodeId && (
+              {nodeId && !hideNodeId && (
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] text-gray-500 font-mono">{nodeId}</span>
                   <button

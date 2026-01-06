@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package Superplane.Widgets;
+
+import "configuration.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/widgets";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Widgets API";
+    version: "1.0";
+    description: "API for Superplane Widgets";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Widgets {
+  rpc ListWidgets(ListWidgetsRequest) returns (ListWidgetsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/widgets"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List widgets";
+      description: "Returns a list of all available widgets";
+      tags: "Widget";
+    };
+  }
+
+  rpc DescribeWidget(DescribeWidgetRequest) returns (DescribeWidgetResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/widgets/{name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe widget";
+      description: "Returns a widget by its name";
+      tags: "Widget";
+    };
+  }
+}
+
+message ListWidgetsRequest {}
+
+message ListWidgetsResponse {
+  repeated Widget widgets = 1;
+}
+
+message DescribeWidgetRequest {
+  string name = 1;
+}
+
+message DescribeWidgetResponse {
+  Widget widget = 1;
+}
+
+message Widget {
+  string name = 1;
+  string label = 2;
+  string description = 3;
+  string icon = 4;
+  string color = 5;
+  repeated Configuration.Field configuration = 6;
+}

@@ -23,6 +23,7 @@ import (
 	secretPb "github.com/superplanehq/superplane/pkg/protos/secrets"
 	triggerPb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
+	widgetPb "github.com/superplanehq/superplane/pkg/protos/widgets"
 	pbWorkflows "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc"
@@ -112,6 +113,9 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 
 	triggerService := NewTriggerService(registry)
 	triggerPb.RegisterTriggersServer(grpcServer, triggerService)
+
+	widgetService := NewWidgetService(registry)
+	widgetPb.RegisterWidgetsServer(grpcServer, widgetService)
 
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)

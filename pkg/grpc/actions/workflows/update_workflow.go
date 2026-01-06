@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -38,6 +39,11 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		return nil, err
 	}
 
+	parentNodesByNodeID := make(map[string]*models.Node)
+	for i := range nodes {
+		parentNodesByNodeID[nodes[i].ID] = &nodes[i]
+	}
+
 	expandedNodes, err := expandNodes(organizationID, nodes)
 	if err != nil {
 		return nil, err
@@ -46,18 +52,6 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 	now := time.Now()
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		//
-		// Update the workflow record first
-		//
-		existingWorkflow.Name = pbWorkflow.Metadata.Name
-		existingWorkflow.Description = pbWorkflow.Metadata.Description
-		existingWorkflow.UpdatedAt = &now
-		existingWorkflow.Edges = datatypes.NewJSONSlice(edges)
-		err := tx.Save(&existingWorkflow).Error
-		if err != nil {
-			return err
-		}
-
 		//
 		// Update the workflow node records
 		//
@@ -71,13 +65,18 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		// and tracking which nodes we've seen, to delete nodes that are no longer in the workflow at the end.
 		//
 		for _, node := range expandedNodes {
+			// Widgets are not persisted in workflow_nodes table and don't have any logic to execute and to setup.
+			if node.Type == models.NodeTypeWidget {
+				continue
+			}
+
 			workflowNode, err := upsertNode(tx, existingNodes, node, workflowID)
 			if err != nil {
 				return err
 			}
 
 			if workflowNode.State == models.WorkflowNodeStateReady {
-				err = setupNode(ctx, tx, encryptor, registry, *workflowNode, webhookBaseURL)
+				err = setupNode(ctx, tx, encryptor, registry, workflowNode, webhookBaseURL)
 				if err != nil {
 					workflowNode.State = models.WorkflowNodeStateError
 					errorMsg := err.Error()
@@ -86,7 +85,29 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 						return saveErr
 					}
 				}
+
+				if workflowNode.ParentNodeID == nil {
+					parentNode, ok := parentNodesByNodeID[workflowNode.NodeID]
+					if !ok {
+						log.Errorf("Parent node %s not found", workflowNode.NodeID)
+						return status.Errorf(codes.Internal, "It was not possible to find the parent node %s", workflowNode.NodeID)
+					}
+					parentNode.Metadata = workflowNode.Metadata.Data()
+				}
 			}
+		}
+
+		//
+		// Update the workflow record latest because we need to setup the metadata of the parent nodes
+		//
+		existingWorkflow.Name = pbWorkflow.Metadata.Name
+		existingWorkflow.Description = pbWorkflow.Metadata.Description
+		existingWorkflow.UpdatedAt = &now
+		existingWorkflow.Edges = datatypes.NewJSONSlice(edges)
+		existingWorkflow.Nodes = datatypes.NewJSONSlice(nodes)
+		err = tx.Save(&existingWorkflow).Error
+		if err != nil {
+			return err
 		}
 
 		return deleteNodes(tx, existingNodes, expandedNodes)
@@ -177,6 +198,7 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 
 	initialState := models.WorkflowNodeStateReady
 	var stateReason *string
+
 	if node.ErrorMessage != nil && *node.ErrorMessage != "" {
 		initialState = models.WorkflowNodeStateError
 		stateReason = node.ErrorMessage
@@ -208,32 +230,35 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 	return &workflowNode, nil
 }
 
-func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode, webhookBaseURL string) error {
+func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.WorkflowNode, webhookBaseURL string) error {
 	switch node.Type {
 	case models.NodeTypeTrigger:
 		return setupTrigger(ctx, tx, encryptor, registry, node, webhookBaseURL)
 	case models.NodeTypeComponent:
 		return setupComponent(tx, encryptor, registry, node)
+	case models.NodeTypeWidget:
+		// Widgets are not persisted and don't have any logic to execute and to setup.
+		return nil
 	}
 
 	return nil
 }
 
-func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode, webhookBaseURL string) error {
+func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.WorkflowNode, webhookBaseURL string) error {
 	ref := node.Ref.Data()
 	trigger, err := registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
 		return err
 	}
 
-	logger := logging.ForNode(node)
+	logger := logging.ForNode(*node)
 	triggerCtx := core.TriggerContext{
 		Configuration:      node.Configuration.Data(),
-		MetadataContext:    contexts.NewNodeMetadataContext(tx, &node),
-		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
+		MetadataContext:    contexts.NewNodeMetadataContext(tx, node),
+		RequestContext:     contexts.NewNodeRequestContext(tx, node),
 		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
-		EventContext:       contexts.NewEventContext(tx, &node),
-		WebhookContext:     contexts.NewWebhookContext(ctx, tx, encryptor, &node, webhookBaseURL),
+		EventContext:       contexts.NewEventContext(tx, node),
+		WebhookContext:     contexts.NewWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
 	}
 
 	if node.AppInstallationID != nil {
@@ -245,7 +270,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
 		triggerCtx.AppInstallationContext = contexts.NewAppInstallationContext(
 			tx,
-			&node,
+			node,
 			appInstallation,
 			encryptor,
 			registry,
@@ -258,21 +283,21 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		return fmt.Errorf("error setting up node %s: %v", node.NodeID, err)
 	}
 
-	return tx.Save(&node).Error
+	return tx.Save(node).Error
 }
 
-func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node models.WorkflowNode) error {
+func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.WorkflowNode) error {
 	ref := node.Ref.Data()
 	component, err := registry.GetComponent(ref.Component.Name)
 	if err != nil {
 		return err
 	}
 
-	logger := logging.ForNode(node)
+	logger := logging.ForNode(*node)
 	setupCtx := core.SetupContext{
 		Configuration:      node.Configuration.Data(),
-		MetadataContext:    contexts.NewNodeMetadataContext(tx, &node),
-		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
+		MetadataContext:    contexts.NewNodeMetadataContext(tx, node),
+		RequestContext:     contexts.NewNodeRequestContext(tx, node),
 		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
 	}
 
@@ -285,7 +310,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 		logger = logging.WithAppInstallation(logger, *appInstallation)
 		setupCtx.AppInstallationContext = contexts.NewAppInstallationContext(
 			tx,
-			&node,
+			node,
 			appInstallation,
 			encryptor,
 			registry,
@@ -298,7 +323,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 		return fmt.Errorf("error setting up node %s: %v", node.NodeID, err)
 	}
 
-	return tx.Save(&node).Error
+	return tx.Save(node).Error
 }
 
 func deleteNodes(tx *gorm.DB, existingNodes []models.WorkflowNode, newNodes []models.Node) error {

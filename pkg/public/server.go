@@ -43,6 +43,7 @@ import (
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
+	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	pbWorkflows "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
@@ -220,6 +221,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbWidgets.RegisterWidgetsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	err = pbBlueprints.RegisterBlueprintsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
@@ -250,6 +256,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/components").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/triggers").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/widgets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 

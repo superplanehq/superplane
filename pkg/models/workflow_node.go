@@ -19,6 +19,7 @@ const (
 	NodeTypeTrigger   = "trigger"
 	NodeTypeComponent = "component"
 	NodeTypeBlueprint = "blueprint"
+	NodeTypeWidget    = "widget"
 )
 
 type WorkflowNode struct {

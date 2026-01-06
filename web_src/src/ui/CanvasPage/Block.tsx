@@ -7,9 +7,10 @@ import { Button } from "../button";
 import MergeComponent, { type MergeComponentProps } from "../merge";
 import { ComponentActionsProps } from "../types/componentActions";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
+import { AnnotationComponent, type AnnotationComponentProps } from "../annotationComponent";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType = "trigger" | "component" | "composite" | "merge" | "switch";
+type BlockType = "trigger" | "component" | "composite" | "merge" | "switch" | "annotation";
 
 interface BlockAi {
   show: boolean;
@@ -44,6 +45,9 @@ export interface BlockData {
 
   // merge node specific props
   merge?: MergeComponentProps;
+
+  // annotation node specific props
+  annotation?: AnnotationComponentProps;
 }
 
 interface BlockProps extends ComponentActionsProps {
@@ -99,12 +103,20 @@ const HANDLE_STYLE = {
 };
 
 function LeftHandle({ data, nodeId }: BlockProps) {
-  if (data.type === "trigger") return null;
+  if (data.type === "trigger" || data.type === "annotation") return null;
 
-  const isCollapsed =
-    (data.type === "composite" && data.composite?.collapsed) ||
-    (data.type === "switch" && data.switch?.collapsed) ||
-    (data.type === "component" && data.component?.collapsed);
+  const isCollapsed = (() => {
+    switch (data.type) {
+      case "composite":
+        return data.composite?.collapsed;
+      case "switch":
+        return data.switch?.collapsed;
+      case "component":
+        return data.component?.collapsed;
+      default:
+        return false;
+    }
+  })();
 
   // Check if this handle is part of the hovered edge (this is the target)
   const hoveredEdge = (data as any)._hoveredEdge;
@@ -145,16 +157,25 @@ function LeftHandle({ data, nodeId }: BlockProps) {
 }
 
 function RightHandle({ data, nodeId }: BlockProps) {
-  // Hide right handle for template nodes and pending connection nodes
+  // Hide right handle for template nodes, pending connection nodes, and annotation nodes
   const isTemplate = (data as any).isTemplate;
   const isPendingConnection = (data as any).isPendingConnection;
-  if (isTemplate || isPendingConnection) return null;
+  if (isTemplate || isPendingConnection || data.type === "annotation") return null;
 
-  const isCollapsed =
-    (data.type === "composite" && data.composite?.collapsed) ||
-    (data.type === "trigger" && data.trigger?.collapsed) ||
-    (data.type === "switch" && data.switch?.collapsed) ||
-    (data.type === "component" && data.component?.collapsed);
+  const isCollapsed = (() => {
+    switch (data.type) {
+      case "composite":
+        return data.composite?.collapsed;
+      case "trigger":
+        return data.trigger?.collapsed;
+      case "switch":
+        return data.switch?.collapsed;
+      case "component":
+        return data.component?.collapsed;
+      default:
+        return false;
+    }
+  })();
 
   const channels = data.outputChannels || ["default"];
 
@@ -382,6 +403,10 @@ function BlockContent({
       return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} {...actionProps} />;
     case "merge":
       return <MergeComponent {...(data.merge as MergeComponentProps)} selected={selected} {...actionProps} />;
+    case "annotation":
+      return (
+        <AnnotationComponent {...(data.annotation as AnnotationComponentProps)} selected={selected} {...actionProps} />
+      );
     default:
       throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }
