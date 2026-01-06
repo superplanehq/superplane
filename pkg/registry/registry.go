@@ -280,6 +280,19 @@ func (r *Registry) GetWidget(name string) (core.Widget, error) {
 	return widget, nil
 }
 
+func (r *Registry) ListWidgets() []core.Widget {
+	widgets := make([]core.Widget, 0, len(r.Widgets))
+	for _, widget := range r.Widgets {
+		widgets = append(widgets, widget)
+	}
+
+	sort.Slice(widgets, func(i, j int) bool {
+		return widgets[i].Name() < widgets[j].Name()
+	})
+
+	return widgets
+}
+
 func (r *Registry) GetApplication(name string) (core.Application, error) {
 	application, ok := r.Applications[name]
 	if !ok {

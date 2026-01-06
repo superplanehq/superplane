@@ -15,6 +15,7 @@ import (
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
+	widgetpb "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -1012,6 +1013,27 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 			Description:   trigger.Description(),
 			Icon:          trigger.Icon(),
 			Color:         trigger.Color(),
+			Configuration: configuration,
+		}
+	}
+	return out
+}
+
+func SerializeWidgets(in []core.Widget) []*widgetpb.Widget {
+	out := make([]*widgetpb.Widget, len(in))
+	for i, widget := range in {
+		configFields := widget.Configuration()
+		configuration := make([]*configpb.Field, len(configFields))
+		for j, field := range configFields {
+			configuration[j] = ConfigurationFieldToProto(field)
+		}
+
+		out[i] = &widgetpb.Widget{
+			Name:          widget.Name(),
+			Label:         widget.Label(),
+			Description:   widget.Description(),
+			Icon:          widget.Icon(),
+			Color:         widget.Color(),
 			Configuration: configuration,
 		}
 	}
