@@ -64,30 +64,30 @@ export function General({ organization }: GeneralProps) {
     }
   };
   return (
-    <div className="space-y-16 pt-6 text-left">
+    <div className="space-y-6 pt-6 text-left">
       <Fieldset className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
-        <Field>
+        <Field className="space-y-4">
           <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Organization Name</Label>
           <Input type="text" value={name} onChange={(e) => setName(e.target.value)} className="max-w-lg" />
+          <div className="flex items-center gap-4">
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={updateOrganizationMutation.isPending}
+              className="max-w-48"
+            >
+              {updateOrganizationMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+            {saveMessage && (
+              <span className={`text-sm ${saveMessage.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
+                {saveMessage}
+              </span>
+            )}
+          </div>
         </Field>
-        <div className="flex items-center gap-4">
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={updateOrganizationMutation.isPending}
-            className="max-w-48"
-          >
-            {updateOrganizationMutation.isPending ? "Saving..." : "Save Changes"}
-          </Button>
-          {saveMessage && (
-            <span className={`text-sm ${saveMessage.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
-              {saveMessage}
-            </span>
-          )}
-        </div>
       </Fieldset>
 
-      <Fieldset className="bg-red-50 border border-red-300 rounded-lg p-6 space-y-4">
+      <Fieldset className="bg-white border border-gray-300 rounded-lg p-6 space-y-4">
         <div>
           <Heading level={3} className="!text-base text-red-500 dark:text-red-400">
             Delete Organization

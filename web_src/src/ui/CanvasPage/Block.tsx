@@ -141,13 +141,15 @@ function LeftHandle({ data, nodeId }: BlockProps) {
       connectingFrom.handleType === "source" &&
       !isAlreadyConnected);
 
+  const horizontalOffset = isCollapsed ? -21 : -15; // keep compact circles from hugging handles
+
   return (
     <Handle
       type="target"
       position={Position.Left}
       style={{
         ...HANDLE_STYLE,
-        left: -15,
+        left: horizontalOffset,
         top: isCollapsed ? "50%" : 30,
         transform: isCollapsed ? "translateY(-50%)" : undefined,
       }}
@@ -202,6 +204,8 @@ function RightHandle({ data, nodeId }: BlockProps) {
         connectingFrom.handleType === "target" &&
         !isAlreadyConnected);
 
+    const horizontalOffset = isCollapsed ? -21 : -15;
+
     return (
       <Handle
         type="source"
@@ -209,7 +213,7 @@ function RightHandle({ data, nodeId }: BlockProps) {
         id={channels[0]}
         style={{
           ...HANDLE_STYLE,
-          right: -15,
+          right: horizontalOffset,
           top: isCollapsed ? "50%" : 30,
           transform: isCollapsed ? "translateY(-50%)" : undefined,
         }}
@@ -248,7 +252,7 @@ function RightHandle({ data, nodeId }: BlockProps) {
               left: "100%",
               top: baseTop + index * spacing,
               transform: "translateY(-50%)",
-              paddingLeft: 4,
+              paddingLeft: isCollapsed ? 10 : 4,
             }}
           >
             <div className="relative flex items-center">
