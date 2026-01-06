@@ -235,3 +235,47 @@ func (a *AppInstallation) SoftDeleteInTransaction(tx *gorm.DB) error {
 		"installation_name": newName,
 	}).Error
 }
+
+func (a *AppInstallation) GetRequest(ID string) (*AppInstallationRequest, error) {
+	var request AppInstallationRequest
+
+	err := database.Conn().
+		Where("id = ?", ID).
+		Where("app_installation_id = ?", a.ID).
+		First(&request).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &request, nil
+}
+
+func (a *AppInstallation) ListRequests(reqType string) ([]AppInstallationRequest, error) {
+	requests := []AppInstallationRequest{}
+
+	err := database.Conn().
+		Where("app_installation_id = ?", a.ID).
+		Find(&requests).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return requests, nil
+}
+
+func (a *AppInstallation) CreateSyncRequest(tx *gorm.DB, runAt *time.Time) error {
+	now := time.Now()
+	return tx.Create(&AppInstallationRequest{
+		ID:                uuid.New(),
+		AppInstallationID: a.ID,
+		State:             AppInstallationRequestStatePending,
+		Type:              AppInstallationRequestTypeSync,
+		RunAt:             *runAt,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}).Error
+}

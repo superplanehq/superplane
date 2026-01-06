@@ -2,6 +2,7 @@ package core
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -127,6 +128,11 @@ type AppInstallationContext interface {
 	 * Called from the components/triggers Setup().
 	 */
 	RequestWebhook(configuration any) error
+
+	/*
+	 * Schedule a sync call for the app installation.
+	 */
+	ScheduleResync(interval time.Duration) error
 }
 
 type InstallationSecret struct {
