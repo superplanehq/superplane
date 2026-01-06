@@ -13,7 +13,7 @@ import (
 )
 
 func TestSignupWithInvitation(t *testing.T) {
-	steps := &signupWithInvitationSteps{t: t}
+	steps := &signupSteps{t: t}
 
 	t.Run("signup with invitation succeeds when BLOCK_SIGNUP is enabled", func(t *testing.T) {
 		invitedEmail := "invited-user@example.com"
@@ -52,20 +52,20 @@ func TestSignupWithInvitation(t *testing.T) {
 	})
 }
 
-type signupWithInvitationSteps struct {
+type signupSteps struct {
 	t       *testing.T
 	session *session.TestSession
 	orgID   string
 }
 
-func (s *signupWithInvitationSteps) start() {
+func (s *signupSteps) start() {
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
 	s.session.Login()
 	s.orgID = s.session.OrgID.String()
 }
 
-func (s *signupWithInvitationSteps) createInvitation(email string) {
+func (s *signupSteps) createInvitation(email string) {
 	invitation, err := models.CreateInvitation(
 		s.session.OrgID,
 		s.session.Account.ID,
@@ -76,7 +76,7 @@ func (s *signupWithInvitationSteps) createInvitation(email string) {
 	require.NotNil(s.t, invitation, "invitation should be created")
 }
 
-func (s *signupWithInvitationSteps) createSecondOrganizationAndInvitation(email string) {
+func (s *signupSteps) createSecondOrganizationAndInvitation(email string) {
 	orgName := "e2e-org-2"
 	organization, err := models.CreateOrganization(orgName, "")
 	require.NoError(s.t, err, "create second organization")
@@ -91,13 +91,18 @@ func (s *signupWithInvitationSteps) createSecondOrganizationAndInvitation(email 
 	require.NotNil(s.t, invitation, "second invitation should be created")
 }
 
-func (s *signupWithInvitationSteps) visitSignupPage() {
-	s.session.ClearCookies()
+func (s *signupSteps) visitSignupPage() {
+	s.clearCookies()
 	s.session.Visit("/signup/email")
 	s.session.Sleep(500) // wait for page load
 }
 
-func (s *signupWithInvitationSteps) fillInSignupForm(name, email, password string) {
+func (s *signupSteps) clearCookies() {
+	err := s.session.Page().Context().ClearCookies()
+	require.NoError(s.t, err, "clear cookies")
+}
+
+func (s *signupSteps) fillInSignupForm(name, email, password string) {
 	nameInput := q.Locator(`input[name="name"]`)
 	emailInput := q.Locator(`input[type="email"]`)
 	passwordInput := q.Locator(`input[type="password"]`)
@@ -108,13 +113,13 @@ func (s *signupWithInvitationSteps) fillInSignupForm(name, email, password strin
 	s.session.Sleep(300)
 }
 
-func (s *signupWithInvitationSteps) submitSignupForm() {
+func (s *signupSteps) submitSignupForm() {
 	submitButton := q.Text("Sign up")
 	s.session.Click(submitButton)
 	s.session.Sleep(2000) // wait for signup to complete
 }
 
-func (s *signupWithInvitationSteps) assertAccountCreated(email string) {
+func (s *signupSteps) assertAccountCreated(email string) {
 	normalizedEmail := utils.NormalizeEmail(email)
 	account, err := models.FindAccountByEmail(normalizedEmail)
 	require.NoError(s.t, err, "account should be created")
@@ -126,7 +131,7 @@ func (s *signupWithInvitationSteps) assertAccountCreated(email string) {
 	assert.NotEmpty(s.t, passwordAuth.PasswordHash, "password hash should be set")
 }
 
-func (s *signupWithInvitationSteps) assertInvitationAccepted(email string) {
+func (s *signupSteps) assertInvitationAccepted(email string) {
 	normalizedEmail := utils.NormalizeEmail(email)
 	var invitation models.OrganizationInvitation
 	err := database.Conn().
@@ -137,7 +142,7 @@ func (s *signupWithInvitationSteps) assertInvitationAccepted(email string) {
 	assert.Equal(s.t, models.InvitationStateAccepted, invitation.State, "invitation should be accepted")
 }
 
-func (s *signupWithInvitationSteps) assertAllInvitationsAccepted(email string) {
+func (s *signupSteps) assertAllInvitationsAccepted(email string) {
 	normalizedEmail := utils.NormalizeEmail(email)
 	var invitations []models.OrganizationInvitation
 	err := database.Conn().
@@ -152,7 +157,7 @@ func (s *signupWithInvitationSteps) assertAllInvitationsAccepted(email string) {
 	}
 }
 
-func (s *signupWithInvitationSteps) assertUserCreated(email string) {
+func (s *signupSteps) assertUserCreated(email string) {
 	normalizedEmail := utils.NormalizeEmail(email)
 	account, err := models.FindAccountByEmail(normalizedEmail)
 	require.NoError(s.t, err, "account should exist")
@@ -166,7 +171,7 @@ func (s *signupWithInvitationSteps) assertUserCreated(email string) {
 	assert.Equal(s.t, normalizedEmail, user.Email, "user email should match")
 }
 
-func (s *signupWithInvitationSteps) assertUserCreatedInAllOrganizations(email string) {
+func (s *signupSteps) assertUserCreatedInAllOrganizations(email string) {
 	normalizedEmail := utils.NormalizeEmail(email)
 	account, err := models.FindAccountByEmail(normalizedEmail)
 	require.NoError(s.t, err, "account should exist")
@@ -181,7 +186,7 @@ func (s *signupWithInvitationSteps) assertUserCreatedInAllOrganizations(email st
 	assert.GreaterOrEqual(s.t, userCount, int64(2), "user should be created in multiple organizations")
 }
 
-func (s *signupWithInvitationSteps) assertRedirectedToOrganization() {
+func (s *signupSteps) assertRedirectedToOrganization() {
 	currentURL := s.session.Page().URL()
 	assert.Contains(s.t, currentURL, "/", "should be redirected after signup")
 	// Should be redirected to organization home or organization select page
@@ -189,12 +194,12 @@ func (s *signupWithInvitationSteps) assertRedirectedToOrganization() {
 	assert.NotContains(s.t, currentURL, "/login", "should not be on login page")
 }
 
-func (s *signupWithInvitationSteps) assertSignupBlocked() {
+func (s *signupSteps) assertSignupBlocked() {
 	// Check for error message indicating signup is blocked
 	s.session.AssertText("signup is currently disabled")
 }
 
-func (s *signupWithInvitationSteps) assertAccountNotCreated(email string) {
+func (s *signupSteps) assertAccountNotCreated(email string) {
 	normalizedEmail := utils.NormalizeEmail(email)
 	_, err := models.FindAccountByEmail(normalizedEmail)
 	require.Error(s.t, err, "account should not be created")
