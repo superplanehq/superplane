@@ -7,13 +7,14 @@ git fetch --tags
 latest_tag=$(git tag -l --sort=-version:refname | head -n 1)
 
 # Calc versions
-PATCH=$(echo $latest_tag | awk -F. '{print $3 + 1}')
+PATCH=$(echo $latest_tag | awk -F. '{print $3}')
 MINOR=$(echo $latest_tag | awk -F. '{print $2}')
 MAJOR=$(echo $latest_tag | awk -F. '{print $1}')
 
 # Create new tag
 case $1 in
   patch)
+    PATCH=$((PATCH + 1))
     new_tag="$MAJOR.$MINOR.$PATCH"
     ;;
   minor)
