@@ -3,18 +3,18 @@
 set -euo pipefail
 
 if [ "${1-}" = "" ]; then
-  echo "Usage: release/single-host/build.sh <version>"
+  echo "Usage: release/superplane-single-host-tarball/build.sh <version>"
   echo ""
   echo "Example:"
-  echo "  release/single-host/build.sh 1.0.0"
+  echo "  release/superplane-single-host-tarball/build.sh v1.2.3"
   exit 1
 fi
 
 VERSION="$1"
 
-BUILD_ROOT="build/single-host-${VERSION}"
+BUILD_ROOT="build/superplane-single-host-tarball-${VERSION}"
 TARGET_DIR="${BUILD_ROOT}/superplane"
-TEMPLATES_DIR="release/single-host/templates"
+TEMPLATES_DIR="release/superplane-single-host-tarball/templates"
 
 echo "* Building single-host release for version ${VERSION}"
 echo "* Target directory: ${TARGET_DIR}"
