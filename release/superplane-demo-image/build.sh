@@ -4,7 +4,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 if [ "${1-}" = "" ]; then
-  echo "Usage: release/demo/build.sh <version>"
+  echo "Usage: release/superplane-demo-image/build.sh <version>"
   exit 1
 fi
 
@@ -16,7 +16,4 @@ docker buildx build \
   --push \
   --platform linux/amd64,linux/arm64 \
   -t "ghcr.io/superplanehq/superplane-demo:${VERSION}" \
-  -t "ghcr.io/superplanehq/superplane-demo:stable" \
-  -t "ghcr.io/superplanehq/superplane-demo:beta" \
   -f release/demo/Dockerfile . \
-  
