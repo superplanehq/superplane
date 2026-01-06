@@ -83,13 +83,11 @@ export function OrganizationSettings() {
 
   const sectionIds = ["profile", "general", "members", "groups", "roles", "integrations", "applications"];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
-  const lastSegment = pathSegments[pathSegments.length - 1] || "";
-  const previousSegment = pathSegments[pathSegments.length - 2] || "";
-  const currentSection = sectionIds.includes(lastSegment)
-    ? lastSegment
-    : sectionIds.includes(previousSegment)
-      ? previousSegment
-      : "general";
+  const settingsIndex = pathSegments.indexOf("settings");
+  const segmentsAfterSettings = settingsIndex >= 0 ? pathSegments.slice(settingsIndex + 1) : [];
+  const currentSection =
+    segmentsAfterSettings.find((segment) => sectionIds.includes(segment)) ||
+    (sectionIds.includes(pathSegments[pathSegments.length - 1]) ? pathSegments[pathSegments.length - 1] : "general");
 
   const organizationName = organization?.metadata?.name || "Organization";
   const userName = user?.name || "My Account";
@@ -189,10 +187,15 @@ export function OrganizationSettings() {
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
       <Sidebar className="w-60 bg-white dark:bg-gray-950 border-r border-gray-300 dark:border-gray-800">
         <SidebarBody>
-          <SidebarSection className="p-4">
-            <div>
-              <img src={SuperplaneLogo} alt="Superplane" className="h-6" />
-            </div>
+          <SidebarSection className="px-4 py-2.5">
+            <button
+              type="button"
+              onClick={() => navigate(`/${organizationId}`)}
+              className="w-7 h-7"
+              aria-label="Go to Canvases"
+            >
+              <img src={SuperplaneLogo} alt="Superplane" className="w-7 h-7 object-contain" />
+            </button>
           </SidebarSection>
           <SidebarSection className="p-4 border-t border-gray-300">
             <div>
@@ -229,7 +232,7 @@ export function OrganizationSettings() {
 
           <SidebarSection className="p-4 border-t border-gray-300">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-600 bg-purple-200 inline px-1 py-0.5 rounded">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-white bg-sky-500 inline px-1 py-0.5 rounded">
                 You
               </p>
               <div className="mt-2">

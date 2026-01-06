@@ -142,7 +142,7 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white border-b border-border px-3 py-3">
+      <header className="bg-white border-b border-border px-4 h-12 flex items-center">
         <OrganizationMenuButton organizationId={organizationId} />
       </header>
       <main className="w-full h-full flex flex-column flex-grow-1">

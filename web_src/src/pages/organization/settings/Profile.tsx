@@ -91,7 +91,7 @@ export function Profile() {
       </Heading>
       <div className="space-y-6">
         {/* Profile Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-300 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 p-6">
           <div className="space-y-6">
             {/* User Avatar and Basic Info */}
             <div className="flex items-center space-x-4">
@@ -110,18 +110,18 @@ export function Profile() {
             {/* User Information */}
             <div className="space-y-4">
               <div>
-                <Text className="text-sm text-left font-medium text-gray-700 dark:text-gray-300 mb-2">User ID</Text>
+                <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">User ID</Text>
                 <Text className="text-left text-gray-500 dark:text-gray-400">{user.id}</Text>
               </div>
               <div>
-                <Text className="text-sm text-left font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">
                   Email Address
                 </Text>
                 <Text className="text-left text-gray-500 dark:text-gray-400">{user.email}</Text>
               </div>
 
               <div>
-                <Text className="text-sm text-left font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">
                   Member Since
                 </Text>
                 <Text className="text-left text-gray-500 dark:text-gray-400">
@@ -132,15 +132,15 @@ export function Profile() {
           </div>
         </div>
 
-        <Heading level={2} className="text-lg text-left font-medium text-gray-800 dark:text-white mb-4">
+        <Heading level={2} className="text-lg text-left font-medium text-gray-800 dark:text-white mb-0">
           API Token
         </Heading>
-        <Text className="text-gray-500 text-left dark:text-gray-400 text-sm">
-          Use this token to authenticate API requests to Superplane. Keep your token secure and do not share it.
+        <Text className="text-gray-800 text-left dark:text-gray-400 text-sm">
+          Use this token to authenticate API requests to SuperPlane. Keep your token secure and do not share it.
         </Text>
 
         {/* API Token Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-300 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 p-6">
           <div className="space-y-4">
             {/* Token Status */}
             <div className="flex items-center gap-2">

@@ -137,7 +137,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                                 ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                                 : app.status?.state === "error"
                                   ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                                  : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                  : "bg-orange-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
                             }`}
                           >
                             {app.status?.state
@@ -163,7 +163,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
       {/* Available Applications */}
       <div>
         <h2 className="text-lg font-medium mb-4">Available</h2>
-        <div className="bg-gray-100 dark:bg-gray-900 rounded-lg">
+        <div className="bg-gray-100 dark:bg-gray-900 rounded-lg border border-gray-300">
           <div className="p-6">
             {availableApps.length === 0 ? (
               <div className="text-center py-12">

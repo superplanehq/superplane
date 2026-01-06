@@ -578,7 +578,7 @@ export const approvalMapper: ComponentBaseMapper = {
       // ... existing props
       statusBadge: lastExecution?.state === "STATE_STARTED" ? {
         text: "Awaiting Approval",
-        color: "bg-yellow-100 text-yellow-800"
+        color: "bg-orange-100 text-yellow-800"
       } : undefined,
     };
   },

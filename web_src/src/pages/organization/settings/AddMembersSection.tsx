@@ -1,11 +1,10 @@
 import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { Avatar } from "../../../components/Avatar/avatar";
-import { Checkbox } from "../../../components/Checkbox/checkbox";
 import { Icon } from "../../../components/Icon";
-import { Input, InputGroup } from "../../../components/Input/input";
-import { Text } from "../../../components/Text/text";
+import { Input } from "../../../components/Input/input";
 import { useAddUserToGroup, useOrganizationGroupUsers, useOrganizationUsers } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/ui/checkbox";
 
 interface AddMembersSectionProps {
   showRoleSelection?: boolean;
@@ -103,15 +102,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
       }
     };
 
-    const handleSelectAll = () => {
-      const filteredMembers = getFilteredExistingMembers();
-      if (selectedMembers.size === filteredMembers.length) {
-        setSelectedMembers(new Set());
-      } else {
-        setSelectedMembers(new Set(filteredMembers.map((m) => m.metadata!.id!)));
-      }
-    };
-
     const getFilteredExistingMembers = () => {
       if (!memberSearchTerm) return existingMembers;
 
@@ -132,35 +122,24 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <Text className="font-semibold text-gray-800 dark:text-white mb-1">Add members</Text>
-          </div>
-        </div>
-
-        {/* Organization Members Content */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <InputGroup>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="relative w-full md:max-w-sm">
+              <Icon
+                name="search"
+                size="sm"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              />
               <Input
                 name="member-search"
                 placeholder="Search members..."
                 aria-label="Search members"
-                className="w-xs"
+                className="w-full pl-9"
                 value={memberSearchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMemberSearchTerm(e.target.value)}
               />
-            </InputGroup>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                className="flex items-center gap-2 text-sm"
-                onClick={handleSelectAll}
-                disabled={loadingMembers || getFilteredExistingMembers().length === 0}
-              >
-                <Icon name="select_all" size="sm" />
-                {selectedMembers.size === getFilteredExistingMembers().length ? "Deselect All" : "Select All"}
-              </Button>
+            </div>
+            <div className="flex items-center justify-end">
               <Button
                 className="flex items-center gap-2 text-sm"
                 onClick={handleExistingMembersSubmit}
@@ -179,10 +158,10 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
               <p className="text-gray-500 dark:text-gray-400">Loading members...</p>
             </div>
           ) : (
-            <div className="max-h-96 overflow-y-auto border border-gray-300 dark:border-gray-700 rounded-lg">
+            <div className="max-h-96 overflow-y-auto">
               {getFilteredExistingMembers().length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     {memberSearchTerm
                       ? "No members found matching your search"
                       : "All organization members are already in this group"}
@@ -197,10 +176,11 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                     >
                       <Checkbox
                         checked={selectedMembers.has(member.metadata!.id!)}
-                        onChange={(checked) => {
+                        onCheckedChange={(checked) => {
+                          const isChecked = checked === true;
                           setSelectedMembers((prev) => {
                             const newSet = new Set(prev);
-                            if (checked) {
+                            if (isChecked) {
                               newSet.add(member.metadata!.id!);
                             } else {
                               newSet.delete(member.metadata!.id!);
