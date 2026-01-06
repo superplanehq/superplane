@@ -170,7 +170,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 				return nil, err
 			}
 
-			return &executionCtx.ID, executionCtx.ExecutionStateContext.Fail("stopped", "Stopped by stopIfExpression")
+			return &executionCtx.ID, executionCtx.ExecutionStateContext.Fail(models.WorkflowNodeExecutionResultReasonError, "Stopped by stopIfExpression")
 		}
 	}
 
@@ -272,7 +272,7 @@ func (m *Merge) HandleTimeout(ctx core.ActionContext) error {
 		return nil
 	}
 
-	return ctx.ExecutionStateContext.Fail("timeoutReached", "Execution timed out waiting for other inputs")
+	return ctx.ExecutionStateContext.Fail(models.WorkflowNodeExecutionResultReasonError, "Execution timed out waiting for other inputs")
 }
 
 func (m *Merge) Execute(ctx core.ExecutionContext) error {

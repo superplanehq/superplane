@@ -158,6 +158,18 @@ export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
+  cancelled: {
+    icon: "circle-slash-2",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-gray-100",
+    badgeColor: "bg-gray-500",
+  },
+  error: {
+    icon: "triangle-alert",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-500",
+  },
   neutral: {
     icon: "circle",
     textColor: "text-gray-800",

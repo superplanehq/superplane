@@ -72,6 +72,17 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
  * Approval-specific state logic function
  */
 export const approvalStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+  if (
+    execution.resultMessage &&
+    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED")
+  ) {
+    return "error";
+  }
+
+  if (execution.result === "RESULT_CANCELLED") {
+    return "cancelled";
+  }
+
   // Error state - component could not evaluate or apply approval logic
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED") {
     return "error";

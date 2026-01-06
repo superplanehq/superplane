@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -245,7 +246,7 @@ func (s *Semaphore) Execute(ctx core.ExecutionContext) error {
 
 	wf, err := semaphore.RunWorkflow(params)
 	if err != nil {
-		return ctx.ExecutionStateContext.Fail("failed to run workflow", err.Error())
+		return ctx.ExecutionStateContext.Fail(models.WorkflowNodeExecutionResultReasonError, err.Error())
 	}
 
 	ctx.MetadataContext.Set(ExecutionMetadata{

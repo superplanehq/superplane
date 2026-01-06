@@ -84,6 +84,7 @@ export function mapExecutionsToSidebarEvents(
       kind: "execution",
       nodeId: execution?.nodeId,
       originalExecution: execution,
+      triggerEventId: execution.rootEvent?.id,
     };
   });
 }
@@ -147,6 +148,7 @@ export function mapQueueItemsToSidebarEvents(
       receivedAt: item.createdAt ? new Date(item.createdAt) : undefined,
       kind: "queue",
       values,
+      triggerEventId: item.rootEvent?.id,
     };
   });
 }
