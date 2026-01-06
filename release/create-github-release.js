@@ -27,13 +27,13 @@ async function main() {
   const userAgent = "superplane-release-script";
 
   const repoRoot = path.resolve(__dirname, "..");
-  const buildRoot = path.join(repoRoot, `build/single-host-${version}`);
+  const buildRoot = path.join(repoRoot, `build/superplane-single-host-tarball-${version}`);
   const artifactPath = path.join(buildRoot, "superplane-single-host.tar.gz");
-  const assetName = "superplane-single-host.tar.gz";
+  const assetName = `superplane-single-host-${version}.tar.gz`;
 
   if (!fs.existsSync(artifactPath)) {
     console.error(
-      `Error: ${artifactPath} does not exist. Run release/single-host/build.sh ${version} first.`
+      `Error: ${artifactPath} does not exist. Run release/superplane-single-host-tarball/build.sh ${version} first.`
     );
     process.exit(1);
   }
@@ -161,4 +161,3 @@ main().catch((err) => {
   console.error("Unexpected error:", err);
   process.exit(1);
 });
-
