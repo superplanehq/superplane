@@ -3,7 +3,7 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata } from "./base";
+import { BaseNodeMetadata, GitRef } from "./types";
 import { Predicate, createGithubMetadataItems } from "./utils";
 
 interface GithubConfiguration {
@@ -11,24 +11,12 @@ interface GithubConfiguration {
   branches: Predicate[];
 }
 
-interface BranchCreatedEventData {
-  ref?: string;
-  ref_type?: string;
-  repository?: {
-    name?: string;
-    full_name?: string;
-  };
-  sender?: {
-    login?: string;
-  };
-}
-
 /**
  * Renderer for the "github.onBranchCreated" trigger
  */
 export const onBranchCreatedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as BranchCreatedEventData;
+    const eventData = event.data?.data as GitRef;
 
     return {
       title: eventData?.ref ? `Branch: ${eventData.ref}` : "Branch Created",
@@ -37,7 +25,7 @@ export const onBranchCreatedTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as BranchCreatedEventData;
+    const eventData = lastEvent.data?.data as GitRef;
 
     return {
       Branch: eventData?.ref || "",
@@ -61,7 +49,7 @@ export const onBranchCreatedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as BranchCreatedEventData;
+      const eventData = lastEvent.data?.data as GitRef;
       props.lastEventData = {
         title: eventData?.ref ? `Branch: ${eventData.ref}` : "Branch Created",
         subtitle: eventData?.repository?.full_name || "",
