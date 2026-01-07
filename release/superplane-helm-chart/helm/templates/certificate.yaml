@@ -10,6 +10,10 @@ metadata:
     {{- if $certManager.annotations }}
     {{- toYaml $certManager.annotations | nindent 4 }}
     {{- end }}
+    {{- if eq .Values.ingress.className "gce" }}
+    # For GCE ingress, edit the existing ingress in-place instead of creating a new one
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    {{- end }}
 spec:
   secretName: {{ $certManager.secretName | required "ingress.ssl.certManager.secretName is required when ingress.ssl.type is 'cert-manager'." }}
   issuerRef:
