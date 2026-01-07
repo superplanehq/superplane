@@ -38,6 +38,7 @@ import {
 } from "@/hooks/useWorkflowData";
 import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
+import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import {
   CANVAS_SIDEBAR_STORAGE_KEY,
   CanvasEdge,
@@ -275,6 +276,7 @@ export function WorkflowPageV2() {
 
         const positionUpdates = new Map(pendingPositionUpdatesRef.current);
         if (positionUpdates.size === 0) return;
+        const focusedNoteId = getActiveNoteId();
 
         try {
           // Check if auto-save is disabled
@@ -358,6 +360,12 @@ export function WorkflowPageV2() {
         } catch (error: any) {
           console.error("Failed to auto-save canvas changes:", error);
           // Don't show error toast for auto-save failures to avoid being intrusive
+        } finally {
+          if (focusedNoteId) {
+            requestAnimationFrame(() => {
+              restoreActiveNoteFocus();
+            });
+          }
         }
       }, 300),
     [

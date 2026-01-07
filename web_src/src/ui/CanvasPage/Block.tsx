@@ -418,6 +418,7 @@ function BlockContent({
       return (
         <AnnotationComponent
           {...(data.annotation as AnnotationComponentProps)}
+          noteId={nodeId}
           selected={selected}
           onAnnotationUpdate={handleAnnotationUpdate}
           {...actionProps}

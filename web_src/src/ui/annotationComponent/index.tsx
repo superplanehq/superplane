@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { EllipsisVertical, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 import { SelectionWrapper } from "../selectionWrapper";
+import { setActiveNoteId } from "./noteFocus";
 import { ComponentActionsProps } from "../types/componentActions";
 
 type AnnotationColor = "yellow" | "blue" | "green" | "purple";
@@ -53,27 +54,32 @@ const NOTE_COLORS: Record<
   },
 };
 
+const noteDrafts = new Map<string, string>();
+
 export interface AnnotationComponentProps extends ComponentActionsProps {
   title: string;
   annotationText?: string;
   annotationColor?: AnnotationColor;
+  noteId?: string;
   selected?: boolean;
   hideActionsButton?: boolean;
   onAnnotationUpdate?: (updates: { text?: string; color?: AnnotationColor }) => void;
 }
 
-export const AnnotationComponent: React.FC<AnnotationComponentProps> = ({
+const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   title,
   annotationText = "",
   annotationColor = "yellow",
+  noteId,
   selected = false,
   onDelete,
   hideActionsButton,
   onAnnotationUpdate,
 }) => {
-  const [draftText, setDraftText] = useState(annotationText);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const lastPointerDownOutsideRef = React.useRef(false);
 
   const syncTextareaHeight = () => {
     const textarea = textareaRef.current;
@@ -83,16 +89,54 @@ export const AnnotationComponent: React.FC<AnnotationComponentProps> = ({
   };
 
   useEffect(() => {
-    setDraftText(annotationText);
+    if (!noteId) return;
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const nextValue = noteDrafts.get(noteId) ?? annotationText ?? "";
+    if (textarea.value !== nextValue) {
+      textarea.value = nextValue;
+    }
+    noteDrafts.set(noteId, nextValue);
     requestAnimationFrame(syncTextareaHeight);
-  }, [annotationText]);
+  }, [annotationText, noteId]);
+
+  useLayoutEffect(() => {
+    if (!noteId) return;
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    if (!noteDrafts.has(noteId)) {
+      noteDrafts.set(noteId, annotationText || "");
+    }
+    const draft = noteDrafts.get(noteId) ?? "";
+    if (textarea.value !== draft) {
+      textarea.value = draft;
+      syncTextareaHeight();
+    }
+  }, [noteId, annotationText]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!containerRef.current || !target) {
+        lastPointerDownOutsideRef.current = true;
+        return;
+      }
+      lastPointerDownOutsideRef.current = !containerRef.current.contains(target);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+    };
+  }, []);
 
   const activeColor = annotationColor && NOTE_COLORS[annotationColor] ? annotationColor : "yellow";
   const colorStyles = NOTE_COLORS[activeColor];
 
   const handleTextCommit = () => {
-    if (draftText !== annotationText) {
-      onAnnotationUpdate?.({ text: draftText });
+    const nextText = textareaRef.current?.value ?? "";
+    if (nextText !== (annotationText || "")) {
+      onAnnotationUpdate?.({ text: nextText });
     }
   };
 
@@ -107,7 +151,13 @@ export const AnnotationComponent: React.FC<AnnotationComponentProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className={cn("group relative flex w-[20rem] flex-col shadow-md outline outline-gray-950/10", colorStyles.container)}>
+      <div
+        ref={containerRef}
+        className={cn(
+          "group relative flex w-[20rem] flex-col shadow-md outline outline-gray-950/10",
+          colorStyles.container,
+        )}
+      >
         <div className={cn("canvas-node-drag-handle h-5 w-full rounded-t-md cursor-grab", colorStyles.background)}>
           <div className="flex h-full w-full flex-col items-stretch justify-center gap-0.5 px-2">
             <span className="h-px w-full bg-black/15" />
@@ -173,12 +223,28 @@ export const AnnotationComponent: React.FC<AnnotationComponentProps> = ({
         <div className="px-3 pb-3">
           <textarea
             ref={textareaRef}
-            value={draftText}
-            onChange={(event) => {
-              setDraftText(event.target.value);
+            data-note-id={noteId || undefined}
+            defaultValue={noteId ? (noteDrafts.get(noteId) ?? annotationText) : annotationText}
+            onInput={(event) => {
+              const value = (event.target as HTMLTextAreaElement).value;
+              if (noteId) {
+                noteDrafts.set(noteId, value);
+                setActiveNoteId(noteId);
+              }
               syncTextareaHeight();
             }}
-            onBlur={handleTextCommit}
+            onBlur={() => {
+              handleTextCommit();
+              if (lastPointerDownOutsideRef.current && noteId) {
+                setActiveNoteId(null);
+              }
+            }}
+            onFocus={() => {
+              if (noteId) {
+                setActiveNoteId(noteId);
+              }
+              lastPointerDownOutsideRef.current = false;
+            }}
             className={cn(
               "nodrag min-h-[120px] w-full resize-none bg-transparent text-sm leading-normal outline-none",
               "text-gray-800",
@@ -192,3 +258,13 @@ export const AnnotationComponent: React.FC<AnnotationComponentProps> = ({
     </SelectionWrapper>
   );
 };
+
+export const AnnotationComponent = React.memo(
+  AnnotationComponentBase,
+  (prev, next) =>
+    prev.title === next.title &&
+    prev.annotationText === next.annotationText &&
+    prev.annotationColor === next.annotationColor &&
+    prev.selected === next.selected &&
+    prev.hideActionsButton === next.hideActionsButton,
+);
