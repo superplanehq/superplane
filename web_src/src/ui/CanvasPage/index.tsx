@@ -8,7 +8,7 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { Loader2, ScanLine, ScanText } from "lucide-react";
+import { CircleX, List, Loader2, ScanLine, ScanText, TriangleAlert } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 import { SidebarEvent } from "../componentSidebar/types";
+import { CanvasLogSidebar, type LogEntry, type LogScopeFilter, type LogTypeFilter } from "../CanvasLogSidebar";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -213,6 +214,8 @@ export interface CanvasPageProps {
   components?: ComponentsComponent[];
   triggers?: TriggersTrigger[];
   blueprints?: BlueprintsBlueprint[];
+
+  logEntries?: LogEntry[];
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -683,6 +686,7 @@ function CanvasPage(props: CanvasPageProps) {
               saveButtonHidden={props.saveButtonHidden}
               isAutoSaveEnabled={props.isAutoSaveEnabled}
               onToggleAutoSave={props.onToggleAutoSave}
+              logEntries={props.logEntries}
             />
           </ReactFlowProvider>
 
@@ -1076,6 +1080,7 @@ function CanvasContent({
   saveButtonHidden,
   isAutoSaveEnabled,
   onToggleAutoSave,
+  logEntries = [],
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1115,6 +1120,7 @@ function CanvasContent({
   saveButtonHidden?: boolean;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
+  logEntries?: LogEntry[];
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1134,6 +1140,12 @@ function CanvasContent({
 
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
+  const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(false);
+  const [logFilter, setLogFilter] = useState<LogTypeFilter>("all");
+  const [logScope, setLogScope] = useState<LogScopeFilter>("all");
+  const [logSearch, setLogSearch] = useState("");
+  const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
+  const [logSidebarHeight, setLogSidebarHeight] = useState(320);
 
   const handleNodeExpand = useCallback((nodeId: string) => {
     const node = stateRef.current.nodes?.find((n) => n.id === nodeId);
@@ -1522,8 +1534,90 @@ function CanvasContent({
     [state.edges, hoveredEdgeId, state.onEdgesChange],
   );
 
+  const logCounts = useMemo(() => {
+    return logEntries.reduce(
+      (acc, entry) => {
+        acc.total += 1;
+        if (entry.type === "error") acc.error += 1;
+        if (entry.type === "warning") acc.warning += 1;
+        if (entry.type === "success") acc.success += 1;
+        if (entry.runItems?.length) {
+          acc.total += entry.runItems.length;
+          entry.runItems.forEach((item) => {
+            if (item.type === "error") acc.error += 1;
+            if (item.type === "warning") acc.warning += 1;
+            if (item.type === "success") acc.success += 1;
+          });
+        }
+        return acc;
+      },
+      { total: 0, error: 0, warning: 0, success: 0 },
+    );
+  }, [logEntries]);
+
+  const filteredLogEntries = useMemo(() => {
+    const query = logSearch.trim().toLowerCase();
+    const matchesSearch = (value?: string) => !query || (value || "").toLowerCase().includes(query);
+
+    return logEntries.reduce<LogEntry[]>((acc, entry) => {
+      if (logScope !== "all" && entry.source !== logScope) {
+        return acc;
+      }
+
+      if (entry.type === "run") {
+        const runItems = entry.runItems || [];
+        const filteredRunItems = runItems.filter((item) => {
+          const typeMatch = logFilter === "all" || item.type === logFilter;
+          const searchMatch =
+            matchesSearch(item.searchText) || matchesSearch(typeof item.title === "string" ? item.title : "");
+          return typeMatch && searchMatch;
+        });
+
+        const entrySearchMatch =
+          matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : "");
+        const typeMatch = logFilter === "all" ? true : filteredRunItems.length > 0;
+        const searchMatch = query ? entrySearchMatch || filteredRunItems.length > 0 : true;
+
+        if (typeMatch && searchMatch) {
+          acc.push({ ...entry, runItems: filteredRunItems });
+        }
+        return acc;
+      }
+
+      if (logFilter !== "all" && entry.type !== logFilter) {
+        return acc;
+      }
+
+      const entrySearchMatch =
+        matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : "");
+      if (!entrySearchMatch) {
+        return acc;
+      }
+
+      acc.push(entry);
+      return acc;
+    }, []);
+  }, [logEntries, logFilter, logScope, logSearch]);
+
+  const handleLogButtonClick = useCallback((filter: LogTypeFilter) => {
+    setLogFilter(filter);
+    setIsLogSidebarOpen(true);
+  }, []);
+
+  const handleRunToggle = useCallback((runId: string) => {
+    setExpandedRuns((prev) => {
+      const next = new Set(prev);
+      if (next.has(runId)) {
+        next.delete(runId);
+      } else {
+        next.add(runId);
+      }
+      return next;
+    });
+  }, []);
+
   return (
-    <>
+    <div className="h-full w-full relative">
       {/* Header */}
       {!hideHeader && (
         <Header
@@ -1574,6 +1668,7 @@ function CanvasContent({
             defaultViewport={viewport}
             fitView={false}
             style={{ opacity: isInitialized ? 1 : 0 }}
+            className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
             <ZoomSlider position="bottom-left" orientation="horizontal">
@@ -1603,11 +1698,70 @@ function CanvasContent({
                   state.componentSidebar.open(node.id);
                 }}
               />
+              <div className="flex items-center gap-0 border-l border-slate-200 pl-1 ml-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs font-medium"
+                      onClick={() => handleLogButtonClick("all")}
+                    >
+                      <List className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>All logs</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs font-medium"
+                      onClick={() => handleLogButtonClick("error")}
+                    >
+                      <CircleX className="h-3 w-3 text-rose-500" />
+                      <span className="tabular-nums">{logCounts.error}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Errors</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs font-medium"
+                      onClick={() => handleLogButtonClick("warning")}
+                    >
+                      <TriangleAlert className="h-3 w-3 text-amber-500" />
+                      <span className="tabular-nums">{logCounts.warning}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Warnings</TooltipContent>
+                </Tooltip>
+              </div>
             </ZoomSlider>
           </ReactFlow>
         </div>
       </div>
-    </>
+      <CanvasLogSidebar
+        isOpen={isLogSidebarOpen}
+        onClose={() => setIsLogSidebarOpen(false)}
+        filter={logFilter}
+        onFilterChange={setLogFilter}
+        height={logSidebarHeight}
+        onHeightChange={setLogSidebarHeight}
+        scope={logScope}
+        onScopeChange={setLogScope}
+        searchValue={logSearch}
+        onSearchChange={setLogSearch}
+        entries={filteredLogEntries}
+        counts={logCounts}
+        expandedRuns={expandedRuns}
+        onToggleRun={handleRunToggle}
+      />
+    </div>
   );
 }
 
