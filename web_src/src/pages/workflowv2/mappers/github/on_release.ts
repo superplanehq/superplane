@@ -3,7 +3,7 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata } from "./base";
+import { BaseNodeMetadata, Release } from "./types";
 
 interface OnReleaseConfiguration {
   actions: string[];
@@ -11,22 +11,7 @@ interface OnReleaseConfiguration {
 
 interface OnReleaseEventData {
   action?: string;
-  release?: {
-    id?: number;
-    name?: string;
-    tag_name?: string;
-    html_url?: string;
-    prerelease?: boolean;
-    draft?: boolean;
-    author?: {
-      id: number;
-      login: string;
-    };
-    assets?: Array<{
-      id: number;
-      name: string;
-    }>;
-  };
+  release?: Release
 }
 
 /**

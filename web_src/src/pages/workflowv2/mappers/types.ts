@@ -107,3 +107,9 @@ export interface CustomFieldRenderer {
    */
   render(node: ComponentsNode, configuration: Record<string, unknown>): ReactNode;
 }
+
+export interface OutputPayload {
+  type: string;
+  timestamp: string;
+  data: any;
+}

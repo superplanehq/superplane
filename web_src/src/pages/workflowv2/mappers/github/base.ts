@@ -7,43 +7,79 @@ import {
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentBaseMapper } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { MetadataItem } from "@/ui/metadataList";
+import { OutputPayload, ComponentBaseMapper } from "../types";
+import { Issue } from "./types";
 
-export interface BaseNodeMetadata {
-  repository: {
-    id: string;
-    name: string;
-    url: string;
-  };
-}
-
-export const baseActionMapper: ComponentBaseMapper = {
+export const baseIssueMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _?: WorkflowsWorkflowNodeQueueItem[],
+    queueItems: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name!;
-
-    return {
-      iconSrc: githubIcon,
-      iconColor: getColorClass(componentDefinition.color),
-      headerColor: getBackgroundColorClass(componentDefinition.color),
-      collapsedBackground: getBackgroundColorClass(componentDefinition.color),
-      collapsed: node.isCollapsed,
-      title: node.name!,
-      eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
-      metadata: metadataList(node),
-      includeEmptyState: !lastExecution,
-      eventStateMap: getStateMap(componentName),
-    };
+    return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
   },
+
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
+    const outputs = execution.outputs as { default: OutputPayload[] };
+    const issue = outputs.default[0].data as Issue;
+    return getDetailsForIssue(issue);
+  }
 };
+
+export function baseProps(
+  nodes: ComponentsNode[],
+  node: ComponentsNode,
+  componentDefinition: ComponentsComponent,
+  lastExecutions: WorkflowsWorkflowNodeExecution[],
+  _?: WorkflowsWorkflowNodeQueueItem[],
+): ComponentBaseProps {
+  const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
+  const componentName = componentDefinition.name!;
+
+  return {
+    iconSrc: githubIcon,
+    iconColor: getColorClass(componentDefinition.color),
+    headerColor: getBackgroundColorClass(componentDefinition.color),
+    collapsedBackground: getBackgroundColorClass(componentDefinition.color),
+    collapsed: node.isCollapsed,
+    title: node.name!,
+    eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
+    metadata: metadataList(node),
+    includeEmptyState: !lastExecution,
+    eventStateMap: getStateMap(componentName),
+  };
+};
+
+export function getDetailsForIssue(issue: Issue): Record<string, string> {
+  const details: Record<string, string> = {
+    "Number": issue?.number.toString(),
+    "ID": issue?.id.toString(),
+    "State": issue?.state,
+    "URL": issue?.html_url,
+    "Title": issue?.title || "-",
+    "Author": issue?.user?.html_url || "-",
+    "Created At": issue?.created_at
+  };
+
+  if (issue.closed_by) {
+    details["Closed By"] = issue?.closed_by.html_url;
+    details["Closed At"] = issue?.closed_at!;
+  }
+
+  if (issue.labels) {
+    details["Labels"] = issue.labels.map(label => label.name).join(", ");
+  }
+
+  if (issue.assignees) {
+    details["Assignees"] = issue.assignees.map(assignee => assignee.login).join(", ");
+  }
+
+  return details;
+}
 
 function metadataList(node: ComponentsNode): MetadataItem[] {
   const metadata: MetadataItem[] = [];
