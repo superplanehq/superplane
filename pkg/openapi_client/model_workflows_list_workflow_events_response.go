@@ -21,10 +21,10 @@ var _ MappedNullable = &WorkflowsListWorkflowEventsResponse{}
 
 // WorkflowsListWorkflowEventsResponse struct for WorkflowsListWorkflowEventsResponse
 type WorkflowsListWorkflowEventsResponse struct {
-	Events        []WorkflowsWorkflowEvent `json:"events,omitempty"`
-	TotalCount    *int64                   `json:"totalCount,omitempty"`
-	HasNextPage   *bool                    `json:"hasNextPage,omitempty"`
-	LastTimestamp *time.Time               `json:"lastTimestamp,omitempty"`
+	Events        []WorkflowsWorkflowEventWithExecutions `json:"events,omitempty"`
+	TotalCount    *int64                                 `json:"totalCount,omitempty"`
+	HasNextPage   *bool                                  `json:"hasNextPage,omitempty"`
+	LastTimestamp *time.Time                             `json:"lastTimestamp,omitempty"`
 }
 
 // NewWorkflowsListWorkflowEventsResponse instantiates a new WorkflowsListWorkflowEventsResponse object
@@ -45,9 +45,9 @@ func NewWorkflowsListWorkflowEventsResponseWithDefaults() *WorkflowsListWorkflow
 }
 
 // GetEvents returns the Events field value if set, zero value otherwise.
-func (o *WorkflowsListWorkflowEventsResponse) GetEvents() []WorkflowsWorkflowEvent {
+func (o *WorkflowsListWorkflowEventsResponse) GetEvents() []WorkflowsWorkflowEventWithExecutions {
 	if o == nil || IsNil(o.Events) {
-		var ret []WorkflowsWorkflowEvent
+		var ret []WorkflowsWorkflowEventWithExecutions
 		return ret
 	}
 	return o.Events
@@ -55,7 +55,7 @@ func (o *WorkflowsListWorkflowEventsResponse) GetEvents() []WorkflowsWorkflowEve
 
 // GetEventsOk returns a tuple with the Events field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsListWorkflowEventsResponse) GetEventsOk() ([]WorkflowsWorkflowEvent, bool) {
+func (o *WorkflowsListWorkflowEventsResponse) GetEventsOk() ([]WorkflowsWorkflowEventWithExecutions, bool) {
 	if o == nil || IsNil(o.Events) {
 		return nil, false
 	}
@@ -71,8 +71,8 @@ func (o *WorkflowsListWorkflowEventsResponse) HasEvents() bool {
 	return false
 }
 
-// SetEvents gets a reference to the given []WorkflowsWorkflowEvent and assigns it to the Events field.
-func (o *WorkflowsListWorkflowEventsResponse) SetEvents(v []WorkflowsWorkflowEvent) {
+// SetEvents gets a reference to the given []WorkflowsWorkflowEventWithExecutions and assigns it to the Events field.
+func (o *WorkflowsListWorkflowEventsResponse) SetEvents(v []WorkflowsWorkflowEventWithExecutions) {
 	o.Events = v
 }
 

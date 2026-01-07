@@ -911,7 +911,7 @@ export type WorkflowsListNodeQueueItemsResponse = {
 };
 
 export type WorkflowsListWorkflowEventsResponse = {
-  events?: Array<WorkflowsWorkflowEvent>;
+  events?: Array<WorkflowsWorkflowEventWithExecutions>;
   totalCount?: number;
   hasNextPage?: boolean;
   lastTimestamp?: string;
@@ -944,6 +944,30 @@ export type WorkflowsWorkflowEvent = {
     [key: string]: unknown;
   };
   createdAt?: string;
+};
+
+export type WorkflowsWorkflowEventExecution = {
+  id?: string;
+  workflowId?: string;
+  nodeId?: string;
+  parentExecutionId?: string;
+  previousExecutionId?: string;
+  state?: WorkflowNodeExecutionState;
+  result?: WorkflowNodeExecutionResult;
+  resultReason?: WorkflowNodeExecutionResultReason;
+  resultMessage?: string;
+};
+
+export type WorkflowsWorkflowEventWithExecutions = {
+  id?: string;
+  workflowId?: string;
+  nodeId?: string;
+  channel?: string;
+  data?: {
+    [key: string]: unknown;
+  };
+  createdAt?: string;
+  executions?: Array<WorkflowsWorkflowEventExecution>;
 };
 
 export type WorkflowsWorkflowMetadata = {

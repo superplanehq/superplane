@@ -4962,7 +4962,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowEvent"
+            "$ref": "#/definitions/WorkflowsWorkflowEventWithExecutions"
           }
         },
         "totalCount": {
@@ -5041,6 +5041,69 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "WorkflowsWorkflowEventExecution": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "workflowId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "parentExecutionId": {
+          "type": "string"
+        },
+        "previousExecutionId": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/WorkflowNodeExecutionState"
+        },
+        "result": {
+          "$ref": "#/definitions/WorkflowNodeExecutionResult"
+        },
+        "resultReason": {
+          "$ref": "#/definitions/WorkflowNodeExecutionResultReason"
+        },
+        "resultMessage": {
+          "type": "string"
+        }
+      }
+    },
+    "WorkflowsWorkflowEventWithExecutions": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "workflowId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "executions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowEventExecution"
+          }
         }
       }
     },

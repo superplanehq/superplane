@@ -199,6 +199,8 @@ docs/WorkflowsUpdateWorkflowBody.md
 docs/WorkflowsUpdateWorkflowResponse.md
 docs/WorkflowsWorkflow.md
 docs/WorkflowsWorkflowEvent.md
+docs/WorkflowsWorkflowEventExecution.md
+docs/WorkflowsWorkflowEventWithExecutions.md
 docs/WorkflowsWorkflowMetadata.md
 docs/WorkflowsWorkflowNodeExecution.md
 docs/WorkflowsWorkflowNodeQueueItem.md
@@ -367,6 +369,8 @@ model_workflows_update_workflow_body.go
 model_workflows_update_workflow_response.go
 model_workflows_workflow.go
 model_workflows_workflow_event.go
+model_workflows_workflow_event_execution.go
+model_workflows_workflow_event_with_executions.go
 model_workflows_workflow_metadata.go
 model_workflows_workflow_node_execution.go
 model_workflows_workflow_node_queue_item.go
