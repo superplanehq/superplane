@@ -126,10 +126,17 @@ ingress:
     certManager:
       issuerRef:
         name: ""
-        kind: "Issuer" # Can be "Issuer" or "ClusterIssuer"
+        kind: "ClusterIssuer" # Can be "Issuer" or "ClusterIssuer"
       secretName: "superplane-tls-secret"
       # Optional: Additional annotations for the Certificate resource
       annotations: {}
+      # Create ClusterIssuer automatically (only used when kind is "ClusterIssuer")
+      createClusterIssuer: false
+      acme:
+        # Email address for Let's Encrypt registration
+        email: ""
+        # ACME server URL (defaults to Let's Encrypt production)
+        server: "https://acme-v02.api.letsencrypt.org/directory"
 
     #
     # Provide a custom certificate managed by yourself.

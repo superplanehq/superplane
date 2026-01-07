@@ -1,0 +1,20 @@
+{{- if and .Values.ingress.ssl.enabled (eq .Values.ingress.ssl.type "cert-manager") }}
+{{- if and .Values.ingress.ssl.certManager.createClusterIssuer (eq .Values.ingress.ssl.certManager.issuerRef.kind "ClusterIssuer") }}
+{{- $certManager := .Values.ingress.ssl.certManager -}}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ $certManager.issuerRef.name | required "ingress.ssl.certManager.issuerRef.name is required when ingress.ssl.type is 'cert-manager'." }}
+spec:
+  acme:
+    server: {{ $certManager.acme.server | default "https://acme-v02.api.letsencrypt.org/directory" }}
+    email: {{ $certManager.acme.email | required "ingress.ssl.certManager.acme.email is required when ingress.ssl.certManager.createClusterIssuer is true." }}
+    privateKeySecretRef:
+      name: {{ $certManager.issuerRef.name }}-key
+    solvers:
+    - http01:
+        ingress:
+          class: {{ .Values.ingress.className }}
+{{- end }}
+{{- end }}
+
