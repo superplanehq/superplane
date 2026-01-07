@@ -235,7 +235,12 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
             }}
             onBlur={() => {
               handleTextCommit();
-              if (lastPointerDownOutsideRef.current && noteId) {
+              const activeElement = document.activeElement as Node | null;
+              const shouldRestore =
+                !lastPointerDownOutsideRef.current && (!activeElement || activeElement === document.body);
+              if (shouldRestore) {
+                requestAnimationFrame(() => textareaRef.current?.focus());
+              } else if (noteId) {
                 setActiveNoteId(null);
               }
             }}
