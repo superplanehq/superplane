@@ -23,7 +23,7 @@ export interface Incident {
   assignments?: IncidentAssignment[];
   service?: ResourceRef;
   escalation_policy?: ResourceRef;
-};
+}
 
 export interface ResourceRef {
   summary?: string;
@@ -31,5 +31,5 @@ export interface ResourceRef {
 }
 
 export interface IncidentAssignment {
-  assignee: ResourceRef
+  assignee: ResourceRef;
 }

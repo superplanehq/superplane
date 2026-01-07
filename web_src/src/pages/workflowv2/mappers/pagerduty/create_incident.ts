@@ -42,7 +42,7 @@ export const createIncidentMapper: ComponentBaseMapper = {
     const outputs = execution.outputs as { default: OutputPayload[] };
     const incident = outputs.default[0].data.incident as Incident;
     return getDetailsForIncident(incident);
-  }
+  },
 };
 
 function metadataList(node: ComponentsNode): MetadataItem[] {

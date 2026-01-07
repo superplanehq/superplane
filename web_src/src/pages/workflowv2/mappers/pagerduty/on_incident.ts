@@ -17,7 +17,7 @@ interface OnIncidentMetadata {
 
 interface OnIncidentEventData {
   agent?: Agent;
-  incident?: Incident
+  incident?: Incident;
 }
 
 /**

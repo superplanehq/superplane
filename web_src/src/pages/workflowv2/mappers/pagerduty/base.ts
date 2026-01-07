@@ -7,30 +7,30 @@ export function getDetailsForIncident(incident: Incident, agent?: ResourceRef): 
     Title: incident?.title || "-",
     Urgency: incident?.urgency || "-",
     Status: incident?.status || "-",
-    "Incident URL": incident?.html_url || "-"
+    "Incident URL": incident?.html_url || "-",
   };
 
   if (incident?.incident_number) {
-    details.Number = incident.incident_number
+    details.Number = incident.incident_number;
   }
 
   if (incident?.service) {
-    details.Service = incident?.service.summary || "-"
-    details["Service URL"] = incident?.service.html_url || "-"
+    details.Service = incident?.service.summary || "-";
+    details["Service URL"] = incident?.service.html_url || "-";
   }
 
   if (incident?.escalation_policy) {
-    details["Escalation Policy"] = incident.escalation_policy.summary || "-"
-    details["Escalation Policy URL"] = incident.escalation_policy.html_url || "-"
+    details["Escalation Policy"] = incident.escalation_policy.summary || "-";
+    details["Escalation Policy URL"] = incident.escalation_policy.html_url || "-";
   }
 
   if (incident?.assignments) {
-    details["Assignments"] = incident.assignments.map(i => i.assignee.summary).join(", ")
+    details["Assignments"] = incident.assignments.map((i) => i.assignee.summary).join(", ");
   }
 
   if (agent) {
-    details["Agent"] = agent.summary || "-"
-    details["Agent URL"] = agent.html_url || "-"
+    details["Agent"] = agent.summary || "-";
+    details["Agent URL"] = agent.html_url || "-";
   }
 
   return details;
