@@ -71,6 +71,7 @@ import {
   mapTriggerEventsToSidebarEvents,
 } from "./utils";
 import { SidebarEvent } from "@/ui/componentSidebar/types";
+import { LogEntry } from "@/ui/CanvasLogSidebar";
 
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
@@ -533,6 +534,21 @@ export function WorkflowPageV2() {
   });
 
   const [currentHistoryNode, setCurrentHistoryNode] = useState<{ nodeId: string; nodeType: string } | null>(null);
+
+  const logEntries = useMemo(() => {
+    return workflow?.spec?.nodes
+      ?.filter((node: ComponentsNode) => node.errorMessage)
+      ?.map((node, index) => {
+      return {
+        id: `log-${index + 1}`,
+        source: "canvas",
+        timestamp: workflow.metadata?.updatedAt || "",
+        title: <span>Component not configured - {node.id} - {node.errorMessage}</span>,
+        type: "warning",
+        searchText: `component not configured ${node.id} ${node.errorMessage}`,
+      } as LogEntry
+    }) || []
+  }, []);
 
   const nodeHistoryQuery = useNodeHistory({
     workflowId: workflowId || "",
@@ -1678,6 +1694,7 @@ export function WorkflowPageV2() {
       components={components}
       triggers={triggers}
       blueprints={blueprints}
+      logEntries={logEntries}
       breadcrumbs={[
         {
           label: "Canvases",
