@@ -38,11 +38,15 @@ spec:
 {{- if ne $className "gce" }}
   ingressClassName: {{ .Values.ingress.className }}
 {{- end }}
-{{- if and $ssl.enabled (eq $ssl.type "custom") }}
+{{- if and $ssl.enabled (or (eq $ssl.type "custom") (eq $ssl.type "cert-manager")) }}
   tls:
     - hosts:
       - "{{ $domainName }}"
+      {{- if eq $ssl.type "custom" }}
       secretName: {{ $ssl.custom.secretName | required "ingress.ssl.custom.secretName is required when ingress.ssl.type is 'custom'." }}
+      {{- else if eq $ssl.type "cert-manager" }}
+      secretName: {{ $ssl.certManager.secretName | required "ingress.ssl.certManager.secretName is required when ingress.ssl.type is 'cert-manager'." }}
+      {{- end }}
 {{- end }}
   defaultBackend:
     service:
