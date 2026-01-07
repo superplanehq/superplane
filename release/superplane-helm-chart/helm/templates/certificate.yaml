@@ -1,0 +1,21 @@
+{{- if and .Values.ingress.ssl.enabled (eq .Values.ingress.ssl.type "cert-manager") }}
+{{- $domainName := .Values.domain.name | required ".Values.domain.name is required." -}}
+{{- $certManager := .Values.ingress.ssl.certManager -}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Release.Name }}-tls
+  namespace: {{ .Release.Namespace }}
+  {{- with $certManager.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  secretName: {{ $certManager.secretName | required "ingress.ssl.certManager.secretName is required when ingress.ssl.type is 'cert-manager'." }}
+  issuerRef:
+    name: {{ $certManager.issuerRef.name | required "ingress.ssl.certManager.issuerRef.name is required when ingress.ssl.type is 'cert-manager'." }}
+    kind: {{ $certManager.issuerRef.kind | default "Issuer" }}
+  dnsNames:
+    - "{{ $domainName }}"
+{{- end }}
+

@@ -119,12 +119,25 @@ ingress:
       certName: ""
 
     #
+    # Use cert-manager to manage SSL certificates.
+    # Requires cert-manager to be installed and configured.
+    # Set ingress.ssl.type to "cert-manager" to use this option.
+    #
+    certManager:
+      issuerRef:
+        name: ""
+        kind: "Issuer" # Can be "Issuer" or "ClusterIssuer"
+      secretName: "superplane-tls-secret"
+      # Optional: Additional annotations for the Certificate resource
+      annotations: {}
+
+    #
     # Provide a custom certificate managed by yourself.
     # Requires the fullchain certificate and the private key used to generate it,
     # which will be stored in a Kubernetes secret for usage.
     #
     custom:
-      secretName: "tls-secret"
+      secretName: "superplane-tls-secret"
       crt: ""
       key: ""
 
@@ -169,3 +182,15 @@ email:
   resendApiKey: ""
   fromName: ""
   fromAddress: ""
+
+#
+# cert-manager configuration
+#
+cert-manager:
+  enabled: false
+  installCRDS: true
+  # Optional: customize cert-manager
+  # resources:
+  #   requests:
+  #     cpu: 10m
+  #     memory: 32Mi
