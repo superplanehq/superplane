@@ -71,7 +71,7 @@ type TriggerContext struct {
 	MetadataContext        MetadataContext
 	RequestContext         RequestContext
 	EventContext           EventContext
-	WebhookContext         WebhookContext
+	WebhookContext         NodeWebhookContext
 	IntegrationContext     IntegrationContext
 	AppInstallationContext AppInstallationContext
 }
@@ -95,7 +95,7 @@ type TriggerActionContext struct {
 	MetadataContext        MetadataContext
 	RequestContext         RequestContext
 	EventContext           EventContext
-	WebhookContext         WebhookContext
+	WebhookContext         NodeWebhookContext
 	AppInstallationContext AppInstallationContext
 }
 
@@ -105,7 +105,7 @@ type WebhookRequestContext struct {
 	WorkflowID     string
 	NodeID         string
 	Configuration  any
-	WebhookContext WebhookContext
+	WebhookContext NodeWebhookContext
 	EventContext   EventContext
 
 	//
@@ -115,7 +115,7 @@ type WebhookRequestContext struct {
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 }
 
-type WebhookContext interface {
+type NodeWebhookContext interface {
 	Setup(options *WebhookSetupOptions) (string, error)
 	GetSecret() ([]byte, error)
 	ResetSecret() ([]byte, []byte, error)

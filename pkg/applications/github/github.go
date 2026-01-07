@@ -323,30 +323,35 @@ type Webhook struct {
 	WebhookName string `json:"name"`
 }
 
-func (g *GitHub) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (any, error) {
+func (g *GitHub) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	metadata := Metadata{}
-	err := mapstructure.Decode(ctx.GetMetadata(), &metadata)
+	err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata)
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := NewClient(ctx, metadata.GitHubApp.ID, metadata.InstallationID)
+	client, err := NewClient(ctx.AppInstallation, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		return nil, err
 	}
 
 	config := WebhookConfiguration{}
-	err = mapstructure.Decode(options.Configuration, &config)
+	err = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
 	if err != nil {
 		return nil, err
+	}
+
+	secret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return nil, fmt.Errorf("error getting webhook secret: %v", err)
 	}
 
 	hook := &github.Hook{
 		Active: github.Ptr(true),
 		Events: []string{config.EventType},
 		Config: &github.HookConfig{
-			URL:         &options.URL,
-			Secret:      github.Ptr(string(options.Secret)),
+			URL:         github.Ptr(ctx.Webhook.GetURL()),
+			Secret:      github.Ptr(string(secret)),
 			ContentType: github.Ptr("json"),
 		},
 	}
@@ -359,26 +364,26 @@ func (g *GitHub) SetupWebhook(ctx core.AppInstallationContext, options core.Webh
 	return &Webhook{ID: createdHook.GetID(), WebhookName: *createdHook.Name}, nil
 }
 
-func (g *GitHub) CleanupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) error {
+func (g *GitHub) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	metadata := Metadata{}
-	err := mapstructure.Decode(ctx.GetMetadata(), &metadata)
+	err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata)
 	if err != nil {
 		return err
 	}
 
-	client, err := NewClient(ctx, metadata.GitHubApp.ID, metadata.InstallationID)
+	client, err := NewClient(ctx.AppInstallation, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		return err
 	}
 
 	webhook := Webhook{}
-	err = mapstructure.Decode(options.Metadata, &webhook)
+	err = mapstructure.Decode(ctx.Webhook.GetMetadata(), &webhook)
 	if err != nil {
 		return err
 	}
 
 	configuration := WebhookConfiguration{}
-	err = mapstructure.Decode(options.Configuration, &configuration)
+	err = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &configuration)
 	if err != nil {
 		return err
 	}

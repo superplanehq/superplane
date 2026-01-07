@@ -24,6 +24,11 @@ import {
   triggerRenderers as githubTriggerRenderers,
   eventStateRegistry as githubEventStateRegistry,
 } from "./github/index";
+import {
+  componentMappers as pagerdutyComponentMappers,
+  triggerRenderers as pagerdutyTriggerRenderers,
+  eventStateRegistry as pagerdutyEventStateRegistry,
+} from "./pagerduty/index";
 import { timeGateMapper } from "./timegate";
 import { filterMapper } from "./filter";
 import { waitCustomFieldRenderer, waitMapper } from "./wait";
@@ -54,16 +59,19 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
+  pagerduty: pagerdutyComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
+  pagerduty: pagerdutyTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
+  pagerduty: pagerdutyEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

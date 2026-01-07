@@ -66,13 +66,23 @@ type Application interface {
 	 * Set up webhooks through the app installation, in the external system.
 	 * This is called by the webhook provisioner, for pending webhook records.
 	 */
-	SetupWebhook(ctx AppInstallationContext, options WebhookOptions) (any, error)
+	SetupWebhook(ctx SetupWebhookContext) (any, error)
 
 	/*
 	 * Delete webhooks through the app installation, in the external system.
 	 * This is called by the webhook cleanup worker, for webhook records that were deleted.
 	 */
-	CleanupWebhook(ctx AppInstallationContext, options WebhookOptions) error
+	CleanupWebhook(ctx CleanupWebhookContext) error
+}
+
+type SetupWebhookContext struct {
+	Webhook         WebhookContext
+	AppInstallation AppInstallationContext
+}
+
+type CleanupWebhookContext struct {
+	Webhook         WebhookContext
+	AppInstallation AppInstallationContext
 }
 
 type WebhookOptions struct {
@@ -155,4 +165,16 @@ type HTTPRequestContext struct {
 	BaseURL         string
 	WebhooksBaseURL string
 	AppInstallation AppInstallationContext
+}
+
+/*
+ * WebhookContext allows implementations to read/manage Webhook records.
+ */
+type WebhookContext interface {
+	GetID() string
+	GetURL() string
+	GetSecret() ([]byte, error)
+	GetMetadata() any
+	GetConfiguration() any
+	SetSecret([]byte) error
 }

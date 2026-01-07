@@ -21,13 +21,15 @@ type WebhookCleanupWorker struct {
 	semaphore *semaphore.Weighted
 	registry  *registry.Registry
 	encryptor crypto.Encryptor
+	baseURL   string
 }
 
-func NewWebhookCleanupWorker(encryptor crypto.Encryptor, registry *registry.Registry) *WebhookCleanupWorker {
+func NewWebhookCleanupWorker(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) *WebhookCleanupWorker {
 	return &WebhookCleanupWorker{
 		registry:  registry,
 		encryptor: encryptor,
 		semaphore: semaphore.NewWeighted(25),
+		baseURL:   baseURL,
 	}
 }
 
@@ -99,10 +101,9 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhoo
 		return err
 	}
 
-	ctx := contexts.NewAppInstallationContext(tx, nil, appInstallation, w.encryptor, w.registry)
-	err = app.CleanupWebhook(ctx, core.WebhookOptions{
-		Configuration: webhook.Configuration.Data(),
-		Metadata:      webhook.Metadata.Data(),
+	err = app.CleanupWebhook(core.CleanupWebhookContext{
+		Webhook:         contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
+		AppInstallation: contexts.NewAppInstallationContext(tx, nil, appInstallation, w.encryptor, w.registry),
 	})
 
 	if err != nil {

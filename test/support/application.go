@@ -58,10 +58,10 @@ func (t *DummyApplication) CompareWebhookConfig(a, b any) (bool, error) {
 	return false, nil
 }
 
-func (t *DummyApplication) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (any, error) {
+func (t *DummyApplication) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	return nil, nil
 }
 
-func (t *DummyApplication) CleanupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) error {
+func (t *DummyApplication) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	return nil
 }
