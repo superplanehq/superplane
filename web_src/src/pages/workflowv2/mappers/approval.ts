@@ -26,6 +26,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { organizationKeys } from "@/hooks/useOrganizationData";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { workflowKeys } from "@/hooks/useWorkflowData";
+import { formatTimeAgo } from "@/utils/date";
 
 type ApprovalItem = {
   type: string;
@@ -174,13 +175,15 @@ function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): Comp
       values: items.map((item) => {
         const type = (item.type || "").toString();
         let value =
-          type === "user"
-            ? item.user || ""
-            : type === "role"
-              ? item.role || ""
-              : type === "group"
-                ? item.group || ""
-                : "";
+          type === "anyone"
+            ? "Anyone"
+            : type === "user"
+              ? item.user || ""
+              : type === "role"
+                ? item.role || ""
+                : type === "group"
+                  ? item.group || ""
+                  : "";
         const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
 
         // Pretty-print values
@@ -234,22 +237,25 @@ function getComponentSubtitle(
   execution: WorkflowsWorkflowNodeExecution,
   additionalData?: unknown,
 ): string | React.ReactNode {
-  let subtitle = "";
-
-  if (execution.metadata?.result === "rejected") {
-    subtitle = "Rejected";
-  } else if (execution.metadata?.result === "approved") {
-    subtitle = "Approved";
-  } else if (execution.state === "STATE_STARTED") {
+  // Show progress for in-progress approvals
+  if (execution.state === "STATE_STARTED") {
     const approvals = (additionalData as { approvals?: ApprovalItemProps[] })?.approvals;
     const approvalsCount = approvals?.length || 0;
     const approvalsApprovedCount = approvals?.filter((approval) => approval.approved).length || 0;
-    subtitle = `${approvalsApprovedCount}/${approvalsCount}`;
-  } else if (execution.state === "STATE_FINISHED") {
-    subtitle = "Error";
+    return `${approvalsApprovedCount}/${approvalsCount} approved`;
   }
 
-  return subtitle;
+  // Show relative time for completed executions (use updatedAt for finished, createdAt otherwise)
+  const timestamp = execution.state === "STATE_FINISHED" && execution.updatedAt
+    ? execution.updatedAt
+    : execution.createdAt;
+
+  if (timestamp) {
+    const date = new Date(timestamp);
+    return formatTimeAgo(date);
+  }
+
+  return "";
 }
 
 // ----------------------- Data Builder -----------------------
@@ -314,13 +320,15 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
         return {
           id: `${record.index}`,
           title:
-            record.type === "user" && record.user
-              ? record.user.name || record.user.email
-              : record.type === "role" && record.role
-                ? record.role
-                : record.type === "group" && record.group
-                  ? record.group
-                  : "Unknown",
+            record.type === "anyone"
+              ? "Any user"
+              : record.type === "user" && record.user
+                ? record.user.name || record.user.email
+                : record.type === "role" && record.role
+                  ? record.role
+                  : record.type === "group" && record.group
+                    ? record.group
+                    : "Unknown",
           approved: record.state === "approved",
           rejected: record.state === "rejected",
           approverName: record.user?.name,
