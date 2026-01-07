@@ -127,18 +127,18 @@ export const runWorkflowMapper: ComponentBaseMapper = {
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
     const metadata = execution.metadata as ExecutionMetadata;
     const details: Record<string, string> = {
-      "URL": metadata.workflowRun?.url || "-",
+      URL: metadata.workflowRun?.url || "-",
       "Run ID": metadata.workflowRun?.id?.toString() || "-",
-      "Status": metadata.workflowRun?.status || "-",
-      "Conclusion": metadata.workflowRun?.conclusion || "-"
+      Status: metadata.workflowRun?.status || "-",
+      Conclusion: metadata.workflowRun?.conclusion || "-",
     };
 
     if (execution.state == "STATE_FINISHED") {
       details["Finished At"] = execution.updatedAt || "-";
     }
 
-    return details
-  }
+    return details;
+  },
 };
 
 function runWorkflowMetadataList(node: ComponentsNode): MetadataItem[] {

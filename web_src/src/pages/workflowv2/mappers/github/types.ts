@@ -25,7 +25,7 @@ export interface Issue {
     id: number;
     login: string;
     html_url: string;
-  }
+  };
 }
 
 export interface Assignee {

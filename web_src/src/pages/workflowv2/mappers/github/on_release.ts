@@ -11,7 +11,7 @@ interface OnReleaseConfiguration {
 
 interface OnReleaseEventData {
   action?: string;
-  release?: Release
+  release?: Release;
 }
 
 /**

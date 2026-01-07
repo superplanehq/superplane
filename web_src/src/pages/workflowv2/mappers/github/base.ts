@@ -27,7 +27,7 @@ export const baseIssueMapper: ComponentBaseMapper = {
     const outputs = execution.outputs as { default: OutputPayload[] };
     const issue = outputs.default[0].data as Issue;
     return getDetailsForIssue(issue);
-  }
+  },
 };
 
 export function baseProps(
@@ -52,17 +52,17 @@ export function baseProps(
     includeEmptyState: !lastExecution,
     eventStateMap: getStateMap(componentName),
   };
-};
+}
 
 export function getDetailsForIssue(issue: Issue): Record<string, string> {
   const details: Record<string, string> = {
-    "Number": issue?.number.toString(),
-    "ID": issue?.id.toString(),
-    "State": issue?.state,
-    "URL": issue?.html_url,
-    "Title": issue?.title || "-",
-    "Author": issue?.user?.html_url || "-",
-    "Created At": issue?.created_at
+    Number: issue?.number.toString(),
+    ID: issue?.id.toString(),
+    State: issue?.state,
+    URL: issue?.html_url,
+    Title: issue?.title || "-",
+    Author: issue?.user?.html_url || "-",
+    "Created At": issue?.created_at,
   };
 
   if (issue.closed_by) {
@@ -71,11 +71,11 @@ export function getDetailsForIssue(issue: Issue): Record<string, string> {
   }
 
   if (issue.labels) {
-    details["Labels"] = issue.labels.map(label => label.name).join(", ");
+    details["Labels"] = issue.labels.map((label) => label.name).join(", ");
   }
 
   if (issue.assignees) {
-    details["Assignees"] = issue.assignees.map(assignee => assignee.login).join(", ");
+    details["Assignees"] = issue.assignees.map((assignee) => assignee.login).join(", ");
   }
 
   return details;
