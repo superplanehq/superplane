@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { resolveIcon } from "@/lib/utils";
 import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { ChevronRight, GripVerticalIcon, Plus, Search, X } from "lucide-react";
+import { ChevronRight, GripVerticalIcon, Plus, Search, StickyNote, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
@@ -54,6 +54,7 @@ export function BuildingBlocksSidebar({
     return (
       <div className="absolute top-4 right-4 z-10 flex gap-2">
         <Button variant="outline" onClick={onAddNote} aria-label="Add Note" data-testid="add-note-button">
+          <StickyNote size={16} className="animate-pulse" />
           Add Note
         </Button>
         <Button

@@ -143,6 +143,7 @@ export interface CanvasPageProps {
     nodeName: string,
     appInstallationRef?: ComponentsAppInstallationRef,
   ) => void;
+  onAnnotationUpdate?: (nodeId: string, updates: { text?: string; color?: string }) => void;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
   installedApplications?: OrganizationsAppInstallation[];
@@ -272,6 +273,11 @@ const nodeTypes = {
         onToggleView={callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
         onToggleCollapse={
           callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
+        }
+        onAnnotationUpdate={
+          callbacks.onAnnotationUpdate.current
+            ? (nodeId, updates) => callbacks.onAnnotationUpdate.current?.(nodeId, updates)
+            : undefined
         }
         ai={{
           show: callbacks.aiState.sidebarOpen,
@@ -526,16 +532,13 @@ function CanvasPage(props: CanvasPageProps) {
       isLive: true,
     };
 
-    const newNodeId = await props.onNodeAdd({
+    await props.onNodeAdd({
       buildingBlock: annotationBlock,
       nodeName: "New Note",
       configuration: {},
       position: { x: 200, y: 200 },
     });
-
-    state.componentSidebar.open(newNodeId);
-    setCurrentTab("settings");
-  }, [props, state, setCurrentTab]);
+  }, [props]);
 
   const handleBuildingBlockDrop = useCallback(
     async (block: BuildingBlock, position?: { x: number; y: number }) => {
@@ -687,6 +690,7 @@ function CanvasPage(props: CanvasPageProps) {
               onDuplicate={props.onDuplicate}
               onConfigure={props.onConfigure}
               onDeactivate={props.onDeactivate}
+              onAnnotationUpdate={props.onAnnotationUpdate}
               runDisabled={props.runDisabled}
               runDisabledTooltip={props.runDisabledTooltip}
               onBuildingBlockDrop={handleBuildingBlockDrop}
@@ -1092,6 +1096,7 @@ function CanvasContent({
   onDeactivate,
   onToggleView,
   onToggleCollapse,
+  onAnnotationUpdate,
   onBuildingBlockDrop,
   onBuildingBlocksSidebarToggle,
   onConnectionDropInEmptySpace,
@@ -1130,6 +1135,7 @@ function CanvasContent({
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
   onDelete?: (nodeId: string) => void;
+  onAnnotationUpdate?: (nodeId: string, updates: { text?: string; color?: string }) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onBuildingBlocksSidebarToggle?: (open: boolean) => void;
   onConnectionDropInEmptySpace?: (
@@ -1196,6 +1202,7 @@ function CanvasContent({
       // Check if this is a pending connection node
       const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       const isPendingConnection = clickedNode?.data?.isPendingConnection;
+      const isAnnotationNode = clickedNode?.data?.type === "annotation";
 
       // Check if this is a placeholder node (persisted, not local-only)
       const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
@@ -1218,6 +1225,10 @@ function CanvasContent({
         !isTemplateNode &&
         !isPlaceholder
       ) {
+        return;
+      }
+
+      if (isAnnotationNode) {
         return;
       }
 
@@ -1284,6 +1295,9 @@ function CanvasContent({
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
+
+  const onAnnotationUpdateRef = useRef(onAnnotationUpdate);
+  onAnnotationUpdateRef.current = onAnnotationUpdate;
 
   const handleSave = useCallback(() => {
     if (onSave) {
@@ -1463,6 +1477,7 @@ function CanvasContent({
     onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
     onToggleView: onToggleViewRef,
+    onAnnotationUpdate: onAnnotationUpdateRef,
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
@@ -1477,6 +1492,7 @@ function CanvasContent({
     onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
     onToggleView: onToggleViewRef,
+    onAnnotationUpdate: onAnnotationUpdateRef,
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,

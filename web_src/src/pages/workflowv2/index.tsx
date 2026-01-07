@@ -844,7 +844,7 @@ export function WorkflowPageV2() {
   );
 
   const handleSaveWorkflow = useCallback(
-    async (workflowToSave?: WorkflowsWorkflow) => {
+    async (workflowToSave?: WorkflowsWorkflow, options?: { showToast?: boolean }) => {
       const targetWorkflow = workflowToSave || workflow;
       if (!targetWorkflow || !organizationId || !workflowId) return;
 
@@ -856,7 +856,6 @@ export function WorkflowPageV2() {
           edges: targetWorkflow.spec?.edges,
         });
 
-        showSuccessToast("Canvas changes saved");
         setLiveCanvasEntries((prev) => [
           buildCanvasStatusLogEntry({
             id: `canvas-save-${Date.now()}`,
@@ -866,6 +865,9 @@ export function WorkflowPageV2() {
           }),
           ...prev,
         ]);
+        if (options?.showToast !== false) {
+          showSuccessToast("Canvas changes saved");
+        }
         setHasUnsavedChanges(false);
         setHasNonPositionalUnsavedChanges(false);
 
@@ -938,7 +940,10 @@ export function WorkflowPageV2() {
           nodeId: node.id!,
           nodeName: node.name!,
           displayLabel,
-          configuration: { text: node.configuration?.text || "" },
+          configuration: {
+            text: node.configuration?.text || "",
+            color: node.configuration?.color || "yellow",
+          },
           configurationFields,
           appName,
           appInstallationRef: node.appInstallation,
@@ -1004,7 +1009,56 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      isAutoSaveEnabled,
+      markUnsavedChange,
+    ],
+  );
+
+  const handleAnnotationUpdate = useCallback(
+    async (nodeId: string, updates: { text?: string; color?: string }) => {
+      if (!workflow || !organizationId || !workflowId) return;
+      if (Object.keys(updates).length === 0) return;
+
+      saveWorkflowSnapshot(workflow);
+
+      const updatedNodes = workflow?.spec?.nodes?.map((node) => {
+        if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
+          return node;
+        }
+
+        return {
+          ...node,
+          configuration: {
+            ...node.configuration,
+            ...updates,
+          },
+        };
+      });
+
+      const updatedWorkflow = {
+        ...workflow,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
+      };
+
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+
+      if (isAutoSaveEnabled) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1072,7 +1126,7 @@ export function WorkflowPageV2() {
       if (buildingBlock.name === "annotation") {
         // Annotation nodes are now widgets
         newNode.widget = { name: "annotation" };
-        newNode.configuration = { text: "" };
+        newNode.configuration = { text: "", color: "yellow" };
       } else if (buildingBlock.type === "component") {
         newNode.component = { name: buildingBlock.name };
       } else if (buildingBlock.type === "trigger") {
@@ -1108,7 +1162,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1172,7 +1226,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1278,7 +1332,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1324,7 +1378,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1367,7 +1421,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1424,7 +1478,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1531,7 +1585,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1820,6 +1874,7 @@ export function WorkflowPageV2() {
       getNodeEditData={getNodeEditData}
       getCustomField={getCustomField}
       onNodeConfigurationSave={handleNodeConfigurationSave}
+      onAnnotationUpdate={handleAnnotationUpdate}
       onSave={handleSave}
       onEdgeCreate={handleEdgeCreate}
       onNodeDelete={handleNodeDelete}
@@ -2226,6 +2281,7 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
   return {
     id: node.id!,
     position: { x: node.position?.x!, y: node.position?.y! },
+    selectable: false,
     data: {
       type: "annotation",
       label: node.name || "Annotation",
@@ -2234,7 +2290,7 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
       annotation: {
         title: node.name || "Annotation",
         annotationText: node.configuration?.text || "",
-        collapsed: node.isCollapsed || false,
+        annotationColor: node.configuration?.color || "yellow",
       },
     },
   };
