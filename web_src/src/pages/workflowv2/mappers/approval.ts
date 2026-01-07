@@ -246,9 +246,8 @@ function getComponentSubtitle(
   }
 
   // Show relative time for completed executions (use updatedAt for finished, createdAt otherwise)
-  const timestamp = execution.state === "STATE_FINISHED" && execution.updatedAt
-    ? execution.updatedAt
-    : execution.createdAt;
+  const timestamp =
+    execution.state === "STATE_FINISHED" && execution.updatedAt ? execution.updatedAt : execution.createdAt;
 
   if (timestamp) {
     const date = new Date(timestamp);
