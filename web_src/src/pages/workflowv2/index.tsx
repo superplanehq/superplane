@@ -32,6 +32,7 @@ import {
   useTriggers,
   useUpdateWorkflow,
   useWorkflow,
+  useWorkflowEvents,
   useWidgets,
   workflowKeys,
 } from "@/hooks/useWorkflowData";
@@ -96,6 +97,7 @@ export function WorkflowPageV2() {
   const { data: availableApplications = [], isLoading: applicationsLoading } = useAvailableApplications();
   const { data: installedApplications = [] } = useInstalledApplications(organizationId!);
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
+  const { data: workflowEventsResponse } = useWorkflowEvents(workflowId!);
 
   usePageTitle([workflow?.metadata?.name || "Canvas"]);
 
@@ -567,22 +569,104 @@ export function WorkflowPageV2() {
     [handleSidebarChange],
   );
 
+  const handleLogRunNodeSelect = useCallback(
+    (nodeId: string) => {
+      handleSidebarChange(true, nodeId);
+      setFocusRequest({ nodeId, requestId: Date.now(), tab: "latest" });
+    },
+    [handleSidebarChange],
+  );
+
   const logEntries = useMemo(() => {
-    return (
-      workflow?.spec?.nodes
-        ?.filter((node: ComponentsNode) => node.errorMessage)
-        ?.map((node, index) => {
+    const nodes = workflow?.spec?.nodes || [];
+    const rootEvents = workflowEventsResponse?.events || [];
+
+    const runEntries = rootEvents.map((event, index) => {
+      const triggerNode = nodes.find((node) => node.id === event.nodeId);
+      const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
+      const { title, subtitle } = triggerRenderer.getTitleAndSubtitle(event as WorkflowsWorkflowEvent);
+      const rootValues = triggerRenderer.getRootEventValues(event as WorkflowsWorkflowEvent);
+
+      const runItems = (event.executions || []).map((execution, executionIndex) => {
+        const componentNode = nodes.find((node) => node.id === execution.nodeId);
+        const componentName = componentNode?.component?.name || "";
+        const stateResolver = getState(componentName);
+        const state = stateResolver(execution as WorkflowsWorkflowNodeExecution);
+        const executionState = state || "unknown";
+        const nodeId = componentNode?.id || execution.nodeId || "";
+        const primaryComponentName = componentName ? componentName.split(".")[0] : "";
+        const componentSubtitle = getComponentBaseMapper(primaryComponentName).subtitle?.(
+          componentNode as ComponentsNode,
+          execution as WorkflowsWorkflowNodeExecution,
+        );
+        const detail = execution.resultMessage || componentSubtitle;
+        const title = (
+          <span>
+            {componentNode?.name || componentNode?.id || execution.nodeId || "Execution"}
+            {nodeId ? (
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  className="text-blue-600 underline hover:text-blue-700"
+                  onClick={() => handleLogRunNodeSelect(nodeId)}
+                >
+                  {nodeId}
+                </button>
+              </>
+            ) : null}
+            {" · "}
+            {executionState}
+          </span>
+        );
+        return {
+          id: execution.id || `${event.id}-execution-${executionIndex}`,
+          type: mapExecutionStateToLogType(state),
+          title,
+          timestamp: event.createdAt || "",
+          detail,
+          searchText: [
+            componentNode?.name,
+            componentNode?.id,
+            execution.nodeId,
+            executionState,
+            execution.resultMessage,
+            execution.resultReason,
+            execution.result,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        };
+      });
+
+      return {
+        id: event.id || `run-${index + 1}`,
+        source: "runs",
+        timestamp: event.createdAt || "",
+        title: `#${event.id?.slice(0, 4)} ·  ${title}` || "· Run",
+        type: "run",
+        runItems,
+        searchText: [title, subtitle, event.id, event.nodeId, Object.values(rootValues).join(" ")]
+          .filter(Boolean)
+          .join(" "),
+      } as LogEntry;
+    });
+
+    const canvasEntries =
+      nodes
+        .filter((node: ComponentsNode) => node.errorMessage)
+        .map((node, index) => {
           return {
             id: `log-${index + 1}`,
             source: "canvas",
-            timestamp: workflow.metadata?.updatedAt || "",
+            timestamp: workflow?.metadata?.updatedAt || "",
             title: (
               <span>
                 Component not configured -{" "}
                 <button
                   type="button"
                   className="text-blue-600 underline hover:text-blue-700"
-                  onClick={() => handleLogNodeSelect(node.id)}
+                  onClick={() => handleLogNodeSelect(node.id || '')}
                 >
                   {node.id}
                 </button>{" "}
@@ -592,9 +676,20 @@ export function WorkflowPageV2() {
             type: "warning",
             searchText: `component not configured ${node.id} ${node.errorMessage}`,
           } as LogEntry;
-        }) || []
-    );
-  }, [handleLogNodeSelect, workflow?.metadata?.updatedAt, workflow?.spec?.nodes]);
+        }) || [];
+
+    return [...runEntries, ...canvasEntries].sort((a, b) => {
+      const aTime = Date.parse(a.timestamp || "") || 0;
+      const bTime = Date.parse(b.timestamp || "") || 0;
+      return aTime - bTime;
+    });
+  }, [
+    handleLogNodeSelect,
+    handleLogRunNodeSelect,
+    workflow?.metadata?.updatedAt,
+    workflow?.spec?.nodes,
+    workflowEventsResponse?.events,
+  ]);
 
   const nodeHistoryQuery = useNodeHistory({
     workflowId: workflowId || "",
@@ -1734,6 +1829,16 @@ export function WorkflowPageV2() {
       ]}
     />
   );
+}
+
+function mapExecutionStateToLogType(state?: string): "success" | "error" | "warning" {
+  if (state === "success") {
+    return "success";
+  }
+  if (state === "failed" || state === "error" || state === "cancelled") {
+    return "error";
+  }
+  return "warning";
 }
 
 function useExecutionChainData(workflowId: string, queryClient: QueryClient, workflow?: WorkflowsWorkflow) {

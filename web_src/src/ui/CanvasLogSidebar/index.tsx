@@ -56,6 +56,25 @@ export interface CanvasLogSidebarProps {
   onToggleRun: (runId: string) => void;
 }
 
+function formatLogTimestamp(value: string) {
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) {
+    return value;
+  }
+
+  const date = new Date(parsed);
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekday = weekdays[date.getDay()];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+
+  return `${weekday} ${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
 export function CanvasLogSidebar({
   isOpen,
   onClose,
@@ -89,7 +108,10 @@ export function CanvasLogSidebar({
 
   const sidebarHeight = height ?? internalHeight;
   const clampHeight = useCallback(
-    (value: number) => Math.max(minHeight, Math.min(maxHeight, value)),
+    (value: number) => {
+      const overrideMaxHeight = Math.min(document.body.clientHeight - 100, maxHeight);
+      return Math.max(minHeight, Math.min(overrideMaxHeight, value));
+    },
     [minHeight, maxHeight],
   );
 
@@ -133,7 +155,7 @@ export function CanvasLogSidebar({
   }
 
   return (
-    <aside className="absolute inset-x-3 bottom-3 z-20 pointer-events-auto">
+    <aside className="absolute inset-x-3 bottom-3 z-31 pointer-events-auto">
       <div
         className="bg-white border border-slate-200 rounded-lg shadow-lg flex flex-col"
         style={{ height: sidebarHeight, minHeight, maxHeight }}
@@ -260,7 +282,9 @@ function LogEntryRow({
             {runItems.length}
           </div>
           <div className="flex-1 min-w-0 text-left">{entry.title}</div>
-          <span className="ml-auto text-xs text-slate-400 tabular-nums whitespace-nowrap">{entry.timestamp}</span>
+          <span className="ml-auto text-xs text-slate-400 tabular-nums whitespace-nowrap">
+            {formatLogTimestamp(entry.timestamp)}
+          </span>
         </button>
         {showChildren && (
           <div className="pb-2">
@@ -273,7 +297,9 @@ function LogEntryRow({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">{item.title}</div>
-                    <span className="text-xs text-slate-400 tabular-nums whitespace-nowrap">{item.timestamp}</span>
+                    <span className="text-xs text-slate-400 tabular-nums whitespace-nowrap">
+                      {formatLogTimestamp(item.timestamp)}
+                    </span>
                   </div>
                   {item.detail && <div className="mt-1 text-xs text-slate-500">{item.detail}</div>}
                 </div>
@@ -289,7 +315,9 @@ function LogEntryRow({
     <div className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700">
       <div>{icon[entry.type]}</div>
       <div className="flex-1 min-w-0">{entry.title}</div>
-      <span className="ml-auto text-xs text-slate-400 tabular-nums whitespace-nowrap">{entry.timestamp}</span>
+      <span className="ml-auto text-xs text-slate-400 tabular-nums whitespace-nowrap">
+        {formatLogTimestamp(entry.timestamp)}
+      </span>
     </div>
   );
 }
