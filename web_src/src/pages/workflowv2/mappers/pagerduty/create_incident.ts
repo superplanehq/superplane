@@ -38,7 +38,7 @@ export const createIncidentMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, node: ComponentsNode): Record<string, string> {
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, string> {
     const outputs = execution.outputs as { default: OutputPayload[] };
     const incident = outputs.default[0].data.incident as Incident;
     return getDetailsForIncident(incident);
