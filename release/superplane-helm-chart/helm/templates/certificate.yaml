@@ -10,13 +10,6 @@ metadata:
     {{- if $certManager.annotations }}
     {{- toYaml $certManager.annotations | nindent 4 }}
     {{- end }}
-    # Ensure cert-manager CRDs are available before creating this resource
-    # This hook runs after cert-manager is installed to ensure CRDs are available
-    {{- if (index .Values "cert-manager").enabled }}
-    "helm.sh/hook-weight": "1"
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
-    {{- end }}
 spec:
   secretName: {{ $certManager.secretName | required "ingress.ssl.certManager.secretName is required when ingress.ssl.type is 'cert-manager'." }}
   issuerRef:
