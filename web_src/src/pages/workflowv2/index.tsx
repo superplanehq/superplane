@@ -534,21 +534,67 @@ export function WorkflowPageV2() {
   });
 
   const [currentHistoryNode, setCurrentHistoryNode] = useState<{ nodeId: string; nodeType: string } | null>(null);
+  const [focusRequest, setFocusRequest] = useState<{
+    nodeId: string;
+    requestId: number;
+    tab?: "latest" | "settings";
+  } | null>(null);
+
+  const handleSidebarChange = useCallback(
+    (open: boolean, nodeId: string | null) => {
+      const next = new URLSearchParams(searchParams);
+      if (open) {
+        next.set("sidebar", "1");
+        if (nodeId) {
+          next.set("node", nodeId);
+        } else {
+          next.delete("node");
+        }
+      } else {
+        next.delete("sidebar");
+        next.delete("node");
+      }
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const handleLogNodeSelect = useCallback(
+    (nodeId: string) => {
+      handleSidebarChange(true, nodeId);
+      setFocusRequest({ nodeId, requestId: Date.now(), tab: "settings" });
+    },
+    [handleSidebarChange],
+  );
 
   const logEntries = useMemo(() => {
-    return workflow?.spec?.nodes
-      ?.filter((node: ComponentsNode) => node.errorMessage)
-      ?.map((node, index) => {
-      return {
-        id: `log-${index + 1}`,
-        source: "canvas",
-        timestamp: workflow.metadata?.updatedAt || "",
-        title: <span>Component not configured - {node.id} - {node.errorMessage}</span>,
-        type: "warning",
-        searchText: `component not configured ${node.id} ${node.errorMessage}`,
-      } as LogEntry
-    }) || []
-  }, []);
+    return (
+      workflow?.spec?.nodes
+        ?.filter((node: ComponentsNode) => node.errorMessage)
+        ?.map((node, index) => {
+          return {
+            id: `log-${index + 1}`,
+            source: "canvas",
+            timestamp: workflow.metadata?.updatedAt || "",
+            title: (
+              <span>
+                Component not configured -{" "}
+                <button
+                  type="button"
+                  className="text-blue-600 underline hover:text-blue-700"
+                  onClick={() => handleLogNodeSelect(node.id)}
+                >
+                  {node.id}
+                </button>{" "}
+                - {node.errorMessage}
+              </span>
+            ),
+            type: "warning",
+            searchText: `component not configured ${node.id} ${node.errorMessage}`,
+          } as LogEntry;
+        }) || []
+    );
+  }, [handleLogNodeSelect, workflow?.metadata?.updatedAt, workflow?.spec?.nodes]);
 
   const nodeHistoryQuery = useNodeHistory({
     workflowId: workflowId || "",
@@ -1509,25 +1555,6 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, updateWorkflowMutation],
   );
 
-  const handleSidebarChange = useCallback(
-    (open: boolean, nodeId: string | null) => {
-      const next = new URLSearchParams(searchParams);
-      if (open) {
-        next.set("sidebar", "1");
-        if (nodeId) {
-          next.set("node", nodeId);
-        } else {
-          next.delete("node");
-        }
-      } else {
-        next.delete("sidebar");
-        next.delete("node");
-      }
-      setSearchParams(next, { replace: true });
-    },
-    [searchParams, setSearchParams],
-  );
-
   // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
   const { onPushThrough, supportsPushThrough } = usePushThroughHandler({
     workflowId: workflowId!,
@@ -1695,6 +1722,7 @@ export function WorkflowPageV2() {
       triggers={triggers}
       blueprints={blueprints}
       logEntries={logEntries}
+      focusRequest={focusRequest}
       breadcrumbs={[
         {
           label: "Canvases",

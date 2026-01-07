@@ -282,6 +282,7 @@ function useComponentSidebarState(
 ): CanvasPageState["componentSidebar"] {
   const [isOpen, setIsOpen] = useState<boolean>(initial?.isOpen ?? false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(initial?.nodeId ?? null);
+  const lastInitialRef = useRef<{ isOpen: boolean; nodeId: string | null } | null>(null);
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -304,6 +305,24 @@ function useComponentSidebarState(
       onChange?.(true, selectedNodeId);
     }
   }, [isOpen, selectedNodeId, onChange]);
+
+  useEffect(() => {
+    if (initial?.isOpen === undefined && initial?.nodeId === undefined) {
+      return;
+    }
+
+    const nextIsOpen = initial?.isOpen ?? false;
+    const nextNodeId = initial?.nodeId ?? null;
+    const lastInitial = lastInitialRef.current;
+
+    if (lastInitial && lastInitial.isOpen === nextIsOpen && lastInitial.nodeId === nextNodeId) {
+      return;
+    }
+
+    lastInitialRef.current = { isOpen: nextIsOpen, nodeId: nextNodeId };
+    setIsOpen(nextIsOpen);
+    setSelectedNodeId(nextNodeId);
+  }, [initial?.isOpen, initial?.nodeId]);
 
   // Don't memoize the object itself - let it be a new reference each render
   // But the callbacks (open, close) are stable thanks to useCallback

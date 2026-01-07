@@ -65,6 +65,12 @@ export interface CanvasEdge extends ReactFlowEdge {
   targetHandle?: string | null;
 }
 
+interface FocusRequest {
+  nodeId: string;
+  requestId: number;
+  tab?: "latest" | "settings";
+}
+
 export interface AiProps {
   enabled: boolean;
   sidebarOpen: boolean;
@@ -216,6 +222,7 @@ export interface CanvasPageProps {
   blueprints?: BlueprintsBlueprint[];
 
   logEntries?: LogEntry[];
+  focusRequest?: FocusRequest | null;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -313,6 +320,12 @@ function CanvasPage(props: CanvasPageProps) {
     nodeName: string;
     channels: string[];
   } | null>(null);
+
+  useEffect(() => {
+    if (props.focusRequest?.tab) {
+      setCurrentTab(props.focusRequest.tab);
+    }
+  }, [props.focusRequest?.requestId, props.focusRequest?.tab]);
 
   const handleNodeEdit = useCallback(
     (nodeId: string) => {
@@ -687,6 +700,7 @@ function CanvasPage(props: CanvasPageProps) {
               isAutoSaveEnabled={props.isAutoSaveEnabled}
               onToggleAutoSave={props.onToggleAutoSave}
               logEntries={props.logEntries}
+              focusRequest={props.focusRequest}
             />
           </ReactFlowProvider>
 
@@ -1081,6 +1095,7 @@ function CanvasContent({
   isAutoSaveEnabled,
   onToggleAutoSave,
   logEntries = [],
+  focusRequest,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1121,6 +1136,7 @@ function CanvasContent({
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
   logEntries?: LogEntry[];
+  focusRequest?: FocusRequest | null;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1320,6 +1336,25 @@ function CanvasContent({
     state.toggleCollapse();
     onToggleCollapse?.();
   }, [state.toggleCollapse, onToggleCollapse]);
+
+  useEffect(() => {
+    if (!focusRequest) {
+      return;
+    }
+
+    const targetNode = stateRef.current.nodes?.find((node) => node.id === focusRequest.nodeId);
+    if (!targetNode) {
+      return;
+    }
+
+    stateRef.current.setNodes((nodes) =>
+      nodes.map((node) => ({
+        ...node,
+        selected: node.id === focusRequest.nodeId,
+      })),
+    );
+    fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
+  }, [focusRequest, fitView]);
 
   // Add keyboard shortcut for toggling collapse/expand
   useEffect(() => {
