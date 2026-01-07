@@ -25,7 +25,7 @@ REGISTRY="oci://ghcr.io/superplanehq"
 # Package the chart with the specified version
 helm package "${CHART_DIR}" --version "${CHART_VERSION}" --app-version "${CHART_VERSION}"
 
-# Get the generated chart filename
+# Get the generated chart filename (Helm uses the chart name from Chart.yaml)
 CHART_FILE="${CHART_NAME}-${CHART_VERSION}.tgz"
 
 if [ ! -f "${CHART_FILE}" ]; then
@@ -35,8 +35,8 @@ fi
 
 echo "* Chart packaged: ${CHART_FILE}"
 
-echo "* Pushing chart to ${REGISTRY}/${CHART_NAME}"
-helm push "${CHART_FILE}" "${REGISTRY}/${CHART_NAME}"
+echo "* Pushing chart to ${REGISTRY}"
+helm push "${CHART_FILE}" "${REGISTRY}"
 
 echo "* Cleaning up local chart file"
 rm -f "${CHART_FILE}"
