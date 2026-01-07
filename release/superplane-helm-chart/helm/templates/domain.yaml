@@ -5,3 +5,4 @@ metadata:
   name: {{ .Values.domain.configMapName }}
 data:
   BASE_URL: https://{{ $domain }}
+  WEBHOOKS_BASE_URL: https://{{ $domain }}
