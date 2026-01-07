@@ -175,13 +175,13 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	}
 
 	// Parse webhook payload
-	data := map[string]any{}
-	err = json.Unmarshal(ctx.Body, &data)
+	var webhook Webhook
+	err = json.Unmarshal(ctx.Body, &webhook)
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	eventType := getEventType(data)
+	eventType := webhook.Event.EventType
 
 	//
 	// Since the webhook may be shared and receive more events than this trigger cares about,
@@ -191,11 +191,15 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		return http.StatusOK, nil
 	}
 
-	if !filterByUrgency(data, config.Urgencies) {
+	if !allowedUrgency(webhook.Event.Data, config.Urgencies) {
 		return http.StatusOK, nil
 	}
 
-	err = ctx.EventContext.Emit(fmt.Sprintf("pagerduty.%s", eventType), data)
+	err = ctx.EventContext.Emit(
+		fmt.Sprintf("pagerduty.%s", eventType),
+		buildPayload(webhook.Event.Agent, webhook.Event.Data),
+	)
+
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}
@@ -203,35 +207,38 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	return http.StatusOK, nil
 }
 
-func getEventType(data map[string]any) string {
-	event, ok := data["event"].(map[string]any)
-	if !ok {
-		return ""
-	}
-
-	eventType, ok := event["event_type"].(string)
-	if !ok {
-		return ""
-	}
-
-	return eventType
+type Webhook struct {
+	Event WebhookEvent `json:"event"`
 }
 
-func filterByUrgency(data map[string]any, allowed []string) bool {
-	event, ok := data["event"].(map[string]any)
-	if !ok {
+type WebhookEvent struct {
+	EventType string         `json:"event_type"`
+	Agent     map[string]any `json:"agent"`
+	Data      map[string]any `json:"data"`
+}
+
+func allowedUrgency(incident map[string]any, allowed []string) bool {
+	if incident == nil {
 		return false
 	}
 
-	dataPayload, ok := event["data"].(map[string]any)
-	if !ok {
-		return false
-	}
-
-	urgency, ok := dataPayload["urgency"].(string)
+	urgency, ok := incident["urgency"].(string)
 	if !ok {
 		return false
 	}
 
 	return slices.Contains(allowed, urgency)
+}
+
+func buildPayload(agent map[string]any, incident map[string]any) map[string]any {
+	payload := map[string]any{}
+	if agent != nil {
+		payload["agent"] = agent
+	}
+
+	if incident != nil {
+		payload["incident"] = incident
+	}
+
+	return payload
 }

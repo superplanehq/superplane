@@ -14,20 +14,18 @@ interface OnIncidentMetadata {
 }
 
 interface OnIncidentEventData {
-  event?: {
-    agent?: {
-      html_url?: string;
+  agent?: {
+    html_url?: string;
+    summary?: string;
+  };
+  incident?: {
+    id?: string;
+    title?: string;
+    urgency?: string;
+    status?: string;
+    html_url?: string;
+    service?: {
       summary?: string;
-    };
-    data?: {
-      id?: string;
-      title?: string;
-      urgency?: string;
-      status?: string;
-      html_url?: string;
-      service?: {
-        summary?: string;
-      };
     };
   };
 }
@@ -38,7 +36,7 @@ interface OnIncidentEventData {
 export const onIncidentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnIncidentEventData;
-    const incident = eventData?.event?.data;
+    const incident = eventData?.incident;
 
     return {
       title: `${incident?.id || ""} - ${incident?.title || ""}`,
@@ -48,7 +46,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnIncidentEventData;
-    const incident = eventData?.event?.data;
+    const incident = eventData?.incident;
 
     let values: Record<string, string> = {
       Title: incident?.title || "",
@@ -58,9 +56,9 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
       URL: incident?.html_url || "",
     };
 
-    if (eventData.event?.agent) {
-      values["Agent"] = eventData.event.agent.summary || "";
-      values["Agent URL"] = eventData.event.agent.html_url || "";
+    if (eventData?.agent) {
+      values["Agent"] = eventData.agent.summary || "";
+      values["Agent URL"] = eventData.agent.html_url || "";
     }
 
     return values;
@@ -103,7 +101,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data?.data as OnIncidentEventData;
-      const incident = eventData?.event?.data;
+      const incident = eventData?.incident;
 
       props.lastEventData = {
         title: `${incident?.id || ""} - ${incident?.title || ""}`,
