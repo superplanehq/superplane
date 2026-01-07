@@ -12,7 +12,7 @@ metadata:
     {{- end }}
     # Ensure cert-manager CRDs are available before creating this resource
     # This hook runs after cert-manager is installed to ensure CRDs are available
-    {{- if .Values.cert-manager.enabled }}
+    {{- if (index .Values "cert-manager").enabled }}
     "helm.sh/hook-weight": "1"
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
