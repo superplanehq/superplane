@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   CanvasLogSidebar,
@@ -118,6 +118,8 @@ export const Default: Story = {
     const [filter, setFilter] = useState<LogTypeFilter>("all");
     const [searchValue, setSearchValue] = useState("");
     const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set(["log-4"]));
+    const wrapperRef = useRef<HTMLDivElement | null>(null);
+    const [stickToBottom, setStickToBottom] = useState(true);
 
     const counts = useMemo(() => getCounts(sampleEntries), []);
 
@@ -165,8 +167,52 @@ export const Default: Story = {
       }, []);
     }, [filter, scope, searchValue]);
 
+    useEffect(() => {
+      const wrapper = wrapperRef.current;
+      if (!wrapper) {
+        return;
+      }
+
+      const scrollContainer = wrapper.querySelector<HTMLDivElement>("[data-log-scroll]");
+      if (!scrollContainer) {
+        return;
+      }
+
+      const handleScroll = () => {
+        const threshold = 16;
+        const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+        const isAtBottom = scrollHeight - scrollTop - clientHeight <= threshold;
+        setStickToBottom(isAtBottom);
+      };
+
+      scrollContainer.addEventListener("scroll", handleScroll);
+      handleScroll();
+
+      return () => {
+        scrollContainer.removeEventListener("scroll", handleScroll);
+      };
+    }, []);
+
+    useEffect(() => {
+      if (!stickToBottom) {
+        return;
+      }
+
+      const wrapper = wrapperRef.current;
+      if (!wrapper) {
+        return;
+      }
+
+      const scrollContainer = wrapper.querySelector<HTMLDivElement>("[data-log-scroll]");
+      if (!scrollContainer) {
+        return;
+      }
+
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    }, [filteredEntries, stickToBottom]);
+
     return (
-      <div className="relative h-[600px] bg-slate-100">
+      <div className="relative h-[600px] bg-slate-100" ref={wrapperRef}>
         <div className="absolute top-4 right-4 z-10">
           <Button variant="secondary" onClick={() => setIsOpen(true)}>
             Open Log Sidebar

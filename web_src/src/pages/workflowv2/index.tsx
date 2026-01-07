@@ -72,7 +72,7 @@ import {
   mapTriggerEventsToSidebarEvents,
 } from "./utils";
 import { SidebarEvent } from "@/ui/componentSidebar/types";
-import { LogEntry } from "@/ui/CanvasLogSidebar";
+import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
@@ -369,7 +369,7 @@ export function WorkflowPageV2() {
 
   const handleNodeWebsocketEvent = useCallback(
     (nodeId: string, event: string) => {
-      if (event.startsWith("event_created")) {
+      if (event.includes("event_created")) {
         queryClient.invalidateQueries({
           queryKey: workflowKeys.nodeEventHistory(workflowId!, nodeId),
         });
@@ -389,8 +389,6 @@ export function WorkflowPageV2() {
     },
     [queryClient, workflowId],
   );
-
-  useWorkflowWebsocket(workflowId!, organizationId!, handleNodeWebsocketEvent);
 
   // Warn user before leaving page with unsaved changes
   useEffect(() => {
@@ -541,6 +539,7 @@ export function WorkflowPageV2() {
     requestId: number;
     tab?: "latest" | "settings";
   } | null>(null);
+  const [liveRunEntries, setLiveRunEntries] = useState<LogEntry[]>([]);
 
   const handleSidebarChange = useCallback(
     (open: boolean, nodeId: string | null) => {
@@ -575,6 +574,144 @@ export function WorkflowPageV2() {
       setFocusRequest({ nodeId, requestId: Date.now(), tab: "latest" });
     },
     [handleSidebarChange],
+  );
+
+  const buildRunItemFromExecution = useCallback(
+    (execution: WorkflowsWorkflowNodeExecution): LogRunItem => {
+      const nodes = workflow?.spec?.nodes || [];
+      const componentNode = nodes.find((node) => node.id === execution.nodeId);
+      const componentName = componentNode?.component?.name || "";
+      const stateResolver = getState(componentName);
+      const state = stateResolver(execution);
+      const executionState = state || "unknown";
+      const nodeId = componentNode?.id || execution.nodeId || "";
+      const primaryComponentName = componentName ? componentName.split(".")[0] : "";
+      const componentSubtitle = componentNode
+        ? getComponentBaseMapper(primaryComponentName).subtitle?.(componentNode, execution)
+        : undefined;
+      const detail = execution.resultMessage || componentSubtitle;
+      const title = (
+        <span>
+          {componentNode?.name || componentNode?.id || execution.nodeId || "Execution"}
+          {nodeId ? (
+            <>
+              {" · "}
+              <button
+                type="button"
+                className="text-blue-600 underline hover:text-blue-700"
+                onClick={() => handleLogRunNodeSelect(nodeId)}
+              >
+                {nodeId}
+              </button>
+            </>
+          ) : null}
+          {" · "}
+          {executionState}
+        </span>
+      );
+
+      return {
+        id: execution.id || `${execution.nodeId}-execution`,
+        type: mapExecutionStateToLogType(state),
+        title,
+        timestamp: execution.updatedAt || execution.createdAt || execution.rootEvent?.createdAt || "",
+        isRunning: execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING",
+        detail,
+        searchText: [
+          componentNode?.name,
+          componentNode?.id,
+          execution.nodeId,
+          executionState,
+          execution.resultMessage,
+          execution.resultReason,
+          execution.result,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      };
+    },
+    [handleLogRunNodeSelect, workflow?.spec?.nodes],
+  );
+
+  const buildRunEntryFromEvent = useCallback(
+    (event: WorkflowsWorkflowEvent, runItems: LogRunItem[] = []): LogEntry => {
+      const nodes = workflow?.spec?.nodes || [];
+      const triggerNode = nodes.find((node) => node.id === event.nodeId);
+      const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
+      const { title, subtitle } = triggerRenderer.getTitleAndSubtitle(event);
+      const rootValues = triggerRenderer.getRootEventValues(event);
+
+      return {
+        id: event.id || `run-${Date.now()}`,
+        source: "runs",
+        timestamp: event.createdAt || "",
+        title: `#${event.id?.slice(0, 4)} ·  ${title}` || "· Run",
+        type: "run",
+        runItems,
+        searchText: [title, subtitle, event.id, event.nodeId, Object.values(rootValues).join(" ")]
+          .filter(Boolean)
+          .join(" "),
+      };
+    },
+    [workflow?.spec?.nodes],
+  );
+
+  const handleWorkflowEventCreated = useCallback(
+    (event: WorkflowsWorkflowEvent) => {
+      if (!event.id) {
+        return;
+      }
+
+      const nodes = workflow?.spec?.nodes || [];
+      const node = nodes.find((item) => item.id === event.nodeId);
+      if (!node || node.type !== "TYPE_TRIGGER") {
+        return;
+      }
+
+      setLiveRunEntries((prev) => {
+        const entry = buildRunEntryFromEvent(event, []);
+        const next = [entry, ...prev.filter((item) => item.id !== entry.id)];
+        return next.sort((a, b) => {
+          const aTime = Date.parse(a.timestamp || "") || 0;
+          const bTime = Date.parse(b.timestamp || "") || 0;
+          return bTime - aTime;
+        });
+      });
+    },
+    [buildRunEntryFromEvent, workflow?.spec?.nodes],
+  );
+
+  const handleExecutionEvent = useCallback(
+    (execution: WorkflowsWorkflowNodeExecution) => {
+      if (!execution.rootEvent?.id) {
+        return;
+      }
+
+      setLiveRunEntries((prev) => {
+        const runItem = buildRunItemFromExecution(execution);
+        const existing = prev.find((item) => item.id === execution.rootEvent?.id);
+        const existingRunItems = existing?.runItems || [];
+        const runItemsMap = new Map(existingRunItems.map((item) => [item.id, item]));
+        runItemsMap.set(runItem.id, runItem);
+        const runItems = Array.from(runItemsMap.values());
+        const entry = buildRunEntryFromEvent(execution.rootEvent as WorkflowsWorkflowEvent, runItems);
+        const next = [entry, ...prev.filter((item) => item.id !== entry.id)];
+        return next.sort((a, b) => {
+          const aTime = Date.parse(a.timestamp || "") || 0;
+          const bTime = Date.parse(b.timestamp || "") || 0;
+          return bTime - aTime;
+        });
+      });
+    },
+    [buildRunEntryFromEvent, buildRunItemFromExecution],
+  );
+
+  useWorkflowWebsocket(
+    workflowId!,
+    organizationId!,
+    handleNodeWebsocketEvent,
+    handleWorkflowEventCreated,
+    handleExecutionEvent,
   );
 
   const logEntries = useMemo(() => {
@@ -624,6 +761,7 @@ export function WorkflowPageV2() {
           type: mapExecutionStateToLogType(state),
           title,
           timestamp: event.createdAt || "",
+          isRunning: execution.state === "STATE_STARTED",
           detail,
           searchText: [
             componentNode?.name,
@@ -652,6 +790,11 @@ export function WorkflowPageV2() {
       } as LogEntry;
     });
 
+    const mergedRunEntries = new Map<string, LogEntry>();
+    runEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
+    liveRunEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
+    const allRunEntries = Array.from(mergedRunEntries.values());
+
     const canvasEntries =
       nodes
         .filter((node: ComponentsNode) => node.errorMessage)
@@ -678,7 +821,7 @@ export function WorkflowPageV2() {
           } as LogEntry;
         }) || [];
 
-    return [...runEntries, ...canvasEntries].sort((a, b) => {
+    return [...allRunEntries, ...canvasEntries].sort((a, b) => {
       const aTime = Date.parse(a.timestamp || "") || 0;
       const bTime = Date.parse(b.timestamp || "") || 0;
       return aTime - bTime;
@@ -686,6 +829,7 @@ export function WorkflowPageV2() {
   }, [
     handleLogNodeSelect,
     handleLogRunNodeSelect,
+    liveRunEntries,
     workflow?.metadata?.updatedAt,
     workflow?.spec?.nodes,
     workflowEventsResponse?.events,

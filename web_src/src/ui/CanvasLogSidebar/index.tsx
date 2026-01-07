@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
-import { CircleCheck, CircleX, Search, TriangleAlert, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { CircleCheck, CircleX, MoreHorizontal, Search, TriangleAlert, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -17,6 +17,7 @@ export interface LogRunItem {
   timestamp: string;
   detail?: ReactNode;
   searchText?: string;
+  isRunning?: boolean;
 }
 
 export interface LogEntry {
@@ -96,6 +97,8 @@ export function CanvasLogSidebar({
 }: CanvasLogSidebarProps) {
   const [internalHeight, setInternalHeight] = useState(defaultHeight);
   const dragStartRef = useRef<{ y: number; height: number } | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const stickToBottomRef = useRef(true);
 
   const scopeTabs = useMemo<Array<{ id: LogScopeFilter; label: string }>>(
     () => [
@@ -125,6 +128,55 @@ export function CanvasLogSidebar({
     },
     [clampHeight, height, onHeightChange],
   );
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    container.scrollTop = container.scrollHeight;
+  }, [isOpen]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const handleScroll = () => {
+      const threshold = 16;
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      stickToBottomRef.current = scrollHeight - scrollTop - clientHeight <= threshold;
+    };
+
+    container.addEventListener("scroll", handleScroll);
+    handleScroll();
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !isOpen) {
+      return;
+    }
+
+    const threshold = 40;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight <= threshold;
+    stickToBottomRef.current = isAtBottom;
+
+    if (isAtBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [entries, isOpen]);
 
   const handleResizeStart = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
@@ -230,7 +282,7 @@ export function CanvasLogSidebar({
             />
           </InputGroup>
         </div>
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto" data-log-scroll ref={scrollContainerRef}>
           {entries.length === 0 ? (
             <div className="px-4 py-6 text-sm text-slate-500">No logs match the current filters.</div>
           ) : (
@@ -293,7 +345,9 @@ function LogEntryRow({
                 key={item.id}
                 className="flex items-start gap-3 px-10 pr-4 py-2 text-sm text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors"
               >
-                <div className="pt-0.5">{icon[item.type]}</div>
+                <div className="pt-0.5">
+                  {item.isRunning ? <MoreHorizontal className="h-4 w-4 text-slate-400" /> : icon[item.type]}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">{item.title}</div>
