@@ -15,6 +15,12 @@ spec:
     - http01:
         ingress:
           class: {{ .Values.ingress.className }}
+          {{- if and (eq .Values.ingress.className "gce") .Values.ingress.staticIpName }}
+          ingressTemplate:
+            metadata:
+              annotations:
+                kubernetes.io/ingress.global-static-ip-name: {{ .Values.ingress.staticIpName }}
+          {{- end }}
 {{- end }}
 {{- end }}
 
