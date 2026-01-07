@@ -855,6 +855,8 @@ export function WorkflowPageV2() {
     async (workflowToSave?: WorkflowsWorkflow, options?: { showToast?: boolean }) => {
       const targetWorkflow = workflowToSave || workflow;
       if (!targetWorkflow || !organizationId || !workflowId) return;
+      const shouldRestoreFocus = options?.showToast === false;
+      const focusedNoteId = shouldRestoreFocus ? getActiveNoteId() : null;
 
       try {
         await updateWorkflowMutation.mutateAsync({
@@ -894,6 +896,12 @@ export function WorkflowPageV2() {
           }),
           ...prev,
         ]);
+      } finally {
+        if (focusedNoteId) {
+          requestAnimationFrame(() => {
+            restoreActiveNoteFocus();
+          });
+        }
       }
     },
     [workflow, organizationId, workflowId, updateWorkflowMutation],
