@@ -26,6 +26,7 @@ import {
   BlueprintsBlueprint,
 } from "@/api-client";
 import { parseDefaultValues } from "@/utils/components";
+import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { AiSidebar } from "../ai";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
@@ -143,6 +144,7 @@ export interface CanvasPageProps {
     nodeName: string,
     appInstallationRef?: ComponentsAppInstallationRef,
   ) => void;
+  onAnnotationUpdate?: (nodeId: string, updates: { text?: string; color?: string }) => void;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
   installedApplications?: OrganizationsAppInstallation[];
@@ -273,6 +275,11 @@ const nodeTypes = {
         onToggleCollapse={
           callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
         }
+        onAnnotationUpdate={
+          callbacks.onAnnotationUpdate.current
+            ? (nodeId, updates) => callbacks.onAnnotationUpdate.current?.(nodeId, updates)
+            : undefined
+        }
         ai={{
           show: callbacks.aiState.sidebarOpen,
           suggestion: callbacks.aiState.suggestions[nodeProps.id] || null,
@@ -291,6 +298,7 @@ function CanvasPage(props: CanvasPageProps) {
   const [currentTab, setCurrentTab] = useState<"latest" | "settings">("latest");
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
+  const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
 
   // Use refs from props if provided, otherwise create local ones
   const hasFitToViewRef = props.hasFitToViewRef || useRef(false);
@@ -519,6 +527,84 @@ function CanvasPage(props: CanvasPageProps) {
   const handleAddNote = useCallback(async () => {
     if (!props.onNodeAdd) return;
 
+    const viewport = props.viewportRef?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
+    const canvasRect = canvasWrapperRef.current?.getBoundingClientRect();
+    const zoom = viewport.zoom || DEFAULT_CANVAS_ZOOM;
+    const visibleWidth = canvasRect?.width ?? window.innerWidth;
+    const visibleHeight = canvasRect?.height ?? window.innerHeight;
+    const visibleBounds = {
+      minX: (0 - viewport.x) / zoom,
+      minY: (0 - viewport.y) / zoom,
+      maxX: (visibleWidth - viewport.x) / zoom,
+      maxY: (visibleHeight - viewport.y) / zoom,
+    };
+
+    const noteSize = { width: 320, height: 160 };
+    const basePosition = {
+      x: (visibleWidth / 2 - viewport.x) / zoom - noteSize.width / 2,
+      y: (visibleHeight / 2 - viewport.y) / zoom - noteSize.height / 2,
+    };
+
+    const nodes = state.nodes || [];
+    const padding = 16;
+    const intersects = (pos: { x: number; y: number }) => {
+      const bounds = {
+        minX: pos.x - padding,
+        minY: pos.y - padding,
+        maxX: pos.x + noteSize.width + padding,
+        maxY: pos.y + noteSize.height + padding,
+      };
+      return nodes.some((node) => {
+        const width = node.width ?? 240;
+        const height = node.height ?? 120;
+        const nodeBounds = {
+          minX: node.position.x,
+          minY: node.position.y,
+          maxX: node.position.x + width,
+          maxY: node.position.y + height,
+        };
+        return !(
+          bounds.maxX < nodeBounds.minX ||
+          bounds.minX > nodeBounds.maxX ||
+          bounds.maxY < nodeBounds.minY ||
+          bounds.minY > nodeBounds.maxY
+        );
+      });
+    };
+
+    const clampToVisible = (pos: { x: number; y: number }) => {
+      const minX = visibleBounds.minX + padding;
+      const minY = visibleBounds.minY + padding;
+      const maxX = visibleBounds.maxX - noteSize.width - padding;
+      const maxY = visibleBounds.maxY - noteSize.height - padding;
+      return {
+        x: Math.min(Math.max(pos.x, minX), maxX),
+        y: Math.min(Math.max(pos.y, minY), maxY),
+      };
+    };
+
+    let position = clampToVisible(basePosition);
+    const step = 40;
+    const maxRings = 8;
+    if (intersects(position)) {
+      let found = false;
+      for (let ring = 1; ring <= maxRings && !found; ring += 1) {
+        for (let dx = -ring; dx <= ring && !found; dx += 1) {
+          for (let dy = -ring; dy <= ring && !found; dy += 1) {
+            if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) continue;
+            const candidate = clampToVisible({
+              x: basePosition.x + dx * step,
+              y: basePosition.y + dy * step,
+            });
+            if (!intersects(candidate)) {
+              position = candidate;
+              found = true;
+            }
+          }
+        }
+      }
+    }
+
     const annotationBlock: BuildingBlock = {
       name: "annotation",
       label: "Annotation",
@@ -526,16 +612,13 @@ function CanvasPage(props: CanvasPageProps) {
       isLive: true,
     };
 
-    const newNodeId = await props.onNodeAdd({
+    await props.onNodeAdd({
       buildingBlock: annotationBlock,
       nodeName: "New Note",
       configuration: {},
-      position: { x: 200, y: 200 },
+      position,
     });
-
-    state.componentSidebar.open(newNodeId);
-    setCurrentTab("settings");
-  }, [props, state, setCurrentTab]);
+  }, [props, state.nodes, props.viewportRef]);
 
   const handleBuildingBlockDrop = useCallback(
     async (block: BuildingBlock, position?: { x: number; y: number }) => {
@@ -643,7 +726,7 @@ function CanvasPage(props: CanvasPageProps) {
   }, [state, templateNodeId]);
 
   return (
-    <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
+    <div ref={canvasWrapperRef} className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
       <div className="relative z-30">
         <CanvasContentHeader
@@ -687,6 +770,7 @@ function CanvasPage(props: CanvasPageProps) {
               onDuplicate={props.onDuplicate}
               onConfigure={props.onConfigure}
               onDeactivate={props.onDeactivate}
+              onAnnotationUpdate={props.onAnnotationUpdate}
               runDisabled={props.runDisabled}
               runDisabledTooltip={props.runDisabledTooltip}
               onBuildingBlockDrop={handleBuildingBlockDrop}
@@ -1092,6 +1176,7 @@ function CanvasContent({
   onDeactivate,
   onToggleView,
   onToggleCollapse,
+  onAnnotationUpdate,
   onBuildingBlockDrop,
   onBuildingBlocksSidebarToggle,
   onConnectionDropInEmptySpace,
@@ -1130,6 +1215,7 @@ function CanvasContent({
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
   onDelete?: (nodeId: string) => void;
+  onAnnotationUpdate?: (nodeId: string, updates: { text?: string; color?: string }) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onBuildingBlocksSidebarToggle?: (open: boolean) => void;
   onConnectionDropInEmptySpace?: (
@@ -1184,6 +1270,14 @@ function CanvasContent({
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
   const [logSidebarHeight, setLogSidebarHeight] = useState(320);
 
+  useEffect(() => {
+    const activeNoteId = getActiveNoteId();
+    if (!activeNoteId) return;
+    const activeElement = document.activeElement;
+    if (activeElement && activeElement !== document.body) return;
+    restoreActiveNoteFocus();
+  }, [state.nodes]);
+
   const handleNodeExpand = useCallback((nodeId: string) => {
     const node = stateRef.current.nodes?.find((n) => n.id === nodeId);
     if (node && stateRef.current.onNodeExpand) {
@@ -1196,6 +1290,7 @@ function CanvasContent({
       // Check if this is a pending connection node
       const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       const isPendingConnection = clickedNode?.data?.isPendingConnection;
+      const isAnnotationNode = clickedNode?.data?.type === "annotation";
 
       // Check if this is a placeholder node (persisted, not local-only)
       const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
@@ -1218,6 +1313,10 @@ function CanvasContent({
         !isTemplateNode &&
         !isPlaceholder
       ) {
+        return;
+      }
+
+      if (isAnnotationNode) {
         return;
       }
 
@@ -1284,6 +1383,9 @@ function CanvasContent({
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
+
+  const onAnnotationUpdateRef = useRef(onAnnotationUpdate);
+  onAnnotationUpdateRef.current = onAnnotationUpdate;
 
   const handleSave = useCallback(() => {
     if (onSave) {
@@ -1463,6 +1565,7 @@ function CanvasContent({
     onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
     onToggleView: onToggleViewRef,
+    onAnnotationUpdate: onAnnotationUpdateRef,
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
@@ -1477,6 +1580,7 @@ function CanvasContent({
     onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
     onToggleView: onToggleViewRef,
+    onAnnotationUpdate: onAnnotationUpdateRef,
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
