@@ -65,6 +65,7 @@ import {
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
+import { useAccount } from "@/contexts/AccountContext";
 import {
   buildRunEntryFromEvent,
   buildRunItemFromExecution,
@@ -95,6 +96,7 @@ export function WorkflowPageV2() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const { account } = useAccount();
   const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
@@ -465,6 +467,7 @@ export function WorkflowPageV2() {
       workflowId!,
       queryClient,
       organizationId!,
+      account ? { id: account.id, email: account.email } : undefined,
     );
   }, [
     workflow,
@@ -482,6 +485,7 @@ export function WorkflowPageV2() {
     componentsLoading,
     applicationsLoading,
     organizationId,
+    account,
   ]);
 
   const getSidebarData = useCallback(
@@ -513,6 +517,7 @@ export function WorkflowPageV2() {
         workflowId,
         queryClient,
         organizationId,
+        account ? { id: account.id, email: account.email } : undefined,
       );
 
       // Add loading state to sidebar data
@@ -521,7 +526,18 @@ export function WorkflowPageV2() {
         isLoading: nodeData.isLoading,
       };
     },
-    [workflow, workflowId, blueprints, allComponents, allTriggers, nodeEventsMap, getNodeData, queryClient],
+    [
+      workflow,
+      workflowId,
+      blueprints,
+      allComponents,
+      allTriggers,
+      nodeEventsMap,
+      getNodeData,
+      queryClient,
+      organizationId,
+      account,
+    ],
   );
 
   // Trigger data loading when sidebar opens for a node
@@ -2133,6 +2149,7 @@ function prepareData(
   workflowId: string,
   queryClient: QueryClient,
   organizationId: string,
+  currentUser?: { id?: string; email?: string },
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -2153,6 +2170,7 @@ function prepareData(
           workflowId,
           queryClient,
           organizationId,
+          currentUser,
         );
       })
       .map((node) => ({
@@ -2317,6 +2335,7 @@ function prepareNode(
   workflowId: string,
   queryClient: any,
   organizationId: string,
+  currentUser?: { id?: string; email?: string },
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
@@ -2351,6 +2370,7 @@ function prepareNode(
         workflowId,
         queryClient,
         organizationId,
+        currentUser,
       );
   }
 }
@@ -2383,6 +2403,7 @@ function prepareComponentNode(
   workflowId: string,
   queryClient: QueryClient,
   organizationId?: string,
+  currentUser?: { id?: string; email?: string },
 ): CanvasNode {
   // Detect placeholder nodes (no component reference, name is "New Component")
   const isPlaceholder = !node.component?.name && node.name === "New Component";
@@ -2432,6 +2453,7 @@ function prepareComponentNode(
     workflowId,
     queryClient,
     organizationId || "",
+    currentUser,
   );
 }
 
@@ -2444,6 +2466,7 @@ function prepareComponentBaseNode(
   workflowId: string,
   queryClient: QueryClient,
   organizationId: string,
+  currentUser?: { id?: string; email?: string },
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const metadata = components.find((c) => c.name === node.component?.name);
@@ -2459,6 +2482,7 @@ function prepareComponentBaseNode(
     workflowId,
     queryClient,
     organizationId,
+    currentUser,
   );
 
   const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props(
@@ -2570,6 +2594,7 @@ function prepareSidebarData(
   workflowId?: string,
   queryClient?: QueryClient,
   organizationId?: string,
+  currentUser?: { id?: string; email?: string },
 ): SidebarData {
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
@@ -2607,6 +2632,7 @@ function prepareSidebarData(
     workflowId || "",
     queryClient as QueryClient,
     organizationId || "",
+    currentUser,
   );
 
   const latestEvents =

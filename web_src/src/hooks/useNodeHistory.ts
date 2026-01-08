@@ -10,6 +10,7 @@ import {
 import { mapTriggerEventsToSidebarEvents, mapExecutionsToSidebarEvents } from "@/pages/workflowv2/utils";
 import { QueryClient } from "@tanstack/react-query";
 import { getComponentAdditionalDataBuilder } from "@/pages/workflowv2/mappers";
+import { useAccount } from "@/contexts/AccountContext";
 
 interface UseNodeHistoryProps {
   workflowId: string;
@@ -32,6 +33,7 @@ export const useNodeHistory = ({
   queryClient,
   components,
 }: UseNodeHistoryProps) => {
+  const { account } = useAccount();
   // For trigger nodes, use events; for other nodes, use executions
   const isTriggerNode = nodeType === "TYPE_TRIGGER";
 
@@ -64,6 +66,7 @@ export const useNodeHistory = ({
         workflowId || "",
         queryClient,
         organizationId || "",
+        account ? { id: account.id, email: account.email } : undefined,
       );
 
       return mapExecutionsToSidebarEvents(allExecutions, allNodes, undefined, additionalData);
@@ -79,6 +82,7 @@ export const useNodeHistory = ({
     organizationId,
     queryClient,
     workflowId,
+    account,
   ]);
 
   const handleLoadMore = useCallback(() => {
