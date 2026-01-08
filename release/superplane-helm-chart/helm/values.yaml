@@ -20,6 +20,7 @@ workers:
       memory: 128Mi
 
 api:
+  ownerSetupEnabled: true
   blockSignup: false
   replicas: 1
   dbPoolSize: 5
