@@ -96,8 +96,9 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
-	s.session.Click(q.TestID("field-type-select"))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Specific user")`))
+	s.session.Click(q.Locator(`button:has-text("Add Item")`))
+	s.session.Click(q.Locator(`button:has-text("Select Type")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("User")`))
 
 	s.session.Click(q.Locator(`button:has-text("Select user")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))

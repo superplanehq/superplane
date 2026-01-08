@@ -3,7 +3,7 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata, GitRef } from "./types";
+import { BaseNodeMetadata } from "./base";
 import { Predicate, createGithubMetadataItems } from "./utils";
 
 interface GithubConfiguration {
@@ -11,12 +11,24 @@ interface GithubConfiguration {
   tags: Predicate[];
 }
 
+interface TagCreatedEventData {
+  ref?: string;
+  ref_type?: string;
+  repository?: {
+    name?: string;
+    full_name?: string;
+  };
+  sender?: {
+    login?: string;
+  };
+}
+
 /**
  * Renderer for the "github.onTagCreated" trigger
  */
 export const onTagCreatedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as GitRef;
+    const eventData = event.data?.data as TagCreatedEventData;
 
     return {
       title: eventData?.ref ? `Tag: ${eventData.ref}` : "Tag Created",
@@ -25,7 +37,7 @@ export const onTagCreatedTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as GitRef;
+    const eventData = lastEvent.data?.data as TagCreatedEventData;
 
     return {
       Tag: eventData?.ref || "",
@@ -49,7 +61,7 @@ export const onTagCreatedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as GitRef;
+      const eventData = lastEvent.data?.data as TagCreatedEventData;
       props.lastEventData = {
         title: eventData?.ref ? `Tag: ${eventData.ref}` : "Tag Created",
         subtitle: eventData?.repository?.full_name || "",

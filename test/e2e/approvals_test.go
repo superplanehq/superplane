@@ -13,8 +13,9 @@ import (
 
 // TODO: Add e2e tests for role and group approval when RBAC is enabled
 func TestApprovals(t *testing.T) {
+	steps := &ApprovalSteps{t: t}
+
 	t.Run("adding an approval component to a canvas", func(t *testing.T) {
-		steps := &ApprovalSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addApprovalToCanvas("TestApproval")
@@ -22,7 +23,6 @@ func TestApprovals(t *testing.T) {
 	})
 
 	t.Run("configuring approvals for a user", func(t *testing.T) {
-		steps := &ApprovalSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addApprovalToCanvas("ReleaseApproval")
@@ -30,7 +30,6 @@ func TestApprovals(t *testing.T) {
 	})
 
 	t.Run("running and approving on a canvas", func(t *testing.T) {
-		steps := &ApprovalSteps{t: t}
 		steps.start()
 		steps.givenCanvasWithManualTriggerApprovalAndNoop()
 		steps.runManualTrigger()
@@ -102,7 +101,7 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
 
 func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
-	s.canvas.WaitForExecution("Approval", models.WorkflowNodeExecutionStatePending, 5*time.Second)
+	s.canvas.WaitForExecution("Approval", models.WorkflowNodeExecutionStateStarted, 5*time.Second)
 }
 
 func (s *ApprovalSteps) approveFirstPendingRequirement() {

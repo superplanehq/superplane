@@ -4962,7 +4962,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowEventWithExecutions"
+            "$ref": "#/definitions/WorkflowsWorkflowEvent"
           }
         },
         "totalCount": {
@@ -5041,37 +5041,6 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
-        }
-      }
-    },
-    "WorkflowsWorkflowEventWithExecutions": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "workflowId": {
-          "type": "string"
-        },
-        "nodeId": {
-          "type": "string"
-        },
-        "channel": {
-          "type": "string"
-        },
-        "data": {
-          "type": "object"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "executions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
-          }
         }
       }
     },

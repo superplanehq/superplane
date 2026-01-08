@@ -54,6 +54,7 @@ interface BlockProps extends ComponentActionsProps {
   data: BlockData;
   nodeId?: string;
   selected?: boolean;
+  onAnnotationUpdate?: (nodeId: string, updates: { text?: string; color?: string }) => void;
 
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: () => void;
@@ -357,6 +358,7 @@ function BlockContent({
   onExpand,
   nodeId,
   selected = false,
+  onAnnotationUpdate,
   onRun,
   runDisabled,
   runDisabledTooltip,
@@ -407,10 +409,22 @@ function BlockContent({
       return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} {...actionProps} />;
     case "merge":
       return <MergeComponent {...(data.merge as MergeComponentProps)} selected={selected} {...actionProps} />;
-    case "annotation":
+    case "annotation": {
+      const handleAnnotationUpdate = (updates: { text?: string; color?: string }) => {
+        if (nodeId && onAnnotationUpdate) {
+          onAnnotationUpdate(nodeId, updates);
+        }
+      };
       return (
-        <AnnotationComponent {...(data.annotation as AnnotationComponentProps)} selected={selected} {...actionProps} />
+        <AnnotationComponent
+          {...(data.annotation as AnnotationComponentProps)}
+          noteId={nodeId}
+          selected={selected}
+          onAnnotationUpdate={handleAnnotationUpdate}
+          {...actionProps}
+        />
       );
+    }
     default:
       throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }

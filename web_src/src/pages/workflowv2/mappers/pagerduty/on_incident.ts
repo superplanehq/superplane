@@ -4,8 +4,6 @@ import { formatRelativeTime } from "@/utils/timezone";
 import { TriggerRenderer } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
-import { Agent, Incident } from "./types";
-import { getDetailsForIncident } from "./base";
 
 interface OnIncidentMetadata {
   service?: {
@@ -16,8 +14,20 @@ interface OnIncidentMetadata {
 }
 
 interface OnIncidentEventData {
-  agent?: Agent;
-  incident?: Incident;
+  agent?: {
+    html_url?: string;
+    summary?: string;
+  };
+  incident?: {
+    id?: string;
+    title?: string;
+    urgency?: string;
+    status?: string;
+    html_url?: string;
+    service?: {
+      summary?: string;
+    };
+  };
 }
 
 /**
@@ -36,7 +46,22 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnIncidentEventData;
-    return getDetailsForIncident(eventData?.incident!, eventData.agent);
+    const incident = eventData?.incident;
+
+    let values: Record<string, string> = {
+      Title: incident?.title || "",
+      Status: incident?.status || "",
+      Urgency: incident?.urgency || "",
+      Service: incident?.service?.summary || "",
+      URL: incident?.html_url || "",
+    };
+
+    if (eventData?.agent) {
+      values["Agent"] = eventData.agent.summary || "";
+      values["Agent URL"] = eventData.agent.html_url || "";
+    }
+
+    return values;
   },
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {

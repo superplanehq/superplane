@@ -69,8 +69,6 @@ spec:
               value: "yes"
             - name: RBAC_MODEL_PATH
               value: /app/rbac/rbac_model.conf
-            - name: PUBLIC_API_BASE_PATH
-              value: "/api/v1"
             - name: RBAC_ORG_POLICY_PATH
               value: /app/rbac/rbac_org_policy.csv
             - name: RBAC_CANVAS_POLICY_PATH

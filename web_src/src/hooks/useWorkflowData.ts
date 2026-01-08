@@ -29,7 +29,7 @@ export const workflowKeys = {
   nodeExecution: (workflowId: string, nodeId: string, states?: string[]) =>
     [...workflowKeys.nodeExecutions(), workflowId, nodeId, ...(states || [])] as const,
   events: () => [...workflowKeys.all, "events"] as const,
-  eventList: (workflowId: string, limit?: number) => [...workflowKeys.events(), workflowId, limit] as const,
+  eventList: (workflowId: string) => [...workflowKeys.events(), workflowId] as const,
   eventExecutions: () => [...workflowKeys.all, "eventExecutions"] as const,
   eventExecution: (workflowId: string, eventId: string) =>
     [...workflowKeys.eventExecutions(), workflowId, eventId] as const,
@@ -201,15 +201,12 @@ export const useNodeExecutions = (
 };
 
 export const useWorkflowEvents = (workflowId: string) => {
-  const limit = 50;
-
   return useQuery({
-    queryKey: workflowKeys.eventList(workflowId, limit),
+    queryKey: workflowKeys.eventList(workflowId),
     queryFn: async () => {
       const response = await workflowsListWorkflowEvents(
         withOrganizationHeader({
           path: { workflowId },
-          query: { limit },
         }),
       );
       return response.data;
