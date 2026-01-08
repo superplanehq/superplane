@@ -139,6 +139,13 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 		appURL = ctx.BaseURL
 	}
 
+	//
+	// TODO: a few other options to consider here:
+	// features.app_home.*
+	// settings.interactivity.optionsLoadURL
+	// Verify if we want incoming webhooks and if it's possible to include that in the manifest here.
+	//
+
 	manifest := map[string]any{
 		"_metadata": map[string]int{
 			"major_version": 1,
@@ -198,7 +205,6 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 			"interactivity": map[string]any{
 				"is_enabled":  true,
 				"request_url": fmt.Sprintf("%s/api/v1/apps/%s/interactions", appURL, ctx.InstallationID),
-				// Options Load URL?
 			},
 			"org_deploy_enabled":     false,
 			"socket_mode_enabled":    false,
