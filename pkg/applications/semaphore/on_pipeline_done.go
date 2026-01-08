@@ -84,7 +84,7 @@ func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return err
 	}

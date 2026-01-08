@@ -102,6 +102,7 @@ func (w *WebhookProvisioner) processAppInstallationWebhook(tx *gorm.DB, webhook 
 	}
 
 	webhookMetadata, err := app.SetupWebhook(core.SetupWebhookContext{
+		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		Webhook:         contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
 		AppInstallation: contexts.NewAppInstallationContext(tx, nil, appInstallation, w.encryptor, w.registry),
 	})

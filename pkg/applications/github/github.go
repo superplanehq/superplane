@@ -406,7 +406,7 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata
 		return
 	}
 
-	appData, err := g.createAppFromManifest(code)
+	appData, err := g.createAppFromManifest(ctx.HTTP, code)
 	if err != nil {
 		ctx.Logger.Errorf("failed to create app from manifest: %v", err)
 		http.Error(ctx.Response, "failed to create app from manifest", http.StatusInternalServerError)
@@ -603,14 +603,14 @@ type GitHubAppData struct {
 	PEM           string `mapstructure:"pem" json:"pem"`
 }
 
-func (g *GitHub) createAppFromManifest(code string) (*GitHubAppData, error) {
+func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*GitHubAppData, error) {
 	URL := fmt.Sprintf("https://api.github.com/app-manifests/%s/conversions", code)
 	req, err := http.NewRequest(http.MethodPost, URL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := http.DefaultClient.Do(req)
+	response, err := httpCtx.Do(req)
 	if err != nil {
 		return nil, err
 	}

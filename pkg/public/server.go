@@ -445,6 +445,7 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 		BaseURL:         s.BaseURL,
 		WebhooksBaseURL: s.WebhooksBaseURL,
 		OrganizationID:  appInstallation.OrganizationID.String(),
+		HTTP:            contexts.NewHTTPContext(s.registry.GetHTTPClient()),
 		AppInstallation: contexts.NewAppInstallationContext(
 			database.Conn(),
 			nil,
@@ -767,6 +768,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 				ID:             execution.ID,
 				WorkflowID:     execution.WorkflowID.String(),
 				Configuration:  execution.Configuration.Data(),
+				HTTP:           contexts.NewHTTPContext(s.registry.GetHTTPClient()),
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution),

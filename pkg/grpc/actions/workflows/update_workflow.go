@@ -254,6 +254,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 	logger := logging.ForNode(*node)
 	triggerCtx := core.TriggerContext{
 		Configuration: node.Configuration.Data(),
+		HTTP:          contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 		Integration:   contexts.NewIntegrationContext(tx, registry),
@@ -296,6 +297,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 	logger := logging.ForNode(*node)
 	setupCtx := core.SetupContext{
 		Configuration: node.Configuration.Data(),
+		HTTP:          contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 		Integration:   contexts.NewIntegrationContext(tx, registry),

@@ -51,6 +51,7 @@ func UpdateApplication(ctx context.Context, registry *registry.Registry, baseURL
 	)
 
 	syncErr := app.Sync(core.SyncContext{
+		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Configuration:   appInstallation.Configuration.Data(),
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,

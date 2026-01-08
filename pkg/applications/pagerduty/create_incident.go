@@ -105,7 +105,7 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 		return errors.New("service is required")
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
@@ -125,7 +125,7 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}

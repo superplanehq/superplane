@@ -113,7 +113,7 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("service is required")
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}

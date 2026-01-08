@@ -101,6 +101,7 @@ func (w *AppInstallationRequestWorker) syncAppInstallation(tx *gorm.DB, request 
 
 	appCtx := contexts.NewAppInstallationContext(tx, nil, installation, w.encryptor, w.registry)
 	syncErr := app.Sync(core.SyncContext{
+		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		AppInstallation: appCtx,
 		Configuration:   installation.Configuration.Data(),
 		BaseURL:         w.baseURL,
