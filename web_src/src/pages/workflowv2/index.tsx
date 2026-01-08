@@ -262,6 +262,7 @@ export function WorkflowPageV2() {
    * Maps node ID to its updated position.
    */
   const pendingPositionUpdatesRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const pendingAnnotationUpdatesRef = useRef<Map<string, { text?: string; color?: string }>>(new Map());
 
   /**
    * Debounced auto-save function for node position changes.
@@ -1042,14 +1043,73 @@ export function WorkflowPageV2() {
     ],
   );
 
+  const debouncedAnnotationAutoSave = useMemo(
+    () =>
+      debounce(async () => {
+        if (!organizationId || !workflowId) return;
+
+        const annotationUpdates = new Map(pendingAnnotationUpdatesRef.current);
+        if (annotationUpdates.size === 0) return;
+
+        if (!isAutoSaveEnabled) {
+          return;
+        }
+
+        const latestWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
+          workflowKeys.detail(organizationId, workflowId),
+        );
+
+        if (!latestWorkflow?.spec?.nodes) return;
+
+        const updatedNodes = latestWorkflow.spec.nodes.map((node) => {
+          if (!node.id || node.type !== "TYPE_WIDGET") {
+            return node;
+          }
+
+          const updates = annotationUpdates.get(node.id);
+          if (!updates) {
+            return node;
+          }
+
+          return {
+            ...node,
+            configuration: {
+              ...node.configuration,
+              ...updates,
+            },
+          };
+        });
+
+        const updatedWorkflow = {
+          ...latestWorkflow,
+          spec: {
+            ...latestWorkflow.spec,
+            nodes: updatedNodes,
+          },
+        };
+
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+
+        annotationUpdates.forEach((updates, nodeId) => {
+          if (pendingAnnotationUpdatesRef.current.get(nodeId) === updates) {
+            pendingAnnotationUpdatesRef.current.delete(nodeId);
+          }
+        });
+      }, 600),
+    [organizationId, workflowId, queryClient, handleSaveWorkflow, isAutoSaveEnabled],
+  );
+
   const handleAnnotationUpdate = useCallback(
-    async (nodeId: string, updates: { text?: string; color?: string }) => {
+    (nodeId: string, updates: { text?: string; color?: string }) => {
       if (!workflow || !organizationId || !workflowId) return;
       if (Object.keys(updates).length === 0) return;
 
       saveWorkflowSnapshot(workflow);
 
-      const updatedNodes = workflow?.spec?.nodes?.map((node) => {
+      const latestWorkflow =
+        queryClient.getQueryData<WorkflowsWorkflow>(workflowKeys.detail(organizationId, workflowId)) || workflow;
+
+      const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
         if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
           return node;
         }
@@ -1064,9 +1124,9 @@ export function WorkflowPageV2() {
       });
 
       const updatedWorkflow = {
-        ...workflow,
+        ...latestWorkflow,
         spec: {
-          ...workflow.spec,
+          ...latestWorkflow.spec,
           nodes: updatedNodes,
         },
       };
@@ -1074,9 +1134,11 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
+        pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...updates });
+        debouncedAnnotationAutoSave();
       } else {
-        markUnsavedChange("structural");
+        markUnsavedChange("position");
       }
     },
     [
@@ -1085,7 +1147,7 @@ export function WorkflowPageV2() {
       workflowId,
       queryClient,
       saveWorkflowSnapshot,
-      handleSaveWorkflow,
+      debouncedAnnotationAutoSave,
       isAutoSaveEnabled,
       markUnsavedChange,
     ],
@@ -1914,7 +1976,7 @@ export function WorkflowPageV2() {
       saveIsPrimary={hasUnsavedChanges}
       saveButtonHidden={!hasUnsavedChanges}
       onUndo={handleRevert}
-      canUndo={initialWorkflowSnapshot !== null}
+      canUndo={!isAutoSaveEnabled && initialWorkflowSnapshot !== null}
       isAutoSaveEnabled={isAutoSaveEnabled}
       onToggleAutoSave={handleToggleAutoSave}
       runDisabled={hasRunBlockingChanges}

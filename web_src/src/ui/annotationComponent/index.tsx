@@ -232,6 +232,9 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                 setActiveNoteId(noteId);
               }
               syncTextareaHeight();
+              if (onAnnotationUpdate) {
+                onAnnotationUpdate({ text: value });
+              }
             }}
             onBlur={() => {
               handleTextCommit();
