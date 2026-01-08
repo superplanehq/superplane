@@ -1,0 +1,9 @@
+{{- if and .Values.ingress.ssl.enabled (eq .Values.ingress.ssl.type "cert-manager") (eq .Values.ingress.className "gce") }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+  namespace: {{ .Release.Namespace }}
+spec:
+  selfSigned: {}
+{{- end }}
