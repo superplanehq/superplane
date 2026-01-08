@@ -216,7 +216,7 @@ export const ComponentSidebar = ({
   const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
 
   const [page, setPage] = useState<"overview" | "history" | "queue" | "execution-chain">("overview");
-  const [previousPage, setPreviousPage] = useState<"overview" | "history" | "queue">("overview");
+  const [previousPage, setPreviousPage] = useState<"overview" | "history" | "queue" | "execution-chain">("overview");
   const [activeExecutionChainEventId, setActiveExecutionChainEventId] = useState<string | null>(null);
   const [activeExecutionChainTriggerEvent, setActiveExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
@@ -308,7 +308,7 @@ export const ComponentSidebar = ({
   }, [onSeeQueue, page]);
 
   const handleSeeFullHistory = useCallback(() => {
-    setPreviousPage(page as "overview" | "history" | "queue");
+    setPreviousPage(page as "overview" | "history" | "queue" | "execution-chain");
     setPage("history");
     onSeeFullHistory?.();
   }, [onSeeFullHistory, page]);
@@ -316,7 +316,7 @@ export const ComponentSidebar = ({
   const handleBackToOverview = useCallback(() => {
     if (page === "execution-chain") {
       // When coming back from execution chain, go to the previous page
-      setPage(previousPage);
+      setPage(previousPage !== "execution-chain" ? previousPage : "overview");
       // Clear highlights when leaving execution chain
       onHighlightedNodesChange?.(new Set());
     } else {
@@ -350,15 +350,19 @@ export const ComponentSidebar = ({
       executionChainTriggerEvent || undefined,
       executionChainExecutionId || undefined,
     );
-    onExecutionChainHandled?.();
   }, [
     executionChainEventId,
     executionChainExecutionId,
     executionChainRequestId,
     executionChainTriggerEvent,
     handleSeeExecutionChain,
-    onExecutionChainHandled,
   ]);
+
+  useEffect(() => {
+    if (page === "execution-chain") {
+      onExecutionChainHandled?.();
+    }
+  }, [page, onExecutionChainHandled]);
 
   const listPage = page === "execution-chain" ? previousPage : page;
   const allEvents = React.useMemo(() => {

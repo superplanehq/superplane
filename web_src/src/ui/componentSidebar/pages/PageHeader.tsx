@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 interface PageHeaderProps {
   page: "history" | "queue" | "execution-chain";
   onBackToOverview: () => void;
-  previousPage?: "overview" | "history" | "queue";
+  previousPage?: "overview" | "history" | "queue" | "execution-chain";
 }
 
 export const PageHeader: React.FC<PageHeaderProps> = ({ page, onBackToOverview, previousPage = "overview" }) => {
