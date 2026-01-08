@@ -1,7 +1,0 @@
-{{- $domain := .Values.domain.name | required ".Values.domain.name is required." -}}
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ .Values.domain.configMapName }}
-data:
-  BASE_URL: https://{{ $domain }}

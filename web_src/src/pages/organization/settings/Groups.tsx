@@ -1,7 +1,6 @@
 import { formatRelativeTime } from "@/utils/timezone";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Avatar } from "../../../components/Avatar/avatar";
 import {
   Dropdown,
   DropdownButton,
@@ -11,6 +10,7 @@ import {
   DropdownMenu,
 } from "../../../components/Dropdown/dropdown";
 import { Icon } from "../../../components/Icon";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "../../../components/Link/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import {
@@ -49,9 +49,8 @@ export function Groups({ organizationId }: GroupsProps) {
     navigate(`/${organizationId}/settings/create-group`);
   };
 
-  const handleViewMembers = (groupName: string) => {
-    navigate(`/${organizationId}/settings/groups/${groupName}/members`);
-  };
+  const getGroupMembersPath = (groupName: string) =>
+    `/${organizationId}/settings/groups/${encodeURIComponent(groupName)}/members`;
 
   const handleDeleteGroup = async (groupName: string) => {
     const confirmed = window.confirm(
@@ -210,21 +209,14 @@ export function Groups({ organizationId }: GroupsProps) {
                   filteredAndSortedGroups.map((group, index) => (
                     <TableRow key={index}>
                       <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar
-                            className="w-9"
-                            square
-                            initials={group.spec?.displayName?.charAt(0).toUpperCase() || "G"}
-                          />
-                          <div>
-                            <Link
-                              href={`/${organizationId}/settings/groups/${group.metadata?.name}/members`}
-                              className="cursor-pointer text-sm font-medium text-blue-600 dark:text-blue-400"
-                            >
-                              {group.spec?.displayName}
-                            </Link>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{group.spec?.description || ""}</p>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <Icon name="users" size="sm" className="text-gray-800" />
+                          <Link
+                            href={group.metadata?.name ? getGroupMembersPath(group.metadata.name) : "#"}
+                            className="cursor-pointer text-sm !font-semibold text-gray-800 !underline underline-offset-2"
+                          >
+                            {group.spec?.displayName}
+                          </Link>
                         </div>
                       </TableCell>
 
@@ -265,24 +257,22 @@ export function Groups({ organizationId }: GroupsProps) {
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end">
-                          <Dropdown>
-                            <DropdownButton disabled={deleteGroupMutation.isPending}>
-                              <Icon name="ellipsis-vertical" size="sm" />
-                            </DropdownButton>
-                            <DropdownMenu>
-                              <DropdownItem onClick={() => handleViewMembers(group.metadata!.name!)}>
-                                <Icon name="group" />
-                                View Members
-                              </DropdownItem>
-                              <DropdownItem
-                                onClick={() => handleDeleteGroup(group.metadata!.name!)}
-                                className="text-red-600 dark:text-red-400"
-                              >
-                                <Icon name="delete" />
-                                {deleteGroupMutation.isPending ? "Deleting..." : "Delete Group"}
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
+                          <TooltipProvider delayDuration={200}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteGroup(group.metadata!.name!)}
+                                  className="p-2 rounded-full text-gray-800 hover:bg-gray-100 transition-colors"
+                                  aria-label="Delete group"
+                                  disabled={deleteGroupMutation.isPending}
+                                >
+                                  <Icon name="trash-2" size="sm" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Delete Group</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </TableCell>
                     </TableRow>

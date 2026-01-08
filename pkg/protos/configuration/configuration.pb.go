@@ -174,6 +174,8 @@ type TypeOptions struct {
 	Date             *DateTypeOptions             `protobuf:"bytes,9,opt,name=date,proto3,oneof" json:"date,omitempty"`
 	Datetime         *DateTimeTypeOptions         `protobuf:"bytes,10,opt,name=datetime,proto3,oneof" json:"datetime,omitempty"`
 	AnyPredicateList *AnyPredicateListTypeOptions `protobuf:"bytes,11,opt,name=any_predicate_list,json=anyPredicateList,proto3,oneof" json:"any_predicate_list,omitempty"`
+	String_          *StringTypeOptions           `protobuf:"bytes,12,opt,name=string,proto3,oneof" json:"string,omitempty"`
+	Text             *TextTypeOptions             `protobuf:"bytes,13,opt,name=text,proto3,oneof" json:"text,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -285,6 +287,20 @@ func (x *TypeOptions) GetAnyPredicateList() *AnyPredicateListTypeOptions {
 	return nil
 }
 
+func (x *TypeOptions) GetString_() *StringTypeOptions {
+	if x != nil {
+		return x.String_
+	}
+	return nil
+}
+
+func (x *TypeOptions) GetText() *TextTypeOptions {
+	if x != nil {
+		return x.Text
+	}
+	return nil
+}
+
 type NumberTypeOptions struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Min           *int32                 `protobuf:"varint,1,opt,name=min,proto3,oneof" json:"min,omitempty"`
@@ -337,6 +353,110 @@ func (x *NumberTypeOptions) GetMax() int32 {
 	return 0
 }
 
+type StringTypeOptions struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MinLength     *int32                 `protobuf:"varint,1,opt,name=min_length,json=minLength,proto3,oneof" json:"min_length,omitempty"`
+	MaxLength     *int32                 `protobuf:"varint,2,opt,name=max_length,json=maxLength,proto3,oneof" json:"max_length,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StringTypeOptions) Reset() {
+	*x = StringTypeOptions{}
+	mi := &file_configuration_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StringTypeOptions) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StringTypeOptions) ProtoMessage() {}
+
+func (x *StringTypeOptions) ProtoReflect() protoreflect.Message {
+	mi := &file_configuration_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StringTypeOptions.ProtoReflect.Descriptor instead.
+func (*StringTypeOptions) Descriptor() ([]byte, []int) {
+	return file_configuration_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *StringTypeOptions) GetMinLength() int32 {
+	if x != nil && x.MinLength != nil {
+		return *x.MinLength
+	}
+	return 0
+}
+
+func (x *StringTypeOptions) GetMaxLength() int32 {
+	if x != nil && x.MaxLength != nil {
+		return *x.MaxLength
+	}
+	return 0
+}
+
+type TextTypeOptions struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MinLength     *int32                 `protobuf:"varint,1,opt,name=min_length,json=minLength,proto3,oneof" json:"min_length,omitempty"`
+	MaxLength     *int32                 `protobuf:"varint,2,opt,name=max_length,json=maxLength,proto3,oneof" json:"max_length,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TextTypeOptions) Reset() {
+	*x = TextTypeOptions{}
+	mi := &file_configuration_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TextTypeOptions) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TextTypeOptions) ProtoMessage() {}
+
+func (x *TextTypeOptions) ProtoReflect() protoreflect.Message {
+	mi := &file_configuration_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TextTypeOptions.ProtoReflect.Descriptor instead.
+func (*TextTypeOptions) Descriptor() ([]byte, []int) {
+	return file_configuration_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *TextTypeOptions) GetMinLength() int32 {
+	if x != nil && x.MinLength != nil {
+		return *x.MinLength
+	}
+	return 0
+}
+
+func (x *TextTypeOptions) GetMaxLength() int32 {
+	if x != nil && x.MaxLength != nil {
+		return *x.MaxLength
+	}
+	return 0
+}
+
 type TimeTypeOptions struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Format        *string                `protobuf:"bytes,1,opt,name=format,proto3,oneof" json:"format,omitempty"`
@@ -346,7 +466,7 @@ type TimeTypeOptions struct {
 
 func (x *TimeTypeOptions) Reset() {
 	*x = TimeTypeOptions{}
-	mi := &file_configuration_proto_msgTypes[3]
+	mi := &file_configuration_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -358,7 +478,7 @@ func (x *TimeTypeOptions) String() string {
 func (*TimeTypeOptions) ProtoMessage() {}
 
 func (x *TimeTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[3]
+	mi := &file_configuration_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -371,7 +491,7 @@ func (x *TimeTypeOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TimeTypeOptions.ProtoReflect.Descriptor instead.
 func (*TimeTypeOptions) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{3}
+	return file_configuration_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *TimeTypeOptions) GetFormat() string {
@@ -390,7 +510,7 @@ type DateTypeOptions struct {
 
 func (x *DateTypeOptions) Reset() {
 	*x = DateTypeOptions{}
-	mi := &file_configuration_proto_msgTypes[4]
+	mi := &file_configuration_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -402,7 +522,7 @@ func (x *DateTypeOptions) String() string {
 func (*DateTypeOptions) ProtoMessage() {}
 
 func (x *DateTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[4]
+	mi := &file_configuration_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -415,7 +535,7 @@ func (x *DateTypeOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DateTypeOptions.ProtoReflect.Descriptor instead.
 func (*DateTypeOptions) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{4}
+	return file_configuration_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DateTypeOptions) GetFormat() string {
@@ -434,7 +554,7 @@ type DateTimeTypeOptions struct {
 
 func (x *DateTimeTypeOptions) Reset() {
 	*x = DateTimeTypeOptions{}
-	mi := &file_configuration_proto_msgTypes[5]
+	mi := &file_configuration_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -446,7 +566,7 @@ func (x *DateTimeTypeOptions) String() string {
 func (*DateTimeTypeOptions) ProtoMessage() {}
 
 func (x *DateTimeTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[5]
+	mi := &file_configuration_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -459,7 +579,7 @@ func (x *DateTimeTypeOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DateTimeTypeOptions.ProtoReflect.Descriptor instead.
 func (*DateTimeTypeOptions) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{5}
+	return file_configuration_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DateTimeTypeOptions) GetFormat() string {
@@ -478,7 +598,7 @@ type SelectTypeOptions struct {
 
 func (x *SelectTypeOptions) Reset() {
 	*x = SelectTypeOptions{}
-	mi := &file_configuration_proto_msgTypes[6]
+	mi := &file_configuration_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -490,7 +610,7 @@ func (x *SelectTypeOptions) String() string {
 func (*SelectTypeOptions) ProtoMessage() {}
 
 func (x *SelectTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[6]
+	mi := &file_configuration_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -503,7 +623,7 @@ func (x *SelectTypeOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectTypeOptions.ProtoReflect.Descriptor instead.
 func (*SelectTypeOptions) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{6}
+	return file_configuration_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SelectTypeOptions) GetOptions() []*SelectOption {
@@ -522,7 +642,7 @@ type MultiSelectTypeOptions struct {
 
 func (x *MultiSelectTypeOptions) Reset() {
 	*x = MultiSelectTypeOptions{}
-	mi := &file_configuration_proto_msgTypes[7]
+	mi := &file_configuration_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -534,7 +654,7 @@ func (x *MultiSelectTypeOptions) String() string {
 func (*MultiSelectTypeOptions) ProtoMessage() {}
 
 func (x *MultiSelectTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[7]
+	mi := &file_configuration_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -547,7 +667,7 @@ func (x *MultiSelectTypeOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MultiSelectTypeOptions.ProtoReflect.Descriptor instead.
 func (*MultiSelectTypeOptions) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{7}
+	return file_configuration_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *MultiSelectTypeOptions) GetOptions() []*SelectOption {
@@ -566,7 +686,7 @@ type IntegrationTypeOptions struct {
 
 func (x *IntegrationTypeOptions) Reset() {
 	*x = IntegrationTypeOptions{}
-	mi := &file_configuration_proto_msgTypes[8]
+	mi := &file_configuration_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -578,7 +698,7 @@ func (x *IntegrationTypeOptions) String() string {
 func (*IntegrationTypeOptions) ProtoMessage() {}
 
 func (x *IntegrationTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[8]
+	mi := &file_configuration_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -591,7 +711,7 @@ func (x *IntegrationTypeOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IntegrationTypeOptions.ProtoReflect.Descriptor instead.
 func (*IntegrationTypeOptions) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{8}
+	return file_configuration_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *IntegrationTypeOptions) GetType() string {
@@ -610,7 +730,7 @@ type ResourceTypeOptions struct {
 
 func (x *ResourceTypeOptions) Reset() {
 	*x = ResourceTypeOptions{}
-	mi := &file_configuration_proto_msgTypes[9]
+	mi := &file_configuration_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -622,7 +742,7 @@ func (x *ResourceTypeOptions) String() string {
 func (*ResourceTypeOptions) ProtoMessage() {}
 
 func (x *ResourceTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[9]
+	mi := &file_configuration_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -635,7 +755,7 @@ func (x *ResourceTypeOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceTypeOptions.ProtoReflect.Descriptor instead.
 func (*ResourceTypeOptions) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{9}
+	return file_configuration_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ResourceTypeOptions) GetType() string {
@@ -655,7 +775,7 @@ type ListTypeOptions struct {
 
 func (x *ListTypeOptions) Reset() {
 	*x = ListTypeOptions{}
-	mi := &file_configuration_proto_msgTypes[10]
+	mi := &file_configuration_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -667,7 +787,7 @@ func (x *ListTypeOptions) String() string {
 func (*ListTypeOptions) ProtoMessage() {}
 
 func (x *ListTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[10]
+	mi := &file_configuration_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -680,7 +800,7 @@ func (x *ListTypeOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTypeOptions.ProtoReflect.Descriptor instead.
 func (*ListTypeOptions) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{10}
+	return file_configuration_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListTypeOptions) GetItemDefinition() *ListItemDefinition {
@@ -706,7 +826,7 @@ type ObjectTypeOptions struct {
 
 func (x *ObjectTypeOptions) Reset() {
 	*x = ObjectTypeOptions{}
-	mi := &file_configuration_proto_msgTypes[11]
+	mi := &file_configuration_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -718,7 +838,7 @@ func (x *ObjectTypeOptions) String() string {
 func (*ObjectTypeOptions) ProtoMessage() {}
 
 func (x *ObjectTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[11]
+	mi := &file_configuration_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -731,7 +851,7 @@ func (x *ObjectTypeOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObjectTypeOptions.ProtoReflect.Descriptor instead.
 func (*ObjectTypeOptions) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{11}
+	return file_configuration_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ObjectTypeOptions) GetSchema() []*Field {
@@ -751,7 +871,7 @@ type SelectOption struct {
 
 func (x *SelectOption) Reset() {
 	*x = SelectOption{}
-	mi := &file_configuration_proto_msgTypes[12]
+	mi := &file_configuration_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -763,7 +883,7 @@ func (x *SelectOption) String() string {
 func (*SelectOption) ProtoMessage() {}
 
 func (x *SelectOption) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[12]
+	mi := &file_configuration_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -776,7 +896,7 @@ func (x *SelectOption) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectOption.ProtoReflect.Descriptor instead.
 func (*SelectOption) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{12}
+	return file_configuration_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SelectOption) GetLabel() string {
@@ -803,7 +923,7 @@ type VisibilityCondition struct {
 
 func (x *VisibilityCondition) Reset() {
 	*x = VisibilityCondition{}
-	mi := &file_configuration_proto_msgTypes[13]
+	mi := &file_configuration_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -815,7 +935,7 @@ func (x *VisibilityCondition) String() string {
 func (*VisibilityCondition) ProtoMessage() {}
 
 func (x *VisibilityCondition) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[13]
+	mi := &file_configuration_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -828,7 +948,7 @@ func (x *VisibilityCondition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VisibilityCondition.ProtoReflect.Descriptor instead.
 func (*VisibilityCondition) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{13}
+	return file_configuration_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *VisibilityCondition) GetField() string {
@@ -855,7 +975,7 @@ type ListItemDefinition struct {
 
 func (x *ListItemDefinition) Reset() {
 	*x = ListItemDefinition{}
-	mi := &file_configuration_proto_msgTypes[14]
+	mi := &file_configuration_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -867,7 +987,7 @@ func (x *ListItemDefinition) String() string {
 func (*ListItemDefinition) ProtoMessage() {}
 
 func (x *ListItemDefinition) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[14]
+	mi := &file_configuration_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -880,7 +1000,7 @@ func (x *ListItemDefinition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListItemDefinition.ProtoReflect.Descriptor instead.
 func (*ListItemDefinition) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{14}
+	return file_configuration_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListItemDefinition) GetType() string {
@@ -907,7 +1027,7 @@ type RequiredCondition struct {
 
 func (x *RequiredCondition) Reset() {
 	*x = RequiredCondition{}
-	mi := &file_configuration_proto_msgTypes[15]
+	mi := &file_configuration_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -919,7 +1039,7 @@ func (x *RequiredCondition) String() string {
 func (*RequiredCondition) ProtoMessage() {}
 
 func (x *RequiredCondition) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[15]
+	mi := &file_configuration_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -932,7 +1052,7 @@ func (x *RequiredCondition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequiredCondition.ProtoReflect.Descriptor instead.
 func (*RequiredCondition) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{15}
+	return file_configuration_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RequiredCondition) GetField() string {
@@ -960,7 +1080,7 @@ type ValidationRule struct {
 
 func (x *ValidationRule) Reset() {
 	*x = ValidationRule{}
-	mi := &file_configuration_proto_msgTypes[16]
+	mi := &file_configuration_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -972,7 +1092,7 @@ func (x *ValidationRule) String() string {
 func (*ValidationRule) ProtoMessage() {}
 
 func (x *ValidationRule) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[16]
+	mi := &file_configuration_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -985,7 +1105,7 @@ func (x *ValidationRule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidationRule.ProtoReflect.Descriptor instead.
 func (*ValidationRule) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{16}
+	return file_configuration_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ValidationRule) GetType() string {
@@ -1018,7 +1138,7 @@ type AnyPredicateListTypeOptions struct {
 
 func (x *AnyPredicateListTypeOptions) Reset() {
 	*x = AnyPredicateListTypeOptions{}
-	mi := &file_configuration_proto_msgTypes[17]
+	mi := &file_configuration_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1030,7 +1150,7 @@ func (x *AnyPredicateListTypeOptions) String() string {
 func (*AnyPredicateListTypeOptions) ProtoMessage() {}
 
 func (x *AnyPredicateListTypeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_configuration_proto_msgTypes[17]
+	mi := &file_configuration_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1043,7 +1163,7 @@ func (x *AnyPredicateListTypeOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnyPredicateListTypeOptions.ProtoReflect.Descriptor instead.
 func (*AnyPredicateListTypeOptions) Descriptor() ([]byte, []int) {
-	return file_configuration_proto_rawDescGZIP(), []int{17}
+	return file_configuration_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *AnyPredicateListTypeOptions) GetOperators() []*SelectOption {
@@ -1079,7 +1199,7 @@ const file_configuration_proto_rawDesc = "" +
 	"\n" +
 	"_sensitiveB\f\n" +
 	"\n" +
-	"_togglable\"\x82\b\n" +
+	"_togglable\"\xa4\t\n" +
 	"\vTypeOptions\x12H\n" +
 	"\x06number\x18\x01 \x01(\v2+.Superplane.Configuration.NumberTypeOptionsH\x00R\x06number\x88\x01\x01\x12H\n" +
 	"\x06select\x18\x02 \x01(\v2+.Superplane.Configuration.SelectTypeOptionsH\x01R\x06select\x88\x01\x01\x12X\n" +
@@ -1093,7 +1213,9 @@ const file_configuration_proto_rawDesc = "" +
 	"\bdatetime\x18\n" +
 	" \x01(\v2-.Superplane.Configuration.DateTimeTypeOptionsH\tR\bdatetime\x88\x01\x01\x12h\n" +
 	"\x12any_predicate_list\x18\v \x01(\v25.Superplane.Configuration.AnyPredicateListTypeOptionsH\n" +
-	"R\x10anyPredicateList\x88\x01\x01B\t\n" +
+	"R\x10anyPredicateList\x88\x01\x01\x12H\n" +
+	"\x06string\x18\f \x01(\v2+.Superplane.Configuration.StringTypeOptionsH\vR\x06string\x88\x01\x01\x12B\n" +
+	"\x04text\x18\r \x01(\v2).Superplane.Configuration.TextTypeOptionsH\fR\x04text\x88\x01\x01B\t\n" +
 	"\a_numberB\t\n" +
 	"\a_selectB\x0f\n" +
 	"\r_multi_selectB\x0e\n" +
@@ -1104,12 +1226,28 @@ const file_configuration_proto_rawDesc = "" +
 	"\x05_timeB\a\n" +
 	"\x05_dateB\v\n" +
 	"\t_datetimeB\x15\n" +
-	"\x13_any_predicate_list\"Q\n" +
+	"\x13_any_predicate_listB\t\n" +
+	"\a_stringB\a\n" +
+	"\x05_text\"Q\n" +
 	"\x11NumberTypeOptions\x12\x15\n" +
 	"\x03min\x18\x01 \x01(\x05H\x00R\x03min\x88\x01\x01\x12\x15\n" +
 	"\x03max\x18\x02 \x01(\x05H\x01R\x03max\x88\x01\x01B\x06\n" +
 	"\x04_minB\x06\n" +
-	"\x04_max\"9\n" +
+	"\x04_max\"y\n" +
+	"\x11StringTypeOptions\x12\"\n" +
+	"\n" +
+	"min_length\x18\x01 \x01(\x05H\x00R\tminLength\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"max_length\x18\x02 \x01(\x05H\x01R\tmaxLength\x88\x01\x01B\r\n" +
+	"\v_min_lengthB\r\n" +
+	"\v_max_length\"w\n" +
+	"\x0fTextTypeOptions\x12\"\n" +
+	"\n" +
+	"min_length\x18\x01 \x01(\x05H\x00R\tminLength\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"max_length\x18\x02 \x01(\x05H\x01R\tmaxLength\x88\x01\x01B\r\n" +
+	"\v_min_lengthB\r\n" +
+	"\v_max_length\"9\n" +
 	"\x0fTimeTypeOptions\x12\x1b\n" +
 	"\x06format\x18\x01 \x01(\tH\x00R\x06format\x88\x01\x01B\t\n" +
 	"\a_format\"9\n" +
@@ -1166,54 +1304,58 @@ func file_configuration_proto_rawDescGZIP() []byte {
 	return file_configuration_proto_rawDescData
 }
 
-var file_configuration_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_configuration_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_configuration_proto_goTypes = []any{
 	(*Field)(nil),                       // 0: Superplane.Configuration.Field
 	(*TypeOptions)(nil),                 // 1: Superplane.Configuration.TypeOptions
 	(*NumberTypeOptions)(nil),           // 2: Superplane.Configuration.NumberTypeOptions
-	(*TimeTypeOptions)(nil),             // 3: Superplane.Configuration.TimeTypeOptions
-	(*DateTypeOptions)(nil),             // 4: Superplane.Configuration.DateTypeOptions
-	(*DateTimeTypeOptions)(nil),         // 5: Superplane.Configuration.DateTimeTypeOptions
-	(*SelectTypeOptions)(nil),           // 6: Superplane.Configuration.SelectTypeOptions
-	(*MultiSelectTypeOptions)(nil),      // 7: Superplane.Configuration.MultiSelectTypeOptions
-	(*IntegrationTypeOptions)(nil),      // 8: Superplane.Configuration.IntegrationTypeOptions
-	(*ResourceTypeOptions)(nil),         // 9: Superplane.Configuration.ResourceTypeOptions
-	(*ListTypeOptions)(nil),             // 10: Superplane.Configuration.ListTypeOptions
-	(*ObjectTypeOptions)(nil),           // 11: Superplane.Configuration.ObjectTypeOptions
-	(*SelectOption)(nil),                // 12: Superplane.Configuration.SelectOption
-	(*VisibilityCondition)(nil),         // 13: Superplane.Configuration.VisibilityCondition
-	(*ListItemDefinition)(nil),          // 14: Superplane.Configuration.ListItemDefinition
-	(*RequiredCondition)(nil),           // 15: Superplane.Configuration.RequiredCondition
-	(*ValidationRule)(nil),              // 16: Superplane.Configuration.ValidationRule
-	(*AnyPredicateListTypeOptions)(nil), // 17: Superplane.Configuration.AnyPredicateListTypeOptions
+	(*StringTypeOptions)(nil),           // 3: Superplane.Configuration.StringTypeOptions
+	(*TextTypeOptions)(nil),             // 4: Superplane.Configuration.TextTypeOptions
+	(*TimeTypeOptions)(nil),             // 5: Superplane.Configuration.TimeTypeOptions
+	(*DateTypeOptions)(nil),             // 6: Superplane.Configuration.DateTypeOptions
+	(*DateTimeTypeOptions)(nil),         // 7: Superplane.Configuration.DateTimeTypeOptions
+	(*SelectTypeOptions)(nil),           // 8: Superplane.Configuration.SelectTypeOptions
+	(*MultiSelectTypeOptions)(nil),      // 9: Superplane.Configuration.MultiSelectTypeOptions
+	(*IntegrationTypeOptions)(nil),      // 10: Superplane.Configuration.IntegrationTypeOptions
+	(*ResourceTypeOptions)(nil),         // 11: Superplane.Configuration.ResourceTypeOptions
+	(*ListTypeOptions)(nil),             // 12: Superplane.Configuration.ListTypeOptions
+	(*ObjectTypeOptions)(nil),           // 13: Superplane.Configuration.ObjectTypeOptions
+	(*SelectOption)(nil),                // 14: Superplane.Configuration.SelectOption
+	(*VisibilityCondition)(nil),         // 15: Superplane.Configuration.VisibilityCondition
+	(*ListItemDefinition)(nil),          // 16: Superplane.Configuration.ListItemDefinition
+	(*RequiredCondition)(nil),           // 17: Superplane.Configuration.RequiredCondition
+	(*ValidationRule)(nil),              // 18: Superplane.Configuration.ValidationRule
+	(*AnyPredicateListTypeOptions)(nil), // 19: Superplane.Configuration.AnyPredicateListTypeOptions
 }
 var file_configuration_proto_depIdxs = []int32{
-	13, // 0: Superplane.Configuration.Field.visibility_conditions:type_name -> Superplane.Configuration.VisibilityCondition
+	15, // 0: Superplane.Configuration.Field.visibility_conditions:type_name -> Superplane.Configuration.VisibilityCondition
 	1,  // 1: Superplane.Configuration.Field.type_options:type_name -> Superplane.Configuration.TypeOptions
-	15, // 2: Superplane.Configuration.Field.required_conditions:type_name -> Superplane.Configuration.RequiredCondition
-	16, // 3: Superplane.Configuration.Field.validation_rules:type_name -> Superplane.Configuration.ValidationRule
+	17, // 2: Superplane.Configuration.Field.required_conditions:type_name -> Superplane.Configuration.RequiredCondition
+	18, // 3: Superplane.Configuration.Field.validation_rules:type_name -> Superplane.Configuration.ValidationRule
 	2,  // 4: Superplane.Configuration.TypeOptions.number:type_name -> Superplane.Configuration.NumberTypeOptions
-	6,  // 5: Superplane.Configuration.TypeOptions.select:type_name -> Superplane.Configuration.SelectTypeOptions
-	7,  // 6: Superplane.Configuration.TypeOptions.multi_select:type_name -> Superplane.Configuration.MultiSelectTypeOptions
-	8,  // 7: Superplane.Configuration.TypeOptions.integration:type_name -> Superplane.Configuration.IntegrationTypeOptions
-	10, // 8: Superplane.Configuration.TypeOptions.list:type_name -> Superplane.Configuration.ListTypeOptions
-	11, // 9: Superplane.Configuration.TypeOptions.object:type_name -> Superplane.Configuration.ObjectTypeOptions
-	9,  // 10: Superplane.Configuration.TypeOptions.resource:type_name -> Superplane.Configuration.ResourceTypeOptions
-	3,  // 11: Superplane.Configuration.TypeOptions.time:type_name -> Superplane.Configuration.TimeTypeOptions
-	4,  // 12: Superplane.Configuration.TypeOptions.date:type_name -> Superplane.Configuration.DateTypeOptions
-	5,  // 13: Superplane.Configuration.TypeOptions.datetime:type_name -> Superplane.Configuration.DateTimeTypeOptions
-	17, // 14: Superplane.Configuration.TypeOptions.any_predicate_list:type_name -> Superplane.Configuration.AnyPredicateListTypeOptions
-	12, // 15: Superplane.Configuration.SelectTypeOptions.options:type_name -> Superplane.Configuration.SelectOption
-	12, // 16: Superplane.Configuration.MultiSelectTypeOptions.options:type_name -> Superplane.Configuration.SelectOption
-	14, // 17: Superplane.Configuration.ListTypeOptions.item_definition:type_name -> Superplane.Configuration.ListItemDefinition
-	0,  // 18: Superplane.Configuration.ObjectTypeOptions.schema:type_name -> Superplane.Configuration.Field
-	0,  // 19: Superplane.Configuration.ListItemDefinition.schema:type_name -> Superplane.Configuration.Field
-	12, // 20: Superplane.Configuration.AnyPredicateListTypeOptions.operators:type_name -> Superplane.Configuration.SelectOption
-	21, // [21:21] is the sub-list for method output_type
-	21, // [21:21] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	8,  // 5: Superplane.Configuration.TypeOptions.select:type_name -> Superplane.Configuration.SelectTypeOptions
+	9,  // 6: Superplane.Configuration.TypeOptions.multi_select:type_name -> Superplane.Configuration.MultiSelectTypeOptions
+	10, // 7: Superplane.Configuration.TypeOptions.integration:type_name -> Superplane.Configuration.IntegrationTypeOptions
+	12, // 8: Superplane.Configuration.TypeOptions.list:type_name -> Superplane.Configuration.ListTypeOptions
+	13, // 9: Superplane.Configuration.TypeOptions.object:type_name -> Superplane.Configuration.ObjectTypeOptions
+	11, // 10: Superplane.Configuration.TypeOptions.resource:type_name -> Superplane.Configuration.ResourceTypeOptions
+	5,  // 11: Superplane.Configuration.TypeOptions.time:type_name -> Superplane.Configuration.TimeTypeOptions
+	6,  // 12: Superplane.Configuration.TypeOptions.date:type_name -> Superplane.Configuration.DateTypeOptions
+	7,  // 13: Superplane.Configuration.TypeOptions.datetime:type_name -> Superplane.Configuration.DateTimeTypeOptions
+	19, // 14: Superplane.Configuration.TypeOptions.any_predicate_list:type_name -> Superplane.Configuration.AnyPredicateListTypeOptions
+	3,  // 15: Superplane.Configuration.TypeOptions.string:type_name -> Superplane.Configuration.StringTypeOptions
+	4,  // 16: Superplane.Configuration.TypeOptions.text:type_name -> Superplane.Configuration.TextTypeOptions
+	14, // 17: Superplane.Configuration.SelectTypeOptions.options:type_name -> Superplane.Configuration.SelectOption
+	14, // 18: Superplane.Configuration.MultiSelectTypeOptions.options:type_name -> Superplane.Configuration.SelectOption
+	16, // 19: Superplane.Configuration.ListTypeOptions.item_definition:type_name -> Superplane.Configuration.ListItemDefinition
+	0,  // 20: Superplane.Configuration.ObjectTypeOptions.schema:type_name -> Superplane.Configuration.Field
+	0,  // 21: Superplane.Configuration.ListItemDefinition.schema:type_name -> Superplane.Configuration.Field
+	14, // 22: Superplane.Configuration.AnyPredicateListTypeOptions.operators:type_name -> Superplane.Configuration.SelectOption
+	23, // [23:23] is the sub-list for method output_type
+	23, // [23:23] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_configuration_proto_init() }
@@ -1227,14 +1369,16 @@ func file_configuration_proto_init() {
 	file_configuration_proto_msgTypes[3].OneofWrappers = []any{}
 	file_configuration_proto_msgTypes[4].OneofWrappers = []any{}
 	file_configuration_proto_msgTypes[5].OneofWrappers = []any{}
-	file_configuration_proto_msgTypes[16].OneofWrappers = []any{}
+	file_configuration_proto_msgTypes[6].OneofWrappers = []any{}
+	file_configuration_proto_msgTypes[7].OneofWrappers = []any{}
+	file_configuration_proto_msgTypes[18].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_configuration_proto_rawDesc), len(file_configuration_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

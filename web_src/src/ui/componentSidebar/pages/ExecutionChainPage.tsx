@@ -46,6 +46,14 @@ function buildExecutionTabData(
     };
   }
 
+  if (
+    execution.resultMessage &&
+    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED")
+  ) {
+    // Ensure error message is first
+    currentData = Object.assign({ Error: execution.resultMessage }, currentData);
+  }
+
   // Filter out undefined and empty values
   tabData.current = Object.fromEntries(
     Object.entries(currentData).filter(([_, value]) => value !== undefined && value !== "" && value !== null),

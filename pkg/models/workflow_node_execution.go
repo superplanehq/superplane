@@ -21,6 +21,7 @@ const (
 	WorkflowNodeExecutionResultFailed    = "failed"
 	WorkflowNodeExecutionResultCancelled = "cancelled"
 
+	WorkflowNodeExecutionResultReasonOk    = "ok"
 	WorkflowNodeExecutionResultReasonError = "error"
 )
 
@@ -157,6 +158,24 @@ func ListNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, re
 	}
 
 	err := query.Find(&executions).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
+func ListNodeExecutionsForRootEvents(rootEventIDs []uuid.UUID) ([]WorkflowNodeExecution, error) {
+	if len(rootEventIDs) == 0 {
+		return []WorkflowNodeExecution{}, nil
+	}
+
+	var executions []WorkflowNodeExecution
+	err := database.Conn().
+		Where("root_event_id IN ?", rootEventIDs).
+		Order("created_at ASC").
+		Find(&executions).
+		Error
 	if err != nil {
 		return nil, err
 	}

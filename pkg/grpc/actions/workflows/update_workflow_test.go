@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,7 @@ import (
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 )
 
@@ -542,4 +544,367 @@ func TestUpdateWorkflow_ErroredNodeBecomesValidAgain(t *testing.T) {
 	require.NoError(t, err, "should be able to find test node")
 	assert.Equal(t, models.WorkflowNodeStateReady, testNode.State, "node should now be in ready state")
 	assert.Nil(t, testNode.StateReason, "node should not have error reason")
+}
+
+func TestUpdateWorkflow_WidgetNodesHandled(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{},
+		[]models.Edge{},
+	)
+
+	annotationText := "This is an annotation describing the workflow"
+	annotationConfig, _ := structpb.NewStruct(map[string]interface{}{
+		"text": annotationText,
+	})
+
+	initialWorkflowPB := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:            "annotation-1",
+					Name:          "Workflow Note",
+					Type:          componentpb.Node_TYPE_WIDGET,
+					Configuration: annotationConfig,
+					Widget: &componentpb.Node_WidgetRef{
+						Name: "annotation",
+					},
+				},
+				{
+					Id:   "component-1",
+					Name: "Regular Component",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	updatedWorkflow, err := UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		initialWorkflowPB,
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err, "UpdateWorkflow should succeed with widget nodes")
+
+	var widgetNodeCount int64
+	database.Conn().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "annotation-1").Count(&widgetNodeCount)
+	assert.Equal(t, int64(0), widgetNodeCount, "widget nodes should not be persisted in workflow_nodes table")
+
+	var componentNode models.WorkflowNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "component-1").First(&componentNode).Error
+	require.NoError(t, err, "should be able to find component node")
+	assert.Equal(t, models.NodeTypeComponent, componentNode.Type, "component node should have correct type")
+
+	assert.NotNil(t, updatedWorkflow.Workflow.Spec.Nodes, "workflow should have nodes in spec")
+	var foundWidget *componentpb.Node
+	for _, node := range updatedWorkflow.Workflow.Spec.Nodes {
+		if node.Id == "annotation-1" {
+			foundWidget = node
+			break
+		}
+	}
+	require.NotNil(t, foundWidget, "should find widget in workflow nodes JSON")
+	assert.Equal(t, componentpb.Node_TYPE_WIDGET, foundWidget.Type, "widget should have correct type")
+	assert.Equal(t, "annotation", foundWidget.Widget.Name, "widget should have correct name")
+	assert.Equal(t, annotationText, foundWidget.Configuration.AsMap()["text"], "widget text should match")
+
+	updatedAnnotationText := "This is an updated annotation"
+	updatedAnnotationConfig, _ := structpb.NewStruct(map[string]interface{}{
+		"text": updatedAnnotationText,
+	})
+
+	updatedWorkflowPB := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:            "annotation-1",
+					Name:          "Workflow Note Updated",
+					Type:          componentpb.Node_TYPE_WIDGET,
+					Configuration: updatedAnnotationConfig,
+					Widget: &componentpb.Node_WidgetRef{
+						Name: "annotation",
+					},
+				},
+				{
+					Id:   "component-1",
+					Name: "Regular Component",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	finalUpdatedWorkflow, err := UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		updatedWorkflowPB,
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err, "UpdateWorkflow should succeed when updating widget nodes")
+
+	// Verify updated widget is in JSON
+	var updatedWidget *componentpb.Node
+	for _, node := range finalUpdatedWorkflow.Workflow.Spec.Nodes {
+		if node.Id == "annotation-1" {
+			updatedWidget = node
+			break
+		}
+	}
+	require.NotNil(t, updatedWidget, "should find updated widget in workflow nodes JSON")
+	assert.Equal(t, "Workflow Note Updated", updatedWidget.Name, "widget name should be updated")
+	assert.Equal(t, updatedAnnotationText, updatedWidget.Configuration.AsMap()["text"], "widget text should be updated")
+}
+
+func TestUpdateWorkflow_WidgetNodesCannotConnect(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{},
+		[]models.Edge{},
+	)
+
+	annotationConfig, _ := structpb.NewStruct(map[string]interface{}{
+		"text": "This is an annotation",
+	})
+
+	workflowWithWidgetAsSource := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:            "annotation-1",
+					Name:          "Annotation Note",
+					Type:          componentpb.Node_TYPE_WIDGET,
+					Configuration: annotationConfig,
+					Widget: &componentpb.Node_WidgetRef{
+						Name: "annotation",
+					},
+				},
+				{
+					Id:   "component-1",
+					Name: "Component",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{
+				{
+					SourceId: "annotation-1",
+					TargetId: "component-1",
+					Channel:  "default",
+				},
+			},
+		},
+	}
+
+	_, err := UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		workflowWithWidgetAsSource,
+		"http://localhost:3000/api/v1",
+	)
+	require.Error(t, err, "UpdateWorkflow should fail when widget node is used as source")
+	assert.Contains(t, err.Error(), "widget nodes cannot be used as source nodes")
+
+	workflowWithWidgetAsTarget := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "component-1",
+					Name: "Component",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+				{
+					Id:            "annotation-1",
+					Name:          "Annotation Note",
+					Type:          componentpb.Node_TYPE_WIDGET,
+					Configuration: annotationConfig,
+					Widget: &componentpb.Node_WidgetRef{
+						Name: "annotation",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{
+				{
+					SourceId: "component-1",
+					TargetId: "annotation-1",
+					Channel:  "default",
+				},
+			},
+		},
+	}
+
+	_, err = UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		workflowWithWidgetAsTarget,
+		"http://localhost:3000/api/v1",
+	)
+	require.Error(t, err, "UpdateWorkflow should fail when widget node is used as target")
+	assert.Contains(t, err.Error(), "widget nodes cannot be used as target nodes")
+}
+
+func TestUpdateWorkflow_WidgetTextLengthValidation(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{},
+		[]models.Edge{},
+	)
+
+	// Test text exceeding max length (5001 characters)
+	longText := strings.Repeat("a", 5001)
+	longAnnotationConfig, _ := structpb.NewStruct(map[string]interface{}{
+		"text": longText,
+	})
+
+	workflowWithLongAnnotation := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:            "annotation-1",
+					Name:          "Long Annotation",
+					Type:          componentpb.Node_TYPE_WIDGET,
+					Configuration: longAnnotationConfig,
+					Widget: &componentpb.Node_WidgetRef{
+						Name: "annotation",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	response, err := UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		workflowWithLongAnnotation,
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err)
+
+	var annotationNode *componentpb.Node
+	for _, node := range response.Workflow.Spec.Nodes {
+		if node.Id == "annotation-1" {
+			annotationNode = node
+			break
+		}
+	}
+	require.NotNil(t, annotationNode)
+	require.Equal(t, annotationNode.ErrorMessage, "field 'text': must be at most 5000 characters")
+
+	// Test text at exactly max length (5000 characters)
+	exactlyMaxText := strings.Repeat("b", 5000)
+	maxAnnotationConfig, _ := structpb.NewStruct(map[string]interface{}{
+		"text": exactlyMaxText,
+	})
+
+	workflowWithMaxAnnotation := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:            "annotation-2",
+					Name:          "Max Length Annotation",
+					Type:          componentpb.Node_TYPE_WIDGET,
+					Configuration: maxAnnotationConfig,
+					Widget: &componentpb.Node_WidgetRef{
+						Name: "annotation",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	maxUpdatedWorkflow, err := UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		workflowWithMaxAnnotation,
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err, "UpdateWorkflow should succeed with max length annotation text")
+
+	// Verify the max length annotation is in JSON
+	var maxFoundAnnotation *componentpb.Node
+	for _, node := range maxUpdatedWorkflow.Workflow.Spec.Nodes {
+		if node.Id == "annotation-2" {
+			maxFoundAnnotation = node
+			break
+		}
+	}
+	require.NotNil(t, maxFoundAnnotation, "should find max annotation in workflow nodes JSON")
+	assert.Equal(t, exactlyMaxText, maxFoundAnnotation.Configuration.AsMap()["text"], "annotation text should match")
+
+	// Widgets should NOT be persisted in workflow_nodes table
+	var annotationNodeCount int64
+	database.Conn().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "annotation-2").Count(&annotationNodeCount)
+	assert.Equal(t, int64(0), annotationNodeCount, "widget nodes should not be persisted in workflow_nodes table")
 }

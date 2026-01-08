@@ -14,6 +14,7 @@ api_roles.go
 api_secret.go
 api_trigger.go
 api_users.go
+api_widget.go
 api_workflow.go
 api_workflow_event.go
 api_workflow_node.go
@@ -59,6 +60,8 @@ docs/ConfigurationRequiredCondition.md
 docs/ConfigurationResourceTypeOptions.md
 docs/ConfigurationSelectOption.md
 docs/ConfigurationSelectTypeOptions.md
+docs/ConfigurationStringTypeOptions.md
+docs/ConfigurationTextTypeOptions.md
 docs/ConfigurationTimeTypeOptions.md
 docs/ConfigurationTypeOptions.md
 docs/ConfigurationValidationRule.md
@@ -99,6 +102,7 @@ docs/MeRegenerateTokenResponse.md
 docs/NodeBlueprintRef.md
 docs/NodeComponentRef.md
 docs/NodeTriggerRef.md
+docs/NodeWidgetRef.md
 docs/OrganizationAPI.md
 docs/OrganizationsAppInstallation.md
 docs/OrganizationsAppInstallationMetadata.md
@@ -165,6 +169,10 @@ docs/UsersUserMetadata.md
 docs/UsersUserRoleAssignment.md
 docs/UsersUserSpec.md
 docs/UsersUserStatus.md
+docs/WidgetAPI.md
+docs/WidgetsDescribeWidgetResponse.md
+docs/WidgetsListWidgetsResponse.md
+docs/WidgetsWidget.md
 docs/WorkflowAPI.md
 docs/WorkflowEventAPI.md
 docs/WorkflowNodeAPI.md
@@ -191,6 +199,7 @@ docs/WorkflowsUpdateWorkflowBody.md
 docs/WorkflowsUpdateWorkflowResponse.md
 docs/WorkflowsWorkflow.md
 docs/WorkflowsWorkflowEvent.md
+docs/WorkflowsWorkflowEventWithExecutions.md
 docs/WorkflowsWorkflowMetadata.md
 docs/WorkflowsWorkflowNodeExecution.md
 docs/WorkflowsWorkflowNodeQueueItem.md
@@ -233,6 +242,8 @@ model_configuration_required_condition.go
 model_configuration_resource_type_options.go
 model_configuration_select_option.go
 model_configuration_select_type_options.go
+model_configuration_string_type_options.go
+model_configuration_text_type_options.go
 model_configuration_time_type_options.go
 model_configuration_type_options.go
 model_configuration_validation_rule.go
@@ -270,6 +281,7 @@ model_me_regenerate_token_response.go
 model_node_blueprint_ref.go
 model_node_component_ref.go
 model_node_trigger_ref.go
+model_node_widget_ref.go
 model_organizations_app_installation.go
 model_organizations_app_installation_metadata.go
 model_organizations_app_installation_spec.go
@@ -331,6 +343,9 @@ model_users_user_metadata.go
 model_users_user_role_assignment.go
 model_users_user_spec.go
 model_users_user_status.go
+model_widgets_describe_widget_response.go
+model_widgets_list_widgets_response.go
+model_widgets_widget.go
 model_workflow_node_execution_result.go
 model_workflow_node_execution_result_reason.go
 model_workflow_node_execution_state.go
@@ -353,6 +368,7 @@ model_workflows_update_workflow_body.go
 model_workflows_update_workflow_response.go
 model_workflows_workflow.go
 model_workflows_workflow_event.go
+model_workflows_workflow_event_with_executions.go
 model_workflows_workflow_metadata.go
 model_workflows_workflow_node_execution.go
 model_workflows_workflow_node_queue_item.go
@@ -370,6 +386,7 @@ test/api_roles_test.go
 test/api_secret_test.go
 test/api_trigger_test.go
 test/api_users_test.go
+test/api_widget_test.go
 test/api_workflow_event_test.go
 test/api_workflow_node_execution_test.go
 test/api_workflow_node_test.go

@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-workers
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: superplane
+    service: {{ .Release.Name }}-workers
+spec:
+  replicas: {{ .Values.workers.replicas }}
+  selector:
+    matchLabels:
+      app: superplane
+      service: {{ .Release.Name }}-workers
+  template:
+    metadata:
+      name: {{ .Release.Name }}-workers
+      labels:
+        app: superplane
+        service: {{ .Release.Name }}-workers
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Release.Name }}-workers
+          image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.domain.configMapName }}
+            - secretRef:
+                name: {{ include "secrets.database.name" . }}
+            - secretRef:
+                name: {{ include "secrets.rabbitmq.name" . }}
+            - secretRef:
+                name: {{ include "secrets.telemetry.name" . }}
+            - secretRef:
+                name: {{ include "secrets.authentication.name" . }}
+            - secretRef:
+                name: {{ include "secrets.encryption.name" . }}
+            - secretRef:
+                name: {{ include "secrets.jwt.name" . }}
+            - secretRef:
+                name: {{ include "secrets.email.name" . }}
+            - secretRef:
+                name: {{ include "secrets.sentry.name" . }}
+          env:
+            - name: START_CONSUMERS
+              value: "yes"
+            - name: START_WORKFLOW_EVENT_ROUTER
+              value: "yes"
+            - name: START_WORKFLOW_NODE_EXECUTOR
+              value: "yes"
+            - name: START_WORKFLOW_NODE_QUEUE_WORKER
+              value: "yes"
+            - name: START_NODE_REQUEST_WORKER
+              value: "yes"
+            - name: START_APP_INSTALLATION_REQUEST_WORKER
+              value: "yes"
+            - name: START_WEBHOOK_PROVISIONER
+              value: "yes"
+            - name: START_WEBHOOK_CLEANUP_WORKER
+              value: "yes"
+            - name: START_INSTALLATION_CLEANUP_WORKER
+              value: "yes"
+            - name: START_WORKFLOW_CLEANUP_WORKER
+              value: "yes"
+            - name: RBAC_MODEL_PATH
+              value: /app/rbac/rbac_model.conf
+            - name: PUBLIC_API_BASE_PATH
+              value: "/api/v1"
+            - name: RBAC_ORG_POLICY_PATH
+              value: /app/rbac/rbac_org_policy.csv
+            - name: RBAC_CANVAS_POLICY_PATH
+              value: /app/rbac/rbac_canvas_policy.csv
+            - name: APPLICATION_NAME
+              value: superplane
+            - name: DB_POOL_SIZE
+              value: "{{ .Values.workers.dbPoolSize }}"
+            - name: EMAIL_FROM_NAME
+              value: "{{ .Values.email.fromName }}"
+            - name: EMAIL_FROM_ADDRESS
+              value: "{{ .Values.email.fromAddress }}"
+            - name: TEMPLATE_DIR
+              value: /app/templates
+            - name: OTEL_ENABLED
+              value: "yes"
+
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+
+          {{- with .Values.workers.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

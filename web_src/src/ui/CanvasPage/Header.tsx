@@ -44,7 +44,7 @@ export function Header({
   return (
     <>
       <header className="bg-white border-b border-border">
-        <div className="relative flex items-center justify-between h-12 px-3">
+        <div className="relative flex items-center justify-between h-12 px-4">
           <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
 
           {/* Breadcrumbs - Absolutely centered */}

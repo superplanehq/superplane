@@ -297,9 +297,9 @@ func NodeExecutionResultToProto(result string) pb.WorkflowNodeExecution_Result {
 
 func NodeExecutionResultReasonToProto(reason string) pb.WorkflowNodeExecution_ResultReason {
 	switch reason {
-	case "ok":
+	case models.WorkflowNodeExecutionResultReasonOk:
 		return pb.WorkflowNodeExecution_RESULT_REASON_OK
-	case "error":
+	case models.WorkflowNodeExecutionResultReasonError:
 		return pb.WorkflowNodeExecution_RESULT_REASON_ERROR
 	default:
 		return pb.WorkflowNodeExecution_RESULT_REASON_OK

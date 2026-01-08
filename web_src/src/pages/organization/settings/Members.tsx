@@ -22,7 +22,7 @@ import {
   useRemoveInvitation,
   useRemoveOrganizationSubject,
 } from "../../../hooks/useOrganizationData";
-import { Button } from "../../../ui/button";
+import { Button } from "@/components/ui/button";
 import { isRBACEnabled } from "@/lib/env";
 
 interface Member {
@@ -319,24 +319,22 @@ export function Members({ organizationId }: MembersProps) {
 
         {/* Email Input Section */}
         <div className="space-y-4">
-          <div className="flex items-start gap-3">
-            <Textarea
-              rows={1}
-              placeholder="Email addresses, separated by commas"
-              className="flex-1"
-              value={emailsInput}
-              onChange={(e) => setEmailsInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-            />
-            <Button
-              className="flex items-center text-sm gap-2"
-              onClick={handleEmailsSubmit}
-              disabled={!emailsInput.trim() || isInviting}
-            >
-              <Icon name="plus" size="sm" />
-              {isInviting ? "Sending..." : "Send Invitations"}
-            </Button>
-          </div>
+          <Textarea
+            rows={1}
+            placeholder="Email addresses, separated by commas"
+            className="flex-1"
+            value={emailsInput}
+            onChange={(e) => setEmailsInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+          <Button
+            className="flex items-center"
+            onClick={handleEmailsSubmit}
+            disabled={!emailsInput.trim() || isInviting}
+          >
+            <Icon name="send" />
+            {isInviting ? "Sending..." : "Send Invitations"}
+          </Button>
         </div>
       </div>
 

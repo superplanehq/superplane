@@ -75,6 +75,54 @@ func validateNumber(field Field, value any) error {
 	return nil
 }
 
+func validateString(field Field, value any) error {
+	text, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	if field.TypeOptions == nil || field.TypeOptions.String == nil {
+		return nil
+	}
+
+	options := field.TypeOptions.String
+	textLength := len(text)
+
+	if options.MinLength != nil && textLength < *options.MinLength {
+		return fmt.Errorf("must be at least %d characters", *options.MinLength)
+	}
+
+	if options.MaxLength != nil && textLength > *options.MaxLength {
+		return fmt.Errorf("must be at most %d characters", *options.MaxLength)
+	}
+
+	return nil
+}
+
+func validateText(field Field, value any) error {
+	text, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	if field.TypeOptions == nil || field.TypeOptions.Text == nil {
+		return nil
+	}
+
+	options := field.TypeOptions.Text
+	textLength := len(text)
+
+	if options.MinLength != nil && textLength < *options.MinLength {
+		return fmt.Errorf("must be at least %d characters", *options.MinLength)
+	}
+
+	if options.MaxLength != nil && textLength > *options.MaxLength {
+		return fmt.Errorf("must be at most %d characters", *options.MaxLength)
+	}
+
+	return nil
+}
+
 func validateSelect(field Field, value any) error {
 	selected, ok := value.(string)
 	if !ok {
@@ -340,7 +388,7 @@ func validateDayInYear(field Field, value any) error {
 	return nil
 }
 
-func validateCron(field Field, value any) error {
+func validateCron(_ Field, value any) error {
 	cronStr, ok := value.(string)
 	if !ok {
 		return fmt.Errorf("must be a string")
@@ -387,9 +435,10 @@ func validateCron(field Field, value any) error {
 func validateFieldValue(field Field, value any) error {
 	switch field.Type {
 	case FieldTypeString:
-		if _, ok := value.(string); !ok {
-			return fmt.Errorf("must be a string")
-		}
+		return validateString(field, value)
+
+	case FieldTypeText:
+		return validateText(field, value)
 
 	case FieldTypeNumber:
 		return validateNumber(field, value)
@@ -713,7 +762,7 @@ func compareStringValues(value, compareValue string, rule ValidationRule) error 
 	return nil
 }
 
-func compareDayInYearValues(valueDayOfYear, compareDayOfYear int, valueStr, compareStr string, rule ValidationRule) error {
+func compareDayInYearValues(valueDayOfYear, compareDayOfYear int, _, compareStr string, rule ValidationRule) error {
 	switch rule.Type {
 	case ValidationRuleLessThan:
 		if valueDayOfYear >= compareDayOfYear {
@@ -737,7 +786,7 @@ func compareDayInYearValues(valueDayOfYear, compareDayOfYear int, valueStr, comp
 	return nil
 }
 
-func validateTimezone(field Field, value any) error {
+func validateTimezone(_ Field, value any) error {
 	timezoneStr, ok := value.(string)
 	if !ok {
 		return fmt.Errorf("must be a string")

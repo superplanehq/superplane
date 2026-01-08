@@ -13,6 +13,8 @@ import {
   workflowsListNodeEvents,
   triggersListTriggers,
   triggersDescribeTrigger,
+  widgetsListWidgets,
+  widgetsDescribeWidget,
 } from "../api-client/sdk.gen";
 import { withOrganizationHeader } from "../utils/withOrganizationHeader";
 
@@ -27,7 +29,7 @@ export const workflowKeys = {
   nodeExecution: (workflowId: string, nodeId: string, states?: string[]) =>
     [...workflowKeys.nodeExecutions(), workflowId, nodeId, ...(states || [])] as const,
   events: () => [...workflowKeys.all, "events"] as const,
-  eventList: (workflowId: string) => [...workflowKeys.events(), workflowId] as const,
+  eventList: (workflowId: string, limit?: number) => [...workflowKeys.events(), workflowId, limit] as const,
   eventExecutions: () => [...workflowKeys.all, "eventExecutions"] as const,
   eventExecution: (workflowId: string, eventId: string) =>
     [...workflowKeys.eventExecutions(), workflowId, eventId] as const,
@@ -54,6 +56,14 @@ export const triggerKeys = {
   list: () => [...triggerKeys.lists()] as const,
   details: () => [...triggerKeys.all, "detail"] as const,
   detail: (name: string) => [...triggerKeys.details(), name] as const,
+};
+
+export const widgetKeys = {
+  all: ["widgets"] as const,
+  lists: () => [...widgetKeys.all, "list"] as const,
+  list: () => [...widgetKeys.lists()] as const,
+  details: () => [...widgetKeys.all, "detail"] as const,
+  detail: (name: string) => [...widgetKeys.details(), name] as const,
 };
 
 // Hooks for fetching workflows
@@ -191,12 +201,15 @@ export const useNodeExecutions = (
 };
 
 export const useWorkflowEvents = (workflowId: string) => {
+  const limit = 50;
+
   return useQuery({
-    queryKey: workflowKeys.eventList(workflowId),
+    queryKey: workflowKeys.eventList(workflowId, limit),
     queryFn: async () => {
       const response = await workflowsListWorkflowEvents(
         withOrganizationHeader({
           path: { workflowId },
+          query: { limit },
         }),
       );
       return response.data;
@@ -383,6 +396,32 @@ export const useTrigger = (triggerName: string) => {
       return response.data?.trigger;
     },
     enabled: !!triggerName,
+  });
+};
+
+// Hooks for fetching widgets
+export const useWidgets = () => {
+  return useQuery({
+    queryKey: widgetKeys.list(),
+    queryFn: async () => {
+      const response = await widgetsListWidgets(withOrganizationHeader({}));
+      return response.data?.widgets || [];
+    },
+  });
+};
+
+export const useWidget = (widgetName: string) => {
+  return useQuery({
+    queryKey: widgetKeys.detail(widgetName),
+    queryFn: async () => {
+      const response = await widgetsDescribeWidget(
+        withOrganizationHeader({
+          path: { name: widgetName },
+        }),
+      );
+      return response.data?.widget;
+    },
+    enabled: !!widgetName,
   });
 };
 

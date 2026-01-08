@@ -61,15 +61,22 @@ export const RUN_WORKFLOW_STATE_MAP: EventStateMap = {
 export const runWorkflowStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
   if (!execution) return "neutral";
 
+  if (
+    execution.resultMessage &&
+    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED")
+  ) {
+    return "error";
+  }
+
+  if (execution.result === "RESULT_CANCELLED") {
+    return "cancelled";
+  }
+
   //
   // If workflow is still running
   //
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
     return "running";
-  }
-
-  if (execution.result === "RESULT_FAILED") {
-    return "failed";
   }
 
   const metadata = execution.metadata as ExecutionMetadata;
@@ -115,6 +122,22 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       specs: runWorkflowSpecs(node),
       eventStateMap: RUN_WORKFLOW_STATE_MAP,
     };
+  },
+
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
+    const metadata = execution.metadata as ExecutionMetadata;
+    const details: Record<string, string> = {
+      URL: metadata.workflowRun?.url || "-",
+      "Run ID": metadata.workflowRun?.id?.toString() || "-",
+      Status: metadata.workflowRun?.status || "-",
+      Conclusion: metadata.workflowRun?.conclusion || "-",
+    };
+
+    if (execution.state == "STATE_FINISHED") {
+      details["Finished At"] = execution.updatedAt || "-";
+    }
+
+    return details;
   },
 };
 

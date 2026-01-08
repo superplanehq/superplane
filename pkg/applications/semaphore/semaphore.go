@@ -130,14 +130,14 @@ type WebhookNotificationMetadata struct {
 	Name string `json:"name"`
 }
 
-func (s *Semaphore) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (any, error) {
-	client, err := NewClient(ctx)
+func (s *Semaphore) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
+	client, err := NewClient(ctx.AppInstallation)
 	if err != nil {
 		return nil, err
 	}
 
 	configuration := WebhookConfiguration{}
-	err = mapstructure.Decode(options.Configuration, &configuration)
+	err = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &configuration)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding configuration: %v", err)
 	}
@@ -147,14 +147,19 @@ func (s *Semaphore) SetupWebhook(ctx core.AppInstallationContext, options core.W
 	// so we sha256 the ID before creating the secret.
 	//
 	hash := sha256.New()
-	hash.Write([]byte(options.ID))
+	hash.Write([]byte(ctx.Webhook.GetID()))
 	suffix := fmt.Sprintf("%x", hash.Sum(nil))
 	name := fmt.Sprintf("superplane-webhook-%x", suffix[:16])
+
+	webhookSecret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return nil, fmt.Errorf("error getting webhook secret: %v", err)
+	}
 
 	//
 	// Create Semaphore secret to store the event source key.
 	//
-	secret, err := upsertSecret(client, name, options.Secret)
+	secret, err := upsertSecret(client, name, webhookSecret)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Semaphore secret: %v", err)
 	}
@@ -162,7 +167,7 @@ func (s *Semaphore) SetupWebhook(ctx core.AppInstallationContext, options core.W
 	//
 	// Create a notification resource to receive events from Semaphore
 	//
-	notification, err := upsertNotification(client, name, options.URL, configuration.Project)
+	notification, err := upsertNotification(client, name, ctx.Webhook.GetURL(), configuration.Project)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Semaphore notification: %v", err)
 	}
@@ -173,14 +178,14 @@ func (s *Semaphore) SetupWebhook(ctx core.AppInstallationContext, options core.W
 	}, nil
 }
 
-func (s *Semaphore) CleanupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) error {
+func (s *Semaphore) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	metadata := WebhookMetadata{}
-	err := mapstructure.Decode(options.Metadata, &metadata)
+	err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata)
 	if err != nil {
 		return fmt.Errorf("error decoding webhook metadata: %v", err)
 	}
 
-	client, err := NewClient(ctx)
+	client, err := NewClient(ctx.AppInstallation)
 	if err != nil {
 		return err
 	}

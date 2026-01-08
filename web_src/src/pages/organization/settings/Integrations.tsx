@@ -162,7 +162,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       {/* Integration Type Selector */}
       {isIntegrationSelectorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-300 dark:border-gray-800 max-w-md w-full mx-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">Select Integration Type</h3>

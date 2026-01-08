@@ -46,6 +46,7 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
 		Edges:          datatypes.NewJSONSlice(edges),
+		Nodes:          datatypes.NewJSONSlice(expandedNodes),
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {

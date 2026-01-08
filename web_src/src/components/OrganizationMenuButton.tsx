@@ -154,7 +154,7 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
             </div>
           </div>
           <div className="px-4 pt-3 pb-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-600 bg-purple-200 inline px-1 py-0.5 rounded">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-white bg-sky-500 inline px-1 py-0.5 rounded">
               You
             </p>
             <div className="flex items-center gap-3 mt-2">

@@ -171,7 +171,7 @@ export function Roles({ organizationId }: RolesProps) {
                         <TableCell>
                           <div className="flex justify-end">
                             {isDefault ? (
-                              <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">
+                              <span className="text-xs text-gray-700 dark:text-gray-400 px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">
                                 Default Role
                               </span>
                             ) : (

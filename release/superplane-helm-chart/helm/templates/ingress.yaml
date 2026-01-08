@@ -1,0 +1,103 @@
+{{- if .Values.ingress.enabled }}
+{{- $domainName := .Values.domain.name | required ".Values.domain.name is required." -}}
+{{- $staticIpName := .Values.ingress.staticIpName -}}
+{{- $className := .Values.ingress.className | required ".Values.ingress.className is required." -}}
+{{- $ssl := .Values.ingress.ssl }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: superplane
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    {{- if eq $className "traefik" }}
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    {{- end }}
+    {{- if eq $className "gce" }}
+    kubernetes.io/ingress.class: gce
+    {{- if $ssl.enabled }}
+    networking.gke.io/v1beta1.FrontendConfig: "http-redirect-proxy"
+    {{- end }}
+    {{- end }}
+    {{- if $staticIpName }}
+    kubernetes.io/ingress.global-static-ip-name: {{ $staticIpName }}
+    {{- end }}
+    {{- if and $ssl.enabled (eq $ssl.type "google") }}
+    ingress.gcp.kubernetes.io/pre-shared-cert: {{ $ssl.google.certName | required "ingress.ssl.google.certName is required when ingress.ssl.type is 'google'." }}
+    {{- end }}
+    {{- if eq $className "alb" }}
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    external-dns.alpha.kubernetes.io/hostname:  "*.{{ $domainName }}"
+    external-dns.alpha.kubernetes.io/ttl:  "60"
+    alb.ingress.kubernetes.io/certificate-arn: {{ $ssl.alb.certName | required "ingress.ssl.alb.certName is required when ingress.className is 'alb'." }}
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    {{- end }}
+spec:
+{{- if ne $className "gce" }}
+  ingressClassName: {{ .Values.ingress.className }}
+{{- end }}
+{{- if and $ssl.enabled (or (eq $ssl.type "custom") (eq $ssl.type "cert-manager")) }}
+  tls:
+    - hosts:
+      - "{{ $domainName }}"
+      {{- if eq $ssl.type "custom" }}
+      secretName: {{ $ssl.custom.secretName | required "ingress.ssl.custom.secretName is required when ingress.ssl.type is 'custom'." }}
+      {{- else if eq $ssl.type "cert-manager" }}
+      secretName: {{ $ssl.certManager.secretName | required "ingress.ssl.certManager.secretName is required when ingress.ssl.type is 'cert-manager'." }}
+      {{- end }}
+{{- end }}
+  defaultBackend:
+    service:
+      name: {{ .Release.Name }}-api
+      port:
+        number: 8000
+  rules:
+  - host: "{{ $domainName }}"
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Release.Name }}-api
+            port:
+              number: 8000
+---
+{{- if and $ssl.enabled (eq $className "gce") }}
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: http-redirect-proxy
+  namespace: {{ .Release.Namespace }}
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: PERMANENT_REDIRECT
+{{- end }}
+{{- if and .Values.ingress.enabled (eq .Values.ingress.className "gce") }}
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: ingress-backend-config
+  namespace: {{ .Release.Namespace }}
+spec:
+  # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-features
+  timeoutSec: 3600
+  connectionDraining:
+    drainingTimeoutSec: 60
+  logging:
+    enable: true
+  sessionAffinity:
+    affinityType: "CLIENT_IP"
+    affinityCookieTtlSec: 3600
+  healthCheck:
+    checkIntervalSec: 30
+    timeoutSec: 10
+    port: 8000
+    type: HTTP
+    requestPath: /health
+{{- end }}
+{{- end }}

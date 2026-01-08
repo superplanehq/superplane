@@ -19,6 +19,8 @@ export function useWorkflowWebsocket(
   workflowId: string,
   organizationId: string,
   onNodeEvent?: (nodeId: string, event: string) => void,
+  onWorkflowEvent?: (event: WorkflowsWorkflowEvent, eventName: string) => void,
+  onExecutionEvent?: (execution: WorkflowsWorkflowNodeExecution, eventName: string) => void,
 ): void {
   const nodeExecutionStore = useNodeExecutionStore();
   const queryClient = useQueryClient();
@@ -33,10 +35,12 @@ export function useWorkflowWebsocket(
 
       switch (data.event) {
         case "event_created":
+        case "workflow_event_created":
           if (payload && "nodeId" in payload && payload.nodeId) {
             const workflowEvent = payload as WorkflowsWorkflowEvent;
             nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
             onNodeEvent?.(workflowEvent.nodeId!, data.event);
+            onWorkflowEvent?.(workflowEvent, data.event);
           }
           break;
         case "execution_created":
@@ -58,6 +62,7 @@ export function useWorkflowWebsocket(
                 });
               }
               onNodeEvent?.(execution.nodeId!, data.event);
+              onExecutionEvent?.(execution, data.event);
             }
           }
           break;
@@ -79,7 +84,7 @@ export function useWorkflowWebsocket(
           break;
       }
     },
-    [nodeExecutionStore, queryClient, workflowId, onNodeEvent],
+    [nodeExecutionStore, queryClient, workflowId, onNodeEvent, onWorkflowEvent, onExecutionEvent],
   );
 
   const processQueue = useCallback(

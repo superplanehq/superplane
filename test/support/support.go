@@ -34,6 +34,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
 	_ "github.com/superplanehq/superplane/pkg/triggers/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
+	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
 )
 
 type ResourceRegistry struct {
@@ -299,25 +300,6 @@ func CreateNextNodeExecution(
 func CreateWorkflow(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []models.WorkflowNode, edges []models.Edge) (*models.Workflow, []models.WorkflowNode) {
 	now := time.Now()
 
-	//
-	// Create workflow
-	//
-	workflow := &models.Workflow{
-		ID:             uuid.New(),
-		OrganizationID: orgID,
-		Name:           RandomName("workflow"),
-		Description:    "Test workflow",
-		Edges:          datatypes.NewJSONSlice(edges),
-		CreatedBy:      &userID,
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-	}
-
-	require.NoError(t, database.Conn().Create(workflow).Error)
-
-	//
-	// Expand blueprint nodes (convert WorkflowNode to Node, expand, then back to WorkflowNode)
-	//
 	inputNodes := make([]models.Node, len(nodes))
 	for i, node := range nodes {
 		inputNodes[i] = models.Node{
@@ -332,6 +314,26 @@ func CreateWorkflow(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []mod
 		}
 	}
 
+	//
+	// Create workflow
+	//
+	workflow := &models.Workflow{
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		Name:           RandomName("workflow"),
+		Description:    "Test workflow",
+		Nodes:          datatypes.NewJSONSlice(inputNodes),
+		Edges:          datatypes.NewJSONSlice(edges),
+		CreatedBy:      &userID,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	require.NoError(t, database.Conn().Create(workflow).Error)
+
+	//
+	// Expand blueprint nodes (convert WorkflowNode to Node, expand, then back to WorkflowNode)
+	//
 	expandedNodes, err := expandBlueprintNodes(t, orgID, inputNodes)
 	require.NoError(t, err)
 

@@ -142,7 +142,7 @@ export const SidebarActionsDropdown = ({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 w-53 bg-white outline-1 outline-slate-300 rounded-md shadow-md z-50">
+        <div className="absolute right-0 top-full mt-1 w-53 bg-white outline-1 outline-slate-950/15 rounded-md shadow-md z-50">
           <div className="py-2">
             {availableActions.length > 0 &&
               availableActions.map((action) => {

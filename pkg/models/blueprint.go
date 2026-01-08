@@ -140,6 +140,7 @@ type NodeRef struct {
 	Component *ComponentRef `json:"component,omitempty"`
 	Blueprint *BlueprintRef `json:"blueprint,omitempty"`
 	Trigger   *TriggerRef   `json:"trigger,omitempty"`
+	Widget    *WidgetRef    `json:"widget,omitempty"`
 }
 
 type ComponentRef struct {
@@ -147,6 +148,10 @@ type ComponentRef struct {
 }
 
 type TriggerRef struct {
+	Name string `json:"name"`
+}
+
+type WidgetRef struct {
 	Name string `json:"name"`
 }
 

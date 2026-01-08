@@ -85,6 +85,21 @@ CREATE TABLE public.accounts (
 
 
 --
+-- Name: app_installation_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.app_installation_requests (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    app_installation_id uuid NOT NULL,
+    state character varying(32) NOT NULL,
+    type character varying(32) NOT NULL,
+    run_at timestamp without time zone NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: app_installation_secrets; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -447,7 +462,8 @@ CREATE TABLE public.workflows (
     updated_at timestamp without time zone NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_by uuid,
-    deleted_at timestamp without time zone
+    deleted_at timestamp without time zone,
+    nodes jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -512,6 +528,14 @@ ALTER TABLE ONLY public.accounts
 
 ALTER TABLE ONLY public.accounts
     ADD CONSTRAINT accounts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: app_installation_requests app_installation_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_requests
+    ADD CONSTRAINT app_installation_requests_pkey PRIMARY KEY (id);
 
 
 --
@@ -757,6 +781,20 @@ CREATE INDEX idx_account_providers_account_id ON public.account_providers USING 
 --
 
 CREATE INDEX idx_account_providers_provider ON public.account_providers USING btree (provider);
+
+
+--
+-- Name: idx_app_installation_requests_installation_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_installation_requests_installation_id ON public.app_installation_requests USING btree (app_installation_id);
+
+
+--
+-- Name: idx_app_installation_requests_state_run_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_installation_requests_state_run_at ON public.app_installation_requests USING btree (state, run_at) WHERE ((state)::text = 'pending'::text);
 
 
 --
@@ -1025,6 +1063,14 @@ ALTER TABLE ONLY public.account_password_auth
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
+
+
+--
+-- Name: app_installation_requests app_installation_requests_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_requests
+    ADD CONSTRAINT app_installation_requests_app_installation_id_fkey FOREIGN KEY (app_installation_id) REFERENCES public.app_installations(id) ON DELETE CASCADE;
 
 
 --
@@ -1307,7 +1353,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251231112927	f
+20260106171814	f
 \.
 
 

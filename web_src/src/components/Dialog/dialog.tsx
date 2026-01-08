@@ -36,7 +36,7 @@ export function Dialog({
         className={clsx(
           className,
           sizes[size],
-          "relative w-full min-w-0 rounded-2xl bg-white p-8 shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10",
+          "relative w-full min-w-0 rounded-2xl bg-white p-8 shadow-lg dark:bg-gray-900",
           "overflow-y-auto max-h-[100vh]",
         )}
         {...props}

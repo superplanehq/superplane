@@ -15,6 +15,7 @@ import (
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
+	widgetpb "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -97,6 +98,42 @@ func numberTypeOptionsToProto(opts *configuration.NumberTypeOptions) *configpb.N
 		max := int32(*opts.Max)
 		pbOpts.Max = &max
 	}
+	return pbOpts
+}
+
+func stringTypeOptionsToProto(opts *configuration.StringTypeOptions) *configpb.StringTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.StringTypeOptions{}
+	if opts.MinLength != nil {
+		minLength := int32(*opts.MinLength)
+		pbOpts.MinLength = &minLength
+	}
+	if opts.MaxLength != nil {
+		maxLength := int32(*opts.MaxLength)
+		pbOpts.MaxLength = &maxLength
+	}
+
+	return pbOpts
+}
+
+func textTypeOptionsToProto(opts *configuration.TextTypeOptions) *configpb.TextTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.TextTypeOptions{}
+	if opts.MinLength != nil {
+		minLength := int32(*opts.MinLength)
+		pbOpts.MinLength = &minLength
+	}
+	if opts.MaxLength != nil {
+		maxLength := int32(*opts.MaxLength)
+		pbOpts.MaxLength = &maxLength
+	}
+
 	return pbOpts
 }
 
@@ -251,6 +288,8 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 
 	return &configpb.TypeOptions{
 		Number:           numberTypeOptionsToProto(opts.Number),
+		String_:          stringTypeOptionsToProto(opts.String),
+		Text:             textTypeOptionsToProto(opts.Text),
 		Select:           selectTypeOptionsToProto(opts.Select),
 		MultiSelect:      multiSelectTypeOptionsToProto(opts.MultiSelect),
 		Integration:      integrationTypeOptionsToProto(opts.Integration),
@@ -334,6 +373,42 @@ func protoToNumberTypeOptions(pbOpts *configpb.NumberTypeOptions) *configuration
 		max := int(*pbOpts.Max)
 		opts.Max = &max
 	}
+	return opts
+}
+
+func protoToStringTypeOptions(pbOpts *configpb.StringTypeOptions) *configuration.StringTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.StringTypeOptions{}
+	if pbOpts.MinLength != nil {
+		minLength := int(*pbOpts.MinLength)
+		opts.MinLength = &minLength
+	}
+	if pbOpts.MaxLength != nil {
+		maxLength := int(*pbOpts.MaxLength)
+		opts.MaxLength = &maxLength
+	}
+
+	return opts
+}
+
+func protoToTextTypeOptions(pbOpts *configpb.TextTypeOptions) *configuration.TextTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.TextTypeOptions{}
+	if pbOpts.MinLength != nil {
+		minLength := int(*pbOpts.MinLength)
+		opts.MinLength = &minLength
+	}
+	if pbOpts.MaxLength != nil {
+		maxLength := int(*pbOpts.MaxLength)
+		opts.MaxLength = &maxLength
+	}
+
 	return opts
 }
 
@@ -488,6 +563,8 @@ func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions
 
 	return &configuration.TypeOptions{
 		Number:           protoToNumberTypeOptions(pbOpts.Number),
+		String:           protoToStringTypeOptions(pbOpts.String_),
+		Text:             protoToTextTypeOptions(pbOpts.Text),
 		Select:           protoToSelectTypeOptions(pbOpts.Select),
 		MultiSelect:      protoToMultiSelectTypeOptions(pbOpts.MultiSelect),
 		Integration:      protoToIntegrationTypeOptions(pbOpts.Integration),
@@ -612,6 +689,12 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			}
 		}
 
+		if node.Ref.Widget != nil {
+			result[i].Widget = &componentpb.Node_WidgetRef{
+				Name: node.Ref.Widget.Name,
+			}
+		}
+
 		if node.Configuration != nil {
 			result[i].Configuration, _ = structpb.NewStruct(node.Configuration)
 		}
@@ -666,6 +749,8 @@ func ProtoToNodeType(nodeType componentpb.Node_Type) string {
 		return models.NodeTypeBlueprint
 	case componentpb.Node_TYPE_TRIGGER:
 		return models.NodeTypeTrigger
+	case componentpb.Node_TYPE_WIDGET:
+		return models.NodeTypeWidget
 	default:
 		return ""
 	}
@@ -677,6 +762,8 @@ func NodeTypeToProto(nodeType string) componentpb.Node_Type {
 		return componentpb.Node_TYPE_BLUEPRINT
 	case models.NodeTypeTrigger:
 		return componentpb.Node_TYPE_TRIGGER
+	case models.NodeTypeWidget:
+		return componentpb.Node_TYPE_WIDGET
 	default:
 		return componentpb.Node_TYPE_COMPONENT
 	}
@@ -702,6 +789,12 @@ func ProtoToNodeRef(node *componentpb.Node) models.NodeRef {
 		if node.Trigger != nil {
 			ref.Trigger = &models.TriggerRef{
 				Name: node.Trigger.Name,
+			}
+		}
+	case componentpb.Node_TYPE_WIDGET:
+		if node.Widget != nil {
+			ref.Widget = &models.WidgetRef{
+				Name: node.Widget.Name,
 			}
 		}
 	}
@@ -813,6 +906,8 @@ func defaultValueFromProto(fieldType, defaultValue string) any {
 	switch fieldType {
 	case configuration.FieldTypeString:
 		fallthrough
+	case configuration.FieldTypeText:
+		fallthrough
 	case configuration.FieldTypeGitRef:
 		fallthrough
 	case configuration.FieldTypeSelect:
@@ -918,6 +1013,27 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 			Description:   trigger.Description(),
 			Icon:          trigger.Icon(),
 			Color:         trigger.Color(),
+			Configuration: configuration,
+		}
+	}
+	return out
+}
+
+func SerializeWidgets(in []core.Widget) []*widgetpb.Widget {
+	out := make([]*widgetpb.Widget, len(in))
+	for i, widget := range in {
+		configFields := widget.Configuration()
+		configuration := make([]*configpb.Field, len(configFields))
+		for j, field := range configFields {
+			configuration[j] = ConfigurationFieldToProto(field)
+		}
+
+		out[i] = &widgetpb.Widget{
+			Name:          widget.Name(),
+			Label:         widget.Label(),
+			Description:   widget.Description(),
+			Icon:          widget.Icon(),
+			Color:         widget.Color(),
 			Configuration: configuration,
 		}
 	}

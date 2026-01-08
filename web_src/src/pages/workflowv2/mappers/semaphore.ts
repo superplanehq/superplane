@@ -62,6 +62,17 @@ export const SEMAPHORE_STATE_MAP: EventStateMap = {
 export const semaphoreStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
   if (!execution) return "neutral";
 
+  if (
+    execution.resultMessage &&
+    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED")
+  ) {
+    return "error";
+  }
+
+  if (execution.result === "RESULT_CANCELLED") {
+    return "cancelled";
+  }
+
   // Check if workflow is still running
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
     return "running";

@@ -71,8 +71,17 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 }
 
 func (s *CanvasSteps) Save() {
-	s.session.Click(q.TestID("save-canvas-button"))
-	s.session.AssertText("Canvas changes saved")
+	saveButton := q.TestID("save-canvas-button")
+	loc := saveButton.Run(s.session)
+
+	if isVisible, _ := loc.IsVisible(); isVisible {
+		s.session.Click(saveButton)
+		s.session.AssertText("Canvas changes saved")
+		s.session.Sleep(500)
+		return
+	}
+
+	// Auto-save may have already persisted the changes.
 	s.session.Sleep(500)
 }
 
@@ -87,9 +96,8 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
-	s.session.Click(q.Locator(`button:has-text("Add Item")`))
-	s.session.Click(q.Locator(`button:has-text("Select Type")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("User")`))
+	s.session.Click(q.TestID("field-type-select"))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Specific user")`))
 
 	s.session.Click(q.Locator(`button:has-text("Select user")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))

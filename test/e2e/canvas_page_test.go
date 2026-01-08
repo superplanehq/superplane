@@ -3,6 +3,7 @@ package e2e
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -49,8 +50,6 @@ func TestCanvasPage(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExistsWithANoopNode()
 		steps.deleteNodeFromCanvas("DeleteMe")
-		steps.assertUnsavedChangesNoteIsVisible()
-		steps.saveCanvas()
 		steps.assertNodeDeletedInDB("DeleteMe")
 	})
 
@@ -92,7 +91,6 @@ func TestCanvasPage(t *testing.T) {
 		steps.givenACanvasExists()
 		steps.addTwoNodesAndConnect()
 		steps.deleteConnectionBetweenNodes("First", "Second")
-		steps.saveCanvas()
 		steps.assertNodesAreNotConnectedInDB("First", "Second")
 	})
 }
@@ -193,16 +191,32 @@ func (s *CanvasPageSteps) deleteNodeFromCanvas(nodeName string) {
 }
 
 func (s *CanvasPageSteps) assertNodeDeletedInDB(nodeName string) {
-	wf, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
-	require.NoError(s.t, err)
+	deadline := time.Now().Add(2 * time.Second)
 
-	nodes, err := models.FindWorkflowNodes(wf.ID)
-	require.NoError(s.t, err)
+	for {
+		wf, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
+		require.NoError(s.t, err)
 
-	for _, n := range nodes {
-		if n.Name == nodeName {
+		nodes, err := models.FindWorkflowNodes(wf.ID)
+		require.NoError(s.t, err)
+
+		exists := false
+		for _, n := range nodes {
+			if n.Name == nodeName {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			return
+		}
+
+		if time.Now().After(deadline) {
 			s.t.Fatalf("expected node %q to be deleted, but it still exists in DB", nodeName)
 		}
+
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 
@@ -337,13 +351,29 @@ func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
 }
 
 func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName string) {
-	workflows := s.canvas.GetWorkflowFromDB()
-	sourceNode := s.canvas.GetNodeFromDB(sourceName)
-	targetNode := s.canvas.GetNodeFromDB(targetName)
+	deadline := time.Now().Add(2 * time.Second)
 
-	for _, conn := range workflows.Edges {
-		if conn.SourceID == sourceNode.NodeID && conn.TargetID == targetNode.NodeID {
+	for {
+		workflows := s.canvas.GetWorkflowFromDB()
+		sourceNode := s.canvas.GetNodeFromDB(sourceName)
+		targetNode := s.canvas.GetNodeFromDB(targetName)
+
+		connected := false
+		for _, conn := range workflows.Edges {
+			if conn.SourceID == sourceNode.NodeID && conn.TargetID == targetNode.NodeID {
+				connected = true
+				break
+			}
+		}
+
+		if !connected {
+			return
+		}
+
+		if time.Now().After(deadline) {
 			s.t.Fatalf("expected nodes %q and %q to not be connected, but connection exists in DB", sourceName, targetName)
 		}
+
+		time.Sleep(200 * time.Millisecond)
 	}
 }

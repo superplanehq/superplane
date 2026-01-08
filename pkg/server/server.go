@@ -20,6 +20,7 @@ import (
 
 	// Import integrations, components and triggers to register them via init()
 	_ "github.com/superplanehq/superplane/pkg/applications/github"
+	_ "github.com/superplanehq/superplane/pkg/applications/pagerduty"
 	_ "github.com/superplanehq/superplane/pkg/applications/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
@@ -35,6 +36,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
+	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
 )
 
 func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, authService authorization.Authorization) {
@@ -82,6 +84,14 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_APP_INSTALLATION_REQUEST_WORKER") == "yes" {
+		log.Println("Starting App Installation Request Worker")
+
+		webhooksBaseURL := getWebhookBaseURL(baseURL)
+		w := workers.NewAppInstallationRequestWorker(encryptor, registry, baseURL, webhooksBaseURL)
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Workflow Node Queue Worker")
 
@@ -100,7 +110,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	if os.Getenv("START_WEBHOOK_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Webhook Cleanup Worker")
 
-		w := workers.NewWebhookCleanupWorker(encryptor, registry)
+		w := workers.NewWebhookCleanupWorker(encryptor, registry, baseURL)
 		go w.Start(context.Background())
 	}
 

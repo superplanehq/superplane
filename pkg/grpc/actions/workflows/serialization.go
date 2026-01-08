@@ -18,43 +18,6 @@ import (
 )
 
 func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workflow, error) {
-	workflowNodes, err := models.FindWorkflowNodes(workflow.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Only expose top-level nodes (no parents) to the UI
-	nodes := make([]models.Node, 0, len(workflowNodes))
-	for _, wn := range workflowNodes {
-		if wn.ParentNodeID != nil {
-			continue
-		}
-
-		var appInstallationID *string
-		if wn.AppInstallationID != nil {
-			idStr := wn.AppInstallationID.String()
-			appInstallationID = &idStr
-		}
-
-		var errorMessage *string
-		if wn.State == models.WorkflowNodeStateError && wn.StateReason != nil {
-			errorMessage = wn.StateReason
-		}
-
-		nodes = append(nodes, models.Node{
-			ID:                wn.NodeID,
-			Name:              wn.Name,
-			Type:              wn.Type,
-			Ref:               wn.Ref.Data(),
-			Configuration:     wn.Configuration.Data(),
-			Metadata:          wn.Metadata.Data(),
-			Position:          wn.Position.Data(),
-			IsCollapsed:       wn.IsCollapsed,
-			AppInstallationID: appInstallationID,
-			ErrorMessage:      errorMessage,
-		})
-	}
-
 	var createdBy *pb.UserRef
 	if workflow.CreatedBy != nil {
 		idStr := workflow.CreatedBy.String()
@@ -77,7 +40,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 				CreatedBy:      createdBy,
 			},
 			Spec: &pb.Workflow_Spec{
-				Nodes: actions.NodesToProto(nodes),
+				Nodes: actions.NodesToProto(workflow.Nodes),
 				Edges: actions.EdgesToProto(workflow.Edges),
 			},
 			Status: nil,
@@ -138,7 +101,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 			CreatedBy:      createdBy,
 		},
 		Spec: &pb.Workflow_Spec{
-			Nodes: actions.NodesToProto(nodes),
+			Nodes: actions.NodesToProto(workflow.Nodes),
 			Edges: actions.EdgesToProto(workflow.Edges),
 		},
 		Status: &pb.Workflow_Status{
@@ -190,6 +153,11 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 		}
 	}
 
+	nodeTypes := make(map[string]compb.Node_Type)
+	for _, node := range workflow.Spec.Nodes {
+		nodeTypes[node.Id] = node.Type
+	}
+
 	for i, edge := range workflow.Spec.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
@@ -201,6 +169,14 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 
 		if !nodeIDs[edge.TargetId] {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
+		}
+
+		if nodeTypes[edge.SourceId] == compb.Node_TYPE_WIDGET {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
+		}
+
+		if nodeTypes[edge.TargetId] == compb.Node_TYPE_WIDGET {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
 		}
 	}
 
@@ -271,6 +247,22 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 
 		return configuration.ValidateConfiguration(trigger.Configuration(), node.Configuration.AsMap())
 
+	case compb.Node_TYPE_WIDGET:
+		if node.Widget == nil {
+			return fmt.Errorf("widget reference is required for widget ref type")
+		}
+
+		if node.Widget.Name == "" {
+			return fmt.Errorf("widget name is required")
+		}
+
+		widget, err := findAndValidateWidget(registry, organizationID, node)
+		if err != nil {
+			return err
+		}
+
+		return configuration.ValidateConfiguration(widget.Configuration(), node.Configuration.AsMap())
+
 	default:
 		return fmt.Errorf("invalid node type: %s", node.Type)
 	}
@@ -292,6 +284,14 @@ func findAndValidateTrigger(registry *registry.Registry, organizationID string, 
 	}
 
 	return registry.GetApplicationTrigger(parts[0], node.Trigger.Name)
+}
+
+func findAndValidateWidget(registry *registry.Registry, organizationID string, node *compb.Node) (core.Widget, error) {
+	if node.Widget != nil && node.Widget.Name == "" {
+		return nil, fmt.Errorf("widget name is required")
+	}
+
+	return registry.GetWidget(node.Widget.Name)
 }
 
 func findAndValidateComponent(registry *registry.Registry, organizationID string, node *compb.Node) (core.Component, error) {

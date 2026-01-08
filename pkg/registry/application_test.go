@@ -10,7 +10,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 // panickingApplication is an application that panics in all panicable methods
@@ -30,10 +29,10 @@ func (p *panickingApplication) HandleRequest(ctx core.HTTPRequestContext) {
 func (p *panickingApplication) CompareWebhookConfig(a, b any) (bool, error) {
 	panic("compare webhook config panic")
 }
-func (p *panickingApplication) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (any, error) {
+func (p *panickingApplication) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	panic("setup webhook panic")
 }
-func (p *panickingApplication) CleanupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) error {
+func (p *panickingApplication) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	panic("cleanup webhook panic")
 }
 
@@ -78,11 +77,8 @@ func TestPanicableApplication_CompareWebhookConfig_CatchesPanic(t *testing.T) {
 func TestPanicableApplication_SetupWebhook_CatchesPanic(t *testing.T) {
 	app := &panickingApplication{}
 	panicable := NewPanicableApplication(app)
-	ctx := &contexts.AppInstallationContext{}
-	options := core.WebhookOptions{}
 
-	metadata, err := panicable.SetupWebhook(ctx, options)
-
+	metadata, err := panicable.SetupWebhook(core.SetupWebhookContext{})
 	require.Error(t, err)
 	assert.Nil(t, metadata)
 	assert.Contains(t, err.Error(), "panicking-app panicked in SetupWebhook()")
@@ -92,11 +88,8 @@ func TestPanicableApplication_SetupWebhook_CatchesPanic(t *testing.T) {
 func TestPanicableApplication_CleanupWebhook_CatchesPanic(t *testing.T) {
 	app := &panickingApplication{}
 	panicable := NewPanicableApplication(app)
-	ctx := &contexts.AppInstallationContext{}
-	options := core.WebhookOptions{}
 
-	err := panicable.CleanupWebhook(ctx, options)
-
+	err := panicable.CleanupWebhook(core.CleanupWebhookContext{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "panicking-app panicked in CleanupWebhook()")
 	assert.Contains(t, err.Error(), "cleanup webhook panic")

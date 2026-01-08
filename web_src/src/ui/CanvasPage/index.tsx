@@ -8,7 +8,7 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { Loader2, ScanLine, ScanText } from "lucide-react";
+import { CircleX, List, Loader2, ScanLine, ScanText, TriangleAlert } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 import { SidebarEvent } from "../componentSidebar/types";
+import { CanvasLogSidebar, type LogEntry, type LogScopeFilter, type LogTypeFilter } from "../CanvasLogSidebar";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -62,6 +63,17 @@ export interface CanvasNode extends ReactFlowNode {
 export interface CanvasEdge extends ReactFlowEdge {
   sourceHandle?: string | null;
   targetHandle?: string | null;
+}
+
+interface FocusRequest {
+  nodeId: string;
+  requestId: number;
+  tab?: "latest" | "settings" | "execution-chain";
+  executionChain?: {
+    eventId: string;
+    executionId?: string | null;
+    triggerEvent?: SidebarEvent | null;
+  };
 }
 
 export interface AiProps {
@@ -213,6 +225,10 @@ export interface CanvasPageProps {
   components?: ComponentsComponent[];
   triggers?: TriggersTrigger[];
   blueprints?: BlueprintsBlueprint[];
+
+  logEntries?: LogEntry[];
+  focusRequest?: FocusRequest | null;
+  onExecutionChainHandled?: () => void;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -310,6 +326,14 @@ function CanvasPage(props: CanvasPageProps) {
     nodeName: string;
     channels: string[];
   } | null>(null);
+
+  useEffect(() => {
+    if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
+      return;
+    }
+
+    setCurrentTab(props.focusRequest.tab);
+  }, [props.focusRequest?.requestId, props.focusRequest?.tab]);
 
   const handleNodeEdit = useCallback(
     (nodeId: string) => {
@@ -492,6 +516,27 @@ function CanvasPage(props: CanvasPageProps) {
     [templateNodeId, state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen],
   );
 
+  const handleAddNote = useCallback(async () => {
+    if (!props.onNodeAdd) return;
+
+    const annotationBlock: BuildingBlock = {
+      name: "annotation",
+      label: "Annotation",
+      type: "component",
+      isLive: true,
+    };
+
+    const newNodeId = await props.onNodeAdd({
+      buildingBlock: annotationBlock,
+      nodeName: "New Note",
+      configuration: {},
+      position: { x: 200, y: 200 },
+    });
+
+    state.componentSidebar.open(newNodeId);
+    setCurrentTab("settings");
+  }, [props, state, setCurrentTab]);
+
   const handleBuildingBlockDrop = useCallback(
     async (block: BuildingBlock, position?: { x: number; y: number }) => {
       // Parse default configuration from building block
@@ -624,6 +669,7 @@ function CanvasPage(props: CanvasPageProps) {
           canvasZoom={canvasZoom}
           disabled={false}
           onBlockClick={handleBuildingBlockClick}
+          onAddNote={handleAddNote}
         />
 
         <div className="flex-1 relative">
@@ -661,6 +707,9 @@ function CanvasPage(props: CanvasPageProps) {
               saveButtonHidden={props.saveButtonHidden}
               isAutoSaveEnabled={props.isAutoSaveEnabled}
               onToggleAutoSave={props.onToggleAutoSave}
+              logEntries={props.logEntries}
+              focusRequest={props.focusRequest}
+              onExecutionChainHandled={props.onExecutionChainHandled}
             />
           </ReactFlowProvider>
 
@@ -715,6 +764,8 @@ function CanvasPage(props: CanvasPageProps) {
             triggers={props.triggers}
             blueprints={props.blueprints}
             onHighlightedNodesChange={setHighlightedNodeIds}
+            focusRequest={props.focusRequest}
+            onExecutionChainHandled={props.onExecutionChainHandled}
           />
         </div>
       </div>
@@ -781,6 +832,8 @@ function Sidebar({
   triggers,
   blueprints,
   onHighlightedNodesChange,
+  focusRequest,
+  onExecutionChainHandled,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -827,6 +880,8 @@ function Sidebar({
   triggers?: TriggersTrigger[];
   blueprints?: BlueprintsBlueprint[];
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
+  focusRequest?: FocusRequest | null;
+  onExecutionChainHandled?: () => void;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -834,6 +889,14 @@ function Sidebar({
     }
     return getSidebarData(state.componentSidebar.selectedNodeId);
   }, [state.componentSidebar.selectedNodeId, getSidebarData]);
+
+  const isAnnotationNode = useMemo(() => {
+    if (!state.componentSidebar.selectedNodeId || !workflowNodes) {
+      return false;
+    }
+    const selectedNode = workflowNodes.find((node) => node.id === state.componentSidebar.selectedNodeId);
+    return selectedNode?.type === "TYPE_WIDGET" && selectedNode?.widget?.name === "annotation";
+  }, [state.componentSidebar.selectedNodeId, workflowNodes]);
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
@@ -858,8 +921,8 @@ function Sidebar({
     return null;
   }
 
-  // Show loading state when data is being fetched
-  if (sidebarData.isLoading && currentTab === "latest") {
+  // Show loading state when data is being fetched (skip for annotation nodes)
+  if (sidebarData.isLoading && currentTab === "latest" && !isAnnotationNode) {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
     const sidebarWidth = saved ? parseInt(saved, 10) : 450;
 
@@ -887,9 +950,9 @@ function Sidebar({
       nextInQueueEvents={nextInQueueEvents}
       nodeId={state.componentSidebar.selectedNodeId || undefined}
       iconSrc={sidebarData.iconSrc}
-      iconSlug={sidebarData.iconSlug}
-      iconColor={sidebarData.iconColor}
-      iconBackground={sidebarData.iconBackground}
+      iconSlug={isAnnotationNode ? "sticky-note" : sidebarData.iconSlug}
+      iconColor={isAnnotationNode ? "text-yellow-600" : sidebarData.iconColor}
+      iconBackground={isAnnotationNode ? "bg-yellow-100" : sidebarData.iconBackground}
       totalInQueueCount={sidebarData.totalInQueueCount}
       totalInHistoryCount={sidebarData.totalInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
@@ -943,13 +1006,20 @@ function Sidebar({
       appName={editingNodeData?.appName}
       appInstallationRef={editingNodeData?.appInstallationRef}
       installedApplications={installedApplications}
-      currentTab={currentTab}
+      currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}
       components={components}
       triggers={triggers}
       blueprints={blueprints}
       onHighlightedNodesChange={onHighlightedNodesChange}
+      executionChainEventId={focusRequest?.executionChain?.eventId || null}
+      executionChainExecutionId={focusRequest?.executionChain?.executionId || null}
+      executionChainTriggerEvent={focusRequest?.executionChain?.triggerEvent || null}
+      executionChainRequestId={focusRequest?.requestId}
+      onExecutionChainHandled={onExecutionChainHandled}
+      hideRunsTab={isAnnotationNode}
+      hideNodeId={isAnnotationNode}
     />
   );
 }
@@ -1044,6 +1114,8 @@ function CanvasContent({
   saveButtonHidden,
   isAutoSaveEnabled,
   onToggleAutoSave,
+  logEntries = [],
+  focusRequest,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1083,6 +1155,9 @@ function CanvasContent({
   saveButtonHidden?: boolean;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
+  logEntries?: LogEntry[];
+  focusRequest?: FocusRequest | null;
+  onExecutionChainHandled?: () => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1102,6 +1177,12 @@ function CanvasContent({
 
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
+  const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(false);
+  const [logFilter, setLogFilter] = useState<LogTypeFilter>("all");
+  const [logScope, setLogScope] = useState<LogScopeFilter>("all");
+  const [logSearch, setLogSearch] = useState("");
+  const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
+  const [logSidebarHeight, setLogSidebarHeight] = useState(320);
 
   const handleNodeExpand = useCallback((nodeId: string) => {
     const node = stateRef.current.nodes?.find((n) => n.id === nodeId);
@@ -1276,6 +1357,25 @@ function CanvasContent({
     state.toggleCollapse();
     onToggleCollapse?.();
   }, [state.toggleCollapse, onToggleCollapse]);
+
+  useEffect(() => {
+    if (!focusRequest) {
+      return;
+    }
+
+    const targetNode = stateRef.current.nodes?.find((node) => node.id === focusRequest.nodeId);
+    if (!targetNode) {
+      return;
+    }
+
+    stateRef.current.setNodes((nodes) =>
+      nodes.map((node) => ({
+        ...node,
+        selected: node.id === focusRequest.nodeId,
+      })),
+    );
+    fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
+  }, [focusRequest, fitView]);
 
   // Add keyboard shortcut for toggling collapse/expand
   useEffect(() => {
@@ -1490,8 +1590,90 @@ function CanvasContent({
     [state.edges, hoveredEdgeId, state.onEdgesChange],
   );
 
+  const logCounts = useMemo(() => {
+    return logEntries.reduce(
+      (acc, entry) => {
+        acc.total += 1;
+        if (entry.type === "error") acc.error += 1;
+        if (entry.type === "warning") acc.warning += 1;
+        if (entry.type === "success") acc.success += 1;
+        if (entry.runItems?.length) {
+          acc.total += entry.runItems.length;
+          entry.runItems.forEach((item) => {
+            if (item.type === "error") acc.error += 1;
+            if (item.type === "warning") acc.warning += 1;
+            if (item.type === "success") acc.success += 1;
+          });
+        }
+        return acc;
+      },
+      { total: 0, error: 0, warning: 0, success: 0 },
+    );
+  }, [logEntries]);
+
+  const filteredLogEntries = useMemo(() => {
+    const query = logSearch.trim().toLowerCase();
+    const matchesSearch = (value?: string) => !query || (value || "").toLowerCase().includes(query);
+
+    return logEntries.reduce<LogEntry[]>((acc, entry) => {
+      if (logScope !== "all" && entry.source !== logScope) {
+        return acc;
+      }
+
+      if (entry.type === "run") {
+        const runItems = entry.runItems || [];
+        const filteredRunItems = runItems.filter((item) => {
+          const typeMatch = logFilter === "all" || item.type === logFilter;
+          const searchMatch =
+            matchesSearch(item.searchText) || matchesSearch(typeof item.title === "string" ? item.title : "");
+          return typeMatch && searchMatch;
+        });
+
+        const entrySearchMatch =
+          matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : "");
+        const typeMatch = logFilter === "all" ? true : filteredRunItems.length > 0;
+        const searchMatch = query ? entrySearchMatch || filteredRunItems.length > 0 : true;
+
+        if (typeMatch && searchMatch) {
+          acc.push({ ...entry, runItems: filteredRunItems });
+        }
+        return acc;
+      }
+
+      if (logFilter !== "all" && entry.type !== logFilter) {
+        return acc;
+      }
+
+      const entrySearchMatch =
+        matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : "");
+      if (!entrySearchMatch) {
+        return acc;
+      }
+
+      acc.push(entry);
+      return acc;
+    }, []);
+  }, [logEntries, logFilter, logScope, logSearch]);
+
+  const handleLogButtonClick = useCallback((filter: LogTypeFilter) => {
+    setLogFilter(filter);
+    setIsLogSidebarOpen(true);
+  }, []);
+
+  const handleRunToggle = useCallback((runId: string) => {
+    setExpandedRuns((prev) => {
+      const next = new Set(prev);
+      if (next.has(runId)) {
+        next.delete(runId);
+      } else {
+        next.add(runId);
+      }
+      return next;
+    });
+  }, []);
+
   return (
-    <>
+    <div className="h-full w-full relative">
       {/* Header */}
       {!hideHeader && (
         <Header
@@ -1542,6 +1724,7 @@ function CanvasContent({
             defaultViewport={viewport}
             fitView={false}
             style={{ opacity: isInitialized ? 1 : 0 }}
+            className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
             <ZoomSlider position="bottom-left" orientation="horizontal">
@@ -1571,11 +1754,70 @@ function CanvasContent({
                   state.componentSidebar.open(node.id);
                 }}
               />
+              <div className="flex items-center gap-0 border-l border-slate-200 pl-1 ml-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs font-medium"
+                      onClick={() => handleLogButtonClick("all")}
+                    >
+                      <List className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>All logs</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs font-medium"
+                      onClick={() => handleLogButtonClick("error")}
+                    >
+                      <CircleX className="h-3 w-3 text-rose-500" />
+                      <span className="tabular-nums">{logCounts.error}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Errors</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs font-medium"
+                      onClick={() => handleLogButtonClick("warning")}
+                    >
+                      <TriangleAlert className="h-3 w-3 text-amber-500" />
+                      <span className="tabular-nums">{logCounts.warning}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Warnings</TooltipContent>
+                </Tooltip>
+              </div>
             </ZoomSlider>
           </ReactFlow>
         </div>
       </div>
-    </>
+      <CanvasLogSidebar
+        isOpen={isLogSidebarOpen}
+        onClose={() => setIsLogSidebarOpen(false)}
+        filter={logFilter}
+        onFilterChange={setLogFilter}
+        height={logSidebarHeight}
+        onHeightChange={setLogSidebarHeight}
+        scope={logScope}
+        onScopeChange={setLogScope}
+        searchValue={logSearch}
+        onSearchChange={setLogSearch}
+        entries={filteredLogEntries}
+        counts={logCounts}
+        expandedRuns={expandedRuns}
+        onToggleRun={handleRunToggle}
+      />
+    </div>
   );
 }
 
