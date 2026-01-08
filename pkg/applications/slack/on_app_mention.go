@@ -45,7 +45,7 @@ func (t *OnAppMention) Configuration() []configuration.Field {
 }
 
 func (t *OnAppMention) Setup(ctx core.TriggerContext) error {
-	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+	return ctx.AppInstallationContext.Subscribe(SubscriptionConfiguration{
 		EventTypes: []string{"app_mention"},
 	})
 }
@@ -60,4 +60,8 @@ func (t *OnAppMention) HandleAction(ctx core.TriggerActionContext) (map[string]a
 
 func (t *OnAppMention) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
+}
+
+func (t *OnAppMention) OnAppMessage(ctx core.AppMessageContext) error {
+	return ctx.Events.Emit("slack.app.mention", ctx.Message)
 }

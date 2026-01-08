@@ -101,6 +101,7 @@ func TruncateTables() error {
 			app_installations,
 			app_installation_secrets,
 			app_installation_requests,
+			app_installation_subscriptions,
 			casbin_rule,
 			role_metadata,
 			group_metadata,

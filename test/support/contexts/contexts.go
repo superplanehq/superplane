@@ -73,6 +73,7 @@ type AppInstallationContext struct {
 	Secrets          map[string]core.InstallationSecret
 	WebhookRequests  []any
 	ResyncRequests   []time.Duration
+	Subscriptions    []any
 }
 
 func (c *AppInstallationContext) ID() uuid.UUID {
@@ -128,6 +129,15 @@ func (c *AppInstallationContext) RequestWebhook(configuration any) error {
 
 func (c *AppInstallationContext) ScheduleResync(interval time.Duration) error {
 	c.ResyncRequests = append(c.ResyncRequests, interval)
+	return nil
+}
+
+func (c *AppInstallationContext) ListSubscriptions() ([]core.AppSubscriptionContext, error) {
+	return nil, nil
+}
+
+func (c *AppInstallationContext) Subscribe(subscription any) error {
+	c.Subscriptions = append(c.Subscriptions, subscription)
 	return nil
 }
 

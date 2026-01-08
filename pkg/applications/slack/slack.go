@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -197,9 +198,11 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 			"interactivity": map[string]any{
 				"is_enabled":  true,
 				"request_url": fmt.Sprintf("%s/api/v1/apps/%s/interactions", appURL, ctx.InstallationID),
+				// Options Load URL?
 			},
-			"org_deploy_enabled":  false,
-			"socket_mode_enabled": false,
+			"org_deploy_enabled":     false,
+			"socket_mode_enabled":    false,
+			"token_rotation_enabled": true,
 		},
 	}
 
@@ -210,6 +213,7 @@ func (s *Slack) HandleRequest(ctx core.HTTPRequestContext) {
 	body, err := s.readAndVerify(ctx)
 	if err != nil {
 		ctx.Logger.Errorf("error verifying slack request: %v", err)
+		ctx.Response.WriteHeader(400)
 		return
 	}
 
@@ -219,16 +223,80 @@ func (s *Slack) HandleRequest(ctx core.HTTPRequestContext) {
 	}
 
 	if strings.HasSuffix(ctx.Request.URL.Path, "/interactions") {
-		s.handleInteraction(ctx, body)
+		s.handleInteractivity(ctx, body)
 		return
 	}
 
 	ctx.Logger.Warnf("unknown path: %s", ctx.Request.URL.Path)
 	ctx.Response.WriteHeader(http.StatusNotFound)
+}
 
-	// TODO: verify request actually comes from Slack
-	// TODO: based on the event type (app_mention, reaction_added, reaction_removed, message, ...),
-	//       find app appropriate nodes that listen to it, and forward the event to them.
+func (s *Slack) handleEvent(ctx core.HTTPRequestContext, body []byte) {
+	subscriptions, err := ctx.AppInstallation.ListSubscriptions()
+	if err != nil {
+		ctx.Logger.Errorf("error listing subscriptions: %v", err)
+		ctx.Response.WriteHeader(500)
+		return
+	}
+
+	eventType, event, err := s.parseEvent(body)
+	if err != nil {
+		ctx.Logger.Errorf("error finding event type: %v", err)
+		ctx.Response.WriteHeader(400)
+		return
+	}
+
+	for _, subscription := range subscriptions {
+		if !s.subscriptionApplies(ctx, subscription, eventType) {
+			continue
+		}
+
+		err = subscription.SendMessage(event)
+		if err != nil {
+			ctx.Logger.Errorf("error sending message to app: %v", err)
+		}
+	}
+}
+
+func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
+	// TODO
+}
+
+func (s *Slack) parseEvent(body []byte) (string, any, error) {
+	var event map[string]any
+	err := json.Unmarshal(body, &event)
+	if err != nil {
+		return "", nil, fmt.Errorf("error unmarshaling event: %v", err)
+	}
+
+	t, ok := event["type"]
+	if !ok {
+		return "", nil, errors.New("type not present")
+	}
+
+	eventType, ok := t.(string)
+	if ok {
+		return "", nil, fmt.Errorf("type is of type %T: %v", t, t)
+	}
+
+	return eventType, event, nil
+}
+
+type SubscriptionConfiguration struct {
+	EventTypes []string `json:"eventTypes"`
+}
+
+func (s *Slack) subscriptionApplies(ctx core.HTTPRequestContext, subscription core.AppSubscriptionContext, eventType string) bool {
+	c := SubscriptionConfiguration{}
+	err := mapstructure.Decode(subscription.Configuration(), &c)
+	if err != nil {
+		ctx.Logger.Errorf("error decoding subscription configuration: %v", err)
+		return false
+	}
+
+	return slices.ContainsFunc(c.EventTypes, func(t string) bool {
+		return t == eventType
+	})
 }
 
 func (s *Slack) readAndVerify(ctx core.HTTPRequestContext) ([]byte, error) {
@@ -287,39 +355,20 @@ func (s *Slack) readAndVerify(ctx core.HTTPRequestContext) ([]byte, error) {
 	return body, nil
 }
 
-func (s *Slack) handleEvent(ctx core.HTTPRequestContext, body []byte) {
-
-}
-
-func (s *Slack) handleInteraction(ctx core.HTTPRequestContext, body []byte) {
-
-}
-
-type WebhookConfiguration struct {
-	EventTypes []string `json:"eventTypes"`
-}
+/*
+ * All the events we receive from Slack are on the app's HandleWebhook(),
+ * so all the Slack components and triggers use app subscriptions,
+ * and not webhooks.
+ */
 
 func (s *Slack) CompareWebhookConfig(a, b any) (bool, error) {
-	configA := WebhookConfiguration{}
-	configB := WebhookConfiguration{}
-
-	err := mapstructure.Decode(a, &configA)
-	if err != nil {
-		return false, err
-	}
-
-	err = mapstructure.Decode(b, &configB)
-	if err != nil {
-		return false, err
-	}
-
-	return slices.Equal(configA.EventTypes, configB.EventTypes), nil
+	return false, nil
 }
 
-func (s *Slack) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (any, error) {
+func (s *Slack) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	return nil, nil
 }
 
-func (s *Slack) CleanupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) error {
+func (s *Slack) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	return nil
 }

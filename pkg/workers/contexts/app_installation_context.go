@@ -284,3 +284,29 @@ func (c *AppInstallationContext) NewBrowserAction(action core.BrowserAction) {
 func (c *AppInstallationContext) RemoveBrowserAction() {
 	c.appInstallation.BrowserAction = nil
 }
+
+func (c *AppInstallationContext) Subscribe(configuration any) error {
+	_, err := models.CreateAppSubscriptionInTransaction(c.tx, c.node, c.appInstallation, configuration)
+	return err
+}
+
+func (c *AppInstallationContext) ListSubscriptions() ([]core.AppSubscriptionContext, error) {
+	subscriptions, err := models.ListAppSubscriptions(c.tx, c.appInstallation.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	contexts := make([]core.AppSubscriptionContext, len(subscriptions))
+	for _, subscription := range subscriptions {
+		contexts = append(contexts, NewAppSubscriptionContext(
+			c.tx,
+			c.registry,
+			&subscription,
+			c.node,
+			c.appInstallation,
+			c,
+		))
+	}
+
+	return contexts, nil
+}
