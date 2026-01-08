@@ -170,9 +170,17 @@ export function buildRunItemFromExecution(options: {
   execution: WorkflowsWorkflowNodeExecution;
   nodes: ComponentsNode[];
   onNodeSelect: (nodeId: string) => void;
+  onExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
+  event?: WorkflowsWorkflowEvent;
   timestampOverride?: string;
 }): LogRunItem {
   const { execution, nodes, onNodeSelect, timestampOverride } = options;
+  const { onExecutionSelect, event } = options;
   const componentNode = nodes.find((node) => node.id === execution.nodeId);
   const componentName = componentNode?.component?.name || "";
   const stateResolver = getState(componentName);
@@ -184,6 +192,9 @@ export function buildRunItemFromExecution(options: {
     ? getComponentBaseMapper(primaryComponentName).subtitle?.(componentNode, execution)
     : undefined;
   const detail = execution.resultMessage || componentSubtitle;
+  const triggerNode = event ? nodes.find((node) => node.id === event.nodeId) : undefined;
+  const triggerEvent = event && triggerNode ? mapTriggerEventToSidebarEvent(event, triggerNode) : undefined;
+  const executionId = execution.id;
   const title = createElement(
     Fragment,
     null,
@@ -198,7 +209,19 @@ export function buildRunItemFromExecution(options: {
             {
               type: "button",
               className: "text-blue-600 underline hover:text-blue-700",
-              onClick: () => onNodeSelect(nodeId),
+              onClick: () => {
+                if (onExecutionSelect && event?.id && executionId) {
+                  onExecutionSelect({
+                    nodeId,
+                    eventId: event.id,
+                    executionId,
+                    triggerEvent,
+                  });
+                  return;
+                }
+
+                onNodeSelect(nodeId);
+              },
             },
             nodeId,
           ),
@@ -257,8 +280,14 @@ export function mapWorkflowEventsToRunLogEntries(options: {
   events: WorkflowsWorkflowEventWithExecutions[];
   nodes: ComponentsNode[];
   onNodeSelect: (nodeId: string) => void;
+  onExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
 }): LogEntry[] {
-  const { events, nodes, onNodeSelect } = options;
+  const { events, nodes, onNodeSelect, onExecutionSelect } = options;
 
   return events.map((event) => {
     const runItems = (event.executions || []).map((execution) =>
@@ -266,6 +295,8 @@ export function mapWorkflowEventsToRunLogEntries(options: {
         execution: execution as WorkflowsWorkflowNodeExecution,
         nodes,
         onNodeSelect,
+        onExecutionSelect,
+        event: event as WorkflowsWorkflowEvent,
         timestampOverride: event.createdAt || "",
       }),
     );
@@ -316,6 +347,24 @@ export function mapCanvasNodesToLogEntries(options: {
         } as LogEntry;
       }) || []
   );
+}
+
+export function buildCanvasStatusLogEntry(options: {
+  id: string;
+  message: string;
+  type: "success" | "error" | "warning";
+  timestamp: string;
+}): LogEntry {
+  const { id, message, type, timestamp } = options;
+
+  return {
+    id,
+    source: "canvas",
+    timestamp,
+    title: message,
+    type,
+    searchText: message,
+  };
 }
 
 export function buildTabData(

@@ -131,6 +131,7 @@ export function CanvasLogSidebar({
 
   useEffect(() => {
     if (!isOpen) {
+      onScopeChange("all");
       return;
     }
 

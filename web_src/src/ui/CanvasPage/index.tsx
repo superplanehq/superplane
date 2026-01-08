@@ -68,7 +68,12 @@ export interface CanvasEdge extends ReactFlowEdge {
 interface FocusRequest {
   nodeId: string;
   requestId: number;
-  tab?: "latest" | "settings";
+  tab?: "latest" | "settings" | "execution-chain";
+  executionChain?: {
+    eventId: string;
+    executionId?: string | null;
+    triggerEvent?: SidebarEvent | null;
+  };
 }
 
 export interface AiProps {
@@ -223,6 +228,7 @@ export interface CanvasPageProps {
 
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
+  onExecutionChainHandled?: () => void;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -322,9 +328,11 @@ function CanvasPage(props: CanvasPageProps) {
   } | null>(null);
 
   useEffect(() => {
-    if (props.focusRequest?.tab) {
-      setCurrentTab(props.focusRequest.tab);
+    if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
+      return;
     }
+
+    setCurrentTab(props.focusRequest.tab);
   }, [props.focusRequest?.requestId, props.focusRequest?.tab]);
 
   const handleNodeEdit = useCallback(
@@ -701,6 +709,7 @@ function CanvasPage(props: CanvasPageProps) {
               onToggleAutoSave={props.onToggleAutoSave}
               logEntries={props.logEntries}
               focusRequest={props.focusRequest}
+              onExecutionChainHandled={props.onExecutionChainHandled}
             />
           </ReactFlowProvider>
 
@@ -755,6 +764,8 @@ function CanvasPage(props: CanvasPageProps) {
             triggers={props.triggers}
             blueprints={props.blueprints}
             onHighlightedNodesChange={setHighlightedNodeIds}
+            focusRequest={props.focusRequest}
+            onExecutionChainHandled={props.onExecutionChainHandled}
           />
         </div>
       </div>
@@ -821,6 +832,8 @@ function Sidebar({
   triggers,
   blueprints,
   onHighlightedNodesChange,
+  focusRequest,
+  onExecutionChainHandled,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -867,6 +880,8 @@ function Sidebar({
   triggers?: TriggersTrigger[];
   blueprints?: BlueprintsBlueprint[];
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
+  focusRequest?: FocusRequest | null;
+  onExecutionChainHandled?: () => void;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -998,6 +1013,11 @@ function Sidebar({
       triggers={triggers}
       blueprints={blueprints}
       onHighlightedNodesChange={onHighlightedNodesChange}
+      executionChainEventId={focusRequest?.executionChain?.eventId || null}
+      executionChainExecutionId={focusRequest?.executionChain?.executionId || null}
+      executionChainTriggerEvent={focusRequest?.executionChain?.triggerEvent || null}
+      executionChainRequestId={focusRequest?.requestId}
+      onExecutionChainHandled={onExecutionChainHandled}
       hideRunsTab={isAnnotationNode}
       hideNodeId={isAnnotationNode}
     />
@@ -1137,6 +1157,7 @@ function CanvasContent({
   onToggleAutoSave?: () => void;
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
+  onExecutionChainHandled?: () => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 

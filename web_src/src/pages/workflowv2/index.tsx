@@ -67,6 +67,7 @@ import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import {
   buildRunEntryFromEvent,
   buildRunItemFromExecution,
+  buildCanvasStatusLogEntry,
   buildTabData,
   getNextInQueueInfo,
   mapCanvasNodesToLogEntries,
@@ -541,9 +542,18 @@ export function WorkflowPageV2() {
   const [focusRequest, setFocusRequest] = useState<{
     nodeId: string;
     requestId: number;
-    tab?: "latest" | "settings";
+    tab?: "latest" | "settings" | "execution-chain";
+    executionChain?: {
+      eventId: string;
+      executionId?: string | null;
+      triggerEvent?: SidebarEvent | null;
+    };
   } | null>(null);
   const [liveRunEntries, setLiveRunEntries] = useState<LogEntry[]>([]);
+  const [liveCanvasEntries, setLiveCanvasEntries] = useState<LogEntry[]>([]);
+  const handleExecutionChainHandled = useCallback(debounce(() => {
+    setFocusRequest(null);
+  }, 500), []);
 
   const handleSidebarChange = useCallback(
     (open: boolean, nodeId: string | null) => {
@@ -580,15 +590,34 @@ export function WorkflowPageV2() {
     [handleSidebarChange],
   );
 
+  const handleLogRunExecutionSelect = useCallback(
+    (options: { nodeId: string; eventId: string; executionId: string; triggerEvent?: SidebarEvent }) => {
+      handleSidebarChange(true, options.nodeId);
+      setFocusRequest({
+        nodeId: options.nodeId,
+        requestId: Date.now(),
+        tab: "execution-chain",
+        executionChain: {
+          eventId: options.eventId,
+          executionId: options.executionId,
+          triggerEvent: options.triggerEvent,
+        },
+      });
+    },
+    [handleSidebarChange],
+  );
+
   const buildLiveRunItemFromExecution = useCallback(
     (execution: WorkflowsWorkflowNodeExecution): LogRunItem => {
       return buildRunItemFromExecution({
         execution,
         nodes: workflow?.spec?.nodes || [],
         onNodeSelect: handleLogRunNodeSelect,
+        onExecutionSelect: handleLogRunExecutionSelect,
+        event: execution.rootEvent || undefined,
       });
     },
-    [handleLogRunNodeSelect, workflow?.spec?.nodes],
+    [handleLogRunExecutionSelect, handleLogRunNodeSelect, workflow?.spec?.nodes],
   );
 
   const buildLiveRunEntryFromEvent = useCallback(
@@ -668,6 +697,7 @@ export function WorkflowPageV2() {
       events: rootEvents,
       nodes,
       onNodeSelect: handleLogRunNodeSelect,
+      onExecutionSelect: handleLogRunExecutionSelect,
     });
 
     const mergedRunEntries = new Map<string, LogEntry>();
@@ -680,8 +710,9 @@ export function WorkflowPageV2() {
       workflowUpdatedAt: workflow?.metadata?.updatedAt || "",
       onNodeSelect: handleLogNodeSelect,
     });
+    const allCanvasEntries = [...liveCanvasEntries, ...canvasEntries];
 
-    return [...allRunEntries, ...canvasEntries].sort((a, b) => {
+    return [...allRunEntries, ...allCanvasEntries].sort((a, b) => {
       const aTime = Date.parse(a.timestamp || "") || 0;
       const bTime = Date.parse(b.timestamp || "") || 0;
       return aTime - bTime;
@@ -689,6 +720,8 @@ export function WorkflowPageV2() {
   }, [
     handleLogNodeSelect,
     handleLogRunNodeSelect,
+    handleLogRunExecutionSelect,
+    liveCanvasEntries,
     liveRunEntries,
     workflow?.metadata?.updatedAt,
     workflow?.spec?.nodes,
@@ -828,6 +861,15 @@ export function WorkflowPageV2() {
         });
 
         showSuccessToast("Canvas changes saved");
+        setLiveCanvasEntries((prev) => [
+          buildCanvasStatusLogEntry({
+            id: `canvas-save-${Date.now()}`,
+            message: "Canvas changes saved",
+            type: "success",
+            timestamp: new Date().toISOString(),
+          }),
+          ...prev,
+        ]);
         setHasUnsavedChanges(false);
         setHasNonPositionalUnsavedChanges(false);
 
@@ -837,6 +879,15 @@ export function WorkflowPageV2() {
         console.error("Failed to save changes to the canvas:", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
         showErrorToast(errorMessage);
+        setLiveCanvasEntries((prev) => [
+          buildCanvasStatusLogEntry({
+            id: `canvas-save-error-${Date.now()}`,
+            message: errorMessage,
+            type: "error",
+            timestamp: new Date().toISOString(),
+          }),
+          ...prev,
+        ]);
       }
     },
     [workflow, organizationId, workflowId, updateWorkflowMutation],
@@ -1822,6 +1873,7 @@ export function WorkflowPageV2() {
       blueprints={blueprints}
       logEntries={logEntries}
       focusRequest={focusRequest}
+      onExecutionChainHandled={handleExecutionChainHandled}
       breadcrumbs={[
         {
           label: "Canvases",
