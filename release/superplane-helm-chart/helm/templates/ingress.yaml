@@ -17,6 +17,12 @@ metadata:
     {{- if $ssl.enabled }}
     networking.gke.io/v1beta1.FrontendConfig: "http-redirect-proxy"
     {{- end }}
+    {{- if and $ssl.enabled (eq $ssl.type "cert-manager") }}
+    # Standard cert-manager trigger
+    cert-manager.io/cluster-issuer: {{ $ssl.certManager.issuerRef.name | quote }}
+    # Tells cert-manager to provide a temp cert while waiting
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    {{- end }}
     {{- end }}
     {{- if $staticIpName }}
     kubernetes.io/ingress.global-static-ip-name: {{ $staticIpName }}
