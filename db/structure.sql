@@ -350,7 +350,8 @@ CREATE TABLE public.workflow_events (
     data jsonb NOT NULL,
     state character varying(32) NOT NULL,
     execution_id uuid,
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    custom_name text
 );
 
 
@@ -1353,7 +1354,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260106171814	f
+20260201090000	f
 \.
 
 
