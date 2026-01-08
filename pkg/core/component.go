@@ -113,18 +113,18 @@ type OutputChannel struct {
  * to control the state and metadata of each execution of it.
  */
 type ExecutionContext struct {
-	ID                     uuid.UUID
-	WorkflowID             string
-	Data                   any
-	Configuration          any
-	Logger                 *log.Entry
-	MetadataContext        MetadataContext
-	NodeMetadataContext    MetadataContext
-	ExecutionStateContext  ExecutionStateContext
-	RequestContext         RequestContext
-	AuthContext            AuthContext
-	IntegrationContext     IntegrationContext
-	AppInstallationContext AppInstallationContext
+	ID              uuid.UUID
+	WorkflowID      string
+	Data            any
+	Configuration   any
+	Logger          *log.Entry
+	Metadata        MetadataContext
+	NodeMetadata    MetadataContext
+	ExecutionState  ExecutionStateContext
+	Requests        RequestContext
+	Auth            AuthContext
+	Integration     IntegrationContext
+	AppInstallation AppInstallationContext
 }
 
 /*
@@ -132,13 +132,13 @@ type ExecutionContext struct {
  * to control the state and metadata of each execution of it.
  */
 type SetupContext struct {
-	Logger                 *log.Entry
-	Configuration          any
-	MetadataContext        MetadataContext
-	RequestContext         RequestContext
-	AuthContext            AuthContext
-	IntegrationContext     IntegrationContext
-	AppInstallationContext AppInstallationContext
+	Logger          *log.Entry
+	Configuration   any
+	Metadata        MetadataContext
+	Requests        RequestContext
+	Auth            AuthContext
+	Integration     IntegrationContext
+	AppInstallation AppInstallationContext
 }
 
 /*
@@ -208,16 +208,16 @@ type Action struct {
  * and control the state and metadata of each execution of it.
  */
 type ActionContext struct {
-	Name                   string
-	Configuration          any
-	Parameters             map[string]any
-	Logger                 *log.Entry
-	MetadataContext        MetadataContext
-	ExecutionStateContext  ExecutionStateContext
-	AuthContext            AuthContext
-	RequestContext         RequestContext
-	IntegrationContext     IntegrationContext
-	AppInstallationContext AppInstallationContext
+	Name            string
+	Configuration   any
+	Parameters      map[string]any
+	Logger          *log.Entry
+	Metadata        MetadataContext
+	ExecutionState  ExecutionStateContext
+	Auth            AuthContext
+	Requests        RequestContext
+	Integration     IntegrationContext
+	AppInstallation AppInstallationContext
 }
 
 /*

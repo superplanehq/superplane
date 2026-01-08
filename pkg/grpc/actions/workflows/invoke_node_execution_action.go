@@ -82,14 +82,14 @@ func InvokeNodeExecutionAction(
 	tx := database.Conn()
 	logger := logging.ForExecution(execution, nil)
 	actionCtx := core.ActionContext{
-		Name:                  actionName,
-		Parameters:            parameters,
-		Configuration:         node.Configuration.Data(),
-		MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
-		AuthContext:           contexts.NewAuthContext(tx, orgID, authService, user),
-		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
-		IntegrationContext:    contexts.NewIntegrationContext(tx, registry),
+		Name:           actionName,
+		Parameters:     parameters,
+		Configuration:  node.Configuration.Data(),
+		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
+		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+		Auth:           contexts.NewAuthContext(tx, orgID, authService, user),
+		Requests:       contexts.NewExecutionRequestContext(tx, execution),
+		Integration:    contexts.NewIntegrationContext(tx, registry),
 	}
 
 	if node.AppInstallationID != nil {
@@ -100,7 +100,7 @@ func InvokeNodeExecutionAction(
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		actionCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
+		actionCtx.AppInstallation = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
 	}
 
 	actionCtx.Logger = logger

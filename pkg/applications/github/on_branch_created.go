@@ -67,8 +67,8 @@ func (t *OnBranchCreated) Configuration() []configuration.Field {
 
 func (t *OnBranchCreated) Setup(ctx core.TriggerContext) error {
 	err := ensureRepoInMetadata(
-		ctx.MetadataContext,
-		ctx.AppInstallationContext,
+		ctx.Metadata,
+		ctx.AppInstallation,
 		ctx.Configuration,
 	)
 
@@ -81,7 +81,7 @@ func (t *OnBranchCreated) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
 		EventType:  "create",
 		Repository: config.Repository,
 	})
@@ -144,7 +144,7 @@ func (t *OnBranchCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		return http.StatusOK, nil
 	}
 
-	err = ctx.EventContext.Emit("github.branchCreated", data)
+	err = ctx.Events.Emit("github.branchCreated", data)
 
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)

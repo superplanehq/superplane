@@ -50,9 +50,9 @@ func TestIf_Execute_EmitsEmptyEvents(t *testing.T) {
 			stateCtx := &contexts.ExecutionStateContext{}
 
 			ctx := core.ExecutionContext{
-				Data:                  tt.inputData,
-				Configuration:         tt.configuration,
-				ExecutionStateContext: stateCtx,
+				Data:           tt.inputData,
+				Configuration:  tt.configuration,
+				ExecutionState: stateCtx,
 			}
 
 			err := ifComponent.Execute(ctx)
@@ -74,9 +74,9 @@ func TestIf_Execute_InvalidExpression_ShouldReturnError(t *testing.T) {
 	stateCtx := &contexts.ExecutionStateContext{}
 
 	ctx := core.ExecutionContext{
-		Data:                  map[string]any{"test": "value"},
-		Configuration:         map[string]any{"expression": "invalid expression syntax +++"},
-		ExecutionStateContext: stateCtx,
+		Data:           map[string]any{"test": "value"},
+		Configuration:  map[string]any{"expression": "invalid expression syntax +++"},
+		ExecutionState: stateCtx,
 	}
 
 	err := ifComponent.Execute(ctx)
@@ -90,9 +90,9 @@ func TestIf_Execute_NonBooleanResult_ShouldReturnError(t *testing.T) {
 	stateCtx := &contexts.ExecutionStateContext{}
 
 	ctx := core.ExecutionContext{
-		Data:                  map[string]any{"test": "value"},
-		Configuration:         map[string]any{"expression": "$.test"},
-		ExecutionStateContext: stateCtx,
+		Data:           map[string]any{"test": "value"},
+		Configuration:  map[string]any{"expression": "$.test"},
+		ExecutionState: stateCtx,
 	}
 
 	err := ifComponent.Execute(ctx)
@@ -125,9 +125,9 @@ func TestIf_Execute_BothTrueAndFalsePathsEmitEmpty(t *testing.T) {
 			stateCtx := &contexts.ExecutionStateContext{}
 
 			ctx := core.ExecutionContext{
-				Data:                  map[string]any{"test": "value"},
-				Configuration:         tt.configuration,
-				ExecutionStateContext: stateCtx,
+				Data:           map[string]any{"test": "value"},
+				Configuration:  tt.configuration,
+				ExecutionState: stateCtx,
 			}
 
 			err := ifComponent.Execute(ctx)

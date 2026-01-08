@@ -303,7 +303,7 @@ func (w *Wait) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Store start time and calculated interval duration in metadata
-	err = ctx.MetadataContext.Set(ExecutionMetadata{
+	err = ctx.Metadata.Set(ExecutionMetadata{
 		StartTime:        startTime,
 		IntervalDuration: interval.Milliseconds(),
 	})
@@ -312,7 +312,7 @@ func (w *Wait) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	return ctx.RequestContext.ScheduleActionCall("timeReached", map[string]any{}, interval)
+	return ctx.Requests.ScheduleActionCall("timeReached", map[string]any{}, interval)
 }
 
 func (w *Wait) Actions() []core.Action {
@@ -341,16 +341,16 @@ func (w *Wait) HandleAction(ctx core.ActionContext) error {
 }
 
 func (w *Wait) HandleTimeReached(ctx core.ActionContext) error {
-	if ctx.ExecutionStateContext.IsFinished() {
+	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
 
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		PayloadType,
 		[]any{
 			createPayload(
-				getStartTimeFromMetadata(ctx.MetadataContext),
+				getStartTimeFromMetadata(ctx.Metadata),
 				time.Now().Format(time.RFC3339),
 				"completed",
 				"timeout",
@@ -361,20 +361,20 @@ func (w *Wait) HandleTimeReached(ctx core.ActionContext) error {
 }
 
 func (w *Wait) HandlePushThrough(ctx core.ActionContext) error {
-	if ctx.ExecutionStateContext.IsFinished() {
+	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
 
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		PayloadType,
 		[]any{
 			createPayload(
-				getStartTimeFromMetadata(ctx.MetadataContext),
+				getStartTimeFromMetadata(ctx.Metadata),
 				time.Now().Format(time.RFC3339),
 				"completed",
 				"manual_override",
-				ctx.AuthContext.AuthenticatedUser(),
+				ctx.Auth.AuthenticatedUser(),
 			),
 		},
 	)
@@ -393,16 +393,16 @@ func (w *Wait) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error
 }
 
 func (w *Wait) Cancel(ctx core.ExecutionContext) error {
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		PayloadType,
 		[]any{
 			createPayload(
-				getStartTimeFromMetadata(ctx.MetadataContext),
+				getStartTimeFromMetadata(ctx.Metadata),
 				time.Now().Format(time.RFC3339),
 				"cancelled",
 				"user_cancel",
-				ctx.AuthContext.AuthenticatedUser(),
+				ctx.Auth.AuthenticatedUser(),
 			),
 		},
 	)

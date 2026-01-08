@@ -43,8 +43,8 @@ func TestNoop_Execute_EmitsEmptyEvents(t *testing.T) {
 			stateCtx := &contexts.ExecutionStateContext{}
 
 			ctx := core.ExecutionContext{
-				Data:                  tt.inputData,
-				ExecutionStateContext: stateCtx,
+				Data:           tt.inputData,
+				ExecutionState: stateCtx,
 			}
 
 			err := noop.Execute(ctx)
@@ -71,8 +71,8 @@ func TestNoop_Execute_AlwaysEmitsEmpty(t *testing.T) {
 		}
 
 		ctx := core.ExecutionContext{
-			Data:                  originalData,
-			ExecutionStateContext: stateCtx,
+			Data:           originalData,
+			ExecutionState: stateCtx,
 		}
 
 		err := noop.Execute(ctx)

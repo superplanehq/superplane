@@ -30,9 +30,9 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		headers.Set("X-Semaphore-Signature-256", "invalidsignature")
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers:        headers,
-			EventContext:   &contexts.EventContext{},
-			WebhookContext: &contexts.WebhookContext{},
+			Headers: headers,
+			Events:  &contexts.EventContext{},
+			Webhook: &contexts.WebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -46,10 +46,10 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		headers.Set("X-Semaphore-Signature-256", "sha256=invalidsignature")
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:           []byte(`{"pipeline":{"state":"done"}}`),
-			Headers:        headers,
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   &contexts.EventContext{},
+			Body:    []byte(`{"pipeline":{"state":"done"}}`),
+			Headers: headers,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  &contexts.EventContext{},
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -69,10 +69,10 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:           body,
-			Headers:        headers,
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Body:    body,
+			Headers: headers,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -94,10 +94,10 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:           body,
-			Headers:        headers,
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Body:    body,
+			Headers: headers,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -111,9 +111,9 @@ func Test__OnPipelineDone__Setup(t *testing.T) {
 	t.Run("project is required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallationContext: appCtx,
-			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          OnPipelineDoneConfiguration{Project: ""},
+			AppInstallation: appCtx,
+			Metadata:        &contexts.MetadataContext{},
+			Configuration:   OnPipelineDoneConfiguration{Project: ""},
 		})
 
 		require.ErrorContains(t, err, "project is required")
@@ -129,9 +129,9 @@ func Test__OnPipelineDone__Setup(t *testing.T) {
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallationContext: &contexts.AppInstallationContext{},
-			MetadataContext:        metadataCtx,
-			Configuration:          OnPipelineDoneConfiguration{Project: "test-project"},
+			AppInstallation: &contexts.AppInstallationContext{},
+			Metadata:        metadataCtx,
+			Configuration:   OnPipelineDoneConfiguration{Project: "test-project"},
 		})
 
 		require.NoError(t, err)
@@ -142,9 +142,9 @@ func Test__OnPipelineDone__Setup(t *testing.T) {
 	t.Run("invalid configuration -> decode error", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallationContext: appCtx,
-			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          "invalid-config",
+			AppInstallation: appCtx,
+			Metadata:        &contexts.MetadataContext{},
+			Configuration:   "invalid-config",
 		})
 
 		require.ErrorContains(t, err, "failed to decode configuration")

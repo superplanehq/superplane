@@ -66,14 +66,14 @@ type Trigger interface {
 }
 
 type TriggerContext struct {
-	Logger                 *log.Entry
-	Configuration          any
-	MetadataContext        MetadataContext
-	RequestContext         RequestContext
-	EventContext           EventContext
-	WebhookContext         NodeWebhookContext
-	IntegrationContext     IntegrationContext
-	AppInstallationContext AppInstallationContext
+	Logger          *log.Entry
+	Configuration   any
+	Metadata        MetadataContext
+	Requests        RequestContext
+	Events          EventContext
+	Webhook         NodeWebhookContext
+	Integration     IntegrationContext
+	AppInstallation AppInstallationContext
 }
 
 type WebhookSetupOptions struct {
@@ -88,25 +88,25 @@ type EventContext interface {
 }
 
 type TriggerActionContext struct {
-	Name                   string
-	Parameters             map[string]any
-	Configuration          any
-	Logger                 *log.Entry
-	MetadataContext        MetadataContext
-	RequestContext         RequestContext
-	EventContext           EventContext
-	WebhookContext         NodeWebhookContext
-	AppInstallationContext AppInstallationContext
+	Name            string
+	Parameters      map[string]any
+	Configuration   any
+	Logger          *log.Entry
+	Metadata        MetadataContext
+	Requests        RequestContext
+	Events          EventContext
+	Webhook         NodeWebhookContext
+	AppInstallation AppInstallationContext
 }
 
 type WebhookRequestContext struct {
-	Body           []byte
-	Headers        http.Header
-	WorkflowID     string
-	NodeID         string
-	Configuration  any
-	WebhookContext NodeWebhookContext
-	EventContext   EventContext
+	Body          []byte
+	Headers       http.Header
+	WorkflowID    string
+	NodeID        string
+	Configuration any
+	Webhook       NodeWebhookContext
+	Events        EventContext
 
 	//
 	// Return an execution context for a given execution,

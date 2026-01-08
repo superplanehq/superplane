@@ -94,14 +94,14 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if matches {
-		return ctx.ExecutionStateContext.Emit(
+		return ctx.ExecutionState.Emit(
 			core.DefaultOutputChannel.Name,
 			"filter.executed",
 			[]any{map[string]any{}},
 		)
 	}
 
-	return ctx.ExecutionStateContext.Pass()
+	return ctx.ExecutionState.Pass()
 }
 
 func (f *Filter) Actions() []core.Action {

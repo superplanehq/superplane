@@ -119,7 +119,7 @@ func (g *GitHub) Configuration() []configuration.Field {
 
 func (g *GitHub) Setup(ctx core.TriggerContext) error {
 	var metadata Metadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
@@ -145,7 +145,7 @@ func (g *GitHub) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("repository is required")
 	}
 
-	integration, err := ctx.IntegrationContext.GetIntegration(config.Integration)
+	integration, err := ctx.Integration.GetIntegration(config.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to get integration: %w", err)
 	}
@@ -160,7 +160,7 @@ func (g *GitHub) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("integration ID is invalid: %w", err)
 	}
 
-	_, err = ctx.WebhookContext.Setup(&core.WebhookSetupOptions{
+	_, err = ctx.Webhook.Setup(&core.WebhookSetupOptions{
 		IntegrationID: &integrationID,
 		Resource:      resource,
 		Configuration: config,
@@ -170,7 +170,7 @@ func (g *GitHub) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to setup webhook: %w", err)
 	}
 
-	ctx.MetadataContext.Set(Metadata{
+	ctx.Metadata.Set(Metadata{
 		Repository: &Repository{
 			ID:   resource.Id(),
 			Name: resource.Name(),
@@ -218,7 +218,7 @@ func (g *GitHub) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
-	secret, err := ctx.WebhookContext.GetSecret()
+	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
 	}
@@ -240,7 +240,7 @@ func (g *GitHub) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusOK, nil
 	}
 
-	err = ctx.EventContext.Emit("github", data)
+	err = ctx.Events.Emit("github", data)
 
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
