@@ -114,6 +114,7 @@ func (g *GitHub) Triggers() []core.Trigger {
 		&OnRelease{},
 		&OnTagCreated{},
 		&OnBranchCreated{},
+		&OnPackagePublished{},
 	}
 }
 
@@ -187,6 +188,9 @@ func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext, metadata Metadata) {
+	eventType := github.WebHookType(ctx.Request)
+	ctx.Logger.Infof("[GitHub] Received webhook event type: %s", eventType)
+
 	webhookSecret, err := findSecret(ctx.AppInstallation, GitHubAppWebhookSecret)
 	if err != nil {
 		ctx.Logger.Errorf("Error finding webhook secret: %v", err)
@@ -201,7 +205,8 @@ func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext, metadata Metadata) {
 		return
 	}
 
-	eventType := github.WebHookType(ctx.Request)
+	ctx.Logger.Infof("[GitHub] Validated payload for event type: %s, payload size: %d bytes", eventType, len(payload))
+
 	event, err := github.ParseWebHook(eventType, payload)
 	if err != nil {
 		ctx.Logger.Errorf("Error parsing webhook payload: %v", err)
@@ -366,9 +371,20 @@ func (g *GitHub) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		},
 	}
 
-	createdHook, _, err := client.Repositories.CreateHook(context.Background(), metadata.Owner, config.Repository, hook)
-	if err != nil {
-		return nil, fmt.Errorf("error creating webhook: %v", err)
+	var createdHook *github.Hook
+
+	// If repository is empty, create organization-level webhook
+	// Otherwise create repository-level webhook
+	if config.Repository == "" {
+		createdHook, _, err = client.Organizations.CreateHook(context.Background(), metadata.Owner, hook)
+		if err != nil {
+			return nil, fmt.Errorf("error creating organization webhook: %v", err)
+		}
+	} else {
+		createdHook, _, err = client.Repositories.CreateHook(context.Background(), metadata.Owner, config.Repository, hook)
+		if err != nil {
+			return nil, fmt.Errorf("error creating repository webhook: %v", err)
+		}
 	}
 
 	return &Webhook{ID: createdHook.GetID(), WebhookName: *createdHook.Name}, nil
@@ -398,9 +414,18 @@ func (g *GitHub) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 		return err
 	}
 
-	_, err = client.Repositories.DeleteHook(context.Background(), metadata.Owner, configuration.Repository, webhook.ID)
-	if err != nil {
-		return fmt.Errorf("error deleting webhook: %v", err)
+	// If repository is empty, delete organization-level webhook
+	// Otherwise delete repository-level webhook
+	if configuration.Repository == "" {
+		_, err = client.Organizations.DeleteHook(context.Background(), metadata.Owner, webhook.ID)
+		if err != nil {
+			return fmt.Errorf("error deleting organization webhook: %v", err)
+		}
+	} else {
+		_, err = client.Repositories.DeleteHook(context.Background(), metadata.Owner, configuration.Repository, webhook.ID)
+		if err != nil {
+			return fmt.Errorf("error deleting repository webhook: %v", err)
+		}
 	}
 
 	return nil
@@ -584,6 +609,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"pull_requests":    "write",
 			"repository_hooks": "write",
 			"statuses":         "write",
+			"packages":         "read",
 		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/apps/%s/setup`, ctx.BaseURL, ctx.InstallationID),
 		"redirect_url": fmt.Sprintf(`%s/api/v1/apps/%s/redirect`, ctx.BaseURL, ctx.InstallationID),
