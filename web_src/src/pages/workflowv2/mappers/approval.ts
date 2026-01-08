@@ -263,7 +263,7 @@ type ApprovalRecord = {
   index: number;
   state: string;
   type: string;
-  user?: { name?: string; email?: string; avatarUrl?: string };
+  user?: { id?: string; name?: string; email?: string; avatarUrl?: string };
   role?: string;
   group?: string;
   approval?: { comment?: string };
@@ -279,11 +279,15 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
     workflowId: string,
     queryClient: QueryClient,
     organizationId?: string,
+    currentUser?: { id?: string; email?: string },
   ) {
     const execution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const executionMetadata = execution?.metadata as Record<string, unknown> | undefined;
     const usersById: Record<string, { email?: string; name?: string }> = {};
     const rolesByName: Record<string, string> = {};
+    let currentUserRoles: string[] = [];
+    const currentUserId = currentUser?.id;
+    const currentUserEmail = currentUser?.email;
     if (organizationId) {
       const usersResp: SuperplaneUsersUser[] | undefined = queryClient.getQueryData(
         organizationKeys.users(organizationId),
@@ -295,6 +299,20 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
           const name = u.spec?.displayName;
           if (id) usersById[id] = { email, name };
         });
+
+        if (currentUserId || currentUserEmail) {
+          const currentOrgUser = usersResp.find(
+            (u) =>
+              (currentUserId && u.metadata?.id === currentUserId) ||
+              (currentUserEmail && u.metadata?.email === currentUserEmail),
+          );
+          if (currentOrgUser?.status?.roleAssignments) {
+            currentUserRoles = currentOrgUser.status.roleAssignments
+              .filter((assignment) => !assignment.domainId || assignment.domainId === organizationId)
+              .map((assignment) => assignment.roleName)
+              .filter((roleName): roleName is string => !!roleName);
+          }
+        }
       }
 
       const rolesResp: RolesRole[] | undefined = queryClient.getQueryData(organizationKeys.roles(organizationId));
@@ -312,6 +330,16 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
       (record: ApprovalRecord) => {
         const isPending = record.state === "pending";
         const isExecutionActive = execution?.state === "STATE_STARTED";
+        const canAct =
+          isPending &&
+          isExecutionActive &&
+          canCurrentUserActOnApproval(record, {
+            currentUserId,
+            currentUserEmail,
+            currentUserRoles,
+            organizationId,
+            queryClient,
+          });
 
         const approvalComment = record.approval?.comment as string | undefined;
         const hasApprovalArtifacts = record.state === "approved" && approvalComment;
@@ -333,9 +361,9 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
           approverName: record.user?.name,
           approverAvatar: record.user?.avatarUrl,
           rejectionComment: record.rejection?.reason,
-          interactive: isPending && isExecutionActive,
+          interactive: canAct,
           requireArtifacts:
-            isPending && isExecutionActive
+            canAct
               ? [
                   {
                     label: "comment",
@@ -414,3 +442,46 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
     };
   },
 };
+
+function canCurrentUserActOnApproval(
+  record: ApprovalRecord,
+  {
+    currentUserId,
+    currentUserEmail,
+    currentUserRoles,
+    organizationId,
+    queryClient,
+  }: {
+    currentUserId?: string;
+    currentUserEmail?: string;
+    currentUserRoles: string[];
+    organizationId?: string;
+    queryClient: QueryClient;
+  },
+): boolean {
+  switch (record.type) {
+    case "anyone":
+      return !!(currentUserId || currentUserEmail);
+    case "user":
+      return (
+        (!!currentUserId && record.user?.id === currentUserId) ||
+        (!!currentUserEmail && record.user?.email === currentUserEmail)
+      );
+    case "role":
+      return !!record.role && currentUserRoles.includes(record.role);
+    case "group": {
+      if (!record.group || !organizationId) return false;
+      const groupUsers = queryClient.getQueryData<SuperplaneUsersUser[]>(
+        organizationKeys.groupUsers(organizationId, record.group),
+      );
+      if (!Array.isArray(groupUsers)) return false;
+      return groupUsers.some(
+        (user) =>
+          (!!currentUserId && user.metadata?.id === currentUserId) ||
+          (!!currentUserEmail && user.metadata?.email === currentUserEmail),
+      );
+    }
+    default:
+      return false;
+  }
+}

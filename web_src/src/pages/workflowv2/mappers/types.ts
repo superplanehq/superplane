@@ -78,6 +78,7 @@ export interface ComponentAdditionalDataBuilder {
     workflowId: string,
     queryClient: QueryClient,
     organizationId?: string,
+    currentUser?: { id?: string; email?: string },
   ): unknown;
 }
 
