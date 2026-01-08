@@ -1,6 +1,7 @@
 package core
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -118,6 +119,7 @@ type ExecutionContext struct {
 	Data            any
 	Configuration   any
 	Logger          *log.Entry
+	HTTP            HTTPContext
 	Metadata        MetadataContext
 	NodeMetadata    MetadataContext
 	ExecutionState  ExecutionStateContext
@@ -128,12 +130,24 @@ type ExecutionContext struct {
 }
 
 /*
+ * Components / triggers / applications should always
+ * use this context instead of the net/http directly for executing HTTP requests.
+ *
+ * This makes it easy for us to write unit tests for the implementations,
+ * and also makes it easier to control HTTP timeouts for everything in one place.
+ */
+type HTTPContext interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
+/*
  * ExecutionContext allows the component
  * to control the state and metadata of each execution of it.
  */
 type SetupContext struct {
 	Logger          *log.Entry
 	Configuration   any
+	HTTP            HTTPContext
 	Metadata        MetadataContext
 	Requests        RequestContext
 	Auth            AuthContext
@@ -212,6 +226,7 @@ type ActionContext struct {
 	Configuration   any
 	Parameters      map[string]any
 	Logger          *log.Entry
+	HTTP            HTTPContext
 	Metadata        MetadataContext
 	ExecutionState  ExecutionStateContext
 	Auth            AuthContext

@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -212,4 +213,19 @@ func (c *RequestContext) ScheduleActionCall(action string, params map[string]any
 	c.Params = params
 	c.Duration = duration
 	return nil
+}
+
+type HTTPContext struct {
+	Request  *http.Request
+	Response *http.Response
+}
+
+func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
+	c.Request = request
+
+	if c.Response != nil {
+		return c.Response, nil
+	}
+
+	return nil, fmt.Errorf("no response mocked")
 }

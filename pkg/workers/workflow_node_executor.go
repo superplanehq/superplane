@@ -228,6 +228,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		WorkflowID:     execution.WorkflowID.String(),
 		Configuration:  execution.Configuration.Data(),
 		Data:           input,
+		HTTP:           contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		NodeMetadata:   contexts.NewNodeMetadataContext(tx, node),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution),

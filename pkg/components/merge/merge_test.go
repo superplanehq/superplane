@@ -2,6 +2,7 @@ package merge
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/google/uuid"
@@ -354,7 +355,7 @@ func (s *MergeTestSteps) CreateSingleQueueItemForProcess1() {
 func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 	fmt.Println("Processing first event")
 
-	ctx1, err := contexts.BuildProcessQueueContext(s.Tx, s.MergeNode, s.QueureItem1)
+	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx1)
@@ -367,7 +368,7 @@ func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 func (s *MergeTestSteps) ProcessFirstEventExpectFinish(m *Merge) {
 	fmt.Println("Processing first event (expect finish)")
 
-	ctx1, err := contexts.BuildProcessQueueContext(s.Tx, s.MergeNode, s.QueureItem1)
+	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx1)
@@ -378,7 +379,7 @@ func (s *MergeTestSteps) ProcessFirstEventExpectFinish(m *Merge) {
 func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 	fmt.Println("Processing second event")
 
-	ctx2, err := contexts.BuildProcessQueueContext(s.Tx, s.MergeNode, s.QueureItem2)
+	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx2)
@@ -389,7 +390,7 @@ func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 func (s *MergeTestSteps) ProcessSecondEventExpectNoFinish(m *Merge) {
 	fmt.Println("Processing second event")
 
-	ctx2, err := contexts.BuildProcessQueueContext(s.Tx, s.MergeNode, s.QueureItem2)
+	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx2)

@@ -181,7 +181,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return err
 	}
@@ -409,7 +409,7 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return err
 	}

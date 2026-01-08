@@ -68,6 +68,7 @@ type Trigger interface {
 type TriggerContext struct {
 	Logger          *log.Entry
 	Configuration   any
+	HTTP            HTTPContext
 	Metadata        MetadataContext
 	Requests        RequestContext
 	Events          EventContext
@@ -92,6 +93,7 @@ type TriggerActionContext struct {
 	Parameters      map[string]any
 	Configuration   any
 	Logger          *log.Entry
+	HTTP            HTTPContext
 	Metadata        MetadataContext
 	Requests        RequestContext
 	Events          EventContext

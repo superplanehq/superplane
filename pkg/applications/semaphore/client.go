@@ -14,9 +14,10 @@ import (
 type Client struct {
 	OrgURL   string
 	APIToken string
+	http     core.HTTPContext
 }
 
-func NewClient(ctx core.AppInstallationContext) (*Client, error) {
+func NewClient(http core.HTTPContext, ctx core.AppInstallationContext) (*Client, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("no app installation context")
 	}
@@ -34,6 +35,7 @@ func NewClient(ctx core.AppInstallationContext) (*Client, error) {
 	return &Client{
 		OrgURL:   string(orgURL),
 		APIToken: string(apiToken),
+		http:     http,
 	}, nil
 }
 
@@ -106,7 +108,7 @@ func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error)
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Token "+c.APIToken)
-	res, err := http.DefaultClient.Do(req)
+	res, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %v", err)
 	}

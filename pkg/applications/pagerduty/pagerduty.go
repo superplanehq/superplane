@@ -184,7 +184,7 @@ func (p *PagerDuty) Sync(ctx core.SyncContext) error {
 }
 
 func (p *PagerDuty) apiTokenSync(ctx core.SyncContext) error {
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("error creating client")
 	}
@@ -228,14 +228,13 @@ func (p *PagerDuty) appOAuthSync(ctx core.SyncContext, configuration Configurati
 	data.Set("client_secret", string(clientSecret))
 	data.Set("scope", strings.Join(scopes, " "))
 
-	httpClient := &http.Client{Timeout: 10 * time.Second}
 	r, err := http.NewRequest(http.MethodPost, "https://identity.pagerduty.com/oauth/token", strings.NewReader(data.Encode()))
 	if err != nil {
 		return fmt.Errorf("error creating request: %v", err)
 	}
 
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := httpClient.Do(r)
+	resp, err := ctx.HTTP.Do(r)
 	if err != nil {
 		return fmt.Errorf("error executing request: %v", err)
 	}
@@ -265,7 +264,7 @@ func (p *PagerDuty) appOAuthSync(ctx core.SyncContext, configuration Configurati
 	//
 	// Verify that the auth is working by listing the services.
 	//
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("error creating client")
 	}
@@ -369,7 +368,7 @@ func (p *PagerDuty) CompareWebhookConfig(a, b any) (bool, error) {
 }
 
 func (p *PagerDuty) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +406,7 @@ func (p *PagerDuty) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 		return fmt.Errorf("error decoding webhook metadata: %v", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return err
 	}
