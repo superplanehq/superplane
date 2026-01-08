@@ -80,12 +80,12 @@ func InvokeNodeTriggerAction(
 	logger := logging.ForNode(*node)
 
 	actionCtx := core.TriggerActionContext{
-		Name:            actionName,
-		Parameters:      parameters,
-		Configuration:   node.Configuration.Data(),
-		MetadataContext: contexts.NewNodeMetadataContext(tx, node),
-		RequestContext:  contexts.NewNodeRequestContext(tx, node),
-		WebhookContext:  contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
+		Name:          actionName,
+		Parameters:    parameters,
+		Configuration: node.Configuration.Data(),
+		Metadata:      contexts.NewNodeMetadataContext(tx, node),
+		Requests:      contexts.NewNodeRequestContext(tx, node),
+		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
 	}
 
 	if node.AppInstallationID != nil {
@@ -96,7 +96,7 @@ func InvokeNodeTriggerAction(
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		actionCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
+		actionCtx.AppInstallation = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
 	}
 
 	actionCtx.Logger = logger

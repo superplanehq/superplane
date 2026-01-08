@@ -31,9 +31,9 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers:        headers,
-			EventContext:   &contexts.EventContext{},
-			WebhookContext: &contexts.WebhookContext{},
+			Headers: headers,
+			Events:  &contexts.EventContext{},
+			Webhook: &contexts.WebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -56,8 +56,8 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   &contexts.EventContext{},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  &contexts.EventContext{},
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -86,8 +86,8 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -117,8 +117,8 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -148,8 +148,8 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeNotEquals, Value: "refs/heads/main"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -179,8 +179,8 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: "refs/heads/feat/*"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -210,8 +210,8 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -227,9 +227,9 @@ func Test__OnPush__Setup(t *testing.T) {
 	t.Run("repository is required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallationContext: appCtx,
-			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          map[string]any{"repository": ""},
+			AppInstallation: appCtx,
+			Metadata:        &contexts.MetadataContext{},
+			Configuration:   map[string]any{"repository": ""},
 		})
 
 		require.ErrorContains(t, err, "repository is required")
@@ -242,9 +242,9 @@ func Test__OnPush__Setup(t *testing.T) {
 			},
 		}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallationContext: appCtx,
-			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          map[string]any{"repository": "world"},
+			AppInstallation: appCtx,
+			Metadata:        &contexts.MetadataContext{},
+			Configuration:   map[string]any{"repository": "world"},
 		})
 
 		require.ErrorContains(t, err, "repository world is not accessible to app installation")
@@ -259,9 +259,9 @@ func Test__OnPush__Setup(t *testing.T) {
 
 		nodeMetadataCtx := contexts.MetadataContext{}
 		require.NoError(t, trigger.Setup(core.TriggerContext{
-			AppInstallationContext: appCtx,
-			MetadataContext:        &nodeMetadataCtx,
-			Configuration:          map[string]any{"repository": "hello"},
+			AppInstallation: appCtx,
+			Metadata:        &nodeMetadataCtx,
+			Configuration:   map[string]any{"repository": "hello"},
 		}))
 
 		require.Equal(t, nodeMetadataCtx.Get(), NodeMetadata{Repository: &helloRepo})

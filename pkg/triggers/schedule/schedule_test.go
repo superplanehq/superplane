@@ -490,12 +490,12 @@ func TestEmitEvent(t *testing.T) {
 			eventCtx := &contexts.EventContext{}
 
 			ctx := core.TriggerActionContext{
-				Name:            "emitEvent",
-				Configuration:   tt.config,
-				Logger:          log.NewEntry(log.StandardLogger()),
-				EventContext:    eventCtx,
-				MetadataContext: &contexts.MetadataContext{},
-				RequestContext:  &contexts.RequestContext{},
+				Name:          "emitEvent",
+				Configuration: tt.config,
+				Logger:        log.NewEntry(log.StandardLogger()),
+				Events:        eventCtx,
+				Metadata:      &contexts.MetadataContext{},
+				Requests:      &contexts.RequestContext{},
 			}
 
 			err := schedule.emitEvent(ctx)

@@ -98,14 +98,14 @@ func (f *If) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if matches {
-		return ctx.ExecutionStateContext.Emit(
+		return ctx.ExecutionState.Emit(
 			ChannelNameTrue,
 			"if.executed",
 			[]any{map[string]any{}},
 		)
 	}
 
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		ChannelNameFalse,
 		"if.executed",
 		[]any{map[string]any{}},

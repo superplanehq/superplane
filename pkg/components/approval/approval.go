@@ -116,7 +116,7 @@ func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) er
 
 	record.State = StateApproved
 	record.Approval = &ApprovalInfo{ApprovedAt: time.Now().Format(time.RFC3339)}
-	record.User = ctx.AuthContext.AuthenticatedUser()
+	record.User = ctx.Auth.AuthenticatedUser()
 	comment, ok := ctx.Parameters["comment"].(string)
 	if ok {
 		record.Approval.Comment = comment
@@ -143,7 +143,7 @@ func (m *Metadata) Reject(record *Record, index int, ctx core.ActionContext) err
 	}
 
 	record.State = StateRejected
-	record.User = ctx.AuthContext.AuthenticatedUser()
+	record.User = ctx.Auth.AuthenticatedUser()
 	record.Rejection = &RejectionInfo{
 		RejectedAt: time.Now().Format(time.RFC3339),
 		Reason:     reasonStr,
@@ -154,7 +154,7 @@ func (m *Metadata) Reject(record *Record, index int, ctx core.ActionContext) err
 }
 
 func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error {
-	authenticatedUser := ctx.AuthContext.AuthenticatedUser()
+	authenticatedUser := ctx.Auth.AuthenticatedUser()
 	switch record.Type {
 	case ItemTypeAnyone:
 		// Any authenticated user can approve
@@ -168,7 +168,7 @@ func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error 
 		return nil
 
 	case ItemTypeRole:
-		hasRole, err := ctx.AuthContext.HasRole(*record.Role)
+		hasRole, err := ctx.Auth.HasRole(*record.Role)
 		if err != nil {
 			return fmt.Errorf("error checking role %s: %v", *record.Role, err)
 		}
@@ -180,7 +180,7 @@ func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error 
 		return nil
 
 	case ItemTypeGroup:
-		inGroup, err := ctx.AuthContext.InGroup(*record.Group)
+		inGroup, err := ctx.Auth.InGroup(*record.Group)
 		if err != nil {
 			return fmt.Errorf("error checking group %s: %v", *record.Group, err)
 		}
@@ -229,7 +229,7 @@ func approvalItemToRecord(ctx core.ExecutionContext, item Item, index int) (*Rec
 			return nil, err
 		}
 
-		user, err := ctx.AuthContext.GetUser(userID)
+		user, err := ctx.Auth.GetUser(userID)
 		if err != nil {
 			return nil, err
 		}
@@ -385,7 +385,7 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 	}
 
 	metadata.UpdateResult()
-	err = ctx.MetadataContext.Set(metadata)
+	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
@@ -394,7 +394,7 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 	// If no items are specified, just finish the execution.
 	//
 	if metadata.Completed() {
-		return ctx.ExecutionStateContext.Emit(
+		return ctx.ExecutionState.Emit(
 			ChannelApproved,
 			"approval.finished",
 			[]any{metadata},
@@ -472,7 +472,7 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 	// without finishing the execution.
 	//
 	if !metadata.Completed() {
-		return ctx.MetadataContext.Set(metadata)
+		return ctx.Metadata.Set(metadata)
 	}
 
 	//
@@ -482,7 +482,7 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 	// the final state of the execution is rejected.
 	//
 	metadata.UpdateResult()
-	err = ctx.MetadataContext.Set(metadata)
+	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return err
 	}
@@ -494,7 +494,7 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 		outputChannel = ChannelRejected
 	}
 
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		outputChannel,
 		"approval.finished",
 		[]any{metadata},
@@ -503,7 +503,7 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 
 func (a *Approval) handleApprove(ctx core.ActionContext) (*Metadata, error) {
 	var metadata Metadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
@@ -542,7 +542,7 @@ func (a *Approval) findPendingRecord(metadata Metadata, parameters map[string]an
 
 func (a *Approval) handleReject(ctx core.ActionContext) (*Metadata, error) {
 	var metadata Metadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}

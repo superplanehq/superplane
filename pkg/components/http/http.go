@@ -398,7 +398,7 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		retryMetadata.MaxRetries = *spec.Retries
 	}
 
-	err = ctx.MetadataContext.Set(retryMetadata)
+	err = ctx.Metadata.Set(retryMetadata)
 	if err != nil {
 		return err
 	}
@@ -438,20 +438,20 @@ func (e *HTTP) scheduleRetry(ctx core.ExecutionContext, lastError string, retryM
 	retryMetadata.TotalRetries++
 	retryMetadata.LastError = lastError
 
-	err := ctx.MetadataContext.Set(retryMetadata)
+	err := ctx.Metadata.Set(retryMetadata)
 	if err != nil {
 		return err
 	}
 
-	return ctx.RequestContext.ScheduleActionCall("retryRequest", map[string]any{}, 1*time.Second)
+	return ctx.Requests.ScheduleActionCall("retryRequest", map[string]any{}, 1*time.Second)
 }
 
 func (e *HTTP) handleRetryRequest(ctx core.ActionContext) error {
-	if ctx.ExecutionStateContext.IsFinished() {
+	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
 
-	metadata := ctx.MetadataContext.Get()
+	metadata := ctx.Metadata.Get()
 
 	var retryMetadata RetryMetadata
 	err := mapstructure.Decode(metadata, &retryMetadata)
@@ -466,11 +466,11 @@ func (e *HTTP) handleRetryRequest(ctx core.ActionContext) error {
 	}
 
 	execCtx := core.ExecutionContext{
-		Configuration:         ctx.Configuration,
-		ExecutionStateContext: ctx.ExecutionStateContext,
-		MetadataContext:       ctx.MetadataContext,
-		RequestContext:        ctx.RequestContext,
-		AuthContext:           ctx.AuthContext,
+		Configuration:  ctx.Configuration,
+		ExecutionState: ctx.ExecutionState,
+		Metadata:       ctx.Metadata,
+		Requests:       ctx.Requests,
+		Auth:           ctx.Auth,
 	}
 
 	return e.executeHTTPRequest(execCtx, spec, retryMetadata)
@@ -531,22 +531,22 @@ func (e *HTTP) executeRequest(spec Spec, timeout time.Duration) (*http.Response,
 
 func (e *HTTP) handleRequestError(ctx core.ExecutionContext, err error, totalAttempts int) error {
 	// Get current metadata and update with final result
-	metadata := ctx.MetadataContext.Get()
+	metadata := ctx.Metadata.Get()
 	var retryMetadata RetryMetadata
 	mapstructure.Decode(metadata, &retryMetadata)
 
 	retryMetadata.Result = "error"
 	retryMetadata.LastError = err.Error()
 
-	if ctx.MetadataContext != nil {
-		ctx.MetadataContext.Set(retryMetadata)
+	if ctx.Metadata != nil {
+		ctx.Metadata.Set(retryMetadata)
 	}
 
 	errorResponse := map[string]any{
 		"error":    err.Error(),
 		"attempts": totalAttempts,
 	}
-	emitErr := ctx.ExecutionStateContext.Emit(
+	emitErr := ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"http.request.error",
 		[]any{errorResponse},
@@ -555,7 +555,7 @@ func (e *HTTP) handleRequestError(ctx core.ExecutionContext, err error, totalAtt
 		return fmt.Errorf("request failed after %d attempts: %w (and failed to emit event: %v)", totalAttempts, err, emitErr)
 	}
 
-	err = ctx.ExecutionStateContext.Fail(models.WorkflowNodeExecutionResultReasonError, fmt.Sprintf("Request failed after %d attempts: %v", totalAttempts, err))
+	err = ctx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, fmt.Sprintf("Request failed after %d attempts: %v", totalAttempts, err))
 	if err != nil {
 		return fmt.Errorf("request failed after %d attempts: %w (and failed to mark execution as failed: %v)", totalAttempts, err, err)
 	}
@@ -569,7 +569,7 @@ func (e *HTTP) processResponse(ctx core.ExecutionContext, resp *http.Response, s
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		// Get current metadata and update with final result
-		metadata := ctx.MetadataContext.Get()
+		metadata := ctx.Metadata.Get()
 		var retryMetadata RetryMetadata
 		mapstructure.Decode(metadata, &retryMetadata)
 
@@ -577,15 +577,15 @@ func (e *HTTP) processResponse(ctx core.ExecutionContext, resp *http.Response, s
 		retryMetadata.FinalStatus = resp.StatusCode
 		retryMetadata.LastError = fmt.Sprintf("failed to read response body: %v", err)
 
-		if ctx.MetadataContext != nil {
-			ctx.MetadataContext.Set(retryMetadata)
+		if ctx.Metadata != nil {
+			ctx.Metadata.Set(retryMetadata)
 		}
 
 		errorResponse := map[string]any{
 			"status": resp.StatusCode,
 			"error":  fmt.Sprintf("failed to read response body: %v", err),
 		}
-		emitErr := ctx.ExecutionStateContext.Emit(
+		emitErr := ctx.ExecutionState.Emit(
 			core.DefaultOutputChannel.Name,
 			"http.request.error",
 			[]any{errorResponse},
@@ -620,7 +620,7 @@ func (e *HTTP) processResponse(ctx core.ExecutionContext, resp *http.Response, s
 	}
 
 	// Get current metadata and update with final result
-	metadata := ctx.MetadataContext.Get()
+	metadata := ctx.Metadata.Get()
 	var retryMetadata RetryMetadata
 	mapstructure.Decode(metadata, &retryMetadata)
 
@@ -631,8 +631,8 @@ func (e *HTTP) processResponse(ctx core.ExecutionContext, resp *http.Response, s
 		retryMetadata.Result = "failed"
 	}
 
-	if ctx.MetadataContext != nil {
-		ctx.MetadataContext.Set(retryMetadata)
+	if ctx.Metadata != nil {
+		ctx.Metadata.Set(retryMetadata)
 	}
 
 	eventType := "http.request.finished"
@@ -641,11 +641,11 @@ func (e *HTTP) processResponse(ctx core.ExecutionContext, resp *http.Response, s
 	}
 
 	if !isSuccess {
-		ctx.ExecutionStateContext.Fail(models.WorkflowNodeExecutionResultReasonError, fmt.Sprintf("HTTP request failed with status %d", resp.StatusCode))
+		ctx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, fmt.Sprintf("HTTP request failed with status %d", resp.StatusCode))
 		return nil
 	}
 
-	err = ctx.ExecutionStateContext.Emit(
+	err = ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		eventType,
 		[]any{response},

@@ -140,8 +140,8 @@ func (r *RunWorkflow) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 
 func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 	err := ensureRepoInMetadata(
-		ctx.MetadataContext,
-		ctx.AppInstallationContext,
+		ctx.Metadata,
+		ctx.AppInstallation,
 		ctx.Configuration,
 	)
 	if err != nil {
@@ -155,7 +155,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 	}
 
 	// Request webhook for workflow_run events
-	ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+	ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
 		EventType:  "workflow_run",
 		Repository: spec.Repository,
 	})
@@ -171,17 +171,17 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	}
 
 	metadata := NodeMetadata{}
-	err = mapstructure.Decode(ctx.NodeMetadataContext.Get(), &metadata)
+	err = mapstructure.Decode(ctx.NodeMetadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
 	var appMetadata Metadata
-	if err := mapstructure.Decode(ctx.AppInstallationContext.GetMetadata(), &appMetadata); err != nil {
+	if err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &appMetadata); err != nil {
 		return fmt.Errorf("failed to decode application metadata: %w", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := NewClient(ctx.AppInstallation, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -231,7 +231,7 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Save workflow run to metadata
-	err = ctx.MetadataContext.Set(RunWorkflowExecutionMetadata{
+	err = ctx.Metadata.Set(RunWorkflowExecutionMetadata{
 		WorkflowRun: &WorkflowRunMetadata{
 			ID:         run.GetID(),
 			Status:     run.GetStatus(),
@@ -245,7 +245,7 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Store workflow run ID in KV for webhook matching
-	err = ctx.ExecutionStateContext.SetKV("workflow_run_id", fmt.Sprintf("%d", run.GetID()))
+	err = ctx.ExecutionState.SetKV("workflow_run_id", fmt.Sprintf("%d", run.GetID()))
 	if err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	ctx.Logger.Infof("Started workflow run %d", run.GetID())
 
 	// Schedule poll to check workflow status updates (in case webhook doesn't arrive)
-	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, WorkflowPollInterval)
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, WorkflowPollInterval)
 }
 
 func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
@@ -261,7 +261,7 @@ func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
 	// Parse metadata and configuration
 	//
 	metadata := RunWorkflowExecutionMetadata{}
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
@@ -273,7 +273,7 @@ func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
 	}
 
 	var appMetadata Metadata
-	if err := mapstructure.Decode(ctx.AppInstallationContext.GetMetadata(), &appMetadata); err != nil {
+	if err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &appMetadata); err != nil {
 		return fmt.Errorf("failed to decode application metadata: %w", err)
 	}
 
@@ -292,7 +292,7 @@ func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
 	//
 	// Create GitHub client, and cancel workflow run
 	//
-	client, err := NewClient(ctx.AppInstallationContext, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := NewClient(ctx.AppInstallation, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -367,7 +367,7 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	}
 
 	metadata := RunWorkflowExecutionMetadata{}
-	err = mapstructure.Decode(executionCtx.MetadataContext.Get(), &metadata)
+	err = mapstructure.Decode(executionCtx.Metadata.Get(), &metadata)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %v", err)
 	}
@@ -377,15 +377,15 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusOK, nil
 	}
 
-	err = executionCtx.MetadataContext.Set(newMetadata)
+	err = executionCtx.Metadata.Set(newMetadata)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
 	}
 
 	if newMetadata.WorkflowRun.Conclusion == WorkflowRunConclusionSuccess {
-		err = executionCtx.ExecutionStateContext.Emit(WorkflowPassedOutputChannel, WorkflowPayloadType, []any{data})
+		err = executionCtx.ExecutionState.Emit(WorkflowPassedOutputChannel, WorkflowPayloadType, []any{data})
 	} else {
-		err = executionCtx.ExecutionStateContext.Emit(WorkflowFailedOutputChannel, WorkflowPayloadType, []any{data})
+		err = executionCtx.ExecutionState.Emit(WorkflowFailedOutputChannel, WorkflowPayloadType, []any{data})
 	}
 
 	if err != nil {
@@ -456,12 +456,12 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	if ctx.ExecutionStateContext.IsFinished() {
+	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
 
 	metadata := RunWorkflowExecutionMetadata{}
-	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
@@ -472,11 +472,11 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 	}
 
 	var appMetadata Metadata
-	if err := mapstructure.Decode(ctx.AppInstallationContext.GetMetadata(), &appMetadata); err != nil {
+	if err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &appMetadata); err != nil {
 		return fmt.Errorf("failed to decode application metadata: %w", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := NewClient(ctx.AppInstallation, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
 	if err != nil {
 		return err
 	}
@@ -494,23 +494,23 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 
 	// If not finished, poll again
 	if run.GetStatus() != WorkflowRunStatusCompleted {
-		return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, WorkflowPollInterval)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, WorkflowPollInterval)
 	}
 
 	// Update metadata with final status
 	metadata.WorkflowRun.Status = run.GetStatus()
 	metadata.WorkflowRun.Conclusion = run.GetConclusion()
-	err = ctx.MetadataContext.Set(metadata)
+	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return err
 	}
 
 	// Emit based on conclusion
 	if run.GetConclusion() == WorkflowRunConclusionSuccess {
-		return ctx.ExecutionStateContext.Emit(WorkflowPassedOutputChannel, WorkflowPayloadType, []any{run})
+		return ctx.ExecutionState.Emit(WorkflowPassedOutputChannel, WorkflowPayloadType, []any{run})
 	}
 
-	return ctx.ExecutionStateContext.Emit(WorkflowFailedOutputChannel, WorkflowPayloadType, []any{run})
+	return ctx.ExecutionState.Emit(WorkflowFailedOutputChannel, WorkflowPayloadType, []any{run})
 }
 
 func (r *RunWorkflow) findWorkflowRun(client *github.Client, owner, repo, executionID string) (*github.WorkflowRun, error) {

@@ -87,7 +87,7 @@ func (t *OnIncident) Configuration() []configuration.Field {
 
 func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 	metadata := NodeMetadata{}
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode metadata: %v", err)
 	}
@@ -113,7 +113,7 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("service is required")
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext)
+	client, err := NewClient(ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
@@ -123,12 +123,12 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("error finding service: %v", err)
 	}
 
-	err = ctx.MetadataContext.Set(NodeMetadata{Service: service})
+	err = ctx.Metadata.Set(NodeMetadata{Service: service})
 	if err != nil {
 		return fmt.Errorf("error setting node metadata: %v", err)
 	}
 
-	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
 		Events: config.Events,
 		Filter: WebhookFilter{
 			Type: "service_reference",
@@ -164,7 +164,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		return http.StatusForbidden, fmt.Errorf("invalid signature format")
 	}
 
-	secret, err := ctx.WebhookContext.GetSecret()
+	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error getting secret: %v", err)
 	}
@@ -195,7 +195,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		return http.StatusOK, nil
 	}
 
-	err = ctx.EventContext.Emit(
+	err = ctx.Events.Emit(
 		fmt.Sprintf("pagerduty.%s", eventType),
 		buildPayload(webhook.Event.Agent, webhook.Event.Data),
 	)

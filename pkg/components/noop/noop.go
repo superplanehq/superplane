@@ -48,7 +48,7 @@ func (c *NoOp) Configuration() []configuration.Field {
 }
 
 func (c *NoOp) Execute(ctx core.ExecutionContext) error {
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		PayloadType,
 		[]any{map[string]any{}},

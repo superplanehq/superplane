@@ -92,7 +92,7 @@ func (s *Semaphore) Configuration() []configuration.Field {
 
 func (s *Semaphore) Setup(ctx core.TriggerContext) error {
 	var metadata Metadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
@@ -123,7 +123,7 @@ func (s *Semaphore) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("project is required")
 	}
 
-	integration, err := ctx.IntegrationContext.GetIntegration(config.Integration)
+	integration, err := ctx.Integration.GetIntegration(config.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to get integration: %w", err)
 	}
@@ -133,7 +133,7 @@ func (s *Semaphore) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to find project %s: %w", config.Project, err)
 	}
 
-	_, err = ctx.WebhookContext.Setup(&core.WebhookSetupOptions{
+	_, err = ctx.Webhook.Setup(&core.WebhookSetupOptions{
 		IntegrationID: &integrationID,
 		Resource:      resource,
 		Configuration: config,
@@ -143,7 +143,7 @@ func (s *Semaphore) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	ctx.MetadataContext.Set(Metadata{
+	ctx.Metadata.Set(Metadata{
 		Project: &Project{
 			ID:   resource.Id(),
 			Name: resource.Name(),
@@ -173,7 +173,7 @@ func (s *Semaphore) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
-	secret, err := ctx.WebhookContext.GetSecret()
+	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
 	}
@@ -188,7 +188,7 @@ func (s *Semaphore) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	err = ctx.EventContext.Emit("semaphore", data)
+	err = ctx.Events.Emit("semaphore", data)
 
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)

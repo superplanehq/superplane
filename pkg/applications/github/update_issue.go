@@ -127,8 +127,8 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 
 func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
 	return ensureRepoInMetadata(
-		ctx.MetadataContext,
-		ctx.AppInstallationContext,
+		ctx.Metadata,
+		ctx.AppInstallation,
 		ctx.Configuration,
 	)
 }
@@ -140,16 +140,16 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	}
 
 	var nodeMetadata NodeMetadata
-	if err := mapstructure.Decode(ctx.NodeMetadataContext.Get(), &nodeMetadata); err != nil {
+	if err := mapstructure.Decode(ctx.NodeMetadata.Get(), &nodeMetadata); err != nil {
 		return fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
 	var appMetadata Metadata
-	if err := mapstructure.Decode(ctx.AppInstallationContext.GetMetadata(), &appMetadata); err != nil {
+	if err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &appMetadata); err != nil {
 		return fmt.Errorf("failed to decode application metadata: %w", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := NewClient(ctx.AppInstallation, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
@@ -192,7 +192,7 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to update issue: %w", err)
 	}
 
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"github.issue",
 		[]any{issue},

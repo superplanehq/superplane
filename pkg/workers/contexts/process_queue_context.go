@@ -101,14 +101,14 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		}
 
 		return &core.ExecutionContext{
-			ID:                    execution.ID,
-			WorkflowID:            execution.WorkflowID.String(),
-			Configuration:         execution.Configuration.Data(),
-			MetadataContext:       NewExecutionMetadataContext(tx, &execution),
-			NodeMetadataContext:   NewNodeMetadataContext(tx, node),
-			ExecutionStateContext: NewExecutionStateContext(tx, &execution),
-			RequestContext:        NewExecutionRequestContext(tx, &execution),
-			Logger:                logging.WithExecution(logging.ForNode(*node), &execution, nil),
+			ID:             execution.ID,
+			WorkflowID:     execution.WorkflowID.String(),
+			Configuration:  execution.Configuration.Data(),
+			Metadata:       NewExecutionMetadataContext(tx, &execution),
+			NodeMetadata:   NewNodeMetadataContext(tx, node),
+			ExecutionState: NewExecutionStateContext(tx, &execution),
+			Requests:       NewExecutionRequestContext(tx, &execution),
+			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
 		}, nil
 	}
 
@@ -194,14 +194,14 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		}
 
 		return &core.ExecutionContext{
-			ID:                    execution.ID,
-			WorkflowID:            execution.WorkflowID.String(),
-			Configuration:         execution.Configuration.Data(),
-			MetadataContext:       NewExecutionMetadataContext(tx, execution),
-			NodeMetadataContext:   NewNodeMetadataContext(tx, node),
-			ExecutionStateContext: NewExecutionStateContext(tx, execution),
-			RequestContext:        NewExecutionRequestContext(tx, execution),
-			Logger:                logging.WithExecution(logging.ForNode(*node), execution, nil),
+			ID:             execution.ID,
+			WorkflowID:     execution.WorkflowID.String(),
+			Configuration:  execution.Configuration.Data(),
+			Metadata:       NewExecutionMetadataContext(tx, execution),
+			NodeMetadata:   NewNodeMetadataContext(tx, node),
+			ExecutionState: NewExecutionStateContext(tx, execution),
+			Requests:       NewExecutionRequestContext(tx, execution),
+			Logger:         logging.WithExecution(logging.ForNode(*node), execution, nil),
 		}, nil
 	}
 

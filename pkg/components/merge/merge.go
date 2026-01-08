@@ -165,17 +165,17 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		//
 		if b, ok := out.(bool); ok && b {
 			md.StopEarly = true
-			err := executionCtx.MetadataContext.Set(md)
+			err := executionCtx.Metadata.Set(md)
 			if err != nil {
 				return nil, err
 			}
 
-			return &executionCtx.ID, executionCtx.ExecutionStateContext.Fail(models.WorkflowNodeExecutionResultReasonError, "Stopped by stopIfExpression")
+			return &executionCtx.ID, executionCtx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, "Stopped by stopIfExpression")
 		}
 	}
 
 	if len(md.Sources) >= incoming {
-		return &executionCtx.ID, executionCtx.ExecutionStateContext.Emit(
+		return &executionCtx.ID, executionCtx.ExecutionState.Emit(
 			core.DefaultOutputChannel.Name,
 			"merge.finished",
 			[]any{md},
@@ -206,7 +206,7 @@ func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup s
 		return nil, err
 	}
 
-	err = executionCtx.ExecutionStateContext.SetKV("merge_group", mergeGroup)
+	err = executionCtx.ExecutionState.SetKV("merge_group", mergeGroup)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup s
 		Sources:  []string{},
 	}
 
-	err = executionCtx.MetadataContext.Set(md)
+	err = executionCtx.Metadata.Set(md)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +227,7 @@ func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup s
 
 func (m *Merge) addEventToMetadata(ctx core.ProcessQueueContext, executionCtx *core.ExecutionContext) (*ExecutionMetadata, error) {
 	md := &ExecutionMetadata{}
-	err := mapstructure.Decode(executionCtx.MetadataContext.Get(), md)
+	err := mapstructure.Decode(executionCtx.Metadata.Get(), md)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,7 @@ func (m *Merge) addEventToMetadata(ctx core.ProcessQueueContext, executionCtx *c
 		}
 	}
 
-	err = executionCtx.MetadataContext.Set(md)
+	err = executionCtx.Metadata.Set(md)
 	if err != nil {
 		return nil, err
 	}
@@ -268,11 +268,11 @@ func (m *Merge) HandleAction(ctx core.ActionContext) error {
 }
 
 func (m *Merge) HandleTimeout(ctx core.ActionContext) error {
-	if ctx.ExecutionStateContext.IsFinished() {
+	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
 
-	return ctx.ExecutionStateContext.Fail(models.WorkflowNodeExecutionResultReasonError, "Execution timed out waiting for other inputs")
+	return ctx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, "Execution timed out waiting for other inputs")
 }
 
 func (m *Merge) Execute(ctx core.ExecutionContext) error {
@@ -284,7 +284,7 @@ func (m *Merge) Execute(ctx core.ExecutionContext) error {
 
 	interval := durationFrom(spec.ExecutionTimeout.Value, spec.ExecutionTimeout.Unit)
 	if interval > 0 {
-		return ctx.RequestContext.ScheduleActionCall("timeoutReached", map[string]any{}, interval)
+		return ctx.Requests.ScheduleActionCall("timeoutReached", map[string]any{}, interval)
 	}
 
 	return nil

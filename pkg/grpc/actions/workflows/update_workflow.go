@@ -253,12 +253,12 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 
 	logger := logging.ForNode(*node)
 	triggerCtx := core.TriggerContext{
-		Configuration:      node.Configuration.Data(),
-		MetadataContext:    contexts.NewNodeMetadataContext(tx, node),
-		RequestContext:     contexts.NewNodeRequestContext(tx, node),
-		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
-		EventContext:       contexts.NewEventContext(tx, node),
-		WebhookContext:     contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
+		Configuration: node.Configuration.Data(),
+		Metadata:      contexts.NewNodeMetadataContext(tx, node),
+		Requests:      contexts.NewNodeRequestContext(tx, node),
+		Integration:   contexts.NewIntegrationContext(tx, registry),
+		Events:        contexts.NewEventContext(tx, node),
+		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
 	}
 
 	if node.AppInstallationID != nil {
@@ -268,7 +268,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		triggerCtx.AppInstallationContext = contexts.NewAppInstallationContext(
+		triggerCtx.AppInstallation = contexts.NewAppInstallationContext(
 			tx,
 			node,
 			appInstallation,
@@ -295,10 +295,10 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 
 	logger := logging.ForNode(*node)
 	setupCtx := core.SetupContext{
-		Configuration:      node.Configuration.Data(),
-		MetadataContext:    contexts.NewNodeMetadataContext(tx, node),
-		RequestContext:     contexts.NewNodeRequestContext(tx, node),
-		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
+		Configuration: node.Configuration.Data(),
+		Metadata:      contexts.NewNodeMetadataContext(tx, node),
+		Requests:      contexts.NewNodeRequestContext(tx, node),
+		Integration:   contexts.NewIntegrationContext(tx, registry),
 	}
 
 	if node.AppInstallationID != nil {
@@ -308,7 +308,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		setupCtx.AppInstallationContext = contexts.NewAppInstallationContext(
+		setupCtx.AppInstallation = contexts.NewAppInstallationContext(
 			tx,
 			node,
 			appInstallation,

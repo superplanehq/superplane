@@ -84,14 +84,14 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 
 			logger := logging.ForExecution(execution, nil)
 			ctx := core.ExecutionContext{
-				ID:                    execution.ID,
-				WorkflowID:            execution.WorkflowID.String(),
-				Configuration:         execution.Configuration.Data(),
-				MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
-				ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
-				RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
-				AuthContext:           contexts.NewAuthContext(tx, uuid.MustParse(organizationID), authService, user),
-				IntegrationContext:    contexts.NewIntegrationContext(tx, registry),
+				ID:             execution.ID,
+				WorkflowID:     execution.WorkflowID.String(),
+				Configuration:  execution.Configuration.Data(),
+				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
+				ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+				Requests:       contexts.NewExecutionRequestContext(tx, execution),
+				Auth:           contexts.NewAuthContext(tx, uuid.MustParse(organizationID), authService, user),
+				Integration:    contexts.NewIntegrationContext(tx, registry),
 			}
 
 			if node.AppInstallationID != nil {
@@ -102,7 +102,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 				}
 
 				logger = logging.WithAppInstallation(logger, *appInstallation)
-				ctx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
+				ctx.AppInstallation = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
 			}
 
 			ctx.Logger = logger

@@ -228,7 +228,7 @@ func (t *OnEvent) Configuration() []configuration.Field {
 
 func (t *OnEvent) Setup(ctx core.TriggerContext) error {
 	var metadata OnEventMetadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
@@ -251,13 +251,13 @@ func (t *OnEvent) Setup(ctx core.TriggerContext) error {
 
 	// Store metadata
 	metadata.Resource = config.Resource
-	err = ctx.MetadataContext.Set(metadata)
+	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
 	// Request webhook if needed
-	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
 		EventType: "event",
 		Resource:  config.Resource,
 	})
@@ -279,7 +279,7 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	// Verify the signature
-	secret, err := ctx.WebhookContext.GetSecret()
+	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
 	}
@@ -312,7 +312,7 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	// Emit the event to trigger workflow execution
-	err = ctx.EventContext.Emit(data)
+	err = ctx.Events.Emit(data)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}

@@ -50,9 +50,9 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 		Parameters: map[string]any{
 			"index": float64(0),
 		},
-		MetadataContext:       metadataCtx,
-		ExecutionStateContext: stateCtx,
-		AuthContext:           authCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: stateCtx,
+		Auth:           authCtx,
 	}
 
 	err := approval.HandleAction(ctx)
@@ -89,9 +89,9 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 			"index":  float64(0),
 			"reason": "Not approved",
 		},
-		MetadataContext:       metadataCtx,
-		ExecutionStateContext: stateCtx,
-		AuthContext:           authCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: stateCtx,
+		Auth:           authCtx,
 	}
 
 	err := approval.HandleAction(ctx)
@@ -129,9 +129,9 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 		Parameters: map[string]any{
 			"index": float64(0),
 		},
-		MetadataContext:       metadataCtx,
-		ExecutionStateContext: stateCtx,
-		AuthContext:           authCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: stateCtx,
+		Auth:           authCtx,
 	}
 
 	err := approval.HandleAction(ctx)
@@ -254,9 +254,9 @@ func TestApproval_Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"items": []any{},
 			},
-			MetadataContext:       metadataCtx,
-			ExecutionStateContext: stateCtx,
-			AuthContext:           authCtx,
+			Metadata:       metadataCtx,
+			ExecutionState: stateCtx,
+			Auth:           authCtx,
 		}
 
 		err := approval.Execute(ctx)
@@ -291,9 +291,9 @@ func TestApproval_Execute(t *testing.T) {
 					},
 				},
 			},
-			MetadataContext:       metadataCtx,
-			ExecutionStateContext: stateCtx,
-			AuthContext:           authCtx,
+			Metadata:       metadataCtx,
+			ExecutionState: stateCtx,
+			Auth:           authCtx,
 		}
 
 		err := approval.Execute(ctx)

@@ -108,7 +108,7 @@ func verifySignature(ctx core.WebhookRequestContext, expectedType string) (int, 
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
-	secret, err := ctx.WebhookContext.GetSecret()
+	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
 	}

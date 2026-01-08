@@ -105,7 +105,7 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 		return errors.New("service is required")
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext)
+	client, err := NewClient(ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
@@ -115,7 +115,7 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error finding service: %v", err)
 	}
 
-	return ctx.MetadataContext.Set(NodeMetadata{Service: service})
+	return ctx.Metadata.Set(NodeMetadata{Service: service})
 }
 
 func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
@@ -125,7 +125,7 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext)
+	client, err := NewClient(ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
@@ -135,7 +135,7 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create incident: %v", err)
 	}
 
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"pagerduty.incident",
 		[]any{incident},

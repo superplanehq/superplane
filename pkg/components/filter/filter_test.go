@@ -55,9 +55,9 @@ func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 			stateCtx := &contexts.ExecutionStateContext{}
 
 			ctx := core.ExecutionContext{
-				Data:                  tt.inputData,
-				Configuration:         tt.configuration,
-				ExecutionStateContext: stateCtx,
+				Data:           tt.inputData,
+				Configuration:  tt.configuration,
+				ExecutionState: stateCtx,
 			}
 
 			err := filter.Execute(ctx)
@@ -85,9 +85,9 @@ func TestFilter_Execute_InvalidExpression_ShouldReturnError(t *testing.T) {
 	stateCtx := &contexts.ExecutionStateContext{}
 
 	ctx := core.ExecutionContext{
-		Data:                  map[string]any{"test": "value"},
-		Configuration:         map[string]any{"expression": "invalid expression syntax +++"},
-		ExecutionStateContext: stateCtx,
+		Data:           map[string]any{"test": "value"},
+		Configuration:  map[string]any{"expression": "invalid expression syntax +++"},
+		ExecutionState: stateCtx,
 	}
 
 	err := filter.Execute(ctx)
@@ -101,9 +101,9 @@ func TestFilter_Execute_NonBooleanResult_ShouldReturnError(t *testing.T) {
 	stateCtx := &contexts.ExecutionStateContext{}
 
 	ctx := core.ExecutionContext{
-		Data:                  map[string]any{"test": "value"},
-		Configuration:         map[string]any{"expression": "$.test"},
-		ExecutionStateContext: stateCtx,
+		Data:           map[string]any{"test": "value"},
+		Configuration:  map[string]any{"expression": "$.test"},
+		ExecutionState: stateCtx,
 	}
 
 	err := filter.Execute(ctx)

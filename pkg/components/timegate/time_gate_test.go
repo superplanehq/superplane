@@ -107,9 +107,9 @@ func TestTimeGate_HandleAction_PushThrough_Finishes(t *testing.T) {
 
 	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ActionContext{
-		Name:                  "pushThrough",
-		ExecutionStateContext: stateCtx,
-		Parameters:            map[string]any{},
+		Name:           "pushThrough",
+		ExecutionState: stateCtx,
+		Parameters:     map[string]any{},
 	}
 
 	err := tg.HandleAction(ctx)

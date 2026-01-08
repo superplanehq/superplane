@@ -190,7 +190,7 @@ func (s *Semaphore) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("project is required")
 	}
 
-	integration, err := ctx.IntegrationContext.GetIntegration(config.Integration)
+	integration, err := ctx.Integration.GetIntegration(config.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to get integration: %w", err)
 	}
@@ -200,7 +200,7 @@ func (s *Semaphore) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to find project %s: %w", config.Project, err)
 	}
 
-	ctx.MetadataContext.Set(NodeMetadata{
+	ctx.Metadata.Set(NodeMetadata{
 		Project: &Project{
 			ID:   resource.Id(),
 			Name: resource.Name(),
@@ -218,7 +218,7 @@ func (s *Semaphore) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	integration, err := ctx.IntegrationContext.GetIntegration(spec.Integration)
+	integration, err := ctx.Integration.GetIntegration(spec.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to get integration: %w", err)
 	}
@@ -246,10 +246,10 @@ func (s *Semaphore) Execute(ctx core.ExecutionContext) error {
 
 	wf, err := semaphore.RunWorkflow(params)
 	if err != nil {
-		return ctx.ExecutionStateContext.Fail(models.WorkflowNodeExecutionResultReasonError, err.Error())
+		return ctx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, err.Error())
 	}
 
-	ctx.MetadataContext.Set(ExecutionMetadata{
+	ctx.Metadata.Set(ExecutionMetadata{
 		Workflow: &Workflow{
 			ID:    wf.Id(),
 			URL:   wf.URL(),
@@ -257,7 +257,7 @@ func (s *Semaphore) Execute(ctx core.ExecutionContext) error {
 		},
 	})
 
-	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
 }
 
 func (s *Semaphore) Actions() []core.Action {
@@ -304,7 +304,7 @@ func (s *Semaphore) poll(ctx core.ActionContext) error {
 	}
 
 	metadata := ExecutionMetadata{}
-	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return err
 	}
@@ -316,7 +316,7 @@ func (s *Semaphore) poll(ctx core.ActionContext) error {
 		return nil
 	}
 
-	integration, err := ctx.IntegrationContext.GetIntegration(spec.Integration)
+	integration, err := ctx.Integration.GetIntegration(spec.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to get integration: %w", err)
 	}
@@ -330,7 +330,7 @@ func (s *Semaphore) poll(ctx core.ActionContext) error {
 	// If not finished, poll again in 1min.
 	//
 	if !resource.Finished() {
-		return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
 	}
 
 	result := "passed"
@@ -347,17 +347,17 @@ func (s *Semaphore) poll(ctx core.ActionContext) error {
 		},
 	}
 
-	ctx.MetadataContext.Set(newMetadata)
+	ctx.Metadata.Set(newMetadata)
 
 	if result == "passed" {
-		return ctx.ExecutionStateContext.Emit(
+		return ctx.ExecutionState.Emit(
 			PassedOutputChannel,
 			"semaphore.workflow.finished",
 			[]any{metadata},
 		)
 	}
 
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		FailedOutputChannel,
 		"semaphore.workflow.finished",
 		[]any{metadata},
@@ -366,7 +366,7 @@ func (s *Semaphore) poll(ctx core.ActionContext) error {
 
 func (s *Semaphore) finish(ctx core.ActionContext) error {
 	metadata := ExecutionMetadata{}
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return err
 	}
@@ -395,9 +395,9 @@ func (s *Semaphore) finish(ctx core.ActionContext) error {
 		},
 	}
 
-	ctx.MetadataContext.Set(newMetadata)
+	ctx.Metadata.Set(newMetadata)
 
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		PassedOutputChannel,
 		"semaphore.workflow.finished",
 		[]any{metadata},
@@ -406,7 +406,7 @@ func (s *Semaphore) finish(ctx core.ActionContext) error {
 
 func (s *Semaphore) Cancel(ctx core.ExecutionContext) error {
 	metadata := ExecutionMetadata{}
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
@@ -415,7 +415,7 @@ func (s *Semaphore) Cancel(ctx core.ExecutionContext) error {
 		return fmt.Errorf("no workflow found in metadata")
 	}
 
-	if ctx.ExecutionStateContext.IsFinished() {
+	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
 
@@ -425,7 +425,7 @@ func (s *Semaphore) Cancel(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	integration, err := ctx.IntegrationContext.GetIntegration(spec.Integration)
+	integration, err := ctx.Integration.GetIntegration(spec.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to get integration: %w", err)
 	}
@@ -442,7 +442,7 @@ func (s *Semaphore) Cancel(ctx core.ExecutionContext) error {
 
 	metadata.Workflow.State = "finished"
 	metadata.Workflow.Result = "cancelled"
-	ctx.MetadataContext.Set(metadata)
+	ctx.Metadata.Set(metadata)
 
 	return nil
 }
