@@ -6,6 +6,7 @@ import { onReleaseTriggerRenderer } from "./on_release";
 import { onTagCreatedTriggerRenderer } from "./on_tag_created";
 import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
 import { baseIssueMapper } from "./base";
+import { onPackagePublishedTriggerRenderer } from "./on_package_published";
 import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper } from "./run_workflow";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -26,4 +27,5 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   onRelease: onReleaseTriggerRenderer,
   onTagCreated: onTagCreatedTriggerRenderer,
   onBranchCreated: onBranchCreatedTriggerRenderer,
+  onPackagePublished: onPackagePublishedTriggerRenderer,
 };
