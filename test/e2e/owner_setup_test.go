@@ -12,8 +12,9 @@ import (
 )
 
 func TestOwnerSetupFlow(t *testing.T) {
+	steps := &ownerSetupSteps{t: t}
+
 	t.Run("completing owner setup via UI creates owner and redirects to home", func(t *testing.T) {
-		steps := &ownerSetupSteps{t: t}
 		steps.start()
 		steps.visitSetupPage()
 		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
@@ -23,7 +24,6 @@ func TestOwnerSetupFlow(t *testing.T) {
 	})
 
 	t.Run("can login with email and password after owner setup", func(t *testing.T) {
-		steps := &ownerSetupSteps{t: t}
 		steps.start()
 		steps.visitSetupPage()
 		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
@@ -52,7 +52,7 @@ func (s *ownerSetupSteps) start() {
 }
 
 func (s *ownerSetupSteps) visitSetupPage() {
-	s.session.Visit("/setup")
+	s.session.Visit("/")
 }
 
 func (s *ownerSetupSteps) fillInOwnerDetailsAndSubmit(email, firstName, lastName, password string) {

@@ -596,8 +596,20 @@ export const CustomComponent = () => {
         }
 
         // Mark this template as converted so it won't be preserved in useEffect
+        console.log("[SAVE] Marking template as converted:", templateNodeId);
+        console.log("[SAVE] convertedTemplateIdsRef now contains:", Array.from(convertedTemplateIdsRef.current));
         convertedTemplateIdsRef.current.add(templateNodeId);
 
+        // Update state
+        console.log("[SAVE] Setting nodes - removing template, adding real node");
+        console.log(
+          "[SAVE] updatedNodes:",
+          updatedNodes.map((n) => ({
+            id: n.id,
+            isTemplate: (n.data as any).isTemplate,
+            isPending: (n.data as any).isPendingConnection,
+          })),
+        );
         setNodes(updatedNodes);
         setEdges(updatedEdges);
 
@@ -787,8 +799,15 @@ export const CustomComponent = () => {
       // Clear template state
       setTemplateNodeId(null);
       setNewNodeData(null);
+
+      // Save to server immediately with the updated nodes and edges
+      console.log("[handleNodeAdd] Auto-saving after adding node", {
+        newNodeId,
+        updatedNodesCount: updatedNodes.length,
+      });
       try {
         await handleSaveBlueprint(updatedNodes, updatedEdges);
+        console.log("[handleNodeAdd] Auto-save completed successfully");
       } catch (error) {
         console.error("Failed to auto-save after adding node:", error);
         showErrorToast("Failed to save component");

@@ -7,11 +7,17 @@ import {
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+import { ComponentBaseMapper } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
-import { BaseNodeMetadata, Incident } from "./types";
-import { getDetailsForIncident } from "./base";
+
+export interface BaseNodeMetadata {
+  service?: {
+    id: string;
+    name: string;
+    html_url: string;
+  };
+}
 
 export const createIncidentMapper: ComponentBaseMapper = {
   props(
@@ -36,12 +42,6 @@ export const createIncidentMapper: ComponentBaseMapper = {
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
-  },
-
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default: OutputPayload[] };
-    const incident = outputs.default[0].data.incident as Incident;
-    return getDetailsForIncident(incident);
   },
 };
 

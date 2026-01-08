@@ -427,7 +427,7 @@ message ListWorkflowEventsRequest {
 }
 
 message ListWorkflowEventsResponse {
-  repeated WorkflowEventWithExecutions events = 1;
+  repeated WorkflowEvent events = 1;
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
@@ -440,16 +440,6 @@ message WorkflowEvent {
   string channel = 4;
   google.protobuf.Struct data = 5;
   google.protobuf.Timestamp created_at = 6;
-}
-
-message WorkflowEventWithExecutions {
-  string id = 1;
-  string workflow_id = 2;
-  string node_id = 3;
-  string channel = 4;
-  google.protobuf.Struct data = 5;
-  google.protobuf.Timestamp created_at = 6;
-  repeated WorkflowNodeExecution executions = 7;
 }
 
 message ListEventExecutionsRequest {

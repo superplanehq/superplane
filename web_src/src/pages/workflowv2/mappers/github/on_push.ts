@@ -3,11 +3,23 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata, Push } from "./types";
+import { BaseNodeMetadata } from "./base";
 import { Predicate, createGithubMetadataItems } from "./utils";
 
 interface GithubConfiguration {
   refs: Predicate[];
+}
+
+interface PushEventData {
+  head_commit?: {
+    message?: string;
+    id?: string;
+    author?: {
+      name?: string;
+      email?: string;
+      username: string;
+    };
+  };
 }
 
 /**
@@ -15,7 +27,7 @@ interface GithubConfiguration {
  */
 export const onPushTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as Push;
+    const eventData = event.data?.data as PushEventData;
 
     return {
       title: eventData?.head_commit?.message || "",
@@ -24,7 +36,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as Push;
+    const eventData = lastEvent.data?.data as PushEventData;
 
     return {
       Commit: eventData?.head_commit?.message || "",
@@ -48,7 +60,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as Push;
+      const eventData = lastEvent.data?.data as PushEventData;
       props.lastEventData = {
         title: eventData?.head_commit?.message || "",
         subtitle: eventData?.head_commit?.id || "",

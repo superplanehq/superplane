@@ -21,6 +21,8 @@ export function usePushThroughHandler({ workflowId, organizationId, workflow }: 
   const onPushThrough = useCallback(
     async (nodeId: string, executionId: string) => {
       try {
+        console.log("Attempting to push through node:", nodeId, "with executionId:", executionId);
+
         await workflowsInvokeNodeExecutionAction(
           withOrganizationHeader({
             path: {

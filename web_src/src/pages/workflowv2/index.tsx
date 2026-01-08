@@ -32,7 +32,6 @@ import {
   useTriggers,
   useUpdateWorkflow,
   useWorkflow,
-  useWorkflowEvents,
   useWidgets,
   workflowKeys,
 } from "@/hooks/useWorkflowData";
@@ -66,19 +65,13 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import {
-  buildRunEntryFromEvent,
-  buildRunItemFromExecution,
-  buildCanvasStatusLogEntry,
   buildTabData,
   getNextInQueueInfo,
-  mapCanvasNodesToLogEntries,
   mapExecutionsToSidebarEvents,
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
-  mapWorkflowEventsToRunLogEntries,
 } from "./utils";
 import { SidebarEvent } from "@/ui/componentSidebar/types";
-import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
@@ -103,7 +96,6 @@ export function WorkflowPageV2() {
   const { data: availableApplications = [], isLoading: applicationsLoading } = useAvailableApplications();
   const { data: installedApplications = [] } = useInstalledApplications(organizationId!);
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
-  const { data: workflowEventsResponse } = useWorkflowEvents(workflowId!);
 
   usePageTitle([workflow?.metadata?.name || "Canvas"]);
 
@@ -281,12 +273,14 @@ export function WorkflowPageV2() {
         try {
           // Check if auto-save is disabled
           if (!isAutoSaveEnabled) {
+            console.log("Skipping position auto-save because auto-save is disabled");
             return;
           }
 
           // Check if there are unsaved structural changes
           // If so, skip auto-save to avoid saving those changes accidentally
           if (hasNonPositionalUnsavedChanges) {
+            console.log("Skipping position auto-save due to unsaved structural changes");
             return;
           }
 
@@ -380,7 +374,7 @@ export function WorkflowPageV2() {
 
   const handleNodeWebsocketEvent = useCallback(
     (nodeId: string, event: string) => {
-      if (event.includes("event_created")) {
+      if (event.startsWith("event_created")) {
         queryClient.invalidateQueries({
           queryKey: workflowKeys.nodeEventHistory(workflowId!, nodeId),
         });
@@ -400,6 +394,8 @@ export function WorkflowPageV2() {
     },
     [queryClient, workflowId],
   );
+
+  useWorkflowWebsocket(workflowId!, organizationId!, handleNodeWebsocketEvent);
 
   // Warn user before leaving page with unsaved changes
   useEffect(() => {
@@ -545,192 +541,6 @@ export function WorkflowPageV2() {
   });
 
   const [currentHistoryNode, setCurrentHistoryNode] = useState<{ nodeId: string; nodeType: string } | null>(null);
-  const [focusRequest, setFocusRequest] = useState<{
-    nodeId: string;
-    requestId: number;
-    tab?: "latest" | "settings" | "execution-chain";
-    executionChain?: {
-      eventId: string;
-      executionId?: string | null;
-      triggerEvent?: SidebarEvent | null;
-    };
-  } | null>(null);
-  const [liveRunEntries, setLiveRunEntries] = useState<LogEntry[]>([]);
-  const [liveCanvasEntries, setLiveCanvasEntries] = useState<LogEntry[]>([]);
-  const handleExecutionChainHandled = useCallback(() => setFocusRequest(null), []);
-
-  const handleSidebarChange = useCallback(
-    (open: boolean, nodeId: string | null) => {
-      const next = new URLSearchParams(searchParams);
-      if (open) {
-        next.set("sidebar", "1");
-        if (nodeId) {
-          next.set("node", nodeId);
-        } else {
-          next.delete("node");
-        }
-      } else {
-        next.delete("sidebar");
-        next.delete("node");
-      }
-      setSearchParams(next, { replace: true });
-    },
-    [searchParams, setSearchParams],
-  );
-
-  const handleLogNodeSelect = useCallback(
-    (nodeId: string) => {
-      handleSidebarChange(true, nodeId);
-      setFocusRequest({ nodeId, requestId: Date.now(), tab: "settings" });
-    },
-    [handleSidebarChange],
-  );
-
-  const handleLogRunNodeSelect = useCallback(
-    (nodeId: string) => {
-      handleSidebarChange(true, nodeId);
-      setFocusRequest({ nodeId, requestId: Date.now(), tab: "latest" });
-    },
-    [handleSidebarChange],
-  );
-
-  const handleLogRunExecutionSelect = useCallback(
-    (options: { nodeId: string; eventId: string; executionId: string; triggerEvent?: SidebarEvent }) => {
-      handleSidebarChange(true, options.nodeId);
-      setFocusRequest({
-        nodeId: options.nodeId,
-        requestId: Date.now(),
-        tab: "execution-chain",
-        executionChain: {
-          eventId: options.eventId,
-          executionId: options.executionId,
-          triggerEvent: options.triggerEvent,
-        },
-      });
-    },
-    [handleSidebarChange],
-  );
-
-  const buildLiveRunItemFromExecution = useCallback(
-    (execution: WorkflowsWorkflowNodeExecution): LogRunItem => {
-      return buildRunItemFromExecution({
-        execution,
-        nodes: workflow?.spec?.nodes || [],
-        onNodeSelect: handleLogRunNodeSelect,
-        onExecutionSelect: handleLogRunExecutionSelect,
-        event: execution.rootEvent || undefined,
-      });
-    },
-    [handleLogRunExecutionSelect, handleLogRunNodeSelect, workflow?.spec?.nodes],
-  );
-
-  const buildLiveRunEntryFromEvent = useCallback(
-    (event: WorkflowsWorkflowEvent, runItems: LogRunItem[] = []): LogEntry => {
-      return buildRunEntryFromEvent({
-        event,
-        nodes: workflow?.spec?.nodes || [],
-        runItems,
-      });
-    },
-    [workflow?.spec?.nodes],
-  );
-
-  const handleWorkflowEventCreated = useCallback(
-    (event: WorkflowsWorkflowEvent) => {
-      if (!event.id) {
-        return;
-      }
-
-      const nodes = workflow?.spec?.nodes || [];
-      const node = nodes.find((item) => item.id === event.nodeId);
-      if (!node || node.type !== "TYPE_TRIGGER") {
-        return;
-      }
-
-      setLiveRunEntries((prev) => {
-        const entry = buildLiveRunEntryFromEvent(event, []);
-        const next = [entry, ...prev.filter((item) => item.id !== entry.id)];
-        return next.sort((a, b) => {
-          const aTime = Date.parse(a.timestamp || "") || 0;
-          const bTime = Date.parse(b.timestamp || "") || 0;
-          return bTime - aTime;
-        });
-      });
-    },
-    [buildLiveRunEntryFromEvent, workflow?.spec?.nodes],
-  );
-
-  const handleExecutionEvent = useCallback(
-    (execution: WorkflowsWorkflowNodeExecution) => {
-      if (!execution.rootEvent?.id) {
-        return;
-      }
-
-      setLiveRunEntries((prev) => {
-        const runItem = buildLiveRunItemFromExecution(execution);
-        const existing = prev.find((item) => item.id === execution.rootEvent?.id);
-        const existingRunItems = existing?.runItems || [];
-        const runItemsMap = new Map(existingRunItems.map((item) => [item.id, item]));
-        runItemsMap.set(runItem.id, runItem);
-        const runItems = Array.from(runItemsMap.values());
-        const entry = buildLiveRunEntryFromEvent(execution.rootEvent as WorkflowsWorkflowEvent, runItems);
-        const next = [entry, ...prev.filter((item) => item.id !== entry.id)];
-        return next.sort((a, b) => {
-          const aTime = Date.parse(a.timestamp || "") || 0;
-          const bTime = Date.parse(b.timestamp || "") || 0;
-          return bTime - aTime;
-        });
-      });
-    },
-    [buildLiveRunEntryFromEvent, buildLiveRunItemFromExecution],
-  );
-
-  useWorkflowWebsocket(
-    workflowId!,
-    organizationId!,
-    handleNodeWebsocketEvent,
-    handleWorkflowEventCreated,
-    handleExecutionEvent,
-  );
-
-  const logEntries = useMemo(() => {
-    const nodes = workflow?.spec?.nodes || [];
-    const rootEvents = workflowEventsResponse?.events || [];
-
-    const runEntries = mapWorkflowEventsToRunLogEntries({
-      events: rootEvents,
-      nodes,
-      onNodeSelect: handleLogRunNodeSelect,
-      onExecutionSelect: handleLogRunExecutionSelect,
-    });
-
-    const mergedRunEntries = new Map<string, LogEntry>();
-    runEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
-    liveRunEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
-    const allRunEntries = Array.from(mergedRunEntries.values());
-
-    const canvasEntries = mapCanvasNodesToLogEntries({
-      nodes,
-      workflowUpdatedAt: workflow?.metadata?.updatedAt || "",
-      onNodeSelect: handleLogNodeSelect,
-    });
-    const allCanvasEntries = [...liveCanvasEntries, ...canvasEntries];
-
-    return [...allRunEntries, ...allCanvasEntries].sort((a, b) => {
-      const aTime = Date.parse(a.timestamp || "") || 0;
-      const bTime = Date.parse(b.timestamp || "") || 0;
-      return aTime - bTime;
-    });
-  }, [
-    handleLogNodeSelect,
-    handleLogRunNodeSelect,
-    handleLogRunExecutionSelect,
-    liveCanvasEntries,
-    liveRunEntries,
-    workflow?.metadata?.updatedAt,
-    workflow?.spec?.nodes,
-    workflowEventsResponse?.events,
-  ]);
 
   const nodeHistoryQuery = useNodeHistory({
     workflowId: workflowId || "",
@@ -869,15 +679,6 @@ export function WorkflowPageV2() {
         if (options?.showToast !== false) {
           showSuccessToast("Canvas changes saved");
         }
-        setLiveCanvasEntries((prev) => [
-          buildCanvasStatusLogEntry({
-            id: `canvas-save-${Date.now()}`,
-            message: "Canvas changes saved",
-            type: "success",
-            timestamp: new Date().toISOString(),
-          }),
-          ...prev,
-        ]);
         setHasUnsavedChanges(false);
         setHasNonPositionalUnsavedChanges(false);
 
@@ -887,22 +688,12 @@ export function WorkflowPageV2() {
         console.error("Failed to save changes to the canvas:", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
         showErrorToast(errorMessage);
-        setLiveCanvasEntries((prev) => [
-          buildCanvasStatusLogEntry({
-            id: `canvas-save-error-${Date.now()}`,
-            message: errorMessage,
-            type: "error",
-            timestamp: new Date().toISOString(),
-          }),
-          ...prev,
-        ]);
       } finally {
         if (focusedNoteId) {
           requestAnimationFrame(() => {
             restoreActiveNoteFocus();
           });
         }
-      }
       }
     },
     [workflow, organizationId, workflowId, updateWorkflowMutation],
@@ -1772,6 +1563,25 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, updateWorkflowMutation],
   );
 
+  const handleSidebarChange = useCallback(
+    (open: boolean, nodeId: string | null) => {
+      const next = new URLSearchParams(searchParams);
+      if (open) {
+        next.set("sidebar", "1");
+        if (nodeId) {
+          next.set("node", nodeId);
+        } else {
+          next.delete("node");
+        }
+      } else {
+        next.delete("sidebar");
+        next.delete("node");
+      }
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
   // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
   const { onPushThrough, supportsPushThrough } = usePushThroughHandler({
     workflowId: workflowId!,
@@ -1939,9 +1749,6 @@ export function WorkflowPageV2() {
       components={components}
       triggers={triggers}
       blueprints={blueprints}
-      logEntries={logEntries}
-      focusRequest={focusRequest}
-      onExecutionChainHandled={handleExecutionChainHandled}
       breadcrumbs={[
         {
           label: "Canvases",

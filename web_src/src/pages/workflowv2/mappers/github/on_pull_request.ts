@@ -3,7 +3,7 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata, PullRequest } from "./types";
+import { BaseNodeMetadata } from "./base";
 
 interface OnPullRequestConfiguration {
   actions: string[];
@@ -12,7 +12,24 @@ interface OnPullRequestConfiguration {
 interface OnPullRequestEventData {
   action?: string;
   number?: number;
-  pull_request?: PullRequest;
+  pull_request?: {
+    _links?: {
+      html?: {
+        href: string;
+      };
+    };
+    title?: string;
+    id?: string;
+    url?: string;
+    head?: {
+      sha: string;
+      ref: string;
+    };
+    user?: {
+      id: string;
+      login: string;
+    };
+  };
 }
 
 /**

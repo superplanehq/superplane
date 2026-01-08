@@ -2,9 +2,7 @@ package github
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -15,8 +13,8 @@ import (
 type GetIssue struct{}
 
 type GetIssueConfiguration struct {
-	Repository  string `json:"repository" mapstructure:"repository"`
-	IssueNumber string `json:"issueNumber" mapstructure:"issueNumber"`
+	Repository  string `mapstructure:"repository"`
+	IssueNumber int    `mapstructure:"issueNumber"`
 }
 
 func (c *GetIssue) Name() string {
@@ -54,22 +52,13 @@ func (c *GetIssue) Configuration() []configuration.Field {
 		{
 			Name:     "issueNumber",
 			Label:    "Issue Number",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeNumber,
 			Required: true,
 		},
 	}
 }
 
 func (c *GetIssue) Setup(ctx core.SetupContext) error {
-	var config GetIssueConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	if config.IssueNumber == "" {
-		return errors.New("issue number is required")
-	}
-
 	return ensureRepoInMetadata(
 		ctx.MetadataContext,
 		ctx.AppInstallationContext,
@@ -81,11 +70,6 @@ func (c *GetIssue) Execute(ctx core.ExecutionContext) error {
 	var config GetIssueConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	issueNumber, err := strconv.Atoi(config.IssueNumber)
-	if err != nil {
-		return fmt.Errorf("issue number is not a number: %v", err)
 	}
 
 	var appMetadata Metadata
@@ -104,7 +88,7 @@ func (c *GetIssue) Execute(ctx core.ExecutionContext) error {
 		context.Background(),
 		appMetadata.Owner,
 		config.Repository,
-		issueNumber,
+		config.IssueNumber,
 	)
 
 	if err != nil {
