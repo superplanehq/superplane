@@ -101,7 +101,7 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
 
 func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
-	s.canvas.WaitForExecution("Approval", models.WorkflowNodeExecutionStatePending, 5*time.Second)
+	s.canvas.WaitForExecution("Approval", models.WorkflowNodeExecutionStateStarted, 5*time.Second)
 }
 
 func (s *ApprovalSteps) approveFirstPendingRequirement() {
