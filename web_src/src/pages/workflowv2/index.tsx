@@ -279,14 +279,12 @@ export function WorkflowPageV2() {
         try {
           // Check if auto-save is disabled
           if (!isAutoSaveEnabled) {
-            console.log("Skipping position auto-save because auto-save is disabled");
             return;
           }
 
           // Check if there are unsaved structural changes
           // If so, skip auto-save to avoid saving those changes accidentally
           if (hasNonPositionalUnsavedChanges) {
-            console.log("Skipping position auto-save due to unsaved structural changes");
             return;
           }
 
@@ -551,12 +549,7 @@ export function WorkflowPageV2() {
   } | null>(null);
   const [liveRunEntries, setLiveRunEntries] = useState<LogEntry[]>([]);
   const [liveCanvasEntries, setLiveCanvasEntries] = useState<LogEntry[]>([]);
-  const handleExecutionChainHandled = useCallback(
-    debounce(() => {
-      setFocusRequest(null);
-    }, 500),
-    [],
-  );
+  const handleExecutionChainHandled = useCallback(() => setFocusRequest(null), []);
 
   const handleSidebarChange = useCallback(
     (open: boolean, nodeId: string | null) => {

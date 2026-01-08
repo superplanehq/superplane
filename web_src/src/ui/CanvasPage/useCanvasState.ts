@@ -214,7 +214,6 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
   const toggleNodeCollapse = useCallback(
     (nodeId: string) => {
-      console.log("toggleNodeCollapse", nodeId);
       let isCurrentlyCollapsed = false;
       setCollapsedNodeIds((prev) => {
         isCurrentlyCollapsed = prev.includes(nodeId);
