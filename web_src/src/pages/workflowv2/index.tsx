@@ -65,11 +65,15 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import {
+  buildRunEntryFromEvent,
+  buildRunItemFromExecution,
   buildTabData,
   getNextInQueueInfo,
+  mapCanvasNodesToLogEntries,
   mapExecutionsToSidebarEvents,
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
+  mapWorkflowEventsToRunLogEntries,
 } from "./utils";
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
@@ -576,82 +580,24 @@ export function WorkflowPageV2() {
     [handleSidebarChange],
   );
 
-  const buildRunItemFromExecution = useCallback(
+  const buildLiveRunItemFromExecution = useCallback(
     (execution: WorkflowsWorkflowNodeExecution): LogRunItem => {
-      const nodes = workflow?.spec?.nodes || [];
-      const componentNode = nodes.find((node) => node.id === execution.nodeId);
-      const componentName = componentNode?.component?.name || "";
-      const stateResolver = getState(componentName);
-      const state = stateResolver(execution);
-      const executionState = state || "unknown";
-      const nodeId = componentNode?.id || execution.nodeId || "";
-      const primaryComponentName = componentName ? componentName.split(".")[0] : "";
-      const componentSubtitle = componentNode
-        ? getComponentBaseMapper(primaryComponentName).subtitle?.(componentNode, execution)
-        : undefined;
-      const detail = execution.resultMessage || componentSubtitle;
-      const title = (
-        <span>
-          {componentNode?.name || componentNode?.id || execution.nodeId || "Execution"}
-          {nodeId ? (
-            <>
-              {" · "}
-              <button
-                type="button"
-                className="text-blue-600 underline hover:text-blue-700"
-                onClick={() => handleLogRunNodeSelect(nodeId)}
-              >
-                {nodeId}
-              </button>
-            </>
-          ) : null}
-          {" · "}
-          {executionState}
-        </span>
-      );
-
-      return {
-        id: execution.id || `${execution.nodeId}-execution`,
-        type: mapExecutionStateToLogType(state),
-        title,
-        timestamp: execution.updatedAt || execution.createdAt || execution.rootEvent?.createdAt || "",
-        isRunning: execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING",
-        detail,
-        searchText: [
-          componentNode?.name,
-          componentNode?.id,
-          execution.nodeId,
-          executionState,
-          execution.resultMessage,
-          execution.resultReason,
-          execution.result,
-        ]
-          .filter(Boolean)
-          .join(" "),
-      };
+      return buildRunItemFromExecution({
+        execution,
+        nodes: workflow?.spec?.nodes || [],
+        onNodeSelect: handleLogRunNodeSelect,
+      });
     },
     [handleLogRunNodeSelect, workflow?.spec?.nodes],
   );
 
-  const buildRunEntryFromEvent = useCallback(
+  const buildLiveRunEntryFromEvent = useCallback(
     (event: WorkflowsWorkflowEvent, runItems: LogRunItem[] = []): LogEntry => {
-      const nodes = workflow?.spec?.nodes || [];
-      const triggerNode = nodes.find((node) => node.id === event.nodeId);
-      const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
-      const { title, subtitle } = triggerRenderer.getTitleAndSubtitle(event);
-      const rootValues = triggerRenderer.getRootEventValues(event);
-
-      return {
-        id: event.id || `run-${Date.now()}`,
-        source: "runs",
-        timestamp: event.createdAt || "",
-        title: `#${event.id?.slice(0, 4)} ·  ${title}` || "· Run",
-        type: "run",
+      return buildRunEntryFromEvent({
+        event,
+        nodes: workflow?.spec?.nodes || [],
         runItems,
-        searchText: [title, subtitle, event.id, event.nodeId, Object.values(rootValues).join(" ")]
-          .filter(Boolean)
-          .join(" "),
-      };
+      });
     },
     [workflow?.spec?.nodes],
   );
@@ -669,7 +615,7 @@ export function WorkflowPageV2() {
       }
 
       setLiveRunEntries((prev) => {
-        const entry = buildRunEntryFromEvent(event, []);
+        const entry = buildLiveRunEntryFromEvent(event, []);
         const next = [entry, ...prev.filter((item) => item.id !== entry.id)];
         return next.sort((a, b) => {
           const aTime = Date.parse(a.timestamp || "") || 0;
@@ -678,7 +624,7 @@ export function WorkflowPageV2() {
         });
       });
     },
-    [buildRunEntryFromEvent, workflow?.spec?.nodes],
+    [buildLiveRunEntryFromEvent, workflow?.spec?.nodes],
   );
 
   const handleExecutionEvent = useCallback(
@@ -688,13 +634,13 @@ export function WorkflowPageV2() {
       }
 
       setLiveRunEntries((prev) => {
-        const runItem = buildRunItemFromExecution(execution);
+        const runItem = buildLiveRunItemFromExecution(execution);
         const existing = prev.find((item) => item.id === execution.rootEvent?.id);
         const existingRunItems = existing?.runItems || [];
         const runItemsMap = new Map(existingRunItems.map((item) => [item.id, item]));
         runItemsMap.set(runItem.id, runItem);
         const runItems = Array.from(runItemsMap.values());
-        const entry = buildRunEntryFromEvent(execution.rootEvent as WorkflowsWorkflowEvent, runItems);
+        const entry = buildLiveRunEntryFromEvent(execution.rootEvent as WorkflowsWorkflowEvent, runItems);
         const next = [entry, ...prev.filter((item) => item.id !== entry.id)];
         return next.sort((a, b) => {
           const aTime = Date.parse(a.timestamp || "") || 0;
@@ -703,7 +649,7 @@ export function WorkflowPageV2() {
         });
       });
     },
-    [buildRunEntryFromEvent, buildRunItemFromExecution],
+    [buildLiveRunEntryFromEvent, buildLiveRunItemFromExecution],
   );
 
   useWorkflowWebsocket(
@@ -718,76 +664,10 @@ export function WorkflowPageV2() {
     const nodes = workflow?.spec?.nodes || [];
     const rootEvents = workflowEventsResponse?.events || [];
 
-    const runEntries = rootEvents.map((event, index) => {
-      const triggerNode = nodes.find((node) => node.id === event.nodeId);
-      const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
-      const { title, subtitle } = triggerRenderer.getTitleAndSubtitle(event as WorkflowsWorkflowEvent);
-      const rootValues = triggerRenderer.getRootEventValues(event as WorkflowsWorkflowEvent);
-
-      const runItems = (event.executions || []).map((execution, executionIndex) => {
-        const componentNode = nodes.find((node) => node.id === execution.nodeId);
-        const componentName = componentNode?.component?.name || "";
-        const stateResolver = getState(componentName);
-        const state = stateResolver(execution as WorkflowsWorkflowNodeExecution);
-        const executionState = state || "unknown";
-        const nodeId = componentNode?.id || execution.nodeId || "";
-        const primaryComponentName = componentName ? componentName.split(".")[0] : "";
-        const componentSubtitle = getComponentBaseMapper(primaryComponentName).subtitle?.(
-          componentNode as ComponentsNode,
-          execution as WorkflowsWorkflowNodeExecution,
-        );
-        const detail = execution.resultMessage || componentSubtitle;
-        const title = (
-          <span>
-            {componentNode?.name || componentNode?.id || execution.nodeId || "Execution"}
-            {nodeId ? (
-              <>
-                {" · "}
-                <button
-                  type="button"
-                  className="text-blue-600 underline hover:text-blue-700"
-                  onClick={() => handleLogRunNodeSelect(nodeId)}
-                >
-                  {nodeId}
-                </button>
-              </>
-            ) : null}
-            {" · "}
-            {executionState}
-          </span>
-        );
-        return {
-          id: execution.id || `${event.id}-execution-${executionIndex}`,
-          type: mapExecutionStateToLogType(state),
-          title,
-          timestamp: event.createdAt || "",
-          isRunning: execution.state === "STATE_STARTED",
-          detail,
-          searchText: [
-            componentNode?.name,
-            componentNode?.id,
-            execution.nodeId,
-            executionState,
-            execution.resultMessage,
-            execution.resultReason,
-            execution.result,
-          ]
-            .filter(Boolean)
-            .join(" "),
-        };
-      });
-
-      return {
-        id: event.id || `run-${index + 1}`,
-        source: "runs",
-        timestamp: event.createdAt || "",
-        title: `#${event.id?.slice(0, 4)} ·  ${title}` || "· Run",
-        type: "run",
-        runItems,
-        searchText: [title, subtitle, event.id, event.nodeId, Object.values(rootValues).join(" ")]
-          .filter(Boolean)
-          .join(" "),
-      } as LogEntry;
+    const runEntries = mapWorkflowEventsToRunLogEntries({
+      events: rootEvents,
+      nodes,
+      onNodeSelect: handleLogRunNodeSelect,
     });
 
     const mergedRunEntries = new Map<string, LogEntry>();
@@ -795,31 +675,11 @@ export function WorkflowPageV2() {
     liveRunEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
     const allRunEntries = Array.from(mergedRunEntries.values());
 
-    const canvasEntries =
-      nodes
-        .filter((node: ComponentsNode) => node.errorMessage)
-        .map((node, index) => {
-          return {
-            id: `log-${index + 1}`,
-            source: "canvas",
-            timestamp: workflow?.metadata?.updatedAt || "",
-            title: (
-              <span>
-                Component not configured -{" "}
-                <button
-                  type="button"
-                  className="text-blue-600 underline hover:text-blue-700"
-                  onClick={() => handleLogNodeSelect(node.id || '')}
-                >
-                  {node.id}
-                </button>{" "}
-                - {node.errorMessage}
-              </span>
-            ),
-            type: "warning",
-            searchText: `component not configured ${node.id} ${node.errorMessage}`,
-          } as LogEntry;
-        }) || [];
+    const canvasEntries = mapCanvasNodesToLogEntries({
+      nodes,
+      workflowUpdatedAt: workflow?.metadata?.updatedAt || "",
+      onNodeSelect: handleLogNodeSelect,
+    });
 
     return [...allRunEntries, ...canvasEntries].sort((a, b) => {
       const aTime = Date.parse(a.timestamp || "") || 0;
@@ -1973,16 +1833,6 @@ export function WorkflowPageV2() {
       ]}
     />
   );
-}
-
-function mapExecutionStateToLogType(state?: string): "success" | "error" | "warning" {
-  if (state === "success") {
-    return "success";
-  }
-  if (state === "failed" || state === "error" || state === "cancelled") {
-    return "error";
-  }
-  return "warning";
 }
 
 function useExecutionChainData(workflowId: string, queryClient: QueryClient, workflow?: WorkflowsWorkflow) {
