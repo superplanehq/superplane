@@ -445,6 +445,7 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 		BaseURL:         s.BaseURL,
 		WebhooksBaseURL: s.WebhooksBaseURL,
 		OrganizationID:  appInstallation.OrganizationID.String(),
+		HTTP:            contexts.NewHTTPContext(s.registry.GetHTTPClient()),
 		AppInstallation: contexts.NewAppInstallationContext(
 			database.Conn(),
 			nil,
