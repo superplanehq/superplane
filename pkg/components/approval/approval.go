@@ -17,9 +17,10 @@ const (
 	StateApproved = "approved"
 	StateRejected = "rejected"
 
-	ItemTypeUser  = "user"
-	ItemTypeRole  = "role"
-	ItemTypeGroup = "group"
+	ItemTypeAnyone = "anyone"
+	ItemTypeUser   = "user"
+	ItemTypeRole   = "role"
+	ItemTypeGroup  = "group"
 
 	ChannelApproved = "approved"
 	ChannelRejected = "rejected"
@@ -155,6 +156,10 @@ func (m *Metadata) Reject(record *Record, index int, ctx core.ActionContext) err
 func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error {
 	authenticatedUser := ctx.AuthContext.AuthenticatedUser()
 	switch record.Type {
+	case ItemTypeAnyone:
+		// Any authenticated user can approve
+		return nil
+
 	case ItemTypeUser:
 		if record.User.ID != authenticatedUser.ID {
 			return fmt.Errorf("item must be approved by %s", authenticatedUser.ID)
@@ -210,6 +215,14 @@ func NewMetadata(ctx core.ExecutionContext, items []Item) (*Metadata, error) {
 
 func approvalItemToRecord(ctx core.ExecutionContext, item Item, index int) (*Record, error) {
 	switch item.Type {
+	case ItemTypeAnyone:
+		return &Record{
+			Type:  item.Type,
+			Index: index,
+			State: StatePending,
+			User:  nil, // No specific user - anyone can approve
+		}, nil
+
 	case ItemTypeUser:
 		userID, err := uuid.Parse(item.User)
 		if err != nil {
@@ -280,25 +293,29 @@ func (a *Approval) OutputChannels(configuration any) []core.OutputChannel {
 func (a *Approval) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:     "items",
-			Label:    "Items",
-			Type:     configuration.FieldTypeList,
-			Required: true,
+			Name:        "items",
+			Label:       "Approvers",
+			Description: "List of users, groups, or roles who must approve before the workflow continues",
+			Type:        configuration.FieldTypeList,
+			Required:    true,
+			Default:     `[{"type":"anyone"}]`,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
-					ItemLabel: "Item",
+					ItemLabel: "Approver",
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
 							{
 								Name:     "type",
-								Label:    "Type",
+								Label:    "Request approval from",
 								Type:     configuration.FieldTypeSelect,
 								Required: true,
+								Default:  "anyone",
 								TypeOptions: &configuration.TypeOptions{
 									Select: &configuration.SelectTypeOptions{
 										Options: []configuration.FieldOption{
-											{Value: "user", Label: "User"},
+											{Value: "anyone", Label: "Any user"},
+											{Value: "user", Label: "Specific user"},
 											// TODO: Uncomment after RBAC definitive implementation
 											// {Value: "role", Label: "Role"},
 											// {Value: "group", Label: "Group"},
