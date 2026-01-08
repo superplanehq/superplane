@@ -67,6 +67,7 @@ func (m *MetadataContext) Set(metadata any) error {
 }
 
 type AppInstallationContext struct {
+	Configuration    map[string]any
 	Metadata         any
 	State            string
 	StateDescription string
@@ -89,7 +90,21 @@ func (c *AppInstallationContext) SetMetadata(metadata any) {
 }
 
 func (c *AppInstallationContext) GetConfig(name string) ([]byte, error) {
-	return nil, nil
+	if c.Configuration == nil {
+		return nil, fmt.Errorf("config not found: %s", name)
+	}
+
+	value, ok := c.Configuration[name]
+	if !ok {
+		return nil, fmt.Errorf("config not found: %s", name)
+	}
+
+	s, ok := value.(string)
+	if !ok {
+		return nil, fmt.Errorf("config is not a string: %s", name)
+	}
+
+	return []byte(s), nil
 }
 
 func (c *AppInstallationContext) GetState() string {
@@ -216,16 +231,18 @@ func (c *RequestContext) ScheduleActionCall(action string, params map[string]any
 }
 
 type HTTPContext struct {
-	Request  *http.Request
-	Response *http.Response
+	Requests  []*http.Request
+	Responses []*http.Response
 }
 
 func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
-	c.Request = request
+	c.Requests = append(c.Requests, request)
 
-	if c.Response != nil {
-		return c.Response, nil
+	if len(c.Responses) == 0 {
+		return nil, fmt.Errorf("no response mocked")
 	}
 
-	return nil, fmt.Errorf("no response mocked")
+	response := c.Responses[0]
+	c.Responses = c.Responses[1:]
+	return response, nil
 }

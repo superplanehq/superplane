@@ -167,6 +167,22 @@ func (p *PagerDuty) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode config: %v", err)
 	}
 
+	if configuration.Region == "" {
+		return fmt.Errorf("region is required")
+	}
+
+	if configuration.SubDomain == "" {
+		return fmt.Errorf("subdomain is required")
+	}
+
+	if configuration.AuthType == "" {
+		return fmt.Errorf("authType is required")
+	}
+
+	if configuration.AuthType != AuthTypeAPIToken && configuration.AuthType != AuthTypeAppOAuth {
+		return fmt.Errorf("authType %s is not supported", configuration.AuthType)
+	}
+
 	metadata := Metadata{}
 	err = mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata)
 	if err != nil {
@@ -200,6 +216,10 @@ func (p *PagerDuty) apiTokenSync(ctx core.SyncContext) error {
 }
 
 func (p *PagerDuty) appOAuthSync(ctx core.SyncContext, configuration Configuration) error {
+	if configuration.ClientID == nil || *configuration.ClientID == "" {
+		return fmt.Errorf("clientId is required")
+	}
+
 	clientSecret, err := ctx.AppInstallation.GetConfig("clientSecret")
 	if err != nil {
 		return err
@@ -242,7 +262,7 @@ func (p *PagerDuty) appOAuthSync(ctx core.SyncContext, configuration Configurati
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("request got %d", resp.StatusCode)
+		return fmt.Errorf("error generating access token for app: request got %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -352,7 +372,7 @@ func (p *PagerDuty) CompareWebhookConfig(a, b any) (bool, error) {
 	//
 	// The event subscription filter on the webhook must match exactly
 	//
-	if configA.Filter.Type == configB.Filter.Type && configA.Filter.ID == configB.Filter.ID {
+	if configA.Filter.Type != configB.Filter.Type || configA.Filter.ID != configB.Filter.ID {
 		return false, nil
 	}
 
