@@ -362,15 +362,14 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
           approverAvatar: record.user?.avatarUrl,
           rejectionComment: record.rejection?.reason,
           interactive: canAct,
-          requireArtifacts:
-            canAct
-              ? [
-                  {
-                    label: "comment",
-                    optional: true,
-                  },
-                ]
-              : undefined,
+          requireArtifacts: canAct
+            ? [
+                {
+                  label: "comment",
+                  optional: true,
+                },
+              ]
+            : undefined,
           artifacts: hasApprovalArtifacts
             ? {
                 Comment: approvalComment,
