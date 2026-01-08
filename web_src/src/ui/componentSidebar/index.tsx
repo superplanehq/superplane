@@ -127,6 +127,13 @@ interface ComponentSidebarProps {
 
   // Highlighting callback for execution chain nodes
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
+
+  // External request to open execution chain
+  executionChainEventId?: string | null;
+  executionChainExecutionId?: string | null;
+  executionChainTriggerEvent?: SidebarEvent | null;
+  executionChainRequestId?: number;
+  onExecutionChainHandled?: () => void;
 }
 
 export const ComponentSidebar = ({
@@ -193,6 +200,11 @@ export const ComponentSidebar = ({
   triggers = [],
   blueprints = [],
   onHighlightedNodesChange,
+  executionChainEventId,
+  executionChainExecutionId,
+  executionChainTriggerEvent,
+  executionChainRequestId,
+  onExecutionChainHandled,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -204,9 +216,9 @@ export const ComponentSidebar = ({
   const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
 
   const [page, setPage] = useState<"overview" | "history" | "queue" | "execution-chain">("overview");
-  const [previousPage, setPreviousPage] = useState<"overview" | "history" | "queue">("overview");
-  const [executionChainEventId, setExecutionChainEventId] = useState<string | null>(null);
-  const [executionChainTriggerEvent, setExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
+  const [previousPage, setPreviousPage] = useState<"overview" | "history" | "queue" | "execution-chain">("overview");
+  const [activeExecutionChainEventId, setActiveExecutionChainEventId] = useState<string | null>(null);
+  const [activeExecutionChainTriggerEvent, setActiveExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const activeTab = currentTab || "latest";
   const [searchQuery, setSearchQuery] = useState("");
@@ -296,7 +308,7 @@ export const ComponentSidebar = ({
   }, [onSeeQueue, page]);
 
   const handleSeeFullHistory = useCallback(() => {
-    setPreviousPage(page as "overview" | "history" | "queue");
+    setPreviousPage(page as "overview" | "history" | "queue" | "execution-chain");
     setPage("history");
     onSeeFullHistory?.();
   }, [onSeeFullHistory, page]);
@@ -304,7 +316,7 @@ export const ComponentSidebar = ({
   const handleBackToOverview = useCallback(() => {
     if (page === "execution-chain") {
       // When coming back from execution chain, go to the previous page
-      setPage(previousPage);
+      setPage(previousPage !== "execution-chain" ? previousPage : "overview");
       // Clear highlights when leaving execution chain
       onHighlightedNodesChange?.(new Set());
     } else {
@@ -312,21 +324,45 @@ export const ComponentSidebar = ({
     }
     setSearchQuery("");
     setStatusFilter("all");
-    setExecutionChainEventId(null);
-    setExecutionChainTriggerEvent(null);
+    setActiveExecutionChainEventId(null);
+    setActiveExecutionChainTriggerEvent(null);
     setSelectedExecutionId(null);
   }, [page, previousPage, onHighlightedNodesChange]);
 
   const handleSeeExecutionChain = useCallback(
     (eventId: string, triggerEvent?: SidebarEvent, selectedExecId?: string) => {
       setPreviousPage(page as "overview" | "history" | "queue");
-      setExecutionChainEventId(eventId);
-      setExecutionChainTriggerEvent(triggerEvent || null);
+      setActiveExecutionChainEventId(eventId);
+      setActiveExecutionChainTriggerEvent(triggerEvent || null);
       setSelectedExecutionId(selectedExecId || null);
       setPage("execution-chain");
     },
     [page],
   );
+
+  useEffect(() => {
+    if (!executionChainEventId) {
+      return;
+    }
+
+    handleSeeExecutionChain(
+      executionChainEventId,
+      executionChainTriggerEvent || undefined,
+      executionChainExecutionId || undefined,
+    );
+  }, [
+    executionChainEventId,
+    executionChainExecutionId,
+    executionChainRequestId,
+    executionChainTriggerEvent,
+    handleSeeExecutionChain,
+  ]);
+
+  useEffect(() => {
+    if (page === "execution-chain") {
+      onExecutionChainHandled?.();
+    }
+  }, [page, onExecutionChainHandled]);
 
   const listPage = page === "execution-chain" ? previousPage : page;
   const allEvents = React.useMemo(() => {
@@ -671,8 +707,8 @@ export const ComponentSidebar = ({
                 >
                   {page === "execution-chain" && (
                     <ExecutionChainPage
-                      eventId={executionChainEventId}
-                      triggerEvent={executionChainTriggerEvent || undefined}
+                      eventId={activeExecutionChainEventId}
+                      triggerEvent={activeExecutionChainTriggerEvent || undefined}
                       selectedExecutionId={selectedExecutionId}
                       loadExecutionChain={loadExecutionChain}
                       openEventIds={openEventIds}
