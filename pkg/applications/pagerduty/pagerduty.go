@@ -202,12 +202,12 @@ func (p *PagerDuty) Sync(ctx core.SyncContext) error {
 func (p *PagerDuty) apiTokenSync(ctx core.SyncContext) error {
 	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
-		return fmt.Errorf("error creating client")
+		return fmt.Errorf("error creating client: %v", err)
 	}
 
 	services, err := client.ListServices()
 	if err != nil {
-		return fmt.Errorf("error determing abilities: %v", err)
+		return fmt.Errorf("error listing services: %v", err)
 	}
 
 	ctx.AppInstallation.SetMetadata(Metadata{Services: services})
