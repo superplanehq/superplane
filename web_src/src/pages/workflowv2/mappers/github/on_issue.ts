@@ -3,7 +3,8 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata } from "./base";
+import { getDetailsForIssue } from "./base";
+import { BaseNodeMetadata, Issue } from "./types";
 
 interface OnIssueConfiguration {
   actions: string[];
@@ -11,17 +12,7 @@ interface OnIssueConfiguration {
 
 interface OnIssueEventData {
   action?: string;
-  issue?: {
-    id?: number;
-    number?: number;
-    title?: string;
-    html_url?: string;
-    state?: string;
-    user?: {
-      id: number;
-      login: string;
-    };
-  };
+  issue?: Issue;
 }
 
 /**
@@ -39,14 +30,8 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnIssueEventData;
-
-    return {
-      URL: eventData?.issue?.html_url || "",
-      Title: eventData?.issue?.title || "",
-      Action: eventData?.action || "",
-      Author: eventData?.issue?.user?.login || "",
-      State: eventData?.issue?.state || "",
-    };
+    const issue = eventData.issue as Issue;
+    return getDetailsForIssue(issue);
   },
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {

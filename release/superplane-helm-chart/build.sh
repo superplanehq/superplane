@@ -22,6 +22,10 @@ CHART_DIR="release/superplane-helm-chart/helm"
 CHART_NAME="superplane-chart"
 REGISTRY="oci://ghcr.io/superplanehq"
 
+# Update Helm dependencies
+echo "* Updating Helm dependencies"
+helm dependency update "${CHART_DIR}"
+
 # Package the chart with the specified version
 helm package "${CHART_DIR}" --version "${CHART_VERSION}" --app-version "${CHART_VERSION}"
 
