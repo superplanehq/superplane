@@ -120,7 +120,8 @@ ingress:
 
     #
     # Use cert-manager to manage SSL certificates.
-    # Requires cert-manager to be installed and configured.
+    # Requires cert-manager to be installed separately before installing this chart.
+    # Install cert-manager with: helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set installCRDs=true
     # Set ingress.ssl.type to "cert-manager" to use this option.
     #
     certManager:
@@ -189,15 +190,3 @@ email:
   resendApiKey: ""
   fromName: ""
   fromAddress: ""
-
-#
-# cert-manager configuration
-#
-cert-manager:
-  enabled: false
-  installCRDS: true
-  # Optional: customize cert-manager
-  # resources:
-  #   requests:
-  #     cpu: 10m
-  #     memory: 32Mi
