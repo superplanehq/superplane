@@ -5044,38 +5044,6 @@
         }
       }
     },
-    "WorkflowsWorkflowEventExecution": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "workflowId": {
-          "type": "string"
-        },
-        "nodeId": {
-          "type": "string"
-        },
-        "parentExecutionId": {
-          "type": "string"
-        },
-        "previousExecutionId": {
-          "type": "string"
-        },
-        "state": {
-          "$ref": "#/definitions/WorkflowNodeExecutionState"
-        },
-        "result": {
-          "$ref": "#/definitions/WorkflowNodeExecutionResult"
-        },
-        "resultReason": {
-          "$ref": "#/definitions/WorkflowNodeExecutionResultReason"
-        },
-        "resultMessage": {
-          "type": "string"
-        }
-      }
-    },
     "WorkflowsWorkflowEventWithExecutions": {
       "type": "object",
       "properties": {
@@ -5102,7 +5070,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowEventExecution"
+            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
           }
         }
       }

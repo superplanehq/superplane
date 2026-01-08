@@ -25,12 +25,12 @@ func ListWorkflowEvents(ctx context.Context, registry *registry.Registry, workfl
 		return nil, err
 	}
 
-	executionsByEventID, err := listExecutionSummariesForWorkflowEvents(events)
+	executionsByEventID, childExecutionsByEventID, err := listExecutionsForWorkflowEvents(events)
 	if err != nil {
 		return nil, err
 	}
 
-	serialized, err := SerializeWorkflowEventsWithExecutions(events, executionsByEventID)
+	serialized, err := SerializeWorkflowEventsWithExecutions(events, executionsByEventID, childExecutionsByEventID)
 	if err != nil {
 		return nil, err
 	}
@@ -57,11 +57,11 @@ func SerializeWorkflowEvents(events []models.WorkflowEvent) ([]*pb.WorkflowEvent
 	return result, nil
 }
 
-func SerializeWorkflowEventsWithExecutions(events []models.WorkflowEvent, executionsByEventID map[string][]models.WorkflowNodeExecutionSummary) ([]*pb.WorkflowEventWithExecutions, error) {
+func SerializeWorkflowEventsWithExecutions(events []models.WorkflowEvent, executionsByEventID map[string][]models.WorkflowNodeExecution, childExecutionsByEventID map[string][]models.WorkflowNodeExecution) ([]*pb.WorkflowEventWithExecutions, error) {
 	result := make([]*pb.WorkflowEventWithExecutions, 0, len(events))
 
 	for _, event := range events {
-		serializedEvent, err := SerializeWorkflowEventWithExecutions(event, executionsByEventID[event.ID.String()])
+		serializedEvent, err := SerializeWorkflowEventWithExecutions(event, executionsByEventID[event.ID.String()], childExecutionsByEventID[event.ID.String()])
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +92,7 @@ func SerializeWorkflowEvent(event models.WorkflowEvent) (*pb.WorkflowEvent, erro
 	}, nil
 }
 
-func SerializeWorkflowEventWithExecutions(event models.WorkflowEvent, executions []models.WorkflowNodeExecutionSummary) (*pb.WorkflowEventWithExecutions, error) {
+func SerializeWorkflowEventWithExecutions(event models.WorkflowEvent, executions []models.WorkflowNodeExecution, childExecutions []models.WorkflowNodeExecution) (*pb.WorkflowEventWithExecutions, error) {
 	data, ok := event.Data.Data().(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("event data is not a map[string]any")
@@ -103,19 +103,9 @@ func SerializeWorkflowEventWithExecutions(event models.WorkflowEvent, executions
 		return nil, err
 	}
 
-	serializedExecutions := make([]*pb.WorkflowEventExecution, 0, len(executions))
-	for _, execution := range executions {
-		serializedExecutions = append(serializedExecutions, &pb.WorkflowEventExecution{
-			Id:                  execution.ID.String(),
-			WorkflowId:          execution.WorkflowID.String(),
-			NodeId:              execution.NodeID,
-			ParentExecutionId:   execution.GetParentExecutionID(),
-			PreviousExecutionId: execution.GetPreviousExecutionID(),
-			State:               NodeExecutionStateToProto(execution.State),
-			Result:              NodeExecutionResultToProto(execution.Result),
-			ResultReason:        NodeExecutionResultReasonToProto(execution.ResultReason),
-			ResultMessage:       execution.ResultMessage,
-		})
+	serializedExecutions, err := SerializeNodeExecutions(executions, childExecutions)
+	if err != nil {
+		return nil, err
 	}
 
 	return &pb.WorkflowEventWithExecutions{
@@ -136,9 +126,9 @@ func getLastEventTimestamp(events []models.WorkflowEvent) *timestamppb.Timestamp
 	return nil
 }
 
-func listExecutionSummariesForWorkflowEvents(events []models.WorkflowEvent) (map[string][]models.WorkflowNodeExecutionSummary, error) {
+func listExecutionsForWorkflowEvents(events []models.WorkflowEvent) (map[string][]models.WorkflowNodeExecution, map[string][]models.WorkflowNodeExecution, error) {
 	if len(events) == 0 {
-		return map[string][]models.WorkflowNodeExecutionSummary{}, nil
+		return map[string][]models.WorkflowNodeExecution{}, map[string][]models.WorkflowNodeExecution{}, nil
 	}
 
 	eventIDs := make([]uuid.UUID, len(events))
@@ -146,16 +136,35 @@ func listExecutionSummariesForWorkflowEvents(events []models.WorkflowEvent) (map
 		eventIDs[i] = event.ID
 	}
 
-	executions, err := models.ListNodeExecutionSummariesForRootEvents(eventIDs)
+	executions, err := models.ListNodeExecutionsForRootEvents(eventIDs)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	executionsByEventID := make(map[string][]models.WorkflowNodeExecutionSummary, len(eventIDs))
+	parentExecutionsByEventID := make(map[string][]models.WorkflowNodeExecution, len(eventIDs))
+	parentExecutions := []models.WorkflowNodeExecution{}
 	for _, execution := range executions {
-		eventID := execution.RootEventID.String()
-		executionsByEventID[eventID] = append(executionsByEventID[eventID], execution)
+		if execution.ParentExecutionID == nil {
+			parentExecutions = append(parentExecutions, execution)
+			eventID := execution.RootEventID.String()
+			parentExecutionsByEventID[eventID] = append(parentExecutionsByEventID[eventID], execution)
+		}
 	}
 
-	return executionsByEventID, nil
+	if len(parentExecutions) == 0 {
+		return parentExecutionsByEventID, map[string][]models.WorkflowNodeExecution{}, nil
+	}
+
+	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs(parentExecutions))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	childExecutionsByEventID := make(map[string][]models.WorkflowNodeExecution, len(eventIDs))
+	for _, execution := range childExecutions {
+		eventID := execution.RootEventID.String()
+		childExecutionsByEventID[eventID] = append(childExecutionsByEventID[eventID], execution)
+	}
+
+	return parentExecutionsByEventID, childExecutionsByEventID, nil
 }

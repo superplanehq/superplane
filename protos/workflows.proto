@@ -449,19 +449,7 @@ message WorkflowEventWithExecutions {
   string channel = 4;
   google.protobuf.Struct data = 5;
   google.protobuf.Timestamp created_at = 6;
-  repeated WorkflowEventExecution executions = 7;
-}
-
-message WorkflowEventExecution {
-  string id = 1;
-  string workflow_id = 2;
-  string node_id = 3;
-  string parent_execution_id = 4;
-  string previous_execution_id = 5;
-  WorkflowNodeExecution.State state = 6;
-  WorkflowNodeExecution.Result result = 7;
-  WorkflowNodeExecution.ResultReason result_reason = 8;
-  string result_message = 9;
+  repeated WorkflowNodeExecution executions = 7;
 }
 
 message ListEventExecutionsRequest {

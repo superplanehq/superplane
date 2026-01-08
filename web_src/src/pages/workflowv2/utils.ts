@@ -156,14 +156,11 @@ export function mapQueueItemsToSidebarEvents(
   });
 }
 
-export function mapExecutionStateToLogType(state?: string): "success" | "error" | "warning" {
-  if (state === "success") {
-    return "success";
-  }
+export function mapExecutionStateToLogType(state?: string): "success" | "error" {
   if (state === "failed" || state === "error" || state === "cancelled") {
     return "error";
   }
-  return "warning";
+  return "success";
 }
 
 export function buildRunItemFromExecution(options: {
@@ -187,11 +184,7 @@ export function buildRunItemFromExecution(options: {
   const state = stateResolver(execution);
   const executionState = state || "unknown";
   const nodeId = componentNode?.id || execution.nodeId || "";
-  const primaryComponentName = componentName ? componentName.split(".")[0] : "";
-  const componentSubtitle = componentNode
-    ? getComponentBaseMapper(primaryComponentName).subtitle?.(componentNode, execution)
-    : undefined;
-  const detail = execution.resultMessage || componentSubtitle;
+  const detail = execution.resultMessage;
   const triggerNode = event ? nodes.find((node) => node.id === event.nodeId) : undefined;
   const triggerEvent = event && triggerNode ? mapTriggerEventToSidebarEvent(event, triggerNode) : undefined;
   const executionId = execution.id;

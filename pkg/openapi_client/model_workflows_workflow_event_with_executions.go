@@ -21,13 +21,13 @@ var _ MappedNullable = &WorkflowsWorkflowEventWithExecutions{}
 
 // WorkflowsWorkflowEventWithExecutions struct for WorkflowsWorkflowEventWithExecutions
 type WorkflowsWorkflowEventWithExecutions struct {
-	Id         *string                           `json:"id,omitempty"`
-	WorkflowId *string                           `json:"workflowId,omitempty"`
-	NodeId     *string                           `json:"nodeId,omitempty"`
-	Channel    *string                           `json:"channel,omitempty"`
-	Data       map[string]interface{}            `json:"data,omitempty"`
-	CreatedAt  *time.Time                        `json:"createdAt,omitempty"`
-	Executions []WorkflowsWorkflowEventExecution `json:"executions,omitempty"`
+	Id         *string                          `json:"id,omitempty"`
+	WorkflowId *string                          `json:"workflowId,omitempty"`
+	NodeId     *string                          `json:"nodeId,omitempty"`
+	Channel    *string                          `json:"channel,omitempty"`
+	Data       map[string]interface{}           `json:"data,omitempty"`
+	CreatedAt  *time.Time                       `json:"createdAt,omitempty"`
+	Executions []WorkflowsWorkflowNodeExecution `json:"executions,omitempty"`
 }
 
 // NewWorkflowsWorkflowEventWithExecutions instantiates a new WorkflowsWorkflowEventWithExecutions object
@@ -240,9 +240,9 @@ func (o *WorkflowsWorkflowEventWithExecutions) SetCreatedAt(v time.Time) {
 }
 
 // GetExecutions returns the Executions field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowEventWithExecutions) GetExecutions() []WorkflowsWorkflowEventExecution {
+func (o *WorkflowsWorkflowEventWithExecutions) GetExecutions() []WorkflowsWorkflowNodeExecution {
 	if o == nil || IsNil(o.Executions) {
-		var ret []WorkflowsWorkflowEventExecution
+		var ret []WorkflowsWorkflowNodeExecution
 		return ret
 	}
 	return o.Executions
@@ -250,7 +250,7 @@ func (o *WorkflowsWorkflowEventWithExecutions) GetExecutions() []WorkflowsWorkfl
 
 // GetExecutionsOk returns a tuple with the Executions field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowEventWithExecutions) GetExecutionsOk() ([]WorkflowsWorkflowEventExecution, bool) {
+func (o *WorkflowsWorkflowEventWithExecutions) GetExecutionsOk() ([]WorkflowsWorkflowNodeExecution, bool) {
 	if o == nil || IsNil(o.Executions) {
 		return nil, false
 	}
@@ -266,8 +266,8 @@ func (o *WorkflowsWorkflowEventWithExecutions) HasExecutions() bool {
 	return false
 }
 
-// SetExecutions gets a reference to the given []WorkflowsWorkflowEventExecution and assigns it to the Executions field.
-func (o *WorkflowsWorkflowEventWithExecutions) SetExecutions(v []WorkflowsWorkflowEventExecution) {
+// SetExecutions gets a reference to the given []WorkflowsWorkflowNodeExecution and assigns it to the Executions field.
+func (o *WorkflowsWorkflowEventWithExecutions) SetExecutions(v []WorkflowsWorkflowNodeExecution) {
 	o.Executions = v
 }
 

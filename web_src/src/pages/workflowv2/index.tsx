@@ -551,9 +551,12 @@ export function WorkflowPageV2() {
   } | null>(null);
   const [liveRunEntries, setLiveRunEntries] = useState<LogEntry[]>([]);
   const [liveCanvasEntries, setLiveCanvasEntries] = useState<LogEntry[]>([]);
-  const handleExecutionChainHandled = useCallback(debounce(() => {
-    setFocusRequest(null);
-  }, 500), []);
+  const handleExecutionChainHandled = useCallback(
+    debounce(() => {
+      setFocusRequest(null);
+    }, 500),
+    [],
+  );
 
   const handleSidebarChange = useCallback(
     (open: boolean, nodeId: string | null) => {

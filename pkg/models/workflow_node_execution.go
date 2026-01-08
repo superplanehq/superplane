@@ -84,19 +84,6 @@ type WorkflowNodeExecution struct {
 	Configuration datatypes.JSONType[map[string]any]
 }
 
-type WorkflowNodeExecutionSummary struct {
-	ID                  uuid.UUID
-	WorkflowID          uuid.UUID
-	NodeID              string
-	RootEventID         uuid.UUID
-	PreviousExecutionID *uuid.UUID
-	ParentExecutionID   *uuid.UUID
-	State               string
-	Result              string
-	ResultReason        string
-	ResultMessage       string
-}
-
 func LockWorkflowNodeExecution(tx *gorm.DB, id uuid.UUID) (*WorkflowNodeExecution, error) {
 	var execution WorkflowNodeExecution
 
@@ -178,15 +165,13 @@ func ListNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, re
 	return executions, nil
 }
 
-func ListNodeExecutionSummariesForRootEvents(rootEventIDs []uuid.UUID) ([]WorkflowNodeExecutionSummary, error) {
+func ListNodeExecutionsForRootEvents(rootEventIDs []uuid.UUID) ([]WorkflowNodeExecution, error) {
 	if len(rootEventIDs) == 0 {
-		return []WorkflowNodeExecutionSummary{}, nil
+		return []WorkflowNodeExecution{}, nil
 	}
 
-	var executions []WorkflowNodeExecutionSummary
+	var executions []WorkflowNodeExecution
 	err := database.Conn().
-		Model(&WorkflowNodeExecution{}).
-		Select("id", "workflow_id", "node_id", "root_event_id", "previous_execution_id", "parent_execution_id", "state", "result", "result_reason", "result_message").
 		Where("root_event_id IN ?", rootEventIDs).
 		Order("created_at ASC").
 		Find(&executions).
@@ -196,22 +181,6 @@ func ListNodeExecutionSummariesForRootEvents(rootEventIDs []uuid.UUID) ([]Workfl
 	}
 
 	return executions, nil
-}
-
-func (e *WorkflowNodeExecutionSummary) GetPreviousExecutionID() string {
-	if e.PreviousExecutionID == nil {
-		return ""
-	}
-
-	return e.PreviousExecutionID.String()
-}
-
-func (e *WorkflowNodeExecutionSummary) GetParentExecutionID() string {
-	if e.ParentExecutionID == nil {
-		return ""
-	}
-
-	return e.ParentExecutionID.String()
 }
 
 func CountNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, results []string) (int64, error) {

@@ -946,18 +946,6 @@ export type WorkflowsWorkflowEvent = {
   createdAt?: string;
 };
 
-export type WorkflowsWorkflowEventExecution = {
-  id?: string;
-  workflowId?: string;
-  nodeId?: string;
-  parentExecutionId?: string;
-  previousExecutionId?: string;
-  state?: WorkflowNodeExecutionState;
-  result?: WorkflowNodeExecutionResult;
-  resultReason?: WorkflowNodeExecutionResultReason;
-  resultMessage?: string;
-};
-
 export type WorkflowsWorkflowEventWithExecutions = {
   id?: string;
   workflowId?: string;
@@ -967,7 +955,7 @@ export type WorkflowsWorkflowEventWithExecutions = {
     [key: string]: unknown;
   };
   createdAt?: string;
-  executions?: Array<WorkflowsWorkflowEventExecution>;
+  executions?: Array<WorkflowsWorkflowNodeExecution>;
 };
 
 export type WorkflowsWorkflowMetadata = {

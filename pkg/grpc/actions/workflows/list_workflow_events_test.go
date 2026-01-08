@@ -47,7 +47,7 @@ func Test__ListWorkflowEvents__ReturnsEventsWithExecutions(t *testing.T) {
 	require.NotNil(t, event1)
 	require.Len(t, event1.Executions, 2)
 
-	parent := findWorkflowEventExecution(event1.Executions, parentExecution.ID.String())
+	parent := findWorkflowNodeExecution(event1.Executions, parentExecution.ID.String())
 	require.NotNil(t, parent)
 	assert.Equal(t, workflow.ID.String(), parent.WorkflowId)
 	assert.Equal(t, "node-1", parent.NodeId)
@@ -55,7 +55,7 @@ func Test__ListWorkflowEvents__ReturnsEventsWithExecutions(t *testing.T) {
 	assert.Empty(t, parent.PreviousExecutionId)
 	assert.Equal(t, pb.WorkflowNodeExecution_STATE_PENDING, parent.State)
 
-	next := findWorkflowEventExecution(event1.Executions, nextExecution.ID.String())
+	next := findWorkflowNodeExecution(event1.Executions, nextExecution.ID.String())
 	require.NotNil(t, next)
 	assert.Equal(t, workflow.ID.String(), next.WorkflowId)
 	assert.Equal(t, "node-1", next.NodeId)
@@ -78,7 +78,7 @@ func findWorkflowEventWithExecutions(events []*pb.WorkflowEventWithExecutions, i
 	return nil
 }
 
-func findWorkflowEventExecution(executions []*pb.WorkflowEventExecution, id string) *pb.WorkflowEventExecution {
+func findWorkflowNodeExecution(executions []*pb.WorkflowNodeExecution, id string) *pb.WorkflowNodeExecution {
 	for _, execution := range executions {
 		if execution.Id == id {
 			return execution
