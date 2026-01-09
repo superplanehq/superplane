@@ -2054,8 +2054,9 @@ type WorkflowEvent struct {
 	WorkflowId    string                 `protobuf:"bytes,2,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`
 	NodeId        string                 `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	Channel       string                 `protobuf:"bytes,4,opt,name=channel,proto3" json:"channel,omitempty"`
-	Data          *_struct.Struct        `protobuf:"bytes,5,opt,name=data,proto3" json:"data,omitempty"`
-	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	CustomName    string                 `protobuf:"bytes,5,opt,name=custom_name,json=customName,proto3" json:"custom_name,omitempty"`
+	Data          *_struct.Struct        `protobuf:"bytes,6,opt,name=data,proto3" json:"data,omitempty"`
+	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2118,6 +2119,13 @@ func (x *WorkflowEvent) GetChannel() string {
 	return ""
 }
 
+func (x *WorkflowEvent) GetCustomName() string {
+	if x != nil {
+		return x.CustomName
+	}
+	return ""
+}
+
 func (x *WorkflowEvent) GetData() *_struct.Struct {
 	if x != nil {
 		return x.Data
@@ -2141,6 +2149,7 @@ type WorkflowEventWithExecutions struct {
 	Data          *_struct.Struct          `protobuf:"bytes,5,opt,name=data,proto3" json:"data,omitempty"`
 	CreatedAt     *timestamp.Timestamp     `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	Executions    []*WorkflowNodeExecution `protobuf:"bytes,7,rep,name=executions,proto3" json:"executions,omitempty"`
+	CustomName    string                   `protobuf:"bytes,8,opt,name=custom_name,json=customName,proto3" json:"custom_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2222,6 +2231,13 @@ func (x *WorkflowEventWithExecutions) GetExecutions() []*WorkflowNodeExecution {
 		return x.Executions
 	}
 	return nil
+}
+
+func (x *WorkflowEventWithExecutions) GetCustomName() string {
+	if x != nil {
+		return x.CustomName
+	}
+	return ""
 }
 
 type ListEventExecutionsRequest struct {
@@ -3005,16 +3021,18 @@ const file_workflows_proto_rawDesc = "" +
 	"\vtotal_count\x18\x02 \x01(\rR\n" +
 	"totalCount\x12\"\n" +
 	"\rhas_next_page\x18\x03 \x01(\bR\vhasNextPage\x12A\n" +
-	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xdb\x01\n" +
+	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xfc\x01\n" +
 	"\rWorkflowEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vworkflow_id\x18\x02 \x01(\tR\n" +
 	"workflowId\x12\x17\n" +
 	"\anode_id\x18\x03 \x01(\tR\x06nodeId\x12\x18\n" +
-	"\achannel\x18\x04 \x01(\tR\achannel\x12+\n" +
-	"\x04data\x18\x05 \x01(\v2\x17.google.protobuf.StructR\x04data\x129\n" +
+	"\achannel\x18\x04 \x01(\tR\achannel\x12\x1f\n" +
+	"\vcustom_name\x18\x05 \x01(\tR\n" +
+	"customName\x12+\n" +
+	"\x04data\x18\x06 \x01(\v2\x17.google.protobuf.StructR\x04data\x129\n" +
 	"\n" +
-	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xb6\x02\n" +
+	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xd7\x02\n" +
 	"\x1bWorkflowEventWithExecutions\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vworkflow_id\x18\x02 \x01(\tR\n" +
@@ -3026,7 +3044,9 @@ const file_workflows_proto_rawDesc = "" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12K\n" +
 	"\n" +
 	"executions\x18\a \x03(\v2+.Superplane.Workflows.WorkflowNodeExecutionR\n" +
-	"executions\"X\n" +
+	"executions\x12\x1f\n" +
+	"\vcustom_name\x18\b \x01(\tR\n" +
+	"customName\"X\n" +
 	"\x1aListEventExecutionsRequest\x12\x1f\n" +
 	"\vworkflow_id\x18\x01 \x01(\tR\n" +
 	"workflowId\x12\x19\n" +

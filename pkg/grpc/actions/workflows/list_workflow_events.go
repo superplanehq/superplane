@@ -87,6 +87,7 @@ func SerializeWorkflowEvent(event models.WorkflowEvent) (*pb.WorkflowEvent, erro
 		WorkflowId: event.WorkflowID.String(),
 		NodeId:     event.NodeID,
 		Channel:    event.Channel,
+		CustomName: valueOrEmpty(event.CustomName),
 		Data:       s,
 		CreatedAt:  timestamppb.New(*event.CreatedAt),
 	}, nil
@@ -113,10 +114,19 @@ func SerializeWorkflowEventWithExecutions(event models.WorkflowEvent, executions
 		WorkflowId: event.WorkflowID.String(),
 		NodeId:     event.NodeID,
 		Channel:    event.Channel,
+		CustomName: valueOrEmpty(event.CustomName),
 		Data:       s,
 		CreatedAt:  timestamppb.New(*event.CreatedAt),
 		Executions: serializedExecutions,
 	}, nil
+}
+
+func valueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+
+	return *value
 }
 
 func getLastEventTimestamp(events []models.WorkflowEvent) *timestamppb.Timestamp {

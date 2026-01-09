@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/test/support"
@@ -111,6 +112,9 @@ func Test__ListNodeExecutions(t *testing.T) {
 		// Create events and executions
 		//
 		rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+		customName := "Custom Root Event"
+		rootEvent.CustomName = &customName
+		require.NoError(t, database.Conn().Save(rootEvent).Error)
 		event := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
 		support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent.ID, event.ID, nil)
 
@@ -136,5 +140,7 @@ func Test__ListNodeExecutions(t *testing.T) {
 		assert.Len(t, response.Executions, 1)
 		assert.Equal(t, uint32(1), response.TotalCount)
 		assert.Equal(t, "node-1", response.Executions[0].NodeId)
+		require.NotNil(t, response.Executions[0].RootEvent)
+		assert.Equal(t, customName, response.Executions[0].RootEvent.CustomName)
 	})
 }

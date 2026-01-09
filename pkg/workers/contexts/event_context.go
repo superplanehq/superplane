@@ -1,6 +1,8 @@
 package contexts
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -42,5 +44,46 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 		CreatedAt:  &now,
 	}
 
+	wrappedPayload := map[string]any{"data": payload}
+	customName, err := s.resolveCustomName(wrappedPayload)
+	if err == nil && customName != nil {
+		event.CustomName = customName
+	}
+
 	return s.tx.Create(&event).Error
+}
+
+func (s *EventContext) resolveCustomName(payload any) (*string, error) {
+	config := s.workflowNode.Configuration.Data()
+	if config == nil {
+		return nil, nil
+	}
+
+	rawTemplate, ok := config["customName"]
+	if !ok || rawTemplate == nil {
+		return nil, nil
+	}
+
+	template, ok := rawTemplate.(string)
+	if !ok {
+		return nil, nil
+	}
+
+	template = strings.TrimSpace(template)
+	if template == "" {
+		return nil, nil
+	}
+
+	builder := NewNodeConfigurationBuilder(s.tx, s.workflowNode.WorkflowID).WithInput(payload)
+	resolved, err := builder.ResolveExpression(template)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvedName := strings.TrimSpace(fmt.Sprintf("%v", resolved))
+	if resolvedName == "" {
+		return nil, nil
+	}
+
+	return &resolvedName, nil
 }

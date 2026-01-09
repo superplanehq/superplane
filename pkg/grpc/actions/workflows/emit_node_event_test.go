@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
@@ -115,6 +116,50 @@ func Test__EmitNodeEvent(t *testing.T) {
 		require.True(t, ok, "event data should be a map")
 		assert.Equal(t, "hello world", dataMap["message"])
 		assert.Equal(t, float64(42), dataMap["count"])
+	})
+
+	t.Run("custom name is resolved from node configuration", func(t *testing.T) {
+		workflow, _ := support.CreateWorkflow(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.WorkflowNode{
+				{
+					NodeID: "node-1",
+					Name:   "Test Node",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		node, err := workflow.FindNode("node-1")
+		require.NoError(t, err)
+		node.Configuration = datatypes.NewJSONType(map[string]any{
+			"customName": "Run: {{ $.message }}",
+		})
+		require.NoError(t, database.Conn().Save(node).Error)
+
+		response, err := EmitNodeEvent(
+			ctx,
+			r.Organization.ID,
+			workflow.ID,
+			"node-1",
+			"default",
+			map[string]any{"message": "hello"},
+		)
+		require.NoError(t, err)
+
+		eventID, err := uuid.Parse(response.EventId)
+		require.NoError(t, err)
+
+		event, err := models.FindWorkflowEvent(eventID)
+		require.NoError(t, err)
+		require.NotNil(t, event.CustomName)
+		assert.Equal(t, "Run: hello", *event.CustomName)
 	})
 
 	t.Run("successful event emission publishes RabbitMQ message", func(t *testing.T) {

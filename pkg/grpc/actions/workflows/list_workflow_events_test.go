@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/test/support"
@@ -34,6 +35,9 @@ func Test__ListWorkflowEvents__ReturnsEventsWithExecutions(t *testing.T) {
 
 	rootEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
 	rootEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+	customName := "Custom Run Name"
+	rootEvent1.CustomName = &customName
+	require.NoError(t, database.Conn().Save(rootEvent1).Error)
 
 	parentExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent1.ID, rootEvent1.ID, nil)
 	nextExecution := support.CreateNextNodeExecution(t, workflow.ID, "node-1", rootEvent1.ID, rootEvent1.ID, &parentExecution.ID)
@@ -46,6 +50,7 @@ func Test__ListWorkflowEvents__ReturnsEventsWithExecutions(t *testing.T) {
 	event1 := findWorkflowEventWithExecutions(response.Events, rootEvent1.ID.String())
 	require.NotNil(t, event1)
 	require.Len(t, event1.Executions, 2)
+	assert.Equal(t, customName, event1.CustomName)
 
 	parent := findWorkflowNodeExecution(event1.Executions, parentExecution.ID.String())
 	require.NotNil(t, parent)
