@@ -396,6 +396,7 @@ func getRootEventForExecution(execution models.WorkflowNodeExecution, rootEvents
 				WorkflowId: rootEvent.WorkflowID.String(),
 				NodeId:     rootEvent.NodeID,
 				Channel:    rootEvent.Channel,
+				CustomName: valueOrEmpty(rootEvent.CustomName),
 				Data:       s,
 				CreatedAt:  timestamppb.New(*rootEvent.CreatedAt),
 			}, nil

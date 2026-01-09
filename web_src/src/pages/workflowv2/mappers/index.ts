@@ -97,17 +97,17 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 export function getTriggerRenderer(name: string): TriggerRenderer {
   const parts = name?.split(".");
   if (parts?.length == 1) {
-    return triggerRenderers[name] || defaultTriggerRenderer;
+    return withCustomName(triggerRenderers[name] || defaultTriggerRenderer);
   }
 
   const appName = parts[0];
   const appTriggers = appTriggerRenderers[appName];
   if (!appTriggers) {
-    return defaultTriggerRenderer;
+    return withCustomName(defaultTriggerRenderer);
   }
 
   const triggerName = parts[1];
-  return appTriggers[triggerName] || defaultTriggerRenderer;
+  return withCustomName(appTriggers[triggerName] || defaultTriggerRenderer);
 }
 
 /**
@@ -206,4 +206,34 @@ export function getExecutionDetails(
   }
 
   return mapper?.getExecutionDetails?.(execution, node);
+}
+
+function withCustomName(renderer: TriggerRenderer): TriggerRenderer {
+  return {
+    ...renderer,
+    getTriggerProps: (node, trigger, lastEvent) => {
+      const props = renderer.getTriggerProps(node, trigger, lastEvent);
+      const customName = lastEvent?.customName?.trim();
+      if (customName && props.lastEventData) {
+        return {
+          ...props,
+          lastEventData: {
+            ...props.lastEventData,
+            title: customName,
+          },
+        };
+      }
+
+      return props;
+    },
+    getTitleAndSubtitle: (event) => {
+      const { title, subtitle } = renderer.getTitleAndSubtitle(event);
+      const customName = event.customName?.trim();
+      if (customName) {
+        return { title: customName, subtitle };
+      }
+
+      return { title, subtitle };
+    },
+  };
 }

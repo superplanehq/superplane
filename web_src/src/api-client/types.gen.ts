@@ -940,6 +940,7 @@ export type WorkflowsWorkflowEvent = {
   workflowId?: string;
   nodeId?: string;
   channel?: string;
+  customName?: string;
   data?: {
     [key: string]: unknown;
   };
@@ -956,6 +957,7 @@ export type WorkflowsWorkflowEventWithExecutions = {
   };
   createdAt?: string;
   executions?: Array<WorkflowsWorkflowNodeExecution>;
+  customName?: string;
 };
 
 export type WorkflowsWorkflowMetadata = {
