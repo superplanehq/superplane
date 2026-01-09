@@ -77,6 +77,7 @@ import {
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
   mapWorkflowEventsToRunLogEntries,
+  summarizeWorkflowChanges,
 } from "./utils";
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
@@ -171,6 +172,7 @@ export function WorkflowPageV2() {
 
   // Revert functionality - track initial workflow snapshot
   const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<WorkflowsWorkflow | null>(null);
+  const lastSavedWorkflowRef = useRef<WorkflowsWorkflow | null>(null);
 
   // Use Zustand store for execution data - extract only the methods to avoid recreating callbacks
   // Subscribe to version to ensure React detects all updates
@@ -187,6 +189,16 @@ export function WorkflowPageV2() {
       hasInitializedStoreRef.current = workflow.metadata.id;
     }
   }, [workflow, initializeFromWorkflow]);
+
+  useEffect(() => {
+    if (!workflow) {
+      return;
+    }
+
+    if (!lastSavedWorkflowRef.current) {
+      lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(workflow));
+    }
+  }, [workflow]);
 
   // Build maps from store for canvas display (using initial data from workflow.status and websocket updates)
   // Rebuild whenever store version changes (indicates data was updated)
@@ -265,6 +277,7 @@ export function WorkflowPageV2() {
    */
   const pendingPositionUpdatesRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const pendingAnnotationUpdatesRef = useRef<Map<string, { text?: string; color?: string }>>(new Map());
+  const logNodeSelectRef = useRef<(nodeId: string) => void>(() => {});
 
   /**
    * Debounced auto-save function for node position changes.
@@ -314,6 +327,23 @@ export function WorkflowPageV2() {
             return node;
           });
 
+          const updatedWorkflow = {
+            ...latestWorkflow,
+            spec: {
+              ...latestWorkflow.spec,
+              nodes: updatedNodes,
+            },
+          };
+
+          const changeSummary = summarizeWorkflowChanges({
+            before: lastSavedWorkflowRef.current,
+            after: updatedWorkflow,
+            onNodeSelect: (nodeId: string) => logNodeSelectRef.current(nodeId),
+          });
+          const changeMessage = changeSummary.changeCount
+            ? `${changeSummary.changeCount} Canvas changes saved`
+            : "Canvas changes saved";
+
           // Save the workflow with updated positions
           await updateWorkflowMutation.mutateAsync({
             name: latestWorkflow.metadata?.name!,
@@ -321,6 +351,22 @@ export function WorkflowPageV2() {
             nodes: updatedNodes,
             edges: latestWorkflow.spec?.edges,
           });
+
+          if (changeSummary.detail) {
+            setLiveCanvasEntries((prev) => [
+              buildCanvasStatusLogEntry({
+                id: `canvas-save-${Date.now()}`,
+                message: changeMessage,
+                type: "success",
+                timestamp: new Date().toISOString(),
+                detail: changeSummary.detail,
+                searchText: changeSummary.searchText,
+              }),
+              ...prev,
+            ]);
+          }
+
+          lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
 
           // Clear the saved position updates after successful save
           // Keep any new updates that came in during the save
@@ -603,6 +649,10 @@ export function WorkflowPageV2() {
     [handleSidebarChange],
   );
 
+  useEffect(() => {
+    logNodeSelectRef.current = handleLogNodeSelect;
+  }, [handleLogNodeSelect]);
+
   const handleLogRunNodeSelect = useCallback(
     (nodeId: string) => {
       handleSidebarChange(true, nodeId);
@@ -874,6 +924,14 @@ export function WorkflowPageV2() {
       if (!targetWorkflow || !organizationId || !workflowId) return;
       const shouldRestoreFocus = options?.showToast === false;
       const focusedNoteId = shouldRestoreFocus ? getActiveNoteId() : null;
+      const changeSummary = summarizeWorkflowChanges({
+        before: lastSavedWorkflowRef.current,
+        after: targetWorkflow,
+        onNodeSelect: handleLogNodeSelect,
+      });
+      const changeMessage = changeSummary.changeCount
+        ? `${changeSummary.changeCount} Canvas changes saved`
+        : "Canvas changes saved";
 
       try {
         await updateWorkflowMutation.mutateAsync({
@@ -886,9 +944,11 @@ export function WorkflowPageV2() {
         setLiveCanvasEntries((prev) => [
           buildCanvasStatusLogEntry({
             id: `canvas-save-${Date.now()}`,
-            message: "Canvas changes saved",
+            message: changeMessage,
             type: "success",
             timestamp: new Date().toISOString(),
+            detail: changeSummary.detail,
+            searchText: changeSummary.searchText,
           }),
           ...prev,
         ]);
@@ -900,6 +960,7 @@ export function WorkflowPageV2() {
 
         // Clear the snapshot since changes are now saved
         setInitialWorkflowSnapshot(null);
+        lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(targetWorkflow));
       } catch (error: any) {
         console.error("Failed to save changes to the canvas:", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
@@ -1826,6 +1887,23 @@ export function WorkflowPageV2() {
         return node;
       });
 
+      const updatedWorkflow = {
+        ...workflow,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
+      };
+
+      const changeSummary = summarizeWorkflowChanges({
+        before: lastSavedWorkflowRef.current,
+        after: updatedWorkflow,
+        onNodeSelect: handleLogNodeSelect,
+      });
+      const changeMessage = changeSummary.changeCount
+        ? `${changeSummary.changeCount} Canvas changes saved`
+        : "Canvas changes saved";
+
       try {
         await updateWorkflowMutation.mutateAsync({
           name: workflow.metadata?.name!,
@@ -1834,12 +1912,24 @@ export function WorkflowPageV2() {
           edges: workflow.spec?.edges,
         });
 
+        setLiveCanvasEntries((prev) => [
+          buildCanvasStatusLogEntry({
+            id: `canvas-save-${Date.now()}`,
+            message: changeMessage,
+            type: "success",
+            timestamp: new Date().toISOString(),
+            detail: changeSummary.detail,
+            searchText: changeSummary.searchText,
+          }),
+          ...prev,
+        ]);
         showSuccessToast("Canvas changes saved");
         setHasUnsavedChanges(false);
         setHasNonPositionalUnsavedChanges(false);
 
         // Clear the snapshot since changes are now saved
         setInitialWorkflowSnapshot(null);
+        lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
       } catch (error: any) {
         console.error("Failed to save changes to the canvas:", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
