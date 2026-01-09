@@ -89,9 +89,20 @@ func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions
 		},
 	}
 
-	createdHook, _, err := i.client.Repositories.CreateHook(context.Background(), i.Owner, options.Resource.Name(), hook)
-	if err != nil {
-		return nil, fmt.Errorf("error creating webhook: %v", err)
+	var createdHook *github.Hook
+
+	// If resource name is empty, create organization-level webhook
+	// Otherwise create repository-level webhook
+	if options.Resource.Name() == "" {
+		createdHook, _, err = i.client.Organizations.CreateHook(context.Background(), i.Owner, hook)
+		if err != nil {
+			return nil, fmt.Errorf("error creating organization webhook: %v", err)
+		}
+	} else {
+		createdHook, _, err = i.client.Repositories.CreateHook(context.Background(), i.Owner, options.Resource.Name(), hook)
+		if err != nil {
+			return nil, fmt.Errorf("error creating repository webhook: %v", err)
+		}
 	}
 
 	return &Webhook{
@@ -113,9 +124,18 @@ func (i *GitHubResourceManager) CleanupWebhook(options integrations.WebhookOptio
 		return fmt.Errorf("error parsing webhook ID: %v", err)
 	}
 
-	_, err = i.client.Repositories.DeleteHook(context.Background(), i.Owner, options.Resource.Name(), hookID)
-	if err != nil {
-		return fmt.Errorf("error deleting webhook: %v", err)
+	// If resource name is empty, delete organization-level webhook
+	// Otherwise delete repository-level webhook
+	if options.Resource.Name() == "" {
+		_, err = i.client.Organizations.DeleteHook(context.Background(), i.Owner, hookID)
+		if err != nil {
+			return fmt.Errorf("error deleting organization webhook: %v", err)
+		}
+	} else {
+		_, err = i.client.Repositories.DeleteHook(context.Background(), i.Owner, options.Resource.Name(), hookID)
+		if err != nil {
+			return fmt.Errorf("error deleting repository webhook: %v", err)
+		}
 	}
 
 	return nil
