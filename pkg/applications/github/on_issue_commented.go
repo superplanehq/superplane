@@ -66,8 +66,8 @@ func (i *OnIssueCommented) Configuration() []configuration.Field {
 
 func (i *OnIssueCommented) Setup(ctx core.TriggerContext) error {
 	err := ensureRepoInMetadata(
-		ctx.MetadataContext,
-		ctx.AppInstallationContext,
+		ctx.Metadata,
+		ctx.AppInstallation,
 		ctx.Configuration,
 	)
 
@@ -80,7 +80,7 @@ func (i *OnIssueCommented) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
 		EventType:  "issue_comment",
 		Repository: config.Repository,
 	})
@@ -116,7 +116,7 @@ func (i *OnIssueCommented) HandleWebhook(ctx core.WebhookRequestContext) (int, e
 		return http.StatusOK, nil
 	}
 
-	err = ctx.EventContext.Emit("github.issueComment", data)
+	err = ctx.Events.Emit("github.issueComment", data)
 
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
