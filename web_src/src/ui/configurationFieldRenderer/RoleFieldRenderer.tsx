@@ -7,11 +7,24 @@ interface RoleFieldRendererProps {
   value: string;
   onChange: (value: string | undefined) => void;
   domainId: string;
+  allValues?: Record<string, unknown>;
 }
 
-export const RoleFieldRenderer = ({ value, onChange, domainId }: RoleFieldRendererProps) => {
+export const RoleFieldRenderer = ({ value, onChange, domainId, allValues }: RoleFieldRendererProps) => {
   // Fetch roles from the organization
   const { data: roles, isLoading, error } = useOrganizationRoles(domainId);
+  const approvalContext = getApprovalListContext(allValues);
+  const usedRoles = new Set<string>();
+
+  if (approvalContext) {
+    approvalContext.items.forEach((item, index) => {
+      if (!item || typeof item !== "object" || index === approvalContext.itemIndex) return;
+      const record = item as Record<string, unknown>;
+      if (record.type === "role" && typeof record.role === "string" && record.role.trim()) {
+        usedRoles.add(record.role);
+      }
+    });
+  }
 
   if (!domainId || domainId.trim() === "") {
     return <div className="text-sm text-red-500 dark:text-red-400">Role field requires domainId prop</div>;
@@ -50,12 +63,29 @@ export const RoleFieldRenderer = ({ value, onChange, domainId }: RoleFieldRender
       <SelectContent>
         {roles
           .filter((role) => role.metadata?.name && role.metadata.name.trim() !== "")
-          .map((role) => (
-            <SelectItem key={role.metadata!.name} value={role.metadata!.name!}>
-              {role.spec?.displayName || role.metadata!.name}
-            </SelectItem>
-          ))}
+          .map((role) => {
+            const roleName = role.metadata?.name || "";
+            const isAlreadyRequested = approvalContext ? usedRoles.has(roleName) && roleName !== value : false;
+            const label = role.spec?.displayName || role.metadata!.name;
+            return (
+              <SelectItem key={role.metadata!.name} value={role.metadata!.name!} disabled={isAlreadyRequested}>
+                {label}
+                {isAlreadyRequested ? " (already requested)" : ""}
+              </SelectItem>
+            );
+          })}
       </SelectContent>
     </Select>
   );
 };
+
+function getApprovalListContext(allValues?: Record<string, unknown>): {
+  items: Array<Record<string, unknown>>;
+  itemIndex: number;
+} | null {
+  if (!allValues || allValues.__isApprovalList !== true) return null;
+  const items = Array.isArray(allValues.__listItems) ? (allValues.__listItems as Array<Record<string, unknown>>) : null;
+  const itemIndex = typeof allValues.__itemIndex === "number" ? allValues.__itemIndex : -1;
+  if (!items) return null;
+  return { items, itemIndex };
+}

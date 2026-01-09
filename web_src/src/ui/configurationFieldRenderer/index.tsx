@@ -260,19 +260,43 @@ export const ConfigurationFieldRenderer = ({
         if (!domainId) {
           return <div className="text-sm text-red-500 dark:text-red-400">User field requires domainId prop</div>;
         }
-        return <UserFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} />;
+        return (
+          <UserFieldRenderer
+            field={field}
+            value={value as string}
+            onChange={onChange}
+            domainId={domainId}
+            allValues={allValues}
+          />
+        );
 
       case "role":
         if (!domainId) {
           return <div className="text-sm text-red-500 dark:text-red-400">Role field requires domainId prop</div>;
         }
-        return <RoleFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} />;
+        return (
+          <RoleFieldRenderer
+            field={field}
+            value={value as string}
+            onChange={onChange}
+            domainId={domainId}
+            allValues={allValues}
+          />
+        );
 
       case "group":
         if (!domainId) {
           return <div className="text-sm text-red-500 dark:text-red-400">Group field requires domainId prop</div>;
         }
-        return <GroupFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} />;
+        return (
+          <GroupFieldRenderer
+            field={field}
+            value={value as string}
+            onChange={onChange}
+            domainId={domainId}
+            allValues={allValues}
+          />
+        );
 
       case "list":
         return (
