@@ -93,6 +93,7 @@ func (g *GitHub) Components() []core.Component {
 		&CreateIssue{},
 		&UpdateIssue{},
 		&RunWorkflow{},
+		&PublishCommitStatus{},
 	}
 }
 
@@ -573,6 +574,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"contents":         "write",
 			"pull_requests":    "write",
 			"repository_hooks": "write",
+			"statuses":         "write",
 		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/apps/%s/setup`, ctx.BaseURL, ctx.InstallationID),
 		"redirect_url": fmt.Sprintf(`%s/api/v1/apps/%s/redirect`, ctx.BaseURL, ctx.InstallationID),
