@@ -2,6 +2,7 @@ import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../typ
 import { onPushTriggerRenderer } from "./on_push";
 import { onPullRequestTriggerRenderer } from "./on_pull_request";
 import { onIssueTriggerRenderer } from "./on_issue";
+import { onIssueCommentedTriggerRenderer } from "./on_issue_commented";
 import { onReleaseTriggerRenderer } from "./on_release";
 import { onTagCreatedTriggerRenderer } from "./on_tag_created";
 import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
@@ -23,6 +24,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   onPush: onPushTriggerRenderer,
   onPullRequest: onPullRequestTriggerRenderer,
   onIssue: onIssueTriggerRenderer,
+  onIssueCommented: onIssueCommentedTriggerRenderer,
   onRelease: onReleaseTriggerRenderer,
   onTagCreated: onTagCreatedTriggerRenderer,
   onBranchCreated: onBranchCreatedTriggerRenderer,
