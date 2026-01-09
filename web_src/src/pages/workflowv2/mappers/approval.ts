@@ -467,18 +467,22 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
         const approvalComment = record.approval?.comment as string | undefined;
         const hasApprovalArtifacts = record.state === "approved" && approvalComment;
 
+        const userLabel = record.user?.name || record.user?.email;
+        const title =
+          userLabel ||
+          (record.type === "anyone"
+            ? "Any user"
+            : record.type === "user" && record.user
+              ? record.user.name || record.user.email
+              : record.type === "role" && record.role
+                ? record.role
+                : record.type === "group" && record.group
+                  ? record.group
+                  : "Unknown");
+
         return {
           id: `${record.index}`,
-          title:
-            record.type === "anyone"
-              ? "Any user"
-              : record.type === "user" && record.user
-                ? record.user.name || record.user.email
-                : record.type === "role" && record.role
-                  ? record.role
-                  : record.type === "group" && record.group
-                    ? record.group
-                    : "Unknown",
+          title,
           approved: record.state === "approved",
           rejected: record.state === "rejected",
           approverName: record.user?.name,
