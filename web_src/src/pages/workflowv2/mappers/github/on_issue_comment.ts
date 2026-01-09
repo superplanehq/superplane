@@ -5,22 +5,22 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, Issue, Comment } from "./types";
 
-interface OnIssueCommentedConfiguration {
+interface OnIssueCommentConfiguration {
   actions: string[];
 }
 
-interface OnIssueCommentedEventData {
+interface OnIssueCommentEventData {
   action?: string;
   issue?: Issue;
   comment?: Comment;
 }
 
 /**
- * Renderer for the "github.onIssueCommented" trigger
+ * Renderer for the "github.onIssueComment" trigger
  */
-export const onIssueCommentedTriggerRenderer: TriggerRenderer = {
+export const onIssueCommentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as OnIssueCommentedEventData;
+    const eventData = event.data?.data as OnIssueCommentEventData;
 
     return {
       title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
@@ -29,7 +29,7 @@ export const onIssueCommentedTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as OnIssueCommentedEventData;
+    const eventData = lastEvent.data?.data as OnIssueCommentEventData;
 
     return {
       Issue: `#${eventData?.issue?.number}`,
@@ -42,7 +42,7 @@ export const onIssueCommentedTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
     const metadata = node.metadata as unknown as BaseNodeMetadata;
-    const configuration = node.configuration as unknown as OnIssueCommentedConfiguration;
+    const configuration = node.configuration as unknown as OnIssueCommentConfiguration;
     const metadataItems = [];
 
     if (metadata?.repository?.name) {
@@ -70,7 +70,7 @@ export const onIssueCommentedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnIssueCommentedEventData;
+      const eventData = lastEvent.data?.data as OnIssueCommentEventData;
 
       props.lastEventData = {
         title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
