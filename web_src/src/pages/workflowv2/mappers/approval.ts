@@ -151,6 +151,27 @@ export const approvalMapper: ComponentBaseMapper = {
   subtitle(node, execution, additionalData) {
     return getComponentSubtitle(node, execution, additionalData);
   },
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, any> {
+    const details: Record<string, any> = {};
+    const metadata = execution.metadata as Record<string, unknown> | undefined;
+    const records = (metadata?.records as ApprovalRecord[] | undefined) || [];
+
+    if (execution.createdAt) {
+      details["Started at"] = new Date(execution.createdAt).toLocaleString();
+    }
+
+    if (execution.state === "STATE_FINISHED" && execution.updatedAt) {
+      details["Finished at"] = new Date(execution.updatedAt).toLocaleString();
+    }
+
+    if (execution.result === "RESULT_CANCELLED") {
+      details["Cancelled by"] = getCancelledByLabel(metadata) || "Unknown";
+    } else {
+      details["Approvals"] = buildApprovalTimeline(records);
+    }
+
+    return details;
+  },
 };
 
 function getApprovalCustomField(
@@ -257,6 +278,108 @@ function getComponentSubtitle(
   return "";
 }
 
+function getApprovalDecisionLabel(record: ApprovalRecord): string {
+  if (record.type === "user") {
+    return record.user?.name || record.user?.email || "User";
+  }
+
+  if (record.user?.name || record.user?.email) {
+    return record.user?.name || record.user?.email || "User";
+  }
+
+  if (record.type === "role") {
+    return record.role || "Role";
+  }
+
+  if (record.type === "group") {
+    return record.group || "Group";
+  }
+
+  if (record.type === "anyone") {
+    return "Any user";
+  }
+
+  return "Approver";
+}
+
+function buildApprovalTimeline(records: ApprovalRecord[]) {
+  return records
+    .map((record) => {
+      const meta = getApprovalDecisionMeta(record);
+      return {
+        label: getApprovalDecisionLabel(record),
+        status: meta.status,
+        timestamp: meta.timestamp,
+        comment: meta.comment,
+      };
+    })
+    .sort((a, b) => {
+      if (!a.timestamp && !b.timestamp) return 0;
+      if (!a.timestamp) return 1;
+      if (!b.timestamp) return -1;
+      return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+    });
+}
+
+function getCancelledByLabel(metadata?: Record<string, unknown>): string | undefined {
+  if (!metadata) return undefined;
+
+  const candidate = metadata.cancelledBy || metadata.cancelled_by || metadata.canceledBy || metadata.canceled_by;
+  if (typeof candidate === "string") return candidate;
+
+  if (candidate && typeof candidate === "object") {
+    const obj = candidate as Record<string, unknown>;
+    const name = obj.name;
+    const email = obj.email;
+    const id = obj.id;
+    if (typeof name === "string" && name.trim()) return name;
+    if (typeof email === "string" && email.trim()) return email;
+    if (typeof id === "string" && id.trim()) return id;
+  }
+
+  return undefined;
+}
+
+function getApprovalDecisionMeta(record: ApprovalRecord): {
+  status: string;
+  timestamp?: string;
+  comment?: string;
+} {
+  const approvalComment = record.approval?.comment?.trim();
+  const rejectionReason = record.rejection?.reason?.trim();
+  const comment = approvalComment || rejectionReason;
+
+  if (record.state === "approved") {
+    return {
+      status: "Approved",
+      timestamp: formatDecisionTimestamp(record.approval?.approvedAt),
+      comment,
+    };
+  }
+
+  if (record.state === "rejected") {
+    return {
+      status: "Rejected",
+      timestamp: formatDecisionTimestamp(record.rejection?.rejectedAt),
+      comment,
+    };
+  }
+
+  return {
+    status: "Pending",
+    comment,
+  };
+}
+
+function formatDecisionTimestamp(timestamp?: string): string | undefined {
+  if (!timestamp) return undefined;
+
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+
+  return formatTimeAgo(parsed);
+}
+
 // ----------------------- Data Builder -----------------------
 
 type ApprovalRecord = {
@@ -266,8 +389,8 @@ type ApprovalRecord = {
   user?: { id?: string; name?: string; email?: string; avatarUrl?: string };
   role?: string;
   group?: string;
-  approval?: { comment?: string };
-  rejection?: { reason?: string };
+  approval?: { approvedAt?: string; comment?: string };
+  rejection?: { rejectedAt?: string; reason?: string };
 };
 
 export const approvalDataBuilder: ComponentAdditionalDataBuilder = {

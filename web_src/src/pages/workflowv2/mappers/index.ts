@@ -190,7 +190,7 @@ export function getExecutionDetails(
   componentName: string,
   execution: WorkflowsWorkflowNodeExecution,
   node: ComponentsNode,
-): Record<string, string> | undefined {
+): Record<string, any> | undefined {
   const parts = componentName?.split(".");
   let mapper: ComponentBaseMapper | undefined;
 
