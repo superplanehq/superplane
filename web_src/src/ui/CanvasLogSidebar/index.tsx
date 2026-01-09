@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CircleCheck, CircleX, MoreHorizontal, Search, TriangleAlert, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  CircleCheck,
+  CircleX,
+  MoreHorizontal,
+  Search,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -28,6 +37,7 @@ export interface LogEntry {
   source: LogScope;
   searchText?: string;
   runItems?: LogRunItem[];
+  detail?: ReactNode;
 }
 
 export interface LogCounts {
@@ -318,6 +328,7 @@ function LogEntryRow({
     error: <CircleX className="h-4 w-4 text-rose-500" />,
     warning: <TriangleAlert className="h-4 w-4 text-amber-500" />,
   } as const;
+  const [isDetailExpanded, setIsDetailExpanded] = useState(false);
 
   if (entry.type === "run") {
     const runItems = entry.runItems || [];
@@ -366,13 +377,36 @@ function LogEntryRow({
     );
   }
 
+  const hasDetail = Boolean(entry.detail);
+
   return (
-    <div className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700">
-      <div>{icon[entry.type]}</div>
-      <div className="flex-1 min-w-0">{entry.title}</div>
-      <span className="ml-auto text-xs text-slate-400 tabular-nums whitespace-nowrap">
-        {formatLogTimestamp(entry.timestamp)}
-      </span>
+    <div className="flex items-start gap-3 px-4 py-2 text-sm text-slate-700">
+      <div className="pt-0.5">{icon[entry.type]}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          {hasDetail ? (
+            <button
+              type="button"
+              className="flex flex-1 min-w-0 items-center gap-2 text-left hover:text-slate-900"
+              onClick={() => setIsDetailExpanded((prev) => !prev)}
+              aria-expanded={isDetailExpanded}
+            >
+              {isDetailExpanded ? (
+                <ChevronDown className="h-4 w-4 text-slate-500" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-slate-500" />
+              )}
+              <div className="min-w-0">{entry.title}</div>
+            </button>
+          ) : (
+            <div className="flex-1 min-w-0">{entry.title}</div>
+          )}
+          <span className="text-xs text-slate-400 tabular-nums whitespace-nowrap">
+            {formatLogTimestamp(entry.timestamp)}
+          </span>
+        </div>
+        {entry.detail && isDetailExpanded && <div className="mt-2 text-xs text-slate-500">{entry.detail}</div>}
+      </div>
     </div>
   );
 }
