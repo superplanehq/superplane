@@ -10,34 +10,34 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-type OnIssueCommented struct{}
+type OnIssueComment struct{}
 
-type OnIssueCommentedConfiguration struct {
+type OnIssueCommentConfiguration struct {
 	Repository string   `json:"repository" mapstructure:"repository"`
 	Actions    []string `json:"actions" mapstructure:"actions"`
 }
 
-func (i *OnIssueCommented) Name() string {
-	return "github.onIssueCommented"
+func (i *OnIssueComment) Name() string {
+	return "github.onIssueComment"
 }
 
-func (i *OnIssueCommented) Label() string {
-	return "On Issue Commented"
+func (i *OnIssueComment) Label() string {
+	return "On Issue Comment"
 }
 
-func (i *OnIssueCommented) Description() string {
+func (i *OnIssueComment) Description() string {
 	return "Listen to issue comment events"
 }
 
-func (i *OnIssueCommented) Icon() string {
+func (i *OnIssueComment) Icon() string {
 	return "github"
 }
 
-func (i *OnIssueCommented) Color() string {
+func (i *OnIssueComment) Color() string {
 	return "gray"
 }
 
-func (i *OnIssueCommented) Configuration() []configuration.Field {
+func (i *OnIssueComment) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:     "repository",
@@ -64,7 +64,7 @@ func (i *OnIssueCommented) Configuration() []configuration.Field {
 	}
 }
 
-func (i *OnIssueCommented) Setup(ctx core.TriggerContext) error {
+func (i *OnIssueComment) Setup(ctx core.TriggerContext) error {
 	err := ensureRepoInMetadata(
 		ctx.Metadata,
 		ctx.AppInstallation,
@@ -75,7 +75,7 @@ func (i *OnIssueCommented) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	var config OnIssueCommentedConfiguration
+	var config OnIssueCommentConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -86,16 +86,16 @@ func (i *OnIssueCommented) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (i *OnIssueCommented) Actions() []core.Action {
+func (i *OnIssueComment) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (i *OnIssueCommented) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (i *OnIssueComment) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	return nil, nil
 }
 
-func (i *OnIssueCommented) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	config := OnIssueCommentedConfiguration{}
+func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	config := OnIssueCommentConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)

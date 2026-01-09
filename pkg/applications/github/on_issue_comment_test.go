@@ -13,8 +13,8 @@ import (
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__OnIssueCommented__HandleWebhook(t *testing.T) {
-	trigger := &OnIssueCommented{}
+func Test__OnIssueComment__HandleWebhook(t *testing.T) {
+	trigger := &OnIssueComment{}
 	eventType := "issue_comment"
 
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
@@ -121,9 +121,9 @@ func Test__OnIssueCommented__HandleWebhook(t *testing.T) {
 	})
 }
 
-func Test__OnIssueCommented__Setup(t *testing.T) {
+func Test__OnIssueComment__Setup(t *testing.T) {
 	helloRepo := Repository{ID: 123456, Name: "hello", URL: "https://github.com/testhq/hello"}
-	trigger := OnIssueCommented{}
+	trigger := OnIssueComment{}
 
 	t.Run("repository is required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
