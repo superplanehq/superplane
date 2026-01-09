@@ -1264,7 +1264,7 @@ function CanvasContent({
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
   const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(false);
-  const [logFilter, setLogFilter] = useState<LogTypeFilter>("all");
+  const [logFilter, setLogFilter] = useState<LogTypeFilter>(new Set());
   const [logScope, setLogScope] = useState<LogScopeFilter>("all");
   const [logSearch, setLogSearch] = useState("");
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
@@ -1718,6 +1718,8 @@ function CanvasContent({
   const filteredLogEntries = useMemo(() => {
     const query = logSearch.trim().toLowerCase();
     const matchesSearch = (value?: string) => !query || (value || "").toLowerCase().includes(query);
+    // Show all if filter is empty or contains all three types
+    const showAll = logFilter.size === 0 || logFilter.size === 3;
 
     return logEntries.reduce<LogEntry[]>((acc, entry) => {
       if (logScope !== "all" && entry.source !== logScope) {
@@ -1727,7 +1729,7 @@ function CanvasContent({
       if (entry.type === "run") {
         const runItems = entry.runItems || [];
         const filteredRunItems = runItems.filter((item) => {
-          const typeMatch = logFilter === "all" || item.type === logFilter;
+          const typeMatch = showAll || logFilter.has(item.type);
           const searchMatch =
             matchesSearch(item.searchText) || matchesSearch(typeof item.title === "string" ? item.title : "");
           return typeMatch && searchMatch;
@@ -1735,7 +1737,7 @@ function CanvasContent({
 
         const entrySearchMatch =
           matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : "");
-        const typeMatch = logFilter === "all" ? true : filteredRunItems.length > 0;
+        const typeMatch = showAll ? true : filteredRunItems.length > 0;
         const searchMatch = query ? entrySearchMatch || filteredRunItems.length > 0 : true;
 
         if (typeMatch && searchMatch) {
@@ -1744,7 +1746,7 @@ function CanvasContent({
         return acc;
       }
 
-      if (logFilter !== "all" && entry.type !== logFilter) {
+      if (!showAll && !logFilter.has(entry.type)) {
         return acc;
       }
 
@@ -1759,8 +1761,12 @@ function CanvasContent({
     }, []);
   }, [logEntries, logFilter, logScope, logSearch]);
 
-  const handleLogButtonClick = useCallback((filter: LogTypeFilter) => {
-    setLogFilter(filter);
+  const handleLogButtonClick = useCallback((filterType: "all" | "error" | "warning") => {
+    if (filterType === "all") {
+      setLogFilter(new Set());
+    } else {
+      setLogFilter(new Set([filterType]));
+    }
     setIsLogSidebarOpen(true);
   }, []);
 
