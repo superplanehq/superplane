@@ -7,11 +7,24 @@ interface UserFieldRendererProps {
   value: string;
   onChange: (value: string | undefined) => void;
   domainId: string;
+  allValues?: Record<string, unknown>;
 }
 
-export const UserFieldRenderer = ({ value, onChange, domainId }: UserFieldRendererProps) => {
+export const UserFieldRenderer = ({ value, onChange, domainId, allValues }: UserFieldRendererProps) => {
   // Fetch users from the organization
   const { data: users, isLoading, error } = useOrganizationUsers(domainId);
+  const approvalContext = getApprovalListContext(allValues);
+  const usedUserIds = new Set<string>();
+
+  if (approvalContext) {
+    approvalContext.items.forEach((item, index) => {
+      if (!item || typeof item !== "object" || index === approvalContext.itemIndex) return;
+      const record = item as Record<string, unknown>;
+      if (record.type === "user" && typeof record.user === "string" && record.user.trim()) {
+        usedUserIds.add(record.user);
+      }
+    });
+  }
 
   if (!domainId || domainId.trim() === "") {
     return <div className="text-sm text-red-500 dark:text-red-400">User field requires domainId prop</div>;
@@ -50,12 +63,29 @@ export const UserFieldRenderer = ({ value, onChange, domainId }: UserFieldRender
       <SelectContent>
         {users
           .filter((user) => user.metadata?.id && user.metadata.id.trim() !== "")
-          .map((user) => (
-            <SelectItem key={user.metadata!.id} value={user.metadata!.id!}>
-              {user.metadata?.email || user.spec?.displayName || user.metadata!.id}
-            </SelectItem>
-          ))}
+          .map((user) => {
+            const userId = user.metadata?.id || "";
+            const isAlreadyRequested = approvalContext ? usedUserIds.has(userId) && userId !== value : false;
+            const label = user.metadata?.email || user.spec?.displayName || user.metadata!.id;
+            return (
+              <SelectItem key={user.metadata!.id} value={user.metadata!.id!} disabled={isAlreadyRequested}>
+                {label}
+                {isAlreadyRequested ? " (already requested)" : ""}
+              </SelectItem>
+            );
+          })}
       </SelectContent>
     </Select>
   );
 };
+
+function getApprovalListContext(allValues?: Record<string, unknown>): {
+  items: Array<Record<string, unknown>>;
+  itemIndex: number;
+} | null {
+  if (!allValues || allValues.__isApprovalList !== true) return null;
+  const items = Array.isArray(allValues.__listItems) ? (allValues.__listItems as Array<Record<string, unknown>>) : null;
+  const itemIndex = typeof allValues.__itemIndex === "number" ? allValues.__itemIndex : -1;
+  if (!items) return null;
+  return { items, itemIndex };
+}
