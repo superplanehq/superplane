@@ -96,3 +96,14 @@ export interface GitRef {
     login?: string;
   };
 }
+
+export interface Comment {
+  id: number;
+  body: string;
+  user?: {
+    login: string;
+    html_url: string;
+  };
+  created_at: string;
+  updated_at?: string;
+}
