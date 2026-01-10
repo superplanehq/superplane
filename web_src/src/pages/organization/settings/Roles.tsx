@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { RolesRole } from "../../../api-client/types.gen";
-import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "../../../components/Dropdown/dropdown";
 import { Icon } from "../../../components/Icon";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { useDeleteRole, useOrganizationRoles } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RolesProps {
   organizationId: string;
@@ -63,33 +63,47 @@ export function Roles({ organizationId }: RolesProps) {
   };
 
   const getSortedData = (data: RolesRole[]) => {
-    if (!sortConfig.key) return data;
+    const defaultOrder = ["org_admin", "org_owner", "org_viewer"];
+    const defaultOrderIndex = new Map(defaultOrder.map((role, index) => [role, index]));
+    const defaultRoles: RolesRole[] = [];
+    const customRoles: RolesRole[] = [];
 
-    return [...data].sort((a, b) => {
+    data.forEach((role) => {
+      if (isDefaultRole(role.metadata?.name)) {
+        defaultRoles.push(role);
+      } else {
+        customRoles.push(role);
+      }
+    });
+
+    const sortedCustomRoles = [...customRoles].sort((a, b) => {
       let aValue: string | number;
       let bValue: string | number;
 
-      switch (sortConfig.key) {
-        case "name":
-          aValue = (a.spec?.displayName || a.metadata?.name || "").toLowerCase();
-          bValue = (b.spec?.displayName || b.metadata?.name || "").toLowerCase();
-          break;
-        case "permissions":
-          aValue = a.spec?.permissions?.length || 0;
-          bValue = b.spec?.permissions?.length || 0;
-          break;
-        default:
-          return 0;
+      if (sortConfig.key === "permissions") {
+        aValue = a.spec?.permissions?.length || 0;
+        bValue = b.spec?.permissions?.length || 0;
+      } else {
+        aValue = (a.spec?.displayName || a.metadata?.name || "").toLowerCase();
+        bValue = (b.spec?.displayName || b.metadata?.name || "").toLowerCase();
       }
 
       if (aValue < bValue) {
-        return sortConfig.direction === "asc" ? -1 : 1;
+        return sortConfig.direction === "desc" && sortConfig.key ? 1 : -1;
       }
       if (aValue > bValue) {
-        return sortConfig.direction === "asc" ? 1 : -1;
+        return sortConfig.direction === "desc" && sortConfig.key ? -1 : 1;
       }
       return 0;
     });
+
+    const sortedDefaultRoles = [...defaultRoles].sort((a, b) => {
+      const aIndex = defaultOrderIndex.get(a.metadata?.name || "") ?? Number.MAX_SAFE_INTEGER;
+      const bIndex = defaultOrderIndex.get(b.metadata?.name || "") ?? Number.MAX_SAFE_INTEGER;
+      return aIndex - bIndex;
+    });
+
+    return [...sortedCustomRoles, ...sortedDefaultRoles];
   };
 
   const isDefaultRole = (roleName: string | undefined) => {
@@ -165,7 +179,7 @@ export function Roles({ organizationId }: RolesProps) {
                   filteredAndSortedRoles.map((role, index) => {
                     const isDefault = isDefaultRole(role.metadata?.name);
                     return (
-                      <TableRow key={role.metadata?.name || index}>
+                      <TableRow key={role.metadata?.name || index} className="last:[&>td]:border-b-0">
                         <TableCell className="font-semibold">{role.spec?.displayName || role.metadata?.name}</TableCell>
                         <TableCell>{role.spec?.permissions?.length || 0}</TableCell>
                         <TableCell>
@@ -175,24 +189,39 @@ export function Roles({ organizationId }: RolesProps) {
                                 Default Role
                               </span>
                             ) : (
-                              <Dropdown>
-                                <DropdownButton disabled={deleteRoleMutation.isPending}>
-                                  <Icon name="ellipsis-vertical" size="sm" />
-                                </DropdownButton>
-                                <DropdownMenu>
-                                  <DropdownItem onClick={() => handleEditRole(role)}>
-                                    <Icon name="edit" />
-                                    Edit
-                                  </DropdownItem>
-                                  <DropdownItem
-                                    onClick={() => handleDeleteRole(role)}
-                                    className="text-red-600 dark:text-red-400"
-                                  >
-                                    <Icon name="delete" />
-                                    {deleteRoleMutation.isPending ? "Deleting..." : "Delete"}
-                                  </DropdownItem>
-                                </DropdownMenu>
-                              </Dropdown>
+                              <TooltipProvider delayDuration={200}>
+                                <div className="flex items-center gap-1">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleEditRole(role)}
+                                        className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
+                                        aria-label="Edit role"
+                                      >
+                                        <Icon name="edit" size="sm" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">Edit Role</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteRole(role)}
+                                        className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
+                                        aria-label="Delete role"
+                                        disabled={deleteRoleMutation.isPending}
+                                      >
+                                        <Icon name="trash-2" size="sm" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      {deleteRoleMutation.isPending ? "Deleting..." : "Delete Role"}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </TooltipProvider>
                             )}
                           </div>
                         </TableCell>

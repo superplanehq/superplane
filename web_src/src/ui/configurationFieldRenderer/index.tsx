@@ -1,5 +1,5 @@
 import React from "react";
-import { Label } from "../label";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/ui/switch";
 import { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";

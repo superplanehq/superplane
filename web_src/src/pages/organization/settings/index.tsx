@@ -85,9 +85,14 @@ export function OrganizationSettings() {
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
   const segmentsAfterSettings = settingsIndex >= 0 ? pathSegments.slice(settingsIndex + 1) : [];
-  const currentSection =
-    segmentsAfterSettings.find((segment) => sectionIds.includes(segment)) ||
-    (sectionIds.includes(pathSegments[pathSegments.length - 1]) ? pathSegments[pathSegments.length - 1] : "general");
+  const currentSection = segmentsAfterSettings.includes("create-role")
+    ? "roles"
+    : segmentsAfterSettings.includes("create-group")
+      ? "groups"
+      : segmentsAfterSettings.find((segment) => sectionIds.includes(segment)) ||
+        (sectionIds.includes(pathSegments[pathSegments.length - 1])
+          ? pathSegments[pathSegments.length - 1]
+          : "general");
 
   const organizationName = organization?.metadata?.name || "Organization";
   const userName = user?.name || "My Account";

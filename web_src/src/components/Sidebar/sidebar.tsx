@@ -13,7 +13,7 @@ export function SidebarHeader({ className, ...props }: React.ComponentPropsWitho
       {...props}
       className={clsx(
         className,
-        "flex flex-col border-b border-gray-950/5 p-4 dark:border-white/5 [&>[data-slot=section]+[data-slot=section]]:mt-2.5",
+        "flex flex-col border-b border-gray-950/10 p-4 dark:border-white/5 [&>[data-slot=section]+[data-slot=section]]:mt-2.5",
       )}
     />
   );
@@ -29,7 +29,7 @@ export function SidebarFooter({ className, ...props }: React.ComponentPropsWitho
       {...props}
       className={clsx(
         className,
-        "flex flex-col border-t border-gray-950/5 p-4 dark:border-white/5 [&>[data-slot=section]+[data-slot=section]]:mt-2.5",
+        "flex flex-col border-t border-gray-950/10 p-4 dark:border-white/5 [&>[data-slot=section]+[data-slot=section]]:mt-2.5",
       )}
     />
   );
@@ -40,7 +40,7 @@ export function SidebarSection({ className, ...props }: React.ComponentPropsWith
 }
 
 export function SidebarDivider({ className, ...props }: React.ComponentPropsWithoutRef<"hr">) {
-  return <hr {...props} className={clsx(className, "my-4 border-t border-gray-950/5 lg:-mx-4 dark:border-white/5")} />;
+  return <hr {...props} className={clsx(className, "my-4 border-t border-gray-950/10 lg:-mx-4 dark:border-white/5")} />;
 }
 
 export function SidebarSpacer({ className, ...props }: React.ComponentPropsWithoutRef<"div">) {

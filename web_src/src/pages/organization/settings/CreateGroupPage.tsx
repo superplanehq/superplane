@@ -24,7 +24,6 @@ export function CreateGroupPage() {
   usePageTitle(["Create Group"]);
 
   const [groupName, setGroupName] = useState("");
-  const [groupDescription, setGroupDescription] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +49,6 @@ export function CreateGroupPage() {
         groupName: groupName.trim().toLocaleLowerCase().replace(/\s+/g, "_"),
         role: selectedRole,
         displayName: groupName,
-        description: groupDescription,
       });
 
       navigate(`/${orgId}/settings/groups`);
@@ -70,7 +68,7 @@ export function CreateGroupPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-left">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="mb-4">
@@ -119,20 +117,6 @@ export function CreateGroupPage() {
                   onChange={(e) => setGroupName(e.target.value)}
                   onKeyPress={handleKeyPress}
                   className="w-full max-w-lg"
-                />
-              </div>
-
-              {/* Group Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-800 dark:text-white mb-2">
-                  Group Description
-                </label>
-                <textarea
-                  placeholder="Describe the group's purpose and responsibilities..."
-                  value={groupDescription}
-                  onChange={(e) => setGroupDescription(e.target.value)}
-                  className="w-full max-w-lg px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white resize-none"
-                  rows={3}
                 />
               </div>
 
@@ -192,12 +176,11 @@ export function CreateGroupPage() {
               disabled={!groupName.trim() || !selectedRole || isCreating || roles.length === 0}
               className="flex items-center gap-2"
             >
-              <Icon name="group_add" size="sm" />
               {isCreating ? "Creating..." : "Create Group"}
             </Button>
 
             <Link to={`/${orgId}/settings/groups`}>
-              <Button variant="secondary">Cancel</Button>
+              <Button variant="outline">Cancel</Button>
             </Link>
           </div>
         </div>

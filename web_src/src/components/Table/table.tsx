@@ -102,7 +102,7 @@ export function TableCell({ className, children, ...props }: React.ComponentProp
       className={clsx(
         className,
         "relative px-4 first:pl-6 last:pr-6",
-        !striped && "border-b border-gray-950/5 dark:border-white/5",
+        !striped && "border-b border-gray-950/10 dark:border-white/5",
         grid && "border-l border-l-gray-950/5 first:border-l-0 dark:border-l-white/5",
         dense ? "py-2.5" : "py-4",
         !bleed && "sm:first:pl-1 sm:last:pr-1",

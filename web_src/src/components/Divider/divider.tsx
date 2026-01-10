@@ -12,7 +12,7 @@ export function Divider({
       className={clsx(
         className,
         "w-full border-t",
-        soft && "border-gray-950/5 dark:border-white/5",
+        soft && "border-gray-950/10 dark:border-white/5",
         !soft && "border-gray-950/10 dark:border-white/10",
       )}
     />

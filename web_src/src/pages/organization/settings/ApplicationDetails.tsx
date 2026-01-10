@@ -13,6 +13,9 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { resolveIcon } from "@/lib/utils";
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface ApplicationDetailsProps {
   organizationId: string;
@@ -28,6 +31,24 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
 
   const { data: availableApps = [] } = useAvailableApplications();
   const appDefinition = installation ? availableApps.find((app) => app.name === installation.spec?.appName) : undefined;
+  const appLogoMap: Record<string, string> = {
+    github: githubIcon,
+    semaphore: SemaphoreLogo,
+    pagerduty: pagerDutyIcon,
+  };
+
+  const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {
+    const logo = appName ? appLogoMap[appName] : undefined;
+    if (logo) {
+      return (
+        <span className={className}>
+          <img src={logo} alt="" className="h-full w-full object-contain" />
+        </span>
+      );
+    }
+    const IconComponent = resolveIcon(slug);
+    return <IconComponent className={className} />;
+  };
 
   const updateMutation = useUpdateApplication(organizationId, installationId || "");
   const uninstallMutation = useUninstallApplication(organizationId, installationId || "");
@@ -163,10 +184,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
           <ArrowLeft className="w-5 h-5" />
         </button>
         {appDefinition?.icon &&
-          (() => {
-            const AppIcon = resolveIcon(appDefinition.icon);
-            return <AppIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />;
-          })()}
+          renderAppIcon(appDefinition.icon, appDefinition.name || installation?.spec?.appName, "w-6 h-6")}
         <div className="flex-1">
           <h4 className="text-2xl font-semibold">{installation.metadata?.name || installation.spec?.appName}</h4>
           {installation.spec?.appName && installation.metadata?.name !== installation.spec?.appName && (
@@ -193,7 +211,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">State</h3>
                   <span
-                    className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
+                    className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${
                       installation.status?.state === "ready"
                         ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                         : installation.status?.state === "error"
@@ -256,16 +274,16 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
           <div className="bg-white dark:bg-gray-900 rounded-lg border border-red-200 dark:border-red-800">
             <div className="p-6">
               <h2 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">Danger Zone</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              <p className="text-sm text-gray-800 dark:text-gray-100 mb-4">
                 Once you uninstall this application, all its data will be permanently deleted. This action cannot be
                 undone.
               </p>
               <Button
                 variant="outline"
                 onClick={() => setShowDeleteConfirm(true)}
-                className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 gap-1"
               >
-                <Trash2 className="w-4 h-4 mr-2" />
+                <Trash2 className="w-4 h-4" />
                 Uninstall Application
               </Button>
             </div>
@@ -276,7 +294,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
           <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
             <div className="p-6">
               {installation?.status?.browserAction && (
-                <Alert className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+                <Alert className="mb-6 bg-orange-100 dark:bg-yellow-900/20 border-orange-200 dark:border-yellow-800">
                   <div className="flex items-start justify-between gap-4">
                     <AlertDescription className="flex-1 text-yellow-800 dark:text-yellow-200 [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:space-y-1">
                       {installation.status.browserAction.description && (
@@ -344,19 +362,13 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">Uninstall Application</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                Are you sure you want to uninstall <strong>{installation?.metadata?.name}</strong>? This action cannot
-                be undone and all data will be permanently deleted.
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
+                Uninstall {installation?.metadata?.name || "application"}?
+              </h3>
+              <p className="text-sm text-gray-800 dark:text-gray-100 mb-6">
+                This cannot be undone. All data will be permanently deleted.
               </p>
-              <div className="flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={uninstallMutation.isPending}
-                >
-                  Cancel
-                </Button>
+              <div className="flex justify-start gap-3">
                 <Button
                   color="blue"
                   onClick={handleUninstall}
@@ -371,6 +383,13 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
                   ) : (
                     "Uninstall"
                   )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={uninstallMutation.isPending}
+                >
+                  Cancel
                 </Button>
               </div>
               {uninstallMutation.isError && (

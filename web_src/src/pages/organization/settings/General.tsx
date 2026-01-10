@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import { useParams } from "react-router-dom";
 import type { OrganizationsOrganization } from "../../../api-client/types.gen";
 import { Field, Fieldset, Label } from "../../../components/Fieldset/fieldset";
@@ -17,6 +18,7 @@ export function General({ organization }: GeneralProps) {
   const [name, setName] = useState(organization.metadata?.name || "");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showDeleteForm, setShowDeleteForm] = useState(false);
 
   // Use React Query mutation hook
   const updateOrganizationMutation = useUpdateOrganization(organizationId || "");
@@ -68,7 +70,7 @@ export function General({ organization }: GeneralProps) {
       <Fieldset className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
         <Field className="space-y-4">
           <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Organization Name</Label>
-          <Input type="text" value={name} onChange={(e) => setName(e.target.value)} className="max-w-lg" />
+          <Input type="text" value={name} onChange={(e) => setName(e.target.value)} className="max-w-sm" />
           <div className="flex items-center gap-4">
             <Button
               type="button"
@@ -87,43 +89,58 @@ export function General({ organization }: GeneralProps) {
         </Field>
       </Fieldset>
 
-      <Fieldset className="bg-white border border-gray-300 rounded-lg p-6 space-y-4">
-        <div>
-          <Heading level={3} className="!text-base text-red-500 dark:text-red-400">
-            Delete Organization
-          </Heading>
-          <p className="text-sm max-w-prose text-gray-800 dark:text-red-300 mt-2 mb-6">
-            Deleting your organization is permanent and will remove all canvases, members, and settings. This action
-            cannot be undone.
-          </p>
-        </div>
-        <Field>
-          <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Type "{organization.metadata?.name}" to confirm
-          </Label>
-          <Input
-            type="text"
-            value={deleteConfirmation}
-            onChange={(e) => setDeleteConfirmation(e.target.value)}
-            placeholder={organization.metadata?.name || "Organization name"}
-            className="max-w-lg"
-          />
-        </Field>
-        <div className="flex items-center gap-4">
-          <Button
+      <Fieldset className="bg-white border border-red-200 rounded-lg p-6 space-y-4">
+        {!showDeleteForm ? (
+          <button
             type="button"
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={
-              deleteOrganizationMutation.isPending ||
-              deleteConfirmation !== (organization.metadata?.name || "") ||
-              !organizationId
-            }
+            onClick={() => setShowDeleteForm(true)}
+            className="flex items-center gap-2 text-sm text-red-500 hover:text-red-500"
           >
-            {deleteOrganizationMutation.isPending ? "Deleting..." : "Delete Organization"}
-          </Button>
-          {deleteError && <span className="text-sm text-red-600">{deleteError}</span>}
-        </div>
+            <Trash2 className="h-4 w-4" />
+            Delete Organization...
+          </button>
+        ) : (
+          <>
+            <div>
+              <Heading level={3} className="!text-lg text-red-500 dark:text-red-400">
+                Delete Organization
+              </Heading>
+              <p className="text-sm max-w-prose text-gray-800 dark:text-red-300 mt-2 mb-6">
+                Deleting your organization is permanent and will remove all canvases, members, and settings. This action
+                cannot be undone.
+              </p>
+            </div>
+            <Field>
+              <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Type "{organization.metadata?.name}" to confirm
+              </Label>
+              <Input
+                type="text"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder={organization.metadata?.name || "Organization name"}
+                className="max-w-sm"
+              />
+            </Field>
+            <div className="flex items-center gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDelete}
+                disabled={
+                  deleteOrganizationMutation.isPending ||
+                  deleteConfirmation !== (organization.metadata?.name || "") ||
+                  !organizationId
+                }
+                className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 gap-1"
+              >
+                <Trash2 className="h-4 w-4" />
+                {deleteOrganizationMutation.isPending ? "Deleting..." : "Delete Organization"}
+              </Button>
+              {deleteError && <span className="text-sm text-red-600">{deleteError}</span>}
+            </div>
+          </>
+        )}
       </Fieldset>
     </div>
   );
