@@ -63,6 +63,7 @@ export function Members({ organizationId }: MembersProps) {
   }>({ key: null, direction: "asc" });
   const [emailsInput, setEmailsInput] = useState("");
   const [invitationError, setInvitationError] = useState<string | null>(null);
+  const [removalError, setRemovalError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"all" | "active" | "invited">("all");
 
   // Use React Query hooks for data fetching
@@ -94,6 +95,14 @@ export function Members({ organizationId }: MembersProps) {
 
   const error = usersError || rolesError || invitationsError;
   const isInviting = createInvitationMutation.isPending;
+  const ownerIds = useMemo(() => {
+    const ids = users
+      .filter((user) => user.status?.roleAssignments?.some((role) => role.roleName === "org_owner"))
+      .map((user) => user.metadata?.id)
+      .filter((id): id is string => Boolean(id));
+
+    return new Set(ids);
+  }, [users]);
 
   // Transform users to Member interface format
   const members = useMemo(() => {
@@ -211,7 +220,13 @@ export function Members({ organizationId }: MembersProps) {
   };
 
   const handleMemberRemove = async (member: UnifiedMember) => {
+    if (member.type === "member" && ownerIds.has(member.id) && ownerIds.size <= 1) {
+      setRemovalError("You must have at least one organization owner.");
+      return;
+    }
+
     try {
+      setRemovalError(null);
       if (member.type === "member") {
         await removeUserMutation.mutateAsync({
           userId: member.id,
@@ -220,6 +235,7 @@ export function Members({ organizationId }: MembersProps) {
         await removeInvitationMutation.mutateAsync(member.id);
       }
     } catch (err) {
+      setRemovalError("Unable to remove this member.");
       console.error("Error removing member:", err);
     }
   };
@@ -381,6 +397,11 @@ export function Members({ organizationId }: MembersProps) {
         </div>
 
         <div className="px-6 pb-6">
+          {removalError && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+              <p>{removalError}</p>
+            </div>
+          )}
           {loadingMembers || loadingInvitations ? (
             <div className="flex justify-center items-center h-32">
               <p className="text-gray-500 dark:text-gray-400">Loading...</p>
@@ -487,20 +508,34 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell>{getStateBadge(member)}</TableCell>
                     <TableCell>
                       <div className="flex justify-end">
-                        <Dropdown>
-                          <DropdownButton className="flex items-center gap-2 text-sm">
-                            <Icon name="ellipsis-vertical" size="sm" />
-                          </DropdownButton>
-                          <DropdownMenu>
-                            <DropdownItem
-                              className="flex items-center gap-1"
-                              onClick={() => handleMemberRemove(member)}
-                            >
-                              <Icon name="x" size="sm" />
-                              {member.type === "member" ? "Remove" : "Cancel invitation"}
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
+                        {member.type === "member" && ownerIds.has(member.id) && ownerIds.size <= 1 ? (
+                          <Dropdown>
+                            <DropdownButton className="flex items-center gap-2 text-sm">
+                              <Icon name="ellipsis-vertical" size="sm" />
+                            </DropdownButton>
+                            <DropdownMenu>
+                              <DropdownItem disabled>
+                                <Icon name="x" size="sm" />
+                                <span className="ml-1">Cannot remove last owner</span>
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        ) : (
+                          <Dropdown>
+                            <DropdownButton className="flex items-center gap-2 text-sm">
+                              <Icon name="ellipsis-vertical" size="sm" />
+                            </DropdownButton>
+                            <DropdownMenu>
+                              <DropdownItem
+                                className="flex items-center gap-1"
+                                onClick={() => handleMemberRemove(member)}
+                              >
+                                <Icon name="x" size="sm" />
+                                {member.type === "member" ? "Remove" : "Cancel invitation"}
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

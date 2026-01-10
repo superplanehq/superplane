@@ -263,7 +263,7 @@ export function Groups({ organizationId }: GroupsProps) {
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteGroup(group.metadata!.name!)}
-                                  className="p-2 rounded-full text-gray-800 hover:bg-gray-100 transition-colors"
+                                  className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors"
                                   aria-label="Delete group"
                                   disabled={deleteGroupMutation.isPending}
                                 >
