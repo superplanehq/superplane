@@ -243,6 +243,22 @@ CREATE TABLE public.organization_invitations (
 
 
 --
+-- Name: organization_okta_configs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_okta_configs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    saml_issuer text NOT NULL,
+    saml_certificate text NOT NULL,
+    scim_token_hash text NOT NULL,
+    enforce_sso boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: organizations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -609,6 +625,22 @@ ALTER TABLE ONLY public.integrations
 
 ALTER TABLE ONLY public.organization_invitations
     ADD CONSTRAINT organization_invitations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_okta_configs organization_okta_configs_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_okta_configs
+    ADD CONSTRAINT organization_okta_configs_organization_id_key UNIQUE (organization_id);
+
+
+--
+-- Name: organization_okta_configs organization_okta_configs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_okta_configs
+    ADD CONSTRAINT organization_okta_configs_pkey PRIMARY KEY (id);
 
 
 --
@@ -1160,6 +1192,14 @@ ALTER TABLE ONLY public.workflow_nodes
 
 ALTER TABLE ONLY public.organization_invitations
     ADD CONSTRAINT organization_invitations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_okta_configs organization_okta_configs_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_okta_configs
+    ADD CONSTRAINT organization_okta_configs_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --

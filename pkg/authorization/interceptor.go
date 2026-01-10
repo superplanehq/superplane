@@ -88,6 +88,9 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbOrganization.Organizations_UninstallApplication_FullMethodName: {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_ListApplications_FullMethodName:     {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_DescribeApplication_FullMethodName:  {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_GetOktaSettings_FullMethodName:      {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_UpdateOktaSettings_FullMethodName:   {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_RotateOktaSCIMToken_FullMethodName:  {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
 
 		// Blueprints rules
 		pbBlueprints.Blueprints_ListBlueprints_FullMethodName:    {Resource: "blueprint", Action: "read", DomainType: models.DomainTypeOrganization},

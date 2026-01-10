@@ -489,6 +489,10 @@ export type OrganizationsDescribeOrganizationResponse = {
   organization?: OrganizationsOrganization;
 };
 
+export type OrganizationsGetOktaSettingsResponse = {
+  settings?: OrganizationsOktaSettings;
+};
+
 export type OrganizationsInstallApplicationBody = {
   appName?: string;
   installationName?: string;
@@ -513,6 +517,13 @@ export type OrganizationsListInvitationsResponse = {
   invitations?: Array<OrganizationsInvitation>;
 };
 
+export type OrganizationsOktaSettings = {
+  samlIssuer?: string;
+  samlCertificate?: string;
+  enforceSso?: boolean;
+  hasScimToken?: boolean;
+};
+
 export type OrganizationsOrganization = {
   metadata?: OrganizationsOrganizationMetadata;
 };
@@ -533,6 +544,14 @@ export type OrganizationsRemoveUserResponse = {
   [key: string]: unknown;
 };
 
+export type OrganizationsRotateOktaScimTokenBody = {
+  [key: string]: unknown;
+};
+
+export type OrganizationsRotateOktaScimTokenResponse = {
+  token?: string;
+};
+
 export type OrganizationsUninstallApplicationResponse = {
   [key: string]: unknown;
 };
@@ -545,6 +564,14 @@ export type OrganizationsUpdateApplicationBody = {
 
 export type OrganizationsUpdateApplicationResponse = {
   installation?: OrganizationsAppInstallation;
+};
+
+export type OrganizationsUpdateOktaSettingsBody = {
+  settings?: OrganizationsOktaSettings;
+};
+
+export type OrganizationsUpdateOktaSettingsResponse = {
+  [key: string]: unknown;
 };
 
 export type OrganizationsUpdateOrganizationBody = {
@@ -2036,6 +2063,93 @@ export type OrganizationsRemoveInvitationResponses = {
 
 export type OrganizationsRemoveInvitationResponse2 =
   OrganizationsRemoveInvitationResponses[keyof OrganizationsRemoveInvitationResponses];
+
+export type OrganizationsGetOktaSettingsData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/organizations/{id}/okta";
+};
+
+export type OrganizationsGetOktaSettingsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsGetOktaSettingsError =
+  OrganizationsGetOktaSettingsErrors[keyof OrganizationsGetOktaSettingsErrors];
+
+export type OrganizationsGetOktaSettingsResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsGetOktaSettingsResponse;
+};
+
+export type OrganizationsGetOktaSettingsResponse2 =
+  OrganizationsGetOktaSettingsResponses[keyof OrganizationsGetOktaSettingsResponses];
+
+export type OrganizationsUpdateOktaSettingsData = {
+  body: OrganizationsUpdateOktaSettingsBody;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/organizations/{id}/okta";
+};
+
+export type OrganizationsUpdateOktaSettingsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsUpdateOktaSettingsError =
+  OrganizationsUpdateOktaSettingsErrors[keyof OrganizationsUpdateOktaSettingsErrors];
+
+export type OrganizationsUpdateOktaSettingsResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsUpdateOktaSettingsResponse;
+};
+
+export type OrganizationsUpdateOktaSettingsResponse2 =
+  OrganizationsUpdateOktaSettingsResponses[keyof OrganizationsUpdateOktaSettingsResponses];
+
+export type OrganizationsRotateOktaScimTokenData = {
+  body: OrganizationsRotateOktaScimTokenBody;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/organizations/{id}/okta/scim-token";
+};
+
+export type OrganizationsRotateOktaScimTokenErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsRotateOktaScimTokenError =
+  OrganizationsRotateOktaScimTokenErrors[keyof OrganizationsRotateOktaScimTokenErrors];
+
+export type OrganizationsRotateOktaScimTokenResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsRotateOktaScimTokenResponse;
+};
+
+export type OrganizationsRotateOktaScimTokenResponse2 =
+  OrganizationsRotateOktaScimTokenResponses[keyof OrganizationsRotateOktaScimTokenResponses];
 
 export type OrganizationsRemoveUserData = {
   body?: never;
