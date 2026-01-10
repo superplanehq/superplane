@@ -1,4 +1,4 @@
-import { AppWindow, Loader2, X } from "lucide-react";
+import { AppWindow, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -7,10 +7,16 @@ import {
   useInstallApplication,
 } from "../../../hooks/useApplications";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { ApplicationsApplicationDefinition } from "../../../api-client/types.gen";
 import { resolveIcon } from "@/lib/utils";
 import { getApiErrorMessage } from "@/utils/errors";
+import { Icon } from "@/components/Icon";
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface ApplicationsProps {
   organizationId: string;
@@ -28,6 +34,24 @@ export function Applications({ organizationId }: ApplicationsProps) {
   const installMutation = useInstallApplication(organizationId);
 
   const isLoading = loadingAvailable || loadingInstalled;
+  const appLogoMap: Record<string, string> = {
+    github: githubIcon,
+    semaphore: SemaphoreLogo,
+    pagerduty: pagerDutyIcon,
+  };
+
+  const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {
+    const logo = appName ? appLogoMap[appName] : undefined;
+    if (logo) {
+      return (
+        <span className={className}>
+          <img src={logo} alt="" className="h-full w-full object-contain" />
+        </span>
+      );
+    }
+    const Icon = resolveIcon(slug);
+    return <Icon className={className} />;
+  };
 
   const handleInstallClick = (app: ApplicationsApplicationDefinition) => {
     setSelectedApplication(app);
@@ -114,7 +138,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                   .map((app) => {
                     const appDefinition = availableApps.find((a) => a.name === app.spec?.appName);
                     const appLabel = appDefinition?.label || app.spec?.appName;
-                    const AppIcon = resolveIcon(appDefinition?.icon);
+                    const appName = appDefinition?.name || app.spec?.appName;
 
                     return (
                       <tr
@@ -132,12 +156,12 @@ export function Applications({ organizationId }: ApplicationsProps) {
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                               app.status?.state === "ready"
-                                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                : app.status?.state === "error"
-                                  ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                                  : "bg-orange-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                              : app.status?.state === "error"
+                                ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                : "bg-orange-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
                             }`}
                           >
                             {app.status?.state
@@ -147,7 +171,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                         </td>
                         <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 truncate">
                           <div className="flex items-center gap-2">
-                            <AppIcon className="w-4 h-4" />
+                            {renderAppIcon(appDefinition?.icon, appName, "w-4 h-4")}
                             <span>{appLabel}</span>
                           </div>
                         </td>
@@ -176,7 +200,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
             ) : (
               <div className="grid gap-6 md:grid-cols-2">
                 {availableApps.map((app) => {
-                  const Icon = resolveIcon(app.icon);
+                  const appName = app.name;
                   return (
                     <div
                       key={app.name}
@@ -185,7 +209,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                       <div className="flex-1 flex flex-col">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                            {renderAppIcon(app.icon, appName, "w-4 h-4 text-gray-500 dark:text-gray-400")}
                             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                               {app.label || app.name}
                             </h3>
@@ -221,14 +245,14 @@ export function Applications({ organizationId }: ApplicationsProps) {
       {isModalOpen &&
         selectedApplication &&
         (() => {
-          const ModalIcon = resolveIcon(selectedApplication.icon);
+          const appName = selectedApplication.name;
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
               <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                      <ModalIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+                      {renderAppIcon(selectedApplication.icon, appName, "w-6 h-6 text-gray-500 dark:text-gray-400")}
                       <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
                         Install {selectedApplication.label || selectedApplication.name}
                       </h3>
@@ -238,25 +262,24 @@ export function Applications({ organizationId }: ApplicationsProps) {
                       className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
                       disabled={installMutation.isPending}
                     >
-                      <X className="w-6 h-6" />
+                      <Icon name="x" size="sm" />
                     </button>
                   </div>
 
                   <div className="space-y-4">
                     {/* Installation Name Field */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-800 dark:text-gray-100 mb-2">
+                      <Label className="text-gray-800 dark:text-gray-100 mb-2">
                         Installation Name
                         <span className="text-red-500 ml-1">*</span>
-                      </label>
+                      </Label>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                         A unique name for this installation
                       </p>
-                      <input
+                      <Input
                         type="text"
                         value={installationName}
                         onChange={(e) => setInstallationName(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="e.g., my-app-integration"
                         required
                       />
@@ -283,10 +306,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                     )}
                   </div>
 
-                  <div className="flex justify-end gap-3 mt-6">
-                    <Button variant="outline" onClick={handleCloseModal} disabled={installMutation.isPending}>
-                      Cancel
-                    </Button>
+                  <div className="flex justify-start gap-3 mt-6">
                     <Button
                       color="blue"
                       onClick={handleInstall}
@@ -301,6 +321,9 @@ export function Applications({ organizationId }: ApplicationsProps) {
                       ) : (
                         "Install"
                       )}
+                    </Button>
+                    <Button variant="outline" onClick={handleCloseModal} disabled={installMutation.isPending}>
+                      Cancel
                     </Button>
                   </div>
 

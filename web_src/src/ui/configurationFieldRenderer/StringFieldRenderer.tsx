@@ -1,5 +1,5 @@
 import React from "react";
-import { Input } from "../input";
+import { Input } from "@/components/ui/input";
 import { FieldRendererProps } from "./types";
 import { toTestId } from "@/utils/testID";
 
