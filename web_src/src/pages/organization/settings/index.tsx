@@ -12,6 +12,7 @@ import { useAccount } from "../../../contexts/AccountContext";
 import { useParams } from "react-router-dom";
 import { Members } from "./Members";
 import { Integrations } from "./Integrations";
+import { SingleSignOnSaml } from "./SingleSignOnSaml";
 import { Applications } from "./Applications";
 import { ApplicationDetails } from "./ApplicationDetails";
 import SuperplaneLogo from "@/assets/superplane.svg";
@@ -21,6 +22,7 @@ import {
   ArrowRightLeft,
   Building,
   CircleUser,
+  KeyRound,
   LogOut,
   Palette,
   Plug,
@@ -81,7 +83,7 @@ export function OrganizationSettings() {
     Icon: typeof Building;
   };
 
-  const sectionIds = ["profile", "general", "members", "groups", "roles", "integrations", "applications"];
+  const sectionIds = ["profile", "general", "members", "groups", "roles", "okta", "integrations", "applications"];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
   const segmentsAfterSettings = settingsIndex >= 0 ? pathSegments.slice(settingsIndex + 1) : [];
@@ -103,6 +105,7 @@ export function OrganizationSettings() {
           { id: "roles", label: "Roles", href: `/${organizationId}/settings/roles`, Icon: Shield },
         ]
       : []),
+    { id: "okta", label: "Single Sign-On (SAML)", href: `/${organizationId}/settings/okta`, Icon: KeyRound },
     { id: "integrations", label: "Integrations", href: `/${organizationId}/settings/integrations`, Icon: Plug },
     { id: "applications", label: "Applications", href: `/${organizationId}/settings/applications`, Icon: AppWindow },
     { id: "change-org", label: "Change Organization", href: "/", Icon: ArrowRightLeft },
@@ -163,6 +166,10 @@ export function OrganizationSettings() {
     roles: {
       title: "Roles",
       description: "Define fine-grained access by creating and assigning roles.",
+    },
+    okta: {
+      title: "Single Sign-On (SAML)",
+      description: "Configure SAML SSO and SCIM provisioning for this organization.",
     },
     integrations: {
       title: "Integrations",
@@ -291,6 +298,7 @@ export function OrganizationSettings() {
             <Route path="members" element={<Members organizationId={organizationId || ""} />} />
             <Route path="groups" element={<Groups organizationId={organizationId || ""} />} />
             <Route path="roles" element={<Roles organizationId={organizationId || ""} />} />
+            <Route path="okta" element={<SingleSignOnSaml />} />
             <Route path="integrations" element={<Integrations organizationId={organizationId || ""} />} />
             <Route path="applications" element={<Applications organizationId={organizationId || ""} />} />
             <Route

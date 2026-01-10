@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/beevik/etree"
-	dsig "github.com/russellhaering/goxmldsig"
 	saml2 "github.com/russellhaering/gosaml2"
 	"github.com/russellhaering/gosaml2/types"
+	dsig "github.com/russellhaering/goxmldsig"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -130,8 +130,8 @@ func TestOktaIntegration(t *testing.T) {
 		})
 
 		oktaConfig := &models.OrganizationOktaConfig{
-			OrganizationID: steps.session.OrgID,
-			SamlIssuer:     issuer,
+			OrganizationID:  steps.session.OrgID,
+			SamlIssuer:      issuer,
 			SamlCertificate: string(pemCert),
 		}
 

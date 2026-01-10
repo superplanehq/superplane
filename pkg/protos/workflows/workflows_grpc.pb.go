@@ -290,7 +290,7 @@ func (UnimplementedWorkflowsServer) InvokeNodeExecutionAction(context.Context, *
 	return nil, status.Errorf(codes.Unimplemented, "method InvokeNodeExecutionAction not implemented")
 }
 func (UnimplementedWorkflowsServer) InvokeNodeTriggerAction(context.Context, *InvokeNodeTriggerActionRequest) (*InvokeNodeTriggerActionResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method InvokeNodeTriggerAction not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method InvokeNodeTriggerAction not implemented")
 }
 func (UnimplementedWorkflowsServer) ListChildExecutions(context.Context, *ListChildExecutionsRequest) (*ListChildExecutionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListChildExecutions not implemented")

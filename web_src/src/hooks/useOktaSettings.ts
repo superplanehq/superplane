@@ -52,6 +52,9 @@ export function useOktaSettings(organizationId: string) {
       });
       return res.data;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["okta-settings", organizationId] });
+    },
   });
 
   return {

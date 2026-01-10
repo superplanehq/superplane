@@ -161,7 +161,7 @@ CREATE TABLE public.blueprints (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100),
+    ptype character varying(100) NOT NULL,
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -873,13 +873,6 @@ CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (or
 
 
 --
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
-
-
---
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1401,11 +1394,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-<<<<<<< HEAD
 20260201090000	f
-=======
-20251222191505	f
->>>>>>> ce7a6eab5 (Saml support)
 \.
 
 

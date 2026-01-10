@@ -107,6 +107,15 @@ import type {
   OrganizationsRemoveInvitationData,
   OrganizationsRemoveInvitationResponse2,
   OrganizationsRemoveInvitationError,
+  OrganizationsGetOktaSettingsData,
+  OrganizationsGetOktaSettingsResponse2,
+  OrganizationsGetOktaSettingsError,
+  OrganizationsUpdateOktaSettingsData,
+  OrganizationsUpdateOktaSettingsResponse2,
+  OrganizationsUpdateOktaSettingsError,
+  OrganizationsRotateOktaScimTokenData,
+  OrganizationsRotateOktaScimTokenResponse2,
+  OrganizationsRotateOktaScimTokenError,
   OrganizationsRemoveUserData,
   OrganizationsRemoveUserResponse2,
   OrganizationsRemoveUserError,
@@ -836,6 +845,65 @@ export const organizationsRemoveInvitation = <ThrowOnError extends boolean = tru
   >({
     url: "/api/v1/organizations/{id}/invitations/{invitationId}",
     ...options,
+  });
+};
+
+/**
+ * Get Okta settings for an organization
+ * Returns the Okta SAML/SCIM configuration for an organization
+ */
+export const organizationsGetOktaSettings = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsGetOktaSettingsData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    OrganizationsGetOktaSettingsResponse2,
+    OrganizationsGetOktaSettingsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/okta",
+    ...options,
+  });
+};
+
+/**
+ * Update Okta settings for an organization
+ * Creates or updates the Okta SAML configuration for an organization
+ */
+export const organizationsUpdateOktaSettings = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsUpdateOktaSettingsData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).put<
+    OrganizationsUpdateOktaSettingsResponse2,
+    OrganizationsUpdateOktaSettingsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/okta",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * Rotate Okta SCIM token for an organization
+ * Generates a new SCIM token for the organization's Okta integration and returns it once
+ */
+export const organizationsRotateOktaScimToken = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsRotateOktaScimTokenData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).post<
+    OrganizationsRotateOktaScimTokenResponse2,
+    OrganizationsRotateOktaScimTokenError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/okta/scim-token",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
   });
 };
 
