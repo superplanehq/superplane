@@ -114,72 +114,58 @@ export function Applications({ organizationId }: ApplicationsProps) {
       {installedApps.length > 0 && (
         <div className="mb-8">
           <h2 className="text-lg font-medium mb-4">Installed</h2>
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
-            <table className="w-full table-fixed">
-              <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <tr>
-                  <th className="px-3 py-2 w-80 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-3 py-2 w-24 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    State
-                  </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Application
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {[...installedApps]
-                  .sort((a, b) => (a.spec?.appName || "").localeCompare(b.spec?.appName || ""))
-                  .map((app) => {
-                    const appDefinition = availableApps.find((a) => a.name === app.spec?.appName);
-                    const appLabel = appDefinition?.label || app.spec?.appName;
-                    const appName = appDefinition?.name || app.spec?.appName;
+          <div className="space-y-4">
+            {[...installedApps]
+              .sort((a, b) => (a.spec?.appName || "").localeCompare(b.spec?.appName || ""))
+              .map((app) => {
+                const appDefinition = availableApps.find((a) => a.name === app.spec?.appName);
+                const appLabel = appDefinition?.label || app.spec?.appName;
+                const appName = appDefinition?.name || app.spec?.appName;
+                const statusLabel = app.status?.state
+                  ? app.status.state.charAt(0).toUpperCase() + app.status.state.slice(1)
+                  : "Unknown";
 
-                    return (
-                      <tr
-                        key={app.metadata?.id}
-                        onClick={() => navigate(`/${organizationId}/settings/applications/${app.metadata?.id}`)}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
-                      >
-                        <td className="px-3 py-2 text-xs font-mono text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                          {app.metadata?.id}
-                        </td>
-                        <td className="px-3 py-2 truncate">
-                          <div className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                            {app.metadata?.name}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
+                return (
+                  <div
+                    key={app.metadata?.id}
+                    className="bg-white border border-gray-300 dark:border-gray-700 rounded-md p-4 flex items-start justify-between gap-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-4 w-4 items-center justify-center">
+                        {renderAppIcon(appDefinition?.icon, appName, "w-4 h-4 text-gray-500 dark:text-gray-400")}
+                      </div>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                            {appLabel || app.metadata?.name || app.spec?.appName}
+                          </h3>
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                               app.status?.state === "ready"
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                              : app.status?.state === "error"
-                                ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                                : "bg-orange-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                : app.status?.state === "error"
+                                  ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                  : "bg-orange-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
                             }`}
                           >
-                            {app.status?.state
-                              ? app.status.state.charAt(0).toUpperCase() + app.status.state.slice(1)
-                              : "Unknown"}
+                            {statusLabel}
                           </span>
-                        </td>
-                        <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 truncate">
-                          <div className="flex items-center gap-2">
-                            {renderAppIcon(appDefinition?.icon, appName, "w-4 h-4")}
-                            <span>{appLabel}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
+                        </div>
+                        {appDefinition?.description ? (
+                          <p className="mt-1 text-sm text-gray-800 dark:text-gray-400">{appDefinition.description}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate(`/${organizationId}/settings/applications/${app.metadata?.id}`)}
+                      className="text-sm py-1.5 self-start"
+                    >
+                      Configure...
+                    </Button>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}
@@ -187,57 +173,47 @@ export function Applications({ organizationId }: ApplicationsProps) {
       {/* Available Applications */}
       <div>
         <h2 className="text-lg font-medium mb-4">Available</h2>
-        <div className="bg-gray-100 dark:bg-gray-900 rounded-lg border border-gray-300">
-          <div className="p-6">
-            {availableApps.length === 0 ? (
+        <div>
+            {availableApps.filter((app) => !installedApps.some((installed) => installed.spec?.appName === app.name))
+              .length === 0 ? (
               <div className="text-center py-12">
-                <AppWindow className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-2">No applications available</h3>
-                <p className="text-gray-500 dark:text-gray-400">
-                  There are currently no applications available to install
-                </p>
+                <AppWindow className="w-6 h-6 text-gray-800 mx-auto mb-2" />
+                <p className="text-sm text-gray-800">You&apos;ve installed all applications!</p>
               </div>
             ) : (
-              <div className="grid gap-6 md:grid-cols-2">
-                {availableApps.map((app) => {
+              <div className="space-y-4">
+              {[...availableApps]
+                .filter((app) => !installedApps.some((installed) => installed.spec?.appName === app.name))
+                .sort((a, b) => (a.label || a.name || "").localeCompare(b.label || b.name || ""))
+                .map((app) => {
                   const appName = app.name;
                   return (
                     <div
                       key={app.name}
-                      className="bg-white min-h-40 border border-gray-300 dark:border-gray-700 rounded-md p-3 hover:shadow-md transition-shadow flex flex-col h-full"
+                      className="bg-white border border-gray-300 dark:border-gray-700 rounded-md p-4 flex items-start justify-between gap-4"
                     >
-                      <div className="flex-1 flex flex-col">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            {renderAppIcon(app.icon, appName, "w-4 h-4 text-gray-500 dark:text-gray-400")}
-                            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                              {app.label || app.name}
-                            </h3>
-                          </div>
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex h-4 w-4 items-center justify-center">
+                          {renderAppIcon(app.icon, appName, "w-4 h-4 text-gray-500 dark:text-gray-400")}
                         </div>
-
-                        {app.description ? (
-                          <p className="text-sm text-gray-800 dark:text-gray-400 mb-3 line-clamp-3">
-                            {app.description}
-                          </p>
-                        ) : (
-                          <div className="mb-3" />
-                        )}
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                            {app.label || app.name}
+                          </h3>
+                          {app.description ? (
+                            <p className="mt-1 text-sm text-gray-800 dark:text-gray-400">{app.description}</p>
+                          ) : null}
+                        </div>
                       </div>
 
-                      <Button
-                        color="blue"
-                        onClick={() => handleInstallClick(app)}
-                        className="w-full text-sm py-1.5 mt-auto"
-                      >
+                      <Button color="blue" onClick={() => handleInstallClick(app)} className="text-sm py-1.5 self-start">
                         Install
                       </Button>
                     </div>
                   );
                 })}
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
