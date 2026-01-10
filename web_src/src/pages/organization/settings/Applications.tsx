@@ -174,14 +174,14 @@ export function Applications({ organizationId }: ApplicationsProps) {
       <div>
         <h2 className="text-lg font-medium mb-4">Available</h2>
         <div>
-            {availableApps.filter((app) => !installedApps.some((installed) => installed.spec?.appName === app.name))
-              .length === 0 ? (
-              <div className="text-center py-12">
-                <AppWindow className="w-6 h-6 text-gray-800 mx-auto mb-2" />
-                <p className="text-sm text-gray-800">You&apos;ve installed all applications!</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
+          {availableApps.filter((app) => !installedApps.some((installed) => installed.spec?.appName === app.name))
+            .length === 0 ? (
+            <div className="text-center py-12">
+              <AppWindow className="w-6 h-6 text-gray-800 mx-auto mb-2" />
+              <p className="text-sm text-gray-800">You&apos;ve installed all applications!</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
               {[...availableApps]
                 .filter((app) => !installedApps.some((installed) => installed.spec?.appName === app.name))
                 .sort((a, b) => (a.label || a.name || "").localeCompare(b.label || b.name || ""))
@@ -206,7 +206,11 @@ export function Applications({ organizationId }: ApplicationsProps) {
                         </div>
                       </div>
 
-                      <Button color="blue" onClick={() => handleInstallClick(app)} className="text-sm py-1.5 self-start">
+                      <Button
+                        color="blue"
+                        onClick={() => handleInstallClick(app)}
+                        className="text-sm py-1.5 self-start"
+                      >
                         Install
                       </Button>
                     </div>
