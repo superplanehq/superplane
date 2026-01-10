@@ -453,7 +453,7 @@ export function Members({ organizationId }: MembersProps) {
               </TableHead>
               <TableBody>
                 {getFilteredMembers().map((member) => (
-                  <TableRow key={member.id}>
+                  <TableRow key={member.id} className="last:[&>td]:border-b-0">
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar
