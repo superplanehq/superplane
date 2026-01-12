@@ -317,7 +317,7 @@ export function MultiComboboxOption<T>({
       className={clsx(
         "group/option grid w-full cursor-default grid-cols-[1fr_--spacing(5)] items-baseline gap-x-2 rounded-lg py-2.5 pr-2 pl-3.5 sm:grid-cols-[1fr_--spacing(4)] sm:py-1.5 sm:pr-2 sm:pl-3",
         "text-base/6 text-gray-950 sm:text-sm/6 dark:text-white forced-colors:text-[CanvasText]",
-        "outline-hidden data-focus:bg-blue-500 data-focus:text-white",
+        "outline-hidden data-focus:bg-sky-500 data-focus:text-white",
         "forced-color-adjust-none forced-colors:data-focus:bg-[Highlight] forced-colors:data-focus:text-[HighlightText]",
         "data-disabled:opacity-50",
       )}
