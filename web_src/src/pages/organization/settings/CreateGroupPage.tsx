@@ -2,7 +2,6 @@ import { Heading } from "@/components/Heading/heading";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
 import {
   Dropdown,
   DropdownButton,
@@ -13,7 +12,6 @@ import {
 } from "../../../components/Dropdown/dropdown";
 import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
-import { Text } from "../../../components/Text/text";
 import { useCreateGroup, useOrganizationRoles } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 
