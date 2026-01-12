@@ -38,6 +38,7 @@ type KeyValue struct {
 type Spec struct {
 	Method          string      `json:"method"`
 	URL             string      `json:"url"`
+	QueryParams     *[]KeyValue `json:"queryParams,omitempty"`
 	Headers         *[]Header   `json:"headers,omitempty"`
 	ContentType     *string     `json:"contentType,omitempty"`
 	JSON            *any        `json:"json,omitempty"`
@@ -157,6 +158,38 @@ func (e *HTTP) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "https://api.example.com/endpoint",
+		},
+		{
+			Name:        "queryParams",
+			Label:       "Query Params",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Query parameters to append to the URL",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Parameter",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:        "key",
+								Type:        configuration.FieldTypeString,
+								Label:       "Key",
+								Required:    true,
+								Placeholder: "search",
+							},
+							{
+								Name:        "value",
+								Type:        configuration.FieldTypeString,
+								Label:       "Value",
+								Required:    true,
+								Placeholder: "shoes",
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "headers",
@@ -287,10 +320,11 @@ func (e *HTTP) Configuration() []configuration.Field {
 		{
 			Name:        "successCodes",
 			Type:        configuration.FieldTypeString,
-			Label:       "Success Codes",
+			Label:       "Overwrite success definition",
 			Required:    false,
 			Togglable:   true,
 			Description: "Comma-separated list of success status codes (e.g., 200, 201, 2xx). Leave empty for default 2xx behavior",
+			Default:     "2xx",
 		},
 		{
 			Name:        "timeoutStrategy",
@@ -506,7 +540,23 @@ func (e *HTTP) executeRequest(spec Spec, timeout time.Duration) (*http.Response,
 	reqCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(reqCtx, spec.Method, spec.URL, body)
+	requestURL := spec.URL
+	if spec.QueryParams != nil && len(*spec.QueryParams) > 0 {
+		parsedURL, parseErr := url.Parse(spec.URL)
+		if parseErr != nil {
+			return nil, fmt.Errorf("failed to parse url: %w", parseErr)
+		}
+
+		query := parsedURL.Query()
+		for _, param := range *spec.QueryParams {
+			query.Set(param.Key, param.Value)
+		}
+
+		parsedURL.RawQuery = query.Encode()
+		requestURL = parsedURL.String()
+	}
+
+	req, err := http.NewRequestWithContext(reqCtx, spec.Method, requestURL, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
