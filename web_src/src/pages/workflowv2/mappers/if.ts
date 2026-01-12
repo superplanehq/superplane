@@ -8,6 +8,7 @@ import { ComponentBaseMapper, EventStateRegistry, OutputPayload, StateFunction }
 import { ComponentBaseProps, EventSection, EventState, EventStateMap, DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { parseExpression } from "@/lib/expressionParser";
+import { formatTimeAgo } from "@/utils/date";
 
 type IfOutputs = Record<string, OutputPayload[]>;
 
@@ -103,6 +104,10 @@ export const ifMapper: ComponentBaseMapper = {
       eventStateMap: getStateMap(componentName),
     };
   },
+  subtitle(_node, execution) {
+    if (!execution?.createdAt) return "";
+    return formatTimeAgo(new Date(execution.createdAt));
+  },
 };
 
 function getEventSections(
@@ -118,6 +123,7 @@ function getEventSections(
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
     eventTitle: title,
+    eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
     eventState: getState(componentName)(execution),
     eventId: execution.rootEvent?.id,
   };

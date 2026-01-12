@@ -9,6 +9,7 @@ import { ComponentBaseProps, EventSection, EventState, EventStateMap, DEFAULT_EV
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { parseExpression } from "@/lib/expressionParser";
+import { formatTimeAgo } from "@/utils/date";
 
 type FilterOutputs = Record<string, OutputPayload[]>;
 
@@ -96,6 +97,10 @@ export const filterMapper: ComponentBaseMapper = {
       eventStateMap: getStateMap(componentName),
     };
   },
+  subtitle(_node, execution) {
+    if (!execution?.createdAt) return "";
+    return formatTimeAgo(new Date(execution.createdAt));
+  },
 };
 
 function getfilterEventSections(
@@ -111,6 +116,7 @@ function getfilterEventSections(
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
     eventTitle: title,
+    eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
     eventState: getState(componentName)(execution),
     eventId: execution.rootEvent?.id,
   };
