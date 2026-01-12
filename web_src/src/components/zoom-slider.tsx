@@ -74,7 +74,7 @@ export function ZoomSlider({
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className={cn(orientation === "horizontal" ? "w-[100px]" : "h-[100px]")}>
+              <div className={cn("hidden", orientation === "horizontal" ? "w-[100px]" : "h-[100px]")}>
                 <Slider
                   className="w-full h-full"
                   orientation={orientation}
