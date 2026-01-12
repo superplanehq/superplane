@@ -5,7 +5,13 @@ import {
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, EventStateRegistry, OutputPayload, StateFunction } from "./types";
-import { ComponentBaseProps, EventSection, EventState, EventStateMap, DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import {
+  ComponentBaseProps,
+  EventSection,
+  EventState,
+  EventStateMap,
+  DEFAULT_EVENT_STATE_MAP,
+} from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { parseExpression } from "@/lib/expressionParser";
