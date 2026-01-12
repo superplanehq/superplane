@@ -897,7 +897,7 @@ export function summarizeWorkflowChanges(options: {
       createElement(
         "div",
         { key: `${part.text}-${index}` },
-        createElement("div", { className: "text-xs font-semibold uppercase tracking-wide text-slate-500" }, part.title),
+        createElement("div", { className: "text-gray-500" }, part.title),
         part.body,
       ),
     ),

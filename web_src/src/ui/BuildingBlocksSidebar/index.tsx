@@ -52,7 +52,7 @@ export function BuildingBlocksSidebar({
 }: BuildingBlocksSidebarProps) {
   if (!isOpen) {
     return (
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
+      <div className="absolute top-4 right-4 z-10 flex gap-3">
         <Button variant="outline" onClick={onAddNote} aria-label="Add Note" data-testid="add-note-button">
           <StickyNote size={16} className="animate-pulse" />
           Add Note
