@@ -578,7 +578,7 @@ export const CustomComponent = () => {
 
         if (sourceConnection) {
           const newEdge = {
-            id: `${sourceConnection.nodeId}--${newNodeId}--${sourceConnection.handleId || "default"}`,
+            id: `${sourceConnection.nodeId}-targets->${newNodeId}-using->${sourceConnection.handleId || "default"}`,
             source: sourceConnection.nodeId,
             target: newNodeId,
             sourceHandle: sourceConnection.handleId || "default",
@@ -766,7 +766,7 @@ export const CustomComponent = () => {
       let updatedEdges = edges;
       if (newNodeData.sourceConnection) {
         const newEdge = {
-          id: `${newNodeData.sourceConnection.nodeId}--${newNodeId}--${newNodeData.sourceConnection.handleId || "default"}`,
+          id: `${newNodeData.sourceConnection.nodeId}-targets->${newNodeId}-using->${newNodeData.sourceConnection.handleId || "default"}`,
           source: newNodeData.sourceConnection.nodeId,
           target: newNodeId,
           sourceHandle: newNodeData.sourceConnection.handleId || "default",
