@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CircleCheck, CircleX, MoreHorizontal, Search, TriangleAlert, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  CircleCheck,
+  CircleX,
+  MoreHorizontal,
+  Search,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -8,7 +17,7 @@ import { cn } from "@/lib/utils";
 export type LogEntryType = "success" | "error" | "warning" | "run";
 export type LogScope = "runs" | "canvas";
 export type LogScopeFilter = "all" | LogScope;
-export type LogTypeFilter = "all" | "success" | "error" | "warning";
+export type LogTypeFilter = Set<"success" | "error" | "warning">;
 
 export interface LogRunItem {
   id: string;
@@ -28,6 +37,7 @@ export interface LogEntry {
   source: LogScope;
   searchText?: string;
   runItems?: LogRunItem[];
+  detail?: ReactNode;
 }
 
 export interface LogCounts {
@@ -108,6 +118,14 @@ export function CanvasLogSidebar({
     ],
     [],
   );
+
+  // Normalize filter: if all three types are selected, treat as empty set (show all)
+  const normalizedFilter = useMemo(() => {
+    if (filter.size === 3) {
+      return new Set<"success" | "error" | "warning">();
+    }
+    return filter;
+  }, [filter]);
 
   const sidebarHeight = height ?? internalHeight;
   const clampHeight = useCallback(
@@ -239,19 +257,77 @@ export function CanvasLogSidebar({
             <Button
               variant="ghost"
               size="sm"
-              className={cn("h-7 px-2 text-xs", filter === "error" ? "bg-rose-50 text-rose-600" : "text-slate-500")}
-              onClick={() => onFilterChange(filter === "error" ? "all" : "error")}
+              className={cn(
+                "h-7 px-2 text-xs",
+                normalizedFilter.size === 0 || normalizedFilter.has("error")
+                  ? "bg-rose-50 text-rose-600"
+                  : "text-slate-500",
+              )}
+              onClick={() => {
+                const nextFilter = new Set(normalizedFilter);
+                const isChecked = normalizedFilter.size === 0 || normalizedFilter.has("error");
+                if (isChecked) {
+                  // If all are currently selected (empty set), unchecking one should leave the other two checked
+                  if (normalizedFilter.size === 0) {
+                    nextFilter.add("warning");
+                    nextFilter.add("success");
+                  } else {
+                    nextFilter.delete("error");
+                  }
+                } else {
+                  nextFilter.add("error");
+                  // If all three are now selected, normalize to empty set
+                  if (nextFilter.size === 3) {
+                    nextFilter.clear();
+                  }
+                }
+                onFilterChange(nextFilter);
+              }}
             >
-              <CircleX className="h-3.5 w-3.5 text-rose-500" />
+              <CircleX
+                className={cn(
+                  "h-3.5 w-3.5",
+                  normalizedFilter.size === 0 || normalizedFilter.has("error") ? "text-rose-500" : "text-slate-400",
+                )}
+              />
               <span className="tabular-nums">{counts.error}</span>
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className={cn("h-7 px-2 text-xs", filter === "warning" ? "bg-amber-50 text-amber-600" : "text-slate-500")}
-              onClick={() => onFilterChange(filter === "warning" ? "all" : "warning")}
+              className={cn(
+                "h-7 px-2 text-xs",
+                normalizedFilter.size === 0 || normalizedFilter.has("warning")
+                  ? "bg-amber-50 text-amber-600"
+                  : "text-slate-500",
+              )}
+              onClick={() => {
+                const nextFilter = new Set(normalizedFilter);
+                const isChecked = normalizedFilter.size === 0 || normalizedFilter.has("warning");
+                if (isChecked) {
+                  // If all are currently selected (empty set), unchecking one should leave the other two checked
+                  if (normalizedFilter.size === 0) {
+                    nextFilter.add("error");
+                    nextFilter.add("success");
+                  } else {
+                    nextFilter.delete("warning");
+                  }
+                } else {
+                  nextFilter.add("warning");
+                  // If all three are now selected, normalize to empty set
+                  if (nextFilter.size === 3) {
+                    nextFilter.clear();
+                  }
+                }
+                onFilterChange(nextFilter);
+              }}
             >
-              <TriangleAlert className="h-3.5 w-3.5 text-amber-500" />
+              <TriangleAlert
+                className={cn(
+                  "h-3.5 w-3.5",
+                  normalizedFilter.size === 0 || normalizedFilter.has("warning") ? "text-amber-500" : "text-slate-400",
+                )}
+              />
               <span className="tabular-nums">{counts.warning}</span>
             </Button>
             <Button
@@ -259,11 +335,39 @@ export function CanvasLogSidebar({
               size="sm"
               className={cn(
                 "h-7 px-2 text-xs",
-                filter === "success" ? "bg-emerald-50 text-emerald-600" : "text-slate-500",
+                normalizedFilter.size === 0 || normalizedFilter.has("success")
+                  ? "bg-emerald-50 text-emerald-600"
+                  : "text-slate-500",
               )}
-              onClick={() => onFilterChange(filter === "success" ? "all" : "success")}
+              onClick={() => {
+                const nextFilter = new Set(normalizedFilter);
+                const isChecked = normalizedFilter.size === 0 || normalizedFilter.has("success");
+                if (isChecked) {
+                  // If all are currently selected (empty set), unchecking one should leave the other two checked
+                  if (normalizedFilter.size === 0) {
+                    nextFilter.add("error");
+                    nextFilter.add("warning");
+                  } else {
+                    nextFilter.delete("success");
+                  }
+                } else {
+                  nextFilter.add("success");
+                  // If all three are now selected, normalize to empty set
+                  if (nextFilter.size === 3) {
+                    nextFilter.clear();
+                  }
+                }
+                onFilterChange(nextFilter);
+              }}
             >
-              <CircleCheck className="h-3.5 w-3.5 text-emerald-500" />
+              <CircleCheck
+                className={cn(
+                  "h-3.5 w-3.5",
+                  normalizedFilter.size === 0 || normalizedFilter.has("success")
+                    ? "text-emerald-500"
+                    : "text-slate-400",
+                )}
+              />
               <span className="tabular-nums">{counts.success}</span>
             </Button>
             <Button variant="ghost" size="icon-sm" onClick={onClose}>
@@ -318,6 +422,7 @@ function LogEntryRow({
     error: <CircleX className="h-4 w-4 text-rose-500" />,
     warning: <TriangleAlert className="h-4 w-4 text-amber-500" />,
   } as const;
+  const [isDetailExpanded, setIsDetailExpanded] = useState(false);
 
   if (entry.type === "run") {
     const runItems = entry.runItems || [];
@@ -366,13 +471,36 @@ function LogEntryRow({
     );
   }
 
+  const hasDetail = Boolean(entry.detail);
+
   return (
-    <div className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700">
-      <div>{icon[entry.type]}</div>
-      <div className="flex-1 min-w-0">{entry.title}</div>
-      <span className="ml-auto text-xs text-slate-400 tabular-nums whitespace-nowrap">
-        {formatLogTimestamp(entry.timestamp)}
-      </span>
+    <div className="flex items-start gap-3 px-4 py-2 text-sm text-slate-700">
+      <div className="pt-0.5">{icon[entry.type]}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          {hasDetail ? (
+            <button
+              type="button"
+              className="flex flex-1 min-w-0 items-center gap-2 text-left hover:text-slate-900"
+              onClick={() => setIsDetailExpanded((prev) => !prev)}
+              aria-expanded={isDetailExpanded}
+            >
+              {isDetailExpanded ? (
+                <ChevronDown className="h-4 w-4 text-slate-500" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-slate-500" />
+              )}
+              <div className="min-w-0">{entry.title}</div>
+            </button>
+          ) : (
+            <div className="flex-1 min-w-0">{entry.title}</div>
+          )}
+          <span className="text-xs text-slate-400 tabular-nums whitespace-nowrap">
+            {formatLogTimestamp(entry.timestamp)}
+          </span>
+        </div>
+        {entry.detail && isDetailExpanded && <div className="mt-2 text-xs text-slate-500">{entry.detail}</div>}
+      </div>
     </div>
   );
 }

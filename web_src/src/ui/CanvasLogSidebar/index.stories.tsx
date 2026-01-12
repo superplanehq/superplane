@@ -115,7 +115,7 @@ export const Default: Story = {
   render: () => {
     const [isOpen, setIsOpen] = useState(true);
     const [scope, setScope] = useState<LogScopeFilter>("all");
-    const [filter, setFilter] = useState<LogTypeFilter>("all");
+    const [filter, setFilter] = useState<LogTypeFilter>(new Set());
     const [searchValue, setSearchValue] = useState("");
     const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set(["log-4"]));
     const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -126,6 +126,8 @@ export const Default: Story = {
     const filteredEntries = useMemo(() => {
       const query = searchValue.trim().toLowerCase();
       const matchesSearch = (value?: string) => !query || (value || "").toLowerCase().includes(query);
+      // Show all if filter is empty or contains all three types
+      const showAll = filter.size === 0 || filter.size === 3;
 
       return sampleEntries.reduce<LogEntry[]>((acc, entry) => {
         if (scope !== "all" && entry.source !== scope) {
@@ -135,7 +137,7 @@ export const Default: Story = {
         if (entry.type === "run") {
           const runItems = entry.runItems || [];
           const filteredRunItems = runItems.filter((item) => {
-            const typeMatch = filter === "all" || item.type === filter;
+            const typeMatch = showAll || filter.has(item.type);
             const searchMatch =
               matchesSearch(item.searchText) || matchesSearch(typeof item.title === "string" ? item.title : undefined);
             return typeMatch && searchMatch;
@@ -143,7 +145,7 @@ export const Default: Story = {
           const entrySearchMatch =
             matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : undefined);
 
-          const typeMatch = filter === "all" ? true : filteredRunItems.length > 0;
+          const typeMatch = showAll ? true : filteredRunItems.length > 0;
           const searchMatch = query ? entrySearchMatch || filteredRunItems.length > 0 : true;
 
           if (typeMatch && searchMatch) {
@@ -152,7 +154,7 @@ export const Default: Story = {
           return acc;
         }
 
-        if (filter !== "all" && entry.type !== filter) {
+        if (!showAll && !filter.has(entry.type)) {
           return acc;
         }
 
@@ -251,7 +253,7 @@ export const Empty: Story = {
   render: () => {
     const [isOpen, setIsOpen] = useState(true);
     const [scope, setScope] = useState<LogScopeFilter>("all");
-    const [filter, setFilter] = useState<LogTypeFilter>("all");
+    const [filter, setFilter] = useState<LogTypeFilter>(new Set());
     const [searchValue, setSearchValue] = useState("");
 
     return (
