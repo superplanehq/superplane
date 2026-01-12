@@ -316,9 +316,9 @@ func (a *Approval) Configuration() []configuration.Field {
 										Options: []configuration.FieldOption{
 											{Value: "anyone", Label: "Any user"},
 											{Value: "user", Label: "Specific user"},
+											{Value: "group", Label: "Group"},
 											// TODO: Uncomment after RBAC definitive implementation
 											// {Value: "role", Label: "Role"},
-											// {Value: "group", Label: "Group"},
 										},
 									},
 								},

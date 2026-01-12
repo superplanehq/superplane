@@ -20,6 +20,7 @@ import {
   useUpdateGroup,
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { isRBACEnabled } from "@/lib/env";
 
 interface GroupsProps {
   organizationId: string;
@@ -199,15 +200,17 @@ export function Groups({ organizationId }: GroupsProps) {
                       <Icon name={getSortIcon("members")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
-                  <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                    onClick={() => handleSort("role")}
-                  >
-                    <div className="flex items-center gap-2">
-                      Role
-                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
-                    </div>
-                  </TableHeader>
+                  {isRBACEnabled() && (
+                    <TableHeader
+                      className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      onClick={() => handleSort("role")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Role
+                        <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
+                      </div>
+                    </TableHeader>
+                  )}
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
@@ -236,31 +239,33 @@ export function Groups({ organizationId }: GroupsProps) {
                         {group.status?.membersCount || 0} member{group.status?.membersCount === 1 ? "" : "s"}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      <Dropdown>
-                        <DropdownButton
-                          className="flex items-center gap-2 text-sm justify-between"
-                          disabled={updateGroupMutation.isPending}
-                        >
-                          {updateGroupMutation.isPending
-                            ? "Updating..."
-                            : roles.find((r) => r?.metadata?.name === group.spec?.role)?.spec?.displayName ||
-                              "Select Role"}
-                          <Icon name="chevron-down" />
-                        </DropdownButton>
-                        <DropdownMenu>
-                          {roles.map((role) => (
-                            <DropdownItem
-                              key={role.metadata?.name}
-                              onClick={() => handleRoleUpdate(group.metadata!.name!, role.metadata!.name!)}
-                            >
-                              <DropdownLabel>{role.spec?.displayName || role.metadata!.name}</DropdownLabel>
-                              <DropdownDescription>{role.spec?.description || ""}</DropdownDescription>
-                            </DropdownItem>
-                          ))}
-                        </DropdownMenu>
-                      </Dropdown>
-                    </TableCell>
+                    {isRBACEnabled() && (
+                      <TableCell>
+                        <Dropdown>
+                          <DropdownButton
+                            className="flex items-center gap-2 text-sm justify-between"
+                            disabled={updateGroupMutation.isPending}
+                          >
+                            {updateGroupMutation.isPending
+                              ? "Updating..."
+                              : roles.find((r) => r?.metadata?.name === group.spec?.role)?.spec?.displayName ||
+                                "Select Role"}
+                            <Icon name="chevron-down" />
+                          </DropdownButton>
+                          <DropdownMenu>
+                            {roles.map((role) => (
+                              <DropdownItem
+                                key={role.metadata?.name}
+                                onClick={() => handleRoleUpdate(group.metadata!.name!, role.metadata!.name!)}
+                              >
+                                <DropdownLabel>{role.spec?.displayName || role.metadata!.name}</DropdownLabel>
+                                <DropdownDescription>{role.spec?.description || ""}</DropdownDescription>
+                              </DropdownItem>
+                            ))}
+                          </DropdownMenu>
+                        </Dropdown>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex justify-end">
                         <TooltipProvider delayDuration={200}>

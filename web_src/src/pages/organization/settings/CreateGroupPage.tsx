@@ -14,6 +14,7 @@ import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
 import { useCreateGroup, useOrganizationRoles } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { isRBACEnabled } from "@/lib/env";
 
 export function CreateGroupPage() {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ export function CreateGroupPage() {
   usePageTitle(["Create Group"]);
 
   const [groupName, setGroupName] = useState("");
-  const [selectedRole, setSelectedRole] = useState("");
+  const [selectedRole, setSelectedRole] = useState(isRBACEnabled() ? "" : "org_owner");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -112,51 +113,53 @@ export function CreateGroupPage() {
               </div>
 
               {/* Role Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-800 dark:text-white mb-2">Role *</label>
-                {loadingRoles ? (
-                  <div className="flex justify-center items-center h-12">
-                    <p className="text-gray-500 dark:text-gray-400">Loading roles...</p>
-                  </div>
-                ) : roles.length === 0 ? (
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                    <div className="flex max-w-lg">
-                      <Icon name="warning" className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5" />
-                      <div className="text-sm">
-                        <p className="text-yellow-800 dark:text-yellow-200 font-medium">No roles available</p>
-                        <p className="text-yellow-700 dark:text-yellow-300 mt-1">
-                          Create a role first to assign it to this group.
-                        </p>
-                        <Link
-                          to={`/${orgId}/settings/create-role`}
-                          className="inline-flex items-center gap-1 mt-2 text-yellow-800 dark:text-yellow-200 hover:text-yellow-900 dark:hover:text-yellow-100 font-medium"
-                        >
-                          <Icon name="plus" size="sm" />
-                          Create Role
-                        </Link>
+              {isRBACEnabled() && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 dark:text-white mb-2">Role *</label>
+                  {loadingRoles ? (
+                    <div className="flex justify-center items-center h-12">
+                      <p className="text-gray-500 dark:text-gray-400">Loading roles...</p>
+                    </div>
+                  ) : roles.length === 0 ? (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                      <div className="flex max-w-lg">
+                        <Icon name="warning" className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5" />
+                        <div className="text-sm">
+                          <p className="text-yellow-800 dark:text-yellow-200 font-medium">No roles available</p>
+                          <p className="text-yellow-700 dark:text-yellow-300 mt-1">
+                            Create a role first to assign it to this group.
+                          </p>
+                          <Link
+                            to={`/${orgId}/settings/create-role`}
+                            className="inline-flex items-center gap-1 mt-2 text-yellow-800 dark:text-yellow-200 hover:text-yellow-900 dark:hover:text-yellow-100 font-medium"
+                          >
+                            <Icon name="plus" size="sm" />
+                            Create Role
+                          </Link>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <Dropdown>
-                    <DropdownButton className="flex items-center gap-2 text-sm justify-between">
-                      {sortedRoles.find((r) => r.metadata?.name === selectedRole)?.spec?.displayName || "Select Role"}
-                      <Icon name="chevron-down" />
-                    </DropdownButton>
-                    <DropdownMenu>
-                      {sortedRoles.map((role) => (
-                        <DropdownItem
-                          key={role.metadata?.name}
-                          onClick={() => setSelectedRole(role.metadata?.name || "")}
-                        >
-                          <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
-                          <DropdownDescription>{role.spec?.description || ""}</DropdownDescription>
-                        </DropdownItem>
-                      ))}
-                    </DropdownMenu>
-                  </Dropdown>
-                )}
-              </div>
+                  ) : (
+                    <Dropdown>
+                      <DropdownButton className="flex items-center gap-2 text-sm justify-between">
+                        {sortedRoles.find((r) => r.metadata?.name === selectedRole)?.spec?.displayName || "Select Role"}
+                        <Icon name="chevron-down" />
+                      </DropdownButton>
+                      <DropdownMenu>
+                        {sortedRoles.map((role) => (
+                          <DropdownItem
+                            key={role.metadata?.name}
+                            onClick={() => setSelectedRole(role.metadata?.name || "")}
+                          >
+                            <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
+                            <DropdownDescription>{role.spec?.description || ""}</DropdownDescription>
+                          </DropdownItem>
+                        ))}
+                      </DropdownMenu>
+                    </Dropdown>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

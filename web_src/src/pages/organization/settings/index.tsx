@@ -102,11 +102,9 @@ export function OrganizationSettings() {
     { id: "canvases", label: "Canvases", href: `/${organizationId}`, Icon: Palette },
     { id: "general", label: "Settings", href: `/${organizationId}/settings/general`, Icon: Building },
     { id: "members", label: "Members", href: `/${organizationId}/settings/members`, Icon: UserIcon },
+    { id: "groups", label: "Groups", href: `/${organizationId}/settings/groups`, Icon: Users },
     ...(isRBACEnabled()
-      ? [
-          { id: "groups", label: "Groups", href: `/${organizationId}/settings/groups`, Icon: Users },
-          { id: "roles", label: "Roles", href: `/${organizationId}/settings/roles`, Icon: Shield },
-        ]
+      ? [{ id: "roles", label: "Roles", href: `/${organizationId}/settings/roles`, Icon: Shield }]
       : []),
     { id: "integrations", label: "Integrations", href: `/${organizationId}/settings/integrations`, Icon: Plug },
     { id: "applications", label: "Applications", href: `/${organizationId}/settings/applications`, Icon: AppWindow },
