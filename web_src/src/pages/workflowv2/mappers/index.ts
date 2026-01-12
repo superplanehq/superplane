@@ -11,7 +11,7 @@ import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
 import { noopMapper } from "./noop";
-import { ifMapper } from "./if";
+import { ifMapper, IF_STATE_REGISTRY } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
 import { semaphoreMapper as oldSemaphoreMapper, SEMAPHORE_STATE_REGISTRY } from "./semaphore";
 import {
@@ -83,6 +83,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   semaphore: SEMAPHORE_STATE_REGISTRY,
   http: HTTP_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
+  if: IF_STATE_REGISTRY,
 };
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {

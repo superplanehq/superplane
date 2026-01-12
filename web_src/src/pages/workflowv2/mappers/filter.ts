@@ -23,8 +23,8 @@ export const FILTER_STATE_MAP: EventStateMap = {
   rejected: {
     icon: "circle-x",
     textColor: "text-gray-800",
-    backgroundColor: "bg-red-100",
-    badgeColor: "bg-red-400",
+    backgroundColor: "bg-gray-100",
+    badgeColor: "bg-gray-500",
   },
 };
 
