@@ -2,6 +2,7 @@
 import {
   ComponentsComponent,
   ComponentsNode,
+  GroupsGroup,
   RolesRole,
   SuperplaneUsersUser,
   groupsListGroupUsers,
@@ -34,6 +35,11 @@ type ApprovalItem = {
   user?: string;
   role?: string;
   group?: string;
+};
+
+type ApprovalLabelMaps = {
+  rolesByName?: Record<string, string>;
+  groupsByName?: Record<string, string>;
 };
 
 export const APPROVAL_STATE_MAP: EventStateMap = {
@@ -134,7 +140,6 @@ export const approvalMapper: ComponentBaseMapper = {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const items = (node.configuration?.items || []) as ApprovalItem[];
     const approvals = (additionalData as { approvals?: ApprovalItemProps[] })?.approvals || [];
-
     return {
       iconSlug: componentDefinition.icon || "hand",
       iconColor: getColorClass("black"),
@@ -279,7 +284,10 @@ function getComponentSubtitle(
   return "";
 }
 
-function getApprovalDecisionLabel(record: ApprovalRecord): string {
+function getApprovalDecisionLabel(record: ApprovalRecord, labelMaps?: ApprovalLabelMaps): string {
+  const rolesByName = labelMaps?.rolesByName;
+  const groupsByName = labelMaps?.groupsByName;
+
   if (record.type === "user") {
     return record.user?.name || record.user?.email || "User";
   }
@@ -289,11 +297,11 @@ function getApprovalDecisionLabel(record: ApprovalRecord): string {
   }
 
   if (record.type === "role") {
-    return record.role || "Role";
+    return (record.role ? rolesByName?.[record.role] : undefined) || record.role || "Role";
   }
 
   if (record.type === "group") {
-    return record.group || "Group";
+    return (record.group ? groupsByName?.[record.group] : undefined) || record.group || "Group";
   }
 
   if (record.type === "anyone") {
@@ -320,6 +328,14 @@ function buildApprovalTimeline(records: ApprovalRecord[]) {
       if (!b.timestamp) return -1;
       return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
     });
+}
+
+function getApprovalLabelMaps(additionalData?: unknown): ApprovalLabelMaps {
+  const labelMaps = additionalData as ApprovalLabelMaps | undefined;
+  return {
+    rolesByName: labelMaps?.rolesByName,
+    groupsByName: labelMaps?.groupsByName,
+  };
 }
 
 function getCancelledByLabel(metadata?: Record<string, unknown>): string | undefined {
@@ -409,6 +425,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
     const executionMetadata = execution?.metadata as Record<string, unknown> | undefined;
     const usersById: Record<string, { email?: string; name?: string }> = {};
     const rolesByName: Record<string, string> = {};
+    const groupsByName: Record<string, string> = {};
     let currentUserRoles: string[] = [];
     const currentUserId = currentUser?.id;
     const currentUserEmail = currentUser?.email;
@@ -447,6 +464,15 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
           if (name) rolesByName[name] = display || name;
         });
       }
+
+      const groupsResp: GroupsGroup[] | undefined = queryClient.getQueryData(organizationKeys.groups(organizationId));
+      if (Array.isArray(groupsResp)) {
+        groupsResp.forEach((group: GroupsGroup) => {
+          const name = group.metadata?.name;
+          const display = group.spec?.displayName;
+          if (name) groupsByName[name] = display || name;
+        });
+      }
     }
 
     if (organizationId) {
@@ -477,6 +503,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
     }
 
     // Map backend records to approval items
+    const labelMaps = { rolesByName, groupsByName };
     const approvals = ((executionMetadata?.records as ApprovalRecord[] | undefined) || []).map(
       (record: ApprovalRecord) => {
         const isPending = record.state === "pending";
@@ -498,15 +525,13 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
         const userLabel = record.user?.name || record.user?.email;
         const title =
           userLabel ||
-          (record.type === "anyone"
-            ? "Any user"
-            : record.type === "user" && record.user
-              ? record.user.name || record.user.email
-              : record.type === "role" && record.role
-                ? record.role
-                : record.type === "group" && record.group
-                  ? record.group
-                  : "Unknown");
+          (record.type === "user"
+            ? record.user?.name || record.user?.email
+            : record.type === "role" || record.type === "group"
+              ? getApprovalDecisionLabel(record, labelMaps)
+              : record.type === "anyone"
+                ? "Any user"
+                : "Unknown");
 
         return {
           id: `${record.index}`,
@@ -593,6 +618,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
       approvals,
       usersById,
       rolesByName,
+      groupsByName,
     };
   },
 };
