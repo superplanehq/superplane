@@ -35,8 +35,8 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     const eventData = event.data?.data as OnPipelineDoneEventData;
 
     return {
-      title: eventData.pipeline?.name || "",
-      subtitle: eventData.pipeline?.result || "",
+      title: eventData?.pipeline?.name || "",
+      subtitle: eventData?.pipeline?.result || "",
     };
   },
 
