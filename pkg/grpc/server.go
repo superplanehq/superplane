@@ -72,6 +72,7 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 		grpc.ChainUnaryInterceptor(
 			recovery.UnaryServerInterceptor(opts...),
 			authorization.NewAuthorizationInterceptor(authService).UnaryInterceptor(),
+			sanitizeErrorUnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(
 			recovery.StreamServerInterceptor(opts...),

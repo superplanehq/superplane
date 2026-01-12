@@ -6,6 +6,7 @@ import (
 	"maps"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -36,7 +37,8 @@ func UpdateApplication(ctx context.Context, registry *registry.Registry, baseURL
 	existingConfig := appInstallation.Configuration.Data()
 	configuration, err = encryptConfigurationIfNeeded(ctx, registry, app, configuration, appInstallation.ID, existingConfig)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to encrypt sensitive configuration: %v", err)
+		log.Errorf("failed to encrypt sensitive configuration for app installation %s: %v", appInstallation.ID, err)
+		return nil, status.Error(codes.Internal, "failed to encrypt sensitive configuration")
 	}
 
 	maps.Copy(existingConfig, configuration)
@@ -69,12 +71,14 @@ func UpdateApplication(ctx context.Context, registry *registry.Registry, baseURL
 
 	err = database.Conn().Save(appInstallation).Error
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to save application installation: %v", err)
+		log.Errorf("failed to save application installation %s: %v", appInstallation.ID, err)
+		return nil, status.Error(codes.Internal, "failed to save application installation")
 	}
 
 	proto, err := serializeAppInstallation(registry, appInstallation, []models.WorkflowNodeReference{})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to serialize application installation: %v", err)
+		log.Errorf("failed to serialize application installation %s: %v", appInstallation.ID, err)
+		return nil, status.Error(codes.Internal, "failed to serialize application installation")
 	}
 
 	return &pb.UpdateApplicationResponse{
