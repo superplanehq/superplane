@@ -11,7 +11,7 @@ import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
 import { noopMapper } from "./noop";
-import { ifMapper } from "./if";
+import { ifMapper, IF_STATE_REGISTRY } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
 import { semaphoreMapper as oldSemaphoreMapper, SEMAPHORE_STATE_REGISTRY } from "./semaphore";
 import {
@@ -30,7 +30,7 @@ import {
   eventStateRegistry as pagerdutyEventStateRegistry,
 } from "./pagerduty/index";
 import { timeGateMapper } from "./timegate";
-import { filterMapper } from "./filter";
+import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
@@ -82,6 +82,8 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   approval: APPROVAL_STATE_REGISTRY,
   semaphore: SEMAPHORE_STATE_REGISTRY,
   http: HTTP_STATE_REGISTRY,
+  filter: FILTER_STATE_REGISTRY,
+  if: IF_STATE_REGISTRY,
 };
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {
