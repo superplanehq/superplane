@@ -94,11 +94,9 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
       Icon: Building,
     },
     { label: "Members", href: organizationId ? `/${organizationId}/settings/members` : "#", Icon: UserIcon },
+    { label: "Groups", href: organizationId ? `/${organizationId}/settings/groups` : "#", Icon: Users },
     ...(isRBACEnabled()
-      ? [
-          { label: "Groups", href: organizationId ? `/${organizationId}/settings/groups` : "#", Icon: Users },
-          { label: "Roles", href: organizationId ? `/${organizationId}/settings/roles` : "#", Icon: Shield },
-        ]
+      ? [{ label: "Roles", href: organizationId ? `/${organizationId}/settings/roles` : "#", Icon: Shield }]
       : []),
     {
       label: "Integrations",
