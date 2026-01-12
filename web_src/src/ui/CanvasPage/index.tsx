@@ -1916,9 +1916,7 @@ function CanvasContent({
                       className={logCounts.warning > 0 ? "h-3 w-3 text-amber-600" : "h-3 w-3 text-gray-800"}
                     />
                     <span
-                      className={
-                        logCounts.warning > 0 ? "tabular-nums text-amber-600" : "tabular-nums text-gray-800"
-                      }
+                      className={logCounts.warning > 0 ? "tabular-nums text-amber-600" : "tabular-nums text-gray-800"}
                     >
                       {logCounts.warning}
                     </span>
