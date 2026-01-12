@@ -16,6 +16,7 @@ import { CustomComponentBuilderPage } from "../../ui/CustomComponentBuilderPage"
 import { filterVisibleConfiguration } from "../../utils/components";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 import { getComponentBaseMapper } from "../workflowv2/mappers";
+import { generateNodeId } from "../workflowv2/utils";
 
 const elk = new ELK();
 const BUNDLE_ICON_SLUG = "component";
@@ -484,13 +485,6 @@ export const CustomComponent = () => {
     [saveSnapshot],
   );
 
-  const generateNodeId = (componentName: string, nodeName: string) => {
-    const randomChars = Math.random().toString(36).substring(2, 8);
-    const sanitizedComponent = componentName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    return `${sanitizedComponent}-${sanitizedName}-${randomChars}`;
-  };
-
   const getNodeEditData = useCallback(
     (nodeId: string) => {
       const node = (nodesRef.current || []).find((n) => n.id === nodeId);
@@ -868,12 +862,13 @@ export const CustomComponent = () => {
   const handleConnectionDropInEmptySpace = useCallback(
     async (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
       saveSnapshot();
-      const newNodeId = `node-${Date.now()}`;
+      const placeholderName = "New Component";
+      const newNodeId = generateNodeId("component", "node");
 
       // Create placeholder node - will fail validation but still be saved
       const newNode: ComponentsNode = {
         id: newNodeId,
-        name: "New Component",
+        name: placeholderName,
         type: "TYPE_COMPONENT",
         // NO component reference - causes validation error
         configuration: {},

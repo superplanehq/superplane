@@ -15,6 +15,13 @@ import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers"
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 
+export function generateNodeId(blockName: string, nodeName: string): string {
+  const randomChars = Math.random().toString(36).substring(2, 8);
+  const sanitizedBlock = blockName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+  const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+  return `${sanitizedBlock}-${sanitizedName}-${randomChars}`;
+}
+
 export function mapTriggerEventsToSidebarEvents(
   events: WorkflowsWorkflowEvent[],
   node: ComponentsNode,

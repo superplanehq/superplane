@@ -71,6 +71,7 @@ import {
   buildRunItemFromExecution,
   buildCanvasStatusLogEntry,
   buildTabData,
+  generateNodeId,
   getNextInQueueInfo,
   mapCanvasNodesToLogEntries,
   mapExecutionsToSidebarEvents,
@@ -1230,13 +1231,6 @@ export function WorkflowPageV2() {
     ],
   );
 
-  const generateNodeId = (blockName: string, nodeName: string) => {
-    const randomChars = Math.random().toString(36).substring(2, 8);
-    const sanitizedBlock = blockName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    return `${sanitizedBlock}-${sanitizedName}-${randomChars}`;
-  };
-
   const handleNodeAdd = useCallback(
     async (newNodeData: NewNodeData): Promise<string> => {
       if (!workflow || !organizationId || !workflowId) return "";
@@ -1347,12 +1341,13 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(workflow);
 
-      const newNodeId = `node-${Date.now()}`;
+      const placeholderName = "New Component";
+      const newNodeId = generateNodeId("component", "node");
 
       // Create placeholder node - will fail validation but still be saved
       const newNode: ComponentsNode = {
         id: newNodeId,
-        name: "New Component",
+        name: placeholderName,
         type: "TYPE_COMPONENT",
         // NO component/blueprint/trigger reference - causes validation error
         configuration: {},

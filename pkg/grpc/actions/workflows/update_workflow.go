@@ -39,6 +39,13 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		return nil, err
 	}
 
+	existingNodesUnscoped, err := models.FindWorkflowNodesUnscoped(workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes, edges, _ = remapNodeIDsForConflicts(nodes, edges, existingNodesUnscoped)
+
 	parentNodesByNodeID := make(map[string]*models.Node)
 	for i := range nodes {
 		parentNodesByNodeID[nodes[i].ID] = &nodes[i]
@@ -125,6 +132,53 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 	return &pb.UpdateWorkflowResponse{
 		Workflow: protoWorkflow,
 	}, nil
+}
+
+// Remap node IDs that conflict with soft-deleted workflow_nodes entries so we
+// can preserve historical records while still allowing new nodes with similar
+// names to be created in the same workflow.
+func remapNodeIDsForConflicts(
+	nodes []models.Node,
+	edges []models.Edge,
+	existingNodes []models.WorkflowNode,
+) ([]models.Node, []models.Edge, map[string]string) {
+	reservedIDs := make(map[string]bool, len(existingNodes))
+	deletedIDs := make(map[string]bool, len(existingNodes))
+
+	for _, existing := range existingNodes {
+		reservedIDs[existing.NodeID] = true
+		if existing.DeletedAt.Valid {
+			deletedIDs[existing.NodeID] = true
+		}
+	}
+
+	remappedIDs := map[string]string{}
+	for i := range nodes {
+		if !deletedIDs[nodes[i].ID] {
+			reservedIDs[nodes[i].ID] = true
+			continue
+		}
+
+		newID := models.GenerateUniqueNodeID(nodes[i], reservedIDs)
+		remappedIDs[nodes[i].ID] = newID
+		nodes[i].ID = newID
+		reservedIDs[newID] = true
+	}
+
+	if len(remappedIDs) == 0 {
+		return nodes, edges, remappedIDs
+	}
+
+	for i := range edges {
+		if newID, ok := remappedIDs[edges[i].SourceID]; ok {
+			edges[i].SourceID = newID
+		}
+		if newID, ok := remappedIDs[edges[i].TargetID]; ok {
+			edges[i].TargetID = newID
+		}
+	}
+
+	return nodes, edges, remappedIDs
 }
 
 func findNode(nodes []models.WorkflowNode, nodeID string) *models.WorkflowNode {
