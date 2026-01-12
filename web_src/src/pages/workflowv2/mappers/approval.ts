@@ -4,6 +4,7 @@ import {
   ComponentsNode,
   RolesRole,
   SuperplaneUsersUser,
+  groupsListGroupUsers,
   workflowsInvokeNodeExecutionAction,
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
@@ -323,6 +324,33 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
           if (name) rolesByName[name] = display || name;
         });
       }
+    }
+
+    if (organizationId) {
+      const groupNames = new Set(
+        ((executionMetadata?.records as ApprovalRecord[] | undefined) || [])
+          .filter((record) => record.type === "group" && record.group)
+          .map((record) => record.group as string),
+      );
+
+      groupNames.forEach((groupName) => {
+        const queryKey = organizationKeys.groupUsers(organizationId, groupName);
+        if (queryClient.getQueryData(queryKey)) return;
+        queryClient.prefetchQuery({
+          queryKey,
+          queryFn: async () => {
+            const response = await groupsListGroupUsers(
+              withOrganizationHeader({
+                path: { groupName },
+                query: { domainId: organizationId, domainType: "DOMAIN_TYPE_ORGANIZATION" },
+              }),
+            );
+            return response.data?.users || [];
+          },
+          staleTime: 5 * 60 * 1000,
+          gcTime: 10 * 60 * 1000,
+        });
+      });
     }
 
     // Map backend records to approval items
