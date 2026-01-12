@@ -16,8 +16,8 @@ func TestGroups(t *testing.T) {
 	t.Run("creating a new group", func(t *testing.T) {
 		steps.start()
 		steps.visitCreateGroupPage()
-		steps.fillInCreateGroupForm("E2E Example Group", "E2E example group description")
-		steps.assertGroupSavedInDB("E2E Example Group", "E2E example group description")
+		steps.fillInCreateGroupForm("E2E Example Group")
+		steps.assertGroupSavedInDB("E2E Example Group")
 	})
 }
 
@@ -36,26 +36,23 @@ func (s *GroupsSteps) visitCreateGroupPage() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/settings/create-group")
 }
 
-func (s *GroupsSteps) fillInCreateGroupForm(name, description string) {
+func (s *GroupsSteps) fillInCreateGroupForm(name string) {
 	nameInput := q.Locator(`input[placeholder="Enter group name"]`)
-	descriptionInput := q.Locator(`textarea[placeholder^="Describe the group's purpose"]`)
 	createButton := q.Text("Create Group")
 
 	s.session.FillIn(nameInput, name)
-	s.session.FillIn(descriptionInput, description)
 	s.session.Sleep(500)
 
 	s.session.Click(createButton)
 	s.session.Sleep(500)
 }
 
-func (s *GroupsSteps) assertGroupSavedInDB(displayName, description string) {
+func (s *GroupsSteps) assertGroupSavedInDB(displayName string) {
 	groupName := normalizeGroupName(displayName)
 
 	metadata, err := models.FindGroupMetadata(groupName, models.DomainTypeOrganization, s.session.OrgID.String())
 	require.NoError(s.t, err)
 	require.Equal(s.t, displayName, metadata.DisplayName)
-	require.Equal(s.t, description, metadata.Description)
 }
 
 func normalizeGroupName(name string) string {
