@@ -6,7 +6,7 @@ import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, Issue, Comment } from "./types";
 
 interface OnIssueCommentConfiguration {
-  actions: string[];
+  contentFilter?: string;
 }
 
 interface OnIssueCommentEventData {
@@ -24,7 +24,7 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
 
     return {
       title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-      subtitle: `Comment ${eventData?.action} by ${eventData?.comment?.user?.login || "unknown"}`,
+      subtitle: `Comment by ${eventData?.comment?.user?.login || "unknown"}`,
     };
   },
 
@@ -52,10 +52,10 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
       });
     }
 
-    if (configuration?.actions) {
+    if (configuration?.contentFilter) {
       metadataItems.push({
         icon: "funnel",
-        label: configuration.actions.join(", "),
+        label: `Filter: ${configuration.contentFilter}`,
       });
     }
 
@@ -74,7 +74,7 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
 
       props.lastEventData = {
         title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-        subtitle: `Comment ${eventData?.action} by ${eventData?.comment?.user?.login || "unknown"}`,
+        subtitle: `Comment by ${eventData?.comment?.user?.login || "unknown"}`,
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,

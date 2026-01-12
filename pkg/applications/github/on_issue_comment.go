@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -13,8 +14,8 @@ import (
 type OnIssueComment struct{}
 
 type OnIssueCommentConfiguration struct {
-	Repository string   `json:"repository" mapstructure:"repository"`
-	Actions    []string `json:"actions" mapstructure:"actions"`
+	Repository    string `json:"repository" mapstructure:"repository"`
+	ContentFilter string `json:"contentFilter" mapstructure:"contentFilter"`
 }
 
 func (i *OnIssueComment) Name() string {
@@ -46,20 +47,12 @@ func (i *OnIssueComment) Configuration() []configuration.Field {
 			Required: true,
 		},
 		{
-			Name:     "actions",
-			Label:    "Actions",
-			Type:     configuration.FieldTypeMultiSelect,
-			Required: true,
-			Default:  []string{"created"},
-			TypeOptions: &configuration.TypeOptions{
-				MultiSelect: &configuration.MultiSelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Created", Value: "created"},
-						{Label: "Edited", Value: "edited"},
-						{Label: "Deleted", Value: "deleted"},
-					},
-				},
-			},
+			Name:        "contentFilter",
+			Label:       "Content Filter",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Placeholder: "e.g., /solve",
+			Description: "Optional regex pattern to filter comments by content",
 		},
 	}
 }
@@ -112,8 +105,32 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	if !whitelistedAction(data, config.Actions) {
+	// Only process "created" actions
+	action, ok := data["action"]
+	if !ok || action != "created" {
 		return http.StatusOK, nil
+	}
+
+	// Apply content filter if configured
+	if config.ContentFilter != "" {
+		comment, ok := data["comment"].(map[string]any)
+		if !ok {
+			return http.StatusBadRequest, fmt.Errorf("invalid comment structure")
+		}
+
+		body, ok := comment["body"].(string)
+		if !ok {
+			return http.StatusBadRequest, fmt.Errorf("invalid comment body")
+		}
+
+		matched, err := regexp.MatchString(config.ContentFilter, body)
+		if err != nil {
+			return http.StatusBadRequest, fmt.Errorf("invalid regex pattern: %w", err)
+		}
+
+		if !matched {
+			return http.StatusOK, nil
+		}
 	}
 
 	err = ctx.Events.Emit("github.issueComment", data)
