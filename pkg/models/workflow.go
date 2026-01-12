@@ -43,9 +43,28 @@ func FindWorkflowNodes(workflowID uuid.UUID) ([]WorkflowNode, error) {
 	return FindWorkflowNodesInTransaction(database.Conn(), workflowID)
 }
 
+func FindWorkflowNodesUnscoped(workflowID uuid.UUID) ([]WorkflowNode, error) {
+	return FindWorkflowNodesUnscopedInTransaction(database.Conn(), workflowID)
+}
+
 func FindWorkflowNodesInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]WorkflowNode, error) {
 	var nodes []WorkflowNode
 	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Find(&nodes).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
+func FindWorkflowNodesUnscopedInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]WorkflowNode, error) {
+	var nodes []WorkflowNode
+	err := tx.
+		Unscoped().
 		Where("workflow_id = ?", workflowID).
 		Find(&nodes).
 		Error

@@ -115,6 +115,148 @@ func TestUpdateWorkflow_NodeRemovalUseSoftDelete(t *testing.T) {
 	assert.Equal(t, int64(1), executionCount, "execution should still exist (FK constraint satisfied by soft deleted node)")
 }
 
+func TestUpdateWorkflow_RemapConflictingNodeIDs(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: "node-1",
+				Name:   "Node 1",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: "node-2",
+				Name:   "Node 2",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{
+				SourceID: "node-1",
+				TargetID: "node-2",
+				Channel:  "default",
+			},
+		},
+	)
+
+	removeNodePB := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-2",
+					Name: "Node 2",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	_, err := UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		removeNodePB,
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err, "UpdateWorkflow should succeed when removing nodes")
+
+	remapWorkflowPB := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-1",
+					Name: "Node 1",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+				{
+					Id:   "node-2",
+					Name: "Node 2",
+					Type: componentpb.Node_TYPE_COMPONENT,
+					Component: &componentpb.Node_ComponentRef{
+						Name: "noop",
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{
+				{
+					SourceId: "node-1",
+					TargetId: "node-2",
+					Channel:  "default",
+				},
+			},
+		},
+	}
+
+	response, err := UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		remapWorkflowPB,
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err, "UpdateWorkflow should succeed when remapping conflicting node IDs")
+	require.NotNil(t, response.Workflow)
+	require.NotNil(t, response.Workflow.Spec)
+
+	var remappedNode *componentpb.Node
+	for _, node := range response.Workflow.Spec.Nodes {
+		if node.GetName() == "Node 1" {
+			remappedNode = node
+			break
+		}
+	}
+	require.NotNil(t, remappedNode, "expected remapped node to exist")
+	assert.NotEqual(t, "node-1", remappedNode.GetId(), "remapped node should not keep the soft-deleted ID")
+
+	var remappedEdge *componentpb.Edge
+	for _, edge := range response.Workflow.Spec.Edges {
+		if edge.GetTargetId() == "node-2" {
+			remappedEdge = edge
+			break
+		}
+	}
+	require.NotNil(t, remappedEdge, "expected remapped edge to exist")
+	assert.Equal(t, remappedNode.GetId(), remappedEdge.GetSourceId(), "edge should point at remapped node ID")
+
+	var activeCount int64
+	database.Conn().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-1").Count(&activeCount)
+	assert.Equal(t, int64(0), activeCount, "soft-deleted node should not be active")
+
+	var unscopedCount int64
+	database.Conn().Unscoped().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-1").Count(&unscopedCount)
+	assert.Equal(t, int64(1), unscopedCount, "soft-deleted node should remain in history")
+
+	var remappedCount int64
+	database.Conn().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, remappedNode.GetId()).Count(&remappedCount)
+	assert.Equal(t, int64(1), remappedCount, "remapped node should be active")
+}
+
 func TestUpdateWorkflow_ErroredNodesCanExist(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
