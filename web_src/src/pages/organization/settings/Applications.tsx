@@ -135,34 +135,34 @@ export function Applications({ organizationId }: ApplicationsProps) {
                         {renderAppIcon(appDefinition?.icon, appName, "w-4 h-4 text-gray-500 dark:text-gray-400")}
                       </div>
                       <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                            {appLabel || app.metadata?.name || app.spec?.appName}
-                          </h3>
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              app.status?.state === "ready"
-                                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                : app.status?.state === "error"
-                                  ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                                  : "bg-orange-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-                            }`}
-                          >
-                            {statusLabel}
-                          </span>
-                        </div>
+                        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                          {appLabel || app.metadata?.name || app.spec?.appName}
+                        </h3>
                         {appDefinition?.description ? (
                           <p className="mt-1 text-sm text-gray-800 dark:text-gray-400">{appDefinition.description}</p>
                         ) : null}
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => navigate(`/${organizationId}/settings/applications/${app.metadata?.id}`)}
-                      className="text-sm py-1.5 self-start"
-                    >
-                      Configure...
-                    </Button>
+                    <div className="flex items-start gap-6">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          app.status?.state === "ready"
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                            : app.status?.state === "error"
+                              ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                              : "bg-orange-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                        }`}
+                      >
+                        {statusLabel}
+                      </span>
+                      <Button
+                        variant="outline"
+                        onClick={() => navigate(`/${organizationId}/settings/applications/${app.metadata?.id}`)}
+                        className="text-sm py-1.5 self-start"
+                      >
+                        Configure...
+                      </Button>
+                    </div>
                   </div>
                 );
               })}

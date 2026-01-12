@@ -317,36 +317,16 @@ export function CreateRolePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-4 text-left">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-left">
       <div className="max-w-8xl mx-auto py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="mb-4">
-            <Breadcrumbs
-              items={[
-                {
-                  label: "Roles",
-                  onClick: () => navigate(`/${orgId}/settings/roles`),
-                },
-                {
-                  label: isEditMode ? "Edit organization role" : "Create new organization role",
-                  current: true,
-                },
-              ]}
-              showDivider={false}
-            />
-          </div>
+        <div className="mb-6">
 
           <div className="flex items-center text-left">
             <div>
-              <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">
-                {isEditMode ? "Edit Organization Role" : "Create New Organization Role"}
+              <Heading level={2} className="text-2xl font-medium text-gray-800 dark:text-white mb-2">
+                {isEditMode ? "Edit Role" : "Create New Role"}
               </Heading>
-              <Text className="text-gray-500 dark:text-gray-400">
-                {isEditMode
-                  ? "Update the role with specific organization permissions."
-                  : "Define a custom role with specific organization permissions."}
-              </Text>
             </div>
           </div>
         </div>
