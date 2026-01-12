@@ -614,7 +614,7 @@ function CanvasPage(props: CanvasPageProps) {
 
     await props.onNodeAdd({
       buildingBlock: annotationBlock,
-      nodeName: "New Note",
+      nodeName: "Note",
       configuration: {},
       position,
     });
@@ -1861,6 +1861,10 @@ function CanvasContent({
                   });
                 }}
                 onSelectNode={(node) => {
+                  const isAnnotationNode = (node.data as any)?.type === "annotation";
+                  if (isAnnotationNode) {
+                    return;
+                  }
                   state.componentSidebar.open(node.id);
                 }}
               />
