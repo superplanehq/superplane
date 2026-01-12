@@ -216,6 +216,35 @@ func TestHTTP__Execute__GET(t *testing.T) {
 	assert.Equal(t, "world", body["hello"])
 }
 
+func TestHTTP__Execute__GET_WithQueryParams(t *testing.T) {
+	h := &HTTP{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/test", r.URL.Path)
+		assert.Equal(t, "bar", r.URL.Query().Get("foo"))
+		assert.Equal(t, "2", r.URL.Query().Get("existing"))
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL + "/test?existing=1",
+		"queryParams": []map[string]any{
+			{"key": "foo", "value": "bar"},
+			{"key": "existing", "value": "2"},
+		},
+	})
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
+	assert.Equal(t, "http.request.finished", stateCtx.Type)
+}
+
 func TestHTTP__Execute__POST_JSON(t *testing.T) {
 	//
 	// Create test server
