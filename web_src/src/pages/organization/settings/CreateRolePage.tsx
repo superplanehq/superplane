@@ -321,7 +321,6 @@ export function CreateRolePage() {
       <div className="max-w-8xl mx-auto py-8">
         {/* Header */}
         <div className="mb-6">
-
           <div className="flex items-center text-left">
             <div>
               <Heading level={2} className="text-2xl font-medium text-gray-800 dark:text-white mb-2">

@@ -83,7 +83,6 @@ export function CreateGroupPage() {
       <div className="max-w-6xl mx-auto py-8">
         {/* Header */}
         <div className="mb-6">
-
           <div className="text-left">
             <Heading level={2} className="mb-2">
               Create New Group
