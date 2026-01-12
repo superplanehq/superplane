@@ -2,13 +2,12 @@ import { Heading } from "@/components/Heading/heading";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
-import { Checkbox, CheckboxField } from "../../../components/Checkbox/checkbox";
 import { Description, Label } from "../../../components/Fieldset/fieldset";
 import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
 import { useCreateRole, useRole, useUpdateRole } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/ui/checkbox";
 
 interface Permission {
   id: string;
@@ -214,7 +213,6 @@ export function CreateRolePage() {
   usePageTitle([isEditMode ? "Edit Role" : "Create Role"]);
 
   const [roleName, setRoleName] = useState("");
-  const [roleDescription, setRoleDescription] = useState("");
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set());
 
   // React Query hooks
@@ -250,7 +248,6 @@ export function CreateRolePage() {
   useEffect(() => {
     if (isEditMode && existingRole) {
       setRoleName(existingRole.spec?.displayName || existingRole.metadata?.name || "");
-      setRoleDescription(existingRole.spec?.description || "");
 
       // Convert permissions back to selected format
       const permissionIds = new Set<string>();
@@ -294,7 +291,6 @@ export function CreateRolePage() {
           domainId: orgId,
           permissions: permissions,
           displayName: roleName.trim(),
-          description: roleDescription.trim() || undefined,
         });
       } else {
         // Create new role
@@ -306,7 +302,6 @@ export function CreateRolePage() {
             spec: {
               permissions: permissions,
               displayName: roleName.trim(),
-              description: roleDescription.trim() || undefined,
             },
           },
           domainType: "DOMAIN_TYPE_ORGANIZATION",
@@ -321,36 +316,15 @@ export function CreateRolePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-4 text-left">
-      <div className="max-w-8xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-left">
+      <div className="max-w-8xl mx-auto py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="mb-4">
-            <Breadcrumbs
-              items={[
-                {
-                  label: "Roles",
-                  onClick: () => navigate(`/${orgId}/settings/roles`),
-                },
-                {
-                  label: isEditMode ? "Edit organization role" : "Create new organization role",
-                  current: true,
-                },
-              ]}
-              showDivider={false}
-            />
-          </div>
-
+        <div className="mb-6">
           <div className="flex items-center text-left">
             <div>
-              <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">
-                {isEditMode ? "Edit Organization Role" : "Create New Organization Role"}
+              <Heading level={2} className="text-2xl font-medium text-gray-800 dark:text-white mb-2">
+                {isEditMode ? "Edit Role" : "Create New Role"}
               </Heading>
-              <Text className="text-gray-500 dark:text-gray-400">
-                {isEditMode
-                  ? "Update the role with specific organization permissions."
-                  : "Define a custom role with specific organization permissions."}
-              </Text>
             </div>
           </div>
         </div>
@@ -396,18 +370,6 @@ export function CreateRolePage() {
                   )}
                 </div>
 
-                {/* Role Description */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
-                  <textarea
-                    placeholder="Describe what this role can do"
-                    value={roleDescription}
-                    onChange={(e) => setRoleDescription(e.target.value)}
-                    className="max-w-lg w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white resize-none"
-                    rows={3}
-                  />
-                </div>
-
                 {/* Permissions */}
                 <div className="pt-4 mb-4">
                   <h2 className="text-base font-semibold text-gray-800 dark:text-white mb-2">
@@ -425,47 +387,41 @@ export function CreateRolePage() {
                         <h3 className="text-md font-semibold text-gray-800 dark:text-white">{category.category}</h3>
                         <button
                           type="button"
-                          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 ml-3 bg-transparent border-none cursor-pointer"
+                          className="text-xs font-medium text-gray-500 ml-3 bg-transparent border-none cursor-pointer"
                           onClick={() => handleCategoryToggle(category.permissions)}
                         >
                           {isCategorySelected(category.permissions) ? "Deselect all" : "Select all"}
                         </button>
                       </div>
                       <div className="space-y-3">
-                        {category.permissions.map((permission) => (
-                          <CheckboxField
-                            key={permission.id}
-                            onClick={() => {
-                              setSelectedPermissions((prev) => {
-                                const newSet = new Set(prev);
-                                if (newSet.has(permission.id)) {
-                                  newSet.delete(permission.id);
-                                } else {
-                                  newSet.add(permission.id);
-                                }
-                                return newSet;
-                              });
-                            }}
-                          >
-                            <Checkbox
-                              name={permission.id}
-                              checked={selectedPermissions.has(permission.id)}
-                              onChange={(checked) => {
-                                setSelectedPermissions((prev) => {
-                                  const newSet = new Set(prev);
-                                  if (checked) {
-                                    newSet.add(permission.id);
-                                  } else {
-                                    newSet.delete(permission.id);
-                                  }
-                                  return newSet;
-                                });
-                              }}
-                            />
-                            <Label className="cursor-pointer">{permission.name}</Label>
-                            <Description>{permission.description}</Description>
-                          </CheckboxField>
-                        ))}
+                        {category.permissions.map((permission) => {
+                          const checkboxId = `permission-${permission.id}`;
+                          return (
+                            <div key={permission.id} className="flex items-start gap-3">
+                              <Checkbox
+                                id={checkboxId}
+                                checked={selectedPermissions.has(permission.id)}
+                                onCheckedChange={(checked) => {
+                                  setSelectedPermissions((prev) => {
+                                    const newSet = new Set(prev);
+                                    if (checked) {
+                                      newSet.add(permission.id);
+                                    } else {
+                                      newSet.delete(permission.id);
+                                    }
+                                    return newSet;
+                                  });
+                                }}
+                              />
+                              <div className="space-y-1">
+                                <Label htmlFor={checkboxId} className="cursor-pointer">
+                                  {permission.name}
+                                </Label>
+                                <Description>{permission.description}</Description>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -481,16 +437,16 @@ export function CreateRolePage() {
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3">
-            <Link to={`/${orgId}/settings/roles`}>
-              <Button variant="secondary">Cancel</Button>
-            </Link>
+          <div className="flex justify-start gap-3">
             <Button
               onClick={handleSubmitRole}
               disabled={!roleName.trim() || selectedPermissions.size === 0 || isSubmitting || isLoading}
             >
               {isSubmitting ? (isEditMode ? "Updating..." : "Creating...") : isEditMode ? "Update Role" : "Create Role"}
             </Button>
+            <Link to={`/${orgId}/settings/roles`}>
+              <Button variant="outline">Cancel</Button>
+            </Link>
           </div>
         </div>
       </div>

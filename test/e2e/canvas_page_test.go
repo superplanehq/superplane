@@ -15,9 +15,8 @@ import (
 )
 
 func TestCanvasPage(t *testing.T) {
-	steps := &CanvasPageSteps{t: t}
-
 	t.Run("adding a node to canvas displays custom node name", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("Hello")
@@ -25,6 +24,7 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("duplicating a node on canvas", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("Hello")
@@ -36,6 +36,7 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("collapsing and expanding a node on canvas", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("Hello")
@@ -47,6 +48,7 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("deleting a node from a canvas", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExistsWithANoopNode()
 		steps.deleteNodeFromCanvas("DeleteMe")
@@ -54,6 +56,7 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("viewing queued items in the sidebar", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(4)
 		steps.openSidebarForNode("Wait")
@@ -63,6 +66,7 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("canceling queued items from the sidebar", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(4)
 		steps.openSidebarForNode("Wait")
@@ -74,6 +78,7 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("canceling running execution from the sidebar", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(1)
 		steps.openSidebarForNode("Wait")
@@ -87,6 +92,7 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("deleting a connection between nodes", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addTwoNodesAndConnect()

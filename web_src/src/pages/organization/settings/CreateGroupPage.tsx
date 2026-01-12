@@ -1,8 +1,7 @@
 import { Heading } from "@/components/Heading/heading";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
 import {
   Dropdown,
   DropdownButton,
@@ -13,7 +12,6 @@ import {
 } from "../../../components/Dropdown/dropdown";
 import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
-import { Text } from "../../../components/Text/text";
 import { useCreateGroup, useOrganizationRoles } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 
@@ -24,7 +22,6 @@ export function CreateGroupPage() {
   usePageTitle(["Create Group"]);
 
   const [groupName, setGroupName] = useState("");
-  const [groupDescription, setGroupDescription] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,11 +29,23 @@ export function CreateGroupPage() {
   const { data: roles = [], isLoading: loadingRoles } = useOrganizationRoles(orgId || "");
   const createGroupMutation = useCreateGroup(orgId || "");
 
+  const sortedRoles = useMemo(() => {
+    const defaultRoles = new Set(["org_admin", "org_owner", "org_viewer"]);
+    const customRoles = roles
+      .filter((role) => !defaultRoles.has(role.metadata?.name || ""))
+      .sort((a, b) => (a.spec?.displayName || "").localeCompare(b.spec?.displayName || ""));
+    const baseRoles = roles
+      .filter((role) => defaultRoles.has(role.metadata?.name || ""))
+      .sort((a, b) => (a.spec?.displayName || "").localeCompare(b.spec?.displayName || ""));
+
+    return [...customRoles, ...baseRoles];
+  }, [roles]);
+
   useEffect(() => {
-    if (roles.length > 0 && !selectedRole) {
-      setSelectedRole(roles[0].metadata?.name || "");
+    if (sortedRoles.length > 0 && !selectedRole) {
+      setSelectedRole(sortedRoles[0].metadata?.name || "");
     }
-  }, [roles, selectedRole]);
+  }, [sortedRoles, selectedRole]);
 
   const handleCreateGroup = async () => {
     if (!groupName.trim() || !selectedRole || !orgId) return;
@@ -50,7 +59,6 @@ export function CreateGroupPage() {
         groupName: groupName.trim().toLocaleLowerCase().replace(/\s+/g, "_"),
         role: selectedRole,
         displayName: groupName,
-        description: groupDescription,
       });
 
       navigate(`/${orgId}/settings/groups`);
@@ -70,32 +78,13 @@ export function CreateGroupPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-left">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="mb-4">
-            <Breadcrumbs
-              items={[
-                {
-                  label: "Groups",
-                  onClick: () => navigate(`/${orgId}/settings/groups`),
-                },
-                {
-                  label: "Create new group",
-                  current: true,
-                },
-              ]}
-              showDivider={false}
-            />
-          </div>
-
+        <div className="mb-6">
           <div className="text-left">
             <Heading level={2} className="mb-2">
               Create New Group
             </Heading>
-            <Text className="text-gray-500 dark:text-gray-400">
-              Create a group to organize members and assign roles
-            </Text>
           </div>
         </div>
 
@@ -119,20 +108,6 @@ export function CreateGroupPage() {
                   onChange={(e) => setGroupName(e.target.value)}
                   onKeyPress={handleKeyPress}
                   className="w-full max-w-lg"
-                />
-              </div>
-
-              {/* Group Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-800 dark:text-white mb-2">
-                  Group Description
-                </label>
-                <textarea
-                  placeholder="Describe the group's purpose and responsibilities..."
-                  value={groupDescription}
-                  onChange={(e) => setGroupDescription(e.target.value)}
-                  className="w-full max-w-lg px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white resize-none"
-                  rows={3}
                 />
               </div>
 
@@ -165,11 +140,11 @@ export function CreateGroupPage() {
                 ) : (
                   <Dropdown>
                     <DropdownButton className="flex items-center gap-2 text-sm justify-between">
-                      {roles.find((r) => r.metadata?.name === selectedRole)?.spec?.displayName || "Select Role"}
+                      {sortedRoles.find((r) => r.metadata?.name === selectedRole)?.spec?.displayName || "Select Role"}
                       <Icon name="chevron-down" />
                     </DropdownButton>
                     <DropdownMenu>
-                      {roles.map((role) => (
+                      {sortedRoles.map((role) => (
                         <DropdownItem
                           key={role.metadata?.name}
                           onClick={() => setSelectedRole(role.metadata?.name || "")}
@@ -192,12 +167,11 @@ export function CreateGroupPage() {
               disabled={!groupName.trim() || !selectedRole || isCreating || roles.length === 0}
               className="flex items-center gap-2"
             >
-              <Icon name="group_add" size="sm" />
               {isCreating ? "Creating..." : "Create Group"}
             </Button>
 
             <Link to={`/${orgId}/settings/groups`}>
-              <Button variant="secondary">Cancel</Button>
+              <Button variant="outline">Cancel</Button>
             </Link>
           </div>
         </div>

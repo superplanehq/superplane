@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"slices"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -15,6 +16,16 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 	user, err := models.FindActiveUserByID(orgID, userID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "user not found")
+	}
+
+	ownerIDs, err := authService.GetOrgUsersForRole(models.RoleOrgOwner, orgID)
+	if err != nil {
+		log.Errorf("Error determining owners for org %s: %v", orgID, err)
+		return nil, status.Error(codes.Internal, "error determining organization owners")
+	}
+
+	if len(ownerIDs) <= 1 && slices.Contains(ownerIDs, user.ID.String()) {
+		return nil, status.Error(codes.FailedPrecondition, "cannot remove the last organization owner")
 	}
 
 	//
