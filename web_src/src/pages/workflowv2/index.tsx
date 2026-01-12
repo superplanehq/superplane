@@ -1808,7 +1808,7 @@ export function WorkflowPageV2() {
   );
 
   const handleNodeDuplicate = useCallback(
-    (nodeId: string) => {
+    async (nodeId: string) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       const nodeToDuplicate = workflow.spec?.nodes?.find((node) => node.id === nodeId);
@@ -1857,9 +1857,23 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      markUnsavedChange("structural");
+      if (isAutoSaveEnabled) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
     },
-    [workflow, organizationId, workflowId, blueprints, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      blueprints,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      isAutoSaveEnabled,
+      markUnsavedChange,
+    ],
   );
 
   const handleSave = useCallback(

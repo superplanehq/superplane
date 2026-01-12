@@ -29,8 +29,6 @@ func TestCanvasPage(t *testing.T) {
 		steps.givenACanvasExists()
 		steps.addNoop("Hello")
 		steps.duplicateNodeOnCanvas("Hello")
-		steps.assertUnsavedChangesNoteIsVisible()
-		steps.saveCanvas()
 		steps.canvas.RenameNode("Hello", "Hello previous")
 		steps.assertNodeDuplicatedInDB("Hello previous", "Hello")
 	})
@@ -132,10 +130,6 @@ func (s *CanvasPageSteps) deleteConnectionBetweenNodes(sourceName, targetName st
 	s.canvas.DeleteConnection(sourceName, targetName)
 }
 
-func (s *CanvasPageSteps) assertUnsavedChangesNoteIsVisible() {
-	s.session.AssertText("You have unsaved changes")
-}
-
 func (s *CanvasPageSteps) assertIsNodeCollapsed(nodeName string) {
 	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
 	s.session.Sleep(100)
@@ -156,10 +150,6 @@ func (s *CanvasPageSteps) assertIsNodeExpanded(nodeName string) {
 
 	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
 	s.session.Sleep(100)
-}
-
-func (s *CanvasPageSteps) saveCanvas() {
-	s.canvas.Save()
 }
 
 func (s *CanvasPageSteps) assertNodeIsAdded(nodeName string) {
