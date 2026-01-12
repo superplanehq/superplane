@@ -30,7 +30,7 @@ import {
   eventStateRegistry as pagerdutyEventStateRegistry,
 } from "./pagerduty/index";
 import { timeGateMapper } from "./timegate";
-import { filterMapper } from "./filter";
+import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
@@ -82,6 +82,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   approval: APPROVAL_STATE_REGISTRY,
   semaphore: SEMAPHORE_STATE_REGISTRY,
   http: HTTP_STATE_REGISTRY,
+  filter: FILTER_STATE_REGISTRY,
 };
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {

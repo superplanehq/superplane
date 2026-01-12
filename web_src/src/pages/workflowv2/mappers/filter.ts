@@ -4,11 +4,63 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseMapper } from "./types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { ComponentBaseMapper, EventStateRegistry, OutputPayload, StateFunction } from "./types";
+import { ComponentBaseProps, EventSection, EventState, EventStateMap, DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { parseExpression } from "@/lib/expressionParser";
+
+type FilterOutputs = Record<string, OutputPayload[]>;
+
+export const FILTER_STATE_MAP: EventStateMap = {
+  ...DEFAULT_EVENT_STATE_MAP,
+  passed: {
+    icon: "circle-check",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-green-100",
+    badgeColor: "bg-emerald-500",
+  },
+  rejected: {
+    icon: "circle-x",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-400",
+  },
+};
+
+export const filterStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+  if (!execution) return "neutral";
+
+  if (
+    execution.resultMessage &&
+    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED")
+  ) {
+    return "error";
+  }
+
+  if (execution.result === "RESULT_CANCELLED") {
+    return "cancelled";
+  }
+
+  if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
+    return "running";
+  }
+
+  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
+    const outputs = execution.outputs as FilterOutputs | undefined;
+    const hasOutputs = outputs
+      ? Object.values(outputs).some((payloads) => Array.isArray(payloads) && payloads.length > 0)
+      : false;
+    return hasOutputs ? "passed" : "rejected";
+  }
+
+  return "failed";
+};
+
+export const FILTER_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: FILTER_STATE_MAP,
+  getState: filterStateFunction,
+};
 
 export const filterMapper: ComponentBaseMapper = {
   props(
