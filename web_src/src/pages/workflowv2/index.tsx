@@ -1598,7 +1598,8 @@ export function WorkflowPageV2() {
       // Parse edge IDs to extract sourceId, targetId, and channel
       // Edge IDs are formatted as: `${sourceId}--${targetId}--${channel}`
       const edgesToRemove = edgeIds.map((edgeId) => {
-        const parts = edgeId?.split("--");
+        let parts = edgeId?.split("-targets->") || [];
+        parts = parts.flatMap((part) => part.split("-using->"));
         return {
           sourceId: parts[0],
           targetId: parts[1],
@@ -2655,7 +2656,7 @@ function prepareMergeNode(
 }
 
 function prepareEdge(edge: ComponentsEdge): CanvasEdge {
-  const id = `${edge.sourceId!}--${edge.targetId!}--${edge.channel!}`;
+  const id = `${edge.sourceId!}-targets->${edge.targetId!}-using->${edge.channel!}`;
 
   return {
     id: id,
