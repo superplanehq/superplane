@@ -36,7 +36,6 @@ deployment offers better scalability and high availability for larger teams.
 - **[Single Host Installation](https://docs.superplane.com/installation/single-host/aws-ec2/)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
 - **[Kubernetes Installation](https://docs.superplane.com/installation/kubernetes/gke/)** - Deploy on GKE, EKS, or any Kubernetes cluster
 
-
 ## Contributing
 
 Found a bug or have a feature idea? Check our **[Contributing Guide](CONTRIBUTING.md)** to get started.
