@@ -126,6 +126,14 @@ export function WorkflowPageV2() {
   const hasFitToViewRef = useRef(false);
 
   /**
+   * Capture the initial node focus from the URL so we only zoom once.
+   */
+  const initialFocusNodeIdRef = useRef<string | null>(null);
+  if (initialFocusNodeIdRef.current === null) {
+    initialFocusNodeIdRef.current = searchParams.get("node") || null;
+  }
+
+  /**
    * Track if the user has manually toggled the building blocks sidebar.
    * This ref persists across re-renders to preserve user preference.
    */
@@ -2089,6 +2097,7 @@ export function WorkflowPageV2() {
       hasUserToggledSidebarRef={hasUserToggledSidebarRef}
       isSidebarOpenRef={isSidebarOpenRef}
       viewportRef={viewportRef}
+      initialFocusNodeId={initialFocusNodeIdRef.current}
       unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
       saveIsPrimary={hasUnsavedChanges}
       saveButtonHidden={!hasUnsavedChanges}

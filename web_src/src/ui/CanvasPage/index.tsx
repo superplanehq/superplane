@@ -196,6 +196,7 @@ export interface CanvasPageProps {
   // Optional: control and observe component sidebar state
   onSidebarChange?: (isOpen: boolean, selectedNodeId: string | null) => void;
   initialSidebar?: { isOpen?: boolean; nodeId?: string | null };
+  initialFocusNodeId?: string | null;
 
   // Full history functionality
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
@@ -809,6 +810,7 @@ function CanvasPage(props: CanvasPageProps) {
               logEntries={props.logEntries}
               focusRequest={props.focusRequest}
               onExecutionChainHandled={props.onExecutionChainHandled}
+              initialFocusNodeId={props.initialFocusNodeId}
             />
           </ReactFlowProvider>
 
@@ -1216,6 +1218,7 @@ function CanvasContent({
   onToggleAutoSave,
   logEntries = [],
   focusRequest,
+  initialFocusNodeId,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1259,6 +1262,7 @@ function CanvasContent({
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
+  initialFocusNodeId?: string | null;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1535,10 +1539,17 @@ function CanvasContent({
       if (!hasFitToViewRef.current) {
         const hasNodes = (stateRef.current.nodes?.length ?? 0) > 0;
 
-        if (hasNodes) {
+        const focusNodeId = initialFocusNodeId;
+        const focusNode = focusNodeId ? stateRef.current.nodes?.find((node) => node.id === focusNodeId) : null;
+
+        if (focusNode) {
+          fitView({ nodes: [focusNode], duration: 500, maxZoom: 1.2 });
+        } else if (hasNodes) {
           // Fit to view but don't zoom in too much (max zoom of 1.0)
           fitView({ maxZoom: 1.0, padding: 0.5 });
+        }
 
+        if (hasNodes) {
           // Store the initial viewport after fit
           const initialViewport = getViewport();
           viewportRef.current = initialViewport;
@@ -1566,7 +1577,7 @@ function CanvasContent({
         setIsInitialized(true);
       }
     },
-    [fitView, getViewport, onZoomChange, hasFitToViewRef, viewportRef],
+    [fitView, getViewport, onZoomChange, hasFitToViewRef, viewportRef, initialFocusNodeId],
   );
 
   // Store callback handlers in a ref so they can be accessed without being in node data
