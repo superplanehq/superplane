@@ -113,7 +113,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 		}
 	}
 
-	return execution.CancelInTransaction(tx)
+	return execution.CancelInTransaction(tx, user.ID)
 }
 
 func cancelChildExecutions(

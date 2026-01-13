@@ -996,6 +996,7 @@ export type WorkflowsWorkflowNodeExecution = {
   };
   childExecutions?: Array<WorkflowsWorkflowNodeExecution>;
   rootEvent?: WorkflowsWorkflowEvent;
+  cancelledBy?: SuperplaneWorkflowsUserRef;
 };
 
 export type WorkflowsWorkflowNodeQueueItem = {

@@ -171,7 +171,7 @@ export const approvalMapper: ComponentBaseMapper = {
     }
 
     if (execution.result === "RESULT_CANCELLED") {
-      details["Cancelled by"] = getCancelledByLabel(metadata) || "Unknown";
+      details["Cancelled by"] = execution.cancelledBy?.name || "Unknown";
     } else {
       details["Approvals"] = buildApprovalTimeline(records);
     }
@@ -328,25 +328,6 @@ function buildApprovalTimeline(records: ApprovalRecord[]) {
       if (!b.timestamp) return -1;
       return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
     });
-}
-
-function getCancelledByLabel(metadata?: Record<string, unknown>): string | undefined {
-  if (!metadata) return undefined;
-
-  const candidate = metadata.cancelledBy || metadata.cancelled_by || metadata.canceledBy || metadata.canceled_by;
-  if (typeof candidate === "string") return candidate;
-
-  if (candidate && typeof candidate === "object") {
-    const obj = candidate as Record<string, unknown>;
-    const name = obj.name;
-    const email = obj.email;
-    const id = obj.id;
-    if (typeof name === "string" && name.trim()) return name;
-    if (typeof email === "string" && email.trim()) return email;
-    if (typeof id === "string" && id.trim()) return id;
-  }
-
-  return undefined;
 }
 
 function getApprovalDecisionMeta(record: ApprovalRecord): {

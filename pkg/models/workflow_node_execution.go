@@ -68,6 +68,7 @@ type WorkflowNodeExecution struct {
 	Result        string
 	ResultReason  string
 	ResultMessage string
+	CancelledBy   *uuid.UUID
 
 	//
 	// Components can store metadata about each execution here.
@@ -440,18 +441,19 @@ func (e *WorkflowNodeExecution) FailInTransaction(tx *gorm.DB, reason, message s
 	return nil
 }
 
-func (e *WorkflowNodeExecution) Cancel() error {
-	return e.CancelInTransaction(database.Conn())
+func (e *WorkflowNodeExecution) Cancel(cancelledBy uuid.UUID) error {
+	return e.CancelInTransaction(database.Conn(), cancelledBy)
 }
 
-func (e *WorkflowNodeExecution) CancelInTransaction(tx *gorm.DB) error {
+func (e *WorkflowNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy uuid.UUID) error {
 	now := time.Now()
 
 	err := tx.Model(e).
 		Updates(map[string]interface{}{
-			"state":      WorkflowNodeExecutionStateFinished,
-			"result":     WorkflowNodeExecutionResultCancelled,
-			"updated_at": &now,
+			"state":        WorkflowNodeExecutionStateFinished,
+			"result":       WorkflowNodeExecutionResultCancelled,
+			"cancelled_by": cancelledBy,
+			"updated_at":   &now,
 		}).Error
 
 	if err != nil {

@@ -389,7 +389,8 @@ CREATE TABLE public.workflow_node_executions (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    cancelled_by uuid
 );
 
 
