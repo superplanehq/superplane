@@ -62,7 +62,6 @@ const OwnerSetup: React.FC = () => {
       errors.confirmPassword = "Passwords do not match.";
     }
 
-
     setFieldErrors(errors);
     return errors;
   };
@@ -183,107 +182,107 @@ const OwnerSetup: React.FC = () => {
 
         {step === "owner" && (
           <form onSubmit={handleOwnerNext} className="space-y-6">
-          {error && (
-            <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-              <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
+            {error && (
+              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
+                Email <span className="text-red-500">*</span>
+              </label>
+              <InputGroup>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className={fieldErrors.email ? "border-red-500" : ""}
+                />
+              </InputGroup>
+              {fieldErrors.email && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.email}</p>}
             </div>
-          )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-              Email <span className="text-red-500">*</span>
-            </label>
-            <InputGroup>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className={fieldErrors.email ? "border-red-500" : ""}
-              />
-            </InputGroup>
-            {fieldErrors.email && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.email}</p>}
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
+                First Name <span className="text-red-500">*</span>
+              </label>
+              <InputGroup>
+                <Input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="First name"
+                  className={fieldErrors.firstName ? "border-red-500" : ""}
+                />
+              </InputGroup>
+              {fieldErrors.firstName && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.firstName}</p>
+              )}
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-              First Name <span className="text-red-500">*</span>
-            </label>
-            <InputGroup>
-              <Input
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="First name"
-                className={fieldErrors.firstName ? "border-red-500" : ""}
-              />
-            </InputGroup>
-            {fieldErrors.firstName && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.firstName}</p>
-            )}
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
+                Last Name <span className="text-red-500">*</span>
+              </label>
+              <InputGroup>
+                <Input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Last name"
+                  className={fieldErrors.lastName ? "border-red-500" : ""}
+                />
+              </InputGroup>
+              {fieldErrors.lastName && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.lastName}</p>
+              )}
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-              Last Name <span className="text-red-500">*</span>
-            </label>
-            <InputGroup>
-              <Input
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder="Last name"
-                className={fieldErrors.lastName ? "border-red-500" : ""}
-              />
-            </InputGroup>
-            {fieldErrors.lastName && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.lastName}</p>
-            )}
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
+                Password <span className="text-red-500">*</span>
+              </label>
+              <InputGroup>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  className={fieldErrors.password ? "border-red-500" : ""}
+                />
+              </InputGroup>
+              {fieldErrors.password ? (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.password}</p>
+              ) : (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  8+ characters, at least 1 number and 1 capital letter
+                </p>
+              )}
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-              Password <span className="text-red-500">*</span>
-            </label>
-            <InputGroup>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                className={fieldErrors.password ? "border-red-500" : ""}
-              />
-            </InputGroup>
-            {fieldErrors.password ? (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.password}</p>
-            ) : (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                8+ characters, at least 1 number and 1 capital letter
-              </p>
-            )}
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
+                Confirm Password <span className="text-red-500">*</span>
+              </label>
+              <InputGroup>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm password"
+                  className={fieldErrors.confirmPassword ? "border-red-500" : ""}
+                />
+              </InputGroup>
+              {fieldErrors.confirmPassword && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.confirmPassword}</p>
+              )}
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-              Confirm Password <span className="text-red-500">*</span>
-            </label>
-            <InputGroup>
-              <Input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm password"
-                className={fieldErrors.confirmPassword ? "border-red-500" : ""}
-              />
-            </InputGroup>
-            {fieldErrors.confirmPassword && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.confirmPassword}</p>
-            )}
-          </div>
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Saving..." : "Next"}
-          </Button>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Saving..." : "Next"}
+            </Button>
           </form>
         )}
 
@@ -427,11 +426,7 @@ const OwnerSetup: React.FC = () => {
             </div>
 
             <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                type="checkbox"
-                checked={smtpUseTLS}
-                onChange={(e) => setSmtpUseTLS(e.target.checked)}
-              />
+              <input type="checkbox" checked={smtpUseTLS} onChange={(e) => setSmtpUseTLS(e.target.checked)} />
               Use TLS (STARTTLS)
             </label>
 

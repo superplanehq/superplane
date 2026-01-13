@@ -15,18 +15,18 @@ import (
 )
 
 type SetupOwnerRequest struct {
-	Email        string `json:"email"`
-	FirstName    string `json:"first_name"`
-	LastName     string `json:"last_name"`
-	Password     string `json:"password"`
-	SMTPEnabled  bool   `json:"smtp_enabled"`
-	SMTPHost     string `json:"smtp_host"`
-	SMTPPort     int    `json:"smtp_port"`
-	SMTPUsername string `json:"smtp_username"`
-	SMTPPassword string `json:"smtp_password"`
-	SMTPFromName string `json:"smtp_from_name"`
+	Email         string `json:"email"`
+	FirstName     string `json:"first_name"`
+	LastName      string `json:"last_name"`
+	Password      string `json:"password"`
+	SMTPEnabled   bool   `json:"smtp_enabled"`
+	SMTPHost      string `json:"smtp_host"`
+	SMTPPort      int    `json:"smtp_port"`
+	SMTPUsername  string `json:"smtp_username"`
+	SMTPPassword  string `json:"smtp_password"`
+	SMTPFromName  string `json:"smtp_from_name"`
 	SMTPFromEmail string `json:"smtp_from_email"`
-	SMTPUseTLS   bool   `json:"smtp_use_tls"`
+	SMTPUseTLS    bool   `json:"smtp_use_tls"`
 }
 
 type SetupOwnerResponse struct {
