@@ -18,9 +18,9 @@ import {
   organizationsDescribeOrganization,
   organizationsUpdateOrganization,
   organizationsRemoveUser,
-  organizationsListInvitations,
-  organizationsCreateInvitation,
-  organizationsRemoveInvitation,
+  organizationsGetInviteLink,
+  organizationsUpdateInviteLink,
+  organizationsResetInviteLink,
   organizationsDeleteOrganization,
 } from "../api-client/sdk.gen";
 import { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
@@ -37,7 +37,7 @@ export const organizationKeys = {
   groupUsers: (orgId: string, groupName: string) => [...organizationKeys.all, "groupUsers", orgId, groupName] as const,
   role: (orgId: string, roleName: string) => [...organizationKeys.all, "role", orgId, roleName] as const,
   canvases: (orgId: string) => [...organizationKeys.all, "canvases", orgId] as const,
-  invitations: (orgId: string) => [...organizationKeys.all, "invitations", orgId] as const,
+  inviteLink: (orgId: string) => [...organizationKeys.all, "inviteLink", orgId] as const,
 };
 
 // Hooks for fetching data
@@ -165,16 +165,16 @@ export const useRole = (organizationId: string, roleName: string) => {
   });
 };
 
-export const useOrganizationInvitations = (organizationId: string) => {
+export const useOrganizationInviteLink = (organizationId: string) => {
   return useQuery({
-    queryKey: organizationKeys.invitations(organizationId),
+    queryKey: organizationKeys.inviteLink(organizationId),
     queryFn: async () => {
-      const response = await organizationsListInvitations(
+      const response = await organizationsGetInviteLink(
         withOrganizationHeader({
           path: { id: organizationId },
         }),
       );
-      return response.data?.invitations || [];
+      return response.data?.inviteLink || null;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
@@ -241,63 +241,44 @@ export const useRemoveOrganizationSubject = (organizationId: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) });
-      queryClient.invalidateQueries({ queryKey: organizationKeys.invitations(organizationId) });
     },
   });
 };
 
-export const useCreateInvitation = (
-  organizationId: string,
-  options?: {
-    onError?: (error: Error) => void;
-  },
-) => {
+export const useUpdateOrganizationInviteLink = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (email: string) => {
-      const response = await organizationsCreateInvitation(
+    mutationFn: async (enabled: boolean) => {
+      const response = await organizationsUpdateInviteLink(
         withOrganizationHeader({
           path: { id: organizationId },
-          body: {
-            email: email,
-          },
-        }),
-      );
-      return response.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.invitations(organizationId) });
-
-      if (data.invitation?.state === "accepted") {
-        queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) });
-      }
-    },
-    onError: options?.onError,
-  });
-};
-
-export const useRemoveInvitation = (
-  organizationId: string,
-  options?: {
-    onError?: (error: Error) => void;
-  },
-) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (invitationId: string) => {
-      const response = await organizationsRemoveInvitation(
-        withOrganizationHeader({
-          path: { id: organizationId, invitationId },
+          body: { enabled },
         }),
       );
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.invitations(organizationId) });
+      queryClient.invalidateQueries({ queryKey: organizationKeys.inviteLink(organizationId) });
     },
-    onError: options?.onError,
+  });
+};
+
+export const useResetOrganizationInviteLink = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await organizationsResetInviteLink(
+        withOrganizationHeader({
+          path: { id: organizationId },
+        }),
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: organizationKeys.inviteLink(organizationId) });
+    },
   });
 };
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -51,6 +52,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/web/assets"
 	grpcLib "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"gorm.io/gorm"
 )
 
 const (
@@ -404,6 +406,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/account", s.getAccount).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
+	accountRoute.HandleFunc("/api/v1/invite-links/{token}/accept", s.acceptInviteLink).Methods("POST")
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
@@ -631,6 +634,99 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+type InviteLinkAcceptResponse struct {
+	OrganizationID   string `json:"organization_id"`
+	OrganizationName string `json:"organization_name"`
+	Status           string `json:"status"`
+}
+
+func (s *Server) acceptInviteLink(w http.ResponseWriter, r *http.Request) {
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	token := mux.Vars(r)["token"]
+	if token == "" {
+		http.Error(w, "invite link token is required", http.StatusBadRequest)
+		return
+	}
+
+	inviteLink, err := models.FindInviteLinkByToken(token)
+	if err != nil {
+		http.Error(w, "invite link not found", http.StatusNotFound)
+		return
+	}
+
+	if !inviteLink.Enabled {
+		http.Error(w, "invite link disabled", http.StatusForbidden)
+		return
+	}
+
+	org, err := models.FindOrganizationByID(inviteLink.OrganizationID.String())
+	if err != nil {
+		http.Error(w, "organization not found", http.StatusNotFound)
+		return
+	}
+
+	status := "joined"
+	var user *models.User
+
+	tx := database.Conn().Begin()
+	user, err = models.FindMaybeDeletedUserByEmailInTransaction(tx, org.ID.String(), account.Email)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			tx.Rollback()
+			http.Error(w, "failed to accept invite", http.StatusInternalServerError)
+			return
+		}
+
+		user, err = models.CreateUserInTransaction(tx, org.ID, account.ID, account.Email, account.Name)
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "failed to accept invite", http.StatusInternalServerError)
+			return
+		}
+	} else if !user.DeletedAt.Valid {
+		tx.Rollback()
+		status = "already_member"
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(InviteLinkAcceptResponse{
+			OrganizationID:   org.ID.String(),
+			OrganizationName: org.Name,
+			Status:           status,
+		})
+		return
+	} else {
+		err = user.RestoreInTransaction(tx)
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "failed to accept invite", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	err = s.authService.AssignRole(user.ID.String(), models.RoleOrgOwner, org.ID.String(), models.DomainTypeOrganization)
+	if err != nil {
+		tx.Rollback()
+		http.Error(w, "failed to accept invite", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		http.Error(w, "failed to accept invite", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(InviteLinkAcceptResponse{
+		OrganizationID:   org.ID.String(),
+		OrganizationName: org.Name,
+		Status:           status,
+	})
 }
 
 func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {
