@@ -162,9 +162,17 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           (allSuggestions.length === 0 && word.endsWith(".")) ||
           (!exampleObj && word.endsWith(".")),
       );
-      setHighlightedIndex(-1);
+      const nextHighlightedIndex = showValuePreview && allSuggestions.length > 0 ? 0 : -1;
+      setHighlightedIndex(nextHighlightedIndex);
+      if (exampleObj && nextHighlightedIndex >= 0) {
+        const fullPath = buildFullPath(allSuggestions[nextHighlightedIndex].suggestion);
+        const value = getValueAtPath(exampleObj, fullPath);
+        setHighlightedValue(value);
+      } else {
+        setHighlightedValue(undefined);
+      }
       previousWordLength.current = word.length;
-    }, [inputValue, flattenedData, isFocused, startWord, prefix, onChange]);
+    }, [inputValue, flattenedData, isFocused, startWord, prefix, onChange, showValuePreview, exampleObj]);
 
     // Handle clicking outside to close suggestions
     useEffect(() => {
