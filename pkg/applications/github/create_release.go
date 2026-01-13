@@ -349,7 +349,7 @@ func (c *CreateRelease) incrementVersion(currentTag string, strategy string) (st
 		return "", fmt.Errorf("invalid version format: %s. Expected semantic version like v1.2.3", currentTag)
 	}
 
-	prefix := matches[1]       // e.g., "v" or "version-" or ""
+	prefix := matches[1] // e.g., "v" or "version-" or ""
 	major, _ := strconv.Atoi(matches[2])
 	minor, _ := strconv.Atoi(matches[3])
 	patch, _ := strconv.Atoi(matches[4])
