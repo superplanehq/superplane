@@ -8,6 +8,7 @@ import { onTagCreatedTriggerRenderer } from "./on_tag_created";
 import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
 import { baseIssueMapper } from "./base";
 import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper } from "./run_workflow";
+import { publishCommitStatusMapper } from "./publish_commit_status";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   runWorkflow: RUN_WORKFLOW_STATE_REGISTRY,
@@ -18,6 +19,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getIssue: baseIssueMapper,
   updateIssue: baseIssueMapper,
   runWorkflow: runWorkflowMapper,
+  publishCommitStatus: publishCommitStatusMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
