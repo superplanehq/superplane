@@ -24,7 +24,13 @@ export const baseIssueMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default: OutputPayload[] };
+    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+
+    // If no outputs (e.g., execution failed), return empty details
+    if (!outputs || !outputs.default || outputs.default.length === 0) {
+      return {};
+    }
+
     const issue = outputs.default[0].data as Issue;
     return getDetailsForIssue(issue);
   },
