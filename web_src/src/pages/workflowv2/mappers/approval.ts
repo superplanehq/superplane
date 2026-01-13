@@ -330,13 +330,6 @@ function buildApprovalTimeline(records: ApprovalRecord[]) {
     });
 }
 
-function getApprovalLabelMaps(additionalData?: unknown): ApprovalLabelMaps {
-  const labelMaps = additionalData as ApprovalLabelMaps | undefined;
-  return {
-    rolesByName: labelMaps?.rolesByName,
-    groupsByName: labelMaps?.groupsByName,
-  };
-}
 
 function getCancelledByLabel(metadata?: Record<string, unknown>): string | undefined {
   if (!metadata) return undefined;
