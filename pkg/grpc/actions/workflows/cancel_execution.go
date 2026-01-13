@@ -113,7 +113,12 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 		}
 	}
 
-	return execution.CancelInTransaction(tx, user.ID)
+	var cancelledBy *uuid.UUID
+	if user != nil {
+		cancelledBy = &user.ID
+	}
+
+	return execution.CancelInTransaction(tx, cancelledBy)
 }
 
 func cancelChildExecutions(
