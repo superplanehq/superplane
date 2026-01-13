@@ -36,7 +36,7 @@ func UninstallApplication(ctx context.Context, orgID string, ID string) (*pb.Uni
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		webhooks, err := models.ListAppInstallationWebhooks(tx, appInstallation.ID)
 		if err != nil {
-			return status.Errorf(codes.Internal, "failed to list application installation webhooks: %v", err)
+			return status.Error(codes.Internal, "failed to list application installation webhooks")
 		}
 
 		//
@@ -45,13 +45,13 @@ func UninstallApplication(ctx context.Context, orgID string, ID string) (*pb.Uni
 		for _, webhook := range webhooks {
 			err = tx.Delete(&webhook).Error
 			if err != nil {
-				return status.Errorf(codes.Internal, "failed to delete webhook: %v", err)
+				return status.Error(codes.Internal, "failed to delete webhook")
 			}
 		}
 
 		err = appInstallation.SoftDeleteInTransaction(tx)
 		if err != nil {
-			return status.Errorf(codes.Internal, "failed to delete application installation: %v", err)
+			return status.Error(codes.Internal, "failed to delete application installation")
 		}
 
 		return nil

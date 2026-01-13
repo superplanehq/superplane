@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
@@ -25,7 +26,8 @@ func DescribeWorkflow(ctx context.Context, registry *registry.Registry, organiza
 
 	proto, err := SerializeWorkflow(&workflow, true)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to serialize workflow: %v", err)
+		log.Errorf("failed to serialize workflow %s: %v", workflow.ID.String(), err)
+		return nil, status.Error(codes.Internal, "failed to serialize workflow")
 	}
 
 	return &pb.DescribeWorkflowResponse{
