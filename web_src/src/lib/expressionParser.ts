@@ -90,8 +90,11 @@ function getNestedValue(data: any, path: string): any {
  * Formats a value for display in an expression
  */
 function formatValueForExpression(value: any): string {
-  if (value === null || value === undefined) {
+  if (value === null) {
     return "null";
+  }
+  if (value === undefined) {
+    return "undefined";
   }
 
   if (typeof value === "string") {

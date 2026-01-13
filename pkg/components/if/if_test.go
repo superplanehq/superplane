@@ -72,7 +72,16 @@ func TestIf_Execute_EmitsEmptyEvents(t *testing.T) {
 			assert.Equal(t, tt.expectedChannel, stateCtx.Channel)
 			assert.Equal(t, "if.executed", stateCtx.Type)
 			assert.Len(t, stateCtx.Payloads, 1)
-			assert.Equal(t, make(map[string]any), stateCtx.Payloads[0])
+
+			// Verify payload structure follows SuperPlane conventions
+			payload, ok := stateCtx.Payloads[0].(map[string]any)
+			assert.True(t, ok, "payload should be a map")
+			assert.Equal(t, "if.executed", payload["type"])
+			assert.NotEmpty(t, payload["timestamp"])
+			assert.Contains(t, payload, "data")
+			data, ok := payload["data"].(map[string]any)
+			assert.True(t, ok, "data should be a map")
+			assert.Empty(t, data, "data should be empty")
 		})
 	}
 }
@@ -159,7 +168,16 @@ func TestIf_Execute_BothTrueAndFalsePathsEmitEmpty(t *testing.T) {
 			assert.Equal(t, tt.expectedChannel, stateCtx.Channel)
 			assert.Equal(t, "if.executed", stateCtx.Type)
 			assert.Len(t, stateCtx.Payloads, 1)
-			assert.Equal(t, make(map[string]any), stateCtx.Payloads[0])
+
+			// Verify payload structure follows SuperPlane conventions
+			payload, ok := stateCtx.Payloads[0].(map[string]any)
+			assert.True(t, ok, "payload should be a map")
+			assert.Equal(t, "if.executed", payload["type"])
+			assert.NotEmpty(t, payload["timestamp"])
+			assert.Contains(t, payload, "data")
+			data, ok := payload["data"].(map[string]any)
+			assert.True(t, ok, "data should be a map")
+			assert.Empty(t, data, "data should be empty")
 		})
 	}
 }

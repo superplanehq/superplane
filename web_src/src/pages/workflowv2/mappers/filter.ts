@@ -78,8 +78,11 @@ export const filterMapper: ComponentBaseMapper = {
     _queueItems: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     const componentName = componentDefinition.name || "filter";
+    // Prefer expression from execution metadata (stored at execution time)
+    // Fall back to node configuration if metadata is not available
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const expression = (node.configuration?.expression as string) || "";
+    const metadata = lastExecution?.metadata as Record<string, any> | undefined;
+    const expression = (metadata?.expression as string) || (node.configuration?.expression as string) || "";
     const filters = parseExpression(expression);
     const specs = expression
       ? [
