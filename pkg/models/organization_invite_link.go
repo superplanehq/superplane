@@ -44,7 +44,7 @@ func FindInviteLinkByTokenInTransaction(tx *gorm.DB, token string) (*Organizatio
 		return &inviteLink, err
 	}
 
-	err := tx.
+	err = tx.
 		Where("token = ?", tokenUUID).
 		First(&inviteLink).
 		Error
