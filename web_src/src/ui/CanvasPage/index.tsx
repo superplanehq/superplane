@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Background,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -8,7 +9,7 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { CircleX, List, Loader2, ScanLine, ScanText, TriangleAlert } from "lucide-react";
+import { CircleX, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -614,7 +615,7 @@ function CanvasPage(props: CanvasPageProps) {
 
     await props.onNodeAdd({
       buildingBlock: annotationBlock,
-      nodeName: "New Note",
+      nodeName: "Note",
       configuration: {},
       position,
     });
@@ -1861,53 +1862,69 @@ function CanvasContent({
                   });
                 }}
                 onSelectNode={(node) => {
+                  const isAnnotationNode = (node.data as any)?.type === "annotation";
+                  if (isAnnotationNode) {
+                    return;
+                  }
                   state.componentSidebar.open(node.id);
                 }}
               />
-              <div className="flex items-center gap-0 border-l border-slate-200 pl-1 ml-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs font-medium"
-                      onClick={() => handleLogButtonClick("all")}
-                    >
-                      <List className="h-3 w-3" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>All logs</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs font-medium"
-                      onClick={() => handleLogButtonClick("error")}
-                    >
-                      <CircleX className="h-3 w-3 text-rose-500" />
-                      <span className="tabular-nums">{logCounts.error}</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Errors</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs font-medium"
-                      onClick={() => handleLogButtonClick("warning")}
-                    >
-                      <TriangleAlert className="h-3 w-3 text-amber-500" />
-                      <span className="tabular-nums">{logCounts.warning}</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Warnings</TooltipContent>
-                </Tooltip>
-              </div>
             </ZoomSlider>
+            <Panel
+              position="bottom-left"
+              className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex gap-0.5 rounded-sm p-0.5"
+              style={{ marginLeft: 256 }}
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs font-medium"
+                    onClick={() => handleLogButtonClick("all")}
+                  >
+                    <ScrollText className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>All Logs</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs font-medium"
+                    onClick={() => handleLogButtonClick("error")}
+                  >
+                    <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
+                    <span className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}>
+                      {logCounts.error}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Errors</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs font-medium"
+                    onClick={() => handleLogButtonClick("warning")}
+                  >
+                    <TriangleAlert
+                      className={logCounts.warning > 0 ? "h-3 w-3 text-amber-600" : "h-3 w-3 text-gray-800"}
+                    />
+                    <span
+                      className={logCounts.warning > 0 ? "tabular-nums text-amber-600" : "tabular-nums text-gray-800"}
+                    >
+                      {logCounts.warning}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Warnings</TooltipContent>
+              </Tooltip>
+            </Panel>
           </ReactFlow>
         </div>
       </div>

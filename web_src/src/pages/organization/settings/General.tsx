@@ -89,12 +89,12 @@ export function General({ organization }: GeneralProps) {
         </Field>
       </Fieldset>
 
-      <Fieldset className="bg-white border border-red-200 rounded-lg p-6 space-y-4">
+      <Fieldset className="bg-white border border-gray-300 rounded-lg p-6 space-y-4">
         {!showDeleteForm ? (
           <button
             type="button"
             onClick={() => setShowDeleteForm(true)}
-            className="flex items-center gap-2 text-sm text-red-500 hover:text-red-500"
+            className="flex items-center gap-2 text-sm text-gray-800 hover:text-red-500"
           >
             <Trash2 className="h-4 w-4" />
             Delete Organization...
