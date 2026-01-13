@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -26,7 +27,8 @@ func DeleteWorkflow(ctx context.Context, registry *registry.Registry, organizati
 	// The cleanup worker will handle the actual deletion of nodes and related data
 	err = workflow.SoftDelete()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to delete workflow: %v", err)
+		log.Errorf("failed to delete workflow %s: %v", workflow.ID.String(), err)
+		return nil, status.Error(codes.Internal, "failed to delete workflow")
 	}
 
 	return &pb.DeleteWorkflowResponse{}, nil

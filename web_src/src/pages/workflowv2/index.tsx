@@ -20,7 +20,7 @@ import {
   WorkflowsWorkflowNodeQueueItem,
   workflowsEmitNodeEvent,
 } from "@/api-client";
-import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -117,6 +117,7 @@ export function WorkflowPageV2() {
   // react-query cache which prepareApprovalNode reads from.
   useOrganizationUsers(organizationId!);
   useOrganizationRoles(organizationId!);
+  useOrganizationGroups(organizationId!);
 
   /**
    * Track if we've already done the initial fit to view.

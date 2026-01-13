@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -50,7 +51,8 @@ func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType st
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
-		return nil, status.Error(codes.Internal, err.Error())
+		log.Errorf("failed to create secret %s: %v", spec.Metadata.Name, err)
+		return nil, status.Error(codes.Internal, "failed to create secret")
 	}
 
 	s, err := serializeSecret(ctx, encryptor, *secret)

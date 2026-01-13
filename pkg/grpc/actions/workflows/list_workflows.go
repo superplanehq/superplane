@@ -3,6 +3,7 @@ package workflows
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -13,7 +14,8 @@ import (
 func ListWorkflows(ctx context.Context, registry *registry.Registry, organizationID string) (*pb.ListWorkflowsResponse, error) {
 	workflows, err := models.ListWorkflows(organizationID)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		log.Errorf("failed to list workflows for organization %s: %v", organizationID, err)
+		return nil, status.Error(codes.Internal, "failed to list workflows")
 	}
 
 	protoWorkflows := make([]*pb.Workflow, len(workflows))
