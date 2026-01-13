@@ -107,11 +107,7 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Emit(
 			core.DefaultOutputChannel.Name,
 			"filter.executed",
-			[]any{map[string]any{
-				"type":      "filter.executed",
-				"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
-				"data":      map[string]any{},
-			}},
+			[]any{map[string]any{}},
 		)
 	}
 

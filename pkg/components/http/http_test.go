@@ -204,7 +204,8 @@ func TestHTTP__Execute__GET(t *testing.T) {
 	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
 
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	assert.Equal(t, 200, response["status"])
 	assert.NotNil(t, response["headers"])
 	assert.NotNil(t, response["body"])
@@ -260,7 +261,8 @@ func TestHTTP__Execute__POST_JSON(t *testing.T) {
 	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
 
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	assert.Equal(t, 201, response["status"])
 }
 
@@ -306,7 +308,8 @@ func TestHTTP__Execute__POST_XML(t *testing.T) {
 	//
 	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	assert.Equal(t, 200, response["status"])
 	body := response["body"].(string)
 	assert.Contains(t, body, "OK")
@@ -482,7 +485,8 @@ func TestHTTP__Execute__NonJSONResponse(t *testing.T) {
 	//
 	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	body := response["body"].(string)
 	assert.Equal(t, "Plain text response", body)
 }
@@ -515,7 +519,8 @@ func TestHTTP__Execute__EmptyResponse(t *testing.T) {
 	//
 	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	assert.Equal(t, 204, response["status"])
 	assert.Nil(t, response["body"])
 }
@@ -688,7 +693,8 @@ func TestHTTP__Execute__FixedTimeoutStrategy_Success(t *testing.T) {
 
 	// Verify response
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	assert.Equal(t, 200, response["status"])
 }
 
@@ -996,7 +1002,8 @@ func TestHTTP__RetryProgression_ExponentialStrategy(t *testing.T) {
 
 	// Verify final response
 	assert.Equal(t, "http.request.finished", stateCtx.Type)
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	assert.Equal(t, 200, response["status"])
 
 	// Verify metadata shows success after 3 retries

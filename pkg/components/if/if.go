@@ -111,22 +111,14 @@ func (f *If) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Emit(
 			ChannelNameTrue,
 			"if.executed",
-			[]any{map[string]any{
-				"type":      "if.executed",
-				"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
-				"data":      map[string]any{},
-			}},
+			[]any{map[string]any{}},
 		)
 	}
 
 	return ctx.ExecutionState.Emit(
 		ChannelNameFalse,
 		"if.executed",
-		[]any{map[string]any{
-			"type":      "if.executed",
-			"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
-			"data":      map[string]any{},
-		}},
+		[]any{map[string]any{}},
 	)
 }
 

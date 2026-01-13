@@ -481,7 +481,8 @@ func TestWait_HandleTimeReached_CompletionOutput(t *testing.T) {
 	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 	require.Len(t, stateCtx.Payloads, 1)
 
-	outputData := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	outputData := payload["data"].(map[string]any)
 	assert.Equal(t, "2025-12-10T09:02:43.651Z", outputData["started_at"])
 	assert.Equal(t, "completed", outputData["result"])
 	assert.Equal(t, "timeout", outputData["reason"])
@@ -515,7 +516,8 @@ func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
 	// Check completion output structure
 	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 	require.Len(t, stateCtx.Payloads, 1)
-	outputData := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	outputData := payload["data"].(map[string]any)
 	assert.Equal(t, "2025-12-10T09:02:43.651Z", outputData["started_at"])
 	assert.Equal(t, "completed", outputData["result"])
 	assert.Equal(t, "manual_override", outputData["reason"])
@@ -628,7 +630,8 @@ func TestWait_Cancel_CompletionOutput(t *testing.T) {
 	// Check completion output structure
 	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 	require.Len(t, stateCtx.Payloads, 1)
-	output := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	output := payload["data"].(map[string]any)
 	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["started_at"])
 	assert.Equal(t, "cancelled", output["result"])
 	assert.Equal(t, "user_cancel", output["reason"])
