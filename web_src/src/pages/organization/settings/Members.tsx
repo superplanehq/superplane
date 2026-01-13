@@ -252,16 +252,6 @@ export function Members({ organizationId }: MembersProps) {
               </Text>
             </div>
             <div className="flex items-center gap-3">
-              {inviteLinkEnabled && (
-                <Button
-                  variant="outline"
-                  onClick={handleCopyInviteLink}
-                  disabled={!inviteLinkUrl || loadingInviteLink || inviteLinkBusy}
-                >
-                  <Icon name="copy" />
-                  Copy link
-                </Button>
-              )}
               <Switch
                 checked={inviteLinkEnabled}
                 onChange={handleInviteLinkToggle}
@@ -282,8 +272,18 @@ export function Members({ organizationId }: MembersProps) {
           )}
 
           {inviteLinkEnabled && inviteLinkUrl && (
-            <div className="mt-4 rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 break-all">
-              {inviteLinkUrl}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="flex-1 rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 break-all">
+                {inviteLinkUrl}
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleCopyInviteLink}
+                disabled={!inviteLinkUrl || loadingInviteLink || inviteLinkBusy}
+              >
+                <Icon name="copy" />
+                Copy link
+              </Button>
             </div>
           )}
         </div>
