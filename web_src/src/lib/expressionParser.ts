@@ -135,7 +135,7 @@ export function substituteExpressionValues(expression: string, data: any): strin
   // This regex matches $ followed by a dot and then one or more word characters or dots
   const pattern = /\$\.([a-zA-Z_][a-zA-Z0-9_.]*)/g;
 
-  return expression.replace(pattern, (match, path) => {
+  return expression.replace(pattern, (_match, path) => {
     const value = getNestedValue(data, path);
     return formatValueForExpression(value);
   });
