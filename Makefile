@@ -178,11 +178,12 @@ db.delete:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) --rm -e PGPASSWORD=$(DB_PASSWORD) app dropdb -h db -p 5432 -U postgres $(DB_NAME)
 
 db.recreate.all.dangerous:
-	$(MAKE) db.delete DB_NAME=superplane_dev
+	$(MAKE) dev.down
+	-$(MAKE) db.delete DB_NAME=superplane_dev
+	-$(MAKE) db.delete DB_NAME=superplane_test
 	$(MAKE) db.create DB_NAME=superplane_dev
-	$(MAKE) db.migrate DB_NAME=superplane_dev
-	$(MAKE) db.delete DB_NAME=superplane_test
 	$(MAKE) db.create DB_NAME=superplane_test
+	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 #
