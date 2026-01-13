@@ -97,7 +97,6 @@ export function CanvasLogSidebar({
   minHeight = 240,
   maxHeight = 820,
   onHeightChange,
-  scope,
   onScopeChange,
   searchValue,
   onSearchChange,
