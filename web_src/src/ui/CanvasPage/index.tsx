@@ -463,14 +463,23 @@ function CanvasPage(props: CanvasPageProps) {
         return;
       }
 
+      const defaultConfiguration = (() => {
+        const defaults = parseDefaultValues(block.configuration || []);
+        const filtered = { ...defaults };
+        block.configuration?.forEach((field) => {
+          if (field.name && field.togglable) {
+            delete filtered[field.name];
+          }
+        });
+        return filtered;
+      })();
+
       // Check if templateNodeId is a placeholder (persisted node) or legacy pending connection (local-only)
       const workflowNode = props.workflowNodes?.find((n) => n.id === templateNodeId);
       const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
 
       if (isPlaceholder && props.onPlaceholderConfigure) {
         // Handle placeholder node (persisted)
-        const defaultConfiguration = parseDefaultValues(block.configuration || []);
-
         await props.onPlaceholderConfigure({
           placeholderId: templateNodeId,
           buildingBlock: block,
@@ -490,9 +499,6 @@ function CanvasPage(props: CanvasPageProps) {
       const pendingNode = state.nodes.find((n) => n.id === templateNodeId && n.data.isPendingConnection);
 
       if (pendingNode) {
-        // Parse default configuration from building block
-        const defaultConfiguration = parseDefaultValues(block.configuration || []);
-
         // Save immediately with defaults
         if (props.onNodeAdd) {
           const newNodeId = await props.onNodeAdd({
@@ -622,8 +628,16 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleBuildingBlockDrop = useCallback(
     async (block: BuildingBlock, position?: { x: number; y: number }) => {
-      // Parse default configuration from building block
-      const defaultConfiguration = parseDefaultValues(block.configuration || []);
+      const defaultConfiguration = (() => {
+        const defaults = parseDefaultValues(block.configuration || []);
+        const filtered = { ...defaults };
+        block.configuration?.forEach((field) => {
+          if (field.name && field.togglable) {
+            delete filtered[field.name];
+          }
+        });
+        return filtered;
+      })();
 
       // Save immediately with defaults
       if (props.onNodeAdd) {

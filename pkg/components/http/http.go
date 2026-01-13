@@ -190,6 +190,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 					},
 				},
 			},
+			Default: "[{\"key\": \"foo\", \"value\": \"bar\"}]",
 		},
 		{
 			Name:        "headers",
@@ -222,14 +223,15 @@ func (e *HTTP) Configuration() []configuration.Field {
 					},
 				},
 			},
+			Default: "[{\"name\": \"X-Foo\", \"value\": \"Bar\"}]",
 		},
 		{
 			Name:        "contentType",
-			Label:       "Content Type",
+			Label:       "Body",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
 			Togglable:   true,
-			Description: "The content type of the request body",
+			Description: "Body content type for POST, PUT, and PATCH requests",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "method", Values: []string{"POST", "PUT", "PATCH"}},
 			},
