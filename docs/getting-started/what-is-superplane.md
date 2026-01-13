@@ -1,13 +1,13 @@
-# What is Superplane
+# What is SuperPlane
 
 ## Table of Contents
 
 - [The DevOps Integration Problem](#the-devops-integration-problem)
-- [How Superplane Solves This](#how-superplane-solves-this)
+- [How SuperPlane Solves This](#how-superplane-solves-this)
 - [Deployment Options](#deployment-options)
 - [Primary Use Cases](#primary-use-cases)
 - [Technical Architecture](#technical-architecture)
-- [When to Use Superplane](#when-to-use-superplane)
+- [When to Use SuperPlane](#when-to-use-superplane)
 - [Getting Started Requirements](#getting-started-requirements)
 - [Next Steps](#next-steps)
 
@@ -25,9 +25,9 @@ This creates several problems:
 
 ---
 
-## How Superplane Solves This
+## How SuperPlane Solves This
 
-Superplane creates a control layer above your existing DevOps tools. Instead of managing workflows separately in each tool, you orchestrate everything from one place.
+SuperPlane creates a control layer above your existing DevOps tools. Instead of managing workflows separately in each tool, you orchestrate everything from one place.
 
 ![Overview](../images/overview.png)
 
@@ -60,7 +60,7 @@ Make your DevOps processes easier to understand and maintain:
 
 ## Deployment Options
 
-**Cloud-hosted:** Use Superplane's managed service with automatic updates and scaling.
+**Cloud-hosted:** Use SuperPlane's managed service with automatic updates and scaling.
 
 **Self-hosted:** Deploy on your own infrastructure using Docker or Kubernetes for data control.
 
@@ -105,7 +105,7 @@ Automate alert routing, run diagnostic workflows, notify stakeholders, and track
 
 ---
 
-## When to Use Superplane
+## When to Use SuperPlane
 
 **Good fit if you:**
 - Coordinate workflows across multiple DevOps tools
@@ -123,7 +123,7 @@ Automate alert routing, run diagnostic workflows, notify stakeholders, and track
 
 ## Getting Started Requirements
 
-**Platform access:** Ability to install self-hosted instance of Superplane or register an organization on the cloud platform.
+**Platform access:** Ability to install self-hosted instance of SuperPlane or register an organization on the cloud platform.
 
 **Integration permissions:** Administrative access to configure webhooks and API integrations in target tools.
 

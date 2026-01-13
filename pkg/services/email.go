@@ -70,7 +70,7 @@ func (s *ResendEmailService) SendInvitationEmail(toEmail, organizationName, invi
 	params := &resend.SendEmailRequest{
 		From:    fmt.Sprintf("%s <%s>", s.fromName, s.fromEmail),
 		To:      []string{toEmail},
-		Subject: "You have been invited to join an organization on Superplane",
+		Subject: "You have been invited to join an organization on SuperPlane",
 		Text:    plainTextContent,
 		Html:    htmlContent,
 	}
@@ -91,7 +91,7 @@ func (s *ResendEmailService) SendNotificationEmail(bccEmails []string, title, bo
 	}
 
 	if title == "" {
-		title = "Superplane Notification"
+		title = "SuperPlane Notification"
 	}
 
 	templateData := NotificationTemplateData{

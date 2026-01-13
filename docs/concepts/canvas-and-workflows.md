@@ -12,7 +12,7 @@
 
 ## Overview
 
-Superplane organizes DevOps automation through a hierarchical structure: Organizations contain Canvases, and Canvases contain multiple Workflows.
+SuperPlane organizes DevOps automation through a hierarchical structure: Organizations contain Canvases, and Canvases contain multiple Workflows.
 
 ```mermaid
 graph TB
@@ -30,7 +30,7 @@ graph TB
 
 ## Organizations
 
-Organizations provide the top-level boundary for all Superplane resources, operating as isolated tenants with complete data separation.
+Organizations provide the top-level boundary for all SuperPlane resources, operating as isolated tenants with complete data separation.
 
 ### Organization Structure Example
 

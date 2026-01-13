@@ -402,7 +402,7 @@ const OwnerSetup: React.FC = () => {
                   type="text"
                   value={smtpFromName}
                   onChange={(e) => setSmtpFromName(e.target.value)}
-                  placeholder="Superplane"
+                  placeholder="SuperPlane"
                 />
               </InputGroup>
             </div>

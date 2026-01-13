@@ -1,6 +1,6 @@
 # Application Development Guide
 
-This guide explains how to add new applications and extend existing applications with new triggers and components in Superplane.
+This guide explains how to add new applications and extend existing applications with new triggers and components in SuperPlane.
 
 ## Table of Contents
 
@@ -14,7 +14,7 @@ This guide explains how to add new applications and extend existing applications
 
 ## Overview
 
-Applications in Superplane are integrations with external services that allow users to trigger workflows and interact with those services. Applications consist of:
+Applications in SuperPlane are integrations with external services that allow users to trigger workflows and interact with those services. Applications consist of:
 
 - **Backend implementation** (Go): Located in `pkg/applications/<app-name>/`
 - **Frontend mappers** (TypeScript): Located in `web_src/src/pages/workflowv2/mappers/<app-name>/`

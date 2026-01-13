@@ -14,7 +14,7 @@ import (
 var createCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a resource from a file.",
-	Long:  `Create a Superplane resource from a YAML file.`,
+	Long:  `Create a SuperPlane resource from a YAML file.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		path, err := cmd.Flags().GetString("file")

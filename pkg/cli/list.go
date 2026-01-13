@@ -106,8 +106,8 @@ var listIntegrationsCmd = &cobra.Command{
 // Root list command
 var listCmd = &cobra.Command{
 	Use:     "list",
-	Short:   "List Superplane resources",
-	Long:    `List multiple Superplane resources.`,
+	Short:   "List SuperPlane resources",
+	Long:    `List multiple SuperPlane resources.`,
 	Aliases: []string{"ls"},
 }
 

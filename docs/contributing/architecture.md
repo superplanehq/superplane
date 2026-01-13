@@ -1,8 +1,8 @@
 # Architecture Overview
 
-This document provides a high-level overview of Superplane's architecture to help contributors understand the core system components.
+This document provides a high-level overview of SuperPlane's architecture to help contributors understand the core system components.
 
-Superplane is built as a modular monolith, where each module (API, Workers, etc.) can be independently scaled based on workload requirements.
+SuperPlane is built as a modular monolith, where each module (API, Workers, etc.) can be independently scaled based on workload requirements.
 
 ## Key Concepts
 
@@ -46,7 +46,7 @@ This architecture enables parallel execution of independent workflow branches, r
 
 ## Authentication & Authorization
 
-Superplane uses a multi-layered security model to authenticate users and enforce fine-grained permissions.
+SuperPlane uses a multi-layered security model to authenticate users and enforce fine-grained permissions.
 
 **Authentication:**
 
@@ -100,7 +100,7 @@ The database model follows a hierarchical structure that enables multi-tenancy a
 
 **Integration:**
 
-- Connects Superplane to external services (GitHub, Semaphore, etc.)
+- Connects SuperPlane to external services (GitHub, Semaphore, etc.)
 - Stores encrypted credentials and configuration
 - Scoped to an organization
 - Enables components to interact with third-party APIs

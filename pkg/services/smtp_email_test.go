@@ -123,7 +123,7 @@ func TestSMTPEmailService_SendInvitationEmail(t *testing.T) {
 		Port:      587,
 		Username:  "user",
 		Password:  "pass",
-		FromName:  "Superplane",
+		FromName:  "SuperPlane",
 		FromEmail: "noreply@example.com",
 		UseTLS:    true,
 	}
@@ -151,7 +151,7 @@ func TestSMTPEmailService_SendInvitationEmail(t *testing.T) {
 	assert.True(t, fakeClient.closeCalled)
 
 	message := fakeClient.message.String()
-	assert.Contains(t, message, "Subject: You have been invited to join an organization on Superplane")
+	assert.Contains(t, message, "Subject: You have been invited to join an organization on SuperPlane")
 	assert.Contains(t, message, "To: user@example.com")
 	assert.True(t, strings.Contains(message, "Invite user@example.com"))
 }

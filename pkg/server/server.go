@@ -332,7 +332,7 @@ func Start() {
 
 	startWorkers(jwtSigner, encryptorInstance, registry, baseURL, authService)
 
-	log.Println("Superplane is UP.")
+	log.Println("SuperPlane is UP.")
 
 	select {}
 }

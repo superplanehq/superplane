@@ -45,8 +45,8 @@ var deleteSecretCmd = &cobra.Command{
 // Root describe command
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
-	Short: "Delete Superplane resources",
-	Long:  `Delete a Superplane resource by ID or name.`,
+	Short: "Delete SuperPlane resources",
+	Long:  `Delete a SuperPlane resource by ID or name.`,
 }
 
 func init() {

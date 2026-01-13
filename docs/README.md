@@ -1,7 +1,7 @@
 ## Documentation
 
 ### Getting Started
-- **[What is Superplane?](getting-started/what-is-superplane.md)** - Learn how Superplane solves DevOps integration challenges
+- **[What is SuperPlane?](getting-started/what-is-superplane.md)** - Learn how SuperPlane solves DevOps integration challenges
 - **[Quick Start Guide](getting-started/quick-start.md)** - Get running in 10 minutes with 3 progressive levels
 - **[Core Concepts](getting-started/core-concepts.md)** - Understand Canvases, Components, and Workflows
 

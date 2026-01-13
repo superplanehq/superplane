@@ -1,11 +1,11 @@
 Hi {{.ToEmail}},
 
-{{.InviterEmail}} has invited you to join the "{{.OrganizationName}}" organization on Superplane.
+{{.InviterEmail}} has invited you to join the "{{.OrganizationName}}" organization on SuperPlane.
 
-To accept this invitation, simply log in to Superplane:
+To accept this invitation, simply log in to SuperPlane:
 {{.InvitationLink}}
 
 You can log in with GitHub or Google. If logging in with GitHub, ensure the primary email in your GitHub account is {{.ToEmail}}
 
 Best regards,
-The Superplane Team
+The SuperPlane Team
