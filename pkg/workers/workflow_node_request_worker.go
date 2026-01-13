@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
@@ -212,6 +213,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Integration:    contexts.NewIntegrationContext(tx, w.registry),
+		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, node.WorkflowID),
 	}
 
 	if node.AppInstallationID != nil {
@@ -286,6 +288,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Integration:    contexts.NewIntegrationContext(tx, w.registry),
+		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 	}
 
 	err = component.HandleAction(actionCtx)

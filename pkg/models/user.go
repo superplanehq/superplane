@@ -94,6 +94,22 @@ func FindMaybeDeletedUserByID(orgID, id string) (*User, error) {
 	return &user, err
 }
 
+func ListActiveUsersByID(orgID string, ids []string) ([]User, error) {
+	return ListActiveUsersByIDInTransaction(database.Conn(), orgID, ids)
+}
+
+func ListActiveUsersByIDInTransaction(tx *gorm.DB, orgID string, ids []string) ([]User, error) {
+	var users []User
+
+	err := tx.
+		Where("id IN ?", ids).
+		Where("organization_id = ?", orgID).
+		Find(&users).
+		Error
+
+	return users, err
+}
+
 func FindActiveUserByID(orgID, id string) (*User, error) {
 	return FindActiveUserByIDInTransaction(database.Conn(), orgID, id)
 }

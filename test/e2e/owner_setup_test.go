@@ -22,6 +22,19 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.assertOwnerSetupIsNoLongerRequired()
 	})
 
+	t.Run("can complete owner setup with SMTP configuration", func(t *testing.T) {
+		steps := &ownerSetupSteps{t: t}
+		steps.start()
+		steps.visitSetupPage()
+		steps.fillInOwnerDetails("smtp-owner@example.com", "SMTP", "Owner", "Password1")
+		steps.chooseSMTPSetup()
+		steps.fillInSMTPDetails("smtp.example.com", "587", "smtp-user", "smtp-pass", "Superplane", "noreply@example.com", true)
+		steps.submitSMTPSetup()
+		steps.assertOwnerAndOrganizationCreated()
+		steps.assertRedirectedToOrganizationHome()
+		steps.assertOwnerSetupIsNoLongerRequired()
+	})
+
 	t.Run("can login with email and password after owner setup", func(t *testing.T) {
 		steps := &ownerSetupSteps{t: t}
 		steps.start()
@@ -56,13 +69,47 @@ func (s *ownerSetupSteps) visitSetupPage() {
 }
 
 func (s *ownerSetupSteps) fillInOwnerDetailsAndSubmit(email, firstName, lastName, password string) {
+	s.fillInOwnerDetails(email, firstName, lastName, password)
+	s.session.Click(q.Text("Next"))
+	s.session.Click(q.Text("Skip for now"))
+	// Poll for setup to complete - wait for organization to be created in database
+	s.waitForSetupToComplete()
+}
+
+func (s *ownerSetupSteps) fillInOwnerDetails(email, firstName, lastName, password string) {
 	s.session.FillIn(q.Locator(`input[type="email"]`), email)
 	s.session.FillIn(q.Locator(`input[placeholder="First name"]`), firstName)
 	s.session.FillIn(q.Locator(`input[placeholder="Last name"]`), lastName)
 	s.session.FillIn(q.Locator(`input[placeholder="Password"]`), password)
 	s.session.FillIn(q.Locator(`input[placeholder="Confirm password"]`), password)
+}
+
+func (s *ownerSetupSteps) chooseSMTPSetup() {
 	s.session.Click(q.Text("Next"))
-	// Poll for setup to complete - wait for organization to be created in database
+	s.session.Click(q.Text("Set up SMTP"))
+}
+
+func (s *ownerSetupSteps) fillInSMTPDetails(host, port, username, password, fromName, fromEmail string, useTLS bool) {
+	s.session.FillIn(q.Locator(`input[placeholder="smtp.example.com"]`), host)
+	s.session.FillIn(q.Locator(`input[placeholder="587"]`), port)
+	if username != "" {
+		s.session.FillIn(q.Locator(`input[placeholder="smtp-user"]`), username)
+	}
+	if password != "" {
+		s.session.FillIn(q.Locator(`input[placeholder="SMTP password"]`), password)
+	}
+	if fromName != "" {
+		s.session.FillIn(q.Locator(`input[placeholder="Superplane"]`), fromName)
+	}
+	s.session.FillIn(q.Locator(`input[placeholder="noreply@example.com"]`), fromEmail)
+
+	if !useTLS {
+		s.session.Click(q.Locator(`input[type="checkbox"]`))
+	}
+}
+
+func (s *ownerSetupSteps) submitSMTPSetup() {
+	s.session.Click(q.Text("Finish setup"))
 	s.waitForSetupToComplete()
 }
 

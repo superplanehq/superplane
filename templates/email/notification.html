@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Superplane</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #1E2938;
+            background-image: radial-gradient(#4A5464 1px, #1E2938 1px);
+            background-size: 6px 6px;
+        }
+        .card {
+            background: #1e2938;
+            max-width: 520px;
+            width: 92%;
+            padding: 28px 32px 32px;
+            border-radius: 14px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+            color: #f1f5f9;
+        }
+        .logo {
+            font-size: 1rem;
+            font-weight: bold;
+            color: #f9fafc;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #3d4859;
+            margin-bottom: 20px;
+        }
+        .title {
+            font-size: 1.25rem;
+            margin: 0 0 12px;
+            color: #f9fafc;
+        }
+        .body {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: #cbd5f5;
+            margin: 0 0 24px;
+            white-space: pre-line;
+        }
+        .action-btn {
+            display: inline-block;
+            padding: 12px 20px;
+            border-radius: 8px;
+            background: #6584b4;
+            color: #1e2938;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .action-btn:hover {
+            background: #5472a3;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 0.75rem;
+            color: #94a9ca;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="logo">Superplane</div>
+        <h1 class="title">{{.Title}}</h1>
+        <p class="body">
+            {{.Body}}
+            {{if .URL}}
+            <br><br>
+            <a href="{{.URL}}" style="color: #cbd5f5; text-decoration: underline;">{{.URL}}</a>
+            {{end}}
+        </p>
+        {{if .URL}}
+        <a class="action-btn" href="{{.URL}}">{{if .URLLabel}}{{.URLLabel}}{{else}}Open in Superplane{{end}}</a>
+        {{end}}
+        <div class="footer">This notification was sent by Superplane.</div>
+    </div>
+</body>
+</html>

@@ -5,9 +5,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -302,6 +307,34 @@ func TestApproval_Execute(t *testing.T) {
 		assert.False(t, stateCtx.Passed)
 		assert.False(t, stateCtx.Finished)
 		assert.NotNil(t, metadataCtx.Metadata)
+	})
+
+	t.Run("with pending items publishes approval notification", func(t *testing.T) {
+		stateCtx := &contexts.ExecutionStateContext{}
+		metadataCtx := &contexts.MetadataContext{}
+
+		amqpURL, _ := config.RabbitMQURL()
+		notificationConsumer := testconsumer.New(amqpURL, messages.NotificationEmailRequestedRoutingKey)
+		notificationConsumer.Start()
+		defer notificationConsumer.Stop()
+
+		ctx := core.ExecutionContext{
+			WorkflowID: "workflow-1",
+			Configuration: map[string]any{
+				"items": []any{
+					map[string]any{
+						"type": "anyone",
+					},
+				},
+			},
+			Metadata:       metadataCtx,
+			ExecutionState: stateCtx,
+			Notifications:  workercontexts.NewNotificationContext(nil, uuid.New(), uuid.Nil),
+		}
+
+		err := approval.Execute(ctx)
+		require.NoError(t, err)
+		assert.True(t, notificationConsumer.HasReceivedMessage())
 	})
 }
 

@@ -83,6 +83,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 			}
 
 			logger := logging.ForExecution(execution, nil)
+			orgUUID := uuid.MustParse(organizationID)
 			ctx := core.ExecutionContext{
 				ID:             execution.ID,
 				WorkflowID:     execution.WorkflowID.String(),
@@ -91,8 +92,9 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution),
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
-				Auth:           contexts.NewAuthContext(tx, uuid.MustParse(organizationID), authService, user),
+				Auth:           contexts.NewAuthContext(tx, orgUUID, authService, user),
 				Integration:    contexts.NewIntegrationContext(tx, registry),
+				Notifications:  contexts.NewNotificationContext(tx, orgUUID, execution.WorkflowID),
 			}
 
 			if node.AppInstallationID != nil {
