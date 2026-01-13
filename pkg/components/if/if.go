@@ -72,6 +72,16 @@ func (f *If) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	// Store the expression in metadata so it can be retrieved later
+	// even if the node configuration changes
+	metadata := map[string]any{
+		"expression": spec.Expression,
+	}
+	err = ctx.Metadata.Set(metadata)
+	if err != nil {
+		return fmt.Errorf("error setting metadata: %w", err)
+	}
+
 	env := map[string]any{
 		"$": ctx.Data,
 	}

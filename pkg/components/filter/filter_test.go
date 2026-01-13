@@ -67,13 +67,13 @@ func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 			assert.NoError(t, err)
 			assert.True(t, stateCtx.Passed)
 			assert.True(t, stateCtx.Finished)
-			
+
 			// Verify that the expression is stored in metadata
 			assert.NotNil(t, metadataCtx.Metadata)
 			metadata, ok := metadataCtx.Metadata.(map[string]any)
 			assert.True(t, ok)
 			assert.Equal(t, tt.configuration["expression"], metadata["expression"])
-			
+
 			if tt.expectedOutputsCount > 0 {
 				assert.Equal(t, tt.expectedChannel, stateCtx.Channel)
 				assert.Equal(t, "filter.executed", stateCtx.Type)

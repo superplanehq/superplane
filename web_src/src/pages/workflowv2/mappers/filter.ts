@@ -110,10 +110,10 @@ export const filterMapper: ComponentBaseMapper = {
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, node: ComponentsNode): Record<string, any> {
     const details: Record<string, any> = {};
 
-    // Timestamp
+    // Evaluated at
     if (execution.createdAt) {
       const evaluatedAt = new Date(execution.createdAt);
-      details["Timestamp"] = evaluatedAt.toLocaleString("en-US", {
+      details["Evaluated at"] = evaluatedAt.toLocaleString("en-US", {
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
@@ -123,7 +123,7 @@ export const filterMapper: ComponentBaseMapper = {
         hour12: false,
       });
     } else {
-      details["Timestamp"] = "N/A";
+      details["Evaluated at"] = "N/A";
     }
 
     // Get the expression from execution metadata (stored at execution time)

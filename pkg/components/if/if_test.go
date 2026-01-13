@@ -48,11 +48,13 @@ func TestIf_Execute_EmitsEmptyEvents(t *testing.T) {
 			ifComponent := &If{}
 
 			stateCtx := &contexts.ExecutionStateContext{}
+			metadataCtx := &contexts.MetadataContext{}
 
 			ctx := core.ExecutionContext{
 				Data:           tt.inputData,
 				Configuration:  tt.configuration,
 				ExecutionState: stateCtx,
+				Metadata:       metadataCtx,
 			}
 
 			err := ifComponent.Execute(ctx)
@@ -60,6 +62,13 @@ func TestIf_Execute_EmitsEmptyEvents(t *testing.T) {
 			assert.NoError(t, err)
 			assert.True(t, stateCtx.Passed)
 			assert.True(t, stateCtx.Finished)
+
+			// Verify that the expression is stored in metadata
+			assert.NotNil(t, metadataCtx.Metadata)
+			metadata, ok := metadataCtx.Metadata.(map[string]any)
+			assert.True(t, ok)
+			assert.Equal(t, tt.configuration["expression"], metadata["expression"])
+
 			assert.Equal(t, tt.expectedChannel, stateCtx.Channel)
 			assert.Equal(t, "if.executed", stateCtx.Type)
 			assert.Len(t, stateCtx.Payloads, 1)
@@ -72,11 +81,13 @@ func TestIf_Execute_InvalidExpression_ShouldReturnError(t *testing.T) {
 	ifComponent := &If{}
 
 	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
 
 	ctx := core.ExecutionContext{
 		Data:           map[string]any{"test": "value"},
 		Configuration:  map[string]any{"expression": "invalid expression syntax +++"},
 		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
 	}
 
 	err := ifComponent.Execute(ctx)
@@ -88,11 +99,13 @@ func TestIf_Execute_NonBooleanResult_ShouldReturnError(t *testing.T) {
 	ifComponent := &If{}
 
 	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
 
 	ctx := core.ExecutionContext{
 		Data:           map[string]any{"test": "value"},
 		Configuration:  map[string]any{"expression": "$.test"},
 		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
 	}
 
 	err := ifComponent.Execute(ctx)
@@ -123,17 +136,26 @@ func TestIf_Execute_BothTrueAndFalsePathsEmitEmpty(t *testing.T) {
 			ifComponent := &If{}
 
 			stateCtx := &contexts.ExecutionStateContext{}
+			metadataCtx := &contexts.MetadataContext{}
 
 			ctx := core.ExecutionContext{
 				Data:           map[string]any{"test": "value"},
 				Configuration:  tt.configuration,
 				ExecutionState: stateCtx,
+				Metadata:       metadataCtx,
 			}
 
 			err := ifComponent.Execute(ctx)
 			assert.NoError(t, err)
 			assert.True(t, stateCtx.Passed)
 			assert.True(t, stateCtx.Finished)
+
+			// Verify that the expression is stored in metadata
+			assert.NotNil(t, metadataCtx.Metadata)
+			metadata, ok := metadataCtx.Metadata.(map[string]any)
+			assert.True(t, ok)
+			assert.Equal(t, tt.configuration["expression"], metadata["expression"])
+
 			assert.Equal(t, tt.expectedChannel, stateCtx.Channel)
 			assert.Equal(t, "if.executed", stateCtx.Type)
 			assert.Len(t, stateCtx.Payloads, 1)
