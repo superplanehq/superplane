@@ -6,7 +6,7 @@ import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, Comment, PullRequest } from "./types";
 
 interface OnPullRequestReviewCommentConfiguration {
-  actions: string[];
+  contentFilter?: string;
 }
 
 interface OnPullRequestReviewCommentEventData {
@@ -68,10 +68,10 @@ export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
       });
     }
 
-    if (configuration?.actions) {
+    if (configuration?.contentFilter) {
       metadataItems.push({
         icon: "funnel",
-        label: configuration.actions.join(", "),
+        label: `Filter: ${configuration.contentFilter}`,
       });
     }
 
