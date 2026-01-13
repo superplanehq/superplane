@@ -26,13 +26,13 @@ Together, integrations and secrets enable secure, authenticated connections to e
 
 ## Integrations
 
-Integrations are connections between Superplane and external services that enable two-way communication: Superplane can make API calls to external tools, and external tools can send events to Superplane workflows.
+Integrations are connections between SuperPlane and external services that enable two-way communication: SuperPlane can make API calls to external tools, and external tools can send events to SuperPlane workflows.
 
 ### What Integrations Provide
 
 **API connectivity:** Establish authenticated connections to external tool APIs for triggering operations, reading data, and managing resources.
 
-**Webhook registration:** Configure external tools to send event notifications to Superplane when important events occur (builds complete, deployments finish, alerts fire).
+**Webhook registration:** Configure external tools to send event notifications to SuperPlane when important events occur (builds complete, deployments finish, alerts fire).
 
 **Credential management:** Store and manage authentication tokens, API keys, and OAuth credentials securely at the integration level.
 
@@ -49,7 +49,7 @@ metadata:
   name: github-integration
   canvasId: canvas-123
 spec:
-  # Type determines what Superplane does when using this integration
+  # Type determines what SuperPlane does when using this integration
   type: github
   
   # Base URL for the service
@@ -67,7 +67,7 @@ spec:
 
 **Integration lifecycle:**
 1. **Authentication setup** - Configure API token authentication with the target tool
-2. **Permission verification** - Confirm Superplane has necessary API permissions
+2. **Permission verification** - Confirm SuperPlane has necessary API permissions
 3. **Webhook configuration** - External tool sends relevant events to Canvas webhook endpoints
 4. **Component availability** - Integration-specific components become available
 
@@ -113,9 +113,9 @@ spec:
     name: my-repository
 ```
 
-When you create this event source, Superplane automatically:
+When you create this event source, SuperPlane automatically:
 - Creates webhooks on the GitHub repository
-- Configures the webhook to send events to Superplane
+- Configures the webhook to send events to SuperPlane
 - Handles authentication and webhook verification
 
 ### Supported Integration Types
@@ -189,7 +189,7 @@ Secrets provide encrypted storage for sensitive data like API tokens, database c
 
 ### Creating Secrets
 
-Create secrets that will be managed by Superplane:
+Create secrets that will be managed by SuperPlane:
 
 ```yaml
 apiVersion: v1
@@ -259,6 +259,6 @@ spec:
 
 **Runtime injection:** Secret values are securely injected into component execution environments without being logged or exposed in component outputs.
 
-**Zero-knowledge access:** Secret values are encrypted and only decrypted during component execution. Superplane administrators cannot view secret contents.
+**Zero-knowledge access:** Secret values are encrypted and only decrypted during component execution. SuperPlane administrators cannot view secret contents.
 
 **Role-based access:** Canvas permissions control who can create, modify, or delete secrets. Only authorized users can manage secret configurations.

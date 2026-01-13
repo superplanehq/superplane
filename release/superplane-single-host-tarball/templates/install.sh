@@ -15,11 +15,11 @@ cat "$(dirname "${BASH_SOURCE[0]:-$0}")/superplane-logo.txt"
 
 ENV_FILE="superplane.env"
 
-echo "Running Superplane single-host installation."
+echo "Running SuperPlane single-host installation."
 echo ""
 
 while :; do
-  read -rp "1) Domain for Superplane (e.g. superplane.example.com): " DOMAIN
+  read -rp "1) Domain for SuperPlane (e.g. superplane.example.com): " DOMAIN
   if [[ -n "${DOMAIN}" ]]; then
     break
   fi
@@ -34,7 +34,7 @@ read -rp "2) Configure email invitations via Resend now? (y/N): " CONFIGURE_EMAI
 CONFIGURE_EMAIL="${CONFIGURE_EMAIL:-n}"
 
 RESEND_API_KEY=""
-EMAIL_FROM_NAME="Superplane"
+EMAIL_FROM_NAME="SuperPlane"
 EMAIL_FROM_ADDRESS=""
 
 if [[ "${CONFIGURE_EMAIL}" =~ ^[Yy]$ ]]; then
@@ -143,7 +143,7 @@ else
   {
     echo "# To enable email invitations, set:"
     echo "# RESEND_API_KEY=your_resend_api_key"
-    echo "# EMAIL_FROM_NAME=Superplane"
+    echo "# EMAIL_FROM_NAME=SuperPlane"
     echo "# EMAIL_FROM_ADDRESS=noreply@example.com"
   } >> "${ENV_FILE}"
 fi
@@ -161,5 +161,5 @@ echo "Running docker compose up --wait --detach..."
 docker compose -f "${SCRIPT_DIR}/docker-compose.yml" up --wait --detach
 
 echo ""
-echo "Superplane is starting via docker compose."
+echo "SuperPlane is starting via docker compose."
 echo "Visit ${BASE_URL} in your browser."

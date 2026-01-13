@@ -471,7 +471,7 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata
 func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Metadata) {
 	//
 	// App installation has already been set up.
-	// Just redirect to the Superplane app installation page.
+	// Just redirect to the SuperPlane app installation page.
 	//
 	if metadata.InstallationID != "" {
 		ctx.Logger.Infof("app installation %s already set up", metadata.InstallationID)
@@ -567,7 +567,7 @@ func (g *GitHub) browserActionURL(organization string) string {
 
 func (g *GitHub) appManifest(ctx core.SyncContext) string {
 	manifest := map[string]any{
-		"name":   `Superplane GH integration`,
+		"name":   `SuperPlane GH integration`,
 		"public": false,
 		"url":    "https://superplane.com",
 		"default_permissions": map[string]string{

@@ -77,8 +77,8 @@ var getIntegrationCmd = &cobra.Command{
 // Root describe command
 var getCmd = &cobra.Command{
 	Use:     "get",
-	Short:   "Show details of Superplane resources",
-	Long:    `Get detailed information about Superplane resources.`,
+	Short:   "Show details of SuperPlane resources",
+	Long:    `Get detailed information about SuperPlane resources.`,
 	Aliases: []string{"desc", "get"},
 }
 

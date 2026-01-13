@@ -60,7 +60,7 @@ services:
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
-      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Superplane}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@notifications.superplane.com}
       BLOCK_SIGNUP: ${BLOCK_SIGNUP:-no}
       ENABLE_PASSWORD_LOGIN: "yes"

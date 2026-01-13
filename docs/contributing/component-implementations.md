@@ -1,6 +1,6 @@
 # Component Implementation Patterns
 
-This document outlines best practices and patterns for implementing components in Superplane.
+This document outlines best practices and patterns for implementing components in SuperPlane.
 
 ## Configuration Spec Struct
 

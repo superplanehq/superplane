@@ -28,7 +28,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.visitSetupPage()
 		steps.fillInOwnerDetails("smtp-owner@example.com", "SMTP", "Owner", "Password1")
 		steps.chooseSMTPSetup()
-		steps.fillInSMTPDetails("smtp.example.com", "587", "smtp-user", "smtp-pass", "Superplane", "noreply@example.com", true)
+		steps.fillInSMTPDetails("smtp.example.com", "587", "smtp-user", "smtp-pass", "SuperPlane", "noreply@example.com", true)
 		steps.submitSMTPSetup()
 		steps.assertOwnerAndOrganizationCreated()
 		steps.assertRedirectedToOrganizationHome()
@@ -99,7 +99,7 @@ func (s *ownerSetupSteps) fillInSMTPDetails(host, port, username, password, from
 		s.session.FillIn(q.Locator(`input[placeholder="SMTP password"]`), password)
 	}
 	if fromName != "" {
-		s.session.FillIn(q.Locator(`input[placeholder="Superplane"]`), fromName)
+		s.session.FillIn(q.Locator(`input[placeholder="SuperPlane"]`), fromName)
 	}
 	s.session.FillIn(q.Locator(`input[placeholder="noreply@example.com"]`), fromEmail)
 

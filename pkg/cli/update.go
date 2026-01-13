@@ -16,7 +16,7 @@ import (
 var updateCmd = &cobra.Command{
 	Use:     "update",
 	Short:   "Update a resource from a file.",
-	Long:    `Update a Superplane resource from a YAML file.`,
+	Long:    `Update a SuperPlane resource from a YAML file.`,
 	Aliases: []string{"update", "edit"},
 
 	Run: func(cmd *cobra.Command, args []string) {

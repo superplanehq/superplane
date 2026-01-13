@@ -104,7 +104,7 @@ COPY --from=builder /app/api/swagger /app/api/swagger
 COPY --from=builder /app/rbac /app/rbac
 COPY --from=builder /app/templates /app/templates
 
-# Trial entrypoint that runs embedded Postgres and RabbitMQ and then Superplane.
+# Trial entrypoint that runs embedded Postgres and RabbitMQ and then SuperPlane.
 COPY release/superplane-demo-image/entrypoint.sh /app/entrypoint.sh
 COPY release/superplane-demo-image/gen-superplane-env.sh /app/gen-superplane-env.sh
 COPY release/superplane-demo-image/spinner.sh /app/spinner.sh

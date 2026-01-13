@@ -15,7 +15,7 @@
 
 ## Overview
 
-Superplane organizes DevOps automation around several key concepts that work together to create comprehensive workflow orchestration.
+SuperPlane organizes DevOps automation around several key concepts that work together to create comprehensive workflow orchestration.
 
 **The hierarchy:**
 - **Organizations** provide data isolation and user management
@@ -28,7 +28,7 @@ Superplane organizes DevOps automation around several key concepts that work tog
 
 ## Organizations
 
-Organizations provide the top-level boundary for all Superplane resources, operating as isolated tenants with complete data separation.
+Organizations provide the top-level boundary for all SuperPlane resources, operating as isolated tenants with complete data separation.
 
 **Key characteristics:**
 - **Data isolation** - Complete separation between organizations with no shared resources
@@ -110,7 +110,7 @@ Events are the core mechanism driving workflow execution. Every component intera
 **Event structure:**
 - **Payload** - JSON data containing information passed between components
 - **Headers** - Metadata about event source, timing, and routing information
-- **Context** - Superplane-specific execution and tracking data
+- **Context** - SuperPlane-specific execution and tracking data
 
 **Data flow:**
 - **Inputs** define what data components expect to receive from events
@@ -130,11 +130,11 @@ Events are the core mechanism driving workflow execution. Every component intera
 
 ## Integrations
 
-Integrations connect external DevOps tools to your Canvas, enabling two-way communication between Superplane and external systems.
+Integrations connect external DevOps tools to your Canvas, enabling two-way communication between SuperPlane and external systems.
 
 **What integrations provide:**
 - **API connectivity** - Authenticated connections to external tool APIs
-- **Webhook registration** - Configure external tools to send events to Superplane
+- **Webhook registration** - Configure external tools to send events to SuperPlane
 - **Credential management** - Secure storage of API tokens and authentication details
 - **Component enablement** - Unlock tool-specific executors and event sources
 
@@ -155,7 +155,7 @@ Integrations connect external DevOps tools to your Canvas, enabling two-way comm
 
 ## Security
 
-Superplane provides robust security for managing sensitive data and controlling access to workflows and resources.
+SuperPlane provides robust security for managing sensitive data and controlling access to workflows and resources.
 
 **Secrets management:**
 - **Canvas-scoped storage** - Encrypted secrets isolated per Canvas

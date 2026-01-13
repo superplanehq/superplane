@@ -162,7 +162,7 @@ func (s *SMTPEmailService) SendInvitationEmail(toEmail, organizationName, invita
 		return fmt.Errorf("failed to render invitation HTML template: %w", err)
 	}
 
-	subject := "You have been invited to join an organization on Superplane"
+	subject := "You have been invited to join an organization on SuperPlane"
 	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
 }
 
@@ -177,7 +177,7 @@ func (s *SMTPEmailService) SendNotificationEmail(bccEmails []string, title, body
 	}
 
 	if title == "" {
-		title = "Superplane Notification"
+		title = "SuperPlane Notification"
 	}
 
 	templateData := NotificationTemplateData{
