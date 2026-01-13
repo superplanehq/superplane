@@ -57,6 +57,7 @@ export interface Release {
 export interface PullRequest {
   title?: string;
   id?: string;
+  number?: number;
   url?: string;
   head?: {
     sha: string;
@@ -98,12 +99,17 @@ export interface GitRef {
 }
 
 export interface Comment {
-  id: number;
-  body: string;
+  id?: number;
+  body?: string;
+  html_url?: string;
+  path?: string;
+  position?: number;
+  line?: number;
   user?: {
+    id: number;
     login: string;
     html_url: string;
   };
-  created_at: string;
+  created_at?: string;
   updated_at?: string;
 }
