@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"google.golang.org/protobuf/proto"
-	"gorm.io/gorm"
 )
 
 const NotificationEmailServiceName = "superplane" + "." + messages.WorkflowExchange + "." + messages.NotificationEmailRequestedRoutingKey + ".worker-consumer"
@@ -153,18 +151,13 @@ func (c *NotificationEmailConsumer) resolveRecipients(orgID uuid.UUID, data *pro
 }
 
 func addUsersToRecipientSet(orgID uuid.UUID, userIDs []string, recipients map[string]struct{}) {
-	for _, userID := range userIDs {
-		user, err := models.FindActiveUserByID(orgID.String(), userID)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Warnf("User %s not found while resolving notification recipients", userID)
-				continue
-			}
+	users, err := models.ListActiveUsersByID(orgID.String(), userIDs)
+	if err != nil {
+		log.Errorf("Error finding users for notification: %v", err)
+		return
+	}
 
-			log.Errorf("Error finding user %s for notification: %v", userID, err)
-			continue
-		}
-
+	for _, user := range users {
 		normalized := utils.NormalizeEmail(user.Email)
 		if normalized == "" {
 			continue
