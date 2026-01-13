@@ -192,6 +192,25 @@ ALTER SEQUENCE public.casbin_rule_id_seq OWNED BY public.casbin_rule.id;
 
 
 --
+-- Name: email_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.email_settings (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    provider character varying(50) NOT NULL,
+    smtp_host character varying(255),
+    smtp_port integer,
+    smtp_username character varying(255),
+    smtp_password bytea,
+    smtp_from_name character varying(255),
+    smtp_from_email character varying(255),
+    smtp_use_tls boolean DEFAULT false NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
 -- Name: group_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -577,6 +596,22 @@ ALTER TABLE ONLY public.blueprints
 
 ALTER TABLE ONLY public.casbin_rule
     ADD CONSTRAINT casbin_rule_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: email_settings email_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.email_settings
+    ADD CONSTRAINT email_settings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: email_settings email_settings_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.email_settings
+    ADD CONSTRAINT email_settings_provider_key UNIQUE (provider);
 
 
 --
@@ -1354,7 +1389,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260201090000	f
+20260202120000	f
 \.
 
 

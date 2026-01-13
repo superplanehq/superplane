@@ -9,6 +9,14 @@ const OwnerSetup: React.FC = () => {
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("");
+  const [smtpUsername, setSmtpUsername] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpFromName, setSmtpFromName] = useState("");
+  const [smtpFromEmail, setSmtpFromEmail] = useState("");
+  const [smtpUseTLS, setSmtpUseTLS] = useState(true);
+  const [step, setStep] = useState<"owner" | "smtpPrompt" | "smtpConfig">("owner");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -25,7 +33,7 @@ const OwnerSetup: React.FC = () => {
     return true;
   };
 
-  const validateAllFields = () => {
+  const validateOwnerFields = () => {
     const errors: Record<string, string> = {};
 
     if (!email.trim()) {
@@ -54,21 +62,40 @@ const OwnerSetup: React.FC = () => {
       errors.confirmPassword = "Passwords do not match.";
     }
 
+
     setFieldErrors(errors);
     return errors;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  const validateSMTPFields = () => {
+    const errors: Record<string, string> = {};
 
-    // Validate all fields synchronously
-    const errors = validateAllFields();
-
-    // Check if there are any errors
-    if (Object.keys(errors).length > 0) {
-      return;
+    if (!smtpHost.trim()) {
+      errors.smtpHost = "SMTP host is required.";
     }
+
+    if (!smtpPort.trim()) {
+      errors.smtpPort = "SMTP port is required.";
+    } else if (!/^[0-9]+$/.test(smtpPort.trim())) {
+      errors.smtpPort = "SMTP port must be a number.";
+    }
+
+    if (!smtpFromEmail.trim()) {
+      errors.smtpFromEmail = "SMTP from email is required.";
+    } else if (!isEmailValid(smtpFromEmail.trim())) {
+      errors.smtpFromEmail = "Please enter a valid from email address.";
+    }
+
+    if (smtpUsername.trim() && !smtpPassword) {
+      errors.smtpPassword = "SMTP password is required when username is provided.";
+    }
+
+    setFieldErrors(errors);
+    return errors;
+  };
+
+  const submitSetup = async (enableSMTP: boolean) => {
+    setError(null);
 
     setLoading(true);
 
@@ -84,6 +111,14 @@ const OwnerSetup: React.FC = () => {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           password,
+          smtp_enabled: enableSMTP,
+          smtp_host: enableSMTP ? smtpHost.trim() : "",
+          smtp_port: enableSMTP && smtpPort ? Number(smtpPort) : 0,
+          smtp_username: enableSMTP ? smtpUsername.trim() : "",
+          smtp_password: enableSMTP ? smtpPassword : "",
+          smtp_from_name: enableSMTP ? smtpFromName.trim() : "",
+          smtp_from_email: enableSMTP ? smtpFromEmail.trim() : "",
+          smtp_use_tls: enableSMTP ? smtpUseTLS : false,
         }),
       });
 
@@ -110,15 +145,44 @@ const OwnerSetup: React.FC = () => {
     }
   };
 
+  const handleOwnerNext = (e: React.FormEvent) => {
+    e.preventDefault();
+    const errors = validateOwnerFields();
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+    setStep("smtpPrompt");
+  };
+
+  const handleSkipSMTP = () => {
+    submitSetup(false);
+  };
+
+  const handleEnableSMTP = () => {
+    setStep("smtpConfig");
+  };
+
+  const handleSubmitSMTP = (e: React.FormEvent) => {
+    e.preventDefault();
+    const errors = validateSMTPFields();
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+    submitSetup(true);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-zinc-900 dark:to-zinc-800 px-4">
       <div className="max-w-lg w-full bg-white dark:bg-zinc-900 rounded-lg shadow-xl p-8">
-        <div className="text-center mb-8">
-          <h4 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Set up owner account</h4>
-          <Text className="text-gray-500 dark:text-gray-400">Create an account for this SuperPlane instance.</Text>
-        </div>
+        {step === "owner" && (
+          <div className="text-center mb-8">
+            <h4 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Set up owner account</h4>
+            <Text className="text-gray-500 dark:text-gray-400">Create an account for this SuperPlane instance.</Text>
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {step === "owner" && (
+          <form onSubmit={handleOwnerNext} className="space-y-6">
           {error && (
             <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
               <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
@@ -220,7 +284,162 @@ const OwnerSetup: React.FC = () => {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Saving..." : "Next"}
           </Button>
-        </form>
+          </form>
+        )}
+
+        {step === "smtpPrompt" && (
+          <div className="space-y-6">
+            {error && (
+              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
+              </div>
+            )}
+
+            <div className="text-left">
+              <h4 className="text-lg font-semibold text-gray-800 dark:text-white">Configure SMTP?</h4>
+              <Text className="text-gray-500 dark:text-gray-400">
+                You can set up email delivery now or skip and configure it later.
+              </Text>
+            </div>
+
+            <div className="flex gap-3">
+              <Button type="button" className="w-full" disabled={loading} onClick={handleEnableSMTP}>
+                Set up SMTP
+              </Button>
+              <Button type="button" className="w-full" variant="secondary" disabled={loading} onClick={handleSkipSMTP}>
+                Skip for now
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "smtpConfig" && (
+          <form onSubmit={handleSubmitSMTP} className="space-y-6">
+            {error && (
+              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
+              </div>
+            )}
+
+            <div className="text-left">
+              <h4 className="text-lg font-semibold text-gray-800 dark:text-white">SMTP configuration</h4>
+              <Text className="text-gray-500 dark:text-gray-400">Configure email delivery for this instance.</Text>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
+                SMTP Host <span className="text-red-500">*</span>
+              </label>
+              <InputGroup>
+                <Input
+                  type="text"
+                  value={smtpHost}
+                  onChange={(e) => setSmtpHost(e.target.value)}
+                  placeholder="smtp.example.com"
+                  className={fieldErrors.smtpHost ? "border-red-500" : ""}
+                />
+              </InputGroup>
+              {fieldErrors.smtpHost && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.smtpHost}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
+                SMTP Port <span className="text-red-500">*</span>
+              </label>
+              <InputGroup>
+                <Input
+                  type="text"
+                  value={smtpPort}
+                  onChange={(e) => setSmtpPort(e.target.value)}
+                  placeholder="587"
+                  className={fieldErrors.smtpPort ? "border-red-500" : ""}
+                />
+              </InputGroup>
+              {fieldErrors.smtpPort && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.smtpPort}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
+                SMTP Username
+              </label>
+              <InputGroup>
+                <Input
+                  type="text"
+                  value={smtpUsername}
+                  onChange={(e) => setSmtpUsername(e.target.value)}
+                  placeholder="smtp-user"
+                />
+              </InputGroup>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
+                SMTP Password
+              </label>
+              <InputGroup>
+                <Input
+                  type="password"
+                  value={smtpPassword}
+                  onChange={(e) => setSmtpPassword(e.target.value)}
+                  placeholder="SMTP password"
+                  className={fieldErrors.smtpPassword ? "border-red-500" : ""}
+                />
+              </InputGroup>
+              {fieldErrors.smtpPassword && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.smtpPassword}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
+                From Name
+              </label>
+              <InputGroup>
+                <Input
+                  type="text"
+                  value={smtpFromName}
+                  onChange={(e) => setSmtpFromName(e.target.value)}
+                  placeholder="Superplane"
+                />
+              </InputGroup>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
+                From Email <span className="text-red-500">*</span>
+              </label>
+              <InputGroup>
+                <Input
+                  type="email"
+                  value={smtpFromEmail}
+                  onChange={(e) => setSmtpFromEmail(e.target.value)}
+                  placeholder="noreply@example.com"
+                  className={fieldErrors.smtpFromEmail ? "border-red-500" : ""}
+                />
+              </InputGroup>
+              {fieldErrors.smtpFromEmail && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.smtpFromEmail}</p>
+              )}
+            </div>
+
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={smtpUseTLS}
+                onChange={(e) => setSmtpUseTLS(e.target.checked)}
+              />
+              Use TLS (STARTTLS)
+            </label>
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Saving..." : "Finish setup"}
+            </Button>
+          </form>
+        )}
       </div>
     </div>
   );

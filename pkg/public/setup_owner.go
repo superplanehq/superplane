@@ -1,6 +1,7 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -14,10 +15,18 @@ import (
 )
 
 type SetupOwnerRequest struct {
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Password  string `json:"password"`
+	Email        string `json:"email"`
+	FirstName    string `json:"first_name"`
+	LastName     string `json:"last_name"`
+	Password     string `json:"password"`
+	SMTPEnabled  bool   `json:"smtp_enabled"`
+	SMTPHost     string `json:"smtp_host"`
+	SMTPPort     int    `json:"smtp_port"`
+	SMTPUsername string `json:"smtp_username"`
+	SMTPPassword string `json:"smtp_password"`
+	SMTPFromName string `json:"smtp_from_name"`
+	SMTPFromEmail string `json:"smtp_from_email"`
+	SMTPUseTLS   bool   `json:"smtp_use_tls"`
 }
 
 type SetupOwnerResponse struct {
@@ -45,6 +54,17 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 	if req.Email == "" || req.FirstName == "" || req.LastName == "" || req.Password == "" {
 		http.Error(w, "All fields are required", http.StatusBadRequest)
 		return
+	}
+
+	if req.SMTPEnabled {
+		if req.SMTPHost == "" || req.SMTPPort == 0 || req.SMTPFromEmail == "" {
+			http.Error(w, "SMTP host, port, and from email are required", http.StatusBadRequest)
+			return
+		}
+		if req.SMTPUsername != "" && req.SMTPPassword == "" {
+			http.Error(w, "SMTP password is required when username is provided", http.StatusBadRequest)
+			return
+		}
 	}
 
 	fullName := req.FirstName + " " + req.LastName
@@ -85,6 +105,34 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		err = s.authService.SetupOrganization(tx, organization.ID.String(), user.ID.String())
 		if err != nil {
 			return err
+		}
+
+		if req.SMTPEnabled {
+			var encryptedPassword []byte
+			if req.SMTPPassword != "" {
+				encryptedPassword, err = s.encryptor.Encrypt(
+					context.Background(),
+					[]byte(req.SMTPPassword),
+					[]byte("smtp_password"),
+				)
+				if err != nil {
+					return err
+				}
+			}
+
+			err = models.UpsertEmailSettingsInTransaction(tx, &models.EmailSettings{
+				Provider:      models.EmailProviderSMTP,
+				SMTPHost:      req.SMTPHost,
+				SMTPPort:      req.SMTPPort,
+				SMTPUsername:  req.SMTPUsername,
+				SMTPPassword:  encryptedPassword,
+				SMTPFromName:  req.SMTPFromName,
+				SMTPFromEmail: req.SMTPFromEmail,
+				SMTPUseTLS:    req.SMTPUseTLS,
+			})
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
