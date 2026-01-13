@@ -173,7 +173,17 @@ func (c *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	c.Passed = true
 	c.Channel = channel
 	c.Type = payloadType
-	c.Payloads = payloads
+
+	// Wrap payloads like the real ExecutionStateContext does
+	wrappedPayloads := make([]any, 0, len(payloads))
+	for _, payload := range payloads {
+		wrappedPayloads = append(wrappedPayloads, map[string]any{
+			"type":      payloadType,
+			"timestamp": time.Now(),
+			"data":      payload,
+		})
+	}
+	c.Payloads = wrappedPayloads
 	return nil
 }
 
