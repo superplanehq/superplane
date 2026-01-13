@@ -2016,7 +2016,16 @@ export function WorkflowPageV2() {
   );
 
   // Show loading indicator while data is being fetched
-  if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading || widgetsLoading || usersLoading || rolesLoading || groupsLoading) {
+  if (
+    workflowLoading ||
+    triggersLoading ||
+    blueprintsLoading ||
+    componentsLoading ||
+    widgetsLoading ||
+    usersLoading ||
+    rolesLoading ||
+    groupsLoading
+  ) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-3">
