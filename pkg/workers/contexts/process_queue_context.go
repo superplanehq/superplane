@@ -111,6 +111,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 			ExecutionState: NewExecutionStateContext(tx, &execution),
 			Requests:       NewExecutionRequestContext(tx, &execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
+			Notifications:  NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 		}, nil
 	}
 
@@ -205,6 +206,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 			ExecutionState: NewExecutionStateContext(tx, execution),
 			Requests:       NewExecutionRequestContext(tx, execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), execution, nil),
+			Notifications:  NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 		}, nil
 	}
 

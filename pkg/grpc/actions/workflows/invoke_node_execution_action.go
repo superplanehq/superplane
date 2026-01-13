@@ -91,6 +91,7 @@ func InvokeNodeExecutionAction(
 		Auth:           contexts.NewAuthContext(tx, orgID, authService, user),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Integration:    contexts.NewIntegrationContext(tx, registry),
+		Notifications:  contexts.NewNotificationContext(tx, orgID, workflow.ID),
 	}
 
 	if node.AppInstallationID != nil {

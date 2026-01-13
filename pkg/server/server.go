@@ -48,7 +48,6 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	}
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
-		log.Println("Starting Invitation Email Consumer")
 		resendAPIKey := os.Getenv("RESEND_API_KEY")
 		fromName := os.Getenv("EMAIL_FROM_NAME")
 		fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
@@ -56,10 +55,16 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 
 		if resendAPIKey != "" && fromName != "" && fromEmail != "" && templateDir != "" {
 			emailService := services.NewResendEmailService(resendAPIKey, fromName, fromEmail, templateDir)
+
+			log.Println("Starting Invitation Email Consumer")
 			invitationEmailConsumer := workers.NewInvitationEmailConsumer(rabbitMQURL, emailService, baseURL)
 			go invitationEmailConsumer.Start()
+
+			log.Println("Starting Notification Email Consumer")
+			notificationEmailConsumer := workers.NewNotificationEmailConsumer(rabbitMQURL, emailService, authService)
+			go notificationEmailConsumer.Start()
 		} else {
-			log.Warn("Invitation Email Consumer not started - missing required environment variables (RESEND_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS, TEMPLATE_DIR)")
+			log.Warn("Email Consumers not started - missing required environment variables (RESEND_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS, TEMPLATE_DIR)")
 		}
 	}
 

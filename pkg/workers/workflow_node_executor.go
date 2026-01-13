@@ -235,6 +235,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
 		Integration:    contexts.NewIntegrationContext(tx, w.registry),
+		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 	}
 
 	if node.AppInstallationID != nil {

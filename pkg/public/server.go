@@ -774,6 +774,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution),
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
 				Logger:         logging.ForExecution(execution, nil),
+				Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 			}, nil
 		},
 	})

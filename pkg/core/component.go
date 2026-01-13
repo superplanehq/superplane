@@ -127,6 +127,7 @@ type ExecutionContext struct {
 	Auth            AuthContext
 	Integration     IntegrationContext
 	AppInstallation AppInstallationContext
+	Notifications   NotificationContext
 }
 
 /*
@@ -233,6 +234,7 @@ type ActionContext struct {
 	Requests        RequestContext
 	Integration     IntegrationContext
 	AppInstallation AppInstallationContext
+	Notifications   NotificationContext
 }
 
 /*
@@ -289,6 +291,16 @@ type AuthContext interface {
 	GetUser(id uuid.UUID) (*User, error)
 	HasRole(role string) (bool, error)
 	InGroup(group string) (bool, error)
+}
+
+type NotificationReceivers struct {
+	Emails []string
+	Groups []string
+	Roles  []string
+}
+
+type NotificationContext interface {
+	Send(title, body, url, urlLabel string, receivers NotificationReceivers) error
 }
 
 type User struct {
