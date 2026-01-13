@@ -1,11 +1,20 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
 import { FieldRendererProps } from "./types";
 
 // Function to get user's current timezone offset as a string (e.g., "-5", "0", "5.5")
 const getUserTimezoneOffset = (): string => {
-  const offset = -new Date().getTimezoneOffset() / 60;
-  return offset.toString();
+  const offsetMinutes = new Date().getTimezoneOffset();
+  // getTimezoneOffset returns minutes behind UTC, so we negate to get offset ahead
+  const offsetHours = -offsetMinutes / 60;
+  
+  // Handle half-hour offsets (e.g., 5.5 for India)
+  if (offsetHours % 1 === 0.5 || offsetHours % 1 === -0.5) {
+    return offsetHours.toString();
+  }
+  
+  // Round to nearest whole number for edge cases
+  return Math.round(offsetHours).toString();
 };
 
 // Timezone options with labels and values
@@ -42,29 +51,29 @@ const timezoneOptions = [
 ];
 
 export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
-  const hasSetDefault = useRef(false);
+  // Calculate browser timezone once
+  const browserTimezone = React.useMemo(() => {
+    const userTimezone = getUserTimezoneOffset();
+    return timezoneOptions.find((tz) => tz.value === userTimezone)?.value || "0";
+  }, []);
 
-  // Set user's current timezone as default on first render if no value is present
-  // or if the value is "current" (which signals to use user's timezone)
-  useEffect(() => {
-    if (!hasSetDefault.current && (value === undefined || value === null || value === "current")) {
-      const userTimezone = getUserTimezoneOffset();
-      // Use user's timezone if it matches one of our options, otherwise fallback to "0" (UTC)
-      const defaultTimezone = timezoneOptions.find((tz) => tz.value === userTimezone) ? userTimezone : "0";
-
-      onChange(defaultTimezone);
-      hasSetDefault.current = true;
+  // Set user's current timezone as default on mount if no value is present
+  // Only run once on initial mount to avoid loops
+  React.useEffect(() => {
+    if (value === undefined || value === null || value === "") {
+      onChange(browserTimezone);
     }
-  }, [value, field.defaultValue, onChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps array - only run once on mount
 
-  // Get the display value - if value is "current", show user's timezone
-  const displayValue = (() => {
-    if (value === "current") {
-      const userTimezone = getUserTimezoneOffset();
-      return timezoneOptions.find((tz) => tz.value === userTimezone)?.value ?? "0";
-    }
-    return (value as string) ?? "0";
-  })();
+  // Get the display value - use the value if set, otherwise use browser timezone
+  // This ensures the Select shows the correct timezone even before state is updated
+  const displayValue = React.useMemo(() => {
+    const val = value !== undefined && value !== null && value !== "" ? (value as string) : browserTimezone;
+    // Ensure the value matches one of our options, otherwise fallback to "0"
+    const matchedOption = timezoneOptions.find((opt) => opt.value === val);
+    return matchedOption ? matchedOption.value : "0";
+  }, [value, browserTimezone]);
 
   return (
     <Select value={displayValue} onValueChange={(val) => onChange(val || undefined)}>

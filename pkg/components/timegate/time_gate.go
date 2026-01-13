@@ -18,10 +18,11 @@ func init() {
 }
 
 const (
-	TimeGateIncludeRangeMode    = "include_range"
-	TimeGateExcludeRangeMode    = "exclude_range"
-	TimeGateIncludeSpecificMode = "include_specific"
-	TimeGateExcludeSpecificMode = "exclude_specific"
+	TimeGateIncludeMode = "include"
+	TimeGateExcludeMode = "exclude"
+
+	TimeGateItemTypeWeekly       = "weekly"
+	TimeGateItemTypeSpecificDate = "specific_dates"
 )
 
 type TimeGate struct{}
@@ -30,14 +31,19 @@ type Metadata struct {
 	NextValidTime *string `json:"nextValidTime"`
 }
 
+type TimeGateItem struct {
+	Type           string   `json:"type"` // "weekly" or "specific_dates"
+	Days           []string `json:"days,omitempty"`           // For weekly type
+	StartTime      string   `json:"startTime"`                // Required for both types
+	EndTime        string   `json:"endTime"`                  // Required for both types
+	StartDayInYear string   `json:"startDayInYear,omitempty"` // For specific_dates type
+	EndDayInYear   string   `json:"endDayInYear,omitempty"`   // For specific_dates type
+}
+
 type Spec struct {
-	Mode           string   `json:"mode"`
-	StartTime      string   `json:"startTime"`
-	EndTime        string   `json:"endTime"`
-	Days           []string `json:"days"`
-	StartDayInYear string   `json:"startDayInYear,omitempty"`
-	EndDayInYear   string   `json:"endDayInYear,omitempty"`
-	Timezone       string   `json:"timezone,omitempty"`
+	Mode     string        `json:"mode"`     // "include" or "exclude"
+	Items    []TimeGateItem `json:"items"`   // List of time gate items
+	Timezone string        `json:"timezone"` // Required timezone
 }
 
 func (tg *TimeGate) Name() string {
@@ -75,121 +81,148 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{
-							Label: "Include Range",
-							Value: TimeGateIncludeRangeMode,
+							Label: "Include",
+							Value: TimeGateIncludeMode,
 						},
 						{
-							Label: "Exclude Range",
-							Value: TimeGateExcludeRangeMode,
-						},
-						{
-							Label: "Include Specific Times",
-							Value: TimeGateIncludeSpecificMode,
-						},
-						{
-							Label: "Exclude Specific Times",
-							Value: TimeGateExcludeSpecificMode,
+							Label: "Exclude",
+							Value: TimeGateExcludeMode,
 						},
 					},
 				},
 			},
 		},
 		{
-			Name:  "days",
-			Label: "Days of Week",
-			Type:  configuration.FieldTypeMultiSelect,
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "mode",
-					Values: []string{TimeGateIncludeRangeMode, TimeGateExcludeRangeMode},
-				},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{
-					Field:  "mode",
-					Values: []string{TimeGateIncludeRangeMode, TimeGateExcludeRangeMode},
-				},
-			},
-			Default: []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"},
+			Name:        "items",
+			Label:       "Time Windows",
+			Type:        configuration.FieldTypeList,
+			Required:    true,
+			Description: "List of time windows to include or exclude",
 			TypeOptions: &configuration.TypeOptions{
-				MultiSelect: &configuration.MultiSelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Monday", Value: "monday"},
-						{Label: "Tuesday", Value: "tuesday"},
-						{Label: "Wednesday", Value: "wednesday"},
-						{Label: "Thursday", Value: "thursday"},
-						{Label: "Friday", Value: "friday"},
-						{Label: "Saturday", Value: "saturday"},
-						{Label: "Sunday", Value: "sunday"},
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Time Window",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:     "type",
+								Label:    "Type",
+								Type:     configuration.FieldTypeSelect,
+								Required: true,
+								TypeOptions: &configuration.TypeOptions{
+									Select: &configuration.SelectTypeOptions{
+										Options: []configuration.FieldOption{
+											{
+												Label: "Weekly",
+												Value: TimeGateItemTypeWeekly,
+											},
+											{
+												Label: "Specific Dates",
+												Value: TimeGateItemTypeSpecificDate,
+											},
+										},
+									},
+								},
+							},
+							{
+								Name:  "days",
+								Label: "Days of Week",
+								Type:  configuration.FieldTypeMultiSelect,
+								VisibilityConditions: []configuration.VisibilityCondition{
+									{
+										Field:  "type",
+										Values: []string{TimeGateItemTypeWeekly},
+									},
+								},
+								RequiredConditions: []configuration.RequiredCondition{
+									{
+										Field:  "type",
+										Values: []string{TimeGateItemTypeWeekly},
+									},
+								},
+								Default: []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"},
+								TypeOptions: &configuration.TypeOptions{
+									MultiSelect: &configuration.MultiSelectTypeOptions{
+										Options: []configuration.FieldOption{
+											{Label: "Monday", Value: "monday"},
+											{Label: "Tuesday", Value: "tuesday"},
+											{Label: "Wednesday", Value: "wednesday"},
+											{Label: "Thursday", Value: "thursday"},
+											{Label: "Friday", Value: "friday"},
+											{Label: "Saturday", Value: "saturday"},
+											{Label: "Sunday", Value: "sunday"},
+										},
+									},
+								},
+							},
+							{
+								Name:        "startDayInYear",
+								Label:       "Start Day (MM/DD)",
+								Type:        configuration.FieldTypeDayInYear,
+								Description: "Start day in MM/DD format (e.g., 12/25 for Christmas)",
+								VisibilityConditions: []configuration.VisibilityCondition{
+									{
+										Field:  "type",
+										Values: []string{TimeGateItemTypeSpecificDate},
+									},
+								},
+								RequiredConditions: []configuration.RequiredCondition{
+									{
+										Field:  "type",
+										Values: []string{TimeGateItemTypeSpecificDate},
+									},
+								},
+							},
+							{
+								Name:        "endDayInYear",
+								Label:       "End Day (MM/DD)",
+								Type:        configuration.FieldTypeDayInYear,
+								Description: "End day in MM/DD format (e.g., 01/01 for New Year)",
+								VisibilityConditions: []configuration.VisibilityCondition{
+									{
+										Field:  "type",
+										Values: []string{TimeGateItemTypeSpecificDate},
+									},
+								},
+								RequiredConditions: []configuration.RequiredCondition{
+									{
+										Field:  "type",
+										Values: []string{TimeGateItemTypeSpecificDate},
+									},
+								},
+							},
+							{
+								Name:        "startTime",
+								Label:       "Start Time (HH:MM)",
+								Type:        configuration.FieldTypeTime,
+								Required:    true,
+								Description: "Start time in HH:MM format (24-hour), e.g., 09:30",
+								Default:     "09:00",
+								ValidationRules: []configuration.ValidationRule{
+									{
+										Type:        configuration.ValidationRuleLessThan,
+										CompareWith: "endTime",
+										Message:     "start time must be before end time",
+									},
+								},
+							},
+							{
+								Name:        "endTime",
+								Label:       "End Time (HH:MM)",
+								Type:        configuration.FieldTypeTime,
+								Required:    true,
+								Description: "End time in HH:MM format (24-hour), e.g., 17:30",
+								Default:     "17:00",
+								ValidationRules: []configuration.ValidationRule{
+									{
+										Type:        configuration.ValidationRuleGreaterThan,
+										CompareWith: "startTime",
+										Message:     "end time must be after start time",
+									},
+								},
+							},
+						},
 					},
-				},
-			},
-		},
-		{
-			Name:        "startDayInYear",
-			Label:       "Start Day (MM/DD)",
-			Type:        configuration.FieldTypeDayInYear,
-			Required:    false,
-			Description: "Start day in MM/DD format (e.g., 12/25 for Christmas)",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "mode",
-					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
-				},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{
-					Field:  "mode",
-					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
-				},
-			},
-		},
-		{
-			Name:        "startTime",
-			Label:       "Start Time (HH:MM)",
-			Type:        configuration.FieldTypeTime,
-			Required:    true,
-			Description: "Start time in HH:MM format (24-hour), e.g., 09:30",
-			Default:     "09:00",
-			ValidationRules: []configuration.ValidationRule{
-				{
-					Type:        configuration.ValidationRuleLessThan,
-					CompareWith: "endTime",
-					Message:     "start time must be before end time",
-				},
-			},
-		},
-		{
-			Name:        "endDayInYear",
-			Label:       "End Day (MM/DD)",
-			Type:        configuration.FieldTypeDayInYear,
-			Required:    false,
-			Description: "End day in MM/DD format (e.g., 01/01 for New Year)",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "mode",
-					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
-				},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{
-					Field:  "mode",
-					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
-				},
-			},
-		},
-		{
-			Name:        "endTime",
-			Label:       "End Time (HH:MM)",
-			Type:        configuration.FieldTypeTime,
-			Required:    true,
-			Description: "End time in HH:MM format (24-hour), e.g., 17:30",
-			Default:     "17:00",
-			ValidationRules: []configuration.ValidationRule{
-				{
-					Type:        configuration.ValidationRuleGreaterThan,
-					CompareWith: "startTime",
-					Message:     "end time must be after start time",
 				},
 			},
 		},
@@ -269,14 +302,7 @@ func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 	nextValidTime := tg.findNextValidTime(now, spec)
 
 	if nextValidTime.IsZero() {
-		switch spec.Mode {
-		case TimeGateIncludeSpecificMode:
-			return fmt.Errorf("no valid time window found: the specified day range (%s to %s) has already passed for this year", spec.StartDayInYear, spec.EndDayInYear)
-		case TimeGateExcludeSpecificMode:
-			return fmt.Errorf("no valid time window found: the specified day range (%s to %s) has already passed for this year", spec.StartDayInYear, spec.EndDayInYear)
-		default:
-			return fmt.Errorf("no valid time window found: check your time configuration and selected days")
-		}
+		return fmt.Errorf("no valid time window found: check your time configuration and items")
 	}
 
 	//
@@ -319,68 +345,78 @@ func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 
 func (tg *TimeGate) validateSpec(spec Spec) error {
 	validModes := map[string]bool{
-		TimeGateIncludeRangeMode:    true,
-		TimeGateExcludeRangeMode:    true,
-		TimeGateIncludeSpecificMode: true,
-		TimeGateExcludeSpecificMode: true,
+		TimeGateIncludeMode: true,
+		TimeGateExcludeMode: true,
 	}
 
 	if !validModes[spec.Mode] {
-		return fmt.Errorf("invalid mode '%s': must be one of include_range, exclude_range, include_specific, exclude_specific", spec.Mode)
+		return fmt.Errorf("invalid mode '%s': must be one of include, exclude", spec.Mode)
 	}
 
-	if spec.Mode == TimeGateIncludeRangeMode || spec.Mode == TimeGateExcludeRangeMode {
-		startTime, err := parseTimeString(spec.StartTime)
-		if err != nil {
-			return fmt.Errorf("startTime error: %w", err)
-		}
-
-		endTime, err := parseTimeString(spec.EndTime)
-		if err != nil {
-			return fmt.Errorf("endTime error: %w", err)
-		}
-
-		if startTime >= endTime {
-			return fmt.Errorf("start time (%s) must be before end time (%s)", spec.StartTime, spec.EndTime)
-		}
-	}
-
-	if spec.Mode == TimeGateIncludeSpecificMode || spec.Mode == TimeGateExcludeSpecificMode {
-		if spec.StartDayInYear == "" || spec.EndDayInYear == "" {
-			return fmt.Errorf("startDayInYear and endDayInYear are required for specific time modes")
-		}
-
-		err := tg.validateDayInYear(spec.StartDayInYear)
-		if err != nil {
-			return fmt.Errorf("startDayInYear error: %w", err)
-		}
-
-		err = tg.validateDayInYear(spec.EndDayInYear)
-		if err != nil {
-			return fmt.Errorf("endDayInYear error: %w", err)
-		}
-
-		startMonth, startDay, _ := tg.parseDayInYear(spec.StartDayInYear)
-		endMonth, endDay, _ := tg.parseDayInYear(spec.EndDayInYear)
-
-		// For cross-year ranges (e.g., 12/25 to 01/05), we allow this
-		// Same day is allowed (e.g., 07/04 to 07/04 for Independence Day)
-		if startMonth == endMonth && startDay > endDay {
-			return fmt.Errorf("start day (%s) must be before or same as end day (%s) when in the same month", spec.StartDayInYear, spec.EndDayInYear)
-		}
-	}
-
-	if (spec.Mode == TimeGateIncludeRangeMode || spec.Mode == TimeGateExcludeRangeMode) && len(spec.Days) == 0 {
-		return fmt.Errorf("at least one day must be selected")
+	if len(spec.Items) == 0 {
+		return fmt.Errorf("at least one time window item is required")
 	}
 
 	validDays := map[string]bool{
 		"monday": true, "tuesday": true, "wednesday": true, "thursday": true,
 		"friday": true, "saturday": true, "sunday": true,
 	}
-	for _, day := range spec.Days {
-		if !validDays[day] {
-			return fmt.Errorf("invalid day '%s': must be one of monday, tuesday, wednesday, thursday, friday, saturday, sunday", day)
+
+	for i, item := range spec.Items {
+		if item.Type != TimeGateItemTypeWeekly && item.Type != TimeGateItemTypeSpecificDate {
+			return fmt.Errorf("item %d: invalid type '%s': must be one of weekly, specific_dates", i, item.Type)
+		}
+
+		// Validate startTime and endTime
+		startTime, err := parseTimeString(item.StartTime)
+		if err != nil {
+			return fmt.Errorf("item %d: startTime error: %w", i, err)
+		}
+
+		endTime, err := parseTimeString(item.EndTime)
+		if err != nil {
+			return fmt.Errorf("item %d: endTime error: %w", i, err)
+		}
+
+		if startTime >= endTime {
+			return fmt.Errorf("item %d: start time (%s) must be before end time (%s)", i, item.StartTime, item.EndTime)
+		}
+
+		if item.Type == TimeGateItemTypeWeekly {
+			if len(item.Days) == 0 {
+				return fmt.Errorf("item %d: at least one day must be selected for weekly type", i)
+			}
+
+			for _, day := range item.Days {
+				if !validDays[day] {
+					return fmt.Errorf("item %d: invalid day '%s': must be one of monday, tuesday, wednesday, thursday, friday, saturday, sunday", i, day)
+				}
+			}
+		}
+
+		if item.Type == TimeGateItemTypeSpecificDate {
+			if item.StartDayInYear == "" || item.EndDayInYear == "" {
+				return fmt.Errorf("item %d: startDayInYear and endDayInYear are required for specific_dates type", i)
+			}
+
+			err := tg.validateDayInYear(item.StartDayInYear)
+			if err != nil {
+				return fmt.Errorf("item %d: startDayInYear error: %w", i, err)
+			}
+
+			err = tg.validateDayInYear(item.EndDayInYear)
+			if err != nil {
+				return fmt.Errorf("item %d: endDayInYear error: %w", i, err)
+			}
+
+			startMonth, startDay, _ := tg.parseDayInYear(item.StartDayInYear)
+			endMonth, endDay, _ := tg.parseDayInYear(item.EndDayInYear)
+
+			// For cross-year ranges (e.g., 12/25 to 01/05), we allow this
+			// Same day is allowed (e.g., 07/04 to 07/04 for Independence Day)
+			if startMonth == endMonth && startDay > endDay {
+				return fmt.Errorf("item %d: start day (%s) must be before or same as end day (%s) when in the same month", i, item.StartDayInYear, item.EndDayInYear)
+			}
 		}
 	}
 
@@ -438,27 +474,50 @@ func (tg *TimeGate) HandlePushThrough(ctx core.ActionContext) error {
 }
 
 func (tg *TimeGate) configEqual(a, b Spec) bool {
-
 	if a.Mode != b.Mode {
 		return false
 	}
 
-	if a.StartTime != b.StartTime || a.EndTime != b.EndTime {
+	if len(a.Items) != len(b.Items) {
 		return false
 	}
 
-	if len(a.Days) != len(b.Days) {
-		return false
-	}
-
-	aDays := make(map[string]bool)
-	for _, day := range a.Days {
-		aDays[day] = true
-	}
-
-	for _, day := range b.Days {
-		if !aDays[day] {
+	// Compare items (order matters for now, but we could make it order-independent if needed)
+	for i, itemA := range a.Items {
+		if i >= len(b.Items) {
 			return false
+		}
+		itemB := b.Items[i]
+
+		if itemA.Type != itemB.Type {
+			return false
+		}
+
+		if itemA.StartTime != itemB.StartTime || itemA.EndTime != itemB.EndTime {
+			return false
+		}
+
+		if itemA.Type == TimeGateItemTypeWeekly {
+			if len(itemA.Days) != len(itemB.Days) {
+				return false
+			}
+
+			aDays := make(map[string]bool)
+			for _, day := range itemA.Days {
+				aDays[day] = true
+			}
+
+			for _, day := range itemB.Days {
+				if !aDays[day] {
+					return false
+				}
+			}
+		}
+
+		if itemA.Type == TimeGateItemTypeSpecificDate {
+			if itemA.StartDayInYear != itemB.StartDayInYear || itemA.EndDayInYear != itemB.EndDayInYear {
+				return false
+			}
 		}
 	}
 
@@ -466,26 +525,51 @@ func (tg *TimeGate) configEqual(a, b Spec) bool {
 }
 
 func (tg *TimeGate) findNextValidTime(now time.Time, spec Spec) time.Time {
-	switch spec.Mode {
-	case TimeGateIncludeRangeMode:
+	if spec.Mode == TimeGateIncludeMode {
 		return tg.findNextIncludeTime(now, spec)
-	case TimeGateExcludeRangeMode:
-		return tg.findNextExcludeEndTime(now, spec)
-	case TimeGateIncludeSpecificMode:
-		return tg.findNextIncludeSpecificTime(now, spec)
-	case TimeGateExcludeSpecificMode:
-		return tg.findNextExcludeSpecificEndTime(now, spec)
-	default:
-		return time.Time{}
 	}
+	// Exclude mode: find next time when we're outside all excluded windows
+	return tg.findNextExcludeEndTime(now, spec)
 }
 
 func (tg *TimeGate) findNextIncludeTime(now time.Time, spec Spec) time.Time {
-	startTime, _ := parseTimeString(spec.StartTime)
-	endTime, _ := parseTimeString(spec.EndTime)
+	// For include mode, find the earliest next valid time across all items
+	var candidates []time.Time
+
+	for _, item := range spec.Items {
+		var candidate time.Time
+		if item.Type == TimeGateItemTypeWeekly {
+			candidate = tg.findNextIncludeWeeklyTime(now, item)
+		} else {
+			candidate = tg.findNextIncludeSpecificTime(now, item)
+		}
+
+		if !candidate.IsZero() {
+			candidates = append(candidates, candidate)
+		}
+	}
+
+	if len(candidates) == 0 {
+		return time.Time{}
+	}
+
+	// Return the earliest candidate
+	earliest := candidates[0]
+	for _, candidate := range candidates[1:] {
+		if candidate.Before(earliest) {
+			earliest = candidate
+		}
+	}
+
+	return earliest
+}
+
+func (tg *TimeGate) findNextIncludeWeeklyTime(now time.Time, item TimeGateItem) time.Time {
+	startTime, _ := parseTimeString(item.StartTime)
+	endTime, _ := parseTimeString(item.EndTime)
 
 	currentDay := getDayString(now.Weekday())
-	isDayMatch := contains(spec.Days, currentDay)
+	isDayMatch := contains(item.Days, currentDay)
 	currentTime := now.Hour()*60 + now.Minute()
 	isTimeInWindow := isTimeInRange(currentTime, startTime, endTime)
 
@@ -497,7 +581,7 @@ func (tg *TimeGate) findNextIncludeTime(now time.Time, spec Spec) time.Time {
 		checkDate := now.AddDate(0, 0, i)
 		dayString := getDayString(checkDate.Weekday())
 
-		if contains(spec.Days, dayString) {
+		if contains(item.Days, dayString) {
 			startHour := startTime / 60
 			startMinute := startTime % 60
 
@@ -518,16 +602,53 @@ func (tg *TimeGate) findNextIncludeTime(now time.Time, spec Spec) time.Time {
 }
 
 func (tg *TimeGate) findNextExcludeEndTime(now time.Time, spec Spec) time.Time {
-	startTime, _ := parseTimeString(spec.StartTime)
-	endTime, _ := parseTimeString(spec.EndTime)
+	// For exclude mode, check if we're currently in any excluded window
+	// If yes, find the end of the earliest ending excluded window
+	// If no, we're already valid
+	var excludedEndTimes []time.Time
+
+	for _, item := range spec.Items {
+		var endTime time.Time
+		var isInWindow bool
+
+		if item.Type == TimeGateItemTypeWeekly {
+			endTime, isInWindow = tg.isInExcludedWeeklyWindow(now, item)
+		} else {
+			endTime, isInWindow = tg.isInExcludedSpecificWindow(now, item)
+		}
+
+		if isInWindow && !endTime.IsZero() {
+			excludedEndTimes = append(excludedEndTimes, endTime)
+		}
+	}
+
+	// If we're not in any excluded window, we're valid now
+	if len(excludedEndTimes) == 0 {
+		return now
+	}
+
+	// Find the earliest end time (when we can exit the excluded window)
+	earliest := excludedEndTimes[0]
+	for _, endTime := range excludedEndTimes[1:] {
+		if endTime.Before(earliest) {
+			earliest = endTime
+		}
+	}
+
+	return earliest
+}
+
+func (tg *TimeGate) isInExcludedWeeklyWindow(now time.Time, item TimeGateItem) (time.Time, bool) {
+	startTime, _ := parseTimeString(item.StartTime)
+	endTime, _ := parseTimeString(item.EndTime)
 
 	currentDay := getDayString(now.Weekday())
-	isDayMatch := contains(spec.Days, currentDay)
+	isDayMatch := contains(item.Days, currentDay)
 	currentTime := now.Hour()*60 + now.Minute()
 	isTimeInWindow := isTimeInRange(currentTime, startTime, endTime)
 
 	if !isDayMatch || !isTimeInWindow {
-		return now
+		return time.Time{}, false
 	}
 
 	endHour := endTime / 60
@@ -538,11 +659,61 @@ func (tg *TimeGate) findNextExcludeEndTime(now time.Time, spec Spec) time.Time {
 		endHour, endMinute, 0, 0, now.Location(),
 	)
 
-	if endOfWindow.After(now) {
-		return endOfWindow
+	return endOfWindow, true
+}
+
+func (tg *TimeGate) isInExcludedSpecificWindow(now time.Time, item TimeGateItem) (time.Time, bool) {
+	startMonth, startDay, err := tg.parseDayInYear(item.StartDayInYear)
+	if err != nil {
+		return time.Time{}, false
 	}
 
-	return now
+	endMonth, endDay, err := tg.parseDayInYear(item.EndDayInYear)
+	if err != nil {
+		return time.Time{}, false
+	}
+
+	startTime, _ := parseTimeString(item.StartTime)
+	endTime, _ := parseTimeString(item.EndTime)
+
+	currentYear := now.Year()
+
+	// Create the start and end datetime for this year
+	startDateTime := time.Date(currentYear, time.Month(startMonth), startDay,
+		startTime/60, startTime%60, 0, 0, now.Location())
+	endDateTime := time.Date(currentYear, time.Month(endMonth), endDay,
+		endTime/60, endTime%60, 0, 0, now.Location())
+
+	// Handle cross-year ranges (e.g., Dec 25 to Jan 5)
+	if startMonth > endMonth {
+		// If we're before the start date, we're outside the excluded range
+		if now.Before(startDateTime) {
+			return time.Time{}, false
+		}
+		// If we're after start date but before new year, we're in the excluded range
+		if now.After(startDateTime) && now.Month() >= time.Month(startMonth) {
+			// Need to wait until next year's end date
+			nextEndDateTime := time.Date(currentYear+1, time.Month(endMonth), endDay,
+				endTime/60, endTime%60, 0, 0, now.Location())
+			return nextEndDateTime, true
+		}
+		// If we're in the new year and before end date, we're in the excluded range
+		endDateTime = time.Date(currentYear+1, time.Month(endMonth), endDay,
+			endTime/60, endTime%60, 0, 0, now.Location())
+		if now.Before(endDateTime) && now.Month() <= time.Month(endMonth) {
+			return endDateTime, true
+		}
+		// We're after the end date, so we're outside the excluded range
+		return time.Time{}, false
+	}
+
+	// Normal same-year range
+	if now.Before(startDateTime) || now.After(endDateTime) {
+		return time.Time{}, false
+	}
+
+	// We're inside the excluded range, return end time
+	return endDateTime, true
 }
 
 func (tg *TimeGate) parseTimezone(timezoneStr string) *time.Location {
@@ -642,19 +813,19 @@ func (tg *TimeGate) parseDayInYear(dayStr string) (int, int, error) {
 	return month, day, nil
 }
 
-func (tg *TimeGate) findNextIncludeSpecificTime(now time.Time, spec Spec) time.Time {
-	startMonth, startDay, err := tg.parseDayInYear(spec.StartDayInYear)
+func (tg *TimeGate) findNextIncludeSpecificTime(now time.Time, item TimeGateItem) time.Time {
+	startMonth, startDay, err := tg.parseDayInYear(item.StartDayInYear)
 	if err != nil {
 		return time.Time{}
 	}
 
-	endMonth, endDay, err := tg.parseDayInYear(spec.EndDayInYear)
+	endMonth, endDay, err := tg.parseDayInYear(item.EndDayInYear)
 	if err != nil {
 		return time.Time{}
 	}
 
-	startTime, _ := parseTimeString(spec.StartTime)
-	endTime, _ := parseTimeString(spec.EndTime)
+	startTime, _ := parseTimeString(item.StartTime)
+	endTime, _ := parseTimeString(item.EndTime)
 
 	currentYear := now.Year()
 
@@ -704,59 +875,6 @@ func (tg *TimeGate) findNextIncludeSpecificTime(now time.Time, spec Spec) time.T
 	return nextStartDateTime
 }
 
-func (tg *TimeGate) findNextExcludeSpecificEndTime(now time.Time, spec Spec) time.Time {
-	startMonth, startDay, err := tg.parseDayInYear(spec.StartDayInYear)
-	if err != nil {
-		return time.Time{}
-	}
-
-	endMonth, endDay, err := tg.parseDayInYear(spec.EndDayInYear)
-	if err != nil {
-		return time.Time{}
-	}
-
-	startTime, _ := parseTimeString(spec.StartTime)
-	endTime, _ := parseTimeString(spec.EndTime)
-
-	currentYear := now.Year()
-
-	// Create the start and end datetime for this year
-	startDateTime := time.Date(currentYear, time.Month(startMonth), startDay,
-		startTime/60, startTime%60, 0, 0, now.Location())
-	endDateTime := time.Date(currentYear, time.Month(endMonth), endDay,
-		endTime/60, endTime%60, 0, 0, now.Location())
-
-	// Handle cross-year ranges (e.g., Dec 25 to Jan 5)
-	if startMonth > endMonth {
-		// If we're before the start date, we're outside the excluded range
-		if now.Before(startDateTime) {
-			return now
-		}
-		// If we're after start date but before new year, we're in the excluded range
-		if now.After(startDateTime) && now.Month() >= time.Month(startMonth) {
-			// Need to wait until next year's end date
-			nextEndDateTime := time.Date(currentYear+1, time.Month(endMonth), endDay,
-				endTime/60, endTime%60, 0, 0, now.Location())
-			return nextEndDateTime
-		}
-		// If we're in the new year and before end date, we're in the excluded range
-		endDateTime = time.Date(currentYear+1, time.Month(endMonth), endDay,
-			endTime/60, endTime%60, 0, 0, now.Location())
-		if now.Before(endDateTime) && now.Month() <= time.Month(endMonth) {
-			return endDateTime
-		}
-		// We're after the end date, so we're outside the excluded range
-		return now
-	}
-
-	// Normal same-year range
-	if now.Before(startDateTime) || now.After(endDateTime) {
-		return now
-	}
-
-	// We're inside the excluded range, return end time
-	return endDateTime
-}
 
 func (tg *TimeGate) Cancel(ctx core.ExecutionContext) error {
 	return nil

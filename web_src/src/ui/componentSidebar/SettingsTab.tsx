@@ -51,14 +51,6 @@ export function SettingsTab({
   appInstallationRef,
   installedApplications = [],
 }: SettingsTabProps) {
-  const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
-  const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
-  const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
-  const [showValidation, setShowValidation] = useState(false);
-  const [selectedAppInstallation, setSelectedAppInstallation] = useState<ComponentsAppInstallationRef | undefined>(
-    appInstallationRef,
-  );
-
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
   }, [configurationFields]);
@@ -72,6 +64,27 @@ export function SettingsTab({
     });
     return filtered;
   }, [configurationFields, defaultValues]);
+
+
+  const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(() => {
+    const initialDefaults = parseDefaultValues(configurationFields);
+    const filtered = { ...initialDefaults };
+    configurationFields.forEach((field) => {
+      if (field.name && field.togglable) {
+        delete filtered[field.name];
+      }
+    });
+    if (Object.values(configuration).length === 0 || !configuration) {
+      return filtered;
+    }
+    return { ...filtered, ...configuration };
+  });
+  const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
+  const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
+  const [showValidation, setShowValidation] = useState(false);
+  const [selectedAppInstallation, setSelectedAppInstallation] = useState<ComponentsAppInstallationRef | undefined>(
+    appInstallationRef,
+  );
 
   // Filter installations by app name
   const availableInstallations = useMemo(() => {

@@ -66,41 +66,39 @@ function getTimeGateModeLabel(mode: string): string {
   }
 
   switch (mode) {
-    case "include_range":
-      return "Include Range";
-    case "exclude_range":
-      return "Exclude Range";
-    case "include_specific":
-      return "Include Specific";
-    case "exclude_specific":
-      return "Exclude Specific";
+    case "include":
+      return "Include";
+    case "exclude":
+      return "Exclude";
     default:
       return mode.charAt(0).toUpperCase() + mode.slice(1).replace(/_/g, " ");
   }
 }
 
 function getTimeWindow(mode: string, configuration: Record<string, unknown>): string {
-  let startTime = "00:00";
-  let endTime = "23:59";
+  const items = (configuration?.items as Array<Record<string, unknown>>) || [];
 
-  // Handle undefined mode or configuration values
-  if (!mode) {
+  if (items.length === 0) {
     return "Not configured";
   }
 
-  if (mode === "include_specific" || mode === "exclude_specific") {
-    const startDay = configuration.startDayInYear || "Day 1";
-    const startTimeVal = configuration.startTime || "00:00";
-    const endDay = configuration.endDayInYear || "Day 365";
-    const endTimeVal = configuration.endTime || "23:59";
-    startTime = `${startDay} ${startTimeVal}`;
-    endTime = `${endDay} ${endTimeVal}`;
-  } else {
-    startTime = `${configuration.startTime || "00:00"}`;
-    endTime = `${configuration.endTime || "23:59"}`;
+  // Display summary of items
+  if (items.length === 1) {
+    const item = items[0];
+    const itemType = item.type as string;
+    const startTime = (item.startTime as string) || "00:00";
+    const endTime = (item.endTime as string) || "23:59";
+
+    if (itemType === "specific_dates") {
+      const startDay = (item.startDayInYear as string) || "";
+      const endDay = (item.endDayInYear as string) || "";
+      return `${startDay} ${startTime} - ${endDay} ${endTime}`;
+    } else {
+      return `${startTime} - ${endTime}`;
+    }
   }
 
-  return `${startTime} - ${endTime}`;
+  return `${items.length} time window${items.length > 1 ? "s" : ""}`;
 }
 
 function getTimezoneDisplay(timezoneOffset: string): string {
@@ -130,15 +128,24 @@ const daysOfWeekOrder = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, frid
 function getTimeGateSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
   const configuration = node.configuration as Record<string, unknown>;
-  const days = (configuration?.days as string[]) || [];
+  const items = (configuration?.items as Array<Record<string, unknown>>) || [];
 
-  if (days && days.length > 0) {
+  // Collect all days from weekly items
+  const allDays = new Set<string>();
+  items.forEach((item) => {
+    if (item.type === "weekly") {
+      const days = (item.days as string[]) || [];
+      days.forEach((day) => allDays.add(day));
+    }
+  });
+
+  if (allDays.size > 0) {
     specs.push({
       title: "day",
       tooltipTitle: "Days of the week",
       iconSlug: "calendar",
       values: [
-        ...days
+        ...Array.from(allDays)
           .sort(
             (a: string, b: string) =>
               daysOfWeekOrder[a.trim() as keyof typeof daysOfWeekOrder] -
@@ -153,6 +160,26 @@ function getTimeGateSpecs(node: ComponentsNode): ComponentBaseSpec[] {
               },
             ],
           })),
+      ],
+    });
+  }
+
+  // Add count of items
+  if (items.length > 0) {
+    specs.push({
+      title: "items",
+      tooltipTitle: "Time windows",
+      iconSlug: "clock",
+      values: [
+        {
+          badges: [
+            {
+              label: `${items.length} window${items.length > 1 ? "s" : ""}`,
+              bgColor: "bg-gray-100",
+              textColor: "text-gray-700",
+            },
+          ],
+        },
       ],
     });
   }

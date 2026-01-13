@@ -45,39 +45,26 @@ func TestTimeGate_OutputChannels(t *testing.T) {
 func TestTimeGate_Configuration(t *testing.T) {
 	tg := &TimeGate{}
 	config := tg.Configuration()
-	assert.Len(t, config, 7) // mode, days, startDayInYear, startTime, endDayInYear, endTime, timezone
+	assert.Len(t, config, 3) // mode, items, timezone
 
 	// Check mode field
 	assert.Equal(t, "mode", config[0].Name)
 	assert.Equal(t, "Mode", config[0].Label)
 	assert.True(t, config[0].Required)
 
-	// Check days field
-	assert.Equal(t, "days", config[1].Name)
-	assert.Equal(t, "Days of Week", config[1].Label)
-	assert.False(t, config[1].Required) // Not required because of visibility conditions
+	// Check items field (list)
+	assert.Equal(t, "items", config[1].Name)
+	assert.Equal(t, "Time Windows", config[1].Label)
+	assert.True(t, config[1].Required)
+	assert.NotNil(t, config[1].TypeOptions)
+	assert.NotNil(t, config[1].TypeOptions.List)
+	assert.NotNil(t, config[1].TypeOptions.List.ItemDefinition)
+	assert.Equal(t, "object", config[1].TypeOptions.List.ItemDefinition.Type)
 
-	// Check startDayInYear field
-	assert.Equal(t, "startDayInYear", config[2].Name)
-	assert.Equal(t, "Start Day (MM/DD)", config[2].Label)
-	assert.False(t, config[2].Required) // Not required because of visibility conditions
-
-	// Check startTime field
-	assert.Equal(t, "startTime", config[3].Name)
-	assert.Equal(t, "Start Time (HH:MM)", config[3].Label)
-	assert.True(t, config[3].Required) // Required for all modes
-	assert.Equal(t, "09:00", config[3].Default)
-
-	// Check endDayInYear field
-	assert.Equal(t, "endDayInYear", config[4].Name)
-	assert.Equal(t, "End Day (MM/DD)", config[4].Label)
-	assert.False(t, config[4].Required) // Not required because of visibility conditions
-
-	// Check endTime field
-	assert.Equal(t, "endTime", config[5].Name)
-	assert.Equal(t, "End Time (HH:MM)", config[5].Label)
-	assert.True(t, config[5].Required) // Required for all modes
-	assert.Equal(t, "17:00", config[5].Default)
+	// Check timezone field
+	assert.Equal(t, "timezone", config[2].Name)
+	assert.Equal(t, "Timezone", config[2].Label)
+	assert.True(t, config[2].Required)
 }
 
 func TestTimeGate_Actions(t *testing.T) {
@@ -235,64 +222,110 @@ func TestValidateSpec(t *testing.T) {
 		errorMsg string
 	}{
 		{
-			name: "valid include range spec",
+			name: "valid include weekly spec",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "09:00",
-				EndTime:   "17:00",
-				Days:      []string{"monday", "tuesday"},
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday", "tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: false,
 		},
 		{
-			name: "valid exclude range spec",
+			name: "valid exclude weekly spec",
 			spec: Spec{
-				Mode:      "exclude_range",
-				StartTime: "13:00",
-				EndTime:   "14:00",
-				Days:      []string{"friday"},
+				Mode:  "exclude",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "13:00",
+						EndTime:   "14:00",
+						Days:      []string{"friday"},
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: false,
 		},
 		{
-			name: "valid include specific spec",
+			name: "valid include specific dates spec",
 			spec: Spec{
-				Mode:           "include_specific",
-				StartTime:      "00:00",
-				EndTime:        "23:59",
-				StartDayInYear: "12/31",
-				EndDayInYear:   "01/01",
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:           "specific_dates",
+						StartTime:      "00:00",
+						EndTime:        "23:59",
+						StartDayInYear: "12/31",
+						EndDayInYear:   "01/01",
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: false,
 		},
 		{
-			name: "valid exclude specific spec",
+			name: "valid exclude specific dates spec",
 			spec: Spec{
-				Mode:           "exclude_specific",
-				StartTime:      "12:00",
-				EndTime:        "13:00",
-				StartDayInYear: "07/04",
-				EndDayInYear:   "07/04",
+				Mode:  "exclude",
+				Items: []TimeGateItem{
+					{
+						Type:           "specific_dates",
+						StartTime:      "12:00",
+						EndTime:        "13:00",
+						StartDayInYear: "07/04",
+						EndDayInYear:   "07/04",
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: false,
 		},
 		{
 			name: "invalid mode",
 			spec: Spec{
-				Mode:      "invalid",
-				StartTime: "09:00",
-				EndTime:   "17:00",
-				Days:      []string{"monday"},
+				Mode:  "invalid",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday"},
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: true,
 			errorMsg: "invalid mode",
 		},
 		{
-			name: "missing days for specific mode",
+			name: "no items",
 			spec: Spec{
-				Mode:      "include_specific",
-				StartTime: "09:00",
-				EndTime:   "17:00",
+				Mode:     "include",
+				Items:    []TimeGateItem{},
+				Timezone: "0",
+			},
+			hasError: true,
+			errorMsg: "at least one time window item is required",
+		},
+		{
+			name: "missing days for specific dates type",
+			spec: Spec{
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "specific_dates",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: true,
 			errorMsg: "startDayInYear and endDayInYear are required",
@@ -300,11 +333,17 @@ func TestValidateSpec(t *testing.T) {
 		{
 			name: "invalid start day format",
 			spec: Spec{
-				Mode:           "include_specific",
-				StartTime:      "09:00",
-				EndTime:        "17:00",
-				StartDayInYear: "invalid-day",
-				EndDayInYear:   "01/01",
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:           "specific_dates",
+						StartTime:      "09:00",
+						EndTime:        "17:00",
+						StartDayInYear: "invalid-day",
+						EndDayInYear:   "01/01",
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: true,
 			errorMsg: "startDayInYear error",
@@ -312,11 +351,17 @@ func TestValidateSpec(t *testing.T) {
 		{
 			name: "start day after end day in same month",
 			spec: Spec{
-				Mode:           "include_specific",
-				StartTime:      "10:00",
-				EndTime:        "11:00",
-				StartDayInYear: "01/15",
-				EndDayInYear:   "01/10",
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:           "specific_dates",
+						StartTime:      "10:00",
+						EndTime:        "11:00",
+						StartDayInYear: "01/15",
+						EndDayInYear:   "01/10",
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: true,
 			errorMsg: "start day",
@@ -324,10 +369,16 @@ func TestValidateSpec(t *testing.T) {
 		{
 			name: "invalid start time",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "25:00",
-				EndTime:   "17:00",
-				Days:      []string{"monday"},
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "25:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday"},
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: true,
 			errorMsg: "startTime error",
@@ -335,10 +386,16 @@ func TestValidateSpec(t *testing.T) {
 		{
 			name: "invalid end time",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "09:00",
-				EndTime:   "25:00",
-				Days:      []string{"monday"},
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "25:00",
+						Days:      []string{"monday"},
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: true,
 			errorMsg: "endTime error",
@@ -346,10 +403,16 @@ func TestValidateSpec(t *testing.T) {
 		{
 			name: "start time after end time",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "17:00",
-				EndTime:   "09:00",
-				Days:      []string{"monday"},
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "17:00",
+						EndTime:   "09:00",
+						Days:      []string{"monday"},
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: true,
 			errorMsg: "start time (17:00) must be before end time (09:00)",
@@ -357,21 +420,33 @@ func TestValidateSpec(t *testing.T) {
 		{
 			name: "start time equals end time",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "12:00",
-				EndTime:   "12:00",
-				Days:      []string{"monday"},
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "12:00",
+						EndTime:   "12:00",
+						Days:      []string{"monday"},
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: true,
 			errorMsg: "start time (12:00) must be before end time (12:00)",
 		},
 		{
-			name: "no days selected",
+			name: "no days selected for weekly",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "09:00",
-				EndTime:   "17:00",
-				Days:      []string{},
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{},
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: true,
 			errorMsg: "at least one day must be selected",
@@ -379,10 +454,16 @@ func TestValidateSpec(t *testing.T) {
 		{
 			name: "invalid day",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "09:00",
-				EndTime:   "17:00",
-				Days:      []string{"invalid_day"},
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"invalid_day"},
+					},
+				},
+				Timezone: "0",
 			},
 			hasError: true,
 			errorMsg: "invalid day 'invalid_day'",
@@ -406,10 +487,16 @@ func TestConfigEqual(t *testing.T) {
 	tg := &TimeGate{}
 
 	baseSpec := Spec{
-		Mode:      "include_range",
-		StartTime: "09:00",
-		EndTime:   "17:00",
-		Days:      []string{"monday", "tuesday"},
+		Mode:  "include",
+		Items: []TimeGateItem{
+			{
+				Type:      "weekly",
+				StartTime: "09:00",
+				EndTime:   "17:00",
+				Days:      []string{"monday", "tuesday"},
+			},
+		},
+		Timezone: "0",
 	}
 
 	tests := []struct {
@@ -428,10 +515,16 @@ func TestConfigEqual(t *testing.T) {
 			name:  "same content different order days",
 			specA: baseSpec,
 			specB: Spec{
-				Mode:      "include_range",
-				StartTime: "09:00",
-				EndTime:   "17:00",
-				Days:      []string{"tuesday", "monday"}, // different order
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"tuesday", "monday"}, // different order
+					},
+				},
+				Timezone: "0",
 			},
 			expected: true,
 		},
@@ -439,10 +532,16 @@ func TestConfigEqual(t *testing.T) {
 			name:  "different mode",
 			specA: baseSpec,
 			specB: Spec{
-				Mode:      "exclude_range", // different mode
-				StartTime: "09:00",
-				EndTime:   "17:00",
-				Days:      []string{"monday", "tuesday"},
+				Mode:  "exclude", // different mode
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday", "tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expected: false,
 		},
@@ -450,10 +549,16 @@ func TestConfigEqual(t *testing.T) {
 			name:  "different start time",
 			specA: baseSpec,
 			specB: Spec{
-				Mode:      "include_range",
-				StartTime: "10:00", // different start time
-				EndTime:   "17:00",
-				Days:      []string{"monday", "tuesday"},
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "10:00", // different start time
+						EndTime:   "17:00",
+						Days:      []string{"monday", "tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expected: false,
 		},
@@ -461,10 +566,16 @@ func TestConfigEqual(t *testing.T) {
 			name:  "different end time",
 			specA: baseSpec,
 			specB: Spec{
-				Mode:      "include_range",
-				StartTime: "09:00",
-				EndTime:   "18:00", // different end time
-				Days:      []string{"monday", "tuesday"},
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "18:00", // different end time
+						Days:      []string{"monday", "tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expected: false,
 		},
@@ -472,21 +583,39 @@ func TestConfigEqual(t *testing.T) {
 			name:  "different days",
 			specA: baseSpec,
 			specB: Spec{
-				Mode:      "include_range",
-				StartTime: "09:00",
-				EndTime:   "17:00",
-				Days:      []string{"monday", "wednesday"}, // different days
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday", "wednesday"}, // different days
+					},
+				},
+				Timezone: "0",
 			},
 			expected: false,
 		},
 		{
-			name:  "different number of days",
+			name:  "different number of items",
 			specA: baseSpec,
 			specB: Spec{
-				Mode:      "include_range",
-				StartTime: "09:00",
-				EndTime:   "17:00",
-				Days:      []string{"monday"}, // fewer days
+				Mode:  "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday", "tuesday"},
+					},
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"wednesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expected: false,
 		},

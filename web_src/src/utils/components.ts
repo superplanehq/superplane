@@ -516,7 +516,37 @@ export function parseDefaultValues(configurationFields: ConfigurationField[]): R
     .map((field) => [field.name, field.defaultValue, field.type] as const)
     .reduce(
       (acc, [name, defaultValue, fieldType]) => {
-        if (name && defaultValue != null) {
+        if (!name) return acc;
+
+        // For timezone fields (detected by name "timezone" or type "timezone"), always set browser timezone if no default value is provided
+        // This must be checked BEFORE the defaultValue != null check
+        // Note: timeGate uses "select" type for timezone, so we check by name
+        if ((name === "timezone" || fieldType === "timezone") && (defaultValue == null || defaultValue === "")) {
+          const offsetMinutes = new Date().getTimezoneOffset();
+          const offsetHours = -offsetMinutes / 60;
+          
+          // Handle half-hour offsets (e.g., 5.5 for India)
+          let timezoneOffset: string;
+          if (offsetHours % 1 === 0.5 || offsetHours % 1 === -0.5) {
+            timezoneOffset = offsetHours.toString();
+          } else {
+            // Round to nearest whole number for edge cases
+            timezoneOffset = Math.round(offsetHours).toString();
+          }
+          
+          // Ensure the calculated offset matches one of the available timezone options
+          // If not, fallback to "0" (UTC)
+          const timezoneOptions = [
+            "-12", "-11", "-10", "-9", "-8", "-7", "-6", "-5", "-4", "-3", "-2", "-1",
+            "0", "1", "2", "3", "4", "5", "5.5", "6", "7", "8", "9", "9.5", "10", "11", "12", "13", "14"
+          ];
+          const finalOffset = timezoneOptions.includes(timezoneOffset) ? timezoneOffset : "0";
+          
+          acc[name] = finalOffset;
+          return acc;
+        }
+
+        if (defaultValue != null) {
           // Parse defaultValue based on field type
           let parsedValue: unknown = defaultValue;
 
@@ -557,8 +587,15 @@ export function parseDefaultValues(configurationFields: ConfigurationField[]): R
               }
               case "timezone": {
                 if (defaultValue === "current") {
-                  const offset = -new Date().getTimezoneOffset() / 60;
-                  parsedValue = offset.toString();
+                  const offsetMinutes = new Date().getTimezoneOffset();
+                  const offsetHours = -offsetMinutes / 60;
+                  let timezoneOffset: string;
+                  if (offsetHours % 1 === 0.5 || offsetHours % 1 === -0.5) {
+                    timezoneOffset = offsetHours.toString();
+                  } else {
+                    timezoneOffset = Math.round(offsetHours).toString();
+                  }
+                  parsedValue = timezoneOffset;
                 } else {
                   parsedValue = defaultValue;
                 }
