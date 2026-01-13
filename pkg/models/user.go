@@ -161,6 +161,23 @@ func FindActiveUserByTokenHash(tokenHash string) (*User, error) {
 	return &user, err
 }
 
+func FindMaybeDeletedUsersByIDs(ids []uuid.UUID) ([]User, error) {
+	if len(ids) == 0 {
+		return []User{}, nil
+	}
+
+	var users []User
+	err := database.Conn().Unscoped().
+		Where("id IN ?", ids).
+		Find(&users).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func FindOrganizationsForAccount(email string) ([]Organization, error) {
 	var organizations []Organization
 

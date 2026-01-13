@@ -53,8 +53,12 @@ function buildExecutionTabData(
     (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED") &&
     !("Error" in currentData)
   ) {
-    // Ensure error message is first
-    currentData = Object.assign({ Error: execution.resultMessage }, currentData);
+    currentData["Error"] = execution.resultMessage;
+  }
+
+  if (execution.result === "RESULT_CANCELLED" && !("Cancelled by" in currentData)) {
+    const cancelledBy = execution.cancelledBy;
+    currentData["Cancelled by"] = cancelledBy?.name || cancelledBy?.id || "Unknown";
   }
 
   // Filter out undefined and empty values
