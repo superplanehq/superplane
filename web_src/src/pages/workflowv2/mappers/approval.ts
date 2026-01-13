@@ -170,12 +170,6 @@ export const approvalMapper: ComponentBaseMapper = {
       details["Finished at"] = new Date(execution.updatedAt).toLocaleString();
     }
 
-    if (execution.result === "RESULT_CANCELLED") {
-      details["Cancelled by"] = execution.cancelledBy?.name || "Unknown";
-    } else {
-      details["Approvals"] = buildApprovalTimeline(records);
-    }
-
     return details;
   },
 };
