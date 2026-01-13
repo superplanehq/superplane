@@ -330,7 +330,6 @@ function buildApprovalTimeline(records: ApprovalRecord[]) {
     });
 }
 
-
 function getCancelledByLabel(metadata?: Record<string, unknown>): string | undefined {
   if (!metadata) return undefined;
 
