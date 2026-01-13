@@ -63,6 +63,16 @@ export function SettingsTab({
     return parseDefaultValues(configurationFields);
   }, [configurationFields]);
 
+  const defaultValuesWithoutToggles = useMemo(() => {
+    const filtered = { ...defaultValues };
+    configurationFields.forEach((field) => {
+      if (field.name && field.togglable) {
+        delete filtered[field.name];
+      }
+    });
+    return filtered;
+  }, [configurationFields, defaultValues]);
+
   // Filter installations by app name
   const availableInstallations = useMemo(() => {
     if (!appName) return [];
@@ -175,9 +185,9 @@ export function SettingsTab({
   useEffect(() => {
     let newConfig;
     if (Object.values(configuration).length === 0 || !configuration) {
-      newConfig = defaultValues;
+      newConfig = defaultValuesWithoutToggles;
     } else {
-      newConfig = { ...defaultValues, ...configuration };
+      newConfig = { ...defaultValuesWithoutToggles, ...configuration };
     }
 
     setNodeConfiguration(filterVisibleFields(newConfig));
@@ -185,7 +195,7 @@ export function SettingsTab({
     setSelectedAppInstallation(appInstallationRef);
     setValidationErrors(new Set());
     setShowValidation(false);
-  }, [configuration, nodeName, defaultValues, filterVisibleFields, appInstallationRef]);
+  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, appInstallationRef]);
 
   // Auto-select if only one installation is available (create mode only)
   useEffect(() => {
@@ -303,7 +313,6 @@ export function SettingsTab({
                   value={nodeConfiguration[fieldName]}
                   onChange={(value) => {
                     const newConfig = {
-                      ...defaultValues,
                       ...nodeConfiguration,
                       [fieldName]: value,
                     };

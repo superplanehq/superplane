@@ -25,7 +25,12 @@ import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
-import { isFieldVisible, isFieldRequired, validateFieldForSubmission } from "../../utils/components";
+import {
+  isFieldVisible,
+  isFieldRequired,
+  parseDefaultValues,
+  validateFieldForSubmission,
+} from "../../utils/components";
 import { ValidationError } from "./types";
 import { AuthorizationDomainType } from "@/api-client";
 
@@ -56,31 +61,45 @@ export const ConfigurationFieldRenderer = ({
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
 
+  const parsedDefaultValue = React.useMemo(() => {
+    if (!field.name) return undefined;
+    return parseDefaultValues([field])[field.name];
+  }, [field]);
+
   const handleToggleChange = React.useCallback(
     (checked: boolean) => {
       if (!isTogglable) return;
 
       if (checked) {
-        const defaultVal = field.defaultValue;
         if (field.type === "select" && field.typeOptions?.select?.options) {
           const selectOptions = field.typeOptions.select.options;
           const initialValue =
-            defaultVal && selectOptions.some((opt) => opt.value === defaultVal)
-              ? defaultVal
+            parsedDefaultValue && selectOptions.some((opt) => opt.value === parsedDefaultValue)
+              ? parsedDefaultValue
               : selectOptions.length > 0
                 ? selectOptions[0].value
                 : "";
           onChange(initialValue);
-        } else if (field.type === "list") {
-          onChange([]);
+        } else if (field.type === "list" || field.type === "multi-select" || field.type === "any-predicate-list") {
+          onChange(Array.isArray(parsedDefaultValue) ? parsedDefaultValue : []);
+        } else if (field.type === "object") {
+          onChange(
+            parsedDefaultValue && typeof parsedDefaultValue === "object" && !Array.isArray(parsedDefaultValue)
+              ? parsedDefaultValue
+              : {},
+          );
+        } else if (field.type === "number") {
+          onChange(typeof parsedDefaultValue === "number" ? parsedDefaultValue : 0);
+        } else if (field.type === "boolean") {
+          onChange(typeof parsedDefaultValue === "boolean" ? parsedDefaultValue : false);
         } else {
-          onChange(defaultVal || (field.type === "number" ? 0 : ""));
+          onChange(parsedDefaultValue ?? "");
         }
       } else {
         onChange(null);
       }
     },
-    [isTogglable, field, onChange],
+    [isTogglable, field, onChange, parsedDefaultValue],
   );
 
   // Check visibility conditions
