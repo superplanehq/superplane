@@ -242,22 +242,10 @@ func (c *CreateRelease) Execute(ctx core.ExecutionContext) error {
 	//
 	// Emit output with release data
 	//
-	output := map[string]interface{}{
-		"id":           release.GetID(),
-		"tag_name":     release.GetTagName(),
-		"name":         release.GetName(),
-		"html_url":     release.GetHTMLURL(),
-		"draft":        release.GetDraft(),
-		"prerelease":   release.GetPrerelease(),
-		"created_at":   release.GetCreatedAt().String(),
-		"published_at": release.GetPublishedAt().String(),
-		"author":       release.GetAuthor(),
-	}
-
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"github.release",
-		[]any{output},
+		[]any{release},
 	)
 }
 
