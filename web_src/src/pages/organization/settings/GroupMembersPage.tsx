@@ -1,6 +1,7 @@
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Breadcrumbs } from "../../../components/Breadcrumbs/breadcrumbs";
 import { Heading } from "../../../components/Heading/heading";
@@ -13,6 +14,7 @@ import {
   useOrganizationGroupUsers,
   useRemoveUserFromGroup,
   useUpdateGroup,
+  organizationKeys,
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { AddMembersSection, AddMembersSectionRef } from "./AddMembersSection";
@@ -23,6 +25,7 @@ export function GroupMembersPage() {
   const navigate = useNavigate();
   const { organizationId } = useParams<{ organizationId: string }>();
   const orgId = organizationId;
+  const queryClient = useQueryClient();
   usePageTitle(["Groups", groupName || "Group"]);
   const addMembersSectionRef = useRef<AddMembersSectionRef>(null);
   const [isEditingGroupName, setIsEditingGroupName] = useState(false);
@@ -100,7 +103,9 @@ export function GroupMembersPage() {
   };
 
   const handleMemberAdded = () => {
-    // No need to manually refresh - React Query will handle cache invalidation
+    if (!orgId || !groupName) return;
+    queryClient.invalidateQueries({ queryKey: organizationKeys.groupUsers(orgId, groupName) });
+    queryClient.invalidateQueries({ queryKey: organizationKeys.groups(orgId) });
   };
 
   if (loading) {

@@ -115,9 +115,9 @@ export function WorkflowPageV2() {
   // user IDs as emails and role names as display names.
   // We don't use the values directly here; loading them populates the
   // react-query cache which prepareApprovalNode reads from.
-  useOrganizationUsers(organizationId!);
-  useOrganizationRoles(organizationId!);
-  useOrganizationGroups(organizationId!);
+  const { isLoading: usersLoading } = useOrganizationUsers(organizationId!);
+  const { isLoading: rolesLoading } = useOrganizationRoles(organizationId!);
+  const { isLoading: groupsLoading } = useOrganizationGroups(organizationId!);
 
   /**
    * Track if we've already done the initial fit to view.
@@ -2016,7 +2016,16 @@ export function WorkflowPageV2() {
   );
 
   // Show loading indicator while data is being fetched
-  if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading || widgetsLoading) {
+  if (
+    workflowLoading ||
+    triggersLoading ||
+    blueprintsLoading ||
+    componentsLoading ||
+    widgetsLoading ||
+    usersLoading ||
+    rolesLoading ||
+    groupsLoading
+  ) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-3">
