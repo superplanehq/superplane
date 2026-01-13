@@ -69,7 +69,13 @@
     <div class="card">
         <div class="logo">Superplane</div>
         <h1 class="title">{{.Title}}</h1>
-        <p class="body">{{.Body}}</p>
+        <p class="body">
+            {{.Body}}
+            {{if .URL}}
+            <br><br>
+            <a href="{{.URL}}" style="color: #cbd5f5; text-decoration: underline;">{{.URL}}</a>
+            {{end}}
+        </p>
         {{if .URL}}
         <a class="action-btn" href="{{.URL}}">{{if .URLLabel}}{{.URLLabel}}{{else}}Open in Superplane{{end}}</a>
         {{end}}

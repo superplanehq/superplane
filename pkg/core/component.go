@@ -116,6 +116,9 @@ type OutputChannel struct {
 type ExecutionContext struct {
 	ID              uuid.UUID
 	WorkflowID      string
+	OrganizationID  string
+	NodeID          string
+	BaseURL         string
 	Data            any
 	Configuration   any
 	Logger          *log.Entry

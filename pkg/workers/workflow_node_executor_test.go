@@ -56,12 +56,12 @@ func Test__WorkflowNodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	// Create two workers and have them try to process the execution concurrently.
 	//
 	go func() {
-		executor1 := NewWorkflowNodeExecutor(r.Encryptor, r.Registry)
+		executor1 := NewWorkflowNodeExecutor(r.Encryptor, r.Registry, "http://localhost")
 		results <- executor1.LockAndProcessNodeExecution(execution.ID)
 	}()
 
 	go func() {
-		executor2 := NewWorkflowNodeExecutor(r.Encryptor, r.Registry)
+		executor2 := NewWorkflowNodeExecutor(r.Encryptor, r.Registry, "http://localhost")
 		results <- executor2.LockAndProcessNodeExecution(execution.ID)
 	}()
 
@@ -146,7 +146,7 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecution(t *testing.T) {
 	// Process the execution and verify the blueprint node creates a child execution
 	// and moves the parent execution to started state.
 	//
-	executor := NewWorkflowNodeExecutor(r.Encryptor, r.Registry)
+	executor := NewWorkflowNodeExecutor(r.Encryptor, r.Registry, "http://localhost")
 	err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
@@ -224,7 +224,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	// Process the execution and verify the execution is started but NOT finished.
 	// The approval component doesn't call Pass() in Execute(), so it should remain in started state.
 	//
-	executor := NewWorkflowNodeExecutor(r.Encryptor, r.Registry)
+	executor := NewWorkflowNodeExecutor(r.Encryptor, r.Registry, "http://localhost")
 	err = executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
@@ -291,7 +291,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	// Process the execution and verify the execution is both started AND finished.
 	// The noop component calls Pass() in Execute(), which should finish the execution.
 	//
-	executor := NewWorkflowNodeExecutor(r.Encryptor, r.Registry)
+	executor := NewWorkflowNodeExecutor(r.Encryptor, r.Registry, "http://localhost")
 	err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
@@ -372,7 +372,7 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecutionFailsWhenConfigurationCann
 	// LockAndProcessNodeExecution should not return an error,
 	// since this isn't a runtime error, but a configuration error.
 	//
-	executor := NewWorkflowNodeExecutor(r.Encryptor, r.Registry)
+	executor := NewWorkflowNodeExecutor(r.Encryptor, r.Registry, "http://localhost")
 	err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 

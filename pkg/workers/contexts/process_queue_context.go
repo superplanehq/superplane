@@ -104,6 +104,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 		return &core.ExecutionContext{
 			ID:             execution.ID,
 			WorkflowID:     execution.WorkflowID.String(),
+			NodeID:         execution.NodeID,
 			Configuration:  execution.Configuration.Data(),
 			HTTP:           NewHTTPContext(httpClient),
 			Metadata:       NewExecutionMetadataContext(tx, &execution),
@@ -199,6 +200,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 		return &core.ExecutionContext{
 			ID:             execution.ID,
 			WorkflowID:     execution.WorkflowID.String(),
+			NodeID:         execution.NodeID,
 			Configuration:  execution.Configuration.Data(),
 			HTTP:           NewHTTPContext(httpClient),
 			Metadata:       NewExecutionMetadataContext(tx, execution),

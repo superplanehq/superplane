@@ -2,7 +2,7 @@
 
 {{.Body}}
 
-{{if .URL}}{{if .URLLabel}}{{.URLLabel}}: {{end}}{{.URL}}{{end}}
+{{if .URL}}{{.URL}}{{end}}
 
 --
 Superplane Notification
