@@ -115,7 +115,7 @@ func (c *PublishCommitStatus) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Placeholder: "https://...",
-			Description: "URL to link to (e.g., build logs, test results)",
+			Description: "e.g. Link to build logs, test results, ...",
 		},
 	}
 }
