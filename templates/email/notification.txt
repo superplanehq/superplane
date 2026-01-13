@@ -1,0 +1,8 @@
+{{.Title}}
+
+{{.Body}}
+
+{{if .URL}}{{.URL}}{{end}}
+
+--
+Superplane Notification

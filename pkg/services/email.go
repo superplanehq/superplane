@@ -12,6 +12,7 @@ import (
 
 type EmailService interface {
 	SendInvitationEmail(toEmail, organizationName, invitationLink, inviterEmail string) error
+	SendNotificationEmail(bccEmails []string, title, body, url, urlLabel string) error
 }
 
 type InvitationTemplateData struct {
@@ -19,6 +20,13 @@ type InvitationTemplateData struct {
 	OrganizationName string
 	InvitationLink   string
 	InviterEmail     string
+}
+
+type NotificationTemplateData struct {
+	Title    string
+	Body     string
+	URL      string
+	URLLabel string
 }
 
 type ResendEmailService struct {
@@ -77,7 +85,54 @@ func (s *ResendEmailService) SendInvitationEmail(toEmail, organizationName, invi
 	return nil
 }
 
-func (s *ResendEmailService) renderTemplate(templateName string, data InvitationTemplateData) (string, error) {
+func (s *ResendEmailService) SendNotificationEmail(bccEmails []string, title, body, url, urlLabel string) error {
+	if len(bccEmails) == 0 {
+		return nil
+	}
+
+	if title == "" {
+		title = "Superplane Notification"
+	}
+
+	templateData := NotificationTemplateData{
+		Title:    title,
+		Body:     body,
+		URL:      url,
+		URLLabel: urlLabel,
+	}
+
+	plainTextContent, err := s.renderTemplate("notification.txt", templateData)
+	if err != nil {
+		log.Errorf("Error rendering notification plain text template: %v", err)
+		return fmt.Errorf("failed to render notification plain text template: %w", err)
+	}
+
+	htmlContent, err := s.renderTemplate("notification.html", templateData)
+	if err != nil {
+		log.Errorf("Error rendering notification HTML template: %v", err)
+		return fmt.Errorf("failed to render notification HTML template: %w", err)
+	}
+
+	params := &resend.SendEmailRequest{
+		From:    fmt.Sprintf("%s <%s>", s.fromName, s.fromEmail),
+		To:      []string{s.fromEmail},
+		Bcc:     bccEmails,
+		Subject: title,
+		Text:    plainTextContent,
+		Html:    htmlContent,
+	}
+
+	response, err := s.client.Emails.Send(params)
+	if err != nil {
+		log.Errorf("Error sending notification email: %v", err)
+		return err
+	}
+
+	log.Infof("Notification email sent successfully (ID: %s)", response.Id)
+	return nil
+}
+
+func (s *ResendEmailService) renderTemplate(templateName string, data any) (string, error) {
 	templatePath := filepath.Join(s.templateDir, "email", templateName)
 
 	tmpl, err := template.ParseFiles(templatePath)

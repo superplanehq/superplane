@@ -3,12 +3,14 @@ package approval
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -401,6 +403,14 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 		)
 	}
 
+	if ctx.Notifications != nil {
+		if err := a.notifyApprovers(ctx, metadata); err != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Warnf("failed to send approval notification: %v", err)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -566,4 +576,67 @@ func (a *Approval) Cancel(ctx core.ExecutionContext) error {
 
 func (a *Approval) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
+}
+
+func (a *Approval) notifyApprovers(ctx core.ExecutionContext, metadata *Metadata) error {
+	url := ""
+	if ctx.BaseURL != "" && ctx.OrganizationID != "" && ctx.WorkflowID != "" && ctx.NodeID != "" {
+		url = fmt.Sprintf(
+			"%s/%s/workflows/%s?sidebar=1&node=%s",
+			strings.TrimRight(ctx.BaseURL, "/"),
+			ctx.OrganizationID,
+			ctx.WorkflowID,
+			ctx.NodeID,
+		)
+	}
+
+	title := "Approval required"
+	body := "A canvas run item is waiting for your approval. Please access the URL below to handle it."
+
+	receivers := core.NotificationReceivers{}
+	emailSet := map[string]struct{}{}
+	groupSet := map[string]struct{}{}
+	roleSet := map[string]struct{}{}
+
+	for _, record := range metadata.Records {
+		if record.State != StatePending {
+			continue
+		}
+
+		switch record.Type {
+		case ItemTypeAnyone:
+			roleSet[models.RoleOrgViewer] = struct{}{}
+			roleSet[models.RoleOrgAdmin] = struct{}{}
+			roleSet[models.RoleOrgOwner] = struct{}{}
+
+		case ItemTypeUser:
+			if record.User != nil && record.User.Email != "" {
+				emailSet[record.User.Email] = struct{}{}
+			}
+
+		case ItemTypeRole:
+			if record.Role != nil && *record.Role != "" {
+				roleSet[*record.Role] = struct{}{}
+			}
+
+		case ItemTypeGroup:
+			if record.Group != nil && *record.Group != "" {
+				groupSet[*record.Group] = struct{}{}
+			}
+		}
+	}
+
+	receivers.Emails = mapKeys(emailSet)
+	receivers.Groups = mapKeys(groupSet)
+	receivers.Roles = mapKeys(roleSet)
+
+	return ctx.Notifications.Send(title, body, url, "Open approval", receivers)
+}
+
+func mapKeys(input map[string]struct{}) []string {
+	result := make([]string, 0, len(input))
+	for key := range input {
+		result = append(result, key)
+	}
+	return result
 }
