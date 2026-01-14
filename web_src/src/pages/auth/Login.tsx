@@ -130,6 +130,13 @@ export const Login: React.FC = () => {
   const redirectTarget = safeRedirect || "";
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
 
+  useEffect(() => {
+    if (!canSignup && isSignupMode) {
+      setIsSignupMode(false);
+      setFormError(null);
+    }
+  }, [canSignup, isSignupMode]);
+
   const handleToggleMode = (nextMode: "login" | "signup") => {
     setIsSignupMode(nextMode === "signup");
     setFormError(null);
@@ -643,7 +650,7 @@ export const Login: React.FC = () => {
           </form>
         )}
 
-        {!configLoading && !isSignupMode && (
+        {!configLoading && !isSignupMode && canSignup && (
           <div style={{ marginTop: "16px", fontSize: "14px", color: "#94a9ca" }}>
             {"Don't have an account? "}
             <button
