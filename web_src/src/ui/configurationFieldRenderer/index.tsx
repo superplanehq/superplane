@@ -12,7 +12,6 @@ import { RadioButtonFieldRenderer } from "./RadioButtonFieldRenderer";
 import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
 import { DaysOfWeekToggle } from "./DaysOfWeekToggle";
 import { DateFieldRenderer } from "./DateFieldRenderer";
-import { DateTimeFieldRenderer } from "./DateTimeFieldRenderer";
 import { UrlFieldRenderer } from "./UrlFieldRenderer";
 import { ListFieldRenderer } from "./ListFieldRenderer";
 import { ExcludeDatesFieldRenderer } from "./ExcludeDatesFieldRenderer";
@@ -245,9 +244,6 @@ export const ConfigurationFieldRenderer = ({
 
       case "date":
         return <DateFieldRenderer {...commonProps} />;
-
-      case "datetime":
-        return <DateTimeFieldRenderer {...commonProps} />;
 
       case "url":
         return <UrlFieldRenderer {...commonProps} />;
