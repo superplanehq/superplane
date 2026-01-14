@@ -10,7 +10,6 @@ import {
   isValidIdentifier,
   parsePathSegments,
 } from "./core";
-import { start } from "repl";
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"input">, "onChange" | "size"> {
   exampleObj: Record<string, unknown> | null;
