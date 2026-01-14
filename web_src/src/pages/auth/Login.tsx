@@ -154,9 +154,7 @@ export const Login: React.FC = () => {
           </div>
         )}
 
-        {loading && (
-          <div style={{ color: "#94a9ca", fontSize: "14px", paddingBottom: "1rem" }}>Loading...</div>
-        )}
+        {loading && <div style={{ color: "#94a9ca", fontSize: "14px", paddingBottom: "1rem" }}>Loading...</div>}
 
         {error && (
           <div
@@ -237,11 +235,7 @@ export const Login: React.FC = () => {
               color: "#1e2938",
             }}
           >
-            <svg
-              style={{ width: "20px", height: "20px", marginRight: "8px" }}
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
+            <svg style={{ width: "20px", height: "20px", marginRight: "8px" }} viewBox="0 0 24 24" fill="currentColor">
               <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
             </svg>
             Email & Password
@@ -249,9 +243,7 @@ export const Login: React.FC = () => {
         )}
 
         {!loading && !hasProviders && !authConfig.passwordLoginEnabled && (
-          <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>
-            No login methods are configured.
-          </div>
+          <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>No login methods are configured.</div>
         )}
       </div>
     </div>
