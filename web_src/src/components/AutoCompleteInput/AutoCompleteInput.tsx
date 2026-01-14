@@ -208,10 +208,11 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       const nextSuggestionsAreArraySuggestions = nextSuggestions.some((suggestion: string) =>
         suggestion.match(/\[\d+\]$/),
       );
-      const isFinalKey = nextSuggestions.length > 0 && !nextSuggestionsAreArraySuggestions;
-      if (isFinalKey) {
+      const isArrayKey = nextSuggestions.length > 0 && nextSuggestionsAreArraySuggestions;
+      const isObjectKey = nextSuggestions.length > 0 && !nextSuggestionsAreArraySuggestions;
+      if (isObjectKey) {
         newValue += ".";
-      } else {
+      } else if (!isArrayKey) {
         newValue = `${newValue}${suffix}`;
       }
 
