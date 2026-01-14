@@ -4,12 +4,17 @@ import { cn } from "@/lib/utils";
 import { FieldRendererProps } from "./types";
 import { toTestId } from "@/utils/testID";
 
-export const TimePickerField: React.FC<FieldRendererProps> = ({
+interface TimePickerFieldProps extends FieldRendererProps {
+  className?: string;
+}
+
+export const TimePickerField: React.FC<TimePickerFieldProps> = ({
   field,
   value,
   onChange,
   hasError,
   allValues = {},
+  className,
 }) => {
   useEffect(() => {
     if ((value === undefined || value === null) && field.defaultValue !== undefined) {
@@ -43,7 +48,8 @@ export const TimePickerField: React.FC<FieldRendererProps> = ({
       placeholder={field.typeOptions?.time?.format || "HH:MM"}
       className={cn(
         "bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none",
-        hasError && "border-red-500 border-2"
+        hasError && "border-red-500 border-2",
+        className
       )}
       min={getTimeConstraints.min}
       max={getTimeConstraints.max}

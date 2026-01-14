@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useFloating, autoUpdate, offset, flip, shift, size } from "@floating-ui/react";
-import { Icon } from "@/components/Icon";
+import { ChevronDown, ChevronUp, Check } from "lucide-react";
 import { twMerge } from "tailwind-merge";
 
 export interface AutoCompleteOption {
@@ -172,11 +172,11 @@ export function AutoCompleteSelect({
             setIsOpen(!isOpen);
           }}
         >
-          <Icon
-            name={isOpen ? "expand_less" : "expand_more"}
-            size="sm"
-            className="ml-2 text-gray-400 dark:text-gray-500 flex-shrink-0"
-          />
+          {isOpen ? (
+            <ChevronUp className="h-4 w-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          )}
         </div>
       </div>
 
@@ -220,7 +220,7 @@ export function AutoCompleteSelect({
                           <span className={twMerge("block truncate", isSelected ? "font-medium" : "font-normal")}>
                             {option.label}
                           </span>
-                          {isSelected && <Icon name="check" size="sm" className="text-blue-500" />}
+                          {isSelected && <Check className="h-4 w-4 text-blue-500 flex-shrink-0" />}
                         </div>
                       </div>
                     );

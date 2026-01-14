@@ -59,7 +59,7 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="flex items-center gap-3">
       {/* All day toggle */}
       <div className="flex items-center gap-3">
         <Switch
@@ -74,25 +74,28 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
 
       {/* Time inputs - only show when "All day" is OFF */}
       {!isAllDay && (
-        <div className="flex gap-3 items-end">
+        <div className="flex items-center gap-0 flex-1">
           <div className="flex-1">
-            <Label className="text-sm text-gray-600 dark:text-gray-400 mb-1 block">Start Time</Label>
             <TimePickerField
               field={{ name: "startTime", label: "Start Time", type: "time" } as any}
               value={startTime}
               onChange={(val) => onStartTimeChange(val as string | undefined)}
               hasError={hasError}
               allValues={{ startTime, endTime }}
+              className="rounded-r-none border-r-0"
             />
           </div>
+          <div className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 border-l-0 border-r-0 flex items-center justify-center font-medium">
+            -
+          </div>
           <div className="flex-1">
-            <Label className="text-sm text-gray-600 dark:text-gray-400 mb-1 block">End Time</Label>
             <TimePickerField
               field={{ name: "endTime", label: "End Time", type: "time" } as any}
               value={endTime}
               onChange={(val) => onEndTimeChange(val as string | undefined)}
               hasError={hasError}
               allValues={{ startTime, endTime }}
+              className="rounded-l-none"
             />
           </div>
         </div>

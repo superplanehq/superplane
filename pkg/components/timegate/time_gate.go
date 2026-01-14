@@ -38,11 +38,11 @@ type Metadata struct {
 }
 
 type TimeGateItem struct {
-	Type      string   `json:"type"`                // "weekly" or "specific_dates"
-	Days      []string `json:"days,omitempty"`      // For weekly type
-	Date      string   `json:"date,omitempty"`      // For specific_dates type (YYYY-MM-DD format)
-	StartTime string   `json:"startTime"`          // Required for both types
-	EndTime   string   `json:"endTime"`            // Required for both types
+	Type      string   `json:"type"`           // "weekly" or "specific_dates"
+	Days      []string `json:"days,omitempty"` // For weekly type
+	Date      string   `json:"date,omitempty"` // For specific_dates type (MM-DD format for recurring dates, or YYYY-MM-DD for backward compatibility)
+	StartTime string   `json:"startTime"`      // Required for both types
+	EndTime   string   `json:"endTime"`        // Required for both types
 }
 
 type Spec struct {
@@ -167,7 +167,7 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 												Value: TimeGateItemTypeWeekly,
 											},
 											{
-												Label: "Specific Dates",
+												Label: "Specific Day",
 												Value: TimeGateItemTypeSpecificDate,
 											},
 										},
@@ -206,10 +206,9 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 								},
 							},
 							{
-								Name:        "date",
-								Label:       "Specific Date",
-								Type:        configuration.FieldTypeDate,
-								Description: "Select a specific date (YYYY-MM-DD format)",
+								Name:  "date",
+								Label: "Specific Day",
+								Type:  configuration.FieldTypeDate,
 								VisibilityConditions: []configuration.VisibilityCondition{
 									{
 										Field:  "type",
@@ -440,10 +439,11 @@ func (tg *TimeGate) validateSpec(spec Spec) error {
 				return fmt.Errorf("item %d: date is required for specific_dates type", i)
 			}
 
-			// Validate date format (YYYY-MM-DD)
-			_, err := time.Parse("2006-01-02", item.Date)
-			if err != nil {
-				return fmt.Errorf("item %d: date must be in YYYY-MM-DD format, got: %s", i, item.Date)
+			// Validate date format (MM-DD for recurring dates, or YYYY-MM-DD for backward compatibility)
+			_, errMMDD := time.Parse("01-02", item.Date)
+			_, errYYYYMMDD := time.Parse("2006-01-02", item.Date)
+			if errMMDD != nil && errYYYYMMDD != nil {
+				return fmt.Errorf("item %d: date must be in MM-DD format (recurring date) or YYYY-MM-DD format, got: %s", i, item.Date)
 			}
 		}
 	}
@@ -755,19 +755,34 @@ func (tg *TimeGate) isInExcludedWeeklyWindow(now time.Time, item TimeGateItem) (
 }
 
 func (tg *TimeGate) isInExcludedSpecificWindow(now time.Time, item TimeGateItem) (time.Time, bool) {
-	// Parse the date (YYYY-MM-DD format)
-	selectedDate, err := time.Parse("2006-01-02", item.Date)
-	if err != nil {
+	// Parse the date (MM-DD format for recurring dates, or YYYY-MM-DD for backward compatibility)
+	var selectedMonth time.Month
+	var selectedDay int
+
+	// Try MM-DD format first (recurring date)
+	if parsedDate, err := time.Parse("01-02", item.Date); err == nil {
+		selectedMonth = parsedDate.Month()
+		selectedDay = parsedDate.Day()
+	} else if parsedDate, err := time.Parse("2006-01-02", item.Date); err == nil {
+		// Fallback to YYYY-MM-DD format (backward compatibility)
+		selectedMonth = parsedDate.Month()
+		selectedDay = parsedDate.Day()
+	} else {
+		return time.Time{}, false
+	}
+
+	// Check if today matches the selected month and day (recurring date)
+	if now.Month() != selectedMonth || now.Day() != selectedDay {
 		return time.Time{}, false
 	}
 
 	startTime, _ := parseTimeString(item.StartTime)
 	endTime, _ := parseTimeString(item.EndTime)
 
-	// Create the start and end datetime for the selected date
-	startDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
+	// Create the start and end datetime for today (matching the selected date)
+	startDateTime := time.Date(now.Year(), now.Month(), now.Day(),
 		startTime/60, startTime%60, 0, 0, now.Location())
-	endDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
+	endDateTime := time.Date(now.Year(), now.Month(), now.Day(),
 		endTime/60, endTime%60, 0, 0, now.Location())
 
 	// Check if we're within the excluded time window on this date
@@ -877,19 +892,44 @@ func (tg *TimeGate) parseDayInYear(dayStr string) (int, int, error) {
 }
 
 func (tg *TimeGate) findNextIncludeSpecificTime(now time.Time, item TimeGateItem) time.Time {
-	// Parse the date (YYYY-MM-DD format)
-	selectedDate, err := time.Parse("2006-01-02", item.Date)
-	if err != nil {
+	// Parse the date (MM-DD format for recurring dates, or YYYY-MM-DD for backward compatibility)
+	var selectedMonth time.Month
+	var selectedDay int
+
+	// Try MM-DD format first (recurring date)
+	if parsedDate, err := time.Parse("01-02", item.Date); err == nil {
+		selectedMonth = parsedDate.Month()
+		selectedDay = parsedDate.Day()
+	} else if parsedDate, err := time.Parse("2006-01-02", item.Date); err == nil {
+		// Fallback to YYYY-MM-DD format (backward compatibility)
+		selectedMonth = parsedDate.Month()
+		selectedDay = parsedDate.Day()
+	} else {
 		return time.Time{}
 	}
 
 	startTime, _ := parseTimeString(item.StartTime)
 	endTime, _ := parseTimeString(item.EndTime)
 
-	// Create the start and end datetime for the selected date
-	startDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
+	// Find the next occurrence of this date (month/day) - could be today or next year
+	var targetYear int
+
+	// Check if the date occurs this year (today or later)
+	thisYearDate := time.Date(now.Year(), selectedMonth, selectedDay,
 		startTime/60, startTime%60, 0, 0, now.Location())
-	endDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
+
+	if thisYearDate.After(now) || (thisYearDate.Year() == now.Year() && thisYearDate.Month() == now.Month() && thisYearDate.Day() == now.Day()) {
+		// The date occurs this year (today or in the future)
+		targetYear = now.Year()
+	} else {
+		// The date has passed this year, use next year
+		targetYear = now.Year() + 1
+	}
+
+	// Create the start and end datetime for the target date
+	startDateTime := time.Date(targetYear, selectedMonth, selectedDay,
+		startTime/60, startTime%60, 0, 0, now.Location())
+	endDateTime := time.Date(targetYear, selectedMonth, selectedDay,
 		endTime/60, endTime%60, 0, 0, now.Location())
 
 	// If we're within the time window on this date, return now

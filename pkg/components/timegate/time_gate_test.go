@@ -259,11 +259,10 @@ func TestValidateSpec(t *testing.T) {
 				Mode:  "include",
 				Items: []TimeGateItem{
 					{
-						Type:           "specific_dates",
-						StartTime:      "00:00",
-						EndTime:        "23:59",
-						StartDayInYear: "12/31",
-						EndDayInYear:   "01/01",
+						Type:      "specific_dates",
+						StartTime: "00:00",
+						EndTime:   "23:59",
+						Date:      "12-31",
 					},
 				},
 				Timezone: "0",
@@ -276,11 +275,10 @@ func TestValidateSpec(t *testing.T) {
 				Mode:  "exclude",
 				Items: []TimeGateItem{
 					{
-						Type:           "specific_dates",
-						StartTime:      "12:00",
-						EndTime:        "13:00",
-						StartDayInYear: "07/04",
-						EndDayInYear:   "07/04",
+						Type:      "specific_dates",
+						StartTime: "12:00",
+						EndTime:   "13:00",
+						Date:      "07-04",
 					},
 				},
 				Timezone: "0",
@@ -315,7 +313,7 @@ func TestValidateSpec(t *testing.T) {
 			errorMsg: "at least one time window item is required",
 		},
 		{
-			name: "missing days for specific dates type",
+			name: "missing date for specific dates type",
 			spec: Spec{
 				Mode:  "include",
 				Items: []TimeGateItem{
@@ -328,43 +326,40 @@ func TestValidateSpec(t *testing.T) {
 				Timezone: "0",
 			},
 			hasError: true,
-			errorMsg: "startDayInYear and endDayInYear are required",
+			errorMsg: "date is required",
 		},
 		{
-			name: "invalid start day format",
+			name: "invalid date format",
 			spec: Spec{
 				Mode:  "include",
 				Items: []TimeGateItem{
 					{
-						Type:           "specific_dates",
-						StartTime:      "09:00",
-						EndTime:        "17:00",
-						StartDayInYear: "invalid-day",
-						EndDayInYear:   "01/01",
+						Type:      "specific_dates",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Date:      "invalid-day",
 					},
 				},
 				Timezone: "0",
 			},
 			hasError: true,
-			errorMsg: "startDayInYear error",
+			errorMsg: "date must be in MM-DD format",
 		},
 		{
-			name: "start day after end day in same month",
+			name: "valid single date spec",
 			spec: Spec{
 				Mode:  "include",
 				Items: []TimeGateItem{
 					{
-						Type:           "specific_dates",
-						StartTime:      "10:00",
-						EndTime:        "11:00",
-						StartDayInYear: "01/15",
-						EndDayInYear:   "01/10",
+						Type:      "specific_dates",
+						StartTime: "10:00",
+						EndTime:   "11:00",
+						Date:      "01-15",
 					},
 				},
 				Timezone: "0",
 			},
-			hasError: true,
-			errorMsg: "start day",
+			hasError: false,
 		},
 		{
 			name: "invalid start time",
@@ -645,10 +640,16 @@ func TestFindNextIncludeTime(t *testing.T) {
 		{
 			name: "currently in include window",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "09:00",
-				EndTime:   "17:00",
-				Days:      []string{"tuesday"},
+				Mode: "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expectedIsNow: true,
 			description:   "Should return now since we're in the window",
@@ -656,10 +657,16 @@ func TestFindNextIncludeTime(t *testing.T) {
 		{
 			name: "outside time window, same day",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "20:00",
-				EndTime:   "22:00",
-				Days:      []string{"tuesday"},
+				Mode: "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "20:00",
+						EndTime:   "22:00",
+						Days:      []string{"tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expectedIsFuture: true,
 			description:      "Should return future time today",
@@ -667,10 +674,16 @@ func TestFindNextIncludeTime(t *testing.T) {
 		{
 			name: "outside day window",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "09:00",
-				EndTime:   "17:00",
-				Days:      []string{"monday"},
+				Mode: "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expectedIsFuture: true,
 			description:      "Should return next Monday",
@@ -678,10 +691,16 @@ func TestFindNextIncludeTime(t *testing.T) {
 		{
 			name: "before time window, same day",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "11:00",
-				EndTime:   "17:00",
-				Days:      []string{"tuesday"},
+				Mode: "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "11:00",
+						EndTime:   "17:00",
+						Days:      []string{"tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expectedIsFuture: true,
 			description:      "Should return 11:00 today",
@@ -718,10 +737,16 @@ func TestFindNextExcludeEndTime(t *testing.T) {
 		{
 			name: "outside exclude window",
 			spec: Spec{
-				Mode:      "exclude_range",
-				StartTime: "09:00",
-				EndTime:   "12:00",
-				Days:      []string{"tuesday"},
+				Mode: "exclude",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "12:00",
+						Days:      []string{"tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expectedIsNow: true,
 			description:   "Should return now since we're outside exclude window",
@@ -729,10 +754,16 @@ func TestFindNextExcludeEndTime(t *testing.T) {
 		{
 			name: "inside exclude window",
 			spec: Spec{
-				Mode:      "exclude_range",
-				StartTime: "13:00",
-				EndTime:   "17:00",
-				Days:      []string{"tuesday"},
+				Mode: "exclude",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "13:00",
+						EndTime:   "17:00",
+						Days:      []string{"tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expectedIsFuture: true,
 			description:      "Should return end of exclude window",
@@ -740,10 +771,16 @@ func TestFindNextExcludeEndTime(t *testing.T) {
 		{
 			name: "exclude window on different day",
 			spec: Spec{
-				Mode:      "exclude_range",
-				StartTime: "13:00",
-				EndTime:   "17:00",
-				Days:      []string{"monday"},
+				Mode: "exclude",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "13:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expectedIsNow: true,
 			description:   "Should return now since exclude is on different day",
@@ -751,10 +788,16 @@ func TestFindNextExcludeEndTime(t *testing.T) {
 		{
 			name: "past exclude window end time",
 			spec: Spec{
-				Mode:      "exclude_range",
-				StartTime: "09:00",
-				EndTime:   "13:00",
-				Days:      []string{"tuesday"},
+				Mode: "exclude",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "13:00",
+						Days:      []string{"tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expectedIsNow: true,
 			description:   "Should return now since exclude window has ended",
@@ -915,10 +958,16 @@ func TestFindNextValidTime(t *testing.T) {
 		{
 			name: "include mode - in window",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "09:00",
-				EndTime:   "17:00",
-				Days:      []string{"tuesday"},
+				Mode: "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expectNow:   true,
 			description: "Include mode, currently in window, should return now",
@@ -926,10 +975,16 @@ func TestFindNextValidTime(t *testing.T) {
 		{
 			name: "include mode - out of window",
 			spec: Spec{
-				Mode:      "include_range",
-				StartTime: "20:00",
-				EndTime:   "22:00",
-				Days:      []string{"tuesday"},
+				Mode: "include",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "20:00",
+						EndTime:   "22:00",
+						Days:      []string{"tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expectFuture: true,
 			description:  "Include mode, out of window, should return future time",
@@ -937,10 +992,16 @@ func TestFindNextValidTime(t *testing.T) {
 		{
 			name: "exclude mode - outside exclude window",
 			spec: Spec{
-				Mode:      "exclude_range",
-				StartTime: "13:00",
-				EndTime:   "17:00",
-				Days:      []string{"tuesday"},
+				Mode: "exclude",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "13:00",
+						EndTime:   "17:00",
+						Days:      []string{"tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expectNow:   true,
 			description: "Exclude mode, outside exclude window, should return now",
@@ -948,10 +1009,16 @@ func TestFindNextValidTime(t *testing.T) {
 		{
 			name: "exclude mode - inside exclude window",
 			spec: Spec{
-				Mode:      "exclude_range",
-				StartTime: "09:00",
-				EndTime:   "17:00",
-				Days:      []string{"tuesday"},
+				Mode: "exclude",
+				Items: []TimeGateItem{
+					{
+						Type:      "weekly",
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"tuesday"},
+					},
+				},
+				Timezone: "0",
 			},
 			expectFuture: true,
 			description:  "Exclude mode, inside exclude window, should return end time",
