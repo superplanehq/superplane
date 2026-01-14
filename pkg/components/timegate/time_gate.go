@@ -17,24 +17,6 @@ func init() {
 	registry.RegisterComponent("time_gate", &TimeGate{})
 }
 
-const (
-	TimeGateIncludeMode = "include"
-	TimeGateExcludeMode = "exclude"
-
-	// Custom modes (replaces "custom" option)
-	TimeGateCustomInclude = "custom_include" // "Run only during custom time window"
-	TimeGateCustomExclude = "custom_exclude" // "Don't run during custom time windows"
-
-	// Template modes
-	TimeGateTemplateWorkingHours        = "template_working_hours"
-	TimeGateTemplateOutsideWorkingHours = "template_outside_working_hours"
-	TimeGateTemplateWeekends            = "template_weekends"
-	TimeGateTemplateNoWeekends          = "template_no_weekends"
-
-	TimeGateItemTypeWeekly       = "weekly"
-	TimeGateItemTypeSpecificDate = "specific_dates"
-)
-
 type TimeGate struct{}
 
 type Metadata struct {
@@ -445,10 +427,12 @@ func (tg *TimeGate) HandlePushThrough(ctx core.ActionContext) error {
 	// Store push through information in metadata
 	user := ctx.Auth.AuthenticatedUser()
 	pushThroughInfo := PushThroughInfo{
-		At:     time.Now().Format(time.RFC3339),
-		UserID: user.ID,
-		Email:  user.Email,
-		Name:   user.Name,
+		At: time.Now().Format(time.RFC3339),
+	}
+	if user != nil {
+		pushThroughInfo.UserID = user.ID
+		pushThroughInfo.Email = user.Email
+		pushThroughInfo.Name = user.Name
 	}
 
 	// Get existing metadata
@@ -583,11 +567,6 @@ func (tg *TimeGate) findNextIncludeWeeklyTimeWithExcludes(now time.Time, item Ti
 		checkDate := now.AddDate(0, 0, i)
 		dayString := getDayString(checkDate.Weekday())
 
-		// Skip if date is excluded
-		if tg.isDateExcluded(checkDate, excludeDates) {
-			continue
-		}
-
 		if contains(item.Days, dayString) {
 			startHour := startTime / 60
 			startMinute := startTime % 60
@@ -596,6 +575,11 @@ func (tg *TimeGate) findNextIncludeWeeklyTimeWithExcludes(now time.Time, item Ti
 				checkDate.Year(), checkDate.Month(), checkDate.Day(),
 				startHour, startMinute, 0, 0, now.Location(),
 			)
+
+			// Check if the candidate time (with window start time) is excluded
+			if tg.isDateExcluded(candidateTime, excludeDates) {
+				continue
+			}
 
 			if i == 0 && !candidateTime.After(now) {
 				continue

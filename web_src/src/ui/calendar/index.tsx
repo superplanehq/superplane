@@ -99,37 +99,6 @@ const Calendar = ({
       }}
       components={{
         Root: ({ className, rootRef, ...rootProps }) => {
-          // #region agent log
-          React.useEffect(() => {
-            if (rootRef && "current" in rootRef && rootRef.current) {
-              const el = rootRef.current;
-              const computed = window.getComputedStyle(el);
-              const logData = {
-                location: "calendar/index.tsx:102",
-                message: "Calendar Root component rendered",
-                data: {
-                  className: el.className,
-                  bgColor: computed.backgroundColor,
-                  border: computed.border,
-                  borderRadius: computed.borderRadius,
-                  padding: computed.padding,
-                  hasDataSlot: el.getAttribute("data-slot"),
-                  parentClasses: el.parentElement?.className,
-                  parentDataSlot: el.parentElement?.getAttribute("data-slot"),
-                },
-                timestamp: Date.now(),
-                sessionId: "debug-session",
-                runId: "run1",
-                hypothesisId: "C",
-              };
-              fetch("http://127.0.0.1:7242/ingest/f719ffac-e1c8-4cef-8f17-d4bc91ac736c", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(logData),
-              }).catch(() => {});
-            }
-          }, [rootRef]);
-          // #endregion
           return <div data-slot="calendar" ref={rootRef} className={cn(className)} {...rootProps} />;
         },
         Chevron: ({ className, orientation, ...chevronProps }) => {

@@ -15,7 +15,7 @@ import {
 } from "@/ui/componentBase";
 import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
-import { getTriggerRenderer, getState } from ".";
+import { getTriggerRenderer } from ".";
 import { calcRelativeTimeFromDiff } from "@/lib/utils";
 import { formatTimeAgo } from "@/utils/date";
 
