@@ -11,10 +11,11 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // If account is not loaded and not loading, redirect to organization select
+  // If account is not loaded and not loading, redirect to login
   if (!loading && !account) {
     console.log("[AuthGuard] No account, redirecting to organization select from:", location.pathname);
-    navigate("/", { replace: true });
+    const redirectParam = encodeURIComponent(`${location.pathname}${location.search}`);
+    navigate(`/login?redirect=${redirectParam}`, { replace: true });
     return null;
   }
 

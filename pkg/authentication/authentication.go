@@ -3,12 +3,11 @@ package authentication
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"sort"
 	"time"
 
@@ -87,7 +86,7 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 
 func (a *Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/logout", a.handleLogout).Methods("GET")
-	router.HandleFunc("/login", a.handleLoginPage).Methods("GET")
+	router.HandleFunc("/auth/config", a.handleAuthConfig).Methods("GET")
 	if a.passwordLoginEnabled {
 		router.HandleFunc("/login", a.handlePasswordLogin).Methods("POST")
 	}
@@ -288,26 +287,7 @@ func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 }
 
-func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("account_token")
-	if err == nil {
-		_, err := a.jwtSigner.ValidateAndGetClaims(cookie.Value)
-		if err == nil {
-			redirectURL := getRedirectURL(r)
-			http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
-			return
-		}
-	}
-
-	templatePath := filepath.Join(a.templateDir, "login.html")
-
-	t, err := template.ParseFiles(templatePath)
-	if err != nil {
-		log.Errorf("Error parsing login template: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
+func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 	providers := goth.GetProviders()
 	providerNames := make([]string, 0, len(providers))
 	for name := range providers {
@@ -315,21 +295,17 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(providerNames)
 
-	redirectParam := r.URL.Query().Get("redirect")
-
-	data := struct {
-		Providers            []string
-		RedirectParam        string
-		PasswordLoginEnabled bool
+	response := struct {
+		Providers            []string `json:"providers"`
+		PasswordLoginEnabled bool     `json:"passwordLoginEnabled"`
 	}{
 		Providers:            providerNames,
-		RedirectParam:        redirectParam,
 		PasswordLoginEnabled: a.passwordLoginEnabled,
 	}
 
-	err = t.Execute(w, data)
-	if err != nil {
-		log.Errorf("Error executing login template: %v", err)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Errorf("Error encoding auth config: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }

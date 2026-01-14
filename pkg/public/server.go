@@ -337,10 +337,7 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 
 	log.Info("Running in production mode - serving static web assets")
 
-	handler := middleware.AccountAuthMiddleware(s.jwt).
-		Middleware(
-			web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath),
-		)
+	handler := web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath)
 
 	s.Router.PathPrefix(webBasePath).Handler(handler)
 
@@ -867,7 +864,7 @@ func (s *Server) setupDevProxy(webBasePath string) {
 		proxy.ServeHTTP(w, r)
 	})
 
-	s.Router.PathPrefix(webBasePath).Handler(middleware.AccountAuthMiddleware(s.jwt).Middleware(proxyHandler))
+	s.Router.PathPrefix(webBasePath).Handler(proxyHandler)
 }
 
 func getAvatarURL(providers []models.AccountProvider) string {

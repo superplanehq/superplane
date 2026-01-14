@@ -10,6 +10,7 @@ import AuthGuard from "./components/AuthGuard";
 import { AccountProvider } from "./contexts/AccountContext";
 import { isCustomComponentsEnabled } from "./lib/env";
 import EmailLogin from "./pages/auth/EmailLogin";
+import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
@@ -56,6 +57,7 @@ function App() {
               />
               <Route path=":organizationId/settings/*" element={withAuthOnly(OrganizationSettings)} />
               {/* Organization selection and creation */}
+              <Route path="login" element={<Login />} />
               <Route path="login/email" element={<EmailLogin />} />
               <Route path="create" element={<OrganizationCreate />} />
               <Route path="setup" element={<OwnerSetup />} />
