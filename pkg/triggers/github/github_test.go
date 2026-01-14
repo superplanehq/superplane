@@ -29,9 +29,9 @@ func Test__HandleWebhook(t *testing.T) {
 		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers:        headers,
-			EventContext:   &contexts.EventContext{},
-			WebhookContext: &contexts.WebhookContext{},
+			Headers: headers,
+			Events:  &contexts.EventContext{},
+			Webhook: &contexts.WebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -45,10 +45,10 @@ func Test__HandleWebhook(t *testing.T) {
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers:        headers,
-			Configuration:  Configuration{EventType: "push"},
-			EventContext:   eventContext,
-			WebhookContext: &contexts.WebhookContext{},
+			Headers:       headers,
+			Configuration: Configuration{EventType: "push"},
+			Events:        eventContext,
+			Webhook:       &contexts.WebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -64,11 +64,11 @@ func Test__HandleWebhook(t *testing.T) {
 		headers.Set("X-GitHub-Event", "push")
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:           []byte(`{"ref":"refs/heads/main"}`),
-			Headers:        headers,
-			Configuration:  Configuration{EventType: "push"},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   &contexts.EventContext{},
+			Body:          []byte(`{"ref":"refs/heads/main"}`),
+			Headers:       headers,
+			Configuration: Configuration{EventType: "push"},
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        &contexts.EventContext{},
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -89,11 +89,11 @@ func Test__HandleWebhook(t *testing.T) {
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:           body,
-			Headers:        headers,
-			Configuration:  Configuration{EventType: "push"},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Body:          body,
+			Headers:       headers,
+			Configuration: Configuration{EventType: "push"},
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -115,11 +115,11 @@ func Test__HandleWebhook(t *testing.T) {
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:           body,
-			Headers:        headers,
-			Configuration:  Configuration{EventType: "push"},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Body:          body,
+			Headers:       headers,
+			Configuration: Configuration{EventType: "push"},
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)

@@ -55,7 +55,7 @@ func (p *OnPipelineDone) Configuration() []configuration.Field {
 
 func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 	var metadata OnPipelineDoneMetadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
@@ -84,7 +84,7 @@ func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("error finding project %s: %v", config.Project, err)
 	}
 
-	err = ctx.MetadataContext.Set(OnPipelineDoneMetadata{
+	err = ctx.Metadata.Set(OnPipelineDoneMetadata{
 		Project: &Project{
 			ID:   project.Metadata.ProjectID,
 			Name: project.Metadata.ProjectName,
@@ -106,7 +106,7 @@ func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
 		Project: project.Metadata.ProjectName,
 	})
 }
@@ -130,7 +130,7 @@ func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
-	secret, err := ctx.WebhookContext.GetSecret()
+	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
 	}
@@ -145,7 +145,7 @@ func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	err = ctx.EventContext.Emit("semaphore.pipeline.done", data)
+	err = ctx.Events.Emit("semaphore.pipeline.done", data)
 
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)

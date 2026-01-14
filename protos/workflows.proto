@@ -389,6 +389,7 @@ message WorkflowNodeExecution {
   google.protobuf.Struct configuration = 15;
   repeated WorkflowNodeExecution child_executions = 16;
   WorkflowEvent root_event = 17;
+  UserRef cancelled_by = 18;
 }
 
 message WorkflowNodeQueueItem {
@@ -438,8 +439,9 @@ message WorkflowEvent {
   string workflow_id = 2;
   string node_id = 3;
   string channel = 4;
-  google.protobuf.Struct data = 5;
-  google.protobuf.Timestamp created_at = 6;
+  string custom_name = 5;
+  google.protobuf.Struct data = 6;
+  google.protobuf.Timestamp created_at = 7;
 }
 
 message WorkflowEventWithExecutions {
@@ -450,6 +452,7 @@ message WorkflowEventWithExecutions {
   google.protobuf.Struct data = 5;
   google.protobuf.Timestamp created_at = 6;
   repeated WorkflowNodeExecution executions = 7;
+  string custom_name = 8;
 }
 
 message ListEventExecutionsRequest {

@@ -8,6 +8,7 @@ package components
 
 import (
 	_struct "github.com/golang/protobuf/ptypes/struct"
+	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	configuration "github.com/superplanehq/superplane/pkg/protos/configuration"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
@@ -849,6 +850,115 @@ func (x *AppInstallationRef) GetName() string {
 	return ""
 }
 
+// Event message for component-triggered notifications.
+type NotificationEmailRequested struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	Title          string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Body           string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	Url            string                 `protobuf:"bytes,4,opt,name=url,proto3" json:"url,omitempty"`
+	UrlLabel       string                 `protobuf:"bytes,5,opt,name=url_label,json=urlLabel,proto3" json:"url_label,omitempty"`
+	Emails         []string               `protobuf:"bytes,6,rep,name=emails,proto3" json:"emails,omitempty"`
+	Groups         []string               `protobuf:"bytes,7,rep,name=groups,proto3" json:"groups,omitempty"`
+	Roles          []string               `protobuf:"bytes,8,rep,name=roles,proto3" json:"roles,omitempty"`
+	Timestamp      *timestamp.Timestamp   `protobuf:"bytes,9,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *NotificationEmailRequested) Reset() {
+	*x = NotificationEmailRequested{}
+	mi := &file_components_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NotificationEmailRequested) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NotificationEmailRequested) ProtoMessage() {}
+
+func (x *NotificationEmailRequested) ProtoReflect() protoreflect.Message {
+	mi := &file_components_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NotificationEmailRequested.ProtoReflect.Descriptor instead.
+func (*NotificationEmailRequested) Descriptor() ([]byte, []int) {
+	return file_components_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *NotificationEmailRequested) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
+}
+
+func (x *NotificationEmailRequested) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *NotificationEmailRequested) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *NotificationEmailRequested) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *NotificationEmailRequested) GetUrlLabel() string {
+	if x != nil {
+		return x.UrlLabel
+	}
+	return ""
+}
+
+func (x *NotificationEmailRequested) GetEmails() []string {
+	if x != nil {
+		return x.Emails
+	}
+	return nil
+}
+
+func (x *NotificationEmailRequested) GetGroups() []string {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
+func (x *NotificationEmailRequested) GetRoles() []string {
+	if x != nil {
+		return x.Roles
+	}
+	return nil
+}
+
+func (x *NotificationEmailRequested) GetTimestamp() *timestamp.Timestamp {
+	if x != nil {
+		return x.Timestamp
+	}
+	return nil
+}
+
 type Node_ComponentRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -858,7 +968,7 @@ type Node_ComponentRef struct {
 
 func (x *Node_ComponentRef) Reset() {
 	*x = Node_ComponentRef{}
-	mi := &file_components_proto_msgTypes[13]
+	mi := &file_components_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -870,7 +980,7 @@ func (x *Node_ComponentRef) String() string {
 func (*Node_ComponentRef) ProtoMessage() {}
 
 func (x *Node_ComponentRef) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[13]
+	mi := &file_components_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -902,7 +1012,7 @@ type Node_TriggerRef struct {
 
 func (x *Node_TriggerRef) Reset() {
 	*x = Node_TriggerRef{}
-	mi := &file_components_proto_msgTypes[14]
+	mi := &file_components_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -914,7 +1024,7 @@ func (x *Node_TriggerRef) String() string {
 func (*Node_TriggerRef) ProtoMessage() {}
 
 func (x *Node_TriggerRef) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[14]
+	mi := &file_components_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -946,7 +1056,7 @@ type Node_WidgetRef struct {
 
 func (x *Node_WidgetRef) Reset() {
 	*x = Node_WidgetRef{}
-	mi := &file_components_proto_msgTypes[15]
+	mi := &file_components_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -958,7 +1068,7 @@ func (x *Node_WidgetRef) String() string {
 func (*Node_WidgetRef) ProtoMessage() {}
 
 func (x *Node_WidgetRef) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[15]
+	mi := &file_components_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -990,7 +1100,7 @@ type Node_BlueprintRef struct {
 
 func (x *Node_BlueprintRef) Reset() {
 	*x = Node_BlueprintRef{}
-	mi := &file_components_proto_msgTypes[16]
+	mi := &file_components_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1002,7 +1112,7 @@ func (x *Node_BlueprintRef) String() string {
 func (*Node_BlueprintRef) ProtoMessage() {}
 
 func (x *Node_BlueprintRef) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[16]
+	mi := &file_components_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1029,7 +1139,7 @@ var File_components_proto protoreflect.FileDescriptor
 
 const file_components_proto_rawDesc = "" +
 	"\n" +
-	"\x10components.proto\x12\x15Superplane.Components\x1a\x13configuration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x17\n" +
+	"\x10components.proto\x12\x15Superplane.Components\x1a\x13configuration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x17\n" +
 	"\x15ListComponentsRequest\"Z\n" +
 	"\x16ListComponentsResponse\x12@\n" +
 	"\n" +
@@ -1099,7 +1209,17 @@ const file_components_proto_rawDesc = "" +
 	"\achannel\x18\x03 \x01(\tR\achannel\"8\n" +
 	"\x12AppInstallationRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name2\xb6\x05\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x9e\x02\n" +
+	"\x1aNotificationEmailRequested\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
+	"\x04body\x18\x03 \x01(\tR\x04body\x12\x10\n" +
+	"\x03url\x18\x04 \x01(\tR\x03url\x12\x1b\n" +
+	"\turl_label\x18\x05 \x01(\tR\burlLabel\x12\x16\n" +
+	"\x06emails\x18\x06 \x03(\tR\x06emails\x12\x16\n" +
+	"\x06groups\x18\a \x03(\tR\x06groups\x12\x14\n" +
+	"\x05roles\x18\b \x03(\tR\x05roles\x128\n" +
+	"\ttimestamp\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xb6\x05\n" +
 	"\n" +
 	"Components\x12\xca\x01\n" +
 	"\x0eListComponents\x12,.Superplane.Components.ListComponentsRequest\x1a-.Superplane.Components.ListComponentsResponse\"[\x92A>\n" +
@@ -1124,7 +1244,7 @@ func file_components_proto_rawDescGZIP() []byte {
 }
 
 var file_components_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_components_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_components_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_components_proto_goTypes = []any{
 	(Node_Type)(0),                       // 0: Superplane.Components.Node.Type
 	(*ListComponentsRequest)(nil),        // 1: Superplane.Components.ListComponentsRequest
@@ -1140,40 +1260,43 @@ var file_components_proto_goTypes = []any{
 	(*Position)(nil),                     // 11: Superplane.Components.Position
 	(*Edge)(nil),                         // 12: Superplane.Components.Edge
 	(*AppInstallationRef)(nil),           // 13: Superplane.Components.AppInstallationRef
-	(*Node_ComponentRef)(nil),            // 14: Superplane.Components.Node.ComponentRef
-	(*Node_TriggerRef)(nil),              // 15: Superplane.Components.Node.TriggerRef
-	(*Node_WidgetRef)(nil),               // 16: Superplane.Components.Node.WidgetRef
-	(*Node_BlueprintRef)(nil),            // 17: Superplane.Components.Node.BlueprintRef
-	(*configuration.Field)(nil),          // 18: Superplane.Configuration.Field
-	(*_struct.Struct)(nil),               // 19: google.protobuf.Struct
+	(*NotificationEmailRequested)(nil),   // 14: Superplane.Components.NotificationEmailRequested
+	(*Node_ComponentRef)(nil),            // 15: Superplane.Components.Node.ComponentRef
+	(*Node_TriggerRef)(nil),              // 16: Superplane.Components.Node.TriggerRef
+	(*Node_WidgetRef)(nil),               // 17: Superplane.Components.Node.WidgetRef
+	(*Node_BlueprintRef)(nil),            // 18: Superplane.Components.Node.BlueprintRef
+	(*configuration.Field)(nil),          // 19: Superplane.Configuration.Field
+	(*_struct.Struct)(nil),               // 20: google.protobuf.Struct
+	(*timestamp.Timestamp)(nil),          // 21: google.protobuf.Timestamp
 }
 var file_components_proto_depIdxs = []int32{
 	5,  // 0: Superplane.Components.ListComponentsResponse.components:type_name -> Superplane.Components.Component
 	5,  // 1: Superplane.Components.DescribeComponentResponse.component:type_name -> Superplane.Components.Component
-	18, // 2: Superplane.Components.Component.configuration:type_name -> Superplane.Configuration.Field
+	19, // 2: Superplane.Components.Component.configuration:type_name -> Superplane.Configuration.Field
 	6,  // 3: Superplane.Components.Component.output_channels:type_name -> Superplane.Components.OutputChannel
-	18, // 4: Superplane.Components.ComponentAction.parameters:type_name -> Superplane.Configuration.Field
+	19, // 4: Superplane.Components.ComponentAction.parameters:type_name -> Superplane.Configuration.Field
 	8,  // 5: Superplane.Components.ListComponentActionsResponse.actions:type_name -> Superplane.Components.ComponentAction
 	0,  // 6: Superplane.Components.Node.type:type_name -> Superplane.Components.Node.Type
-	19, // 7: Superplane.Components.Node.configuration:type_name -> google.protobuf.Struct
-	19, // 8: Superplane.Components.Node.metadata:type_name -> google.protobuf.Struct
+	20, // 7: Superplane.Components.Node.configuration:type_name -> google.protobuf.Struct
+	20, // 8: Superplane.Components.Node.metadata:type_name -> google.protobuf.Struct
 	11, // 9: Superplane.Components.Node.position:type_name -> Superplane.Components.Position
-	14, // 10: Superplane.Components.Node.component:type_name -> Superplane.Components.Node.ComponentRef
-	17, // 11: Superplane.Components.Node.blueprint:type_name -> Superplane.Components.Node.BlueprintRef
-	15, // 12: Superplane.Components.Node.trigger:type_name -> Superplane.Components.Node.TriggerRef
-	16, // 13: Superplane.Components.Node.widget:type_name -> Superplane.Components.Node.WidgetRef
+	15, // 10: Superplane.Components.Node.component:type_name -> Superplane.Components.Node.ComponentRef
+	18, // 11: Superplane.Components.Node.blueprint:type_name -> Superplane.Components.Node.BlueprintRef
+	16, // 12: Superplane.Components.Node.trigger:type_name -> Superplane.Components.Node.TriggerRef
+	17, // 13: Superplane.Components.Node.widget:type_name -> Superplane.Components.Node.WidgetRef
 	13, // 14: Superplane.Components.Node.app_installation:type_name -> Superplane.Components.AppInstallationRef
-	1,  // 15: Superplane.Components.Components.ListComponents:input_type -> Superplane.Components.ListComponentsRequest
-	3,  // 16: Superplane.Components.Components.DescribeComponent:input_type -> Superplane.Components.DescribeComponentRequest
-	7,  // 17: Superplane.Components.Components.ListComponentActions:input_type -> Superplane.Components.ListComponentActionsRequest
-	2,  // 18: Superplane.Components.Components.ListComponents:output_type -> Superplane.Components.ListComponentsResponse
-	4,  // 19: Superplane.Components.Components.DescribeComponent:output_type -> Superplane.Components.DescribeComponentResponse
-	9,  // 20: Superplane.Components.Components.ListComponentActions:output_type -> Superplane.Components.ListComponentActionsResponse
-	18, // [18:21] is the sub-list for method output_type
-	15, // [15:18] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	21, // 15: Superplane.Components.NotificationEmailRequested.timestamp:type_name -> google.protobuf.Timestamp
+	1,  // 16: Superplane.Components.Components.ListComponents:input_type -> Superplane.Components.ListComponentsRequest
+	3,  // 17: Superplane.Components.Components.DescribeComponent:input_type -> Superplane.Components.DescribeComponentRequest
+	7,  // 18: Superplane.Components.Components.ListComponentActions:input_type -> Superplane.Components.ListComponentActionsRequest
+	2,  // 19: Superplane.Components.Components.ListComponents:output_type -> Superplane.Components.ListComponentsResponse
+	4,  // 20: Superplane.Components.Components.DescribeComponent:output_type -> Superplane.Components.DescribeComponentResponse
+	9,  // 21: Superplane.Components.Components.ListComponentActions:output_type -> Superplane.Components.ListComponentActionsResponse
+	19, // [19:22] is the sub-list for method output_type
+	16, // [16:19] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_components_proto_init() }
@@ -1187,7 +1310,7 @@ func file_components_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_components_proto_rawDesc), len(file_components_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

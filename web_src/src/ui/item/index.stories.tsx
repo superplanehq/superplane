@@ -38,7 +38,7 @@ const meta = {
     <div className="w-[360px]">
       <Item {...args}>
         <ItemMedia variant="icon">
-          <ShieldAlert className="text-amber-500" />
+          <ShieldAlert className="text-amber-600" />
         </ItemMedia>
         <ItemContent>
           <ItemTitle>Security Alert</ItemTitle>

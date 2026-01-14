@@ -1,6 +1,7 @@
 package core
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -113,18 +114,34 @@ type OutputChannel struct {
  * to control the state and metadata of each execution of it.
  */
 type ExecutionContext struct {
-	ID                     uuid.UUID
-	WorkflowID             string
-	Data                   any
-	Configuration          any
-	Logger                 *log.Entry
-	MetadataContext        MetadataContext
-	NodeMetadataContext    MetadataContext
-	ExecutionStateContext  ExecutionStateContext
-	RequestContext         RequestContext
-	AuthContext            AuthContext
-	IntegrationContext     IntegrationContext
-	AppInstallationContext AppInstallationContext
+	ID              uuid.UUID
+	WorkflowID      string
+	OrganizationID  string
+	NodeID          string
+	BaseURL         string
+	Data            any
+	Configuration   any
+	Logger          *log.Entry
+	HTTP            HTTPContext
+	Metadata        MetadataContext
+	NodeMetadata    MetadataContext
+	ExecutionState  ExecutionStateContext
+	Requests        RequestContext
+	Auth            AuthContext
+	Integration     IntegrationContext
+	AppInstallation AppInstallationContext
+	Notifications   NotificationContext
+}
+
+/*
+ * Components / triggers / applications should always
+ * use this context instead of the net/http directly for executing HTTP requests.
+ *
+ * This makes it easy for us to write unit tests for the implementations,
+ * and also makes it easier to control HTTP timeouts for everything in one place.
+ */
+type HTTPContext interface {
+	Do(*http.Request) (*http.Response, error)
 }
 
 /*
@@ -132,13 +149,14 @@ type ExecutionContext struct {
  * to control the state and metadata of each execution of it.
  */
 type SetupContext struct {
-	Logger                 *log.Entry
-	Configuration          any
-	MetadataContext        MetadataContext
-	RequestContext         RequestContext
-	AuthContext            AuthContext
-	IntegrationContext     IntegrationContext
-	AppInstallationContext AppInstallationContext
+	Logger          *log.Entry
+	Configuration   any
+	HTTP            HTTPContext
+	Metadata        MetadataContext
+	Requests        RequestContext
+	Auth            AuthContext
+	Integration     IntegrationContext
+	AppInstallation AppInstallationContext
 }
 
 /*
@@ -208,16 +226,18 @@ type Action struct {
  * and control the state and metadata of each execution of it.
  */
 type ActionContext struct {
-	Name                   string
-	Configuration          any
-	Parameters             map[string]any
-	Logger                 *log.Entry
-	MetadataContext        MetadataContext
-	ExecutionStateContext  ExecutionStateContext
-	AuthContext            AuthContext
-	RequestContext         RequestContext
-	IntegrationContext     IntegrationContext
-	AppInstallationContext AppInstallationContext
+	Name            string
+	Configuration   any
+	Parameters      map[string]any
+	Logger          *log.Entry
+	HTTP            HTTPContext
+	Metadata        MetadataContext
+	ExecutionState  ExecutionStateContext
+	Auth            AuthContext
+	Requests        RequestContext
+	Integration     IntegrationContext
+	AppInstallation AppInstallationContext
+	Notifications   NotificationContext
 }
 
 /*
@@ -274,6 +294,16 @@ type AuthContext interface {
 	GetUser(id uuid.UUID) (*User, error)
 	HasRole(role string) (bool, error)
 	InGroup(group string) (bool, error)
+}
+
+type NotificationReceivers struct {
+	Emails []string
+	Groups []string
+	Roles  []string
+}
+
+type NotificationContext interface {
+	Send(title, body, url, urlLabel string, receivers NotificationReceivers) error
 }
 
 type User struct {

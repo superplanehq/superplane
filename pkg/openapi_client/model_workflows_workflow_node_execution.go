@@ -38,6 +38,7 @@ type WorkflowsWorkflowNodeExecution struct {
 	Configuration       map[string]interface{}             `json:"configuration,omitempty"`
 	ChildExecutions     []WorkflowsWorkflowNodeExecution   `json:"childExecutions,omitempty"`
 	RootEvent           *WorkflowsWorkflowEvent            `json:"rootEvent,omitempty"`
+	CancelledBy         *SuperplaneWorkflowsUserRef        `json:"cancelledBy,omitempty"`
 }
 
 // NewWorkflowsWorkflowNodeExecution instantiates a new WorkflowsWorkflowNodeExecution object
@@ -613,6 +614,38 @@ func (o *WorkflowsWorkflowNodeExecution) SetRootEvent(v WorkflowsWorkflowEvent) 
 	o.RootEvent = &v
 }
 
+// GetCancelledBy returns the CancelledBy field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowNodeExecution) GetCancelledBy() SuperplaneWorkflowsUserRef {
+	if o == nil || IsNil(o.CancelledBy) {
+		var ret SuperplaneWorkflowsUserRef
+		return ret
+	}
+	return *o.CancelledBy
+}
+
+// GetCancelledByOk returns a tuple with the CancelledBy field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowNodeExecution) GetCancelledByOk() (*SuperplaneWorkflowsUserRef, bool) {
+	if o == nil || IsNil(o.CancelledBy) {
+		return nil, false
+	}
+	return o.CancelledBy, true
+}
+
+// HasCancelledBy returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowNodeExecution) HasCancelledBy() bool {
+	if o != nil && !IsNil(o.CancelledBy) {
+		return true
+	}
+
+	return false
+}
+
+// SetCancelledBy gets a reference to the given SuperplaneWorkflowsUserRef and assigns it to the CancelledBy field.
+func (o *WorkflowsWorkflowNodeExecution) SetCancelledBy(v SuperplaneWorkflowsUserRef) {
+	o.CancelledBy = &v
+}
+
 func (o WorkflowsWorkflowNodeExecution) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -673,6 +706,9 @@ func (o WorkflowsWorkflowNodeExecution) ToMap() (map[string]interface{}, error) 
 	}
 	if !IsNil(o.RootEvent) {
 		toSerialize["rootEvent"] = o.RootEvent
+	}
+	if !IsNil(o.CancelledBy) {
+		toSerialize["cancelledBy"] = o.CancelledBy
 	}
 	return toSerialize, nil
 }

@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon, isUrl, calcRelativeTimeFromDiff } from "@/lib/utils";
 import React, { useCallback, useMemo, useState } from "react";
-import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
+import {
+  DEFAULT_EVENT_STATE_MAP,
+  EventState,
+  EventStateMap,
+  EventStateStyle,
+  ComponentBaseSpecValue,
+} from "@/ui/componentBase";
 import { WorkflowsWorkflowNodeExecution, ComponentsNode, WorkflowsWorkflowEvent } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
@@ -39,6 +45,35 @@ export interface ChainItemData {
     payload?: any;
   };
 }
+
+type DetailValue = {
+  text: string;
+  comment?: string;
+};
+
+type ExpressionBadges = {
+  __type: "expressionBadges";
+  values: ComponentBaseSpecValue[];
+};
+
+type EvaluationBadges = {
+  __type: "evaluationBadges";
+  values: ComponentBaseSpecValue[];
+  passed: boolean;
+  failedParts?: string[];
+};
+
+type ErrorValue = {
+  __type: "error";
+  message: string;
+};
+
+type ApprovalTimelineEntry = {
+  label: string;
+  status: string;
+  timestamp?: string;
+  comment?: string;
+};
 
 interface ChainItemProps {
   item: ChainItemData;
@@ -110,6 +145,40 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   const EventBadgeColor = eventStateStyle.badgeColor;
 
   const showConnectingLine = totalItems && index < totalItems - 1;
+  const isDetailValue = (value: unknown): value is DetailValue => {
+    if (!value || typeof value !== "object") return false;
+    return "text" in value && typeof (value as DetailValue).text === "string";
+  };
+  const isExpressionBadges = (value: unknown): value is ExpressionBadges => {
+    if (!value || typeof value !== "object") return false;
+    return "__type" in value && (value as ExpressionBadges).__type === "expressionBadges";
+  };
+  const isEvaluationBadges = (value: unknown): value is EvaluationBadges => {
+    if (!value || typeof value !== "object") return false;
+    return "__type" in value && (value as EvaluationBadges).__type === "evaluationBadges";
+  };
+  const isErrorValue = (value: unknown): value is ErrorValue => {
+    if (!value || typeof value !== "object") return false;
+    return "__type" in value && (value as ErrorValue).__type === "error";
+  };
+  const isApprovalTimeline = (value: unknown): value is ApprovalTimelineEntry[] => {
+    if (!Array.isArray(value)) return false;
+    return value.every(
+      (entry) =>
+        entry &&
+        typeof entry === "object" &&
+        "label" in entry &&
+        "status" in entry &&
+        typeof (entry as ApprovalTimelineEntry).label === "string" &&
+        typeof (entry as ApprovalTimelineEntry).status === "string",
+    );
+  };
+  const getApprovalStatusColor = (status: string) => {
+    const normalized = status.toLowerCase();
+    if (normalized === "approved") return "bg-emerald-500";
+    if (normalized === "rejected") return "bg-red-500";
+    return "bg-gray-400";
+  };
 
   return (
     <div className="relative">
@@ -258,6 +327,268 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             {activeTab === "current" && item.tabData.current && (
               <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 pt-2 pb-3">
                 {Object.entries(item.tabData.current).map(([key, value]) => {
+                  if (isApprovalTimeline(value)) {
+                    return (
+                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                          {key}:
+                        </span>
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
+                          <div className="flex flex-col gap-3">
+                            {value.map((entry, entryIndex) => (
+                              <div key={`${entry.label}-${entryIndex}`} className="relative pl-4">
+                                <div
+                                  className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ${getApprovalStatusColor(
+                                    entry.status,
+                                  )}`}
+                                />
+                                {entryIndex < value.length - 1 && (
+                                  <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
+                                )}
+                                <div className="text-[13px] text-gray-800 font-medium truncate" title={entry.label}>
+                                  {entry.label}
+                                </div>
+                                <div
+                                  className="text-[12px] text-gray-600 truncate"
+                                  title={`${entry.status}${entry.timestamp ? ` ${entry.timestamp}` : ""}`}
+                                >
+                                  {entry.status}
+                                  {entry.timestamp ? ` ${entry.timestamp}` : ""}
+                                </div>
+                                {entry.comment && (
+                                  <div className="text-[12px] text-gray-500 italic break-words">"{entry.comment}"</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (isExpressionBadges(value)) {
+                    return (
+                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                          {key}:
+                        </span>
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0 overflow-hidden">
+                          <div className="flex flex-col gap-2 max-w-full">
+                            {value.values.map((specValue, specIndex) => {
+                              // Check if the last badge is a logical operator
+                              const badges = specValue.badges;
+                              const lastBadge = badges[badges.length - 1];
+                              const isLogicalOperator =
+                                lastBadge &&
+                                (lastBadge.label === "&&" ||
+                                  lastBadge.label === "||" ||
+                                  lastBadge.label.toLowerCase() === "and" ||
+                                  lastBadge.label.toLowerCase() === "or");
+
+                              if (isLogicalOperator && badges.length > 1) {
+                                // Split: render condition on one line, operator on its own line
+                                return (
+                                  <React.Fragment key={specIndex}>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {badges.slice(0, -1).map((badge, badgeIndex) => (
+                                        <span
+                                          key={badgeIndex}
+                                          className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${badge.bgColor} ${badge.textColor}`}
+                                        >
+                                          {badge.label}
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${lastBadge.bgColor} ${lastBadge.textColor}`}
+                                      >
+                                        {lastBadge.label}
+                                      </span>
+                                    </div>
+                                  </React.Fragment>
+                                );
+                              }
+
+                              // Normal rendering for groups without logical operators at the end
+                              return (
+                                <div key={specIndex} className="flex items-center gap-2 flex-wrap">
+                                  {badges.map((badge, badgeIndex) => (
+                                    <span
+                                      key={badgeIndex}
+                                      className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${badge.bgColor} ${badge.textColor}`}
+                                    >
+                                      {badge.label}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (isEvaluationBadges(value)) {
+                    // Operators that should always use default gray styling
+                    const operators = new Set([
+                      ">=",
+                      "<=",
+                      "==",
+                      "!=",
+                      ">",
+                      "<",
+                      "contains",
+                      "startswith",
+                      "endswith",
+                      "matches",
+                      "in",
+                      "!",
+                      "+",
+                      "-",
+                      "*",
+                      "/",
+                      "%",
+                      "**",
+                      "??",
+                      "?",
+                      ":",
+                    ]);
+                    const logicalOperators = new Set(["and", "or", "||", "&&"]);
+
+                    // Helper to determine if a badge should be red
+                    // A badge is red if it's part of a failed comparison (but not if it's an operator)
+                    const shouldBeRed = (badgeLabel: string) => {
+                      if (!value.failedParts || value.failedParts.length === 0) {
+                        return false;
+                      }
+                      // Operators always use their default gray styling
+                      const normalizedLabel = badgeLabel.trim().toLowerCase();
+                      if (operators.has(normalizedLabel) || logicalOperators.has(normalizedLabel)) {
+                        return false;
+                      }
+                      // Check if this badge label matches any failed part
+                      const trimmedLabel = badgeLabel.trim();
+                      return value.failedParts.some((failedPart) => {
+                        const normalizedFailed = failedPart.trim();
+                        return trimmedLabel === normalizedFailed;
+                      });
+                    };
+
+                    return (
+                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                          {key}:
+                        </span>
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0 overflow-hidden">
+                          <div className="flex flex-col gap-2 max-w-full">
+                            {value.values.map((specValue, specIndex) => {
+                              // Check if the last badge is a logical operator
+                              const badges = specValue.badges;
+                              const lastBadge = badges[badges.length - 1];
+                              const isLogicalOperator =
+                                lastBadge &&
+                                (lastBadge.label === "&&" ||
+                                  lastBadge.label === "||" ||
+                                  lastBadge.label.toLowerCase() === "and" ||
+                                  lastBadge.label.toLowerCase() === "or");
+
+                              if (isLogicalOperator && badges.length > 1) {
+                                // Split: render condition on one line, operator on its own line
+                                return (
+                                  <React.Fragment key={specIndex}>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {badges.slice(0, -1).map((badge, badgeIndex) => {
+                                        // Use red only for null/undefined when failed, otherwise use original colors
+                                        const isRed = shouldBeRed(badge.label);
+                                        const badgeBg = isRed ? "bg-red-200" : badge.bgColor;
+                                        const badgeText = isRed ? "text-red-900" : badge.textColor;
+                                        return (
+                                          <span
+                                            key={badgeIndex}
+                                            className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${badgeBg} ${badgeText}`}
+                                          >
+                                            {badge.label}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${lastBadge.bgColor} ${lastBadge.textColor}`}
+                                      >
+                                        {lastBadge.label}
+                                      </span>
+                                    </div>
+                                  </React.Fragment>
+                                );
+                              }
+
+                              // Normal rendering for groups without logical operators at the end
+                              return (
+                                <div key={specIndex} className="flex items-center gap-2 flex-wrap">
+                                  {badges.map((badge, badgeIndex) => {
+                                    // Use red only for null/undefined when failed, otherwise use original colors
+                                    const isRed = shouldBeRed(badge.label);
+                                    const badgeBg = isRed ? "bg-red-200" : badge.bgColor;
+                                    const badgeText = isRed ? "text-red-900" : badge.textColor;
+                                    return (
+                                      <span
+                                        key={badgeIndex}
+                                        className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap flex-shrink-0 ${badgeBg} ${badgeText}`}
+                                      >
+                                        {badge.label}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (isErrorValue(value)) {
+                    return (
+                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                        <span
+                          className="text-[13px] flex-shrink-0 text-right w-[30%] truncate text-red-600"
+                          title={key}
+                        >
+                          {key}:
+                        </span>
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-red-600 min-w-0">
+                          <div className="break-words whitespace-normal" title={value.message}>
+                            {value.message}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (isDetailValue(value)) {
+                    return (
+                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                          {key}:
+                        </span>
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
+                          <div className="truncate" title={value.text}>
+                            {value.text}
+                          </div>
+                          {value.comment && (
+                            <div className="text-[12px] text-gray-500 italic truncate" title={value.comment}>
+                              "{value.comment}"
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
                   const stringValue = String(value);
                   const isUrlValue = isUrl(stringValue);
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { Label } from "../label";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/ui/switch";
 import { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
@@ -25,7 +25,12 @@ import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
-import { isFieldVisible, isFieldRequired, validateFieldForSubmission } from "../../utils/components";
+import {
+  isFieldVisible,
+  isFieldRequired,
+  parseDefaultValues,
+  validateFieldForSubmission,
+} from "../../utils/components";
 import { ValidationError } from "./types";
 import { AuthorizationDomainType } from "@/api-client";
 
@@ -52,35 +57,50 @@ export const ConfigurationFieldRenderer = ({
   fieldPath,
   realtimeValidationErrors,
   enableRealtimeValidation = false,
+  autocompleteExampleObj,
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
+
+  const parsedDefaultValue = React.useMemo(() => {
+    if (!field.name) return undefined;
+    return parseDefaultValues([field])[field.name];
+  }, [field]);
 
   const handleToggleChange = React.useCallback(
     (checked: boolean) => {
       if (!isTogglable) return;
 
       if (checked) {
-        const defaultVal = field.defaultValue;
         if (field.type === "select" && field.typeOptions?.select?.options) {
           const selectOptions = field.typeOptions.select.options;
           const initialValue =
-            defaultVal && selectOptions.some((opt) => opt.value === defaultVal)
-              ? defaultVal
+            parsedDefaultValue && selectOptions.some((opt) => opt.value === parsedDefaultValue)
+              ? parsedDefaultValue
               : selectOptions.length > 0
                 ? selectOptions[0].value
                 : "";
           onChange(initialValue);
-        } else if (field.type === "list") {
-          onChange([]);
+        } else if (field.type === "list" || field.type === "multi-select" || field.type === "any-predicate-list") {
+          onChange(Array.isArray(parsedDefaultValue) ? parsedDefaultValue : []);
+        } else if (field.type === "object") {
+          onChange(
+            parsedDefaultValue && typeof parsedDefaultValue === "object" && !Array.isArray(parsedDefaultValue)
+              ? parsedDefaultValue
+              : {},
+          );
+        } else if (field.type === "number") {
+          onChange(typeof parsedDefaultValue === "number" ? parsedDefaultValue : 0);
+        } else if (field.type === "boolean") {
+          onChange(typeof parsedDefaultValue === "boolean" ? parsedDefaultValue : false);
         } else {
-          onChange(defaultVal || (field.type === "number" ? 0 : ""));
+          onChange(parsedDefaultValue ?? "");
         }
       } else {
         onChange(null);
       }
     },
-    [isTogglable, field, onChange],
+    [isTogglable, field, onChange, parsedDefaultValue],
   );
 
   // Check visibility conditions
@@ -188,7 +208,7 @@ export const ConfigurationFieldRenderer = ({
     return null;
   }
   const renderField = () => {
-    const commonProps = { field, value, onChange, allValues, hasError: hasFieldError };
+    const commonProps = { field, value, onChange, allValues, hasError: hasFieldError, autocompleteExampleObj };
 
     switch (field.type) {
       case "string":
@@ -260,19 +280,44 @@ export const ConfigurationFieldRenderer = ({
         if (!domainId) {
           return <div className="text-sm text-red-500 dark:text-red-400">User field requires domainId prop</div>;
         }
-        return <UserFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} />;
+        return (
+          <UserFieldRenderer
+            field={field}
+            value={value as string}
+            onChange={onChange}
+            domainId={domainId}
+            allValues={allValues}
+          />
+        );
 
       case "role":
         if (!domainId) {
           return <div className="text-sm text-red-500 dark:text-red-400">Role field requires domainId prop</div>;
         }
-        return <RoleFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} />;
+        return (
+          <RoleFieldRenderer
+            field={field}
+            value={value as string}
+            onChange={onChange}
+            domainId={domainId}
+            allValues={allValues}
+          />
+        );
 
       case "group":
         if (!domainId) {
           return <div className="text-sm text-red-500 dark:text-red-400">Group field requires domainId prop</div>;
         }
-        return <GroupFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} />;
+        return (
+          <GroupFieldRenderer
+            {...commonProps}
+            field={field}
+            value={value as string}
+            onChange={onChange}
+            domainId={domainId}
+            allValues={allValues}
+          />
+        );
 
       case "list":
         return (

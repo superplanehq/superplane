@@ -70,8 +70,8 @@ func (r *OnRelease) Configuration() []configuration.Field {
 
 func (r *OnRelease) Setup(ctx core.TriggerContext) error {
 	err := ensureRepoInMetadata(
-		ctx.MetadataContext,
-		ctx.AppInstallationContext,
+		ctx.Metadata,
+		ctx.AppInstallation,
 		ctx.Configuration,
 	)
 
@@ -84,7 +84,7 @@ func (r *OnRelease) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
 		EventType:  "release",
 		Repository: config.Repository,
 	})
@@ -120,7 +120,7 @@ func (r *OnRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusOK, nil
 	}
 
-	err = ctx.EventContext.Emit("github.release", data)
+	err = ctx.Events.Emit("github.release", data)
 
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)

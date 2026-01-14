@@ -16,4 +16,5 @@ export interface FieldRendererProps {
   hasError?: boolean;
   validationErrors?: ValidationError[] | Set<string>;
   fieldPath?: string;
+  autocompleteExampleObj?: Record<string, unknown> | null;
 }

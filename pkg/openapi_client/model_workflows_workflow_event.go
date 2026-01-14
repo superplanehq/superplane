@@ -25,6 +25,7 @@ type WorkflowsWorkflowEvent struct {
 	WorkflowId *string                `json:"workflowId,omitempty"`
 	NodeId     *string                `json:"nodeId,omitempty"`
 	Channel    *string                `json:"channel,omitempty"`
+	CustomName *string                `json:"customName,omitempty"`
 	Data       map[string]interface{} `json:"data,omitempty"`
 	CreatedAt  *time.Time             `json:"createdAt,omitempty"`
 }
@@ -174,6 +175,38 @@ func (o *WorkflowsWorkflowEvent) SetChannel(v string) {
 	o.Channel = &v
 }
 
+// GetCustomName returns the CustomName field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowEvent) GetCustomName() string {
+	if o == nil || IsNil(o.CustomName) {
+		var ret string
+		return ret
+	}
+	return *o.CustomName
+}
+
+// GetCustomNameOk returns a tuple with the CustomName field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowEvent) GetCustomNameOk() (*string, bool) {
+	if o == nil || IsNil(o.CustomName) {
+		return nil, false
+	}
+	return o.CustomName, true
+}
+
+// HasCustomName returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowEvent) HasCustomName() bool {
+	if o != nil && !IsNil(o.CustomName) {
+		return true
+	}
+
+	return false
+}
+
+// SetCustomName gets a reference to the given string and assigns it to the CustomName field.
+func (o *WorkflowsWorkflowEvent) SetCustomName(v string) {
+	o.CustomName = &v
+}
+
 // GetData returns the Data field value if set, zero value otherwise.
 func (o *WorkflowsWorkflowEvent) GetData() map[string]interface{} {
 	if o == nil || IsNil(o.Data) {
@@ -259,6 +292,9 @@ func (o WorkflowsWorkflowEvent) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Channel) {
 		toSerialize["channel"] = o.Channel
+	}
+	if !IsNil(o.CustomName) {
+		toSerialize["customName"] = o.CustomName
 	}
 	if !IsNil(o.Data) {
 		toSerialize["data"] = o.Data

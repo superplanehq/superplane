@@ -23,7 +23,7 @@
 
 ## Overview
 
-Events are the core mechanism that drives workflow execution in Superplane. Every component interaction, data transfer, and workflow progression happens through events. Data flows through workflows via inputs and outputs, allowing components to pass information and coordinate their operations.
+Events are the core mechanism that drives workflow execution in SuperPlane. Every component interaction, data transfer, and workflow progression happens through events. Data flows through workflows via inputs and outputs, allowing components to pass information and coordinate their operations.
 
 **Key concepts:**
 - **Events** carry data between components and trigger workflow execution
@@ -62,7 +62,7 @@ Events contain three main parts:
 }
 ```
 
-**Context:** Superplane-specific information
+**Context:** SuperPlane-specific information
 ```json
 {
   "source": "github-webhook",
@@ -360,7 +360,7 @@ spec:
 
 ### Pushing Outputs from Executions
 
-Executors can push outputs back to Superplane using the `/outputs` API endpoint. This is typically done from within the executing system (CI/CD pipeline, script, etc.).
+Executors can push outputs back to SuperPlane using the `/outputs` API endpoint. This is typically done from within the executing system (CI/CD pipeline, script, etc.).
 
 **Using OIDC tokens (Semaphore example):**
 ```bash
@@ -398,7 +398,7 @@ curl \
 ```
 
 **Parameters:**
-- `execution_id` - Superplane execution identifier (passed as parameter to executor)
+- `execution_id` - SuperPlane execution identifier (passed as parameter to executor)
 - `external_id` - External system's run/workflow identifier
 - `outputs` - Key-value pairs of output data
 

@@ -2,8 +2,10 @@
 import {
   ComponentsComponent,
   ComponentsNode,
+  GroupsGroup,
   RolesRole,
   SuperplaneUsersUser,
+  groupsListGroupUsers,
   workflowsInvokeNodeExecutionAction,
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
@@ -33,6 +35,11 @@ type ApprovalItem = {
   user?: string;
   role?: string;
   group?: string;
+};
+
+type ApprovalLabelMaps = {
+  rolesByName?: Record<string, string>;
+  groupsByName?: Record<string, string>;
 };
 
 export const APPROVAL_STATE_MAP: EventStateMap = {
@@ -133,7 +140,6 @@ export const approvalMapper: ComponentBaseMapper = {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const items = (node.configuration?.items || []) as ApprovalItem[];
     const approvals = (additionalData as { approvals?: ApprovalItemProps[] })?.approvals || [];
-
     return {
       iconSlug: componentDefinition.icon || "hand",
       iconColor: getColorClass("black"),
@@ -150,6 +156,25 @@ export const approvalMapper: ComponentBaseMapper = {
   },
   subtitle(node, execution, additionalData) {
     return getComponentSubtitle(node, execution, additionalData);
+  },
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, any> {
+    const details: Record<string, any> = {};
+    const metadata = execution.metadata as Record<string, unknown> | undefined;
+    const records = (metadata?.records as ApprovalRecord[] | undefined) || [];
+
+    if (execution.createdAt) {
+      details["Started at"] = new Date(execution.createdAt).toLocaleString();
+    }
+
+    if (execution.state === "STATE_FINISHED" && execution.updatedAt) {
+      details["Finished at"] = new Date(execution.updatedAt).toLocaleString();
+    }
+
+    if (execution.result !== "RESULT_CANCELLED") {
+      details["Approvals"] = buildApprovalTimeline(records);
+    }
+
+    return details;
   },
 };
 
@@ -257,17 +282,103 @@ function getComponentSubtitle(
   return "";
 }
 
+function getApprovalDecisionLabel(record: ApprovalRecord, labelMaps?: ApprovalLabelMaps): string {
+  const rolesByName = labelMaps?.rolesByName;
+  const groupsByName = labelMaps?.groupsByName;
+
+  if (record.type === "user") {
+    return record.user?.name || record.user?.email || "User";
+  }
+
+  if (record.user?.name || record.user?.email) {
+    return record.user?.name || record.user?.email || "User";
+  }
+
+  if (record.type === "role") {
+    return (record.role ? rolesByName?.[record.role] : undefined) || record.role || "Role";
+  }
+
+  if (record.type === "group") {
+    return (record.group ? groupsByName?.[record.group] : undefined) || record.group || "Group";
+  }
+
+  if (record.type === "anyone") {
+    return "Any user";
+  }
+
+  return "Approver";
+}
+
+function buildApprovalTimeline(records: ApprovalRecord[]) {
+  return records
+    .map((record) => {
+      const meta = getApprovalDecisionMeta(record);
+      return {
+        label: getApprovalDecisionLabel(record),
+        status: meta.status,
+        timestamp: meta.timestamp,
+        comment: meta.comment,
+      };
+    })
+    .sort((a, b) => {
+      if (!a.timestamp && !b.timestamp) return 0;
+      if (!a.timestamp) return 1;
+      if (!b.timestamp) return -1;
+      return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+    });
+}
+
+function getApprovalDecisionMeta(record: ApprovalRecord): {
+  status: string;
+  timestamp?: string;
+  comment?: string;
+} {
+  const approvalComment = record.approval?.comment?.trim();
+  const rejectionReason = record.rejection?.reason?.trim();
+  const comment = approvalComment || rejectionReason;
+
+  if (record.state === "approved") {
+    return {
+      status: "Approved",
+      timestamp: formatDecisionTimestamp(record.approval?.approvedAt),
+      comment,
+    };
+  }
+
+  if (record.state === "rejected") {
+    return {
+      status: "Rejected",
+      timestamp: formatDecisionTimestamp(record.rejection?.rejectedAt),
+      comment,
+    };
+  }
+
+  return {
+    status: "Pending",
+    comment,
+  };
+}
+
+function formatDecisionTimestamp(timestamp?: string): string | undefined {
+  if (!timestamp) return undefined;
+
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+
+  return formatTimeAgo(parsed);
+}
+
 // ----------------------- Data Builder -----------------------
 
 type ApprovalRecord = {
   index: number;
   state: string;
   type: string;
-  user?: { name?: string; email?: string; avatarUrl?: string };
+  user?: { id?: string; name?: string; email?: string; avatarUrl?: string };
   role?: string;
   group?: string;
-  approval?: { comment?: string };
-  rejection?: { reason?: string };
+  approval?: { approvedAt?: string; comment?: string };
+  rejection?: { rejectedAt?: string; reason?: string };
 };
 
 export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
@@ -279,11 +390,16 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
     workflowId: string,
     queryClient: QueryClient,
     organizationId?: string,
+    currentUser?: { id?: string; email?: string },
   ) {
     const execution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const executionMetadata = execution?.metadata as Record<string, unknown> | undefined;
     const usersById: Record<string, { email?: string; name?: string }> = {};
     const rolesByName: Record<string, string> = {};
+    const groupsByName: Record<string, string> = {};
+    let currentUserRoles: string[] = [];
+    const currentUserId = currentUser?.id;
+    const currentUserEmail = currentUser?.email;
     if (organizationId) {
       const usersResp: SuperplaneUsersUser[] | undefined = queryClient.getQueryData(
         organizationKeys.users(organizationId),
@@ -295,6 +411,20 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
           const name = u.spec?.displayName;
           if (id) usersById[id] = { email, name };
         });
+
+        if (currentUserId || currentUserEmail) {
+          const currentOrgUser = usersResp.find(
+            (u) =>
+              (currentUserId && u.metadata?.id === currentUserId) ||
+              (currentUserEmail && u.metadata?.email === currentUserEmail),
+          );
+          if (currentOrgUser?.status?.roleAssignments) {
+            currentUserRoles = currentOrgUser.status.roleAssignments
+              .filter((assignment) => !assignment.domainId || assignment.domainId === organizationId)
+              .map((assignment) => assignment.roleName)
+              .filter((roleName): roleName is string => !!roleName);
+          }
+        }
       }
 
       const rolesResp: RolesRole[] | undefined = queryClient.getQueryData(organizationKeys.roles(organizationId));
@@ -305,44 +435,92 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
           if (name) rolesByName[name] = display || name;
         });
       }
+
+      const groupsResp: GroupsGroup[] | undefined = queryClient.getQueryData(organizationKeys.groups(organizationId));
+      if (Array.isArray(groupsResp)) {
+        groupsResp.forEach((group: GroupsGroup) => {
+          const name = group.metadata?.name;
+          const display = group.spec?.displayName;
+          if (name) groupsByName[name] = display || name;
+        });
+      }
+    }
+
+    if (organizationId) {
+      const groupNames = new Set(
+        ((executionMetadata?.records as ApprovalRecord[] | undefined) || [])
+          .filter((record) => record.type === "group" && record.group)
+          .map((record) => record.group as string),
+      );
+
+      groupNames.forEach((groupName) => {
+        const queryKey = organizationKeys.groupUsers(organizationId, groupName);
+        if (queryClient.getQueryData(queryKey)) return;
+        queryClient.prefetchQuery({
+          queryKey,
+          queryFn: async () => {
+            const response = await groupsListGroupUsers(
+              withOrganizationHeader({
+                path: { groupName },
+                query: { domainId: organizationId, domainType: "DOMAIN_TYPE_ORGANIZATION" },
+              }),
+            );
+            return response.data?.users || [];
+          },
+          staleTime: 5 * 60 * 1000,
+          gcTime: 10 * 60 * 1000,
+        });
+      });
     }
 
     // Map backend records to approval items
+    const labelMaps = { rolesByName, groupsByName };
     const approvals = ((executionMetadata?.records as ApprovalRecord[] | undefined) || []).map(
       (record: ApprovalRecord) => {
         const isPending = record.state === "pending";
         const isExecutionActive = execution?.state === "STATE_STARTED";
+        const canAct =
+          isPending &&
+          isExecutionActive &&
+          canCurrentUserActOnApproval(record, {
+            currentUserId,
+            currentUserEmail,
+            currentUserRoles,
+            organizationId,
+            queryClient,
+          });
 
         const approvalComment = record.approval?.comment as string | undefined;
         const hasApprovalArtifacts = record.state === "approved" && approvalComment;
 
+        const userLabel = record.user?.name || record.user?.email;
+        const title =
+          userLabel ||
+          (record.type === "user"
+            ? record.user?.name || record.user?.email
+            : record.type === "role" || record.type === "group"
+              ? getApprovalDecisionLabel(record, labelMaps)
+              : record.type === "anyone"
+                ? "Any user"
+                : "Unknown");
+
         return {
           id: `${record.index}`,
-          title:
-            record.type === "anyone"
-              ? "Any user"
-              : record.type === "user" && record.user
-                ? record.user.name || record.user.email
-                : record.type === "role" && record.role
-                  ? record.role
-                  : record.type === "group" && record.group
-                    ? record.group
-                    : "Unknown",
+          title,
           approved: record.state === "approved",
           rejected: record.state === "rejected",
           approverName: record.user?.name,
           approverAvatar: record.user?.avatarUrl,
           rejectionComment: record.rejection?.reason,
-          interactive: isPending && isExecutionActive,
-          requireArtifacts:
-            isPending && isExecutionActive
-              ? [
-                  {
-                    label: "comment",
-                    optional: true,
-                  },
-                ]
-              : undefined,
+          interactive: canAct,
+          requireArtifacts: canAct
+            ? [
+                {
+                  label: "comment",
+                  optional: true,
+                },
+              ]
+            : undefined,
           artifacts: hasApprovalArtifacts
             ? {
                 Comment: approvalComment,
@@ -411,6 +589,50 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
       approvals,
       usersById,
       rolesByName,
+      groupsByName,
     };
   },
 };
+
+function canCurrentUserActOnApproval(
+  record: ApprovalRecord,
+  {
+    currentUserId,
+    currentUserEmail,
+    currentUserRoles,
+    organizationId,
+    queryClient,
+  }: {
+    currentUserId?: string;
+    currentUserEmail?: string;
+    currentUserRoles: string[];
+    organizationId?: string;
+    queryClient: QueryClient;
+  },
+): boolean {
+  switch (record.type) {
+    case "anyone":
+      return !!(currentUserId || currentUserEmail);
+    case "user":
+      return (
+        (!!currentUserId && record.user?.id === currentUserId) ||
+        (!!currentUserEmail && record.user?.email === currentUserEmail)
+      );
+    case "role":
+      return !!record.role && currentUserRoles.includes(record.role);
+    case "group": {
+      if (!record.group || !organizationId) return false;
+      const groupUsers = queryClient.getQueryData<SuperplaneUsersUser[]>(
+        organizationKeys.groupUsers(organizationId, record.group),
+      );
+      if (!Array.isArray(groupUsers)) return false;
+      return groupUsers.some(
+        (user) =>
+          (!!currentUserId && user.metadata?.id === currentUserId) ||
+          (!!currentUserEmail && user.metadata?.email === currentUserEmail),
+      );
+    }
+    default:
+      return false;
+  }
+}

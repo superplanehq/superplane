@@ -72,7 +72,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 	r := &Registry{
 		Encryptor:    encryptor,
 		Integrations: map[string]Integration{},
-		httpClient:   &http.Client{Timeout: 10 * time.Second},
+		httpClient:   &http.Client{Timeout: 30 * time.Second},
 		Components:   map[string]core.Component{},
 		Triggers:     map[string]core.Trigger{},
 		Applications: map[string]core.Application{},
@@ -125,6 +125,10 @@ func (r *Registry) Init() {
 	for name, widget := range registeredWidgets {
 		r.Widgets[name] = widget
 	}
+}
+
+func (r *Registry) GetHTTPClient() *http.Client {
+	return r.httpClient
 }
 
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {

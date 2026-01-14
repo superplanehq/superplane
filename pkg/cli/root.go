@@ -16,8 +16,8 @@ var Verbose bool
 
 var RootCmd = &cobra.Command{
 	Use:   "superplane",
-	Short: "Superplane command line interface",
-	Long:  `Superplane CLI - Command line interface for the Superplane API`,
+	Short: "SuperPlane command line interface",
+	Long:  `SuperPlane CLI - Command line interface for the SuperPlane API`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if !Verbose {
 			log.SetOutput(io.Discard)

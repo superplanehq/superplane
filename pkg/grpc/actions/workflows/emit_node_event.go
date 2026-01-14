@@ -3,6 +3,7 @@ package workflows
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/datatypes"
 )
 
@@ -27,7 +29,7 @@ func EmitNodeEvent(
 		return nil, fmt.Errorf("workflow not found: %w", err)
 	}
 
-	_, err = workflow.FindNode(nodeID)
+	node, err := workflow.FindNode(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("node not found: %w", err)
 	}
@@ -40,6 +42,11 @@ func EmitNodeEvent(
 		Data:       datatypes.NewJSONType[any](data),
 		State:      models.WorkflowEventStatePending,
 		CreatedAt:  &now,
+	}
+
+	customName, err := resolveCustomName(node, data)
+	if err == nil && customName != nil {
+		event.CustomName = customName
 	}
 
 	if err := database.Conn().Create(&event).Error; err != nil {
@@ -56,4 +63,40 @@ func EmitNodeEvent(
 	return &pb.EmitNodeEventResponse{
 		EventId: event.ID.String(),
 	}, nil
+}
+
+func resolveCustomName(node *models.WorkflowNode, payload map[string]any) (*string, error) {
+	config := node.Configuration.Data()
+	if config == nil {
+		return nil, nil
+	}
+
+	rawTemplate, ok := config["customName"]
+	if !ok || rawTemplate == nil {
+		return nil, nil
+	}
+
+	template, ok := rawTemplate.(string)
+	if !ok {
+		return nil, nil
+	}
+
+	template = strings.TrimSpace(template)
+	if template == "" {
+		return nil, nil
+	}
+
+	builder := contexts.NewNodeConfigurationBuilder(database.Conn(), node.WorkflowID).
+		WithInput(payload)
+	resolved, err := builder.ResolveExpression(template)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvedName := strings.TrimSpace(fmt.Sprintf("%v", resolved))
+	if resolvedName == "" {
+		return nil, nil
+	}
+
+	return &resolvedName, nil
 }

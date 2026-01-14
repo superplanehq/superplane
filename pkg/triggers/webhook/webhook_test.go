@@ -236,13 +236,13 @@ func TestWebhook_Setup(t *testing.T) {
 			}
 
 			ctx := core.TriggerContext{
-				Configuration:   tt.config,
-				MetadataContext: metadataCtx,
-				RequestContext: &mockRequestContext{
+				Configuration: tt.config,
+				Metadata:      metadataCtx,
+				Requests: &mockRequestContext{
 					workflowID: "test-workflow",
 					nodeID:     "test-node",
 				},
-				WebhookContext: webhookCtx,
+				Webhook: webhookCtx,
 			}
 
 			err := webhook.Setup(ctx)
@@ -323,9 +323,9 @@ func TestWebhook_Setup_AuthenticationMethodChange(t *testing.T) {
 			}
 
 			ctx := core.TriggerContext{
-				Configuration:   config,
-				MetadataContext: metadataCtx,
-				WebhookContext:  webhookCtx,
+				Configuration: config,
+				Metadata:      metadataCtx,
+				Webhook:       webhookCtx,
 			}
 
 			err := webhook.Setup(ctx)
@@ -402,9 +402,9 @@ func TestWebhook_HandleAction_ResetAuth(t *testing.T) {
 			webhookCtx := &mockWebhookContext{}
 
 			ctx := core.TriggerActionContext{
-				Name:            "resetAuthentication",
-				MetadataContext: metadataCtx,
-				WebhookContext:  webhookCtx,
+				Name:     "resetAuthentication",
+				Metadata: metadataCtx,
+				Webhook:  webhookCtx,
 			}
 
 			_, err := webhook.HandleAction(ctx)
@@ -584,11 +584,11 @@ func TestWebhook_HandleWebhook(t *testing.T) {
 			webhookCtx := &mockWebhookContext{}
 
 			ctx := core.WebhookRequestContext{
-				Body:           tt.body,
-				Headers:        headers,
-				Configuration:  tt.config,
-				EventContext:   eventCtx,
-				WebhookContext: webhookCtx,
+				Body:          tt.body,
+				Headers:       headers,
+				Configuration: tt.config,
+				Events:        eventCtx,
+				Webhook:       webhookCtx,
 			}
 
 			code, err := webhook.HandleWebhook(ctx)
@@ -671,8 +671,8 @@ func TestWebhook_HandleWebhook_SignatureVerification(t *testing.T) {
 				Configuration: Metadata{
 					Authentication: "signature",
 				},
-				EventContext:   eventCtx,
-				WebhookContext: webhookCtx,
+				Events:  eventCtx,
+				Webhook: webhookCtx,
 			}
 
 			code, err := webhook.HandleWebhook(ctx)
@@ -712,12 +712,12 @@ func TestWebhook_URLGeneration_WithTrailingSlash(t *testing.T) {
 		Configuration: Configuration{
 			Authentication: "none",
 		},
-		MetadataContext: metadataCtx,
-		RequestContext: &mockRequestContext{
+		Metadata: metadataCtx,
+		Requests: &mockRequestContext{
 			workflowID: "test-workflow",
 			nodeID:     "test-node",
 		},
-		WebhookContext: webhookCtx,
+		Webhook: webhookCtx,
 	}
 
 	err := webhook.Setup(ctx)

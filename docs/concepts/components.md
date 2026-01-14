@@ -25,7 +25,7 @@
 
 ## Overview
 
-Components are the building blocks of workflows in Superplane. They operate on an event-driven model where components listen for events, process them, and emit new events to trigger downstream components.
+Components are the building blocks of workflows in SuperPlane. They operate on an event-driven model where components listen for events, process them, and emit new events to trigger downstream components.
 
 **Component types:**
 - **Event sources** - Listen to external systems and emit events to the Canvas
@@ -76,7 +76,7 @@ spec: {}
 
 ### Custom Webhook Usage
 
-When you create a custom webhook event source, you push events to Superplane using the provided URL and signature key. The event should be a JSON object with HMAC-SHA256 signature:
+When you create a custom webhook event source, you push events to SuperPlane using the provided URL and signature key. The event should be a JSON object with HMAC-SHA256 signature:
 
 ```bash
 export SOURCE_ID="<YOUR_SOURCE_ID>"
@@ -393,7 +393,7 @@ permissions:
   id-token: write
 ```
 
-4. **Push outputs back to Superplane:**
+4. **Push outputs back to SuperPlane:**
 ```yaml
 - name: Push outputs
   run: |

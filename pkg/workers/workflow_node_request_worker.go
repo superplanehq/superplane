@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
@@ -130,13 +131,14 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Wor
 	}
 
 	actionCtx := core.TriggerActionContext{
-		Name:            actionName,
-		Parameters:      spec.InvokeAction.Parameters,
-		Configuration:   node.Configuration.Data(),
-		Logger:          logging.ForNode(*node),
-		MetadataContext: contexts.NewNodeMetadataContext(tx, node),
-		EventContext:    contexts.NewEventContext(tx, node),
-		RequestContext:  contexts.NewNodeRequestContext(tx, node),
+		Name:          actionName,
+		Parameters:    spec.InvokeAction.Parameters,
+		Configuration: node.Configuration.Data(),
+		Logger:        logging.ForNode(*node),
+		HTTP:          contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		Metadata:      contexts.NewNodeMetadataContext(tx, node),
+		Events:        contexts.NewEventContext(tx, node),
+		Requests:      contexts.NewNodeRequestContext(tx, node),
 	}
 
 	if node.AppInstallationID != nil {
@@ -150,7 +152,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Wor
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 
-		actionCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
+		actionCtx.AppInstallation = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
 	}
 
 	_, err = trigger.HandleAction(actionCtx)
@@ -203,13 +205,15 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 
 	logger := logging.ForExecution(execution, nil)
 	actionCtx := core.ActionContext{
-		Name:                  actionName,
-		Configuration:         node.Configuration.Data(),
-		Parameters:            spec.InvokeAction.Parameters,
-		MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
-		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
-		IntegrationContext:    contexts.NewIntegrationContext(tx, w.registry),
+		Name:           actionName,
+		Configuration:  node.Configuration.Data(),
+		Parameters:     spec.InvokeAction.Parameters,
+		HTTP:           contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
+		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+		Requests:       contexts.NewExecutionRequestContext(tx, execution),
+		Integration:    contexts.NewIntegrationContext(tx, w.registry),
+		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, node.WorkflowID),
 	}
 
 	if node.AppInstallationID != nil {
@@ -219,7 +223,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		actionCtx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
+		actionCtx.AppInstallation = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
 	}
 
 	actionCtx.Logger = logger
@@ -275,14 +279,16 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 	}
 
 	actionCtx := core.ActionContext{
-		Name:                  actionName,
-		Configuration:         childNode.Configuration,
-		Parameters:            spec.InvokeAction.Parameters,
-		Logger:                logging.ForExecution(execution, parentExecution),
-		MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
-		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
-		IntegrationContext:    contexts.NewIntegrationContext(tx, w.registry),
+		Name:           actionName,
+		Configuration:  childNode.Configuration,
+		Parameters:     spec.InvokeAction.Parameters,
+		Logger:         logging.ForExecution(execution, parentExecution),
+		HTTP:           contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
+		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+		Requests:       contexts.NewExecutionRequestContext(tx, execution),
+		Integration:    contexts.NewIntegrationContext(tx, w.registry),
+		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 	}
 
 	err = component.HandleAction(actionCtx)

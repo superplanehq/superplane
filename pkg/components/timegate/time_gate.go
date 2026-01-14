@@ -259,7 +259,7 @@ func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 	}
 
 	var metadata Metadata
-	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
@@ -296,7 +296,7 @@ func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 	interval := time.Until(nextValidTime)
 
 	if interval <= 0 {
-		return ctx.ExecutionStateContext.Emit(
+		return ctx.ExecutionState.Emit(
 			core.DefaultOutputChannel.Name,
 			"timegate.finished",
 			[]any{ctx.Data},
@@ -306,13 +306,13 @@ func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 	//
 	// Schedule the action and save the next valid time in metadata
 	//
-	err = ctx.RequestContext.ScheduleActionCall("timeReached", map[string]any{}, interval)
+	err = ctx.Requests.ScheduleActionCall("timeReached", map[string]any{}, interval)
 	if err != nil {
 		return err
 	}
 
 	formatted := nextValidTime.Format(time.RFC3339)
-	return ctx.MetadataContext.Set(Metadata{
+	return ctx.Metadata.Set(Metadata{
 		NextValidTime: &formatted,
 	})
 }
@@ -412,12 +412,12 @@ func (tg *TimeGate) HandleAction(ctx core.ActionContext) error {
 }
 
 func (tg *TimeGate) HandleTimeReached(ctx core.ActionContext) error {
-	if ctx.ExecutionStateContext.IsFinished() {
+	if ctx.ExecutionState.IsFinished() {
 		// already handled, for example via "pushThrough" action
 		return nil
 	}
 
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"timegate.finished",
 		[]any{map[string]any{}},
@@ -425,12 +425,12 @@ func (tg *TimeGate) HandleTimeReached(ctx core.ActionContext) error {
 }
 
 func (tg *TimeGate) HandlePushThrough(ctx core.ActionContext) error {
-	if ctx.ExecutionStateContext.IsFinished() {
+	if ctx.ExecutionState.IsFinished() {
 		// already handled, for example via "timeReached" action
 		return nil
 	}
 
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"timegate.finished",
 		[]any{map[string]any{}},

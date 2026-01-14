@@ -94,6 +94,22 @@ func FindMaybeDeletedUserByID(orgID, id string) (*User, error) {
 	return &user, err
 }
 
+func ListActiveUsersByID(orgID string, ids []string) ([]User, error) {
+	return ListActiveUsersByIDInTransaction(database.Conn(), orgID, ids)
+}
+
+func ListActiveUsersByIDInTransaction(tx *gorm.DB, orgID string, ids []string) ([]User, error) {
+	var users []User
+
+	err := tx.
+		Where("id IN ?", ids).
+		Where("organization_id = ?", orgID).
+		Find(&users).
+		Error
+
+	return users, err
+}
+
 func FindActiveUserByID(orgID, id string) (*User, error) {
 	return FindActiveUserByIDInTransaction(database.Conn(), orgID, id)
 }
@@ -143,6 +159,23 @@ func FindActiveUserByTokenHash(tokenHash string) (*User, error) {
 		Error
 
 	return &user, err
+}
+
+func FindMaybeDeletedUsersByIDs(ids []uuid.UUID) ([]User, error) {
+	if len(ids) == 0 {
+		return []User{}, nil
+	}
+
+	var users []User
+	err := database.Conn().Unscoped().
+		Where("id IN ?", ids).
+		Find(&users).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
 }
 
 func FindOrganizationsForAccount(email string) ([]Organization, error) {

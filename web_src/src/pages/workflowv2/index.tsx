@@ -20,7 +20,7 @@ import {
   WorkflowsWorkflowNodeQueueItem,
   workflowsEmitNodeEvent,
 } from "@/api-client";
-import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -38,6 +38,7 @@ import {
 } from "@/hooks/useWorkflowData";
 import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
+import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import {
   CANVAS_SIDEBAR_STORAGE_KEY,
   CanvasEdge,
@@ -64,17 +65,20 @@ import {
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
+import { useAccount } from "@/contexts/AccountContext";
 import {
   buildRunEntryFromEvent,
   buildRunItemFromExecution,
   buildCanvasStatusLogEntry,
   buildTabData,
+  generateNodeId,
   getNextInQueueInfo,
   mapCanvasNodesToLogEntries,
   mapExecutionsToSidebarEvents,
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
   mapWorkflowEventsToRunLogEntries,
+  summarizeWorkflowChanges,
 } from "./utils";
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
@@ -94,6 +98,7 @@ export function WorkflowPageV2() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const { account } = useAccount();
   const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
@@ -110,14 +115,23 @@ export function WorkflowPageV2() {
   // user IDs as emails and role names as display names.
   // We don't use the values directly here; loading them populates the
   // react-query cache which prepareApprovalNode reads from.
-  useOrganizationUsers(organizationId!);
-  useOrganizationRoles(organizationId!);
+  const { isLoading: usersLoading } = useOrganizationUsers(organizationId!);
+  const { isLoading: rolesLoading } = useOrganizationRoles(organizationId!);
+  const { isLoading: groupsLoading } = useOrganizationGroups(organizationId!);
 
   /**
    * Track if we've already done the initial fit to view.
    * This ref persists across re-renders to prevent viewport changes on save.
    */
   const hasFitToViewRef = useRef(false);
+
+  /**
+   * Capture the initial node focus from the URL so we only zoom once.
+   */
+  const initialFocusNodeIdRef = useRef<string | null>(null);
+  if (initialFocusNodeIdRef.current === null) {
+    initialFocusNodeIdRef.current = searchParams.get("node") || null;
+  }
 
   /**
    * Track if the user has manually toggled the building blocks sidebar.
@@ -168,6 +182,7 @@ export function WorkflowPageV2() {
 
   // Revert functionality - track initial workflow snapshot
   const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<WorkflowsWorkflow | null>(null);
+  const lastSavedWorkflowRef = useRef<WorkflowsWorkflow | null>(null);
 
   // Use Zustand store for execution data - extract only the methods to avoid recreating callbacks
   // Subscribe to version to ensure React detects all updates
@@ -184,6 +199,16 @@ export function WorkflowPageV2() {
       hasInitializedStoreRef.current = workflow.metadata.id;
     }
   }, [workflow, initializeFromWorkflow]);
+
+  useEffect(() => {
+    if (!workflow) {
+      return;
+    }
+
+    if (!lastSavedWorkflowRef.current) {
+      lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(workflow));
+    }
+  }, [workflow]);
 
   // Build maps from store for canvas display (using initial data from workflow.status and websocket updates)
   // Rebuild whenever store version changes (indicates data was updated)
@@ -261,6 +286,8 @@ export function WorkflowPageV2() {
    * Maps node ID to its updated position.
    */
   const pendingPositionUpdatesRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const pendingAnnotationUpdatesRef = useRef<Map<string, { text?: string; color?: string }>>(new Map());
+  const logNodeSelectRef = useRef<(nodeId: string) => void>(() => {});
 
   /**
    * Debounced auto-save function for node position changes.
@@ -275,6 +302,7 @@ export function WorkflowPageV2() {
 
         const positionUpdates = new Map(pendingPositionUpdatesRef.current);
         if (positionUpdates.size === 0) return;
+        const focusedNoteId = getActiveNoteId();
 
         try {
           // Check if auto-save is disabled
@@ -309,6 +337,23 @@ export function WorkflowPageV2() {
             return node;
           });
 
+          const updatedWorkflow = {
+            ...latestWorkflow,
+            spec: {
+              ...latestWorkflow.spec,
+              nodes: updatedNodes,
+            },
+          };
+
+          const changeSummary = summarizeWorkflowChanges({
+            before: lastSavedWorkflowRef.current,
+            after: updatedWorkflow,
+            onNodeSelect: (nodeId: string) => logNodeSelectRef.current(nodeId),
+          });
+          const changeMessage = changeSummary.changeCount
+            ? `${changeSummary.changeCount} Canvas changes saved`
+            : "Canvas changes saved";
+
           // Save the workflow with updated positions
           await updateWorkflowMutation.mutateAsync({
             name: latestWorkflow.metadata?.name!,
@@ -316,6 +361,22 @@ export function WorkflowPageV2() {
             nodes: updatedNodes,
             edges: latestWorkflow.spec?.edges,
           });
+
+          if (changeSummary.detail) {
+            setLiveCanvasEntries((prev) => [
+              buildCanvasStatusLogEntry({
+                id: `canvas-save-${Date.now()}`,
+                message: changeMessage,
+                type: "success",
+                timestamp: new Date().toISOString(),
+                detail: changeSummary.detail,
+                searchText: changeSummary.searchText,
+              }),
+              ...prev,
+            ]);
+          }
+
+          lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
 
           // Clear the saved position updates after successful save
           // Keep any new updates that came in during the save
@@ -358,6 +419,12 @@ export function WorkflowPageV2() {
         } catch (error: any) {
           console.error("Failed to auto-save canvas changes:", error);
           // Don't show error toast for auto-save failures to avoid being intrusive
+        } finally {
+          if (focusedNoteId) {
+            requestAnimationFrame(() => {
+              restoreActiveNoteFocus();
+            });
+          }
         }
       }, 300),
     [
@@ -456,6 +523,7 @@ export function WorkflowPageV2() {
       workflowId!,
       queryClient,
       organizationId!,
+      account ? { id: account.id, email: account.email } : undefined,
     );
   }, [
     workflow,
@@ -473,6 +541,7 @@ export function WorkflowPageV2() {
     componentsLoading,
     applicationsLoading,
     organizationId,
+    account,
   ]);
 
   const getSidebarData = useCallback(
@@ -504,6 +573,7 @@ export function WorkflowPageV2() {
         workflowId,
         queryClient,
         organizationId,
+        account ? { id: account.id, email: account.email } : undefined,
       );
 
       // Add loading state to sidebar data
@@ -512,7 +582,18 @@ export function WorkflowPageV2() {
         isLoading: nodeData.isLoading,
       };
     },
-    [workflow, workflowId, blueprints, allComponents, allTriggers, nodeEventsMap, getNodeData, queryClient],
+    [
+      workflow,
+      workflowId,
+      blueprints,
+      allComponents,
+      allTriggers,
+      nodeEventsMap,
+      getNodeData,
+      queryClient,
+      organizationId,
+      account,
+    ],
   );
 
   // Trigger data loading when sidebar opens for a node
@@ -577,6 +658,10 @@ export function WorkflowPageV2() {
     },
     [handleSidebarChange],
   );
+
+  useEffect(() => {
+    logNodeSelectRef.current = handleLogNodeSelect;
+  }, [handleLogNodeSelect]);
 
   const handleLogRunNodeSelect = useCallback(
     (nodeId: string) => {
@@ -843,10 +928,92 @@ export function WorkflowPageV2() {
     [workflow, nodeExecutionsMap, nodeEventsMap, nodeQueueItemsMap],
   );
 
+  const getAutocompleteExampleObj = useCallback(
+    (nodeId: string): Record<string, unknown> | null => {
+      const workflowNodes = workflow?.spec?.nodes || [];
+      const workflowEdges = workflow?.spec?.edges || [];
+
+      const latestExecution = nodeExecutionsMap[nodeId]?.[0];
+      if (latestExecution?.input && Object.keys(latestExecution.input).length > 0) {
+        return latestExecution.input as Record<string, unknown>;
+      }
+
+      const currentNode = workflowNodes.find((node) => node.id === nodeId);
+      if (currentNode?.type === "TYPE_TRIGGER") {
+        const latestEvent = nodeEventsMap[nodeId]?.[0];
+        if (latestEvent?.data && Object.keys(latestEvent.data).length > 0) {
+          return latestEvent.data as Record<string, unknown>;
+        }
+        return null;
+      }
+
+      const incomingEdges = workflowEdges.filter((edge) => edge.targetId === nodeId && edge.sourceId);
+      if (incomingEdges.length === 0) {
+        return null;
+      }
+
+      const candidates: Array<{ payload: Record<string, unknown>; timestamp?: string }> = [];
+      for (const edge of incomingEdges) {
+        const sourceId = edge.sourceId;
+        if (!sourceId) continue;
+
+        const sourceNode = workflowNodes.find((node) => node.id === sourceId);
+        if (!sourceNode) continue;
+
+        if (sourceNode.type === "TYPE_TRIGGER") {
+          const sourceEvent = nodeEventsMap[sourceId]?.[0];
+          if (sourceEvent?.data && Object.keys(sourceEvent.data).length > 0) {
+            candidates.push({ payload: sourceEvent.data as Record<string, unknown>, timestamp: sourceEvent.createdAt });
+          }
+          continue;
+        }
+
+        const sourceExecution = nodeExecutionsMap[sourceId]?.[0];
+        if (!sourceExecution?.outputs) continue;
+
+        const outputData: unknown[] = Object.values(sourceExecution.outputs)?.find((output) => {
+          return Array.isArray(output) && output?.length > 0;
+        }) as unknown[];
+
+        if (outputData?.length > 0) {
+          candidates.push({
+            payload: outputData[0] as Record<string, unknown>,
+            timestamp: sourceExecution.updatedAt || sourceExecution.createdAt,
+          });
+        }
+      }
+
+      if (candidates.length === 0) {
+        return null;
+      }
+
+      const latestCandidate = candidates.reduce((latest, current) => {
+        if (!latest) return current;
+        if (!current.timestamp) return latest;
+        if (!latest.timestamp) return current;
+        return new Date(current.timestamp).getTime() > new Date(latest.timestamp).getTime() ? current : latest;
+      }, candidates[0]);
+
+      console.log("Autocomplete example object for node", nodeId, latestCandidate.payload);
+      return latestCandidate.payload;
+    },
+    [workflow, nodeExecutionsMap, nodeEventsMap],
+  );
+
   const handleSaveWorkflow = useCallback(
-    async (workflowToSave?: WorkflowsWorkflow) => {
+    async (workflowToSave?: WorkflowsWorkflow, options?: { showToast?: boolean }) => {
       const targetWorkflow = workflowToSave || workflow;
       if (!targetWorkflow || !organizationId || !workflowId) return;
+      const shouldRestoreFocus = options?.showToast === false;
+      const focusedNoteId = shouldRestoreFocus ? getActiveNoteId() : null;
+      const changeSummary = summarizeWorkflowChanges({
+        before: lastSavedWorkflowRef.current,
+        after: targetWorkflow,
+        onNodeSelect: handleLogNodeSelect,
+      });
+      const changeMessage = changeSummary.changeCount
+        ? `${changeSummary.changeCount} Canvas changes saved`
+        : "Canvas changes saved";
 
       try {
         await updateWorkflowMutation.mutateAsync({
@@ -856,21 +1023,26 @@ export function WorkflowPageV2() {
           edges: targetWorkflow.spec?.edges,
         });
 
-        showSuccessToast("Canvas changes saved");
         setLiveCanvasEntries((prev) => [
           buildCanvasStatusLogEntry({
             id: `canvas-save-${Date.now()}`,
-            message: "Canvas changes saved",
+            message: changeMessage,
             type: "success",
             timestamp: new Date().toISOString(),
+            detail: changeSummary.detail,
+            searchText: changeSummary.searchText,
           }),
           ...prev,
         ]);
+        if (options?.showToast !== false) {
+          showSuccessToast("Canvas changes saved");
+        }
         setHasUnsavedChanges(false);
         setHasNonPositionalUnsavedChanges(false);
 
         // Clear the snapshot since changes are now saved
         setInitialWorkflowSnapshot(null);
+        lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(targetWorkflow));
       } catch (error: any) {
         console.error("Failed to save changes to the canvas:", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
@@ -884,6 +1056,12 @@ export function WorkflowPageV2() {
           }),
           ...prev,
         ]);
+      } finally {
+        if (focusedNoteId) {
+          requestAnimationFrame(() => {
+            restoreActiveNoteFocus();
+          });
+        }
       }
     },
     [workflow, organizationId, workflowId, updateWorkflowMutation],
@@ -938,7 +1116,10 @@ export function WorkflowPageV2() {
           nodeId: node.id!,
           nodeName: node.name!,
           displayLabel,
-          configuration: { text: node.configuration?.text || "" },
+          configuration: {
+            text: node.configuration?.text || "",
+            color: node.configuration?.color || "yellow",
+          },
           configurationFields,
           appName,
           appInstallationRef: node.appInstallation,
@@ -1004,7 +1185,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1021,12 +1202,115 @@ export function WorkflowPageV2() {
     ],
   );
 
-  const generateNodeId = (blockName: string, nodeName: string) => {
-    const randomChars = Math.random().toString(36).substring(2, 8);
-    const sanitizedBlock = blockName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    return `${sanitizedBlock}-${sanitizedName}-${randomChars}`;
-  };
+  const debouncedAnnotationAutoSave = useMemo(
+    () =>
+      debounce(async () => {
+        if (!organizationId || !workflowId) return;
+
+        const annotationUpdates = new Map(pendingAnnotationUpdatesRef.current);
+        if (annotationUpdates.size === 0) return;
+
+        if (!isAutoSaveEnabled) {
+          return;
+        }
+
+        const latestWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
+          workflowKeys.detail(organizationId, workflowId),
+        );
+
+        if (!latestWorkflow?.spec?.nodes) return;
+
+        const updatedNodes = latestWorkflow.spec.nodes.map((node) => {
+          if (!node.id || node.type !== "TYPE_WIDGET") {
+            return node;
+          }
+
+          const updates = annotationUpdates.get(node.id);
+          if (!updates) {
+            return node;
+          }
+
+          return {
+            ...node,
+            configuration: {
+              ...node.configuration,
+              ...updates,
+            },
+          };
+        });
+
+        const updatedWorkflow = {
+          ...latestWorkflow,
+          spec: {
+            ...latestWorkflow.spec,
+            nodes: updatedNodes,
+          },
+        };
+
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+
+        annotationUpdates.forEach((updates, nodeId) => {
+          if (pendingAnnotationUpdatesRef.current.get(nodeId) === updates) {
+            pendingAnnotationUpdatesRef.current.delete(nodeId);
+          }
+        });
+      }, 600),
+    [organizationId, workflowId, queryClient, handleSaveWorkflow, isAutoSaveEnabled],
+  );
+
+  const handleAnnotationUpdate = useCallback(
+    (nodeId: string, updates: { text?: string; color?: string }) => {
+      if (!workflow || !organizationId || !workflowId) return;
+      if (Object.keys(updates).length === 0) return;
+
+      saveWorkflowSnapshot(workflow);
+
+      const latestWorkflow =
+        queryClient.getQueryData<WorkflowsWorkflow>(workflowKeys.detail(organizationId, workflowId)) || workflow;
+
+      const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
+        if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
+          return node;
+        }
+
+        return {
+          ...node,
+          configuration: {
+            ...node.configuration,
+            ...updates,
+          },
+        };
+      });
+
+      const updatedWorkflow = {
+        ...latestWorkflow,
+        spec: {
+          ...latestWorkflow.spec,
+          nodes: updatedNodes,
+        },
+      };
+
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+
+      if (isAutoSaveEnabled) {
+        const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
+        pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...updates });
+        debouncedAnnotationAutoSave();
+      } else {
+        markUnsavedChange("position");
+      }
+    },
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      queryClient,
+      saveWorkflowSnapshot,
+      debouncedAnnotationAutoSave,
+      isAutoSaveEnabled,
+      markUnsavedChange,
+    ],
+  );
 
   const handleNodeAdd = useCallback(
     async (newNodeData: NewNodeData): Promise<string> => {
@@ -1072,7 +1356,7 @@ export function WorkflowPageV2() {
       if (buildingBlock.name === "annotation") {
         // Annotation nodes are now widgets
         newNode.widget = { name: "annotation" };
-        newNode.configuration = { text: "" };
+        newNode.configuration = { text: "", color: "yellow" };
       } else if (buildingBlock.type === "component") {
         newNode.component = { name: buildingBlock.name };
       } else if (buildingBlock.type === "trigger") {
@@ -1108,7 +1392,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1138,12 +1422,13 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(workflow);
 
-      const newNodeId = `node-${Date.now()}`;
+      const placeholderName = "New Component";
+      const newNodeId = generateNodeId("component", "node");
 
       // Create placeholder node - will fail validation but still be saved
       const newNode: ComponentsNode = {
         id: newNodeId,
-        name: "New Component",
+        name: placeholderName,
         type: "TYPE_COMPONENT",
         // NO component/blueprint/trigger reference - causes validation error
         configuration: {},
@@ -1172,7 +1457,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1278,7 +1563,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1324,7 +1609,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1367,7 +1652,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1394,7 +1679,8 @@ export function WorkflowPageV2() {
       // Parse edge IDs to extract sourceId, targetId, and channel
       // Edge IDs are formatted as: `${sourceId}--${targetId}--${channel}`
       const edgesToRemove = edgeIds.map((edgeId) => {
-        const parts = edgeId?.split("--");
+        let parts = edgeId?.split("-targets->") || [];
+        parts = parts.flatMap((part) => part.split("-using->"));
         return {
           sourceId: parts[0],
           targetId: parts[1],
@@ -1424,7 +1710,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1531,7 +1817,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (isAutoSaveEnabled) {
-        await handleSaveWorkflow(updatedWorkflow);
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
       }
@@ -1603,7 +1889,7 @@ export function WorkflowPageV2() {
   );
 
   const handleNodeDuplicate = useCallback(
-    (nodeId: string) => {
+    async (nodeId: string) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       const nodeToDuplicate = workflow.spec?.nodes?.find((node) => node.id === nodeId);
@@ -1652,9 +1938,23 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      markUnsavedChange("structural");
+      if (isAutoSaveEnabled) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
     },
-    [workflow, organizationId, workflowId, blueprints, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      blueprints,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      isAutoSaveEnabled,
+      markUnsavedChange,
+    ],
   );
 
   const handleSave = useCallback(
@@ -1678,6 +1978,23 @@ export function WorkflowPageV2() {
         return node;
       });
 
+      const updatedWorkflow = {
+        ...workflow,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
+      };
+
+      const changeSummary = summarizeWorkflowChanges({
+        before: lastSavedWorkflowRef.current,
+        after: updatedWorkflow,
+        onNodeSelect: handleLogNodeSelect,
+      });
+      const changeMessage = changeSummary.changeCount
+        ? `${changeSummary.changeCount} Canvas changes saved`
+        : "Canvas changes saved";
+
       try {
         await updateWorkflowMutation.mutateAsync({
           name: workflow.metadata?.name!,
@@ -1686,12 +2003,24 @@ export function WorkflowPageV2() {
           edges: workflow.spec?.edges,
         });
 
+        setLiveCanvasEntries((prev) => [
+          buildCanvasStatusLogEntry({
+            id: `canvas-save-${Date.now()}`,
+            message: changeMessage,
+            type: "success",
+            timestamp: new Date().toISOString(),
+            detail: changeSummary.detail,
+            searchText: changeSummary.searchText,
+          }),
+          ...prev,
+        ]);
         showSuccessToast("Canvas changes saved");
         setHasUnsavedChanges(false);
         setHasNonPositionalUnsavedChanges(false);
 
         // Clear the snapshot since changes are now saved
         setInitialWorkflowSnapshot(null);
+        lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
       } catch (error: any) {
         console.error("Failed to save changes to the canvas:", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
@@ -1767,7 +2096,16 @@ export function WorkflowPageV2() {
   );
 
   // Show loading indicator while data is being fetched
-  if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading || widgetsLoading) {
+  if (
+    workflowLoading ||
+    triggersLoading ||
+    blueprintsLoading ||
+    componentsLoading ||
+    widgetsLoading ||
+    usersLoading ||
+    rolesLoading ||
+    groupsLoading
+  ) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-3">
@@ -1818,8 +2156,10 @@ export function WorkflowPageV2() {
       loadSidebarData={loadSidebarData}
       getTabData={getTabData}
       getNodeEditData={getNodeEditData}
+      getAutocompleteExampleObj={getAutocompleteExampleObj}
       getCustomField={getCustomField}
       onNodeConfigurationSave={handleNodeConfigurationSave}
+      onAnnotationUpdate={handleAnnotationUpdate}
       onSave={handleSave}
       onEdgeCreate={handleEdgeCreate}
       onNodeDelete={handleNodeDelete}
@@ -1839,11 +2179,12 @@ export function WorkflowPageV2() {
       hasUserToggledSidebarRef={hasUserToggledSidebarRef}
       isSidebarOpenRef={isSidebarOpenRef}
       viewportRef={viewportRef}
+      initialFocusNodeId={initialFocusNodeIdRef.current}
       unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
       saveIsPrimary={hasUnsavedChanges}
       saveButtonHidden={!hasUnsavedChanges}
       onUndo={handleRevert}
-      canUndo={initialWorkflowSnapshot !== null}
+      canUndo={!isAutoSaveEnabled && initialWorkflowSnapshot !== null}
       isAutoSaveEnabled={isAutoSaveEnabled}
       onToggleAutoSave={handleToggleAutoSave}
       runDisabled={hasRunBlockingChanges}
@@ -2000,6 +2341,7 @@ function prepareData(
   workflowId: string,
   queryClient: QueryClient,
   organizationId: string,
+  currentUser?: { id?: string; email?: string },
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -2020,6 +2362,7 @@ function prepareData(
           workflowId,
           queryClient,
           organizationId,
+          currentUser,
         );
       })
       .map((node) => ({
@@ -2184,6 +2527,7 @@ function prepareNode(
   workflowId: string,
   queryClient: any,
   organizationId: string,
+  currentUser?: { id?: string; email?: string },
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
@@ -2218,6 +2562,7 @@ function prepareNode(
         workflowId,
         queryClient,
         organizationId,
+        currentUser,
       );
   }
 }
@@ -2226,6 +2571,7 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
   return {
     id: node.id!,
     position: { x: node.position?.x!, y: node.position?.y! },
+    selectable: false,
     data: {
       type: "annotation",
       label: node.name || "Annotation",
@@ -2234,7 +2580,7 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
       annotation: {
         title: node.name || "Annotation",
         annotationText: node.configuration?.text || "",
-        collapsed: node.isCollapsed || false,
+        annotationColor: node.configuration?.color || "yellow",
       },
     },
   };
@@ -2249,6 +2595,7 @@ function prepareComponentNode(
   workflowId: string,
   queryClient: QueryClient,
   organizationId?: string,
+  currentUser?: { id?: string; email?: string },
 ): CanvasNode {
   // Detect placeholder nodes (no component reference, name is "New Component")
   const isPlaceholder = !node.component?.name && node.name === "New Component";
@@ -2298,6 +2645,7 @@ function prepareComponentNode(
     workflowId,
     queryClient,
     organizationId || "",
+    currentUser,
   );
 }
 
@@ -2310,6 +2658,7 @@ function prepareComponentBaseNode(
   workflowId: string,
   queryClient: QueryClient,
   organizationId: string,
+  currentUser?: { id?: string; email?: string },
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const metadata = components.find((c) => c.name === node.component?.name);
@@ -2325,6 +2674,7 @@ function prepareComponentBaseNode(
     workflowId,
     queryClient,
     organizationId,
+    currentUser,
   );
 
   const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props(
@@ -2412,7 +2762,7 @@ function prepareMergeNode(
 }
 
 function prepareEdge(edge: ComponentsEdge): CanvasEdge {
-  const id = `${edge.sourceId!}--${edge.targetId!}--${edge.channel!}`;
+  const id = `${edge.sourceId!}-targets->${edge.targetId!}-using->${edge.channel!}`;
 
   return {
     id: id,
@@ -2436,6 +2786,7 @@ function prepareSidebarData(
   workflowId?: string,
   queryClient?: QueryClient,
   organizationId?: string,
+  currentUser?: { id?: string; email?: string },
 ): SidebarData {
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
@@ -2473,6 +2824,7 @@ function prepareSidebarData(
     workflowId || "",
     queryClient as QueryClient,
     organizationId || "",
+    currentUser,
   );
 
   const latestEvents =

@@ -75,7 +75,7 @@ func (s *Semaphore) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
@@ -131,7 +131,7 @@ type WebhookNotificationMetadata struct {
 }
 
 func (s *Semaphore) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func (s *Semaphore) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 		return fmt.Errorf("error decoding webhook metadata: %v", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return err
 	}

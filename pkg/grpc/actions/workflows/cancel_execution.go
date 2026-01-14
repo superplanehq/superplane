@@ -83,15 +83,18 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 			}
 
 			logger := logging.ForExecution(execution, nil)
+			orgUUID := uuid.MustParse(organizationID)
 			ctx := core.ExecutionContext{
-				ID:                    execution.ID,
-				WorkflowID:            execution.WorkflowID.String(),
-				Configuration:         execution.Configuration.Data(),
-				MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
-				ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
-				RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
-				AuthContext:           contexts.NewAuthContext(tx, uuid.MustParse(organizationID), authService, user),
-				IntegrationContext:    contexts.NewIntegrationContext(tx, registry),
+				ID:             execution.ID,
+				WorkflowID:     execution.WorkflowID.String(),
+				Configuration:  execution.Configuration.Data(),
+				HTTP:           contexts.NewHTTPContext(registry.GetHTTPClient()),
+				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
+				ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+				Requests:       contexts.NewExecutionRequestContext(tx, execution),
+				Auth:           contexts.NewAuthContext(tx, orgUUID, authService, user),
+				Integration:    contexts.NewIntegrationContext(tx, registry),
+				Notifications:  contexts.NewNotificationContext(tx, orgUUID, execution.WorkflowID),
 			}
 
 			if node.AppInstallationID != nil {
@@ -102,7 +105,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 				}
 
 				logger = logging.WithAppInstallation(logger, *appInstallation)
-				ctx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
+				ctx.AppInstallation = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
 			}
 
 			ctx.Logger = logger
@@ -112,7 +115,12 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 		}
 	}
 
-	return execution.CancelInTransaction(tx)
+	var cancelledBy *uuid.UUID
+	if user != nil {
+		cancelledBy = &user.ID
+	}
+
+	return execution.CancelInTransaction(tx, cancelledBy)
 }
 
 func cancelChildExecutions(

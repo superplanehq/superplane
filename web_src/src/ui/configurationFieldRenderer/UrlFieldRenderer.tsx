@@ -1,5 +1,5 @@
 import React from "react";
-import { Input } from "../input";
+import { Input } from "@/components/ui/input";
 import { FieldRendererProps } from "./types";
 
 export const UrlFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {

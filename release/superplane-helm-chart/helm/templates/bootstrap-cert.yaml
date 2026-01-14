@@ -1,0 +1,18 @@
+{{- if and .Values.ingress.ssl.enabled (eq .Values.ingress.ssl.type "cert-manager") (eq .Values.ingress.className "gce") }}
+{{- $domainName := .Values.domain.name | required ".Values.domain.name is required." -}}
+{{- $certManager := .Values.ingress.ssl.certManager -}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: bootstrap-cert
+  namespace: {{ .Release.Namespace }}
+spec:
+  # This secretName MUST match your Ingress tls[0].secretName
+  secretName: {{ $certManager.secretName | required "ingress.ssl.certManager.secretName is required when ingress.ssl.type is 'cert-manager'." }}
+  commonName: {{ $domainName }}
+  dnsNames:
+    - {{ $domainName }}
+  issuerRef:
+    name: selfsigned-issuer
+    kind: Issuer
+{{- end }}

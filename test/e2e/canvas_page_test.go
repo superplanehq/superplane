@@ -15,9 +15,8 @@ import (
 )
 
 func TestCanvasPage(t *testing.T) {
-	steps := &CanvasPageSteps{t: t}
-
 	t.Run("adding a node to canvas displays custom node name", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("Hello")
@@ -25,17 +24,17 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("duplicating a node on canvas", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("Hello")
 		steps.duplicateNodeOnCanvas("Hello")
-		steps.assertUnsavedChangesNoteIsVisible()
-		steps.saveCanvas()
 		steps.canvas.RenameNode("Hello", "Hello previous")
 		steps.assertNodeDuplicatedInDB("Hello previous", "Hello")
 	})
 
 	t.Run("collapsing and expanding a node on canvas", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("Hello")
@@ -47,6 +46,7 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("deleting a node from a canvas", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExistsWithANoopNode()
 		steps.deleteNodeFromCanvas("DeleteMe")
@@ -54,6 +54,7 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("viewing queued items in the sidebar", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(4)
 		steps.openSidebarForNode("Wait")
@@ -63,6 +64,7 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("canceling queued items from the sidebar", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(4)
 		steps.openSidebarForNode("Wait")
@@ -74,6 +76,7 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("canceling running execution from the sidebar", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(1)
 		steps.openSidebarForNode("Wait")
@@ -87,6 +90,7 @@ func TestCanvasPage(t *testing.T) {
 	})
 
 	t.Run("deleting a connection between nodes", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addTwoNodesAndConnect()
@@ -126,10 +130,6 @@ func (s *CanvasPageSteps) deleteConnectionBetweenNodes(sourceName, targetName st
 	s.canvas.DeleteConnection(sourceName, targetName)
 }
 
-func (s *CanvasPageSteps) assertUnsavedChangesNoteIsVisible() {
-	s.session.AssertText("You have unsaved changes")
-}
-
 func (s *CanvasPageSteps) assertIsNodeCollapsed(nodeName string) {
 	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
 	s.session.Sleep(100)
@@ -150,10 +150,6 @@ func (s *CanvasPageSteps) assertIsNodeExpanded(nodeName string) {
 
 	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
 	s.session.Sleep(100)
-}
-
-func (s *CanvasPageSteps) saveCanvas() {
-	s.canvas.Save()
 }
 
 func (s *CanvasPageSteps) assertNodeIsAdded(nodeName string) {

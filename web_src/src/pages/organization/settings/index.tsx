@@ -85,9 +85,14 @@ export function OrganizationSettings() {
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
   const segmentsAfterSettings = settingsIndex >= 0 ? pathSegments.slice(settingsIndex + 1) : [];
-  const currentSection =
-    segmentsAfterSettings.find((segment) => sectionIds.includes(segment)) ||
-    (sectionIds.includes(pathSegments[pathSegments.length - 1]) ? pathSegments[pathSegments.length - 1] : "general");
+  const currentSection = segmentsAfterSettings.includes("create-role")
+    ? "roles"
+    : segmentsAfterSettings.includes("create-group")
+      ? "groups"
+      : segmentsAfterSettings.find((segment) => sectionIds.includes(segment)) ||
+        (sectionIds.includes(pathSegments[pathSegments.length - 1])
+          ? pathSegments[pathSegments.length - 1]
+          : "general");
 
   const organizationName = organization?.metadata?.name || "Organization";
   const userName = user?.name || "My Account";
@@ -97,11 +102,9 @@ export function OrganizationSettings() {
     { id: "canvases", label: "Canvases", href: `/${organizationId}`, Icon: Palette },
     { id: "general", label: "Settings", href: `/${organizationId}/settings/general`, Icon: Building },
     { id: "members", label: "Members", href: `/${organizationId}/settings/members`, Icon: UserIcon },
+    { id: "groups", label: "Groups", href: `/${organizationId}/settings/groups`, Icon: Users },
     ...(isRBACEnabled()
-      ? [
-          { id: "groups", label: "Groups", href: `/${organizationId}/settings/groups`, Icon: Users },
-          { id: "roles", label: "Roles", href: `/${organizationId}/settings/roles`, Icon: Shield },
-        ]
+      ? [{ id: "roles", label: "Roles", href: `/${organizationId}/settings/roles`, Icon: Shield }]
       : []),
     { id: "integrations", label: "Integrations", href: `/${organizationId}/settings/integrations`, Icon: Plug },
     { id: "applications", label: "Applications", href: `/${organizationId}/settings/applications`, Icon: AppWindow },

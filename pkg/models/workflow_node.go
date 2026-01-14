@@ -1,7 +1,10 @@
 package models
 
 import (
+	"fmt"
 	"log"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,6 +43,69 @@ type WorkflowNode struct {
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 	DeletedAt         gorm.DeletedAt `gorm:"index"`
+}
+
+var nodeIDSanitizer = regexp.MustCompile(`[^a-z0-9]`)
+
+func GenerateUniqueNodeID(node Node, reservedIDs map[string]bool) string {
+	blockName := NodeTypeName(node)
+	nodeName := node.Name
+	if nodeName == "" {
+		nodeName = "node"
+	}
+
+	for {
+		candidate := GenerateNodeID(blockName, nodeName)
+		if !reservedIDs[candidate] {
+			return candidate
+		}
+	}
+}
+
+func GenerateNodeID(blockName string, nodeName string) string {
+	randomChars := randomNodeSuffix(6)
+	sanitizedBlock := sanitizeNodeIDSegment(blockName)
+	sanitizedName := sanitizeNodeIDSegment(nodeName)
+	return fmt.Sprintf("%s-%s-%s", sanitizedBlock, sanitizedName, randomChars)
+}
+
+func NodeTypeName(node Node) string {
+	if node.Ref.Component != nil && node.Ref.Component.Name != "" {
+		return node.Ref.Component.Name
+	}
+	if node.Ref.Trigger != nil && node.Ref.Trigger.Name != "" {
+		return node.Ref.Trigger.Name
+	}
+	if node.Ref.Blueprint != nil && node.Ref.Blueprint.ID != "" {
+		return node.Ref.Blueprint.ID
+	}
+	if node.Ref.Widget != nil && node.Ref.Widget.Name != "" {
+		return node.Ref.Widget.Name
+	}
+	if node.Type != "" {
+		return node.Type
+	}
+	return "node"
+}
+
+func sanitizeNodeIDSegment(value string) string {
+	sanitized := nodeIDSanitizer.ReplaceAllString(strings.ToLower(value), "-")
+	sanitized = strings.Trim(sanitized, "-")
+	if sanitized == "" {
+		return "node"
+	}
+	return sanitized
+}
+
+func randomNodeSuffix(length int) string {
+	randomValue := strings.ReplaceAll(uuid.NewString(), "-", "")
+	if length <= 0 {
+		return randomValue
+	}
+	if length > len(randomValue) {
+		return randomValue
+	}
+	return randomValue[:length]
 }
 
 func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {

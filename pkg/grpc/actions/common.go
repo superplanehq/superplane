@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -1002,6 +1003,7 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 	out := make([]*triggerpb.Trigger, len(in))
 	for i, trigger := range in {
 		configFields := trigger.Configuration()
+		configFields = AppendGlobalTriggerFields(configFields)
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = ConfigurationFieldToProto(field)
@@ -1017,6 +1019,25 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 		}
 	}
 	return out
+}
+
+func AppendGlobalTriggerFields(fields []configuration.Field) []configuration.Field {
+	if slices.ContainsFunc(fields, func(field configuration.Field) bool {
+		return field.Name == "customName"
+	}) {
+		return fields
+	}
+
+	fields = append(fields, configuration.Field{
+		Name:        "customName",
+		Label:       "Run title (optional)",
+		Type:        configuration.FieldTypeString,
+		Togglable:   true,
+		Description: "Optional run title template. Supports expressions like {{ $.data }}.",
+		Placeholder: "Deploy {{ $.repository.name }} @ {{ $.head_commit.id }}",
+	})
+
+	return fields
 }
 
 func SerializeWidgets(in []core.Widget) []*widgetpb.Widget {

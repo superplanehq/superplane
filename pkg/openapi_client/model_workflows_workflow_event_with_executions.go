@@ -28,6 +28,7 @@ type WorkflowsWorkflowEventWithExecutions struct {
 	Data       map[string]interface{}           `json:"data,omitempty"`
 	CreatedAt  *time.Time                       `json:"createdAt,omitempty"`
 	Executions []WorkflowsWorkflowNodeExecution `json:"executions,omitempty"`
+	CustomName *string                          `json:"customName,omitempty"`
 }
 
 // NewWorkflowsWorkflowEventWithExecutions instantiates a new WorkflowsWorkflowEventWithExecutions object
@@ -271,6 +272,38 @@ func (o *WorkflowsWorkflowEventWithExecutions) SetExecutions(v []WorkflowsWorkfl
 	o.Executions = v
 }
 
+// GetCustomName returns the CustomName field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowEventWithExecutions) GetCustomName() string {
+	if o == nil || IsNil(o.CustomName) {
+		var ret string
+		return ret
+	}
+	return *o.CustomName
+}
+
+// GetCustomNameOk returns a tuple with the CustomName field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowEventWithExecutions) GetCustomNameOk() (*string, bool) {
+	if o == nil || IsNil(o.CustomName) {
+		return nil, false
+	}
+	return o.CustomName, true
+}
+
+// HasCustomName returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowEventWithExecutions) HasCustomName() bool {
+	if o != nil && !IsNil(o.CustomName) {
+		return true
+	}
+
+	return false
+}
+
+// SetCustomName gets a reference to the given string and assigns it to the CustomName field.
+func (o *WorkflowsWorkflowEventWithExecutions) SetCustomName(v string) {
+	o.CustomName = &v
+}
+
 func (o WorkflowsWorkflowEventWithExecutions) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -301,6 +334,9 @@ func (o WorkflowsWorkflowEventWithExecutions) ToMap() (map[string]interface{}, e
 	}
 	if !IsNil(o.Executions) {
 		toSerialize["executions"] = o.Executions
+	}
+	if !IsNil(o.CustomName) {
+		toSerialize["customName"] = o.CustomName
 	}
 	return toSerialize, nil
 }

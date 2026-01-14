@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
@@ -36,8 +37,15 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 
 	nodes, edges, err := ParseWorkflow(registry, organizationID, pbWorkflow)
 	if err != nil {
-		return nil, err
+		return nil, actions.ToStatus(err)
 	}
+
+	existingNodesUnscoped, err := models.FindWorkflowNodesUnscoped(workflowID)
+	if err != nil {
+		return nil, actions.ToStatus(err)
+	}
+
+	nodes, edges, _ = remapNodeIDsForConflicts(nodes, edges, existingNodesUnscoped)
 
 	parentNodesByNodeID := make(map[string]*models.Node)
 	for i := range nodes {
@@ -46,7 +54,7 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 
 	expandedNodes, err := expandNodes(organizationID, nodes)
 	if err != nil {
-		return nil, err
+		return nil, actions.ToStatus(err)
 	}
 
 	now := time.Now()
@@ -84,6 +92,18 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 					if saveErr := tx.Save(workflowNode).Error; saveErr != nil {
 						return saveErr
 					}
+
+					errorNodeID := node.ID
+					if workflowNode.ParentNodeID != nil {
+						errorNodeID = *workflowNode.ParentNodeID
+					}
+
+					parentNode, ok := parentNodesByNodeID[errorNodeID]
+					if !ok {
+						log.Errorf("Parent node %s not found for node setup error", errorNodeID)
+					} else {
+						parentNode.ErrorMessage = &errorMsg
+					}
 				}
 
 				if workflowNode.ParentNodeID == nil {
@@ -114,17 +134,64 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, actions.ToStatus(err)
 	}
 
 	protoWorkflow, err := SerializeWorkflow(existingWorkflow, true)
 	if err != nil {
-		return nil, err
+		return nil, actions.ToStatus(err)
 	}
 
 	return &pb.UpdateWorkflowResponse{
 		Workflow: protoWorkflow,
 	}, nil
+}
+
+// Remap node IDs that conflict with soft-deleted workflow_nodes entries so we
+// can preserve historical records while still allowing new nodes with similar
+// names to be created in the same workflow.
+func remapNodeIDsForConflicts(
+	nodes []models.Node,
+	edges []models.Edge,
+	existingNodes []models.WorkflowNode,
+) ([]models.Node, []models.Edge, map[string]string) {
+	reservedIDs := make(map[string]bool, len(existingNodes))
+	deletedIDs := make(map[string]bool, len(existingNodes))
+
+	for _, existing := range existingNodes {
+		reservedIDs[existing.NodeID] = true
+		if existing.DeletedAt.Valid {
+			deletedIDs[existing.NodeID] = true
+		}
+	}
+
+	remappedIDs := map[string]string{}
+	for i := range nodes {
+		if !deletedIDs[nodes[i].ID] {
+			reservedIDs[nodes[i].ID] = true
+			continue
+		}
+
+		newID := models.GenerateUniqueNodeID(nodes[i], reservedIDs)
+		remappedIDs[nodes[i].ID] = newID
+		nodes[i].ID = newID
+		reservedIDs[newID] = true
+	}
+
+	if len(remappedIDs) == 0 {
+		return nodes, edges, remappedIDs
+	}
+
+	for i := range edges {
+		if newID, ok := remappedIDs[edges[i].SourceID]; ok {
+			edges[i].SourceID = newID
+		}
+		if newID, ok := remappedIDs[edges[i].TargetID]; ok {
+			edges[i].TargetID = newID
+		}
+	}
+
+	return nodes, edges, remappedIDs
 }
 
 func findNode(nodes []models.WorkflowNode, nodeID string) *models.WorkflowNode {
@@ -253,12 +320,13 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 
 	logger := logging.ForNode(*node)
 	triggerCtx := core.TriggerContext{
-		Configuration:      node.Configuration.Data(),
-		MetadataContext:    contexts.NewNodeMetadataContext(tx, node),
-		RequestContext:     contexts.NewNodeRequestContext(tx, node),
-		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
-		EventContext:       contexts.NewEventContext(tx, node),
-		WebhookContext:     contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
+		Configuration: node.Configuration.Data(),
+		HTTP:          contexts.NewHTTPContext(registry.GetHTTPClient()),
+		Metadata:      contexts.NewNodeMetadataContext(tx, node),
+		Requests:      contexts.NewNodeRequestContext(tx, node),
+		Integration:   contexts.NewIntegrationContext(tx, registry),
+		Events:        contexts.NewEventContext(tx, node),
+		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
 	}
 
 	if node.AppInstallationID != nil {
@@ -268,7 +336,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		triggerCtx.AppInstallationContext = contexts.NewAppInstallationContext(
+		triggerCtx.AppInstallation = contexts.NewAppInstallationContext(
 			tx,
 			node,
 			appInstallation,
@@ -295,10 +363,11 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 
 	logger := logging.ForNode(*node)
 	setupCtx := core.SetupContext{
-		Configuration:      node.Configuration.Data(),
-		MetadataContext:    contexts.NewNodeMetadataContext(tx, node),
-		RequestContext:     contexts.NewNodeRequestContext(tx, node),
-		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
+		Configuration: node.Configuration.Data(),
+		HTTP:          contexts.NewHTTPContext(registry.GetHTTPClient()),
+		Metadata:      contexts.NewNodeMetadataContext(tx, node),
+		Requests:      contexts.NewNodeRequestContext(tx, node),
+		Integration:   contexts.NewIntegrationContext(tx, registry),
 	}
 
 	if node.AppInstallationID != nil {
@@ -308,7 +377,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		setupCtx.AppInstallationContext = contexts.NewAppInstallationContext(
+		setupCtx.AppInstallation = contexts.NewAppInstallationContext(
 			tx,
 			node,
 			appInstallation,

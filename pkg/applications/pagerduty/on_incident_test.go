@@ -41,9 +41,9 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("X-PagerDuty-Signature", "invalid")
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers:        headers,
-			EventContext:   &contexts.EventContext{},
-			WebhookContext: &contexts.WebhookContext{},
+			Headers: headers,
+			Events:  &contexts.EventContext{},
+			Webhook: &contexts.WebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -56,11 +56,11 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("X-PagerDuty-Signature", "v1=invalid")
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:           body,
-			Headers:        headers,
-			Configuration:  validConfig,
-			WebhookContext: &contexts.WebhookContext{Secret: "test-secret"},
-			EventContext:   &contexts.EventContext{},
+			Body:          body,
+			Headers:       headers,
+			Configuration: validConfig,
+			Webhook:       &contexts.WebhookContext{Secret: "test-secret"},
+			Events:        &contexts.EventContext{},
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -75,11 +75,11 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		headers.Set("X-PagerDuty-Signature", "v1="+signatureFor(secret, body))
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:           body,
-			Headers:        headers,
-			Configuration:  validConfig,
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   &contexts.EventContext{},
+			Body:          body,
+			Headers:       headers,
+			Configuration: validConfig,
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        &contexts.EventContext{},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -95,11 +95,11 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:           body,
-			Headers:        headers,
-			Configuration:  validConfig,
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Body:          body,
+			Headers:       headers,
+			Configuration: validConfig,
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -116,11 +116,11 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:           body,
-			Headers:        headers,
-			Configuration:  map[string]any{"events": []string{"incident.triggered"}, "urgencies": []string{"high"}},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Body:          body,
+			Headers:       headers,
+			Configuration: map[string]any{"events": []string{"incident.triggered"}, "urgencies": []string{"high"}},
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -137,11 +137,11 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:           body,
-			Headers:        headers,
-			Configuration:  validConfig,
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Body:          body,
+			Headers:       headers,
+			Configuration: validConfig,
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        eventContext,
 		})
 
 		require.Equal(t, http.StatusOK, code)
@@ -166,9 +166,9 @@ func Test__OnIncident__Setup(t *testing.T) {
 	t.Run("invalid configuration -> decode error", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallationContext: appCtx,
-			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          "invalid-config",
+			AppInstallation: appCtx,
+			Metadata:        &contexts.MetadataContext{},
+			Configuration:   "invalid-config",
 		})
 
 		require.ErrorContains(t, err, "failed to decode configuration")
@@ -177,9 +177,9 @@ func Test__OnIncident__Setup(t *testing.T) {
 	t.Run("at least one event required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallationContext: appCtx,
-			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          OnIncidentConfiguration{Events: []string{}, Service: "svc-1"},
+			AppInstallation: appCtx,
+			Metadata:        &contexts.MetadataContext{},
+			Configuration:   OnIncidentConfiguration{Events: []string{}, Service: "svc-1"},
 		})
 
 		require.ErrorContains(t, err, "at least one event type must be chosen")
@@ -188,9 +188,9 @@ func Test__OnIncident__Setup(t *testing.T) {
 	t.Run("service is required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallationContext: appCtx,
-			MetadataContext:        &contexts.MetadataContext{},
-			Configuration:          OnIncidentConfiguration{Events: []string{"incident.triggered"}},
+			AppInstallation: appCtx,
+			Metadata:        &contexts.MetadataContext{},
+			Configuration:   OnIncidentConfiguration{Events: []string{"incident.triggered"}},
 		})
 
 		require.ErrorContains(t, err, "service is required")
@@ -204,9 +204,9 @@ func Test__OnIncident__Setup(t *testing.T) {
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallationContext: appCtx,
-			MetadataContext:        metadataCtx,
-			Configuration:          OnIncidentConfiguration{Events: []string{"incident.triggered"}, Service: "svc-1"},
+			AppInstallation: appCtx,
+			Metadata:        metadataCtx,
+			Configuration:   OnIncidentConfiguration{Events: []string{"incident.triggered"}, Service: "svc-1"},
 		})
 
 		require.NoError(t, err)

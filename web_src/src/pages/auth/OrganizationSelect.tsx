@@ -1,7 +1,7 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { Building, Palette, User } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 
@@ -26,15 +26,30 @@ const OrganizationSelect: React.FC = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { account } = useAccount();
+  const { account, loading: accountLoading } = useAccount();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
+    if (accountLoading) {
+      return;
+    }
+
+    if (!account) {
+      const redirectParam = encodeURIComponent(`${location.pathname}${location.search}`);
+      navigate(`/login?redirect=${redirectParam}`, { replace: true });
+      setLoading(false);
+      return;
+    }
+
     fetchOrganizations();
-  }, [account]);
+  }, [account, accountLoading, location.pathname, location.search, navigate]);
 
   const fetchOrganizations = async () => {
-    if (!account) return;
+    if (!account) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const orgsResponse = await fetch("/organizations", {

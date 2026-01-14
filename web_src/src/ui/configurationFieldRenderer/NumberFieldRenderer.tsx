@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Input } from "../input";
+import { Input } from "@/components/ui/input";
 import { FieldRendererProps } from "./types";
 
 export const NumberFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {

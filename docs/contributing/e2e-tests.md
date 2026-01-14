@@ -1,6 +1,6 @@
 # End-to-End (E2E) Testing Guide
 
-This document explains how to write and run E2E tests for Superplane.
+This document explains how to write and run E2E tests for SuperPlane.
 
 ## Table of Contents
 

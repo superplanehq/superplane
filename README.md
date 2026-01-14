@@ -1,4 +1,4 @@
-# Superplane
+# SuperPlane
 
 SuperPlane is an AI-native DevOps control plane. Our mission is to build the
 platform teams use to ship and manage software in the AI era.

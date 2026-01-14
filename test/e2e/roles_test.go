@@ -16,10 +16,10 @@ func TestRoles(t *testing.T) {
 	t.Run("creating a new role", func(t *testing.T) {
 		steps.start()
 		steps.visitCreateRolePage()
-		steps.fillInCreateRoleForm("E2E Example Role", "E2E example role description")
+		steps.fillInCreateRoleForm("E2E Example Role")
 		steps.selectAllOrganizationPermissions()
 		steps.submitRoleForm()
-		steps.assertRoleSavedInDB("E2E Example Role", "E2E example role description")
+		steps.assertRoleSavedInDB("E2E Example Role")
 	})
 }
 
@@ -38,12 +38,10 @@ func (s *RolesSteps) visitCreateRolePage() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/settings/create-role")
 }
 
-func (s *RolesSteps) fillInCreateRoleForm(name, description string) {
+func (s *RolesSteps) fillInCreateRoleForm(name string) {
 	nameInput := q.Locator(`input[placeholder="Enter role name"]`)
-	descriptionInput := q.Locator(`textarea[placeholder="Describe what this role can do"]`)
 
 	s.session.FillIn(nameInput, name)
-	s.session.FillIn(descriptionInput, description)
 	s.session.Sleep(300)
 }
 
@@ -61,16 +59,16 @@ func (s *RolesSteps) submitRoleForm() {
 	s.session.Sleep(1500)
 }
 
-func (s *RolesSteps) assertRoleSavedInDB(displayName, description string) {
+func (s *RolesSteps) assertRoleSavedInDB(displayName string) {
 	var metadata []models.RoleMetadata
 	err := database.Conn().Where("domain_type = ? AND domain_id = ?", models.DomainTypeOrganization, s.session.OrgID.String()).Find(&metadata).Error
 	require.NoError(s.t, err)
 
 	for _, m := range metadata {
-		if m.DisplayName == displayName && m.Description == description {
+		if m.DisplayName == displayName {
 			return
 		}
 	}
 
-	require.Fail(s.t, "role metadata not found for display name %q and description %q", displayName, description)
+	require.Fail(s.t, "role metadata not found for display name %q", displayName)
 }

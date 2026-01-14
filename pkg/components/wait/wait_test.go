@@ -15,12 +15,12 @@ func TestWait_HandleAction_PushThrough(t *testing.T) {
 
 	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ActionContext{
-		Name:                  "pushThrough",
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       &contexts.MetadataContext{},
-		AuthContext:           &contexts.AuthContext{},
-		Configuration:         nil,
-		Parameters:            map[string]any{},
+		Name:           "pushThrough",
+		ExecutionState: stateCtx,
+		Metadata:       &contexts.MetadataContext{},
+		Auth:           &contexts.AuthContext{},
+		Configuration:  nil,
+		Parameters:     map[string]any{},
 	}
 
 	err := w.HandleAction(ctx)
@@ -34,10 +34,10 @@ func TestWait_HandleAction_TimeReached(t *testing.T) {
 
 	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ActionContext{
-		Name:                  "timeReached",
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       &contexts.MetadataContext{},
-		Parameters:            map[string]any{},
+		Name:           "timeReached",
+		ExecutionState: stateCtx,
+		Metadata:       &contexts.MetadataContext{},
+		Parameters:     map[string]any{},
 	}
 
 	err := w.HandleAction(ctx)
@@ -51,10 +51,10 @@ func TestWait_HandleAction_Unknown(t *testing.T) {
 
 	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ActionContext{
-		Name:                  "unknown",
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       &contexts.MetadataContext{},
-		Parameters:            map[string]any{},
+		Name:           "unknown",
+		ExecutionState: stateCtx,
+		Metadata:       &contexts.MetadataContext{},
+		Parameters:     map[string]any{},
 	}
 
 	err := w.HandleAction(ctx)
@@ -307,11 +307,11 @@ func TestWait_Execute_IntervalMode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			requestCtx := &contexts.RequestContext{}
 			ctx := core.ExecutionContext{
-				Configuration:         tt.config,
-				Data:                  tt.data,
-				RequestContext:        requestCtx,
-				MetadataContext:       &contexts.MetadataContext{},
-				ExecutionStateContext: &contexts.ExecutionStateContext{},
+				Configuration:  tt.config,
+				Data:           tt.data,
+				Requests:       requestCtx,
+				Metadata:       &contexts.MetadataContext{},
+				ExecutionState: &contexts.ExecutionStateContext{},
 			}
 
 			err := w.Execute(ctx)
@@ -383,11 +383,11 @@ func TestWait_Execute_CountdownMode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			requestCtx := &contexts.RequestContext{}
 			ctx := core.ExecutionContext{
-				Configuration:         tt.config,
-				Data:                  tt.data,
-				RequestContext:        requestCtx,
-				MetadataContext:       &contexts.MetadataContext{},
-				ExecutionStateContext: &contexts.ExecutionStateContext{},
+				Configuration:  tt.config,
+				Data:           tt.data,
+				Requests:       requestCtx,
+				Metadata:       &contexts.MetadataContext{},
+				ExecutionState: &contexts.ExecutionStateContext{},
 			}
 
 			err := w.Execute(ctx)
@@ -447,10 +447,10 @@ func TestWait_Execute_InvalidConfiguration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := core.ExecutionContext{
-				Configuration:         tt.config,
-				RequestContext:        &contexts.RequestContext{},
-				MetadataContext:       &contexts.MetadataContext{},
-				ExecutionStateContext: &contexts.ExecutionStateContext{},
+				Configuration:  tt.config,
+				Requests:       &contexts.RequestContext{},
+				Metadata:       &contexts.MetadataContext{},
+				ExecutionState: &contexts.ExecutionStateContext{},
 			}
 
 			err := w.Execute(ctx)
@@ -465,9 +465,9 @@ func TestWait_HandleTimeReached_CompletionOutput(t *testing.T) {
 
 	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ActionContext{
-		Name:                  "timeReached",
-		ExecutionStateContext: stateCtx,
-		MetadataContext: &contexts.MetadataContext{
+		Name:           "timeReached",
+		ExecutionState: stateCtx,
+		Metadata: &contexts.MetadataContext{
 			Metadata: ExecutionMetadata{StartTime: "2025-12-10T09:02:43.651Z"},
 		},
 	}
@@ -481,7 +481,8 @@ func TestWait_HandleTimeReached_CompletionOutput(t *testing.T) {
 	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 	require.Len(t, stateCtx.Payloads, 1)
 
-	outputData := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	outputData := payload["data"].(map[string]any)
 	assert.Equal(t, "2025-12-10T09:02:43.651Z", outputData["started_at"])
 	assert.Equal(t, "completed", outputData["result"])
 	assert.Equal(t, "timeout", outputData["reason"])
@@ -494,15 +495,15 @@ func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
 
 	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ActionContext{
-		Name:                  "pushThrough",
-		ExecutionStateContext: stateCtx,
-		AuthContext: &contexts.AuthContext{
+		Name:           "pushThrough",
+		ExecutionState: stateCtx,
+		Auth: &contexts.AuthContext{
 			User: &core.User{
 				Email: "alex@company.com",
 				Name:  "Aleksandar Mitrović",
 			},
 		},
-		MetadataContext: &contexts.MetadataContext{
+		Metadata: &contexts.MetadataContext{
 			Metadata: ExecutionMetadata{StartTime: "2025-12-10T09:02:43.651Z"},
 		},
 	}
@@ -515,7 +516,8 @@ func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
 	// Check completion output structure
 	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 	require.Len(t, stateCtx.Payloads, 1)
-	outputData := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	outputData := payload["data"].(map[string]any)
 	assert.Equal(t, "2025-12-10T09:02:43.651Z", outputData["started_at"])
 	assert.Equal(t, "completed", outputData["result"])
 	assert.Equal(t, "manual_override", outputData["reason"])
@@ -579,10 +581,10 @@ func TestWait_Execute_CountdownMode_ResolvedValues(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := core.ExecutionContext{
-				Configuration:         tt.config,
-				RequestContext:        &contexts.RequestContext{},
-				MetadataContext:       &contexts.MetadataContext{},
-				ExecutionStateContext: &contexts.ExecutionStateContext{},
+				Configuration:  tt.config,
+				Requests:       &contexts.RequestContext{},
+				Metadata:       &contexts.MetadataContext{},
+				ExecutionState: &contexts.ExecutionStateContext{},
 			}
 
 			err := w.Execute(ctx)
@@ -608,11 +610,11 @@ func TestWait_Cancel_CompletionOutput(t *testing.T) {
 
 	stateCtx := &contexts.ExecutionStateContext{}
 	ctx := core.ExecutionContext{
-		ExecutionStateContext: stateCtx,
-		MetadataContext: &contexts.MetadataContext{
+		ExecutionState: stateCtx,
+		Metadata: &contexts.MetadataContext{
 			Metadata: ExecutionMetadata{StartTime: "2025-12-10T09:02:43.651Z"},
 		},
-		AuthContext: &contexts.AuthContext{
+		Auth: &contexts.AuthContext{
 			User: &core.User{
 				Email: "alex@company.com",
 				Name:  "Aleksandar Mitrović",
@@ -628,7 +630,8 @@ func TestWait_Cancel_CompletionOutput(t *testing.T) {
 	// Check completion output structure
 	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 	require.Len(t, stateCtx.Payloads, 1)
-	output := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	output := payload["data"].(map[string]any)
 	assert.Equal(t, "2025-12-10T09:02:43.651Z", output["started_at"])
 	assert.Equal(t, "cancelled", output["result"])
 	assert.Equal(t, "user_cancel", output["reason"])

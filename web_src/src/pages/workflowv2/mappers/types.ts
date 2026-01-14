@@ -62,7 +62,7 @@ export interface ComponentBaseMapper {
     additionalData?: unknown,
   ): string | React.ReactNode;
 
-  getExecutionDetails?(execution: WorkflowsWorkflowNodeExecution, node: ComponentsNode): Record<string, string>;
+  getExecutionDetails?(execution: WorkflowsWorkflowNodeExecution, node: ComponentsNode): Record<string, any>;
 }
 
 /**
@@ -78,6 +78,7 @@ export interface ComponentAdditionalDataBuilder {
     workflowId: string,
     queryClient: QueryClient,
     organizationId?: string,
+    currentUser?: { id?: string; email?: string },
   ): unknown;
 }
 

@@ -82,7 +82,7 @@ export const runWorkflowStateFunction: StateFunction = (execution: WorkflowsWork
   }
 
   const metadata = execution.metadata as ExecutionMetadata;
-  const pipelineResult = metadata.pipeline?.result;
+  const pipelineResult = metadata?.pipeline?.result;
   if (pipelineResult === "failed") {
     return "failed";
   }

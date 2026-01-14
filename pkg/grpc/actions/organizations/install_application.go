@@ -60,6 +60,7 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, baseUR
 	)
 
 	syncErr := app.Sync(core.SyncContext{
+		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
 		AppInstallation: appCtx,
 		Configuration:   appInstallation.Configuration.Data(),
 		BaseURL:         baseURL,

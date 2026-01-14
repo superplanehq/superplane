@@ -1,9 +1,10 @@
 import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../button";
-import { Input } from "../input";
+import { Input } from "@/components/ui/input";
 import { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
+import { showErrorToast } from "@/utils/toast";
 
 interface ExtendedFieldRendererProps extends FieldRendererProps {
   validationErrors?: ValidationError[] | Set<string>;
@@ -19,11 +20,33 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   hasError: _hasError,
   validationErrors,
   fieldPath = field.name || "",
+  autocompleteExampleObj,
 }) => {
   const items = Array.isArray(value) ? value : [];
   const listOptions = field.typeOptions?.list;
   const itemDefinition = listOptions?.itemDefinition;
   const itemLabel = listOptions?.itemLabel || "Item";
+  const isApprovalItemsList =
+    itemDefinition?.type === "object" &&
+    Array.isArray(itemDefinition.schema) &&
+    itemDefinition.schema.some((schemaField) => schemaField.name === "type") &&
+    itemDefinition.schema.some((schemaField) => ["user", "role", "group"].includes(schemaField.name || ""));
+
+  const getApproverKey = (item: Record<string, unknown>) => {
+    const type = typeof item.type === "string" ? item.type : "";
+    if (!type) return undefined;
+
+    if (type === "user" && typeof item.user === "string" && item.user.trim()) {
+      return `user:${item.user}`;
+    }
+    if (type === "role" && typeof item.role === "string" && item.role.trim()) {
+      return `role:${item.role}`;
+    }
+    if (type === "group" && typeof item.group === "string" && item.group.trim()) {
+      return `group:${item.group}`;
+    }
+    return undefined;
+  };
 
   const addItem = () => {
     const newItem = itemDefinition?.type === "object" ? {} : itemDefinition?.type === "number" ? 0 : "";
@@ -38,6 +61,20 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   const updateItem = (index: number, newValue: unknown) => {
     const newItems = [...items];
     newItems[index] = newValue;
+    if (isApprovalItemsList) {
+      const newKey =
+        newValue && typeof newValue === "object" ? getApproverKey(newValue as Record<string, unknown>) : undefined;
+      if (newKey) {
+        const hasDuplicate = newItems.some((item, itemIndex) => {
+          if (itemIndex === index || !item || typeof item !== "object") return false;
+          return getApproverKey(item as Record<string, unknown>) === newKey;
+        });
+        if (hasDuplicate) {
+          showErrorToast("Approver already added.");
+          return;
+        }
+      }
+    }
     onChange(newItems);
   };
 
@@ -60,19 +97,33 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                     }
                   })();
 
+                  const itemValues =
+                    item && typeof item === "object"
+                      ? (item as Record<string, unknown>)
+                      : ({} as Record<string, unknown>);
+                  const nestedValues = isApprovalItemsList
+                    ? {
+                        ...itemValues,
+                        __listItems: items,
+                        __itemIndex: index,
+                        __isApprovalList: true,
+                      }
+                    : itemValues;
+
                   return (
                     <ConfigurationFieldRenderer
                       key={schemaField.name}
                       field={schemaField}
-                      value={item[schemaField.name!]}
+                      value={itemValues[schemaField.name!]}
                       onChange={(val) => {
-                        const newItem = { ...item, [schemaField.name!]: val };
+                        const newItem = { ...itemValues, [schemaField.name!]: val };
                         updateItem(index, newItem);
                       }}
-                      allValues={item}
+                      allValues={nestedValues}
                       domainId={domainId}
                       domainType={domainType}
                       hasError={hasNestedError}
+                      autocompleteExampleObj={autocompleteExampleObj}
                     />
                   );
                 })}

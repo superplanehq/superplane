@@ -90,12 +90,14 @@ func SerializeNodeExecutionsForSingleNode(node *models.WorkflowNode, executions 
 func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExecutions []models.WorkflowNodeExecution) ([]*pb.WorkflowNodeExecution, error) {
 	var rootEvents, inputEvents, outputEvents []models.WorkflowEvent
 	var rootEventsErr, inputEventsErr, outputEventsErr error
+	var cancelledByUsers []models.User
+	var cancelledByUsersErr error
 	var wg sync.WaitGroup
 
 	//
 	// Fetch all execution resources in parallel
 	//
-	wg.Add(3)
+	wg.Add(4)
 
 	//
 	// Root events
@@ -121,6 +123,14 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 		outputEvents, outputEventsErr = models.FindWorkflowEventsForExecutions(executionIDs(executions))
 	}()
 
+	//
+	// Cancelled-by users
+	//
+	go func() {
+		defer wg.Done()
+		cancelledByUsers, cancelledByUsersErr = models.FindMaybeDeletedUsersByIDs(cancelledByIDs(executions))
+	}()
+
 	wg.Wait()
 
 	if rootEventsErr != nil {
@@ -131,6 +141,14 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 	}
 	if outputEventsErr != nil {
 		return nil, fmt.Errorf("error finding output events: %v", outputEventsErr)
+	}
+	if cancelledByUsersErr != nil {
+		return nil, fmt.Errorf("error finding cancelled-by users: %v", cancelledByUsersErr)
+	}
+
+	cancelledByUsersByID := make(map[uuid.UUID]models.User, len(cancelledByUsers))
+	for _, user := range cancelledByUsers {
+		cancelledByUsersByID[user.ID] = user
 	}
 
 	//
@@ -153,7 +171,8 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 			return nil, err
 		}
 
-		metadata, err := structpb.NewStruct(execution.Metadata.Data())
+		metadataMap := execution.Metadata.Data()
+		metadata, err := structpb.NewStruct(metadataMap)
 		if err != nil {
 			return nil, err
 		}
@@ -180,6 +199,7 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 			Input:               input,
 			Outputs:             outputs,
 			RootEvent:           rootEvent,
+			CancelledBy:         cancelledByRef(execution.CancelledBy, cancelledByUsersByID),
 		}
 
 		if len(childExecutions) == 0 {
@@ -340,6 +360,23 @@ func executionIDs(executions []models.WorkflowNodeExecution) []string {
 	return ids
 }
 
+func cancelledByIDs(executions []models.WorkflowNodeExecution) []uuid.UUID {
+	idsMap := make(map[uuid.UUID]struct{})
+	for _, execution := range executions {
+		if execution.CancelledBy == nil {
+			continue
+		}
+		idsMap[*execution.CancelledBy] = struct{}{}
+	}
+
+	ids := make([]uuid.UUID, 0, len(idsMap))
+	for id := range idsMap {
+		ids = append(ids, id)
+	}
+
+	return ids
+}
+
 func eventIDs(executions []models.WorkflowNodeExecution) []string {
 	ids := make([]string, len(executions))
 	for i, execution := range executions {
@@ -356,6 +393,20 @@ func rootEventIDs(executions []models.WorkflowNodeExecution) []string {
 	}
 
 	return ids
+}
+
+func cancelledByRef(id *uuid.UUID, users map[uuid.UUID]models.User) *pb.UserRef {
+	if id == nil {
+		return nil
+	}
+
+	user, ok := users[*id]
+	name := ""
+	if ok {
+		name = user.Name
+	}
+
+	return &pb.UserRef{Id: id.String(), Name: name}
 }
 
 func getInputForExecution(execution models.WorkflowNodeExecution, events []models.WorkflowEvent) (*structpb.Struct, error) {
@@ -396,6 +447,7 @@ func getRootEventForExecution(execution models.WorkflowNodeExecution, rootEvents
 				WorkflowId: rootEvent.WorkflowID.String(),
 				NodeId:     rootEvent.NodeID,
 				Channel:    rootEvent.Channel,
+				CustomName: valueOrEmpty(rootEvent.CustomName),
 				Data:       s,
 				CreatedAt:  timestamppb.New(*rootEvent.CreatedAt),
 			}, nil

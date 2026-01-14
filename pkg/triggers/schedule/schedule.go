@@ -317,7 +317,7 @@ func (s *Schedule) Setup(ctx core.TriggerContext) error {
 	}
 
 	var metadata Metadata
-	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
@@ -351,13 +351,13 @@ func (s *Schedule) Setup(ctx core.TriggerContext) error {
 	//
 	// Always schedule the next and save the next trigger in the metadata.
 	//
-	err = ctx.RequestContext.ScheduleActionCall("emitEvent", map[string]any{}, time.Until(*nextTrigger))
+	err = ctx.Requests.ScheduleActionCall("emitEvent", map[string]any{}, time.Until(*nextTrigger))
 	if err != nil {
 		return err
 	}
 
 	formatted := nextTrigger.Format(time.RFC3339)
-	return ctx.MetadataContext.Set(Metadata{
+	return ctx.Metadata.Set(Metadata{
 		NextTrigger:   &formatted,
 		ReferenceTime: metadata.ReferenceTime,
 	})
@@ -416,14 +416,14 @@ func (s *Schedule) emitEvent(ctx core.TriggerActionContext) error {
 		payload["timezone"] = formatTimezone(timezone)
 	}
 
-	err = ctx.EventContext.Emit("scheduler.tick", payload)
+	err = ctx.Events.Emit("scheduler.tick", payload)
 
 	if err != nil {
 		return err
 	}
 
 	var existingMetadata Metadata
-	err = mapstructure.Decode(ctx.MetadataContext.Get(), &existingMetadata)
+	err = mapstructure.Decode(ctx.Metadata.Get(), &existingMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse existing metadata: %w", err)
 	}
@@ -434,7 +434,7 @@ func (s *Schedule) emitEvent(ctx core.TriggerActionContext) error {
 		return err
 	}
 
-	err = ctx.RequestContext.ScheduleActionCall("emitEvent", map[string]any{}, time.Until(*nextTrigger))
+	err = ctx.Requests.ScheduleActionCall("emitEvent", map[string]any{}, time.Until(*nextTrigger))
 	if err != nil {
 		return err
 	}
@@ -442,7 +442,7 @@ func (s *Schedule) emitEvent(ctx core.TriggerActionContext) error {
 	formatted := nextTrigger.Format(time.RFC3339)
 	ctx.Logger.Infof("Next trigger at: %v", formatted)
 
-	return ctx.MetadataContext.Set(Metadata{
+	return ctx.Metadata.Set(Metadata{
 		NextTrigger:   &formatted,
 		ReferenceTime: existingMetadata.ReferenceTime,
 	})

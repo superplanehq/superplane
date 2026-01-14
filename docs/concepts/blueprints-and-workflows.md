@@ -1,6 +1,6 @@
 # Blueprints and Workflows
 
-This document describes the new architecture introduced in the blueprints-and-workflows branch, which fundamentally changes how Superplane handles event processing through the introduction of **Components**, **Blueprints**, and **Workflows**.
+This document describes the new architecture introduced in the blueprints-and-workflows branch, which fundamentally changes how SuperPlane handles event processing through the introduction of **Components**, **Blueprints**, and **Workflows**.
 
 ## Overview
 

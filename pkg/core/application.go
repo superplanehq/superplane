@@ -106,12 +106,14 @@ type AppMessageContext struct {
 }
 
 type SetupWebhookContext struct {
+	HTTP            HTTPContext
 	Webhook         WebhookContext
 	Logger          *logrus.Entry
 	AppInstallation AppInstallationContext
 }
 
 type CleanupWebhookContext struct {
+	HTTP            HTTPContext
 	Webhook         WebhookContext
 	AppInstallation AppInstallationContext
 }
@@ -130,6 +132,7 @@ type SyncContext struct {
 	WebhooksBaseURL string
 	OrganizationID  string
 	InstallationID  string
+	HTTP            HTTPContext
 	AppInstallation AppInstallationContext
 }
 
@@ -210,6 +213,7 @@ type HTTPRequestContext struct {
 	OrganizationID  string
 	BaseURL         string
 	WebhooksBaseURL string
+	HTTP            HTTPContext
 	AppInstallation AppInstallationContext
 }
 

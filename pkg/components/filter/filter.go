@@ -68,6 +68,16 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	// Store the expression in metadata so it can be retrieved later
+	// even if the node configuration changes
+	metadata := map[string]any{
+		"expression": spec.Expression,
+	}
+	err = ctx.Metadata.Set(metadata)
+	if err != nil {
+		return fmt.Errorf("error setting metadata: %w", err)
+	}
+
 	env := map[string]any{
 		"$": ctx.Data,
 	}
@@ -94,14 +104,14 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if matches {
-		return ctx.ExecutionStateContext.Emit(
+		return ctx.ExecutionState.Emit(
 			core.DefaultOutputChannel.Name,
 			"filter.executed",
 			[]any{map[string]any{}},
 		)
 	}
 
-	return ctx.ExecutionStateContext.Pass()
+	return ctx.ExecutionState.Pass()
 }
 
 func (f *Filter) Actions() []core.Action {

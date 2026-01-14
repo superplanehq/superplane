@@ -104,6 +104,12 @@ spec:
 {{- else }}
               value: "no"
 {{- end }}
+            - name: OWNER_SETUP_ENABLED
+{{- if .Values.api.ownerSetupEnabled }}
+              value: "yes"
+{{- else }}
+              value: "no"
+{{- end }}
             - name: OTEL_ENABLED
               value: "yes"
 

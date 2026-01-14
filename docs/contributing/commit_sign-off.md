@@ -8,11 +8,11 @@
 
 ## Overview
 
-Any contributions to Superplane must only contain code that can legally be
-contributed to Superplane, and which the Superplane project can distribute
+Any contributions to SuperPlane must only contain code that can legally be
+contributed to SuperPlane, and which the SuperPlane project can distribute
 under its license.
 
-Prior to contributing to Superplane please read the [Developer's Certificate of Origin](/docs/legal/developer_certificate_of_origin.txt)
+Prior to contributing to SuperPlane please read the [Developer's Certificate of Origin](/docs/legal/developer_certificate_of_origin.txt)
 and sign-off all commits with the `--signoff` option provided by `git commit`.
 
 For example:

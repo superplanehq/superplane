@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CircleCheck, CircleX, MoreHorizontal, Search, TriangleAlert, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  CircleCheck,
+  CircleX,
+  MoreHorizontal,
+  ScrollText,
+  Search,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -8,7 +18,7 @@ import { cn } from "@/lib/utils";
 export type LogEntryType = "success" | "error" | "warning" | "run";
 export type LogScope = "runs" | "canvas";
 export type LogScopeFilter = "all" | LogScope;
-export type LogTypeFilter = "all" | "success" | "error" | "warning";
+export type LogTypeFilter = Set<"success" | "error" | "warning">;
 
 export interface LogRunItem {
   id: string;
@@ -28,6 +38,7 @@ export interface LogEntry {
   source: LogScope;
   searchText?: string;
   runItems?: LogRunItem[];
+  detail?: ReactNode;
 }
 
 export interface LogCounts {
@@ -86,7 +97,6 @@ export function CanvasLogSidebar({
   minHeight = 240,
   maxHeight = 820,
   onHeightChange,
-  scope,
   onScopeChange,
   searchValue,
   onSearchChange,
@@ -100,14 +110,13 @@ export function CanvasLogSidebar({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef(true);
 
-  const scopeTabs = useMemo<Array<{ id: LogScopeFilter; label: string }>>(
-    () => [
-      { id: "all", label: "All Events" },
-      { id: "runs", label: "Runs" },
-      { id: "canvas", label: "Canvas" },
-    ],
-    [],
-  );
+  // Normalize filter: if all three types are selected, treat as empty set (show all)
+  const normalizedFilter = useMemo(() => {
+    if (filter.size === 3) {
+      return new Set<"success" | "error" | "warning">();
+    }
+    return filter;
+  }, [filter]);
 
   const sidebarHeight = height ?? internalHeight;
   const clampHeight = useCallback(
@@ -208,87 +217,120 @@ export function CanvasLogSidebar({
   }
 
   return (
-    <aside className="absolute inset-x-3 bottom-3 z-31 pointer-events-auto">
+    <aside className="absolute left-0 right-0 bottom-0 z-31 pointer-events-auto">
       <div
-        className="bg-white border border-slate-200 rounded-lg shadow-lg flex flex-col"
+        className="bg-white outline outline-slate-950/10 flex flex-col"
         style={{ height: sidebarHeight, minHeight, maxHeight }}
       >
         <div
-          className="h-1 cursor-row-resize rounded-t-lg hover:bg-slate-100 transition-colors"
+          className="h-0.5 cursor-row-resize rounded-t-lg hover:bg-slate-100 transition-colors"
           onMouseDown={handleResizeStart}
         />
-        <div className="flex items-center justify-between px-4 border-b border-slate-200">
-          <div className="flex items-center gap-4">
-            {scopeTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => onScopeChange(tab.id)}
+        <div className="flex items-center justify-between pl-4 pr-1 border-b border-slate-200 h-7">
+          <div className="flex items-center gap-4 -mb-1.5">
+            <button
+              type="button"
+              onClick={() => onFilterChange(new Set())}
+              className={cn(
+                "flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
+                normalizedFilter.size === 0
+                  ? "border-gray-800 text-gray-800"
+                  : "border-transparent text-gray-500 hover:text-gray-800",
+              )}
+            >
+              <ScrollText className="h-4 w-4" />
+              All Logs
+            </button>
+            <button
+              type="button"
+              onClick={() => onFilterChange(new Set(["error"]))}
+              className={cn(
+                "group flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
+                normalizedFilter.size === 1 && normalizedFilter.has("error")
+                  ? "border-gray-800 text-gray-800"
+                  : "border-transparent text-gray-500 hover:text-gray-800",
+              )}
+            >
+              <CircleX
                 className={cn(
-                  "pb-2 text-sm font-medium border-b-2 transition-colors",
-                  scope === tab.id
-                    ? "border-slate-900 text-slate-900"
-                    : "border-transparent text-slate-500 hover:text-slate-700",
+                  "h-4 w-4",
+                  counts.error > 0
+                    ? "text-red-500"
+                    : normalizedFilter.size === 1 && normalizedFilter.has("error")
+                      ? "text-gray-800"
+                      : "text-gray-500 group-hover:text-gray-800",
+                )}
+              />
+              <span
+                className={cn(
+                  "tabular-nums",
+                  counts.error > 0
+                    ? "text-red-500"
+                    : normalizedFilter.size === 1 && normalizedFilter.has("error")
+                      ? "text-gray-800"
+                      : "text-gray-500 group-hover:text-gray-800",
                 )}
               >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 pb-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn("h-7 px-2 text-xs", filter === "error" ? "bg-rose-50 text-rose-600" : "text-slate-500")}
-              onClick={() => onFilterChange(filter === "error" ? "all" : "error")}
-            >
-              <CircleX className="h-3.5 w-3.5 text-rose-500" />
-              <span className="tabular-nums">{counts.error}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn("h-7 px-2 text-xs", filter === "warning" ? "bg-amber-50 text-amber-600" : "text-slate-500")}
-              onClick={() => onFilterChange(filter === "warning" ? "all" : "warning")}
-            >
-              <TriangleAlert className="h-3.5 w-3.5 text-amber-500" />
-              <span className="tabular-nums">{counts.warning}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+                {counts.error}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onFilterChange(new Set(["warning"]))}
               className={cn(
-                "h-7 px-2 text-xs",
-                filter === "success" ? "bg-emerald-50 text-emerald-600" : "text-slate-500",
+                "group flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
+                normalizedFilter.size === 1 && normalizedFilter.has("warning")
+                  ? "border-gray-800 text-gray-800"
+                  : "border-transparent text-gray-500 hover:text-gray-800",
               )}
-              onClick={() => onFilterChange(filter === "success" ? "all" : "success")}
             >
-              <CircleCheck className="h-3.5 w-3.5 text-emerald-500" />
-              <span className="tabular-nums">{counts.success}</span>
-            </Button>
-            <Button variant="ghost" size="icon-sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
+              <TriangleAlert
+                className={cn(
+                  "h-4 w-4",
+                  counts.warning > 0
+                    ? "text-amber-600"
+                    : normalizedFilter.size === 1 && normalizedFilter.has("warning")
+                      ? "text-gray-800"
+                      : "text-gray-500 group-hover:text-gray-800",
+                )}
+              />
+              <span
+                className={cn(
+                  "tabular-nums",
+                  counts.warning > 0
+                    ? "text-amber-600"
+                    : normalizedFilter.size === 1 && normalizedFilter.has("warning")
+                      ? "text-gray-800"
+                      : "text-gray-500 group-hover:text-gray-800",
+                )}
+              >
+                {counts.warning}
+              </span>
+            </button>
           </div>
+          <Button variant="ghost" size="icon-sm" onClick={onClose} className="size-6 rounded">
+            <X className="h-3 w-3" />
+          </Button>
         </div>
-        <div className="px-4 py-3 border-b border-slate-200">
-          <InputGroup className="bg-slate-50">
-            <InputGroupAddon>
-              <Search className="h-4 w-4" />
+        <div className="px-2 border-b border-slate-200">
+          <InputGroup className="h-7 border-0 shadow-none !ring-0 !focus-within:ring-0 focus-within:ring-offset-0">
+            <InputGroupAddon className="border-0 shadow-none">
+              <Search className="h-4 w-4 -ml-1 text-gray-800" />
             </InputGroupAddon>
             <InputGroupInput
-              placeholder="search through logs"
+              placeholder="Search through Logs…"
               value={searchValue}
               onChange={(event) => onSearchChange(event.target.value)}
+              className="h-7 !text-[13px] border-0 shadow-none focus:ring-0 focus-visible:ring-0 focus-visible:border-0"
             />
           </InputGroup>
         </div>
         <div className="flex-1 overflow-auto" data-log-scroll ref={scrollContainerRef}>
           {entries.length === 0 ? (
-            <div className="px-4 py-6 text-sm text-slate-500">No logs match the current filters.</div>
+            <div className="px-4 py-1.5 text-[13px] text-gray-800">No logs found.</div>
           ) : (
-            <div className="divide-y divide-slate-100">
-              {entries.map((entry) => (
+            <div className="divide-y divide-slate-200">
+              {[...entries].reverse().map((entry) => (
                 <LogEntryRow
                   key={entry.id}
                   entry={entry}
@@ -315,9 +357,10 @@ function LogEntryRow({
 }) {
   const icon = {
     success: <CircleCheck className="h-4 w-4 text-emerald-500" />,
-    error: <CircleX className="h-4 w-4 text-rose-500" />,
-    warning: <TriangleAlert className="h-4 w-4 text-amber-500" />,
+    error: <CircleX className="h-4 w-4 text-red-500" />,
+    warning: <TriangleAlert className="h-4 w-4 text-amber-600" />,
   } as const;
+  const [isDetailExpanded, setIsDetailExpanded] = useState(false);
 
   if (entry.type === "run") {
     const runItems = entry.runItems || [];
@@ -328,35 +371,35 @@ function LogEntryRow({
         <button
           type="button"
           onClick={() => onToggleRun(entry.id)}
-          className="flex w-full items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+          className="flex w-full items-center gap-3 px-4 py-1.5 text-sm text-gray-800 hover:bg-gray-50"
           aria-expanded={isExpanded}
         >
-          <div className="h-4 w-4 rounded-full bg-slate-100 text-xs font-semibold text-slate-600 flex items-center justify-center">
+          <div className="h-4 w-4 rounded-full text-xs font-mono text-gray-500 flex items-center justify-center border border-gray-400">
             {runItems.length}
           </div>
-          <div className="flex-1 min-w-0 text-left">{entry.title}</div>
-          <span className="ml-auto text-xs text-slate-400 tabular-nums whitespace-nowrap">
+          <div className="flex-1 min-w-0 text-left font-mono text-xs">{entry.title}</div>
+          <span className="ml-auto text-xs text-gray-500 tabular-nums whitespace-nowrap">
             {formatLogTimestamp(entry.timestamp)}
           </span>
         </button>
         {showChildren && (
-          <div className="pb-2">
+          <div>
             {runItems.map((item) => (
               <div
                 key={item.id}
-                className="flex items-start gap-3 px-10 pr-4 py-2 text-sm text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors"
+                className="flex items-start gap-3 px-11 pr-4 py-1.5 text-sm text-gray-800 bg-gray-50 border-t border-gray-200 transition-colors"
               >
                 <div className="pt-0.5">
-                  {item.isRunning ? <MoreHorizontal className="h-4 w-4 text-slate-400" /> : icon[item.type]}
+                  {item.isRunning ? <MoreHorizontal className="h-4 w-4 text-gray-500" /> : icon[item.type]}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0">{item.title}</div>
-                    <span className="text-xs text-slate-400 tabular-nums whitespace-nowrap">
+                    <div className="flex-1 min-w-0 text-[13px] font-mono">{item.title}</div>
+                    <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">
                       {formatLogTimestamp(item.timestamp)}
                     </span>
                   </div>
-                  {item.detail && <div className="mt-1 text-xs text-slate-500">{item.detail}</div>}
+                  {item.detail && <div className="mt-1 text-xs text-gray-800">{item.detail}</div>}
                 </div>
               </div>
             ))}
@@ -366,13 +409,36 @@ function LogEntryRow({
     );
   }
 
+  const hasDetail = Boolean(entry.detail);
+
   return (
-    <div className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700">
-      <div>{icon[entry.type]}</div>
-      <div className="flex-1 min-w-0">{entry.title}</div>
-      <span className="ml-auto text-xs text-slate-400 tabular-nums whitespace-nowrap">
-        {formatLogTimestamp(entry.timestamp)}
-      </span>
+    <div className="flex items-start gap-3 px-4 py-1.5 text-[13px] text-gray-800">
+      <div className="pt-0.5">{icon[entry.type]}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          {hasDetail ? (
+            <button
+              type="button"
+              className="flex flex-1 min-w-0 items-center gap-2 text-left hover:text-gray-800"
+              onClick={() => setIsDetailExpanded((prev) => !prev)}
+              aria-expanded={isDetailExpanded}
+            >
+              {isDetailExpanded ? (
+                <ChevronDown className="h-4 w-4 text-gray-500" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-gray-500" />
+              )}
+              <div className="min-w-0">{entry.title}</div>
+            </button>
+          ) : (
+            <div className="flex-1 min-w-0 text-[13px] font-mono">{entry.title}</div>
+          )}
+          <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">
+            {formatLogTimestamp(entry.timestamp)}
+          </span>
+        </div>
+        {entry.detail && isDetailExpanded && <div className="mt-2 text-[13px] text-gray-500">{entry.detail}</div>}
+      </div>
     </div>
   );
 }

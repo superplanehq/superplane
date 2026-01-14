@@ -13,6 +13,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   domainId,
   domainType,
   hasError,
+  autocompleteExampleObj,
 }) => {
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   const [editorValue, setEditorValue] = React.useState<string>(() =>
@@ -151,6 +152,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
           allValues={objValue}
           domainId={domainId}
           domainType={domainType}
+          autocompleteExampleObj={autocompleteExampleObj}
         />
       ))}
     </div>

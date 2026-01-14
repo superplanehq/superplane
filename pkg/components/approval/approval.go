@@ -3,12 +3,14 @@ package approval
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -116,7 +118,7 @@ func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) er
 
 	record.State = StateApproved
 	record.Approval = &ApprovalInfo{ApprovedAt: time.Now().Format(time.RFC3339)}
-	record.User = ctx.AuthContext.AuthenticatedUser()
+	record.User = ctx.Auth.AuthenticatedUser()
 	comment, ok := ctx.Parameters["comment"].(string)
 	if ok {
 		record.Approval.Comment = comment
@@ -143,7 +145,7 @@ func (m *Metadata) Reject(record *Record, index int, ctx core.ActionContext) err
 	}
 
 	record.State = StateRejected
-	record.User = ctx.AuthContext.AuthenticatedUser()
+	record.User = ctx.Auth.AuthenticatedUser()
 	record.Rejection = &RejectionInfo{
 		RejectedAt: time.Now().Format(time.RFC3339),
 		Reason:     reasonStr,
@@ -154,7 +156,7 @@ func (m *Metadata) Reject(record *Record, index int, ctx core.ActionContext) err
 }
 
 func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error {
-	authenticatedUser := ctx.AuthContext.AuthenticatedUser()
+	authenticatedUser := ctx.Auth.AuthenticatedUser()
 	switch record.Type {
 	case ItemTypeAnyone:
 		// Any authenticated user can approve
@@ -168,7 +170,7 @@ func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error 
 		return nil
 
 	case ItemTypeRole:
-		hasRole, err := ctx.AuthContext.HasRole(*record.Role)
+		hasRole, err := ctx.Auth.HasRole(*record.Role)
 		if err != nil {
 			return fmt.Errorf("error checking role %s: %v", *record.Role, err)
 		}
@@ -180,7 +182,7 @@ func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error 
 		return nil
 
 	case ItemTypeGroup:
-		inGroup, err := ctx.AuthContext.InGroup(*record.Group)
+		inGroup, err := ctx.Auth.InGroup(*record.Group)
 		if err != nil {
 			return fmt.Errorf("error checking group %s: %v", *record.Group, err)
 		}
@@ -229,7 +231,7 @@ func approvalItemToRecord(ctx core.ExecutionContext, item Item, index int) (*Rec
 			return nil, err
 		}
 
-		user, err := ctx.AuthContext.GetUser(userID)
+		user, err := ctx.Auth.GetUser(userID)
 		if err != nil {
 			return nil, err
 		}
@@ -316,9 +318,9 @@ func (a *Approval) Configuration() []configuration.Field {
 										Options: []configuration.FieldOption{
 											{Value: "anyone", Label: "Any user"},
 											{Value: "user", Label: "Specific user"},
+											{Value: "group", Label: "Group"},
 											// TODO: Uncomment after RBAC definitive implementation
 											// {Value: "role", Label: "Role"},
-											// {Value: "group", Label: "Group"},
 										},
 									},
 								},
@@ -385,7 +387,7 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 	}
 
 	metadata.UpdateResult()
-	err = ctx.MetadataContext.Set(metadata)
+	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
@@ -394,11 +396,19 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 	// If no items are specified, just finish the execution.
 	//
 	if metadata.Completed() {
-		return ctx.ExecutionStateContext.Emit(
+		return ctx.ExecutionState.Emit(
 			ChannelApproved,
 			"approval.finished",
 			[]any{metadata},
 		)
+	}
+
+	if ctx.Notifications != nil {
+		if err := a.notifyApprovers(ctx, metadata); err != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Warnf("failed to send approval notification: %v", err)
+			}
+		}
 	}
 
 	return nil
@@ -472,7 +482,7 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 	// without finishing the execution.
 	//
 	if !metadata.Completed() {
-		return ctx.MetadataContext.Set(metadata)
+		return ctx.Metadata.Set(metadata)
 	}
 
 	//
@@ -482,7 +492,7 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 	// the final state of the execution is rejected.
 	//
 	metadata.UpdateResult()
-	err = ctx.MetadataContext.Set(metadata)
+	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return err
 	}
@@ -494,7 +504,7 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 		outputChannel = ChannelRejected
 	}
 
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		outputChannel,
 		"approval.finished",
 		[]any{metadata},
@@ -503,7 +513,7 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 
 func (a *Approval) handleApprove(ctx core.ActionContext) (*Metadata, error) {
 	var metadata Metadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
@@ -542,7 +552,7 @@ func (a *Approval) findPendingRecord(metadata Metadata, parameters map[string]an
 
 func (a *Approval) handleReject(ctx core.ActionContext) (*Metadata, error) {
 	var metadata Metadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
@@ -566,4 +576,67 @@ func (a *Approval) Cancel(ctx core.ExecutionContext) error {
 
 func (a *Approval) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
+}
+
+func (a *Approval) notifyApprovers(ctx core.ExecutionContext, metadata *Metadata) error {
+	url := ""
+	if ctx.BaseURL != "" && ctx.OrganizationID != "" && ctx.WorkflowID != "" && ctx.NodeID != "" {
+		url = fmt.Sprintf(
+			"%s/%s/workflows/%s?sidebar=1&node=%s",
+			strings.TrimRight(ctx.BaseURL, "/"),
+			ctx.OrganizationID,
+			ctx.WorkflowID,
+			ctx.NodeID,
+		)
+	}
+
+	title := "Approval required"
+	body := "A canvas run item is waiting for your approval. Please visit the URL below to handle it."
+
+	receivers := core.NotificationReceivers{}
+	emailSet := map[string]struct{}{}
+	groupSet := map[string]struct{}{}
+	roleSet := map[string]struct{}{}
+
+	for _, record := range metadata.Records {
+		if record.State != StatePending {
+			continue
+		}
+
+		switch record.Type {
+		case ItemTypeAnyone:
+			roleSet[models.RoleOrgViewer] = struct{}{}
+			roleSet[models.RoleOrgAdmin] = struct{}{}
+			roleSet[models.RoleOrgOwner] = struct{}{}
+
+		case ItemTypeUser:
+			if record.User != nil && record.User.Email != "" {
+				emailSet[record.User.Email] = struct{}{}
+			}
+
+		case ItemTypeRole:
+			if record.Role != nil && *record.Role != "" {
+				roleSet[*record.Role] = struct{}{}
+			}
+
+		case ItemTypeGroup:
+			if record.Group != nil && *record.Group != "" {
+				groupSet[*record.Group] = struct{}{}
+			}
+		}
+	}
+
+	receivers.Emails = mapKeys(emailSet)
+	receivers.Groups = mapKeys(groupSet)
+	receivers.Roles = mapKeys(roleSet)
+
+	return ctx.Notifications.Send(title, body, url, "Open approval", receivers)
+}
+
+func mapKeys(input map[string]struct{}) []string {
+	result := make([]string, 0, len(input))
+	for key := range input {
+		result = append(result, key)
+	}
+	return result
 }

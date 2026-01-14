@@ -176,7 +176,7 @@ CREATE TABLE public.blueprints (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100),
+    ptype character varying(100) NOT NULL,
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -204,6 +204,25 @@ CREATE SEQUENCE public.casbin_rule_id_seq
 --
 
 ALTER SEQUENCE public.casbin_rule_id_seq OWNED BY public.casbin_rule.id;
+
+
+--
+-- Name: email_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.email_settings (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    provider character varying(50) NOT NULL,
+    smtp_host character varying(255),
+    smtp_port integer,
+    smtp_username character varying(255),
+    smtp_password bytea,
+    smtp_from_name character varying(255),
+    smtp_from_email character varying(255),
+    smtp_use_tls boolean DEFAULT false NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
 
 
 --
@@ -365,7 +384,8 @@ CREATE TABLE public.workflow_events (
     data jsonb NOT NULL,
     state character varying(32) NOT NULL,
     execution_id uuid,
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    custom_name text
 );
 
 
@@ -403,7 +423,8 @@ CREATE TABLE public.workflow_node_executions (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    cancelled_by uuid
 );
 
 
@@ -599,6 +620,22 @@ ALTER TABLE ONLY public.blueprints
 
 ALTER TABLE ONLY public.casbin_rule
     ADD CONSTRAINT casbin_rule_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: email_settings email_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.email_settings
+    ADD CONSTRAINT email_settings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: email_settings email_settings_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.email_settings
+    ADD CONSTRAINT email_settings_provider_key UNIQUE (provider);
 
 
 --
@@ -881,13 +918,6 @@ CREATE INDEX idx_app_installations_organization_id ON public.app_installations U
 --
 
 CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (organization_id);
-
-
---
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --
@@ -1428,7 +1458,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260108154024	f
+20260114145029	f
 \.
 
 

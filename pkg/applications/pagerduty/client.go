@@ -14,9 +14,10 @@ type Client struct {
 	AuthType string
 	Token    string
 	BaseURL  string
+	http     core.HTTPContext
 }
 
-func NewClient(ctx core.AppInstallationContext) (*Client, error) {
+func NewClient(http core.HTTPContext, ctx core.AppInstallationContext) (*Client, error) {
 	authType, err := ctx.GetConfig("authType")
 	if err != nil {
 		return nil, fmt.Errorf("error finding auth type: %v", err)
@@ -33,6 +34,7 @@ func NewClient(ctx core.AppInstallationContext) (*Client, error) {
 			Token:    string(apiToken),
 			AuthType: AuthTypeAPIToken,
 			BaseURL:  "https://api.pagerduty.com",
+			http:     http,
 		}, nil
 
 	case AuthTypeAppOAuth:
@@ -57,6 +59,7 @@ func NewClient(ctx core.AppInstallationContext) (*Client, error) {
 			Token:    accessToken,
 			AuthType: AuthTypeAppOAuth,
 			BaseURL:  "https://api.pagerduty.com",
+			http:     http,
 		}, nil
 	}
 
@@ -78,7 +81,7 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 		req.Header.Set("Authorization", fmt.Sprintf("Token token=%s", c.Token))
 	}
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %v", err)
 	}

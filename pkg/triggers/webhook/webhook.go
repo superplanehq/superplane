@@ -74,7 +74,7 @@ func (w *Webhook) Configuration() []configuration.Field {
 
 func (w *Webhook) Setup(ctx core.TriggerContext) error {
 	var metadata Metadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
@@ -91,7 +91,7 @@ func (w *Webhook) Setup(ctx core.TriggerContext) error {
 	}
 
 	if metadata.URL == "" {
-		webhookURL, err := ctx.WebhookContext.Setup(nil)
+		webhookURL, err := ctx.Webhook.Setup(nil)
 		if err != nil {
 			return fmt.Errorf("failed to setup webhook: %w", err)
 		}
@@ -101,7 +101,7 @@ func (w *Webhook) Setup(ctx core.TriggerContext) error {
 
 	metadata.Authentication = config.Authentication
 
-	err = ctx.MetadataContext.Set(metadata)
+	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return fmt.Errorf("failed to set metadata: %w", err)
 	}
@@ -130,7 +130,7 @@ func (w *Webhook) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 
 func (w *Webhook) resetAuthentication(ctx core.TriggerActionContext) (map[string]any, error) {
 	var metadata Metadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
@@ -144,9 +144,9 @@ func (w *Webhook) resetAuthentication(ctx core.TriggerActionContext) (map[string
 	plainKey, err := []byte{}, nil
 	switch metadata.Authentication {
 	case "signature":
-		plainKey, _, err = ctx.WebhookContext.ResetSecret()
+		plainKey, _, err = ctx.Webhook.ResetSecret()
 	case "bearer":
-		plainKey, _, err = ctx.WebhookContext.ResetSecret()
+		plainKey, _, err = ctx.Webhook.ResetSecret()
 	default:
 		return nil, fmt.Errorf("unsupported authentication method: %s", metadata.Authentication)
 	}
@@ -173,7 +173,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusInternalServerError, fmt.Errorf("failed to parse configuration: %w", err)
 	}
 
-	secret, err := ctx.WebhookContext.GetSecret()
+	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
 	}
@@ -218,7 +218,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		"headers": ctx.Headers,
 	}
 
-	err = ctx.EventContext.Emit("webhook", output)
+	err = ctx.Events.Emit("webhook", output)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}

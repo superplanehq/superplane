@@ -53,11 +53,13 @@ func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 			filter := &Filter{}
 
 			stateCtx := &contexts.ExecutionStateContext{}
+			metadataCtx := &contexts.MetadataContext{}
 
 			ctx := core.ExecutionContext{
-				Data:                  tt.inputData,
-				Configuration:         tt.configuration,
-				ExecutionStateContext: stateCtx,
+				Data:           tt.inputData,
+				Configuration:  tt.configuration,
+				ExecutionState: stateCtx,
+				Metadata:       metadataCtx,
 			}
 
 			err := filter.Execute(ctx)
@@ -65,11 +67,27 @@ func TestFilter_Execute_EmitsEmptyEvents(t *testing.T) {
 			assert.NoError(t, err)
 			assert.True(t, stateCtx.Passed)
 			assert.True(t, stateCtx.Finished)
+
+			// Verify that the expression is stored in metadata
+			assert.NotNil(t, metadataCtx.Metadata)
+			metadata, ok := metadataCtx.Metadata.(map[string]any)
+			assert.True(t, ok)
+			assert.Equal(t, tt.configuration["expression"], metadata["expression"])
+
 			if tt.expectedOutputsCount > 0 {
 				assert.Equal(t, tt.expectedChannel, stateCtx.Channel)
 				assert.Equal(t, "filter.executed", stateCtx.Type)
 				assert.Len(t, stateCtx.Payloads, 1)
-				assert.Equal(t, make(map[string]any), stateCtx.Payloads[0])
+
+				// Verify payload structure follows SuperPlane conventions
+				payload, ok := stateCtx.Payloads[0].(map[string]any)
+				assert.True(t, ok, "payload should be a map")
+				assert.Equal(t, "filter.executed", payload["type"])
+				assert.NotEmpty(t, payload["timestamp"])
+				assert.Contains(t, payload, "data")
+				data, ok := payload["data"].(map[string]any)
+				assert.True(t, ok, "data should be a map")
+				assert.Empty(t, data, "data should be empty")
 			} else {
 				assert.Empty(t, stateCtx.Channel)
 				assert.Empty(t, stateCtx.Type)
@@ -83,11 +101,13 @@ func TestFilter_Execute_InvalidExpression_ShouldReturnError(t *testing.T) {
 	filter := &Filter{}
 
 	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
 
 	ctx := core.ExecutionContext{
-		Data:                  map[string]any{"test": "value"},
-		Configuration:         map[string]any{"expression": "invalid expression syntax +++"},
-		ExecutionStateContext: stateCtx,
+		Data:           map[string]any{"test": "value"},
+		Configuration:  map[string]any{"expression": "invalid expression syntax +++"},
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
 	}
 
 	err := filter.Execute(ctx)
@@ -99,11 +119,13 @@ func TestFilter_Execute_NonBooleanResult_ShouldReturnError(t *testing.T) {
 	filter := &Filter{}
 
 	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
 
 	ctx := core.ExecutionContext{
-		Data:                  map[string]any{"test": "value"},
-		Configuration:         map[string]any{"expression": "$.test"},
-		ExecutionStateContext: stateCtx,
+		Data:           map[string]any{"test": "value"},
+		Configuration:  map[string]any{"expression": "$.test"},
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
 	}
 
 	err := filter.Execute(ctx)

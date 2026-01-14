@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Background,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -8,7 +9,7 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { CircleX, List, Loader2, ScanLine, ScanText, TriangleAlert } from "lucide-react";
+import { CircleX, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import {
   BlueprintsBlueprint,
 } from "@/api-client";
 import { parseDefaultValues } from "@/utils/components";
+import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { AiSidebar } from "../ai";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
@@ -137,12 +139,14 @@ export interface CanvasPageProps {
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
+  getAutocompleteExampleObj?: (nodeId: string) => Record<string, unknown> | null;
   onNodeConfigurationSave?: (
     nodeId: string,
     configuration: Record<string, any>,
     nodeName: string,
     appInstallationRef?: ComponentsAppInstallationRef,
   ) => void;
+  onAnnotationUpdate?: (nodeId: string, updates: { text?: string; color?: string }) => void;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
   installedApplications?: OrganizationsAppInstallation[];
@@ -193,6 +197,7 @@ export interface CanvasPageProps {
   // Optional: control and observe component sidebar state
   onSidebarChange?: (isOpen: boolean, selectedNodeId: string | null) => void;
   initialSidebar?: { isOpen?: boolean; nodeId?: string | null };
+  initialFocusNodeId?: string | null;
 
   // Full history functionality
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
@@ -273,6 +278,11 @@ const nodeTypes = {
         onToggleCollapse={
           callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
         }
+        onAnnotationUpdate={
+          callbacks.onAnnotationUpdate.current
+            ? (nodeId, updates) => callbacks.onAnnotationUpdate.current?.(nodeId, updates)
+            : undefined
+        }
         ai={{
           show: callbacks.aiState.sidebarOpen,
           suggestion: callbacks.aiState.suggestions[nodeProps.id] || null,
@@ -291,6 +301,7 @@ function CanvasPage(props: CanvasPageProps) {
   const [currentTab, setCurrentTab] = useState<"latest" | "settings">("latest");
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
+  const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
 
   // Use refs from props if provided, otherwise create local ones
   const hasFitToViewRef = props.hasFitToViewRef || useRef(false);
@@ -455,14 +466,23 @@ function CanvasPage(props: CanvasPageProps) {
         return;
       }
 
+      const defaultConfiguration = (() => {
+        const defaults = parseDefaultValues(block.configuration || []);
+        const filtered = { ...defaults };
+        block.configuration?.forEach((field) => {
+          if (field.name && field.togglable) {
+            delete filtered[field.name];
+          }
+        });
+        return filtered;
+      })();
+
       // Check if templateNodeId is a placeholder (persisted node) or legacy pending connection (local-only)
       const workflowNode = props.workflowNodes?.find((n) => n.id === templateNodeId);
       const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
 
       if (isPlaceholder && props.onPlaceholderConfigure) {
         // Handle placeholder node (persisted)
-        const defaultConfiguration = parseDefaultValues(block.configuration || []);
-
         await props.onPlaceholderConfigure({
           placeholderId: templateNodeId,
           buildingBlock: block,
@@ -482,9 +502,6 @@ function CanvasPage(props: CanvasPageProps) {
       const pendingNode = state.nodes.find((n) => n.id === templateNodeId && n.data.isPendingConnection);
 
       if (pendingNode) {
-        // Parse default configuration from building block
-        const defaultConfiguration = parseDefaultValues(block.configuration || []);
-
         // Save immediately with defaults
         if (props.onNodeAdd) {
           const newNodeId = await props.onNodeAdd({
@@ -519,6 +536,84 @@ function CanvasPage(props: CanvasPageProps) {
   const handleAddNote = useCallback(async () => {
     if (!props.onNodeAdd) return;
 
+    const viewport = props.viewportRef?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
+    const canvasRect = canvasWrapperRef.current?.getBoundingClientRect();
+    const zoom = viewport.zoom || DEFAULT_CANVAS_ZOOM;
+    const visibleWidth = canvasRect?.width ?? window.innerWidth;
+    const visibleHeight = canvasRect?.height ?? window.innerHeight;
+    const visibleBounds = {
+      minX: (0 - viewport.x) / zoom,
+      minY: (0 - viewport.y) / zoom,
+      maxX: (visibleWidth - viewport.x) / zoom,
+      maxY: (visibleHeight - viewport.y) / zoom,
+    };
+
+    const noteSize = { width: 320, height: 160 };
+    const basePosition = {
+      x: (visibleWidth / 2 - viewport.x) / zoom - noteSize.width / 2,
+      y: (visibleHeight / 2 - viewport.y) / zoom - noteSize.height / 2,
+    };
+
+    const nodes = state.nodes || [];
+    const padding = 16;
+    const intersects = (pos: { x: number; y: number }) => {
+      const bounds = {
+        minX: pos.x - padding,
+        minY: pos.y - padding,
+        maxX: pos.x + noteSize.width + padding,
+        maxY: pos.y + noteSize.height + padding,
+      };
+      return nodes.some((node) => {
+        const width = node.width ?? 240;
+        const height = node.height ?? 120;
+        const nodeBounds = {
+          minX: node.position.x,
+          minY: node.position.y,
+          maxX: node.position.x + width,
+          maxY: node.position.y + height,
+        };
+        return !(
+          bounds.maxX < nodeBounds.minX ||
+          bounds.minX > nodeBounds.maxX ||
+          bounds.maxY < nodeBounds.minY ||
+          bounds.minY > nodeBounds.maxY
+        );
+      });
+    };
+
+    const clampToVisible = (pos: { x: number; y: number }) => {
+      const minX = visibleBounds.minX + padding;
+      const minY = visibleBounds.minY + padding;
+      const maxX = visibleBounds.maxX - noteSize.width - padding;
+      const maxY = visibleBounds.maxY - noteSize.height - padding;
+      return {
+        x: Math.min(Math.max(pos.x, minX), maxX),
+        y: Math.min(Math.max(pos.y, minY), maxY),
+      };
+    };
+
+    let position = clampToVisible(basePosition);
+    const step = 40;
+    const maxRings = 8;
+    if (intersects(position)) {
+      let found = false;
+      for (let ring = 1; ring <= maxRings && !found; ring += 1) {
+        for (let dx = -ring; dx <= ring && !found; dx += 1) {
+          for (let dy = -ring; dy <= ring && !found; dy += 1) {
+            if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) continue;
+            const candidate = clampToVisible({
+              x: basePosition.x + dx * step,
+              y: basePosition.y + dy * step,
+            });
+            if (!intersects(candidate)) {
+              position = candidate;
+              found = true;
+            }
+          }
+        }
+      }
+    }
+
     const annotationBlock: BuildingBlock = {
       name: "annotation",
       label: "Annotation",
@@ -526,21 +621,26 @@ function CanvasPage(props: CanvasPageProps) {
       isLive: true,
     };
 
-    const newNodeId = await props.onNodeAdd({
+    await props.onNodeAdd({
       buildingBlock: annotationBlock,
-      nodeName: "New Note",
+      nodeName: "Note",
       configuration: {},
-      position: { x: 200, y: 200 },
+      position,
     });
-
-    state.componentSidebar.open(newNodeId);
-    setCurrentTab("settings");
-  }, [props, state, setCurrentTab]);
+  }, [props, state.nodes, props.viewportRef]);
 
   const handleBuildingBlockDrop = useCallback(
     async (block: BuildingBlock, position?: { x: number; y: number }) => {
-      // Parse default configuration from building block
-      const defaultConfiguration = parseDefaultValues(block.configuration || []);
+      const defaultConfiguration = (() => {
+        const defaults = parseDefaultValues(block.configuration || []);
+        const filtered = { ...defaults };
+        block.configuration?.forEach((field) => {
+          if (field.name && field.togglable) {
+            delete filtered[field.name];
+          }
+        });
+        return filtered;
+      })();
 
       // Save immediately with defaults
       if (props.onNodeAdd) {
@@ -643,7 +743,7 @@ function CanvasPage(props: CanvasPageProps) {
   }, [state, templateNodeId]);
 
   return (
-    <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
+    <div ref={canvasWrapperRef} className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
       <div className="relative z-30">
         <CanvasContentHeader
@@ -687,6 +787,7 @@ function CanvasPage(props: CanvasPageProps) {
               onDuplicate={props.onDuplicate}
               onConfigure={props.onConfigure}
               onDeactivate={props.onDeactivate}
+              onAnnotationUpdate={props.onAnnotationUpdate}
               runDisabled={props.runDisabled}
               runDisabledTooltip={props.runDisabledTooltip}
               onBuildingBlockDrop={handleBuildingBlockDrop}
@@ -710,6 +811,7 @@ function CanvasPage(props: CanvasPageProps) {
               logEntries={props.logEntries}
               focusRequest={props.focusRequest}
               onExecutionChainHandled={props.onExecutionChainHandled}
+              initialFocusNodeId={props.initialFocusNodeId}
             />
           </ReactFlowProvider>
 
@@ -726,6 +828,7 @@ function CanvasPage(props: CanvasPageProps) {
             getSidebarData={props.getSidebarData}
             loadSidebarData={props.loadSidebarData}
             getTabData={props.getTabData}
+            getAutocompleteExampleObj={props.getAutocompleteExampleObj}
             onCancelQueueItem={handleCancelQueueItem}
             onPushThrough={handlePushThrough}
             onCancelExecution={handleCancelExecution}
@@ -794,6 +897,7 @@ function Sidebar({
   getSidebarData,
   loadSidebarData,
   getTabData,
+  getAutocompleteExampleObj,
   onCancelQueueItem,
   onPushThrough,
   onCancelExecution,
@@ -839,6 +943,7 @@ function Sidebar({
   getSidebarData?: (nodeId: string) => SidebarData | null;
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
+  getAutocompleteExampleObj?: (nodeId: string) => Record<string, unknown> | null;
   onCancelQueueItem?: (id: string) => void;
   onPushThrough?: (executionId: string) => void;
   onCancelExecution?: (executionId: string) => void;
@@ -916,6 +1021,13 @@ function Sidebar({
       setNextInQueueEvents(sidebarData.nextInQueueEvents);
     }
   }, [sidebarData?.latestEvents, sidebarData?.nextInQueueEvents]);
+
+  const autocompleteExampleObj = useMemo(() => {
+    if (!state.componentSidebar.selectedNodeId || !getAutocompleteExampleObj) {
+      return undefined;
+    }
+    return getAutocompleteExampleObj(state.componentSidebar.selectedNodeId);
+  }, [state.componentSidebar.selectedNodeId, getAutocompleteExampleObj]);
 
   if (!sidebarData) {
     return null;
@@ -1006,6 +1118,7 @@ function Sidebar({
       appName={editingNodeData?.appName}
       appInstallationRef={editingNodeData?.appInstallationRef}
       installedApplications={installedApplications}
+      autocompleteExampleObj={autocompleteExampleObj}
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}
@@ -1092,6 +1205,7 @@ function CanvasContent({
   onDeactivate,
   onToggleView,
   onToggleCollapse,
+  onAnnotationUpdate,
   onBuildingBlockDrop,
   onBuildingBlocksSidebarToggle,
   onConnectionDropInEmptySpace,
@@ -1116,6 +1230,7 @@ function CanvasContent({
   onToggleAutoSave,
   logEntries = [],
   focusRequest,
+  initialFocusNodeId,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1130,6 +1245,7 @@ function CanvasContent({
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
   onDelete?: (nodeId: string) => void;
+  onAnnotationUpdate?: (nodeId: string, updates: { text?: string; color?: string }) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onBuildingBlocksSidebarToggle?: (open: boolean) => void;
   onConnectionDropInEmptySpace?: (
@@ -1158,6 +1274,7 @@ function CanvasContent({
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
+  initialFocusNodeId?: string | null;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1178,11 +1295,19 @@ function CanvasContent({
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
   const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(false);
-  const [logFilter, setLogFilter] = useState<LogTypeFilter>("all");
+  const [logFilter, setLogFilter] = useState<LogTypeFilter>(new Set());
   const [logScope, setLogScope] = useState<LogScopeFilter>("all");
   const [logSearch, setLogSearch] = useState("");
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
   const [logSidebarHeight, setLogSidebarHeight] = useState(320);
+
+  useEffect(() => {
+    const activeNoteId = getActiveNoteId();
+    if (!activeNoteId) return;
+    const activeElement = document.activeElement;
+    if (activeElement && activeElement !== document.body) return;
+    restoreActiveNoteFocus();
+  }, [state.nodes]);
 
   const handleNodeExpand = useCallback((nodeId: string) => {
     const node = stateRef.current.nodes?.find((n) => n.id === nodeId);
@@ -1196,6 +1321,7 @@ function CanvasContent({
       // Check if this is a pending connection node
       const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       const isPendingConnection = clickedNode?.data?.isPendingConnection;
+      const isAnnotationNode = clickedNode?.data?.type === "annotation";
 
       // Check if this is a placeholder node (persisted, not local-only)
       const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
@@ -1218,6 +1344,10 @@ function CanvasContent({
         !isTemplateNode &&
         !isPlaceholder
       ) {
+        return;
+      }
+
+      if (isAnnotationNode) {
         return;
       }
 
@@ -1284,6 +1414,9 @@ function CanvasContent({
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
+
+  const onAnnotationUpdateRef = useRef(onAnnotationUpdate);
+  onAnnotationUpdateRef.current = onAnnotationUpdate;
 
   const handleSave = useCallback(() => {
     if (onSave) {
@@ -1418,10 +1551,17 @@ function CanvasContent({
       if (!hasFitToViewRef.current) {
         const hasNodes = (stateRef.current.nodes?.length ?? 0) > 0;
 
-        if (hasNodes) {
+        const focusNodeId = initialFocusNodeId;
+        const focusNode = focusNodeId ? stateRef.current.nodes?.find((node) => node.id === focusNodeId) : null;
+
+        if (focusNode) {
+          fitView({ nodes: [focusNode], duration: 500, maxZoom: 1.2 });
+        } else if (hasNodes) {
           // Fit to view but don't zoom in too much (max zoom of 1.0)
           fitView({ maxZoom: 1.0, padding: 0.5 });
+        }
 
+        if (hasNodes) {
           // Store the initial viewport after fit
           const initialViewport = getViewport();
           viewportRef.current = initialViewport;
@@ -1449,7 +1589,7 @@ function CanvasContent({
         setIsInitialized(true);
       }
     },
-    [fitView, getViewport, onZoomChange, hasFitToViewRef, viewportRef],
+    [fitView, getViewport, onZoomChange, hasFitToViewRef, viewportRef, initialFocusNodeId],
   );
 
   // Store callback handlers in a ref so they can be accessed without being in node data
@@ -1463,6 +1603,7 @@ function CanvasContent({
     onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
     onToggleView: onToggleViewRef,
+    onAnnotationUpdate: onAnnotationUpdateRef,
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
@@ -1477,6 +1618,7 @@ function CanvasContent({
     onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
     onToggleView: onToggleViewRef,
+    onAnnotationUpdate: onAnnotationUpdateRef,
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
@@ -1614,6 +1756,8 @@ function CanvasContent({
   const filteredLogEntries = useMemo(() => {
     const query = logSearch.trim().toLowerCase();
     const matchesSearch = (value?: string) => !query || (value || "").toLowerCase().includes(query);
+    // Show all if filter is empty or contains all three types
+    const showAll = logFilter.size === 0 || logFilter.size === 3;
 
     return logEntries.reduce<LogEntry[]>((acc, entry) => {
       if (logScope !== "all" && entry.source !== logScope) {
@@ -1623,7 +1767,7 @@ function CanvasContent({
       if (entry.type === "run") {
         const runItems = entry.runItems || [];
         const filteredRunItems = runItems.filter((item) => {
-          const typeMatch = logFilter === "all" || item.type === logFilter;
+          const typeMatch = showAll || logFilter.has(item.type);
           const searchMatch =
             matchesSearch(item.searchText) || matchesSearch(typeof item.title === "string" ? item.title : "");
           return typeMatch && searchMatch;
@@ -1631,7 +1775,7 @@ function CanvasContent({
 
         const entrySearchMatch =
           matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : "");
-        const typeMatch = logFilter === "all" ? true : filteredRunItems.length > 0;
+        const typeMatch = showAll ? true : filteredRunItems.length > 0;
         const searchMatch = query ? entrySearchMatch || filteredRunItems.length > 0 : true;
 
         if (typeMatch && searchMatch) {
@@ -1640,7 +1784,7 @@ function CanvasContent({
         return acc;
       }
 
-      if (logFilter !== "all" && entry.type !== logFilter) {
+      if (!showAll && !logFilter.has(entry.type)) {
         return acc;
       }
 
@@ -1655,8 +1799,12 @@ function CanvasContent({
     }, []);
   }, [logEntries, logFilter, logScope, logSearch]);
 
-  const handleLogButtonClick = useCallback((filter: LogTypeFilter) => {
-    setLogFilter(filter);
+  const handleLogButtonClick = useCallback((filterType: "all" | "error" | "warning") => {
+    if (filterType === "all") {
+      setLogFilter(new Set());
+    } else {
+      setLogFilter(new Set([filterType]));
+    }
     setIsLogSidebarOpen(true);
   }, []);
 
@@ -1751,53 +1899,69 @@ function CanvasContent({
                   });
                 }}
                 onSelectNode={(node) => {
+                  const isAnnotationNode = (node.data as any)?.type === "annotation";
+                  if (isAnnotationNode) {
+                    return;
+                  }
                   state.componentSidebar.open(node.id);
                 }}
               />
-              <div className="flex items-center gap-0 border-l border-slate-200 pl-1 ml-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs font-medium"
-                      onClick={() => handleLogButtonClick("all")}
-                    >
-                      <List className="h-3 w-3" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>All logs</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs font-medium"
-                      onClick={() => handleLogButtonClick("error")}
-                    >
-                      <CircleX className="h-3 w-3 text-rose-500" />
-                      <span className="tabular-nums">{logCounts.error}</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Errors</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs font-medium"
-                      onClick={() => handleLogButtonClick("warning")}
-                    >
-                      <TriangleAlert className="h-3 w-3 text-amber-500" />
-                      <span className="tabular-nums">{logCounts.warning}</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Warnings</TooltipContent>
-                </Tooltip>
-              </div>
             </ZoomSlider>
+            <Panel
+              position="bottom-left"
+              className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex gap-0.5 rounded-sm p-0.5"
+              style={{ marginLeft: 256 }}
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs font-medium"
+                    onClick={() => handleLogButtonClick("all")}
+                  >
+                    <ScrollText className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>All Logs</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs font-medium"
+                    onClick={() => handleLogButtonClick("error")}
+                  >
+                    <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
+                    <span className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}>
+                      {logCounts.error}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Errors</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs font-medium"
+                    onClick={() => handleLogButtonClick("warning")}
+                  >
+                    <TriangleAlert
+                      className={logCounts.warning > 0 ? "h-3 w-3 text-amber-600" : "h-3 w-3 text-gray-800"}
+                    />
+                    <span
+                      className={logCounts.warning > 0 ? "tabular-nums text-amber-600" : "tabular-nums text-gray-800"}
+                    >
+                      {logCounts.warning}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Warnings</TooltipContent>
+              </Tooltip>
+            </Panel>
           </ReactFlow>
         </div>
       </div>

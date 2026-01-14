@@ -93,6 +93,7 @@ func (g *GitHub) Components() []core.Component {
 		&CreateIssue{},
 		&UpdateIssue{},
 		&RunWorkflow{},
+		&PublishCommitStatus{},
 	}
 }
 
@@ -100,7 +101,9 @@ func (g *GitHub) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnPush{},
 		&OnPullRequest{},
+		&OnPullRequestReviewComment{},
 		&OnIssue{},
+		&OnIssueComment{},
 		&OnRelease{},
 		&OnTagCreated{},
 		&OnBranchCreated{},
@@ -406,7 +409,7 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata
 		return
 	}
 
-	appData, err := g.createAppFromManifest(code)
+	appData, err := g.createAppFromManifest(ctx.HTTP, code)
 	if err != nil {
 		ctx.Logger.Errorf("failed to create app from manifest: %v", err)
 		http.Error(ctx.Response, "failed to create app from manifest", http.StatusInternalServerError)
@@ -468,7 +471,7 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata
 func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Metadata) {
 	//
 	// App installation has already been set up.
-	// Just redirect to the Superplane app installation page.
+	// Just redirect to the SuperPlane app installation page.
 	//
 	if metadata.InstallationID != "" {
 		ctx.Logger.Infof("app installation %s already set up", metadata.InstallationID)
@@ -564,7 +567,7 @@ func (g *GitHub) browserActionURL(organization string) string {
 
 func (g *GitHub) appManifest(ctx core.SyncContext) string {
 	manifest := map[string]any{
-		"name":   `Superplane GH integration`,
+		"name":   `SuperPlane GH integration`,
 		"public": false,
 		"url":    "https://superplane.com",
 		"default_permissions": map[string]string{
@@ -573,6 +576,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"contents":         "write",
 			"pull_requests":    "write",
 			"repository_hooks": "write",
+			"statuses":         "write",
 		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/apps/%s/setup`, ctx.BaseURL, ctx.InstallationID),
 		"redirect_url": fmt.Sprintf(`%s/api/v1/apps/%s/redirect`, ctx.BaseURL, ctx.InstallationID),
@@ -603,14 +607,14 @@ type GitHubAppData struct {
 	PEM           string `mapstructure:"pem" json:"pem"`
 }
 
-func (g *GitHub) createAppFromManifest(code string) (*GitHubAppData, error) {
+func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*GitHubAppData, error) {
 	URL := fmt.Sprintf("https://api.github.com/app-manifests/%s/conversions", code)
 	req, err := http.NewRequest(http.MethodPost, URL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := http.DefaultClient.Do(req)
+	response, err := httpCtx.Do(req)
 	if err != nil {
 		return nil, err
 	}

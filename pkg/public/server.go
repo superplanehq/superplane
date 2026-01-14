@@ -337,10 +337,7 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 
 	log.Info("Running in production mode - serving static web assets")
 
-	handler := middleware.AccountAuthMiddleware(s.jwt).
-		Middleware(
-			web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath),
-		)
+	handler := web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath)
 
 	s.Router.PathPrefix(webBasePath).Handler(handler)
 
@@ -445,6 +442,7 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 		BaseURL:         s.BaseURL,
 		WebhooksBaseURL: s.WebhooksBaseURL,
 		OrganizationID:  appInstallation.OrganizationID.String(),
+		HTTP:            contexts.NewHTTPContext(s.registry.GetHTTPClient()),
 		AppInstallation: contexts.NewAppInstallationContext(
 			database.Conn(),
 			nil,
@@ -731,13 +729,13 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 
 	tx := database.Conn()
 	return trigger.HandleWebhook(core.WebhookRequestContext{
-		Body:           body,
-		Headers:        headers,
-		WorkflowID:     node.WorkflowID.String(),
-		NodeID:         node.NodeID,
-		Configuration:  node.Configuration.Data(),
-		WebhookContext: contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
-		EventContext:   contexts.NewEventContext(tx, &node),
+		Body:          body,
+		Headers:       headers,
+		WorkflowID:    node.WorkflowID.String(),
+		NodeID:        node.NodeID,
+		Configuration: node.Configuration.Data(),
+		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
+		Events:        contexts.NewEventContext(tx, &node),
 	})
 }
 
@@ -750,13 +748,13 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 
 	tx := database.Conn()
 	return component.HandleWebhook(core.WebhookRequestContext{
-		Body:           body,
-		Headers:        headers,
-		WorkflowID:     node.WorkflowID.String(),
-		NodeID:         node.NodeID,
-		Configuration:  node.Configuration.Data(),
-		WebhookContext: contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
-		EventContext:   contexts.NewEventContext(tx, &node),
+		Body:          body,
+		Headers:       headers,
+		WorkflowID:    node.WorkflowID.String(),
+		NodeID:        node.NodeID,
+		Configuration: node.Configuration.Data(),
+		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
+		Events:        contexts.NewEventContext(tx, &node),
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
 			if err != nil {
@@ -764,14 +762,18 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 			}
 
 			return &core.ExecutionContext{
-				ID:                    execution.ID,
-				WorkflowID:            execution.WorkflowID.String(),
-				Configuration:         execution.Configuration.Data(),
-				MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
-				NodeMetadataContext:   contexts.NewNodeMetadataContext(tx, &node),
-				ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
-				RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
-				Logger:                logging.ForExecution(execution, nil),
+				ID:             execution.ID,
+				WorkflowID:     execution.WorkflowID.String(),
+				NodeID:         execution.NodeID,
+				BaseURL:        s.BaseURL,
+				Configuration:  execution.Configuration.Data(),
+				HTTP:           contexts.NewHTTPContext(s.registry.GetHTTPClient()),
+				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
+				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
+				ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+				Requests:       contexts.NewExecutionRequestContext(tx, execution),
+				Logger:         logging.ForExecution(execution, nil),
+				Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 			}, nil
 		},
 	})
@@ -862,7 +864,7 @@ func (s *Server) setupDevProxy(webBasePath string) {
 		proxy.ServeHTTP(w, r)
 	})
 
-	s.Router.PathPrefix(webBasePath).Handler(middleware.AccountAuthMiddleware(s.jwt).Middleware(proxyHandler))
+	s.Router.PathPrefix(webBasePath).Handler(proxyHandler)
 }
 
 func getAvatarURL(providers []models.AccountProvider) string {

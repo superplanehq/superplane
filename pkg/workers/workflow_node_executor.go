@@ -28,14 +28,16 @@ var ErrRecordLocked = errors.New("record locked")
 type WorkflowNodeExecutor struct {
 	encryptor crypto.Encryptor
 	registry  *registry.Registry
+	baseURL   string
 	semaphore *semaphore.Weighted
 	logger    *logrus.Entry
 }
 
-func NewWorkflowNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry) *WorkflowNodeExecutor {
+func NewWorkflowNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) *WorkflowNodeExecutor {
 	return &WorkflowNodeExecutor{
 		encryptor: encryptor,
 		registry:  registry,
+		baseURL:   baseURL,
 		semaphore: semaphore.NewWeighted(25),
 		logger:    logrus.WithFields(logrus.Fields{"worker": "WorkflowNodeExecutor"}),
 	}
@@ -224,16 +226,21 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 	}
 
 	ctx := core.ExecutionContext{
-		ID:                    execution.ID,
-		WorkflowID:            execution.WorkflowID.String(),
-		Configuration:         execution.Configuration.Data(),
-		Data:                  input,
-		MetadataContext:       contexts.NewExecutionMetadataContext(tx, execution),
-		NodeMetadataContext:   contexts.NewNodeMetadataContext(tx, node),
-		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
-		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
-		AuthContext:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
-		IntegrationContext:    contexts.NewIntegrationContext(tx, w.registry),
+		ID:             execution.ID,
+		WorkflowID:     execution.WorkflowID.String(),
+		OrganizationID: workflow.OrganizationID.String(),
+		NodeID:         execution.NodeID,
+		BaseURL:        w.baseURL,
+		Configuration:  execution.Configuration.Data(),
+		Data:           input,
+		HTTP:           contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
+		NodeMetadata:   contexts.NewNodeMetadataContext(tx, node),
+		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
+		Requests:       contexts.NewExecutionRequestContext(tx, execution),
+		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
+		Integration:    contexts.NewIntegrationContext(tx, w.registry),
+		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 	}
 
 	if node.AppInstallationID != nil {
@@ -249,7 +256,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		ctx.AppInstallationContext = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
+		ctx.AppInstallation = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
 	}
 
 	ctx.Logger = logger

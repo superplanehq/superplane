@@ -21,9 +21,9 @@ func createExecutionContext(config map[string]any) (core.ExecutionContext, *cont
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}
 	return core.ExecutionContext{
-		Configuration:         config,
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
+		Configuration:  config,
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
 	}, stateCtx, metadataCtx
 }
 
@@ -204,7 +204,8 @@ func TestHTTP__Execute__GET(t *testing.T) {
 	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
 
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	assert.Equal(t, 200, response["status"])
 	assert.NotNil(t, response["headers"])
 	assert.NotNil(t, response["body"])
@@ -214,6 +215,35 @@ func TestHTTP__Execute__GET(t *testing.T) {
 	//
 	body := response["body"].(map[string]any)
 	assert.Equal(t, "world", body["hello"])
+}
+
+func TestHTTP__Execute__GET_WithQueryParams(t *testing.T) {
+	h := &HTTP{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/test", r.URL.Path)
+		assert.Equal(t, "bar", r.URL.Query().Get("foo"))
+		assert.Equal(t, "2", r.URL.Query().Get("existing"))
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL + "/test?existing=1",
+		"queryParams": []map[string]any{
+			{"key": "foo", "value": "bar"},
+			{"key": "existing", "value": "2"},
+		},
+	})
+
+	err := h.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
+	assert.Equal(t, "http.request.finished", stateCtx.Type)
 }
 
 func TestHTTP__Execute__POST_JSON(t *testing.T) {
@@ -260,7 +290,8 @@ func TestHTTP__Execute__POST_JSON(t *testing.T) {
 	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
 
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	assert.Equal(t, 201, response["status"])
 }
 
@@ -306,7 +337,8 @@ func TestHTTP__Execute__POST_XML(t *testing.T) {
 	//
 	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	assert.Equal(t, 200, response["status"])
 	body := response["body"].(string)
 	assert.Contains(t, body, "OK")
@@ -482,7 +514,8 @@ func TestHTTP__Execute__NonJSONResponse(t *testing.T) {
 	//
 	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	body := response["body"].(string)
 	assert.Equal(t, "Plain text response", body)
 }
@@ -515,7 +548,8 @@ func TestHTTP__Execute__EmptyResponse(t *testing.T) {
 	//
 	assert.Equal(t, stateCtx.Channel, core.DefaultOutputChannel.Name)
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	assert.Equal(t, 204, response["status"])
 	assert.Nil(t, response["body"])
 }
@@ -628,8 +662,8 @@ func TestHTTP__Execute__WithoutRetryStrategy(t *testing.T) {
 			"method": "GET",
 			"url":    server.URL,
 		},
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
 	}
 
 	err := h.Execute(ctx)
@@ -675,8 +709,8 @@ func TestHTTP__Execute__FixedTimeoutStrategy_Success(t *testing.T) {
 			"timeoutSeconds":  5,
 			"retries":         2,
 		},
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
 	}
 
 	err := h.Execute(ctx)
@@ -688,7 +722,8 @@ func TestHTTP__Execute__FixedTimeoutStrategy_Success(t *testing.T) {
 
 	// Verify response
 	assert.Equal(t, stateCtx.Type, "http.request.finished")
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	assert.Equal(t, 200, response["status"])
 }
 
@@ -719,8 +754,8 @@ func TestHTTP__Execute__ExponentialTimeoutStrategy_Success(t *testing.T) {
 			"timeoutSeconds":  2,
 			"retries":         3,
 		},
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
 	}
 
 	err := h.Execute(ctx)
@@ -766,9 +801,9 @@ func TestHTTP__HandleAction__RetryRequest_SuccessOnRetry(t *testing.T) {
 			"timeoutSeconds":  1,
 			"retries":         1,
 		},
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
-		RequestContext:        requestCtx,
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		Requests:       requestCtx,
 	}
 
 	err := h.Execute(ctx)
@@ -779,11 +814,11 @@ func TestHTTP__HandleAction__RetryRequest_SuccessOnRetry(t *testing.T) {
 	assert.Equal(t, 1*time.Second, requestCtx.Duration)
 
 	actionCtx := core.ActionContext{
-		Name:                  "retryRequest",
-		Configuration:         ctx.Configuration,
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
-		RequestContext:        requestCtx,
+		Name:           "retryRequest",
+		Configuration:  ctx.Configuration,
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		Requests:       requestCtx,
 	}
 
 	err = h.HandleAction(actionCtx)
@@ -829,26 +864,26 @@ func TestHTTP__HandleAction__RetryRequest_ExhaustedRetries(t *testing.T) {
 			"timeoutSeconds":  1,
 			"retries":         2,
 		},
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
-		RequestContext:        requestCtx,
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		Requests:       requestCtx,
 	}
 
 	err := h.Execute(ctx)
 	assert.NoError(t, err)
 
 	actionCtx := core.ActionContext{
-		Name:                  "retryRequest",
-		Configuration:         ctx.Configuration,
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
-		RequestContext:        &contexts.RequestContext{},
+		Name:           "retryRequest",
+		Configuration:  ctx.Configuration,
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		Requests:       &contexts.RequestContext{},
 	}
 
 	err = h.HandleAction(actionCtx)
 	assert.NoError(t, err)
 
-	actionCtx.RequestContext = &contexts.RequestContext{}
+	actionCtx.Requests = &contexts.RequestContext{}
 	err = h.HandleAction(actionCtx)
 	assert.NoError(t, err)
 	assert.False(t, stateCtx.Passed)
@@ -954,9 +989,9 @@ func TestHTTP__RetryProgression_ExponentialStrategy(t *testing.T) {
 			"timeoutSeconds":  2,
 			"retries":         3,
 		},
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
-		RequestContext:        requestCtx,
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		Requests:       requestCtx,
 	}
 
 	// Execute initial request (should fail and schedule retry)
@@ -967,11 +1002,11 @@ func TestHTTP__RetryProgression_ExponentialStrategy(t *testing.T) {
 
 	requestCtx1 := &contexts.RequestContext{}
 	actionCtx := core.ActionContext{
-		Name:                  "retryRequest",
-		Configuration:         ctx.Configuration,
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
-		RequestContext:        requestCtx1,
+		Name:           "retryRequest",
+		Configuration:  ctx.Configuration,
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		Requests:       requestCtx1,
 	}
 
 	err = h.HandleAction(actionCtx)
@@ -979,14 +1014,14 @@ func TestHTTP__RetryProgression_ExponentialStrategy(t *testing.T) {
 	assert.Equal(t, "retryRequest", requestCtx1.Action)
 
 	requestCtx2 := &contexts.RequestContext{}
-	actionCtx.RequestContext = requestCtx2
+	actionCtx.Requests = requestCtx2
 	err = h.HandleAction(actionCtx)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "retryRequest", requestCtx2.Action)
 
 	requestCtx3 := &contexts.RequestContext{}
-	actionCtx.RequestContext = requestCtx3
+	actionCtx.Requests = requestCtx3
 	err = h.HandleAction(actionCtx)
 	assert.NoError(t, err)
 	assert.True(t, stateCtx.Passed)
@@ -996,7 +1031,8 @@ func TestHTTP__RetryProgression_ExponentialStrategy(t *testing.T) {
 
 	// Verify final response
 	assert.Equal(t, "http.request.finished", stateCtx.Type)
-	response := stateCtx.Payloads[0].(map[string]any)
+	payload := stateCtx.Payloads[0].(map[string]any)
+	response := payload["data"].(map[string]any)
 	assert.Equal(t, 200, response["status"])
 
 	// Verify metadata shows success after 3 retries
@@ -1027,9 +1063,9 @@ func TestHTTP__RetryProgression_NetworkError(t *testing.T) {
 			"timeoutSeconds":  1,
 			"retries":         2,
 		},
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
-		RequestContext:        requestCtx,
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		Requests:       requestCtx,
 	}
 
 	// Execute initial request (should fail with network error and schedule retry)
@@ -1043,11 +1079,11 @@ func TestHTTP__RetryProgression_NetworkError(t *testing.T) {
 	// Simulate retries until exhaustion
 	for i := 0; i < 2; i++ {
 		actionCtx := core.ActionContext{
-			Name:                  "retryRequest",
-			Configuration:         ctx.Configuration,
-			ExecutionStateContext: stateCtx,
-			MetadataContext:       metadataCtx,
-			RequestContext:        &contexts.RequestContext{},
+			Name:           "retryRequest",
+			Configuration:  ctx.Configuration,
+			ExecutionState: stateCtx,
+			Metadata:       metadataCtx,
+			Requests:       &contexts.RequestContext{},
 		}
 
 		if i == 1 {
@@ -1087,9 +1123,9 @@ func TestHTTP__RetryMetadata_Progression(t *testing.T) {
 			"timeoutSeconds":  1,
 			"retries":         2,
 		},
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
-		RequestContext:        &contexts.RequestContext{},
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		Requests:       &contexts.RequestContext{},
 	}
 
 	// Execute initial request (attempt 0)
@@ -1109,11 +1145,11 @@ func TestHTTP__RetryMetadata_Progression(t *testing.T) {
 
 	// Simulate first retry (attempt 1)
 	actionCtx := core.ActionContext{
-		Name:                  "retryRequest",
-		Configuration:         ctx.Configuration,
-		ExecutionStateContext: stateCtx,
-		MetadataContext:       metadataCtx,
-		RequestContext:        &contexts.RequestContext{},
+		Name:           "retryRequest",
+		Configuration:  ctx.Configuration,
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		Requests:       &contexts.RequestContext{},
 	}
 
 	err = h.HandleAction(actionCtx)
@@ -1126,7 +1162,7 @@ func TestHTTP__RetryMetadata_Progression(t *testing.T) {
 	assert.Equal(t, 2, retryMeta.TotalRetries)
 	assert.Equal(t, "HTTP status 500", retryMeta.LastError)
 
-	actionCtx.RequestContext = &contexts.RequestContext{}
+	actionCtx.Requests = &contexts.RequestContext{}
 	err = h.HandleAction(actionCtx)
 	assert.NoError(t, err)
 	assert.False(t, stateCtx.Passed)

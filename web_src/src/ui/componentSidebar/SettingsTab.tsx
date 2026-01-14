@@ -34,6 +34,7 @@ interface SettingsTabProps {
   appName?: string;
   appInstallationRef?: ComponentsAppInstallationRef;
   installedApplications?: OrganizationsAppInstallation[];
+  autocompleteExampleObj?: Record<string, unknown> | null;
 }
 
 export function SettingsTab({
@@ -50,6 +51,7 @@ export function SettingsTab({
   appName,
   appInstallationRef,
   installedApplications = [],
+  autocompleteExampleObj,
 }: SettingsTabProps) {
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
@@ -62,6 +64,16 @@ export function SettingsTab({
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
   }, [configurationFields]);
+
+  const defaultValuesWithoutToggles = useMemo(() => {
+    const filtered = { ...defaultValues };
+    configurationFields.forEach((field) => {
+      if (field.name && field.togglable) {
+        delete filtered[field.name];
+      }
+    });
+    return filtered;
+  }, [configurationFields, defaultValues]);
 
   // Filter installations by app name
   const availableInstallations = useMemo(() => {
@@ -175,9 +187,9 @@ export function SettingsTab({
   useEffect(() => {
     let newConfig;
     if (Object.values(configuration).length === 0 || !configuration) {
-      newConfig = defaultValues;
+      newConfig = defaultValuesWithoutToggles;
     } else {
-      newConfig = { ...defaultValues, ...configuration };
+      newConfig = { ...defaultValuesWithoutToggles, ...configuration };
     }
 
     setNodeConfiguration(filterVisibleFields(newConfig));
@@ -185,7 +197,7 @@ export function SettingsTab({
     setSelectedAppInstallation(appInstallationRef);
     setValidationErrors(new Set());
     setShowValidation(false);
-  }, [configuration, nodeName, defaultValues, filterVisibleFields, appInstallationRef]);
+  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, appInstallationRef]);
 
   // Auto-select if only one installation is available (create mode only)
   useEffect(() => {
@@ -303,7 +315,6 @@ export function SettingsTab({
                   value={nodeConfiguration[fieldName]}
                   onChange={(value) => {
                     const newConfig = {
-                      ...defaultValues,
                       ...nodeConfiguration,
                       [fieldName]: value,
                     };
@@ -324,6 +335,7 @@ export function SettingsTab({
                   fieldPath={fieldName}
                   realtimeValidationErrors={realtimeValidationErrors}
                   enableRealtimeValidation={true}
+                  autocompleteExampleObj={autocompleteExampleObj}
                 />
               );
             })}

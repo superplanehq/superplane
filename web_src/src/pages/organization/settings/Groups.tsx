@@ -20,6 +20,7 @@ import {
   useUpdateGroup,
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { isRBACEnabled } from "@/lib/env";
 
 interface GroupsProps {
   organizationId: string;
@@ -144,16 +145,29 @@ export function Groups({ organizationId }: GroupsProps) {
       )}
 
       <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
-        <div className="px-6 pt-6 pb-4 flex items-center justify-start">
-          <Button className="flex items-center" onClick={handleCreateGroup}>
-            <Icon name="plus" />
-            Create New Group
-          </Button>
-        </div>
-        <div className="px-6 pb-6">
+        {filteredAndSortedGroups.length > 0 && (
+          <div className="px-6 pt-6 pb-4 flex items-center justify-start">
+            <Button className="flex items-center" onClick={handleCreateGroup}>
+              <Icon name="plus" />
+              Create New Group
+            </Button>
+          </div>
+        )}
+        <div className="px-6 pb-6 min-h-96">
           {loadingGroups ? (
             <div className="flex justify-center items-center h-32">
               <p className="text-gray-500 dark:text-gray-400">Loading groups...</p>
+            </div>
+          ) : filteredAndSortedGroups.length === 0 ? (
+            <div className="flex min-h-96 flex-col items-center justify-center text-center">
+              <div className="flex items-center justify-center text-gray-800">
+                <Icon name="users" size="xl" />
+              </div>
+              <p className="mt-3 text-sm text-gray-800">Create your first group</p>
+              <Button className="mt-4 flex items-center" onClick={handleCreateGroup}>
+                <Icon name="plus" />
+                Create New Group
+              </Button>
             </div>
           ) : (
             <Table dense>
@@ -186,50 +200,46 @@ export function Groups({ organizationId }: GroupsProps) {
                       <Icon name={getSortIcon("members")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
-                  <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                    onClick={() => handleSort("role")}
-                  >
-                    <div className="flex items-center gap-2">
-                      Role
-                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
-                    </div>
-                  </TableHeader>
+                  {isRBACEnabled() && (
+                    <TableHeader
+                      className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      onClick={() => handleSort("role")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Role
+                        <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
+                      </div>
+                    </TableHeader>
+                  )}
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredAndSortedGroups.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      No groups found
+                {filteredAndSortedGroups.map((group, index) => (
+                  <TableRow key={index} className="last:[&>td]:border-b-0">
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Icon name="users" size="sm" className="text-gray-800" />
+                        <Link
+                          href={group.metadata?.name ? getGroupMembersPath(group.metadata.name) : "#"}
+                          className="cursor-pointer text-sm !font-semibold text-gray-800 !underline underline-offset-2"
+                        >
+                          {group.spec?.displayName}
+                        </Link>
+                      </div>
                     </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredAndSortedGroups.map((group, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Icon name="users" size="sm" className="text-gray-800" />
-                          <Link
-                            href={group.metadata?.name ? getGroupMembersPath(group.metadata.name) : "#"}
-                            className="cursor-pointer text-sm !font-semibold text-gray-800 !underline underline-offset-2"
-                          >
-                            {group.spec?.displayName}
-                          </Link>
-                        </div>
-                      </TableCell>
 
-                      <TableCell>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          {formatRelativeTime(group.metadata?.createdAt)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          {group.status?.membersCount || 0} member{group.status?.membersCount === 1 ? "" : "s"}
-                        </span>
-                      </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {formatRelativeTime(group.metadata?.createdAt)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {group.status?.membersCount || 0} member{group.status?.membersCount === 1 ? "" : "s"}
+                      </span>
+                    </TableCell>
+                    {isRBACEnabled() && (
                       <TableCell>
                         <Dropdown>
                           <DropdownButton
@@ -255,29 +265,29 @@ export function Groups({ organizationId }: GroupsProps) {
                           </DropdownMenu>
                         </Dropdown>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <TooltipProvider delayDuration={200}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteGroup(group.metadata!.name!)}
-                                  className="p-2 rounded-full text-gray-800 hover:bg-gray-100 transition-colors"
-                                  aria-label="Delete group"
-                                  disabled={deleteGroupMutation.isPending}
-                                >
-                                  <Icon name="trash-2" size="sm" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Delete Group</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                    )}
+                    <TableCell>
+                      <div className="flex justify-end">
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteGroup(group.metadata!.name!)}
+                                className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors"
+                                aria-label="Delete group"
+                                disabled={deleteGroupMutation.isPending}
+                              >
+                                <Icon name="trash-2" size="sm" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Delete Group</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}

@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,7 +29,7 @@ func (e *ConfigurationBuildError) Unwrap() error {
 	return e.Err
 }
 
-func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem *models.WorkflowNodeQueueItem) (*core.ProcessQueueContext, error) {
+func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models.WorkflowNode, queueItem *models.WorkflowNodeQueueItem) (*core.ProcessQueueContext, error) {
 	event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
 	if err != nil {
 		return nil, err
@@ -101,14 +102,17 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		}
 
 		return &core.ExecutionContext{
-			ID:                    execution.ID,
-			WorkflowID:            execution.WorkflowID.String(),
-			Configuration:         execution.Configuration.Data(),
-			MetadataContext:       NewExecutionMetadataContext(tx, &execution),
-			NodeMetadataContext:   NewNodeMetadataContext(tx, node),
-			ExecutionStateContext: NewExecutionStateContext(tx, &execution),
-			RequestContext:        NewExecutionRequestContext(tx, &execution),
-			Logger:                logging.WithExecution(logging.ForNode(*node), &execution, nil),
+			ID:             execution.ID,
+			WorkflowID:     execution.WorkflowID.String(),
+			NodeID:         execution.NodeID,
+			Configuration:  execution.Configuration.Data(),
+			HTTP:           NewHTTPContext(httpClient),
+			Metadata:       NewExecutionMetadataContext(tx, &execution),
+			NodeMetadata:   NewNodeMetadataContext(tx, node),
+			ExecutionState: NewExecutionStateContext(tx, &execution),
+			Requests:       NewExecutionRequestContext(tx, &execution),
+			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
+			Notifications:  NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 		}, nil
 	}
 
@@ -194,14 +198,17 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		}
 
 		return &core.ExecutionContext{
-			ID:                    execution.ID,
-			WorkflowID:            execution.WorkflowID.String(),
-			Configuration:         execution.Configuration.Data(),
-			MetadataContext:       NewExecutionMetadataContext(tx, execution),
-			NodeMetadataContext:   NewNodeMetadataContext(tx, node),
-			ExecutionStateContext: NewExecutionStateContext(tx, execution),
-			RequestContext:        NewExecutionRequestContext(tx, execution),
-			Logger:                logging.WithExecution(logging.ForNode(*node), execution, nil),
+			ID:             execution.ID,
+			WorkflowID:     execution.WorkflowID.String(),
+			NodeID:         execution.NodeID,
+			Configuration:  execution.Configuration.Data(),
+			HTTP:           NewHTTPContext(httpClient),
+			Metadata:       NewExecutionMetadataContext(tx, execution),
+			NodeMetadata:   NewNodeMetadataContext(tx, node),
+			ExecutionState: NewExecutionStateContext(tx, execution),
+			Requests:       NewExecutionRequestContext(tx, execution),
+			Logger:         logging.WithExecution(logging.ForNode(*node), execution, nil),
+			Notifications:  NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 		}, nil
 	}
 

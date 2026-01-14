@@ -169,7 +169,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 	}
 
 	metadata := RunWorkflowNodeMetadata{}
-	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -181,7 +181,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error finding project %s: %v", config.Project, err)
 	}
 
-	err = ctx.MetadataContext.Set(RunWorkflowNodeMetadata{
+	err = ctx.Metadata.Set(RunWorkflowNodeMetadata{
 		Project: &Project{
 			ID:   project.Metadata.ProjectID,
 			Name: project.Metadata.ProjectName,
@@ -203,7 +203,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+	ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
 		Project: project.Metadata.ProjectName,
 	})
 
@@ -218,12 +218,12 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	}
 
 	metadata := RunWorkflowNodeMetadata{}
-	err = mapstructure.Decode(ctx.NodeMetadataContext.Get(), &metadata)
+	err = mapstructure.Decode(ctx.NodeMetadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return err
 	}
@@ -241,12 +241,12 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 
 	response, err := client.RunWorkflow(params)
 	if err != nil {
-		return ctx.ExecutionStateContext.Fail(models.WorkflowNodeExecutionResultReasonError, err.Error())
+		return ctx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, err.Error())
 	}
 
 	ctx.Logger.Infof("New workflow created - workflow=%s, pipeline=%s", response.WorkflowID, response.PipelineID)
 
-	ctx.MetadataContext.Set(RunWorkflowExecutionMetadata{
+	ctx.Metadata.Set(RunWorkflowExecutionMetadata{
 		Workflow: &WorkflowMetadata{
 			ID:  response.WorkflowID,
 			URL: fmt.Sprintf("%s/workflows/%s", string(client.OrgURL), response.WorkflowID),
@@ -260,7 +260,7 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	// This is what allows the component to associate a semaphore webhook
 	// for a pipeline finishing to a SuperPlane execution.
 	//
-	err = ctx.ExecutionStateContext.SetKV("pipeline", response.PipelineID)
+	err = ctx.ExecutionState.SetKV("pipeline", response.PipelineID)
 	if err != nil {
 		return err
 	}
@@ -269,7 +269,7 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	// We still set up the poller to check for pipeline finishing,
 	// just in case something wrong happens with the update through the webhook.
 	//
-	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, PollInterval)
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 }
 
 func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
@@ -287,7 +287,7 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
-	secret, err := ctx.WebhookContext.GetSecret()
+	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
 	}
@@ -321,7 +321,7 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	}
 
 	metadata := RunWorkflowExecutionMetadata{}
-	err = mapstructure.Decode(executionCtx.MetadataContext.Get(), &metadata)
+	err = mapstructure.Decode(executionCtx.Metadata.Get(), &metadata)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %v", err)
 	}
@@ -335,15 +335,15 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 
 	metadata.Pipeline.State = hook.Pipeline.State
 	metadata.Pipeline.Result = hook.Pipeline.Result
-	err = executionCtx.MetadataContext.Set(metadata)
+	err = executionCtx.Metadata.Set(metadata)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
 	}
 
 	if metadata.Pipeline.Result == PipelineResultPassed {
-		err = executionCtx.ExecutionStateContext.Emit(PassedOutputChannel, PayloadType, []any{metadata})
+		err = executionCtx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{metadata})
 	} else {
-		err = executionCtx.ExecutionStateContext.Emit(FailedOutputChannel, PayloadType, []any{metadata})
+		err = executionCtx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{metadata})
 	}
 
 	if err != nil {
@@ -392,12 +392,12 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	if ctx.ExecutionStateContext.IsFinished() {
+	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
 
 	metadata := RunWorkflowExecutionMetadata{}
-	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return err
 	}
@@ -409,7 +409,7 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext)
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return err
 	}
@@ -423,26 +423,26 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 	// If not finished, poll again in 1min.
 	//
 	if pipeline.State != PipelineStateDone {
-		return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, PollInterval)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
 
 	metadata.Pipeline.State = pipeline.State
 	metadata.Pipeline.Result = pipeline.Result
-	err = ctx.MetadataContext.Set(metadata)
+	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return err
 	}
 
 	if pipeline.Result == PipelineResultPassed {
-		return ctx.ExecutionStateContext.Emit(PassedOutputChannel, PayloadType, []any{metadata})
+		return ctx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{metadata})
 	}
 
-	return ctx.ExecutionStateContext.Emit(FailedOutputChannel, PayloadType, []any{metadata})
+	return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{metadata})
 }
 
 func (r *RunWorkflow) finish(ctx core.ActionContext) error {
 	metadata := RunWorkflowExecutionMetadata{}
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return err
 	}
@@ -462,7 +462,7 @@ func (r *RunWorkflow) finish(ctx core.ActionContext) error {
 	}
 
 	metadata.Extra = dataMap
-	err = ctx.MetadataContext.Set(metadata)
+	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return err
 	}

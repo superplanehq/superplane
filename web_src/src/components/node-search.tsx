@@ -86,10 +86,14 @@ export function NodeSearchInternal({ onSearch, onSelectNode, open, onOpenChange 
           ) : (
             <CommandGroup heading="Components">
               {searchResults.map((node) => {
+                const isAnnotationNode = (node.data as { type?: string })?.type === "annotation";
+                const fallbackLabel =
+                  (node.data as { nodeName?: string })?.nodeName || (node.data as { label?: string })?.label;
+                const displayLabel = isAnnotationNode ? "Note" : fallbackLabel || node.id;
                 return (
                   <CommandItem key={node.id} onSelect={() => onSelect(node)}>
                     <div className="flex items-center gap-2 w-full">
-                      <span>{node.data.label as string}</span>
+                      <span>{displayLabel}</span>
                       <span className="text-muted-foreground text-xs ml-auto">{node.id}</span>
                     </div>
                   </CommandItem>

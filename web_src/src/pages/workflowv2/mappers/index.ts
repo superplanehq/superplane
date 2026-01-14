@@ -11,7 +11,7 @@ import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
 import { noopMapper } from "./noop";
-import { ifMapper } from "./if";
+import { ifMapper, IF_STATE_REGISTRY } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
 import { semaphoreMapper as oldSemaphoreMapper, SEMAPHORE_STATE_REGISTRY } from "./semaphore";
 import {
@@ -35,7 +35,7 @@ import {
   eventStateRegistry as slackEventStateRegistry,
 } from "./slack";
 import { timeGateMapper } from "./timegate";
-import { filterMapper } from "./filter";
+import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
@@ -90,6 +90,8 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   approval: APPROVAL_STATE_REGISTRY,
   semaphore: SEMAPHORE_STATE_REGISTRY,
   http: HTTP_STATE_REGISTRY,
+  filter: FILTER_STATE_REGISTRY,
+  if: IF_STATE_REGISTRY,
 };
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {
@@ -105,17 +107,17 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 export function getTriggerRenderer(name: string): TriggerRenderer {
   const parts = name?.split(".");
   if (parts?.length == 1) {
-    return triggerRenderers[name] || defaultTriggerRenderer;
+    return withCustomName(triggerRenderers[name] || defaultTriggerRenderer);
   }
 
   const appName = parts[0];
   const appTriggers = appTriggerRenderers[appName];
   if (!appTriggers) {
-    return defaultTriggerRenderer;
+    return withCustomName(defaultTriggerRenderer);
   }
 
   const triggerName = parts[1];
-  return appTriggers[triggerName] || defaultTriggerRenderer;
+  return withCustomName(appTriggers[triggerName] || defaultTriggerRenderer);
 }
 
 /**
@@ -198,7 +200,7 @@ export function getExecutionDetails(
   componentName: string,
   execution: WorkflowsWorkflowNodeExecution,
   node: ComponentsNode,
-): Record<string, string> | undefined {
+): Record<string, any> | undefined {
   const parts = componentName?.split(".");
   let mapper: ComponentBaseMapper | undefined;
 
@@ -214,4 +216,34 @@ export function getExecutionDetails(
   }
 
   return mapper?.getExecutionDetails?.(execution, node);
+}
+
+function withCustomName(renderer: TriggerRenderer): TriggerRenderer {
+  return {
+    ...renderer,
+    getTriggerProps: (node, trigger, lastEvent) => {
+      const props = renderer.getTriggerProps(node, trigger, lastEvent);
+      const customName = lastEvent?.customName?.trim();
+      if (customName && props.lastEventData) {
+        return {
+          ...props,
+          lastEventData: {
+            ...props.lastEventData,
+            title: customName,
+          },
+        };
+      }
+
+      return props;
+    },
+    getTitleAndSubtitle: (event) => {
+      const { title, subtitle } = renderer.getTitleAndSubtitle(event);
+      const customName = event.customName?.trim();
+      if (customName) {
+        return { title: customName, subtitle };
+      }
+
+      return { title, subtitle };
+    },
+  };
 }

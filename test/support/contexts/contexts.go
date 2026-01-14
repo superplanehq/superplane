@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -66,6 +67,7 @@ func (m *MetadataContext) Set(metadata any) error {
 }
 
 type AppInstallationContext struct {
+	Configuration    map[string]any
 	Metadata         any
 	State            string
 	StateDescription string
@@ -94,7 +96,21 @@ func (c *AppInstallationContext) SetMetadata(metadata any) {
 }
 
 func (c *AppInstallationContext) GetConfig(name string) ([]byte, error) {
-	return nil, nil
+	if c.Configuration == nil {
+		return nil, fmt.Errorf("config not found: %s", name)
+	}
+
+	value, ok := c.Configuration[name]
+	if !ok {
+		return nil, fmt.Errorf("config not found: %s", name)
+	}
+
+	s, ok := value.(string)
+	if !ok {
+		return nil, fmt.Errorf("config is not a string: %s", name)
+	}
+
+	return []byte(s), nil
 }
 
 func (c *AppInstallationContext) GetState() string {
@@ -173,7 +189,17 @@ func (c *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	c.Passed = true
 	c.Channel = channel
 	c.Type = payloadType
-	c.Payloads = payloads
+
+	// Wrap payloads like the real ExecutionStateContext does
+	wrappedPayloads := make([]any, 0, len(payloads))
+	for _, payload := range payloads {
+		wrappedPayloads = append(wrappedPayloads, map[string]any{
+			"type":      payloadType,
+			"timestamp": time.Now(),
+			"data":      payload,
+		})
+	}
+	c.Payloads = wrappedPayloads
 	return nil
 }
 
@@ -228,4 +254,21 @@ func (c *RequestContext) ScheduleActionCall(action string, params map[string]any
 	c.Params = params
 	c.Duration = duration
 	return nil
+}
+
+type HTTPContext struct {
+	Requests  []*http.Request
+	Responses []*http.Response
+}
+
+func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
+	c.Requests = append(c.Requests, request)
+
+	if len(c.Responses) == 0 {
+		return nil, fmt.Errorf("no response mocked")
+	}
+
+	response := c.Responses[0]
+	c.Responses = c.Responses[1:]
+	return response, nil
 }

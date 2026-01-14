@@ -127,7 +127,7 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 	logger = logging.WithQueueItem(logger, *queueItem)
 	logger.Info("Processing queue item")
 
-	ctx, err := contexts.BuildProcessQueueContext(tx, node, queueItem)
+	ctx, err := contexts.BuildProcessQueueContext(w.registry.GetHTTPClient(), tx, node, queueItem)
 	if err != nil {
 
 		//
