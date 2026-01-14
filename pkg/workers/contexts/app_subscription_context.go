@@ -71,6 +71,7 @@ func (c *AppSubscriptionContext) sendMessageToComponent(message any) error {
 	}
 
 	return appComponent.OnAppMessage(core.AppMessageContext{
+		Configuration:   c.node.Configuration.Data(),
 		AppInstallation: c.appCtx,
 		Events:          NewEventContext(c.tx, c.node),
 		Message:         message,
@@ -80,22 +81,23 @@ func (c *AppSubscriptionContext) sendMessageToComponent(message any) error {
 
 func (c *AppSubscriptionContext) sendMessageToTrigger(message any) error {
 	nodeRef := c.subscription.NodeRef.Data()
-	if nodeRef.Component == nil {
+	if nodeRef.Trigger == nil {
 		return fmt.Errorf("invalid trigger ref")
 	}
 
 	triggerName := nodeRef.Trigger.Name
-	trigger, err := c.registry.GetComponent(triggerName)
+	trigger, err := c.registry.GetTrigger(triggerName)
 	if err != nil {
 		return fmt.Errorf("trigger %s not found", triggerName)
 	}
 
 	appTrigger, ok := trigger.(core.AppTrigger)
 	if !ok {
-		return fmt.Errorf("trigger %s is not an app trigger", appTrigger)
+		return fmt.Errorf("trigger %s is not an app trigger", trigger.Name())
 	}
 
 	return appTrigger.OnAppMessage(core.AppMessageContext{
+		Configuration:   c.node.Configuration.Data(),
 		AppInstallation: c.appCtx,
 		Message:         message,
 		Events:          NewEventContext(c.tx, c.node),

@@ -1,8 +1,12 @@
 package slack
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -10,7 +14,12 @@ import (
 type OnAppMention struct{}
 
 type OnAppMentionConfiguration struct {
-	Channel string `json:"channel"`
+	Channel string `json:"channel" mapstructure:"channel"`
+}
+
+type AppMentionMetadata struct {
+	Channel           *ChannelMetadata `json:"channel,omitempty" mapstructure:"channel,omitempty"`
+	AppSubscriptionID *uuid.UUID       `json:"appSubscriptionID,omitempty" mapstructure:"appSubscriptionID,omitempty"`
 }
 
 func (t *OnAppMention) Name() string {
@@ -18,7 +27,7 @@ func (t *OnAppMention) Name() string {
 }
 
 func (t *OnAppMention) Label() string {
-	return "On App Mentioned"
+	return "On App Mention"
 }
 
 func (t *OnAppMention) Description() string {
@@ -39,14 +48,61 @@ func (t *OnAppMention) Configuration() []configuration.Field {
 			Name:     "channel",
 			Label:    "Channel",
 			Type:     configuration.FieldTypeString,
-			Required: true,
+			Required: false,
 		},
 	}
 }
 
 func (t *OnAppMention) Setup(ctx core.TriggerContext) error {
-	return ctx.AppInstallationContext.Subscribe(SubscriptionConfiguration{
+	//
+	// If subscription ID is already set, nothing to do.
+	//
+	var metadata AppMentionMetadata
+	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	if metadata.AppSubscriptionID != nil && metadata.Channel != nil {
+		return nil
+	}
+
+	//
+	// Validate channel configuration
+	//
+	var config SendTextMessageConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if config.Channel == "" {
+		return errors.New("channel is required")
+	}
+
+	client, err := NewClient(ctx.AppInstallationContext)
+	if err != nil {
+		return fmt.Errorf("failed to create Slack client: %w", err)
+	}
+
+	channelInfo, err := client.GetChannelInfo(config.Channel)
+	if err != nil {
+		return fmt.Errorf("channel validation failed: %w", err)
+	}
+
+	subscriptionID, err := ctx.AppInstallationContext.Subscribe(SubscriptionConfiguration{
 		EventTypes: []string{"app_mention"},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to app events: %w", err)
+	}
+
+	return ctx.MetadataContext.Set(AppMentionMetadata{
+		AppSubscriptionID: subscriptionID,
+		Channel: &ChannelMetadata{
+			ID:   channelInfo.ID,
+			Name: channelInfo.Name,
+		},
 	})
 }
 
@@ -63,5 +119,27 @@ func (t *OnAppMention) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 }
 
 func (t *OnAppMention) OnAppMessage(ctx core.AppMessageContext) error {
+	config := OnAppMentionConfiguration{}
+	err := mapstructure.Decode(ctx.Configuration, &config)
+	if err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	ctx.Logger.Infof("configuration: %+v", config)
+
+	message := ctx.Message.(map[string]any)
+	channel := message["channel"].(string)
+
+	//
+	// If channel configuration is set and does not match the message channel, ignore the message.
+	//
+	if config.Channel != "" && config.Channel != channel {
+		ctx.Logger.Infof("message channel %s does not match configuration channel %s, ignoring", channel, config.Channel)
+		return nil
+	}
+
+	//
+	// Othewise, emit message.
+	//
 	return ctx.Events.Emit("slack.app.mention", ctx.Message)
 }

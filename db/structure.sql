@@ -115,6 +115,21 @@ CREATE TABLE public.app_installation_secrets (
 
 
 --
+-- Name: app_installation_subscriptions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.app_installation_subscriptions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    installation_id uuid NOT NULL,
+    workflow_id uuid NOT NULL,
+    node_id character varying(128) NOT NULL,
+    configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: app_installations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -161,7 +176,7 @@ CREATE TABLE public.blueprints (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100) NOT NULL,
+    ptype character varying(100),
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -547,6 +562,14 @@ ALTER TABLE ONLY public.app_installation_secrets
 
 
 --
+-- Name: app_installation_subscriptions app_installation_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_subscriptions
+    ADD CONSTRAINT app_installation_subscriptions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: app_installations app_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -812,6 +835,27 @@ CREATE INDEX idx_app_installation_secrets_organization_id ON public.app_installa
 
 
 --
+-- Name: idx_app_installation_subscriptions_installation; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_installation_subscriptions_installation ON public.app_installation_subscriptions USING btree (installation_id);
+
+
+--
+-- Name: idx_app_installation_subscriptions_node; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_installation_subscriptions_node ON public.app_installation_subscriptions USING btree (workflow_id, node_id);
+
+
+--
+-- Name: idx_app_installation_subscriptions_workflow; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_installation_subscriptions_workflow ON public.app_installation_subscriptions USING btree (workflow_id);
+
+
+--
 -- Name: idx_app_installations_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -837,6 +881,13 @@ CREATE INDEX idx_app_installations_organization_id ON public.app_installations U
 --
 
 CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (organization_id);
+
+
+--
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --
@@ -1087,6 +1138,30 @@ ALTER TABLE ONLY public.app_installation_secrets
 
 ALTER TABLE ONLY public.app_installation_secrets
     ADD CONSTRAINT app_installation_secrets_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: app_installation_subscriptions app_installation_subscriptions_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_subscriptions
+    ADD CONSTRAINT app_installation_subscriptions_installation_id_fkey FOREIGN KEY (installation_id) REFERENCES public.app_installations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: app_installation_subscriptions app_installation_subscriptions_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_subscriptions
+    ADD CONSTRAINT app_installation_subscriptions_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: app_installation_subscriptions app_installation_subscriptions_workflow_id_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_subscriptions
+    ADD CONSTRAINT app_installation_subscriptions_workflow_id_node_id_fkey FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
 
 
 --
@@ -1353,7 +1428,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260106171814	f
+20260108154024	f
 \.
 
 

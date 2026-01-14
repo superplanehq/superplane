@@ -92,13 +92,14 @@ type AppTrigger interface {
 	 * Inherits all the methods from Trigger interface,
 	 * and adds a couple more, which are only applicable to app triggers.
 	 */
-	Component
+	Trigger
 
 	OnAppMessage(ctx AppMessageContext) error
 }
 
 type AppMessageContext struct {
 	Message         any
+	Configuration   any
 	Logger          *logrus.Entry
 	AppInstallation AppInstallationContext
 	Events          EventContext
@@ -172,7 +173,7 @@ type AppInstallationContext interface {
 	/*
 	 * Subscribe to app events.
 	 */
-	Subscribe(any) error
+	Subscribe(any) (*uuid.UUID, error)
 
 	/*
 	 * Schedule a sync call for the app installation.

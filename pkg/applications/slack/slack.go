@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,12 +23,12 @@ import (
 const (
 	appBootstrapDescription = `
 To complete the Slack app setup:
-1.  The "**Create Slack App**" button/link will take you to Slack with the app manifest pre-filled.
-2.  Review the manifest and click "**Next**", then "**Create**".
-3.  **Install App**: On the next page, click "**Install to Workspace**" and authorize.
-4.  **Get Bot Token**: Navigate to "OAuth & Permissions" (under Features in the sidebar). Copy the "**Bot User OAuth Token**".
-5.  **Get Signing Secret**: Navigate to "Basic Information" (under Settings in the sidebar). Scroll down to "App Credentials" and copy the "**Signing Secret**".
-6.  **Update Configuration**: Paste the "Bot User OAuth Token" and "Signing Secret" into this SuperPlane App's configuration fields and save.
+1.  The "**Create Slack App**" button/link will take you to Slack with the app manifest pre-filled
+2.  Review the manifest and click "**Next**", then "**Create**"
+3.  **Get Signing Secret**: In "Basic Information" section, copy the "**Signing Secret**"
+4.  **Install App**: In OAuth & Permissions, click "**Install to Workspace**" and authorize
+5.  **Get Bot Token**: In "OAuth & Permissions", copy the "**Bot User OAuth Token**"
+6.  **Update Configuration**: Paste the "Bot User OAuth Token" and "Signing Secret" into the app installation configuration fields in SuperPlane and save
 `
 )
 
@@ -38,6 +37,15 @@ func init() {
 }
 
 type Slack struct{}
+
+type Metadata struct {
+	URL    string `mapstructure:"url" json:"url"`
+	TeamID string `mapstructure:"team_id" json:"team_id"`
+	Team   string `mapstructure:"team" json:"team"`
+	UserID string `mapstructure:"user_id" json:"user_id"`
+	User   string `mapstructure:"user" json:"user"`
+	BotID  string `mapstructure:"bot_id" json:"bot_id"`
+}
 
 func (s *Slack) Name() string {
 	return "slack"
@@ -52,7 +60,7 @@ func (s *Slack) Icon() string {
 }
 
 func (s *Slack) Description() string {
-	return "Slack"
+	return "Send and react to Slack messages and interactions"
 }
 
 func (s *Slack) Configuration() []configuration.Field {
@@ -80,37 +88,61 @@ func (s *Slack) Configuration() []configuration.Field {
 }
 
 func (s *Slack) Components() []core.Component {
-	return []core.Component{}
+	return []core.Component{
+		&SendTextMessage{},
+	}
 }
 
 func (s *Slack) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnAppMention{},
+	}
 }
 
 func (s *Slack) Sync(ctx core.SyncContext) error {
-	// TODO: metadata? user, bot, team ID?
-
-	botToken, err := ctx.AppInstallation.GetConfig("botToken")
+	metadata := Metadata{}
+	err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata)
 	if err != nil {
-		return fmt.Errorf("failed to get bot token: %v", err)
+		return fmt.Errorf("failed to decode metadata: %v", err)
 	}
 
-	signingSecret, err := ctx.AppInstallation.GetConfig("signingSecret")
-	if err != nil {
-		return fmt.Errorf("failed to get signing secret: %v", err)
+	//
+	// If metadata is already set, nothing to do.
+	//
+	if metadata.URL != "" {
+		return nil
 	}
+
+	botToken, _ := ctx.AppInstallation.GetConfig("botToken")
+	signingSecret, _ := ctx.AppInstallation.GetConfig("signingSecret")
 
 	//
 	// If tokens are configured, verify if the auth is working,
 	// by using the bot token to send a message to the channel.
 	//
 	if botToken != nil && signingSecret != nil {
-		client, err := NewClient(string(botToken))
+		client, err := NewClient(ctx.AppInstallation)
 		if err != nil {
 			return err
 		}
 
-		return client.AuthTest()
+		result, err := client.AuthTest()
+		if err != nil {
+			return fmt.Errorf("error verifying slack auth: %v", err)
+		}
+
+		ctx.AppInstallation.SetMetadata(Metadata{
+			URL:    result.URL,
+			TeamID: result.TeamID,
+			Team:   result.Team,
+			UserID: result.UserID,
+			User:   result.User,
+			BotID:  result.BotID,
+		})
+
+		ctx.AppInstallation.RemoveBrowserAction()
+		ctx.AppInstallation.SetState("ready", "")
+		return nil
 	}
 
 	return s.createAppCreationPrompt(ctx)
@@ -145,6 +177,8 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 	// settings.interactivity.optionsLoadURL
 	// Verify if we want incoming webhooks and if it's possible to include that in the manifest here.
 	//
+
+	// "token_rotation_enabled": true
 
 	manifest := map[string]any{
 		"_metadata": map[string]int{
@@ -206,9 +240,8 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 				"is_enabled":  true,
 				"request_url": fmt.Sprintf("%s/api/v1/apps/%s/interactions", appURL, ctx.InstallationID),
 			},
-			"org_deploy_enabled":     false,
-			"socket_mode_enabled":    false,
-			"token_rotation_enabled": true,
+			"org_deploy_enabled":  false,
+			"socket_mode_enabled": false,
 		},
 	}
 
@@ -237,18 +270,41 @@ func (s *Slack) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.WriteHeader(http.StatusNotFound)
 }
 
+type EventPayload struct {
+	Type  string         `json:"type"`
+	Event map[string]any `json:"event"`
+}
+
 func (s *Slack) handleEvent(ctx core.HTTPRequestContext, body []byte) {
+	payload := EventPayload{}
+	err := json.Unmarshal(body, &payload)
+	if err != nil {
+		ctx.Logger.Errorf("error unmarshaling event payload: %v", err)
+		ctx.Response.WriteHeader(400)
+		return
+	}
+
+	if payload.Type == "url_verification" {
+		s.handleChallenge(ctx, payload.Event)
+		return
+	}
+
+	if payload.Type != "event_callback" {
+		ctx.Logger.Warnf("ignoring event type: %s", payload.Type)
+		return
+	}
+
+	eventType, event, err := s.parseEventCallback(payload)
+	if err != nil {
+		ctx.Logger.Errorf("error parsing event callback: %v", err)
+		ctx.Response.WriteHeader(400)
+		return
+	}
+
 	subscriptions, err := ctx.AppInstallation.ListSubscriptions()
 	if err != nil {
 		ctx.Logger.Errorf("error listing subscriptions: %v", err)
 		ctx.Response.WriteHeader(500)
-		return
-	}
-
-	eventType, event, err := s.parseEvent(body)
-	if err != nil {
-		ctx.Logger.Errorf("error finding event type: %v", err)
-		ctx.Response.WriteHeader(400)
 		return
 	}
 
@@ -259,33 +315,42 @@ func (s *Slack) handleEvent(ctx core.HTTPRequestContext, body []byte) {
 
 		err = subscription.SendMessage(event)
 		if err != nil {
-			ctx.Logger.Errorf("error sending message to app: %v", err)
+			ctx.Logger.Errorf("error sending message from app: %v", err)
 		}
 	}
+}
+
+func (s *Slack) handleChallenge(ctx core.HTTPRequestContext, event any) {
+	eventMap, ok := event.(map[string]any)
+	if !ok {
+		return
+	}
+
+	challenge, ok := eventMap["challenge"].(string)
+	if !ok {
+		return
+	}
+
+	ctx.Response.WriteHeader(200)
+	ctx.Response.Write([]byte(challenge))
 }
 
 func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
 	// TODO
 }
 
-func (s *Slack) parseEvent(body []byte) (string, any, error) {
-	var event map[string]any
-	err := json.Unmarshal(body, &event)
-	if err != nil {
-		return "", nil, fmt.Errorf("error unmarshaling event: %v", err)
-	}
-
-	t, ok := event["type"]
+func (s *Slack) parseEventCallback(eventPayload EventPayload) (string, any, error) {
+	t, ok := eventPayload.Event["type"]
 	if !ok {
-		return "", nil, errors.New("type not present")
+		return "", nil, fmt.Errorf("type not found in event")
 	}
 
 	eventType, ok := t.(string)
-	if ok {
+	if !ok {
 		return "", nil, fmt.Errorf("type is of type %T: %v", t, t)
 	}
 
-	return eventType, event, nil
+	return eventType, eventPayload.Event, nil
 }
 
 type SubscriptionConfiguration struct {

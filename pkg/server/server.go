@@ -22,6 +22,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/applications/github"
 	_ "github.com/superplanehq/superplane/pkg/applications/pagerduty"
 	_ "github.com/superplanehq/superplane/pkg/applications/semaphore"
+	_ "github.com/superplanehq/superplane/pkg/applications/slack"
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
