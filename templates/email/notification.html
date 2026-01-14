@@ -13,67 +13,117 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: #1E2938;
-            background-image: radial-gradient(#4A5464 1px, #1E2938 1px);
-            background-size: 6px 6px;
+            background-color: #ffffff;
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1f2937;
+            }
         }
         .card {
-            background: #1e2938;
+            background: transparent;
             max-width: 520px;
             width: 92%;
             padding: 28px 32px 32px;
-            border-radius: 14px;
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-            color: #f1f5f9;
+            color: #1f2937;
+        }
+        @media (prefers-color-scheme: dark) {
+            .card {
+                color: #f3f4f6;
+            }
+        }
+        .logo-container {
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 16px;
+        }
+        @media (prefers-color-scheme: dark) {
+            .logo-container {
+                border-bottom-color: #374151;
+            }
         }
         .logo {
-            font-size: 1rem;
-            font-weight: bold;
-            color: #f9fafc;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #3d4859;
-            margin-bottom: 20px;
+            height: 22px;
+            width: auto;
+        }
+        .logo path {
+            fill: #1f2937;
+        }
+        @media (prefers-color-scheme: dark) {
+            .logo path {
+                fill: #f3f4f6;
+            }
         }
         .title {
             font-size: 1.25rem;
             margin: 0 0 12px;
-            color: #f9fafc;
+            color: #1f2937;
+            font-weight: 600;
+        }
+        @media (prefers-color-scheme: dark) {
+            .title {
+                color: #f3f4f6;
+            }
         }
         .body {
             font-size: 0.95rem;
             line-height: 1.5;
-            color: #cbd5f5;
+            color: #1f2937;
             margin: 0 0 24px;
             white-space: pre-line;
         }
+        @media (prefers-color-scheme: dark) {
+            .body {
+                color: #f3f4f6;
+            }
+        }
+        .body a {
+            color: #3b82f6;
+            text-decoration: underline;
+        }
+        @media (prefers-color-scheme: dark) {
+            .body a {
+                color: #93c5fd;
+            }
+        }
         .action-btn {
             display: inline-block;
-            padding: 12px 20px;
-            border-radius: 8px;
-            background: #6584b4;
-            color: #1e2938;
+            padding: 8px 16px;
+            border-radius: 5px;
+            background: #1f2937;
+            color: #f3f4f6;
             text-decoration: none;
             font-weight: 600;
+            font-size: 0.95rem;
+        }
+        @media (prefers-color-scheme: dark) {
+            .action-btn {
+                background: #f3f4f6;
+                color: #1f2937;
+            }
         }
         .action-btn:hover {
-            background: #5472a3;
+            opacity: 0.9;
         }
         .footer {
             margin-top: 20px;
             font-size: 0.75rem;
-            color: #94a9ca;
+            color: #6b7280;
         }
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="logo">SuperPlane</div>
+        <div class="logo-container">
+            <svg class="logo" width="29" height="21" viewBox="0 0 29 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M29 14.32C28.5655 14.7542 28.1107 15.1686 27.6379 15.5626L17.112 5.16914L22.7409 18.5877C22.1782 18.8335 21.6021 19.0552 21.0139 19.2508L15.4286 5.93611V20.2791C15.1216 20.2926 14.8129 20.3 14.5025 20.3L14.2391 20.2982C14.0172 20.2955 13.7961 20.2888 13.5759 20.2791V5.88893L7.97322 19.2446C7.38516 19.0484 6.80914 18.8264 6.24652 18.58L11.8656 5.18536L1.36087 15.5578C0.888333 15.1638 0.434276 14.7489 0 14.3147L14.4975 0L29 14.32Z" fill="#1E2938"/>
+            </svg>
+        </div>
         <h1 class="title">{{.Title}}</h1>
-        <p class="body">
-            {{.Body}}
+        <p class="body">{{.Body}}
             {{if .URL}}
             <br><br>
-            <a href="{{.URL}}" style="color: #cbd5f5; text-decoration: underline;">{{.URL}}</a>
+            <a href="{{.URL}}">{{.URL}}</a>
             {{end}}
         </p>
         {{if .URL}}
