@@ -4,12 +4,53 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseMapper } from "./types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
+import { ComponentBaseMapper, EventStateRegistry, StateFunction } from "./types";
+import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState, EventStateMap, DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
-import { getTriggerRenderer, getState, getStateMap } from ".";
+import { getTriggerRenderer, getState } from ".";
 import { calcRelativeTimeFromDiff } from "@/lib/utils";
+import { formatTimeAgo } from "@/utils/date";
+
+export const TIMEGATE_STATE_MAP: EventStateMap = {
+  ...DEFAULT_EVENT_STATE_MAP,
+  waiting: {
+    icon: "clock",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-orange-100",
+    badgeColor: "bg-yellow-600",
+  },
+};
+
+export const timeGateStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+  if (!execution) return "neutral";
+
+  if (
+    execution.resultMessage &&
+    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED")
+  ) {
+    return "error";
+  }
+
+  if (execution.result === "RESULT_CANCELLED") {
+    return "cancelled";
+  }
+
+  if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
+    return "waiting";
+  }
+
+  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
+    return "success";
+  }
+
+  return "failed";
+};
+
+export const TIMEGATE_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: TIMEGATE_STATE_MAP,
+  getState: timeGateStateFunction,
+};
 
 export const timeGateMapper: ComponentBaseMapper = {
   props(
@@ -35,8 +76,24 @@ export const timeGateMapper: ComponentBaseMapper = {
       includeEmptyState: !lastExecutions[0],
       metadata: getTimeGateMetadataList(node),
       specs: getTimeGateSpecs(node),
-      eventStateMap: getStateMap(componentName),
+      eventStateMap: TIMEGATE_STATE_MAP,
     };
+  },
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, any> {
+    const details: Record<string, any> = {};
+    const metadata = execution.metadata as Record<string, unknown> | undefined;
+
+    if (execution.createdAt) {
+      details["Started at"] = new Date(execution.createdAt).toLocaleString();
+    }
+
+    if (execution.state === "STATE_FINISHED" && execution.updatedAt) {
+      details["Finished at"] = new Date(execution.updatedAt).toLocaleString();
+    }
+
+    details["Timeline"] = buildTimeGateTimeline(execution, metadata);
+
+    return details;
   },
 };
 
@@ -183,17 +240,17 @@ function getTimeGateEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution,
   _nodeQueueItems: WorkflowsWorkflowNodeQueueItem[] | undefined,
-  componentName: string,
+  _componentName: string,
 ): EventSection[] {
-  const executionState = getState(componentName)(execution);
+  const executionState = timeGateStateFunction(execution);
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
   let subtitle: string | undefined;
 
-  // If running, show next run time in the subtitle
-  if (executionState === "running") {
+  // If waiting, show next run time in the subtitle
+  if (executionState === "waiting") {
     const executionMetadata = execution.metadata as { nextValidTime?: string };
     if (executionMetadata?.nextValidTime) {
       const nextRunTime = new Date(executionMetadata.nextValidTime);
@@ -213,4 +270,128 @@ function getTimeGateEventSections(
   };
 
   return [eventSection];
+}
+
+function buildTimeGateTimeline(
+  execution: WorkflowsWorkflowNodeExecution,
+  metadata?: Record<string, unknown>,
+): Array<{ label: string; status: string; timestamp?: string; comment?: string }> {
+  const timeline: Array<{ label: string; status: string; timestamp?: string; comment?: string }> = [];
+
+  // Started event
+  if (execution.createdAt) {
+    timeline.push({
+      label: "Execution started",
+      status: "Started",
+      timestamp: formatTimeAgo(new Date(execution.createdAt)),
+    });
+  }
+
+  // Waiting for time window (if running and has nextValidTime)
+  if (execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING") {
+    const nextValidTime = metadata?.nextValidTime as string | undefined;
+    if (nextValidTime) {
+      try {
+        const nextTime = new Date(nextValidTime);
+        const now = new Date();
+        const timeDiff = nextTime.getTime() - now.getTime();
+        const timeLeftText = timeDiff > 0 ? calcRelativeTimeFromDiff(timeDiff) : "Ready to run";
+        timeline.push({
+          label: "Waiting for time window",
+          status: "Waiting",
+          timestamp: `runs in ${timeLeftText}`,
+        });
+      } catch {
+        // Invalid date, skip
+      }
+    }
+  }
+
+  // Cancelled event
+  if (execution.result === "RESULT_CANCELLED") {
+    const cancelledBy = metadata?.cancelledBy as
+      | { at?: string; userId?: string; email?: string; name?: string }
+      | undefined;
+
+    if (cancelledBy) {
+      const userDisplayName = cancelledBy.name || cancelledBy.email || "Unknown user";
+      const cancelledAt = cancelledBy.at ? formatTimeAgo(new Date(cancelledBy.at)) : (execution.updatedAt ? formatTimeAgo(new Date(execution.updatedAt)) : "");
+      timeline.push({
+        label: "Cancelled",
+        status: "Cancelled",
+        timestamp: cancelledAt ? `${cancelledAt} by ${userDisplayName}` : `by ${userDisplayName}`,
+      });
+    } else if (execution.updatedAt) {
+      timeline.push({
+        label: "Cancelled",
+        status: "Cancelled",
+        timestamp: formatTimeAgo(new Date(execution.updatedAt)),
+      });
+    }
+  }
+  // Finished event
+  else if (execution.state === "STATE_FINISHED") {
+    if (execution.updatedAt) {
+      // Check if it was pushed through manually
+      const pushedThrough = metadata?.pushedThrough as
+        | { at?: string; userId?: string; email?: string; name?: string }
+        | undefined;
+
+      if (pushedThrough) {
+        // Manually pushed through
+        const userDisplayName = pushedThrough.name || pushedThrough.email || "Unknown user";
+        const pushedAt = pushedThrough.at ? formatTimeAgo(new Date(pushedThrough.at)) : formatTimeAgo(new Date(execution.updatedAt));
+        timeline.push({
+          label: "Manually pushed through",
+          status: "Passed",
+          timestamp: `${pushedAt} by ${userDisplayName}`,
+        });
+      } else {
+        // Natural time window reached
+        const result = execution.result === "RESULT_PASSED" ? "Time window reached" : "Finished";
+        timeline.push({
+          label: result,
+          status: execution.result === "RESULT_PASSED" ? "Passed" : "Finished",
+          timestamp: formatTimeAgo(new Date(execution.updatedAt)),
+        });
+      }
+    }
+  }
+
+  // Sort by actual timestamp (not formatted string) for proper ordering
+  timeline.sort((a, b) => {
+    let aTime: number | null = null;
+    let bTime: number | null = null;
+
+    if (execution.createdAt && a.label === "Execution started") {
+      aTime = new Date(execution.createdAt).getTime();
+    } else if (execution.updatedAt && (a.label === "Time window reached" || a.label === "Finished")) {
+      aTime = new Date(execution.updatedAt).getTime();
+    } else if (metadata?.nextValidTime && a.label === "Waiting for time window") {
+      try {
+        aTime = new Date(metadata.nextValidTime as string).getTime();
+      } catch {
+        // Invalid date
+      }
+    }
+
+    if (execution.createdAt && b.label === "Execution started") {
+      bTime = new Date(execution.createdAt).getTime();
+    } else if (execution.updatedAt && (b.label === "Time window reached" || b.label === "Finished")) {
+      bTime = new Date(execution.updatedAt).getTime();
+    } else if (metadata?.nextValidTime && b.label === "Waiting for time window") {
+      try {
+        bTime = new Date(metadata.nextValidTime as string).getTime();
+      } catch {
+        // Invalid date
+      }
+    }
+
+    if (aTime === null && bTime === null) return 0;
+    if (aTime === null) return 1;
+    if (bTime === null) return -1;
+    return aTime - bTime;
+  });
+
+  return timeline;
 }

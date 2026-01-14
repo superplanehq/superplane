@@ -350,10 +350,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                 </div>
                                 <div
                                   className="text-[12px] text-gray-600 truncate"
-                                  title={`${entry.status}${entry.timestamp ? ` ${entry.timestamp}` : ""}`}
+                                  title={`${entry.status}${entry.timestamp ? ` · ${entry.timestamp}` : ""}`}
                                 >
                                   {entry.status}
-                                  {entry.timestamp ? ` ${entry.timestamp}` : ""}
+                                  {entry.timestamp ? ` · ${entry.timestamp}` : ""}
                                 </div>
                                 {entry.comment && (
                                   <div className="text-[12px] text-gray-500 italic break-words">"{entry.comment}"</div>
