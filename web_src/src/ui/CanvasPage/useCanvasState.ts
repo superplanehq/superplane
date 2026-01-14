@@ -160,12 +160,26 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
       }
 
       // Check for position changes and notify parent
-      changes.forEach((change) => {
-        if (change.type === "position" && change.position && change.dragging === false && props.onNodePositionChange) {
-          // Only notify when dragging ends (dragging === false)
-          props.onNodePositionChange(change.id, change.position);
+      // Collect all position changes that ended (dragging === false)
+      const positionChanges = changes.filter(
+        (change) => change.type === "position" && change.position && change.dragging === false,
+      );
+
+      if (positionChanges.length > 0) {
+        // If batch update is supported, use it for multiple nodes
+        if (positionChanges.length > 1 && props.onNodesPositionChange) {
+          const updates = positionChanges.map((change) => ({
+            nodeId: change.id,
+            position: change.position!,
+          }));
+          props.onNodesPositionChange(updates);
+        } else if (props.onNodePositionChange) {
+          // Fall back to individual updates for single node or when batch is not supported
+          positionChanges.forEach((change) => {
+            props.onNodePositionChange!(change.id, change.position!);
+          });
         }
-      });
+      }
 
       setNodes((nds) => applyNodeChanges(changes, nds));
     },

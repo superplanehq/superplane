@@ -1783,6 +1783,65 @@ export function WorkflowPageV2() {
     ],
   );
 
+  const handleNodesPositionChange = useCallback(
+    (updates: Array<{ nodeId: string; position: { x: number; y: number } }>) => {
+      if (!workflow || !organizationId || !workflowId || updates.length === 0) return;
+
+      // Create a map of nodeId -> rounded position for efficient lookup
+      const positionMap = new Map(
+        updates.map((update) => [
+          update.nodeId,
+          {
+            x: Math.round(update.position.x),
+            y: Math.round(update.position.y),
+          },
+        ]),
+      );
+
+      // Update all nodes in a single operation
+      const updatedNodes = workflow.spec?.nodes?.map((node) =>
+        positionMap.has(node.id)
+          ? {
+              ...node,
+              position: positionMap.get(node.id)!,
+            }
+          : node,
+      );
+
+      const updatedWorkflow = {
+        ...workflow,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
+      };
+
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+
+      if (isAutoSaveEnabled) {
+        // Add all position updates to pending updates
+        positionMap.forEach((position, nodeId) => {
+          pendingPositionUpdatesRef.current.set(nodeId, position);
+        });
+
+        debouncedAutoSave();
+      } else {
+        saveWorkflowSnapshot(workflow);
+        markUnsavedChange("position");
+      }
+    },
+    [
+      workflow,
+      organizationId,
+      workflowId,
+      queryClient,
+      debouncedAutoSave,
+      isAutoSaveEnabled,
+      saveWorkflowSnapshot,
+      markUnsavedChange,
+    ],
+  );
+
   const handleNodeCollapseChange = useCallback(
     async (nodeId: string) => {
       if (!workflow || !organizationId || !workflowId) return;
@@ -2165,6 +2224,7 @@ export function WorkflowPageV2() {
       onNodeDelete={handleNodeDelete}
       onEdgeDelete={handleEdgeDelete}
       onNodePositionChange={handleNodePositionChange}
+      onNodesPositionChange={handleNodesPositionChange}
       onToggleView={handleNodeCollapseChange}
       onToggleCollapse={() => markUnsavedChange("structural")}
       onRun={handleRun}

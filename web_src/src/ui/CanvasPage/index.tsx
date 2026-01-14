@@ -154,6 +154,7 @@ export interface CanvasPageProps {
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
+  onNodesPositionChange?: (updates: Array<{ nodeId: string; position: { x: number; y: number } }>) => void;
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
   onPushThrough?: (nodeId: string, executionId: string) => void;
   onCancelExecution?: (nodeId: string, executionId: string) => void;
