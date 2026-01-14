@@ -57,15 +57,17 @@ function AppRouter() {
     <BrowserRouter>
       <SetupGuard>
         <Routes>
-          {/* Auth routes */}
+          {/* public routes */}
           <Route path="login" element={<Login />} />
           <Route path="login/email" element={<EmailLogin />} />
           <Route path="create" element={<OrganizationCreate />} />
           <Route path="setup" element={<OwnerSetup />} />
-          <Route path="invite/:token" element={<InviteLinkAccept />} />
 
           {/* Organization selection and creation */}
-          <Route path="" element={<OrganizationSelect />} />
+          <Route path="" element={withAuthOnly(OrganizationSelect)} />
+
+          {/* Invite link acceptance */}
+          <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
 
           {/* Organization-scoped protected routes */}
           <Route path=":organizationId">
