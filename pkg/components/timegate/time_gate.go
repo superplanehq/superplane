@@ -91,28 +91,24 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{
-							Label: "Run only during custom time window",
-							Value: TimeGateCustomInclude,
-						},
-						{
-							Label: "Don't run during custom time windows",
-							Value: TimeGateCustomExclude,
-						},
-						{
-							Label: "Run during working hours",
+							Label: "Run only during work hours",
 							Value: TimeGateTemplateWorkingHours,
 						},
 						{
-							Label: "Run outside of working hours",
-							Value: TimeGateTemplateOutsideWorkingHours,
-						},
-						{
-							Label: "Run on weekends",
+							Label: "Run only during weekend",
 							Value: TimeGateTemplateWeekends,
 						},
 						{
-							Label: "Don't run on weekends",
+							Label: "Custom times",
+							Value: TimeGateCustomInclude,
+						},
+						{
+							Label: "Don't run on weekend",
 							Value: TimeGateTemplateNoWeekends,
+						},
+						{
+							Label: "Custom times",
+							Value: TimeGateCustomExclude,
 						},
 					},
 				},

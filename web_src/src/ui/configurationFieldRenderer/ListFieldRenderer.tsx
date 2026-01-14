@@ -62,9 +62,9 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
         const defaultType = typeField.typeOptions.select.options[0].value;
         newItem.type = defaultType;
         
-        // For weekly type, preselect Monday through Friday
+        // For weekly type, don't preselect any days (all turned off by default)
         if (defaultType === "weekly") {
-          newItem.days = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+          newItem.days = [];
         }
         // For specific_dates type, set default date to December 31 (12-31)
         else if (defaultType === "specific_dates") {
@@ -115,26 +115,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   // Check if this is timegate items field and determine label based on when_to_run
   const isTimegateItems = field.name === "items";
   const whenToRun = allValues?.when_to_run as string | undefined;
-  const getTimeWindowsLabel = () => {
-    if (!isTimegateItems || !whenToRun) return null;
-    
-    if (whenToRun === "custom_include" || whenToRun === "template_working_hours" || whenToRun === "template_weekends") {
-      return "Allowed time windows";
-    } else if (whenToRun === "custom_exclude" || whenToRun === "template_outside_working_hours" || whenToRun === "template_no_weekends") {
-      return "Blocked time windows";
-    }
-    return null;
-  };
-
-  const timeWindowsLabel = getTimeWindowsLabel();
-
   return (
     <div className="space-y-3">
-      {timeWindowsLabel && (
-        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          {timeWindowsLabel}
-        </div>
-      )}
       {items.map((item, index) => {
         const itemType = (item && typeof item === "object" ? (item as Record<string, unknown>).type : undefined) as string | undefined;
         return (
@@ -196,9 +178,9 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                             if (val === "specific_dates" && !newItem.date) {
                               newItem.date = "12-31";
                             }
-                            // When switching to "weekly", set default days to Mon-Fri if not already set
+                            // When switching to "weekly", don't set default days (all turned off by default)
                             if (val === "weekly" && !newItem.days) {
-                              newItem.days = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+                              newItem.days = [];
                             }
                             updateItem(index, newItem);
                           }}
