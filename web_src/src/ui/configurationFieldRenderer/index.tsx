@@ -15,6 +15,7 @@ import { DateFieldRenderer } from "./DateFieldRenderer";
 import { DateTimeFieldRenderer } from "./DateTimeFieldRenderer";
 import { UrlFieldRenderer } from "./UrlFieldRenderer";
 import { ListFieldRenderer } from "./ListFieldRenderer";
+import { ExcludeDatesFieldRenderer } from "./ExcludeDatesFieldRenderer";
 import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
 import { IntegrationFieldRenderer } from "./IntegrationFieldRenderer";
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
@@ -329,6 +330,19 @@ export const ConfigurationFieldRenderer = ({
         );
 
       case "list":
+        // For exclude_dates, use custom renderer with toggle
+        if (field.name === "exclude_dates") {
+          return (
+            <ExcludeDatesFieldRenderer
+              {...commonProps}
+              domainId={domainId}
+              domainType={domainType}
+              validationErrors={validationErrors}
+              fieldPath={fieldPath || field.name}
+              allValues={allValues}
+            />
+          );
+        }
         return (
           <ListFieldRenderer
             {...commonProps}
@@ -418,10 +432,13 @@ export const ConfigurationFieldRenderer = ({
   // Check if this is the date field for specific dates - hide label for it (will be shown in custom renderer)
   const isDateFieldInList = field.name === "date";
   
+  // Check if this is the exclude_dates field - hide label for it (will be shown in custom renderer)
+  const isExcludeDatesField = field.name === "exclude_dates";
+  
   // For all other field types, render label above field
   return (
     <div className="space-y-2">
-      {!usesTabs && !isItemsField && !isDaysField && !isTimeFieldInRange && !isDateFieldInList && (
+      {!usesTabs && !isItemsField && !isDaysField && !isTimeFieldInRange && !isDateFieldInList && !isExcludeDatesField && (
         <div className="flex items-center gap-3">
           {isTogglable && (
             <Switch

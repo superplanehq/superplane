@@ -390,24 +390,6 @@ export function SettingsTab({
                       [fieldName]: value,
                     };
                     
-                    // Handle template selection for timegate component
-                    if (fieldName === "when_to_run" && typeof value === "string") {
-                      const templateData = getTemplateData(value);
-                      if (templateData) {
-                        // Pre-fill mode and items with template values
-                        newConfig.mode = templateData.mode;
-                        newConfig.items = templateData.items;
-                      } else if (value === "custom_include" || value === "custom_exclude") {
-                        // When switching to custom, derive mode from when_to_run
-                        if (value === "custom_include") {
-                          newConfig.mode = "include";
-                        } else if (value === "custom_exclude") {
-                          newConfig.mode = "exclude";
-                        }
-                        // Keep items as-is (user may have already configured them)
-                      }
-                    }
-                    
                     setNodeConfiguration(filterVisibleFields(newConfig));
                   }}
                   allValues={nodeConfiguration}

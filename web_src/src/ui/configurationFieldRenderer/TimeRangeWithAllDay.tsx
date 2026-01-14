@@ -10,6 +10,8 @@ interface TimeRangeWithAllDayProps {
   onEndTimeChange: (value: string | undefined) => void;
   onBothTimesChange?: (startTime: string | undefined, endTime: string | undefined) => void;
   hasError?: boolean;
+  hasStartTimeError?: boolean;
+  hasEndTimeError?: boolean;
   itemType?: string; // "weekly" or "specific_dates"
 }
 
@@ -20,6 +22,8 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
   onEndTimeChange,
   onBothTimesChange,
   hasError,
+  hasStartTimeError,
+  hasEndTimeError,
   itemType,
 }) => {
   const isWeekly = itemType === "weekly";
@@ -85,7 +89,7 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
                 field={{ name: "startTime", label: "Start Time", type: "time" } as any}
                 value={startTime}
                 onChange={(val) => onStartTimeChange(val as string | undefined)}
-                hasError={hasError}
+                hasError={hasError || hasStartTimeError}
                 allValues={{ startTime, endTime }}
                 className="rounded-r-none border-r-0"
               />
@@ -98,7 +102,7 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
                 field={{ name: "endTime", label: "End Time", type: "time" } as any}
                 value={endTime}
                 onChange={(val) => onEndTimeChange(val as string | undefined)}
-                hasError={hasError}
+                hasError={hasError || hasEndTimeError}
                 allValues={{ startTime, endTime }}
                 className="rounded-l-none"
               />
@@ -132,7 +136,7 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
               field={{ name: "startTime", label: "Start Time", type: "time" } as any}
               value={startTime}
               onChange={(val) => onStartTimeChange(val as string | undefined)}
-              hasError={hasError}
+              hasError={hasError || hasStartTimeError}
               allValues={{ startTime, endTime }}
               className="rounded-r-none border-r-0"
             />
@@ -145,7 +149,7 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
               field={{ name: "endTime", label: "End Time", type: "time" } as any}
               value={endTime}
               onChange={(val) => onEndTimeChange(val as string | undefined)}
-              hasError={hasError}
+              hasError={hasError || hasEndTimeError}
               allValues={{ startTime, endTime }}
               className="rounded-l-none"
             />
