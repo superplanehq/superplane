@@ -1,13 +1,14 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import "./App.css";
 
 // Import pages
 import AuthGuard from "./components/AuthGuard";
 import { AccountProvider } from "./contexts/AccountContext";
+import { useAccount } from "./contexts/AccountContext";
 import { isCustomComponentsEnabled } from "./lib/env";
 import EmailLogin from "./pages/auth/EmailLogin";
 import { Login } from "./pages/auth/Login";
@@ -53,32 +54,45 @@ function App() {
 function AppRouter() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Auth routes */}
-        <Route path="login" element={<Login />} />
-        <Route path="login/email" element={<EmailLogin />} />
-        <Route path="create" element={<OrganizationCreate />} />
-        <Route path="setup" element={<OwnerSetup />} />
+      <SetupGuard>
+        <Routes>
+          {/* Auth routes */}
+          <Route path="login" element={<Login />} />
+          <Route path="login/email" element={<EmailLogin />} />
+          <Route path="create" element={<OrganizationCreate />} />
+          <Route path="setup" element={<OwnerSetup />} />
 
-        {/* Organization selection and creation */}
-        <Route path="" element={<OrganizationSelect />} />
+          {/* Organization selection and creation */}
+          <Route path="" element={<OrganizationSelect />} />
 
-        {/* Organization-scoped protected routes */}
-        <Route path=":organizationId">
-          <Route index element={withAuthOnly(HomePage)} />
-          {isCustomComponentsEnabled() && (
-            <Route path="custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
-          )}
-          <Route path="workflows/:workflowId" element={withAuthOnly(WorkflowPageV2)} />
-          <Route path="workflows/:workflowId/nodes/:nodeId/:executionId" element={withAuthOnly(NodeRunPage)} />
-          <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
-        </Route>
+          {/* Organization-scoped protected routes */}
+          <Route path=":organizationId">
+            <Route index element={withAuthOnly(HomePage)} />
+            {isCustomComponentsEnabled() && (
+              <Route path="custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
+            )}
+            <Route path="workflows/:workflowId" element={withAuthOnly(WorkflowPageV2)} />
+            <Route path="workflows/:workflowId/nodes/:nodeId/:executionId" element={withAuthOnly(NodeRunPage)} />
+            <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
+          </Route>
 
-        {/* Catch-all route */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+          {/* Catch-all route */}
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </SetupGuard>
     </BrowserRouter>
   );
+}
+
+function SetupGuard({ children }: { children: React.ReactNode }) {
+  const { setupRequired, loading } = useAccount();
+  const location = useLocation();
+
+  if (!loading && setupRequired && location.pathname !== "/setup") {
+    return <Navigate to="/setup" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 export default App;
