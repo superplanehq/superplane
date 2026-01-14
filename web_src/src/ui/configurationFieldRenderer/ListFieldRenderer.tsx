@@ -259,7 +259,6 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                               hasError={hasTimeError}
                               hasStartTimeError={hasStartTimeError}
                               hasEndTimeError={hasEndTimeError}
-                              itemType="weekly"
                             />
                             {hasStartTimeError && (!startTimeValue || startTimeValue === "") && (
                               <p className="text-xs text-red-500 dark:text-red-400 text-left mt-1">
@@ -387,7 +386,6 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                                 hasError={hasTimeError}
                                 hasStartTimeError={hasStartTimeError}
                                 hasEndTimeError={hasEndTimeError}
-                                itemType="weekly"
                               />
                               {hasStartTimeError && (!startTimeValue || startTimeValue === "") && (
                                 <p className="text-xs text-red-500 dark:text-red-400 text-left mt-1">

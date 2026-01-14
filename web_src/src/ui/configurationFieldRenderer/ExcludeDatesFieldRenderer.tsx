@@ -5,14 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FieldRendererProps, ValidationError } from "./types";
-import { AuthorizationDomainType } from "@/api-client";
+import { FieldRendererProps } from "./types";
 
 interface ExcludeDatesFieldRendererProps extends FieldRendererProps {
-  domainId?: string;
-  domainType?: AuthorizationDomainType;
-  validationErrors?: ValidationError[] | Set<string>;
-  fieldPath?: string;
+  // All props are inherited from FieldRendererProps
 }
 
 const months = [
@@ -46,10 +42,6 @@ export const ExcludeDatesFieldRenderer: React.FC<ExcludeDatesFieldRendererProps>
   field,
   value,
   onChange,
-  domainId: _domainId,
-  domainType: _domainType,
-  validationErrors: _validationErrors,
-  fieldPath: _fieldPath,
   hasError = false,
 }) => {
   // Normalize dates array: convert strings to objects { date: string }
