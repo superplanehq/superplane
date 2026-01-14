@@ -107,7 +107,7 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeList,
 			Required:    true,
 			Description: "Items will wait until the next valid time window is reached",
-			Default:     `[{"days":["monday","tuesday","wednesday","thursday","friday"],"startTime":"09:00","endTime":"17:00"}]`,
+			Default:     `[{"days":["monday","tuesday","wednesday","thursday","friday"],"startTime":"00:00","endTime":"23:59"}]`,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Time Window",
@@ -140,7 +140,7 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 								Type:        configuration.FieldTypeTime,
 								Required:    true,
 								Description: "Start time in HH:MM format (24-hour), e.g., 09:30",
-								Default:     "09:00",
+								Default:     "00:00",
 								ValidationRules: []configuration.ValidationRule{
 									{
 										Type:        configuration.ValidationRuleLessThan,
@@ -155,7 +155,7 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 								Type:        configuration.FieldTypeTime,
 								Required:    true,
 								Description: "End time in HH:MM format (24-hour), e.g., 17:30",
-								Default:     "17:00",
+								Default:     "23:59",
 								ValidationRules: []configuration.ValidationRule{
 									{
 										Type:        configuration.ValidationRuleGreaterThan,

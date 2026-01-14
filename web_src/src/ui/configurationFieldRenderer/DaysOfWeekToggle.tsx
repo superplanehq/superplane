@@ -46,7 +46,7 @@ export const DaysOfWeekToggle: React.FC<FieldRendererProps> = ({ field, value, o
             type="button"
             onClick={() => toggleDay(day.value)}
             className={cn(
-              "w-10 h-10 rounded-full text-sm font-medium focus:outline-none",
+              "w-9 h-9 rounded-full text-sm font-medium focus:outline-none",
               isSelected
                 ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
                 : "bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500",

@@ -70,7 +70,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
@@ -388,44 +387,117 @@ export function SettingsTab({
             }, [configurationFields]).map((field, index, array) => {
               if (!field.name) return null;
               const fieldName = field.name;
-              const isExcludeDates = fieldName === "exclude_dates";
               const previousField = index > 0 ? array[index - 1] : null;
-              const shouldShowDivider = isExcludeDates && previousField && previousField.name !== "exclude_dates";
+              const isItemsField = fieldName === "items";
+              const isTimezoneField = fieldName === "timezone";
+              const nextField = index < array.length - 1 ? array[index + 1] : null;
+              const isBeforeTimezone = nextField?.name === "timezone";
+              // Skip timezone if it's rendered as part of the items group
+              const shouldSkipTimezone = isTimezoneField && previousField?.name === "items";
+
+              // If this is the items field, render it with timezone in the same group
+              if (isItemsField && nextField?.name === "timezone") {
+                const timezoneField = nextField;
+                return (
+                  <React.Fragment key={`items-timezone-group`}>
+                    <div className="space-y-6 pb-6 border-b border-gray-200 dark:border-gray-700">
+                      <ConfigurationFieldRenderer
+                        field={field}
+                        value={nodeConfiguration[fieldName]}
+                        onChange={(value) => {
+                          const newConfig = {
+                            ...nodeConfiguration,
+                            [fieldName]: value,
+                          };
+
+                          setNodeConfiguration(filterVisibleFields(newConfig));
+                        }}
+                        allValues={nodeConfiguration}
+                        domainId={domainId}
+                        domainType={domainType}
+                        hasError={
+                          showValidation &&
+                          (validationErrors.has(fieldName) ||
+                            // Check for nested errors in this field
+                            Array.from(validationErrors).some(
+                              (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
+                            ))
+                        }
+                        validationErrors={showValidation ? validationErrors : undefined}
+                        fieldPath={fieldName}
+                        realtimeValidationErrors={realtimeValidationErrors}
+                        enableRealtimeValidation={true}
+                      />
+                      <ConfigurationFieldRenderer
+                        field={timezoneField}
+                        value={nodeConfiguration[timezoneField.name!]}
+                        onChange={(value) => {
+                          const newConfig = {
+                            ...nodeConfiguration,
+                            [timezoneField.name!]: value,
+                          };
+
+                          setNodeConfiguration(filterVisibleFields(newConfig));
+                        }}
+                        allValues={nodeConfiguration}
+                        domainId={domainId}
+                        domainType={domainType}
+                        hasError={
+                          showValidation &&
+                          (validationErrors.has(timezoneField.name!) ||
+                            // Check for nested errors in this field
+                            Array.from(validationErrors).some(
+                              (error) =>
+                                error.startsWith(`${timezoneField.name!}.`) ||
+                                error.startsWith(`${timezoneField.name!}[`),
+                            ))
+                        }
+                        validationErrors={showValidation ? validationErrors : undefined}
+                        fieldPath={timezoneField.name!}
+                        realtimeValidationErrors={realtimeValidationErrors}
+                        enableRealtimeValidation={true}
+                      />
+                    </div>
+                  </React.Fragment>
+                );
+              }
+
+              // Skip timezone if it was already rendered with items
+              if (shouldSkipTimezone) {
+                return null;
+              }
 
               return (
                 <React.Fragment key={fieldName}>
-                  {shouldShowDivider && (
-                    <div className="pt-4">
-                      <Separator className="bg-gray-200 dark:bg-gray-700" />
-                    </div>
-                  )}
-                  <ConfigurationFieldRenderer
-                    field={field}
-                    value={nodeConfiguration[fieldName]}
-                    onChange={(value) => {
-                      const newConfig = {
-                        ...nodeConfiguration,
-                        [fieldName]: value,
-                      };
+                  <div className={isItemsField || isBeforeTimezone ? "pb-6" : ""}>
+                    <ConfigurationFieldRenderer
+                      field={field}
+                      value={nodeConfiguration[fieldName]}
+                      onChange={(value) => {
+                        const newConfig = {
+                          ...nodeConfiguration,
+                          [fieldName]: value,
+                        };
 
-                      setNodeConfiguration(filterVisibleFields(newConfig));
-                    }}
-                    allValues={nodeConfiguration}
-                    domainId={domainId}
-                    domainType={domainType}
-                    hasError={
-                      showValidation &&
-                      (validationErrors.has(fieldName) ||
-                        // Check for nested errors in this field
-                        Array.from(validationErrors).some(
-                          (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
-                        ))
-                    }
-                    validationErrors={showValidation ? validationErrors : undefined}
-                    fieldPath={fieldName}
-                    realtimeValidationErrors={realtimeValidationErrors}
-                    enableRealtimeValidation={true}
-                  />
+                        setNodeConfiguration(filterVisibleFields(newConfig));
+                      }}
+                      allValues={nodeConfiguration}
+                      domainId={domainId}
+                      domainType={domainType}
+                      hasError={
+                        showValidation &&
+                        (validationErrors.has(fieldName) ||
+                          // Check for nested errors in this field
+                          Array.from(validationErrors).some(
+                            (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
+                          ))
+                      }
+                      validationErrors={showValidation ? validationErrors : undefined}
+                      fieldPath={fieldName}
+                      realtimeValidationErrors={realtimeValidationErrors}
+                      enableRealtimeValidation={true}
+                    />
+                  </div>
                 </React.Fragment>
               );
             })}

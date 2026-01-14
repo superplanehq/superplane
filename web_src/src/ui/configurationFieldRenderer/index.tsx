@@ -431,6 +431,11 @@ export const ConfigurationFieldRenderer = ({
   // Check if this is the exclude_dates field - hide label for it (will be shown in custom renderer)
   const isExcludeDatesField = field.name === "exclude_dates";
 
+  // For list fields, render directly without wrapper (they handle their own structure)
+  if (field.type === "list" && isItemsField) {
+    return <>{isEnabled && renderField()}</>;
+  }
+
   // For all other field types, render label above field
   return (
     <div className="space-y-2">

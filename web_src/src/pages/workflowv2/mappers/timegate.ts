@@ -5,7 +5,14 @@ import {
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, EventStateRegistry, StateFunction } from "./types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState, EventStateMap, DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import {
+  ComponentBaseProps,
+  ComponentBaseSpec,
+  EventSection,
+  EventState,
+  EventStateMap,
+  DEFAULT_EVENT_STATE_MAP,
+} from "@/ui/componentBase";
 import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer, getState } from ".";
@@ -315,7 +322,11 @@ function buildTimeGateTimeline(
 
     if (cancelledBy) {
       const userDisplayName = cancelledBy.name || cancelledBy.email || "Unknown user";
-      const cancelledAt = cancelledBy.at ? formatTimeAgo(new Date(cancelledBy.at)) : (execution.updatedAt ? formatTimeAgo(new Date(execution.updatedAt)) : "");
+      const cancelledAt = cancelledBy.at
+        ? formatTimeAgo(new Date(cancelledBy.at))
+        : execution.updatedAt
+          ? formatTimeAgo(new Date(execution.updatedAt))
+          : "";
       timeline.push({
         label: "Cancelled",
         status: "Cancelled",
@@ -340,7 +351,9 @@ function buildTimeGateTimeline(
       if (pushedThrough) {
         // Manually pushed through
         const userDisplayName = pushedThrough.name || pushedThrough.email || "Unknown user";
-        const pushedAt = pushedThrough.at ? formatTimeAgo(new Date(pushedThrough.at)) : formatTimeAgo(new Date(execution.updatedAt));
+        const pushedAt = pushedThrough.at
+          ? formatTimeAgo(new Date(pushedThrough.at))
+          : formatTimeAgo(new Date(execution.updatedAt));
         timeline.push({
           label: "Manually pushed through",
           status: "Passed",
