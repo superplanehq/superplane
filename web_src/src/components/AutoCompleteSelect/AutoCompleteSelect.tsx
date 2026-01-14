@@ -173,9 +173,12 @@ export function AutoCompleteSelect({
           }}
         >
           <Icon
-            name={isOpen ? "expand_less" : "expand_more"}
+            name="chevron-down"
             size="sm"
-            className="ml-2 text-gray-400 dark:text-gray-500 flex-shrink-0"
+            className={twMerge(
+              "ml-2 text-gray-400 dark:text-gray-500 flex-shrink-0 transition-transform",
+              isOpen && "rotate-180",
+            )}
           />
         </div>
       </div>

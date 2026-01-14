@@ -65,9 +65,31 @@ type OpenAIResponse struct {
 	Usage      *ResponseUsage   `json:"usage,omitempty"`
 }
 
+type ModelsResponse struct {
+	Data []Model `json:"data"`
+}
+
+type Model struct {
+	ID string `json:"id"`
+}
+
 func (c *Client) Verify() error {
 	_, err := c.execRequest(http.MethodGet, c.BaseURL+"/models", nil)
 	return err
+}
+
+func (c *Client) ListModels() ([]Model, error) {
+	responseBody, err := c.execRequest(http.MethodGet, c.BaseURL+"/models", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response ModelsResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal models response: %v", err)
+	}
+
+	return response.Data, nil
 }
 
 func (c *Client) CreateResponse(model, input string) (*OpenAIResponse, error) {

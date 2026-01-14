@@ -89,6 +89,37 @@ func (o *OpenAI) CompareWebhookConfig(a, b any) (bool, error) {
 	return true, nil
 }
 
+func (o *OpenAI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
+	if resourceType != "model" {
+		return []core.ApplicationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	if err != nil {
+		return nil, err
+	}
+
+	models, err := client.ListModels()
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]core.ApplicationResource, 0, len(models))
+	for _, model := range models {
+		if model.ID == "" {
+			continue
+		}
+
+		resources = append(resources, core.ApplicationResource{
+			Type: resourceType,
+			Name: model.ID,
+			ID:   model.ID,
+		})
+	}
+
+	return resources, nil
+}
+
 func (o *OpenAI) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	return nil, nil
 }

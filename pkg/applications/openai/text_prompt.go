@@ -57,18 +57,13 @@ func (c *CreateResponse) Configuration() []configuration.Field {
 		{
 			Name:        "model",
 			Label:       "Model",
-			Type:        configuration.FieldTypeSelect,
+			Type:        configuration.FieldTypeAppInstallationResource,
 			Required:    true,
 			Default:     "gpt-4.1-mini",
 			Placeholder: "e.g. gpt-4.1-mini",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "gpt-4.1-mini", Value: "gpt-4.1-mini"},
-						{Label: "gpt-4.1", Value: "gpt-4.1"},
-						{Label: "gpt-4o-mini", Value: "gpt-4o-mini"},
-						{Label: "gpt-4o", Value: "gpt-4o"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "model",
 				},
 			},
 		},
