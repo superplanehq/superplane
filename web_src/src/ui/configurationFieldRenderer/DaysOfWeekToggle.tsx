@@ -12,7 +12,7 @@ const DAYS_OF_WEEK = [
   { value: "sunday", label: "Su" },
 ];
 
-export const DaysOfWeekToggle: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const DaysOfWeekToggle: React.FC<FieldRendererProps> = ({ value, onChange, hasError }) => {
   // Get current selected days as an array
   const selectedDays = Array.isArray(value) ? value : value ? [value] : [];
 
