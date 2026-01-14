@@ -51,6 +51,10 @@ func (t *DummyApplication) Sync(ctx core.SyncContext) error {
 	return t.onSync(ctx)
 }
 
+func (t *DummyApplication) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
+	return []core.ApplicationResource{}, nil
+}
+
 func (t *DummyApplication) HandleRequest(ctx core.HTTPRequestContext) {
 }
 

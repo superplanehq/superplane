@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -19,7 +18,7 @@ type OnAppMentionConfiguration struct {
 
 type AppMentionMetadata struct {
 	Channel           *ChannelMetadata `json:"channel,omitempty" mapstructure:"channel,omitempty"`
-	AppSubscriptionID *uuid.UUID       `json:"appSubscriptionID,omitempty" mapstructure:"appSubscriptionID,omitempty"`
+	AppSubscriptionID *string          `json:"appSubscriptionID,omitempty" mapstructure:"appSubscriptionID,omitempty"`
 }
 
 func (t *OnAppMention) Name() string {
@@ -47,8 +46,13 @@ func (t *OnAppMention) Configuration() []configuration.Field {
 		{
 			Name:     "channel",
 			Label:    "Channel",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeAppInstallationResource,
 			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "channel",
+				},
+			},
 		},
 	}
 }
@@ -97,8 +101,9 @@ func (t *OnAppMention) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to subscribe to app events: %w", err)
 	}
 
+	s := subscriptionID.String()
 	return ctx.Metadata.Set(AppMentionMetadata{
-		AppSubscriptionID: subscriptionID,
+		AppSubscriptionID: &s,
 		Channel: &ChannelMetadata{
 			ID:   channelInfo.ID,
 			Name: channelInfo.Name,
@@ -124,8 +129,6 @@ func (t *OnAppMention) OnAppMessage(ctx core.AppMessageContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-
-	ctx.Logger.Infof("configuration: %+v", config)
 
 	message := ctx.Message.(map[string]any)
 	channel := message["channel"].(string)

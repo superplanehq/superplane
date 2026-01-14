@@ -12,6 +12,8 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   onChange,
   domainId,
   domainType,
+  appInstallationId,
+  organizationId,
   hasError,
   autocompleteExampleObj,
 }) => {
@@ -152,6 +154,8 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
           allValues={objValue}
           domainId={domainId}
           domainType={domainType}
+          appInstallationId={appInstallationId}
+          organizationId={organizationId}
           autocompleteExampleObj={autocompleteExampleObj}
         />
       ))}

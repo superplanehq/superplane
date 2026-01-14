@@ -38,7 +38,6 @@ interface SettingsTabProps {
 }
 
 export function SettingsTab({
-  mode,
   nodeName,
   nodeLabel: _nodeLabel,
   configuration,
@@ -199,15 +198,31 @@ export function SettingsTab({
     setShowValidation(false);
   }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, appInstallationRef]);
 
-  // Auto-select if only one installation is available (create mode only)
+  // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
-    if (mode === "create" && availableInstallations.length === 1 && !selectedAppInstallation) {
-      setSelectedAppInstallation({
-        id: availableInstallations[0].metadata?.id,
-        name: availableInstallations[0].metadata?.name,
-      });
+    if (availableInstallations.length === 0) {
+      if (selectedAppInstallation) {
+        setSelectedAppInstallation(undefined);
+      }
+      return;
     }
-  }, [mode, availableInstallations, selectedAppInstallation]);
+
+    const selectedId = selectedAppInstallation?.id;
+    const hasSelected = selectedId
+      ? availableInstallations.some((installation) => installation.metadata?.id === selectedId)
+      : false;
+    if (hasSelected) {
+      return;
+    }
+
+    const firstInstallation = availableInstallations[0];
+    setSelectedAppInstallation({
+      id: firstInstallation.metadata?.id,
+      name: firstInstallation.metadata?.name,
+    });
+  }, [availableInstallations, selectedAppInstallation]);
+
+  const shouldShowConfiguration = !appName || !!selectedAppInstallation?.id;
 
   const handleSave = () => {
     validateNow();
@@ -303,7 +318,7 @@ export function SettingsTab({
         )}
 
         {/* Configuration section */}
-        {configurationFields && configurationFields.length > 0 && (!appName || availableInstallations.length > 0) && (
+        {configurationFields && configurationFields.length > 0 && shouldShowConfiguration && (
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
             {configurationFields.map((field) => {
               if (!field.name) return null;
@@ -323,6 +338,8 @@ export function SettingsTab({
                   allValues={nodeConfiguration}
                   domainId={domainId}
                   domainType={domainType}
+                  organizationId={domainId}
+                  appInstallationId={selectedAppInstallation?.id}
                   hasError={
                     showValidation &&
                     (validationErrors.has(fieldName) ||
@@ -343,7 +360,7 @@ export function SettingsTab({
         )}
 
         {/* Custom field section */}
-        {customField && (
+        {customField && shouldShowConfiguration && (
           <div
             className={
               configurationFields && configurationFields.length > 0

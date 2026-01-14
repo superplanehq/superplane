@@ -325,6 +325,8 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
                       allValues={configValues}
                       domainId={organizationId}
                       domainType="DOMAIN_TYPE_ORGANIZATION"
+                      organizationId={organizationId}
+                      appInstallationId={installation?.metadata?.id}
                     />
                   ))}
 

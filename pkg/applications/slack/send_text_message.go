@@ -53,11 +53,15 @@ func (c *SendTextMessage) OutputChannels(configuration any) []core.OutputChannel
 func (c *SendTextMessage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "channel",
-			Label:       "Channel",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Channel name (e.g., #general) or channel ID (e.g., C1234567890)",
+			Name:     "channel",
+			Label:    "Channel",
+			Type:     configuration.FieldTypeAppInstallationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "channel",
+				},
+			},
 		},
 		{
 			Name:     "text",

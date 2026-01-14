@@ -1218,6 +1218,50 @@
         ]
       }
     },
+    "/api/v1/organizations/{id}/applications/{installationId}/resources": {
+      "get": {
+        "summary": "List application resources",
+        "description": "Lists resources for an application installation",
+        "operationId": "Organizations_ListApplicationResources",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsListApplicationResourcesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "installationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
     "/api/v1/organizations/{id}/invitations": {
       "get": {
         "summary": "List organization invitations",
@@ -3343,6 +3387,9 @@
       "properties": {
         "type": {
           "type": "string"
+        },
+        "useNameAsValue": {
+          "type": "boolean"
         }
       }
     },
@@ -3907,6 +3954,20 @@
         }
       }
     },
+    "OrganizationsAppInstallationResourceRef": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      }
+    },
     "OrganizationsAppInstallationSpec": {
       "type": "object",
       "properties": {
@@ -4037,6 +4098,18 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "OrganizationsListApplicationResourcesResponse": {
+      "type": "object",
+      "properties": {
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/OrganizationsAppInstallationResourceRef"
+          }
         }
       }
     },

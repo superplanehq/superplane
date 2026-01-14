@@ -54,8 +54,14 @@ func (c *PublishCommitStatus) Configuration() []configuration.Field {
 		{
 			Name:     "repository",
 			Label:    "Repository",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeAppInstallationResource,
 			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "repository",
+					UseNameAsValue: true,
+				},
+			},
 		},
 		{
 			Name:        "sha",
@@ -137,11 +143,6 @@ func (c *PublishCommitStatus) Execute(ctx core.ExecutionContext) error {
 	// Validate SHA format
 	if !shaRegex.MatchString(config.SHA) {
 		return fmt.Errorf("invalid commit SHA format: expected 40-character hexadecimal string, got %q", config.SHA)
-	}
-
-	var nodeMetadata NodeMetadata
-	if err := mapstructure.Decode(ctx.NodeMetadata.Get(), &nodeMetadata); err != nil {
-		return fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
 	var appMetadata Metadata

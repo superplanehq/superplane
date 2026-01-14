@@ -188,7 +188,8 @@ func resourceTypeOptionsToProto(opts *configuration.ResourceTypeOptions) *config
 	}
 
 	return &configpb.ResourceTypeOptions{
-		Type: opts.Type,
+		Type:           opts.Type,
+		UseNameAsValue: opts.UseNameAsValue,
 	}
 }
 
@@ -463,7 +464,8 @@ func protoToResourceTypeOptions(pbOpts *configpb.ResourceTypeOptions) *configura
 	}
 
 	return &configuration.ResourceTypeOptions{
-		Type: pbOpts.Type,
+		Type:           pbOpts.Type,
+		UseNameAsValue: pbOpts.UseNameAsValue,
 	}
 }
 
@@ -916,6 +918,8 @@ func defaultValueFromProto(fieldType, defaultValue string) any {
 	case configuration.FieldTypeIntegration:
 		fallthrough
 	case configuration.FieldTypeIntegrationResource:
+		fallthrough
+	case configuration.FieldTypeAppInstallationResource:
 		fallthrough
 	case configuration.FieldTypeTime:
 		fallthrough

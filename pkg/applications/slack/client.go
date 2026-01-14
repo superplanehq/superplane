@@ -100,6 +100,33 @@ func (c *Client) GetChannelInfo(channel string) (*ChannelInfo, error) {
 	return result.Channel, nil
 }
 
+func (c *Client) ListChannels() ([]ChannelInfo, error) {
+	responseBody, err := c.execRequest(http.MethodGet, "https://slack.com/api/conversations.list", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result ConversationsListResponse
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	if !result.OK {
+		if result.Error != "" {
+			return nil, fmt.Errorf("failed to list channels: %s", result.Error)
+		}
+		return nil, fmt.Errorf("failed to list channels")
+	}
+
+	return result.Channels, nil
+}
+
+type ConversationsListResponse struct {
+	OK       bool          `json:"ok"`
+	Error    string        `json:"error,omitempty"`
+	Channels []ChannelInfo `json:"channels,omitempty"`
+}
+
 type ChatPostMessageRequest struct {
 	Channel         string        `json:"channel"`
 	Text            string        `json:"text,omitempty"`

@@ -51,6 +51,11 @@ type Application interface {
 	Sync(ctx SyncContext) error
 
 	/*
+	 * List resources of a given type.
+	 */
+	ListResources(resourceType string, ctx ListResourcesContext) ([]ApplicationResource, error)
+
+	/*
 	 * HTTP request handler
 	 */
 	HandleRequest(ctx HTTPRequestContext)
@@ -103,6 +108,18 @@ type AppMessageContext struct {
 	Logger          *logrus.Entry
 	AppInstallation AppInstallationContext
 	Events          EventContext
+}
+
+type ApplicationResource struct {
+	Type string
+	Name string
+	ID   string
+}
+
+type ListResourcesContext struct {
+	Logger          *logrus.Entry
+	HTTP            HTTPContext
+	AppInstallation AppInstallationContext
 }
 
 type SetupWebhookContext struct {

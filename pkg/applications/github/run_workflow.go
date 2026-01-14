@@ -88,8 +88,14 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 		{
 			Name:     "repository",
 			Label:    "Repository",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeAppInstallationResource,
 			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "repository",
+					UseNameAsValue: true,
+				},
+			},
 		},
 		{
 			Name:        "workflowFile",
@@ -168,12 +174,6 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	metadata := NodeMetadata{}
-	err = mapstructure.Decode(ctx.NodeMetadata.Get(), &metadata)
-	if err != nil {
-		return fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
 	var appMetadata Metadata
