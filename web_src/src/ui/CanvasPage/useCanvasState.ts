@@ -1,4 +1,4 @@
-import type { Edge, EdgeChange, Node, NodeChange } from "@xyflow/react";
+import type { Edge, EdgeChange, Node, NodeChange, NodePositionChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AiProps, CanvasPageProps } from ".";
@@ -162,7 +162,8 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
       // Check for position changes and notify parent
       // Collect all position changes that ended (dragging === false)
       const positionChanges = changes.filter(
-        (change) => change.type === "position" && change.position && change.dragging === false,
+        (change): change is NodePositionChange =>
+          change.type === "position" && change.position !== undefined && change.dragging === false,
       );
 
       if (positionChanges.length > 0) {
@@ -170,13 +171,13 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
         if (positionChanges.length > 1 && props.onNodesPositionChange) {
           const updates = positionChanges.map((change) => ({
             nodeId: change.id,
-            position: change.position!,
+            position: change.position,
           }));
           props.onNodesPositionChange(updates);
         } else if (props.onNodePositionChange) {
           // Fall back to individual updates for single node or when batch is not supported
           positionChanges.forEach((change) => {
-            props.onNodePositionChange!(change.id, change.position!);
+            props.onNodePositionChange!(change.id, change.position);
           });
         }
       }

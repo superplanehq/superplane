@@ -1800,7 +1800,7 @@ export function WorkflowPageV2() {
 
       // Update all nodes in a single operation
       const updatedNodes = workflow.spec?.nodes?.map((node) =>
-        positionMap.has(node.id)
+        node.id && positionMap.has(node.id)
           ? {
               ...node,
               position: positionMap.get(node.id)!,
