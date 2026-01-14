@@ -8,7 +8,6 @@ import { XMLFieldRenderer } from "./XMLFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
 import { BooleanFieldRenderer } from "./BooleanFieldRenderer";
 import { SelectFieldRenderer } from "./SelectFieldRenderer";
-import { RadioButtonFieldRenderer } from "./RadioButtonFieldRenderer";
 import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
 import { DaysOfWeekToggle } from "./DaysOfWeekToggle";
 import { DateFieldRenderer } from "./DateFieldRenderer";
@@ -228,11 +227,6 @@ export const ConfigurationFieldRenderer = ({
         return <BooleanFieldRenderer {...commonProps} />;
 
       case "select":
-        // Use radio buttons for select fields with exactly 2 options (like Mode and Type)
-        const selectOptions = field.typeOptions?.select?.options ?? [];
-        if (selectOptions.length === 2) {
-          return <RadioButtonFieldRenderer {...commonProps} />;
-        }
         return <SelectFieldRenderer {...commonProps} />;
 
       case "multi-select":
