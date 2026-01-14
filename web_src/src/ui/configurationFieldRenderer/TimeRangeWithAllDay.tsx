@@ -80,7 +80,7 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
         {/* Time inputs - only show when "All day" is OFF, on the right */}
         {!isAllDay && (
           <div className="flex items-center gap-0 flex-1">
-            <div className="flex-1">
+            <div className="flex-[0.5]">
               <TimePickerField
                 field={{ name: "startTime", label: "Start Time", type: "time" } as any}
                 value={startTime}
@@ -93,7 +93,7 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
             <div className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 border-l-0 border-r-0 flex items-center justify-center font-medium">
               -
             </div>
-            <div className="flex-1">
+            <div className="flex-[0.5]">
               <TimePickerField
                 field={{ name: "endTime", label: "End Time", type: "time" } as any}
                 value={endTime}
@@ -127,7 +127,7 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
       {/* Time inputs - only show when "All day" is OFF */}
       {!isAllDay && (
         <div className="flex items-center gap-0 flex-1">
-          <div className="flex-1">
+          <div className="flex-[0.5]">
             <TimePickerField
               field={{ name: "startTime", label: "Start Time", type: "time" } as any}
               value={startTime}
@@ -140,7 +140,7 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
           <div className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 border-l-0 border-r-0 flex items-center justify-center font-medium">
             -
           </div>
-          <div className="flex-1">
+          <div className="flex-[0.5]">
             <TimePickerField
               field={{ name: "endTime", label: "End Time", type: "time" } as any}
               value={endTime}

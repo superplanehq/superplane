@@ -98,8 +98,8 @@ export const MonthDayFieldRenderer: React.FC<FieldRendererProps> = ({ field, val
   const errorClassName = hasError ? "border-red-500 border-2" : "";
 
   return (
-    <div className="flex items-center">
-      <div className="flex-1">
+    <div className="flex items-center gap-0 flex-1 min-w-0">
+      <div className="flex-[0.5] min-w-0 w-full">
         <AutoCompleteSelect
           options={monthOptions}
           value={currentMonth ? currentMonth.toString() : ""}
@@ -109,7 +109,7 @@ export const MonthDayFieldRenderer: React.FC<FieldRendererProps> = ({ field, val
           className={`${errorClassName} rounded-r-none border-r-0`}
         />
       </div>
-      <div className="flex-1">
+      <div className="flex-[0.5] min-w-0 w-full">
         <AutoCompleteSelect
           options={dayOptions}
           value={currentDay ? currentDay.toString() : ""}

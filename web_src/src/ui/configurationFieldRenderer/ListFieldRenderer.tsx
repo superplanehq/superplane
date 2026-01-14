@@ -59,7 +59,25 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
       const typeField = itemDefinition.schema.find((f) => f.name === "type");
       if (typeField && typeField.type === "select" && typeField.typeOptions?.select?.options && typeField.typeOptions.select.options.length > 0) {
         // Use the first option as default (which should be "weekly")
-        newItem.type = typeField.typeOptions.select.options[0].value;
+        const defaultType = typeField.typeOptions.select.options[0].value;
+        newItem.type = defaultType;
+        
+        // For weekly type, preselect Monday through Friday
+        if (defaultType === "weekly") {
+          newItem.days = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+        }
+        // For specific_dates type, set default date to December 31 (12-31)
+        else if (defaultType === "specific_dates") {
+          newItem.date = "12-31";
+        }
+      }
+      
+      // For timegate items, set "All day" to ON by default (00:00 to 23:59)
+      const startTimeField = itemDefinition.schema.find((f) => f.name === "startTime");
+      const endTimeField = itemDefinition.schema.find((f) => f.name === "endTime");
+      if (startTimeField && endTimeField) {
+        newItem.startTime = "00:00";
+        newItem.endTime = "23:59";
       }
       
       onChange([...items, newItem]);
@@ -174,6 +192,14 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                           value={itemValues[typeField.name!]}
                           onChange={(val) => {
                             const newItem = { ...itemValues, [typeField.name!]: val };
+                            // When switching to "specific_dates", set default date to Dec 31 if not already set
+                            if (val === "specific_dates" && !newItem.date) {
+                              newItem.date = "12-31";
+                            }
+                            // When switching to "weekly", set default days to Mon-Fri if not already set
+                            if (val === "weekly" && !newItem.days) {
+                              newItem.days = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+                            }
                             updateItem(index, newItem);
                           }}
                           allValues={nestedValues}
