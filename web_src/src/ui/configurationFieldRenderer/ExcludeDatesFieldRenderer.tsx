@@ -85,10 +85,7 @@ export const ExcludeDatesFieldRenderer: React.FC<ExcludeDatesFieldRendererProps>
 
     // Check if date already exists
     if (!dates.some((d) => (typeof d === "object" && d !== null ? (d as { date?: string }).date : d) === newDate)) {
-      const newDates = [
-        ...dates,
-        { date: newDate },
-      ];
+      const newDates = [...dates, { date: newDate }];
       onChange(newDates);
     }
 

@@ -45,17 +45,21 @@ func TestTimeGate_OutputChannels(t *testing.T) {
 func TestTimeGate_Configuration(t *testing.T) {
 	tg := &TimeGate{}
 	config := tg.Configuration()
-	assert.Len(t, config, 3) // mode, items, timezone
-
-	// Check mode field
-	assert.Equal(t, "mode", config[0].Name)
-	assert.Equal(t, "Mode", config[0].Label)
-	assert.True(t, config[0].Required)
+	assert.Len(t, config, 3) // items, exclude_dates, timezone
 
 	// Check items field (list)
-	assert.Equal(t, "items", config[1].Name)
-	assert.Equal(t, "Time Window", config[1].Label)
-	assert.True(t, config[1].Required)
+	assert.Equal(t, "items", config[0].Name)
+	assert.Equal(t, "Time Window", config[0].Label)
+	assert.True(t, config[0].Required)
+	assert.NotNil(t, config[0].TypeOptions)
+	assert.NotNil(t, config[0].TypeOptions.List)
+	assert.NotNil(t, config[0].TypeOptions.List.ItemDefinition)
+	assert.Equal(t, "object", config[0].TypeOptions.List.ItemDefinition.Type)
+
+	// Check exclude_dates field (list)
+	assert.Equal(t, "exclude_dates", config[1].Name)
+	assert.Equal(t, "Exclude Dates", config[1].Label)
+	assert.False(t, config[1].Required)
 	assert.NotNil(t, config[1].TypeOptions)
 	assert.NotNil(t, config[1].TypeOptions.List)
 	assert.NotNil(t, config[1].TypeOptions.List.ItemDefinition)
@@ -96,6 +100,8 @@ func TestTimeGate_HandleAction_PushThrough_Finishes(t *testing.T) {
 	ctx := core.ActionContext{
 		Name:           "pushThrough",
 		ExecutionState: stateCtx,
+		Metadata:       &contexts.MetadataContext{},
+		Auth:           &contexts.AuthContext{},
 		Parameters:     map[string]any{},
 	}
 

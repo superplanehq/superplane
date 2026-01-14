@@ -424,7 +424,10 @@ func (tg *TimeGate) HandlePushThrough(ctx core.ActionContext) error {
 	}
 
 	// Store push through information in metadata
-	user := ctx.Auth.AuthenticatedUser()
+	var user *core.User
+	if ctx.Auth != nil {
+		user = ctx.Auth.AuthenticatedUser()
+	}
 	pushThroughInfo := PushThroughInfo{
 		At: time.Now().Format(time.RFC3339),
 	}
@@ -786,7 +789,10 @@ func contains(slice []string, item string) bool {
 
 func (tg *TimeGate) Cancel(ctx core.ExecutionContext) error {
 	// Store cancellation information in metadata
-	user := ctx.Auth.AuthenticatedUser()
+	var user *core.User
+	if ctx.Auth != nil {
+		user = ctx.Auth.AuthenticatedUser()
+	}
 	if user != nil {
 		cancelInfo := CancelInfo{
 			At:     time.Now().Format(time.RFC3339),
