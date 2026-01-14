@@ -47,13 +47,13 @@ type TimeGateItem struct {
 
 type ExcludeDate struct {
 	Date      string `json:"date"`      // MM-DD format
-	StartTime string `json:"startTime"` // HH:MM format, optional (defaults to 00:00 for all day)
-	EndTime   string `json:"endTime"`   // HH:MM format, optional (defaults to 23:59 for all day)
+	StartTime string `json:"startTime"` // HH:MM format (currently not used in UI, always defaults to 00:00)
+	EndTime   string `json:"endTime"`   // HH:MM format (currently not used in UI, always defaults to 23:59)
 }
 
 type Spec struct {
 	Items        []TimeGateItem `mapstructure:"items"`         // List of time gate items (all allow mode)
-	ExcludeDates []ExcludeDate  `mapstructure:"exclude_dates"` // List of dates to exclude with optional time ranges
+	ExcludeDates []ExcludeDate  `mapstructure:"exclude_dates"` // List of dates to exclude (entire day)
 	Timezone     string         `mapstructure:"timezone"`      // Required timezone
 }
 
@@ -159,7 +159,6 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 			Description: "Override the rules above for specific dates like holidays.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
-					ItemLabel: "Excluded Date",
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
@@ -173,22 +172,6 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 										Format: "01-02", // MM-DD format for recurring dates
 									},
 								},
-							},
-							{
-								Name:        "startTime",
-								Label:       "Start Time (HH:MM)",
-								Type:        configuration.FieldTypeTime,
-								Required:    false,
-								Description: "Start time in HH:MM format (24-hour), e.g., 09:30. Leave empty for all day.",
-								Default:     "00:00",
-							},
-							{
-								Name:        "endTime",
-								Label:       "End Time (HH:MM)",
-								Type:        configuration.FieldTypeTime,
-								Required:    false,
-								Description: "End time in HH:MM format (24-hour), e.g., 17:30. Leave empty for all day.",
-								Default:     "23:59",
 							},
 						},
 					},
