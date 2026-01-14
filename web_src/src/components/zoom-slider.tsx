@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { Maximize, Minus, Plus } from "lucide-react";
+import { Maximize, Minus, MousePointer2, Plus } from "lucide-react";
 
 import { Panel, useViewport, useStore, useReactFlow, type PanelProps } from "@xyflow/react";
 
@@ -14,10 +14,14 @@ export function ZoomSlider({
   className,
   orientation = "horizontal",
   children,
+  isSelectionModeEnabled,
+  onSelectionModeToggle,
   ...props
 }: Omit<PanelProps, "children"> & {
   orientation?: "horizontal" | "vertical";
   children?: React.ReactNode;
+  isSelectionModeEnabled?: boolean;
+  onSelectionModeToggle?: () => void;
 }) {
   const { zoom } = useViewport();
   const { zoomTo, zoomIn, zoomOut, fitView } = useReactFlow();
@@ -120,6 +124,24 @@ export function ZoomSlider({
           </TooltipTrigger>
           <TooltipContent>Fit all nodes in view (Ctrl/Cmd + 1)</TooltipContent>
         </Tooltip>
+        {onSelectionModeToggle && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={isSelectionModeEnabled ? "default" : "ghost"}
+                size="icon-sm"
+                onClick={onSelectionModeToggle}
+              >
+                <MousePointer2 className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isSelectionModeEnabled
+                ? "Disable rectangle selection mode"
+                : "Enable rectangle selection mode (Ctrl/Cmd + drag)"}
+            </TooltipContent>
+          </Tooltip>
+        )}
         {children}
       </Panel>
     </TooltipProvider>
