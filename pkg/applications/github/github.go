@@ -95,6 +95,7 @@ func (g *GitHub) Components() []core.Component {
 		&RunWorkflow{},
 		&PublishCommitStatus{},
 		&CreateRelease{},
+		&UpdateRelease{},
 	}
 }
 
