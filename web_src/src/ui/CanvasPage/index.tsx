@@ -9,7 +9,7 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { CircleX, Loader2, MousePointer2, ScanLine, ScanText, ScrollText, TriangleAlert } from "lucide-react";
+import { CircleX, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
@@ -1900,10 +1900,14 @@ function CanvasContent({
             zoomOnPinch={true}
             zoomOnDoubleClick={false}
             panOnScroll={true}
-            panOnDrag={true}
+            panOnDrag={!isSelectionModeEnabled || isTemporarilyEnabled}
             selectionOnDrag={true}
-            selectionKeyCode={isSelectionModeEnabled && !isTemporarilyEnabled ? undefined : selectionKey}
-            multiSelectionKeyCode={isSelectionModeEnabled && !isTemporarilyEnabled ? undefined : selectionKey}
+            {...(isSelectionModeEnabled && !isTemporarilyEnabled
+              ? {}
+              : {
+                  selectionKeyCode: selectionKey,
+                  multiSelectionKeyCode: selectionKey,
+                })}
             panOnScrollSpeed={0.8}
             nodesDraggable={true}
             nodesConnectable={!!onEdgeCreate}
@@ -1969,7 +1973,7 @@ function CanvasContent({
             <Panel
               position="bottom-left"
               className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex gap-0.5 rounded-sm p-0.5"
-              style={{ marginLeft: 256 }}
+              style={{ marginLeft: 304 }}
             >
               <Tooltip>
                 <TooltipTrigger asChild>
