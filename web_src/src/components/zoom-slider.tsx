@@ -138,7 +138,7 @@ export function ZoomSlider({
             <TooltipContent>
               {isSelectionModeEnabled
                 ? "Disable rectangle selection mode"
-                : "Enable rectangle selection mode (Ctrl/Cmd + drag)"}
+                : "Select and move multiple components at once (Ctrl/Cmd + drag)"}
             </TooltipContent>
           </Tooltip>
         )}
