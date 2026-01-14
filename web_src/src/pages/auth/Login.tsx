@@ -325,7 +325,6 @@ export const Login: React.FC = () => {
           </svg>
         </div>
 
-        {showProviderButtons && (
           <div
             style={{
               color: "#94a9ca",
@@ -333,10 +332,7 @@ export const Login: React.FC = () => {
               paddingTop: "1rem",
               borderTop: "1px solid #3d4859",
             }}
-          >
-            {isSignupMode ? "Sign up with" : "Continue with"}
-          </div>
-        )}
+          ></div>
 
         {configLoading && (
           <div style={{ color: "#94a9ca", fontSize: "14px", paddingBottom: "1rem" }}>Loading...</div>
@@ -408,7 +404,21 @@ export const Login: React.FC = () => {
         {!configLoading &&
           showProviderButtons &&
           (isSignupMode ? canSignupWithPassword : canLoginWithPassword) && (
-          <div style={{ color: "#94a9ca", fontSize: "13px", margin: "8px 0 16px" }}>---- or -----</div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              color: "#94a9ca",
+              fontSize: "13px",
+              width: "90%",
+              margin: "8px auto 16px",
+            }}
+          >
+            <div style={{ flex: 1, height: "1px", backgroundColor: "#3d4859" }} />
+            <span>or</span>
+            <div style={{ flex: 1, height: "1px", backgroundColor: "#3d4859" }} />
+          </div>
         )}
 
         {!configLoading && isSignupMode && !canSignup && (

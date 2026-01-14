@@ -23,7 +23,7 @@ import {
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { isRBACEnabled } from "@/lib/env";
-import { Switch } from "@/components/Switch/switch";
+import { Switch } from "@/ui/switch";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 
@@ -239,7 +239,7 @@ export function Members({ organizationId }: MembersProps) {
                 Invite link to add members
               </Text>
               <Text className="text-sm text-gray-500 dark:text-gray-400">
-                Only people with permission to invite members can see this. You can also{" "}
+                Only people with owner and admin roles can see this. You can also{" "}
                 <button
                   type="button"
                   className="text-blue-600 hover:underline disabled:text-gray-400"
@@ -254,7 +254,7 @@ export function Members({ organizationId }: MembersProps) {
             <div className="flex items-center gap-3">
               <Switch
                 checked={inviteLinkEnabled}
-                onChange={handleInviteLinkToggle}
+                onCheckedChange={handleInviteLinkToggle}
                 disabled={loadingInviteLink || inviteLinkBusy}
                 aria-label="Toggle invite link"
               />
