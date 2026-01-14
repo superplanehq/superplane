@@ -928,6 +928,78 @@ export function WorkflowPageV2() {
     [workflow, nodeExecutionsMap, nodeEventsMap, nodeQueueItemsMap],
   );
 
+  const getAutocompleteExampleObj = useCallback(
+    (nodeId: string): Record<string, unknown> | null => {
+      const workflowNodes = workflow?.spec?.nodes || [];
+      const workflowEdges = workflow?.spec?.edges || [];
+
+      const latestExecution = nodeExecutionsMap[nodeId]?.[0];
+      if (latestExecution?.input && Object.keys(latestExecution.input).length > 0) {
+        return latestExecution.input as Record<string, unknown>;
+      }
+
+      const currentNode = workflowNodes.find((node) => node.id === nodeId);
+      if (currentNode?.type === "TYPE_TRIGGER") {
+        const latestEvent = nodeEventsMap[nodeId]?.[0];
+        if (latestEvent?.data && Object.keys(latestEvent.data).length > 0) {
+          return latestEvent.data as Record<string, unknown>;
+        }
+        return null;
+      }
+
+      const incomingEdges = workflowEdges.filter((edge) => edge.targetId === nodeId && edge.sourceId);
+      if (incomingEdges.length === 0) {
+        return null;
+      }
+
+      const candidates: Array<{ payload: Record<string, unknown>; timestamp?: string }> = [];
+      for (const edge of incomingEdges) {
+        const sourceId = edge.sourceId;
+        if (!sourceId) continue;
+
+        const sourceNode = workflowNodes.find((node) => node.id === sourceId);
+        if (!sourceNode) continue;
+
+        if (sourceNode.type === "TYPE_TRIGGER") {
+          const sourceEvent = nodeEventsMap[sourceId]?.[0];
+          if (sourceEvent?.data && Object.keys(sourceEvent.data).length > 0) {
+            candidates.push({ payload: sourceEvent.data as Record<string, unknown>, timestamp: sourceEvent.createdAt });
+          }
+          continue;
+        }
+
+        const sourceExecution = nodeExecutionsMap[sourceId]?.[0];
+        if (!sourceExecution?.outputs) continue;
+
+        const outputData: unknown[] = Object.values(sourceExecution.outputs)?.find((output) => {
+          return Array.isArray(output) && output?.length > 0;
+        }) as unknown[];
+
+        if (outputData?.length > 0) {
+          candidates.push({
+            payload: outputData[0] as Record<string, unknown>,
+            timestamp: sourceExecution.updatedAt || sourceExecution.createdAt,
+          });
+        }
+      }
+
+      if (candidates.length === 0) {
+        return null;
+      }
+
+      const latestCandidate = candidates.reduce((latest, current) => {
+        if (!latest) return current;
+        if (!current.timestamp) return latest;
+        if (!latest.timestamp) return current;
+        return new Date(current.timestamp).getTime() > new Date(latest.timestamp).getTime() ? current : latest;
+      }, candidates[0]);
+
+      console.log("Autocomplete example object for node", nodeId, latestCandidate.payload);
+      return latestCandidate.payload;
+    },
+    [workflow, nodeExecutionsMap, nodeEventsMap],
+  );
+
   const handleSaveWorkflow = useCallback(
     async (workflowToSave?: WorkflowsWorkflow, options?: { showToast?: boolean }) => {
       const targetWorkflow = workflowToSave || workflow;
@@ -2084,6 +2156,7 @@ export function WorkflowPageV2() {
       loadSidebarData={loadSidebarData}
       getTabData={getTabData}
       getNodeEditData={getNodeEditData}
+      getAutocompleteExampleObj={getAutocompleteExampleObj}
       getCustomField={getCustomField}
       onNodeConfigurationSave={handleNodeConfigurationSave}
       onAnnotationUpdate={handleAnnotationUpdate}

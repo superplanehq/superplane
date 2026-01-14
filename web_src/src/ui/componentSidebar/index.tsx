@@ -118,6 +118,7 @@ interface ComponentSidebarProps {
   appName?: string;
   appInstallationRef?: ComponentsAppInstallationRef;
   installedApplications?: OrganizationsAppInstallation[];
+  autocompleteExampleObj?: Record<string, unknown> | null;
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
@@ -195,6 +196,7 @@ export const ComponentSidebar = ({
   appName,
   appInstallationRef,
   installedApplications,
+  autocompleteExampleObj,
   workflowNodes = [],
   components = [],
   triggers = [],
@@ -224,7 +226,11 @@ export const ComponentSidebar = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
   const [justCopied, setJustCopied] = useState(false);
-  const autocompleteExampleObj = React.useMemo(() => {
+  const resolvedAutocompleteExampleObj = React.useMemo(() => {
+    if (autocompleteExampleObj) {
+      return autocompleteExampleObj;
+    }
+
     for (const event of latestEvents) {
       if (event.kind === "execution" && event.originalExecution?.input) {
         return event.originalExecution.input as Record<string, unknown>;
@@ -240,7 +246,7 @@ export const ComponentSidebar = ({
       }
     }
     return null;
-  }, [latestEvents]);
+  }, [autocompleteExampleObj, latestEvents]);
 
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {
@@ -646,7 +652,7 @@ export const ComponentSidebar = ({
                   appName={appName}
                   appInstallationRef={appInstallationRef}
                   installedApplications={installedApplications}
-                  autocompleteExampleObj={{ $: autocompleteExampleObj }}
+                  autocompleteExampleObj={resolvedAutocompleteExampleObj ? { $: resolvedAutocompleteExampleObj } : null}
                 />
               </TabsContent>
             )}

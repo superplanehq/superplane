@@ -310,6 +310,7 @@ export const ConfigurationFieldRenderer = ({
         }
         return (
           <GroupFieldRenderer
+            {...commonProps}
             field={field}
             value={value as string}
             onChange={onChange}
