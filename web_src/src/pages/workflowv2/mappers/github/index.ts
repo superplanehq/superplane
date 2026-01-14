@@ -10,6 +10,7 @@ import { onPullRequestReviewCommentTriggerRenderer } from "./on_pr_review_commen
 import { baseIssueMapper } from "./base";
 import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper } from "./run_workflow";
 import { publishCommitStatusMapper } from "./publish_commit_status";
+import { createReleaseMapper } from "./create_release";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   runWorkflow: RUN_WORKFLOW_STATE_REGISTRY,
@@ -21,6 +22,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   updateIssue: baseIssueMapper,
   runWorkflow: runWorkflowMapper,
   publishCommitStatus: publishCommitStatusMapper,
+  createRelease: createReleaseMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
