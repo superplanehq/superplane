@@ -484,7 +484,7 @@ function CanvasPage(props: CanvasPageProps) {
         await props.onPlaceholderConfigure({
           placeholderId: templateNodeId,
           buildingBlock: block,
-          nodeName: block.name || "",
+          nodeName: block.name === "time_gate" ? "Time Gate" : block.name || "",
           configuration: defaultConfiguration,
           appName: block.appName,
         });
@@ -504,7 +504,7 @@ function CanvasPage(props: CanvasPageProps) {
         if (props.onNodeAdd) {
           const newNodeId = await props.onNodeAdd({
             buildingBlock: block,
-            nodeName: block.name || "",
+            nodeName: block.name === "time_gate" ? "Time Gate" : block.name || "",
             configuration: defaultConfiguration,
             position: pendingNode.position,
             sourceConnection: pendingNode.data.sourceConnection as
@@ -644,7 +644,7 @@ function CanvasPage(props: CanvasPageProps) {
       if (props.onNodeAdd) {
         const newNodeId = await props.onNodeAdd({
           buildingBlock: block,
-          nodeName: block.name || "",
+          nodeName: block.name === "time_gate" ? "Time Gate" : block.name || "",
           configuration: defaultConfiguration,
           position,
           appName: block.appName,

@@ -18,13 +18,5 @@ export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({
     }
   }, [value, field.defaultValue, onChange]);
 
-  return (
-    <TimePickerField
-      field={field}
-      value={value}
-      onChange={onChange}
-      hasError={hasError}
-      allValues={allValues}
-    />
-  );
+  return <TimePickerField field={field} value={value} onChange={onChange} hasError={hasError} allValues={allValues} />;
 };

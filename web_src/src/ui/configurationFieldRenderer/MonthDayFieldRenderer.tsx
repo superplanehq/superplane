@@ -71,7 +71,7 @@ export const MonthDayFieldRenderer: React.FC<FieldRendererProps> = ({ field, val
 
   const handleMonthChange = (monthValue: string) => {
     const monthNum = parseInt(monthValue, 10);
-    
+
     // If there was a previously selected day, adjust it if needed
     if (currentDay) {
       const maxDays = daysInMonth[monthNum - 1];

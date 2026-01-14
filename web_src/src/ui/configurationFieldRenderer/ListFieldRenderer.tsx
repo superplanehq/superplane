@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Plus, X } from "lucide-react";
 import { Button } from "../button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
 import { showErrorToast } from "@/utils/toast";
@@ -56,13 +57,13 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     if (itemDefinition?.type === "object" && itemDefinition.schema) {
       // Initialize with default values from field definitions
       const newItem: Record<string, unknown> = {};
-      
+
       // For exclude_dates, set default date and "All day" ON
       if (field.name === "exclude_dates") {
         const dateField = itemDefinition.schema.find((f) => f.name === "date");
         const startTimeField = itemDefinition.schema.find((f) => f.name === "startTime");
         const endTimeField = itemDefinition.schema.find((f) => f.name === "endTime");
-        
+
         if (dateField) {
           newItem.date = "12-31";
         }
@@ -76,19 +77,19 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
         const daysField = itemDefinition.schema.find((f) => f.name === "days");
         const startTimeField = itemDefinition.schema.find((f) => f.name === "startTime");
         const endTimeField = itemDefinition.schema.find((f) => f.name === "endTime");
-        
+
         if (daysField) {
           // Set default days to weekdays (monday-friday)
           newItem.days = ["monday", "tuesday", "wednesday", "thursday", "friday"];
         }
-        
+
         if (startTimeField && endTimeField) {
           // Set "All day" to ON by default (00:00 to 23:59)
           newItem.startTime = "00:00";
           newItem.endTime = "23:59";
         }
       }
-      
+
       onChange([...items, newItem]);
     } else {
       const newItem = itemDefinition?.type === "number" ? 0 : "";
@@ -102,6 +103,12 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   };
 
   const updateItem = (index: number, newValue: unknown) => {
+    // For time windows, always ensure only one item exists
+    if (isTimeWindows) {
+      onChange([newValue]);
+      return;
+    }
+
     const newItems = [...items];
     newItems[index] = newValue;
     if (isApprovalItemsList) {
@@ -124,25 +131,63 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   // Check if this is the items field (Time Windows) to add label
   const isTimeWindows = field.name === "items";
 
+  // For time windows, ensure only one item exists
+  useEffect(() => {
+    if (isTimeWindows) {
+      if (items.length === 0) {
+        // Initialize with one default item if empty
+        if (itemDefinition?.type === "object" && itemDefinition.schema) {
+          const newItem: Record<string, unknown> = {};
+          const daysField = itemDefinition.schema.find((f) => f.name === "days");
+          const startTimeField = itemDefinition.schema.find((f) => f.name === "startTime");
+          const endTimeField = itemDefinition.schema.find((f) => f.name === "endTime");
+
+          if (daysField) {
+            newItem.days = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+          }
+
+          if (startTimeField && endTimeField) {
+            newItem.startTime = "00:00";
+            newItem.endTime = "23:59";
+          }
+
+          onChange([newItem]);
+        }
+      } else if (items.length > 1) {
+        // If multiple items exist, keep only the first one
+        onChange([items[0]]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTimeWindows, items.length]);
+
+  // For time windows, use only the first item
+  const displayItems = isTimeWindows ? (items.length > 0 ? [items[0]] : []) : items;
+
   return (
     <div className="space-y-3">
       {isTimeWindows && (
-        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          When to run
-        </div>
+        <Label className="block text-left">
+          Active Days
+          <span className="text-gray-800 dark:text-gray-300 ml-1">*</span>
+        </Label>
       )}
-      {items.map((item, index) => {
+      {displayItems.map((item, index) => {
         return (
-        <div key={`item-${index}`} className="relative">
-          {itemDefinition?.type === "object" && itemDefinition.schema ? (
-            <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
+          <div key={`item-${index}`} className={isTimeWindows ? "" : "relative"}>
+            {itemDefinition?.type === "object" && itemDefinition.schema ? (
+              <div
+                className={
+                  isTimeWindows ? "space-y-4" : "border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4"
+                }
+              >
                 {(() => {
                   const startTimeField = itemDefinition.schema.find((f) => f.name === "startTime");
                   const endTimeField = itemDefinition.schema.find((f) => f.name === "endTime");
                   const daysField = itemDefinition.schema.find((f) => f.name === "days");
                   const dateField = itemDefinition.schema.find((f) => f.name === "date");
                   const isExcludeDate = field.name === "exclude_dates";
-                  
+
                   const itemValues =
                     item && typeof item === "object"
                       ? (item as Record<string, unknown>)
@@ -192,34 +237,35 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                         />
                       )}
                       {/* Render days field for time windows */}
-                      {daysField && (() => {
-                        const daysValue = itemValues[daysField.name!] as string[] | undefined;
-                        const daysArray = Array.isArray(daysValue) ? daysValue : [];
-                        const hasDaysError = getNestedError(daysField.name!) || daysArray.length === 0;
-                        
-                        return (
-                          <div>
-                            <ConfigurationFieldRenderer
-                              key={`days-${index}`}
-                              field={daysField}
-                              value={itemValues[daysField.name!]}
-                              onChange={(val) => {
-                                const newItem = { ...itemValues, [daysField.name!]: val };
-                                updateItem(index, newItem);
-                              }}
-                              allValues={nestedValues}
-                              domainId={domainId}
-                              domainType={domainType}
-                              hasError={hasDaysError}
-                            />
-                            {daysArray.length === 0 && (
-                              <p className="text-xs text-red-500 dark:text-red-400 text-left mt-1">
-                                At least one day must be selected
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })()}
+                      {daysField &&
+                        (() => {
+                          const daysValue = itemValues[daysField.name!] as string[] | undefined;
+                          const daysArray = Array.isArray(daysValue) ? daysValue : [];
+                          const hasDaysError = getNestedError(daysField.name!) || daysArray.length === 0;
+
+                          return (
+                            <div>
+                              <ConfigurationFieldRenderer
+                                key={`days-${index}`}
+                                field={daysField}
+                                value={itemValues[daysField.name!]}
+                                onChange={(val) => {
+                                  const newItem = { ...itemValues, [daysField.name!]: val };
+                                  updateItem(index, newItem);
+                                }}
+                                allValues={nestedValues}
+                                domainId={domainId}
+                                domainType={domainType}
+                                hasError={hasDaysError}
+                              />
+                              {daysArray.length === 0 && (
+                                <p className="text-xs text-red-500 dark:text-red-400 text-left mt-1">
+                                  At least one day must be selected
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
                       {/* Render time range with "All day" toggle if both time fields exist */}
                       {startTimeField && endTimeField && (
                         <div>
@@ -258,39 +304,42 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                         </div>
                       )}
                       {itemDefinition.schema
-                        .filter((f) => f.name !== "startTime" && f.name !== "endTime" && f.name !== "days" && f.name !== "date")
+                        .filter(
+                          (f) =>
+                            f.name !== "startTime" && f.name !== "endTime" && f.name !== "days" && f.name !== "date",
+                        )
                         .map((schemaField) => {
-                            const itemValues =
-                              item && typeof item === "object"
-                                ? (item as Record<string, unknown>)
-                                : ({} as Record<string, unknown>);
-                            const nestedValues = isApprovalItemsList
-                              ? {
-                                  ...itemValues,
-                                  __listItems: items,
-                                  __itemIndex: index,
-                                  __isApprovalList: true,
-                                }
-                              : itemValues;
+                          const itemValues =
+                            item && typeof item === "object"
+                              ? (item as Record<string, unknown>)
+                              : ({} as Record<string, unknown>);
+                          const nestedValues = isApprovalItemsList
+                            ? {
+                                ...itemValues,
+                                __listItems: items,
+                                __itemIndex: index,
+                                __isApprovalList: true,
+                              }
+                            : itemValues;
 
-                            return (
-                              <ConfigurationFieldRenderer
-                                key={schemaField.name}
-                                field={schemaField}
-                                value={itemValues[schemaField.name!]}
-                                onChange={(val) => {
-                                  const newItem = { ...itemValues, [schemaField.name!]: val };
-                                  updateItem(index, newItem);
-                                }}
-                                allValues={nestedValues}
-                                domainId={domainId}
-                                domainType={domainType}
-                                hasError={getNestedError(schemaField.name!)}
-                              />
-                            );
-                          })}
-                      </>
-                    );
+                          return (
+                            <ConfigurationFieldRenderer
+                              key={schemaField.name}
+                              field={schemaField}
+                              value={itemValues[schemaField.name!]}
+                              onChange={(val) => {
+                                const newItem = { ...itemValues, [schemaField.name!]: val };
+                                updateItem(index, newItem);
+                              }}
+                              allValues={nestedValues}
+                              domainId={domainId}
+                              domainType={domainType}
+                              hasError={getNestedError(schemaField.name!)}
+                            />
+                          );
+                        })}
+                    </>
+                  );
                 })()}
               </div>
             ) : (
@@ -310,30 +359,34 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                 />
               </div>
             )}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeItem(index)}
-                    className="absolute top-2 right-2 h-6 w-6 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Remove item</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-        </div>
+            {!isTimeWindows && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeItem(index)}
+                      className="absolute top-2 right-2 h-6 w-6 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Remove item</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         );
       })}
-      <Button variant="outline" onClick={addItem} className="w-full mt-3">
-        <Plus className="h-4 w-4 mr-2" />
-        Add {itemLabel}
-      </Button>
+      {!isTimeWindows && (
+        <Button variant="outline" onClick={addItem} className="w-full mt-3">
+          <Plus className="h-4 w-4 mr-2" />
+          Add {itemLabel}
+        </Button>
+      )}
     </div>
   );
 };

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Approval required - SuperPlane</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #ffffff;
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1f2937;
+            }
+        }
+        .card {
+            background: transparent;
+            max-width: 520px;
+            width: 92%;
+            padding: 28px 32px 32px;
+            color: #1f2937;
+        }
+        @media (prefers-color-scheme: dark) {
+            .card {
+                color: #f3f4f6;
+            }
+        }
+        .logo-container {
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 16px;
+        }
+        @media (prefers-color-scheme: dark) {
+            .logo-container {
+                border-bottom-color: #374151;
+            }
+        }
+        .logo {
+            height: 22px;
+            width: auto;
+        }
+        .logo path {
+            fill: #1f2937;
+        }
+        @media (prefers-color-scheme: dark) {
+            .logo path {
+                fill: #f3f4f6;
+            }
+        }
+        .title {
+            font-size: 1.25rem;
+            margin: 0 0 12px;
+            color: #1f2937;
+        }
+        @media (prefers-color-scheme: dark) {
+            .title {
+                color: #f3f4f6;
+            }
+        }
+        .body {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: #1f2937;
+            margin: 0 0 24px;
+            white-space: pre-line;
+        }
+        @media (prefers-color-scheme: dark) {
+            .body {
+                color: #f3f4f6;
+            }
+        }
+        .body a {
+            color: #3b82f6;
+            text-decoration: underline;
+        }
+        @media (prefers-color-scheme: dark) {
+            .body a {
+                color: #93c5fd;
+            }
+        }
+        .action-btn {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 5px;
+            background: #1f2937;
+            color: #f3f4f6;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        @media (prefers-color-scheme: dark) {
+            .action-btn {
+                background: #f3f4f6;
+                color: #1f2937;
+            }
+        }
+        .action-btn:hover {
+            opacity: 0.9;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+        /* Dark mode toggle styles */
+        .dark-mode-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 5px;
+            background: #1f2937;
+            color: #f3f4f6;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.875rem;
+            z-index: 1000;
+        }
+        .dark-mode-toggle:hover {
+            opacity: 0.9;
+        }
+        /* Force dark mode when .dark class is on body */
+        body.dark {
+            background-color: #1f2937;
+        }
+        body.dark .card {
+            color: #f3f4f6;
+        }
+        body.dark .logo-container {
+            border-bottom-color: #374151;
+        }
+        body.dark .logo path {
+            fill: #f3f4f6;
+        }
+        body.dark .title {
+            color: #f3f4f6;
+        }
+        body.dark .body {
+            color: #f3f4f6;
+        }
+        body.dark .body a {
+            color: #93c5fd;
+        }
+        body.dark .action-btn {
+            background: #f3f4f6;
+            color: #1f2937;
+        }
+    </style>
+    <script>
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark');
+            const isDark = document.body.classList.contains('dark');
+            localStorage.setItem('darkMode', isDark);
+        }
+        // Load saved preference
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark');
+        }
+    </script>
+</head>
+<body>
+    <button class="dark-mode-toggle" onclick="toggleDarkMode()">Toggle Dark Mode</button>
+    <div class="card">
+        <div class="logo-container">
+            <svg class="logo" width="29" height="21" viewBox="0 0 29 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M29 14.32C28.5655 14.7542 28.1107 15.1686 27.6379 15.5626L17.112 5.16914L22.7409 18.5877C22.1782 18.8335 21.6021 19.0552 21.0139 19.2508L15.4286 5.93611V20.2791C15.1216 20.2926 14.8129 20.3 14.5025 20.3L14.2391 20.2982C14.0172 20.2955 13.7961 20.2888 13.5759 20.2791V5.88893L7.97322 19.2446C7.38516 19.0484 6.80914 18.8264 6.24652 18.58L11.8656 5.18536L1.36087 15.5578C0.888333 15.1638 0.434276 14.7489 0 14.3147L14.4975 0L29 14.32Z" fill="#1E2938"/>
+            </svg>
+        </div>
+        <h1 class="title">Approval required</h1>
+        <p class="body">A canvas run item is waiting for your approval. Please access the URL below to handle it.
+
+            <a href="https://app.superplane.com/org-123/workflows/workflow-456?sidebar=1&node=node-789">https://app.superplane.com/org-123/workflows/workflow-456?sidebar=1&node=node-789</a>
+        </p>
+        <a class="action-btn" href="https://app.superplane.com/org-123/workflows/workflow-456?sidebar=1&node=node-789">Open approval</a>
+        <div class="footer">This notification was sent by SuperPlane.</div>
+    </div>
+</body>
+</html>

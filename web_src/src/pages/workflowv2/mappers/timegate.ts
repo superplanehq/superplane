@@ -57,18 +57,28 @@ const dayAbbreviations: Record<string, string> = {
 };
 
 const monthNames: Record<number, string> = {
-  1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
-  7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec",
+  1: "Jan",
+  2: "Feb",
+  3: "Mar",
+  4: "Apr",
+  5: "May",
+  6: "Jun",
+  7: "Jul",
+  8: "Aug",
+  9: "Sep",
+  10: "Oct",
+  11: "Nov",
+  12: "Dec",
 };
 
 function formatDays(days: string[]): string {
   if (!days || days.length === 0) return "";
-  
+
   const sortedDays = [...days].sort(
-    (a, b) => daysOfWeekOrder[a as keyof typeof daysOfWeekOrder] - daysOfWeekOrder[b as keyof typeof daysOfWeekOrder]
+    (a, b) => daysOfWeekOrder[a as keyof typeof daysOfWeekOrder] - daysOfWeekOrder[b as keyof typeof daysOfWeekOrder],
   );
-  
-  return sortedDays.map(d => dayAbbreviations[d] || d).join(", ");
+
+  return sortedDays.map((d) => dayAbbreviations[d] || d).join(", ");
 }
 
 function formatTime(startTime: string, endTime: string): string {
@@ -102,10 +112,10 @@ function getTimeGateSpecs(node: ComponentsNode): ComponentBaseSpec[] {
     const days = (item.days as string[]) || [];
     const startTime = (item.startTime as string) || "00:00";
     const endTime = (item.endTime as string) || "23:59";
-    
+
     const daysStr = formatDays(days);
     const timeStr = formatTime(startTime, endTime);
-    
+
     ruleValues.push({
       badges: [
         {
@@ -132,10 +142,10 @@ function getTimeGateSpecs(node: ComponentsNode): ComponentBaseSpec[] {
     const date = (excludeDate.date as string) || "";
     const startTime = (excludeDate.startTime as string) || "00:00";
     const endTime = (excludeDate.endTime as string) || "23:59";
-    
+
     const dateStr = formatDate(date);
     const timeStr = formatTime(startTime, endTime);
-    
+
     ruleValues.push({
       badges: [
         {

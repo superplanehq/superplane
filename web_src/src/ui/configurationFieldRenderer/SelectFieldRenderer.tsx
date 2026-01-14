@@ -6,12 +6,12 @@ import { toTestId } from "@/utils/testID";
 // Helper function to determine if a when_to_run option is Block or Allow
 const getWhenToRunType = (value: string | undefined): "block" | "allow" | null => {
   if (!value) return null;
-  
+
   // Block logic options
   if (value === "custom_exclude" || value === "template_no_weekends") {
     return "block";
   }
-  
+
   // Allow logic options
   if (
     value === "custom_include" ||
@@ -21,7 +21,7 @@ const getWhenToRunType = (value: string | undefined): "block" | "allow" | null =
   ) {
     return "allow";
   }
-  
+
   return null;
 };
 

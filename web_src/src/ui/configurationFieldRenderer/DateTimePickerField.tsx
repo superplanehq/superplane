@@ -23,9 +23,7 @@ export const DateTimePickerField: React.FC<FieldRendererProps> = ({
   }, [value]);
 
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(dateTimeValue);
-  const [selectedTime, setSelectedTime] = React.useState<string>(
-    dateTimeValue ? format(dateTimeValue, "HH:mm") : ""
-  );
+  const [selectedTime, setSelectedTime] = React.useState<string>(dateTimeValue ? format(dateTimeValue, "HH:mm") : "");
 
   // Sync state when value prop changes
   React.useEffect(() => {
@@ -97,16 +95,12 @@ export const DateTimePickerField: React.FC<FieldRendererProps> = ({
           className={cn(
             "w-full justify-start text-left font-normal",
             !dateTimeValue && "text-muted-foreground",
-            hasError && "border-red-500 border-2"
+            hasError && "border-red-500 border-2",
           )}
           data-testid={toTestId(`datetime-field-${field.name}`)}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
-          {dateTimeValue ? (
-            <span>{format(dateTimeValue, "PPP p")}</span>
-          ) : (
-            <span>Pick a date and time</span>
-          )}
+          {dateTimeValue ? <span>{format(dateTimeValue, "PPP p")}</span> : <span>Pick a date and time</span>}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-4" align="start">

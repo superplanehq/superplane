@@ -22,9 +22,7 @@ export const ExcludeDatesFieldRenderer: React.FC<ExcludeDatesFieldRendererProps>
   fieldPath,
   hasError = false,
 }) => {
-  const [isEnabled, setIsEnabled] = useState(
-    Array.isArray(value) && value.length > 0
-  );
+  const [isEnabled, setIsEnabled] = useState(Array.isArray(value) && value.length > 0);
 
   const handleToggleChange = (checked: boolean) => {
     setIsEnabled(checked);
@@ -47,7 +45,7 @@ export const ExcludeDatesFieldRenderer: React.FC<ExcludeDatesFieldRendererProps>
         />
         <Label className={`block text-left ${hasError ? "text-red-600 dark:text-red-400" : ""}`}>
           {field.label || field.name}
-          {field.required && <span className="text-red-500 ml-1">*</span>}
+          {field.required && <span className="text-gray-800 dark:text-gray-300 ml-1">*</span>}
         </Label>
       </div>
       {isEnabled && (

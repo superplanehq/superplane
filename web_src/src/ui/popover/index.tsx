@@ -17,12 +17,12 @@ const PopoverContent = React.forwardRef<
 >(({ className, align = "center", sideOffset = 4, ...props }, ref) => {
   // #region agent log
   React.useEffect(() => {
-    if (ref && 'current' in ref && ref.current) {
+    if (ref && "current" in ref && ref.current) {
       const el = ref.current;
       const computed = window.getComputedStyle(el);
       const logData = {
-        location: 'popover/index.tsx:19',
-        message: 'PopoverContent rendered with data-slot check',
+        location: "popover/index.tsx:19",
+        message: "PopoverContent rendered with data-slot check",
         data: {
           className: el.className,
           bgColor: computed.backgroundColor,
@@ -30,19 +30,23 @@ const PopoverContent = React.forwardRef<
           borderRadius: computed.borderRadius,
           padding: computed.padding,
           width: computed.width,
-          hasDataSlot: el.getAttribute('data-slot'),
-          children: Array.from(el.children).map(c => ({
+          hasDataSlot: el.getAttribute("data-slot"),
+          children: Array.from(el.children).map((c) => ({
             tag: c.tagName,
             className: c.className,
-            dataSlot: c.getAttribute('data-slot')
-          }))
+            dataSlot: c.getAttribute("data-slot"),
+          })),
         },
         timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'post-fix',
-        hypothesisId: 'E'
+        sessionId: "debug-session",
+        runId: "post-fix",
+        hypothesisId: "E",
       };
-      fetch('http://127.0.0.1:7242/ingest/f719ffac-e1c8-4cef-8f17-d4bc91ac736c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+      fetch("http://127.0.0.1:7242/ingest/f719ffac-e1c8-4cef-8f17-d4bc91ac736c", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(logData),
+      }).catch(() => {});
     }
   }, [ref]);
   // #endregion

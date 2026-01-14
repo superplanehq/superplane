@@ -7,12 +7,12 @@ const getUserTimezoneOffset = (): string => {
   const offsetMinutes = new Date().getTimezoneOffset();
   // getTimezoneOffset returns minutes behind UTC, so we negate to get offset ahead
   const offsetHours = -offsetMinutes / 60;
-  
+
   // Handle half-hour offsets (e.g., 5.5 for India)
   if (offsetHours % 1 === 0.5 || offsetHours % 1 === -0.5) {
     return offsetHours.toString();
   }
-  
+
   // Round to nearest whole number for edge cases
   return Math.round(offsetHours).toString();
 };

@@ -4,7 +4,7 @@ import {
   ConfigurationField,
   OrganizationsAppInstallation,
 } from "@/api-client";
-import { useCallback, useEffect, useMemo, useState, ReactNode } from "react";
+import React, { useCallback, useEffect, useMemo, useState, ReactNode } from "react";
 
 // Helper function to get template data (mode and items) for timegate templates
 function getTemplateData(templateMode: string): { mode: string; items: Array<Record<string, unknown>> } | null {
@@ -70,6 +70,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
@@ -124,7 +125,6 @@ export function SettingsTab({
     });
     return filtered;
   }, [configurationFields, defaultValues]);
-
 
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(() => {
     const initialDefaults = parseDefaultValues(configurationFields);
@@ -291,8 +291,8 @@ export function SettingsTab({
         {/* Node identification section */}
         <div className="flex flex-col gap-2 h-[60px]">
           <Label className={`min-w-[100px] text-left ${hasNodeNameError ? "text-red-600 dark:text-red-400" : ""}`}>
-            Node Name
-            <span className="text-red-500 ml-1">*</span>
+            Name
+            <span className="text-gray-800 dark:text-gray-300 ml-1">*</span>
             {hasNodeNameError && <span className="text-red-500 text-xs ml-2">- required field</span>}
           </Label>
           <Input
@@ -336,7 +336,7 @@ export function SettingsTab({
                   }`}
                 >
                   App Installation
-                  <span className="text-red-500 ml-1">*</span>
+                  <span className="text-gray-800 dark:text-gray-300 ml-1">*</span>
                   {showValidation && validationErrors.has("appInstallation") && (
                     <span className="text-red-500 text-xs ml-2">- required field</span>
                   )}
@@ -376,38 +376,57 @@ export function SettingsTab({
         {/* Configuration section */}
         {configurationFields && configurationFields.length > 0 && (!appName || availableInstallations.length > 0) && (
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
-            {configurationFields.map((field) => {
+            {useMemo(() => {
+              // Reorder fields: items first, then timezone right after, then everything else
+              return [...configurationFields].sort((a, b) => {
+                if (a.name === "items") return -1;
+                if (b.name === "items") return 1;
+                if (a.name === "timezone" && b.name !== "items") return -1;
+                if (b.name === "timezone" && a.name !== "items") return 1;
+                return 0;
+              });
+            }, [configurationFields]).map((field, index, array) => {
               if (!field.name) return null;
               const fieldName = field.name;
+              const isExcludeDates = fieldName === "exclude_dates";
+              const previousField = index > 0 ? array[index - 1] : null;
+              const shouldShowDivider = isExcludeDates && previousField && previousField.name !== "exclude_dates";
+
               return (
-                <ConfigurationFieldRenderer
-                  key={fieldName}
-                  field={field}
-                  value={nodeConfiguration[fieldName]}
-                  onChange={(value) => {
-                    const newConfig = {
-                      ...nodeConfiguration,
-                      [fieldName]: value,
-                    };
-                    
-                    setNodeConfiguration(filterVisibleFields(newConfig));
-                  }}
-                  allValues={nodeConfiguration}
-                  domainId={domainId}
-                  domainType={domainType}
-                  hasError={
-                    showValidation &&
-                    (validationErrors.has(fieldName) ||
-                      // Check for nested errors in this field
-                      Array.from(validationErrors).some(
-                        (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
-                      ))
-                  }
-                  validationErrors={showValidation ? validationErrors : undefined}
-                  fieldPath={fieldName}
-                  realtimeValidationErrors={realtimeValidationErrors}
-                  enableRealtimeValidation={true}
-                />
+                <React.Fragment key={fieldName}>
+                  {shouldShowDivider && (
+                    <div className="pt-4">
+                      <Separator className="bg-gray-200 dark:bg-gray-700" />
+                    </div>
+                  )}
+                  <ConfigurationFieldRenderer
+                    field={field}
+                    value={nodeConfiguration[fieldName]}
+                    onChange={(value) => {
+                      const newConfig = {
+                        ...nodeConfiguration,
+                        [fieldName]: value,
+                      };
+
+                      setNodeConfiguration(filterVisibleFields(newConfig));
+                    }}
+                    allValues={nodeConfiguration}
+                    domainId={domainId}
+                    domainType={domainType}
+                    hasError={
+                      showValidation &&
+                      (validationErrors.has(fieldName) ||
+                        // Check for nested errors in this field
+                        Array.from(validationErrors).some(
+                          (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
+                        ))
+                    }
+                    validationErrors={showValidation ? validationErrors : undefined}
+                    fieldPath={fieldName}
+                    realtimeValidationErrors={realtimeValidationErrors}
+                    enableRealtimeValidation={true}
+                  />
+                </React.Fragment>
               );
             })}
           </div>

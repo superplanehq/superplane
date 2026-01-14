@@ -46,10 +46,11 @@ export const TimePickerField: React.FC<TimePickerFieldProps> = ({
       value={(value as string) ?? (field.defaultValue as string) ?? ""}
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder={field.typeOptions?.time?.format || "HH:MM"}
+      size={5}
       className={cn(
-        "bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none",
+        "bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none w-auto",
         hasError && "border-red-500 border-2",
-        className
+        className,
       )}
       min={getTimeConstraints.min}
       max={getTimeConstraints.max}

@@ -384,7 +384,7 @@ export const ConfigurationFieldRenderer = ({
           {isEnabled && renderField()}
           <Label className={`text-left cursor-pointer ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
             {field.label || field.name}
-            {isRequired && <span className="text-red-500 ml-1">*</span>}
+            {isRequired && <span className="text-gray-800 dark:text-gray-300 ml-1">*</span>}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
                 (!enableRealtimeValidation &&
@@ -408,59 +408,60 @@ export const ConfigurationFieldRenderer = ({
         )}
 
         {/* Display field description */}
-        {field.description && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-left bg-gray-50 dark:bg-gray-800 p-2 rounded">
-            {field.description}
-          </p>
-        )}
+        {field.description && <p className="text-xs text-gray-500 dark:text-gray-400 text-left">{field.description}</p>}
       </div>
     );
   }
 
   // Check if this field uses tabs (select with 2 options)
   const usesTabs = field.type === "select" && field.typeOptions?.select?.options?.length === 2;
-  
+
   // Check if this is the items field (Time Windows) - hide label for it
   const isItemsField = field.name === "items";
-  
+
   // Check if this is the days field - hide label for it
   const isDaysField = field.name === "days";
-  
+
   // Check if this is a time field that's handled by TimeRangeWithAllDay - hide label for it
   const isTimeFieldInRange = field.name === "startTime" || field.name === "endTime";
-  
+
   // Check if this is the date field for specific dates - hide label for it (will be shown in custom renderer)
   const isDateFieldInList = field.name === "date";
-  
+
   // Check if this is the exclude_dates field - hide label for it (will be shown in custom renderer)
   const isExcludeDatesField = field.name === "exclude_dates";
-  
+
   // For all other field types, render label above field
   return (
     <div className="space-y-2">
-      {!usesTabs && !isItemsField && !isDaysField && !isTimeFieldInRange && !isDateFieldInList && !isExcludeDatesField && (
-        <div className="flex items-center gap-3">
-          {isTogglable && (
-            <Switch
-              checked={isEnabled}
-              onCheckedChange={handleToggleChange}
-              className={`${hasFieldError ? "border-red-500 border-2" : ""}`}
-            />
-          )}
-          <Label className={`block text-left ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
-            {field.label || field.name}
-            {isRequired && <span className="text-red-500 ml-1">*</span>}
-            {hasFieldError &&
-              ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
-                (!enableRealtimeValidation &&
-                  validationErrors &&
-                  isRequired &&
-                  (value === undefined || value === null || value === ""))) && (
-                <span className="text-red-500 text-xs ml-2">- required field</span>
-              )}
-          </Label>
-        </div>
-      )}
+      {!usesTabs &&
+        !isItemsField &&
+        !isDaysField &&
+        !isTimeFieldInRange &&
+        !isDateFieldInList &&
+        !isExcludeDatesField && (
+          <div className="flex items-center gap-3">
+            {isTogglable && (
+              <Switch
+                checked={isEnabled}
+                onCheckedChange={handleToggleChange}
+                className={`${hasFieldError ? "border-red-500 border-2" : ""}`}
+              />
+            )}
+            <Label className={`block text-left ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
+              {field.label || field.name}
+              {isRequired && <span className="text-gray-800 dark:text-gray-300 ml-1">*</span>}
+              {hasFieldError &&
+                ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
+                  (!enableRealtimeValidation &&
+                    validationErrors &&
+                    isRequired &&
+                    (value === undefined || value === null || value === ""))) && (
+                  <span className="text-red-500 text-xs ml-2">- required field</span>
+                )}
+            </Label>
+          </div>
+        )}
       {isEnabled && (
         <div className="flex items-center gap-2">
           <div className="flex-1">{renderField()}</div>
@@ -479,10 +480,8 @@ export const ConfigurationFieldRenderer = ({
       )}
 
       {/* Display field description */}
-      {field.description && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 text-left bg-gray-50 dark:bg-gray-800 p-2 rounded">
-          {field.description}
-        </p>
+      {field.description && field.name !== "timezone" && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-left">{field.description}</p>
       )}
 
       {/* Display type-specific help text */}

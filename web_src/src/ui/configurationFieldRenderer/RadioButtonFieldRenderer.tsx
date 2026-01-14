@@ -3,12 +3,7 @@ import { FieldRendererProps } from "./types";
 import { toTestId } from "@/utils/testID";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export const RadioButtonFieldRenderer: React.FC<FieldRendererProps> = ({
-  field,
-  value,
-  onChange,
-  hasError,
-}) => {
+export const RadioButtonFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
   const selectOptions = field.typeOptions?.select?.options ?? [];
   const hasSetDefault = useRef(false);
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
@@ -30,11 +25,7 @@ export const RadioButtonFieldRenderer: React.FC<FieldRendererProps> = ({
 
   return (
     <div className={hasError ? "border-red-500 border-2 rounded p-2" : ""}>
-      <Tabs
-        value={activeValue}
-        onValueChange={(val) => onChange(val)}
-        className="w-full"
-      >
+      <Tabs value={activeValue} onValueChange={(val) => onChange(val)} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           {selectOptions.map((opt) => {
             const optionValue = opt.value ?? "";
