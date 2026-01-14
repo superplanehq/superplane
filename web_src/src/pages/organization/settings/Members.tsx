@@ -239,16 +239,22 @@ export function Members({ organizationId }: MembersProps) {
                 Invite link to add members
               </Text>
               <Text className="text-sm text-gray-500 dark:text-gray-400">
-                Only people with owner and admin roles can see this. You can also{" "}
-                <button
-                  type="button"
-                  className="text-blue-600 hover:underline disabled:text-gray-400"
-                  onClick={handleInviteLinkReset}
-                  disabled={loadingInviteLink || inviteLinkBusy}
-                >
-                  generate a new link
-                </button>
-                .
+                Only people with owner and admin roles can see this.
+                {inviteLinkEnabled && (
+                  <>
+                    {" "}
+                    You can also{" "}
+                    <button
+                      type="button"
+                      className="text-blue-600 hover:underline disabled:text-gray-400"
+                      onClick={handleInviteLinkReset}
+                      disabled={loadingInviteLink || inviteLinkBusy}
+                    >
+                      generate a new link
+                    </button>
+                    .
+                  </>
+                )}
               </Text>
             </div>
             <div className="flex items-center gap-3">
