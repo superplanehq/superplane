@@ -20,6 +20,7 @@ import HomePage from "./pages/home";
 import NodeRunPage from "./pages/node-run";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
+import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -61,6 +62,7 @@ function AppRouter() {
           <Route path="login/email" element={<EmailLogin />} />
           <Route path="create" element={<OrganizationCreate />} />
           <Route path="setup" element={<OwnerSetup />} />
+          <Route path="invite/:token" element={<InviteLinkAccept />} />
 
           {/* Organization selection and creation */}
           <Route path="" element={<OrganizationSelect />} />
