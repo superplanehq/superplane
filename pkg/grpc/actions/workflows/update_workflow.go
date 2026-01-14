@@ -92,6 +92,18 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 					if saveErr := tx.Save(workflowNode).Error; saveErr != nil {
 						return saveErr
 					}
+
+					errorNodeID := node.ID
+					if workflowNode.ParentNodeID != nil {
+						errorNodeID = *workflowNode.ParentNodeID
+					}
+
+					parentNode, ok := parentNodesByNodeID[errorNodeID]
+					if !ok {
+						log.Errorf("Parent node %s not found for node setup error", errorNodeID)
+					} else {
+						parentNode.ErrorMessage = &errorMsg
+					}
 				}
 
 				if workflowNode.ParentNodeID == nil {

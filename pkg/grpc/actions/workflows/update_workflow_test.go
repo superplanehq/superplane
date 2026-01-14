@@ -602,6 +602,77 @@ func TestUpdateWorkflow_ValidationErrorsPersisted(t *testing.T) {
 	assert.Contains(t, *invalidNode.StateReason, "nonexistent-component", "error reason should mention the invalid component")
 }
 
+func TestUpdateWorkflow_SetupErrorsPersistedInResponse(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	blueprint := support.CreateBlueprint(
+		t,
+		r.Organization.ID,
+		[]models.Node{
+			{
+				ID:            "internal-http",
+				Name:          "Internal HTTP",
+				Type:          models.NodeTypeComponent,
+				Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "http"}},
+				Configuration: map[string]any{"method": "GET"},
+			},
+		},
+		[]models.Edge{},
+		[]models.BlueprintOutputChannel{},
+	)
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{},
+		[]models.Edge{},
+	)
+
+	updatedWorkflowPB := &pb.Workflow{
+		Metadata: &pb.Workflow_Metadata{
+			Name:        workflow.Name,
+			Description: workflow.Description,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "blueprint-node",
+					Name: "Blueprint Node",
+					Type: componentpb.Node_TYPE_BLUEPRINT,
+					Blueprint: &componentpb.Node_BlueprintRef{
+						Id: blueprint.ID.String(),
+					},
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	response, err := UpdateWorkflow(
+		context.Background(),
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		workflow.ID.String(),
+		updatedWorkflowPB,
+		"http://localhost:3000/api/v1",
+	)
+	require.NoError(t, err, "UpdateWorkflow should succeed even with setup errors")
+
+	var blueprintNode *componentpb.Node
+	for _, node := range response.Workflow.Spec.Nodes {
+		if node.Id == "blueprint-node" {
+			blueprintNode = node
+			break
+		}
+	}
+	require.NotNil(t, blueprintNode, "should find blueprint node in response")
+	assert.NotEmpty(t, blueprintNode.ErrorMessage, "blueprint node should carry setup error message")
+	assert.Contains(t, blueprintNode.ErrorMessage, "url is required", "error message should include setup failure")
+}
+
 func TestUpdateWorkflow_ErroredNodeBecomesValidAgain(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
