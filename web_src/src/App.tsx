@@ -37,38 +37,47 @@ const withAuthOnly = (Component: React.ComponentType) => (
   </AuthGuard>
 );
 
-// Main App component with router
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AccountProvider>
         <TooltipProvider delayDuration={150}>
-          <BrowserRouter>
-            <Routes>
-              {/* Organization-scoped protected routes */}
-              <Route path=":organizationId" element={withAuthOnly(HomePage)} />
-              {isCustomComponentsEnabled() && (
-                <Route path=":organizationId/custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
-              )}
-              <Route path=":organizationId/workflows/:workflowId" element={withAuthOnly(WorkflowPageV2)} />
-              <Route
-                path=":organizationId/workflows/:workflowId/nodes/:nodeId/:executionId"
-                element={withAuthOnly(NodeRunPage)}
-              />
-              <Route path=":organizationId/settings/*" element={withAuthOnly(OrganizationSettings)} />
-              {/* Organization selection and creation */}
-              <Route path="login" element={<Login />} />
-              <Route path="login/email" element={<EmailLogin />} />
-              <Route path="create" element={<OrganizationCreate />} />
-              <Route path="setup" element={<OwnerSetup />} />
-              <Route path="" element={<OrganizationSelect />} />
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
-          </BrowserRouter>
+          <AppRouter />
         </TooltipProvider>
         <Toaster position="bottom-center" closeButton />
       </AccountProvider>
     </QueryClientProvider>
+  );
+}
+
+function AppRouter() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Auth routes */}
+        <Route path="login" element={<Login />} />
+        <Route path="login/email" element={<EmailLogin />} />
+        <Route path="create" element={<OrganizationCreate />} />
+        <Route path="setup" element={<OwnerSetup />} />
+
+        {/* Organization selection and creation */}
+        <Route path="" element={<OrganizationSelect />} />
+
+        {/* Organization-scoped protected routes */}
+        <Route path=":organizationId">
+          <Route index element={withAuthOnly(HomePage)} />
+          {isCustomComponentsEnabled() && (
+            <Route path="custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
+          )}
+          <Route path="workflows/:workflowId" element={withAuthOnly(WorkflowPageV2)} />
+          <Route path="workflows/:workflowId/nodes/:nodeId/:executionId" element={withAuthOnly(NodeRunPage)} />
+          <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
+        </Route>
+
+        {/* Catch-all route */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
