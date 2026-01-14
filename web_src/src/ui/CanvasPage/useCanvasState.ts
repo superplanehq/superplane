@@ -162,8 +162,12 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
       // Check for position changes and notify parent
       // Collect all position changes that ended (dragging === false)
       const positionChanges = changes.filter(
-        (change): change is NodePositionChange =>
-          change.type === "position" && change.position !== undefined && change.dragging === false,
+        (change): change is NodePositionChange & { position: { x: number; y: number } } =>
+          change.type === "position" &&
+          change.position !== undefined &&
+          change.dragging === false &&
+          typeof change.position.x === "number" &&
+          typeof change.position.y === "number",
       );
 
       if (positionChanges.length > 0) {
