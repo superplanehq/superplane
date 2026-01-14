@@ -6,6 +6,66 @@ import {
 } from "@/api-client";
 import { useCallback, useEffect, useMemo, useState, ReactNode } from "react";
 
+// Helper function to get template data (mode and items) for timegate templates
+function getTemplateData(templateMode: string): { mode: string; items: Array<Record<string, unknown>> } | null {
+  switch (templateMode) {
+    case "template_working_hours":
+      // Include: Mon-Fri 9:00-17:00
+      return {
+        mode: "include",
+        items: [
+          {
+            type: "weekly",
+            days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+            startTime: "09:00",
+            endTime: "17:00",
+          },
+        ],
+      };
+    case "template_outside_working_hours":
+      // Exclude: Mon-Fri 9:00-17:00
+      return {
+        mode: "exclude",
+        items: [
+          {
+            type: "weekly",
+            days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+            startTime: "09:00",
+            endTime: "17:00",
+          },
+        ],
+      };
+    case "template_weekends":
+      // Include: Sat-Sun 00:00-23:59
+      return {
+        mode: "include",
+        items: [
+          {
+            type: "weekly",
+            days: ["saturday", "sunday"],
+            startTime: "00:00",
+            endTime: "23:59",
+          },
+        ],
+      };
+    case "template_no_weekends":
+      // Exclude: Sat-Sun 00:00-23:59
+      return {
+        mode: "exclude",
+        items: [
+          {
+            type: "weekly",
+            days: ["saturday", "sunday"],
+            startTime: "00:00",
+            endTime: "23:59",
+          },
+        ],
+      };
+    default:
+      return null;
+  }
+}
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -329,6 +389,22 @@ export function SettingsTab({
                       ...nodeConfiguration,
                       [fieldName]: value,
                     };
+                    
+                    // Handle template selection for timegate component
+                    if (fieldName === "when_to_run" && typeof value === "string") {
+                      const templateData = getTemplateData(value);
+                      if (templateData) {
+                        newConfig.mode = templateData.mode;
+                        newConfig.items = templateData.items;
+                      } else if (value === "custom") {
+                        // Clear items when switching to custom, let user configure manually
+                        // Keep existing mode if set, otherwise default to include
+                        if (!newConfig.mode) {
+                          newConfig.mode = "include";
+                        }
+                      }
+                    }
+                    
                     setNodeConfiguration(filterVisibleFields(newConfig));
                   }}
                   allValues={nodeConfiguration}

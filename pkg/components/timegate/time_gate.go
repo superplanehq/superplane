@@ -21,6 +21,12 @@ const (
 	TimeGateIncludeMode = "include"
 	TimeGateExcludeMode = "exclude"
 
+	// Template modes
+	TimeGateTemplateWorkingHours        = "template_working_hours"
+	TimeGateTemplateOutsideWorkingHours = "template_outside_working_hours"
+	TimeGateTemplateWeekends            = "template_weekends"
+	TimeGateTemplateNoWeekends          = "template_no_weekends"
+
 	TimeGateItemTypeWeekly       = "weekly"
 	TimeGateItemTypeSpecificDate = "specific_dates"
 )
@@ -32,7 +38,7 @@ type Metadata struct {
 }
 
 type TimeGateItem struct {
-	Type           string   `json:"type"` // "weekly" or "specific_dates"
+	Type           string   `json:"type"`                     // "weekly" or "specific_dates"
 	Days           []string `json:"days,omitempty"`           // For weekly type
 	StartTime      string   `json:"startTime"`                // Required for both types
 	EndTime        string   `json:"endTime"`                  // Required for both types
@@ -41,9 +47,10 @@ type TimeGateItem struct {
 }
 
 type Spec struct {
-	Mode     string        `json:"mode"`     // "include" or "exclude"
-	Items    []TimeGateItem `json:"items"`   // List of time gate items
-	Timezone string        `json:"timezone"` // Required timezone
+	WhenToRun string         `mapstructure:"when_to_run"`
+	Mode      string         `mapstructure:"mode"`     // "include" or "exclude"
+	Items     []TimeGateItem `mapstructure:"items"`    // List of time gate items
+	Timezone  string         `mapstructure:"timezone"` // Required timezone
 }
 
 func (tg *TimeGate) Name() string {
@@ -73,6 +80,38 @@ func (tg *TimeGate) OutputChannels(configuration any) []core.OutputChannel {
 func (tg *TimeGate) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:     "when_to_run",
+			Label:    "When to run",
+			Type:     configuration.FieldTypeSelect,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{
+							Label: "Custom",
+							Value: "custom",
+						},
+						{
+							Label: "Run during working hours",
+							Value: TimeGateTemplateWorkingHours,
+						},
+						{
+							Label: "Run outside of working hours",
+							Value: TimeGateTemplateOutsideWorkingHours,
+						},
+						{
+							Label: "Run on weekends",
+							Value: TimeGateTemplateWeekends,
+						},
+						{
+							Label: "Don't run on weekends",
+							Value: TimeGateTemplateNoWeekends,
+						},
+					},
+				},
+			},
+		},
+		{
 			Name:     "mode",
 			Label:    "Mode",
 			Type:     configuration.FieldTypeSelect,
@@ -91,13 +130,31 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 					},
 				},
 			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "when_to_run",
+					Values: []string{"custom"},
+				},
+			},
 		},
 		{
 			Name:        "items",
 			Label:       "Time Windows",
 			Type:        configuration.FieldTypeList,
-			Required:    true,
+			Required:    false,
 			Description: "List of time windows to include or exclude",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "when_to_run",
+					Values: []string{"custom"},
+				},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{
+					Field:  "when_to_run",
+					Values: []string{"custom"},
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Time Window",
@@ -286,6 +343,11 @@ func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	// Convert template to actual mode and items if a template is selected
+	if spec.WhenToRun != "" && spec.WhenToRun != "custom" {
+		spec = tg.convertTemplateToSpec(spec)
+	}
+
 	err = tg.validateSpec(spec)
 	if err != nil {
 		return err
@@ -345,12 +407,16 @@ func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 
 func (tg *TimeGate) validateSpec(spec Spec) error {
 	validModes := map[string]bool{
-		TimeGateIncludeMode: true,
-		TimeGateExcludeMode: true,
+		TimeGateIncludeMode:                 true,
+		TimeGateExcludeMode:                 true,
+		TimeGateTemplateWorkingHours:        true,
+		TimeGateTemplateOutsideWorkingHours: true,
+		TimeGateTemplateWeekends:            true,
+		TimeGateTemplateNoWeekends:          true,
 	}
 
 	if !validModes[spec.Mode] {
-		return fmt.Errorf("invalid mode '%s': must be one of include, exclude", spec.Mode)
+		return fmt.Errorf("invalid mode '%s': must be one of include, exclude, or a template", spec.Mode)
 	}
 
 	if len(spec.Items) == 0 {
@@ -522,6 +588,70 @@ func (tg *TimeGate) configEqual(a, b Spec) bool {
 	}
 
 	return true
+}
+
+func (tg *TimeGate) convertTemplateToSpec(spec Spec) Spec {
+	switch spec.WhenToRun {
+	case TimeGateTemplateWorkingHours:
+		// Include: Mon-Fri 9:00-17:00
+		return Spec{
+			Mode:     TimeGateIncludeMode,
+			Timezone: spec.Timezone,
+			Items: []TimeGateItem{
+				{
+					Type:      TimeGateItemTypeWeekly,
+					Days:      []string{"monday", "tuesday", "wednesday", "thursday", "friday"},
+					StartTime: "09:00",
+					EndTime:   "17:00",
+				},
+			},
+		}
+	case TimeGateTemplateOutsideWorkingHours:
+		// Exclude: Mon-Fri 9:00-17:00
+		return Spec{
+			Mode:     TimeGateExcludeMode,
+			Timezone: spec.Timezone,
+			Items: []TimeGateItem{
+				{
+					Type:      TimeGateItemTypeWeekly,
+					Days:      []string{"monday", "tuesday", "wednesday", "thursday", "friday"},
+					StartTime: "09:00",
+					EndTime:   "17:00",
+				},
+			},
+		}
+	case TimeGateTemplateWeekends:
+		// Include: Sat-Sun 00:00-23:59
+		return Spec{
+			Mode:     TimeGateIncludeMode,
+			Timezone: spec.Timezone,
+			Items: []TimeGateItem{
+				{
+					Type:      TimeGateItemTypeWeekly,
+					Days:      []string{"saturday", "sunday"},
+					StartTime: "00:00",
+					EndTime:   "23:59",
+				},
+			},
+		}
+	case TimeGateTemplateNoWeekends:
+		// Exclude: Sat-Sun 00:00-23:59
+		return Spec{
+			Mode:     TimeGateExcludeMode,
+			Timezone: spec.Timezone,
+			Items: []TimeGateItem{
+				{
+					Type:      TimeGateItemTypeWeekly,
+					Days:      []string{"saturday", "sunday"},
+					StartTime: "00:00",
+					EndTime:   "23:59",
+				},
+			},
+		}
+	default:
+		// Not a template, return as-is
+		return spec
+	}
 }
 
 func (tg *TimeGate) findNextValidTime(now time.Time, spec Spec) time.Time {
@@ -874,7 +1004,6 @@ func (tg *TimeGate) findNextIncludeSpecificTime(now time.Time, item TimeGateItem
 		startTime/60, startTime%60, 0, 0, now.Location())
 	return nextStartDateTime
 }
-
 
 func (tg *TimeGate) Cancel(ctx core.ExecutionContext) error {
 	return nil

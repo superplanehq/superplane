@@ -42,12 +42,13 @@ export const timeGateMapper: ComponentBaseMapper = {
 
 function getTimeGateMetadataList(node: ComponentsNode): MetadataItem[] {
   const configuration = node.configuration as Record<string, unknown>;
-  const mode = configuration?.mode;
+  const whenToRun = configuration?.when_to_run as string;
+  const mode = configuration?.mode as string;
 
   return [
     {
       icon: "settings",
-      label: getTimeGateModeLabel(mode as string),
+      label: getTimeGateModeLabel(whenToRun, mode),
     },
     {
       icon: "clock",
@@ -60,7 +61,22 @@ function getTimeGateMetadataList(node: ComponentsNode): MetadataItem[] {
   ];
 }
 
-function getTimeGateModeLabel(mode: string): string {
+function getTimeGateModeLabel(whenToRun: string | undefined, mode: string | undefined): string {
+  if (whenToRun && whenToRun !== "custom") {
+    switch (whenToRun) {
+      case "template_working_hours":
+        return "Run during working hours";
+      case "template_outside_working_hours":
+        return "Run outside of working hours";
+      case "template_weekends":
+        return "Run on weekends";
+      case "template_no_weekends":
+        return "Don't run on weekends";
+      default:
+        return whenToRun.charAt(0).toUpperCase() + whenToRun.slice(1).replace(/_/g, " ");
+    }
+  }
+
   if (!mode) {
     return "Not configured";
   }
@@ -75,7 +91,7 @@ function getTimeGateModeLabel(mode: string): string {
   }
 }
 
-function getTimeWindow(mode: string, configuration: Record<string, unknown>): string {
+function getTimeWindow(_mode: string, configuration: Record<string, unknown>): string {
   const items = (configuration?.items as Array<Record<string, unknown>>) || [];
 
   if (items.length === 0) {
