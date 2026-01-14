@@ -422,7 +422,7 @@ export const ConfigurationFieldRenderer = ({
   // Check if this is the days field - hide label for it
   const isDaysField = field.name === "days";
 
-  // Check if this is a time field that's handled by TimeRangeWithAllDay - hide label for it
+  // Check if this is a time field that's handled by TimeRangeWithAllDay - hide label for it (label is shown by the component)
   const isTimeFieldInRange = field.name === "startTime" || field.name === "endTime";
 
   // Check if this is the date field for specific dates - hide label for it (will be shown in custom renderer)

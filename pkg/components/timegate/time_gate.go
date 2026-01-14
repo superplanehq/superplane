@@ -681,43 +681,6 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-func (tg *TimeGate) validateDayInYear(dayStr string) error {
-	_, _, err := tg.parseDayInYear(dayStr)
-	return err
-}
-
-func (tg *TimeGate) parseDayInYear(dayStr string) (int, int, error) {
-	if dayStr == "" {
-		return 0, 0, fmt.Errorf("day string is empty")
-	}
-
-	var month, day int
-	var extra string
-	n, err := fmt.Sscanf(dayStr, "%d/%d%s", &month, &day, &extra)
-
-	// Accept n=2 (valid format) but reject n=3 (extra characters)
-	if n < 2 || n > 2 {
-		return 0, 0, fmt.Errorf("invalid day format '%s': expected MM/DD (e.g., 12/25)", dayStr)
-	}
-
-	// For n=2, err might be EOF (which is expected when no extra string)
-	if err != nil && n < 2 {
-		return 0, 0, fmt.Errorf("invalid day format '%s': expected MM/DD (e.g., 12/25)", dayStr)
-	}
-
-	if month < 1 || month > 12 || day < 1 || day > 31 {
-		return 0, 0, fmt.Errorf("invalid day values '%s': month must be 1-12, day must be 1-31", dayStr)
-	}
-
-	// Additional validation for days per month
-	daysInMonth := []int{0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31} // Feb has 29 to account for leap years
-	if day > daysInMonth[month] {
-		return 0, 0, fmt.Errorf("invalid day '%d' for month '%d'", day, month)
-	}
-
-	return month, day, nil
-}
-
 func (tg *TimeGate) Cancel(ctx core.ExecutionContext) error {
 	// Store cancellation information in metadata
 	user := ctx.Auth.AuthenticatedUser()

@@ -11,7 +11,7 @@ interface TimeRangeWithAllDayProps {
   hasError?: boolean;
   hasStartTimeError?: boolean;
   hasEndTimeError?: boolean;
-  itemType?: string; // "weekly" or "specific_dates"
+  itemType?: string;
 }
 
 export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
@@ -25,7 +25,7 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
   hasEndTimeError,
   itemType: _itemType,
 }) => {
-  // Initialize with all day (00:00 - 23:59) by default if no times are set
+  // Initialize with default times (00:00 - 23:59) if no times are set
   useEffect(() => {
     if (
       (startTime === undefined || startTime === null || startTime === "") &&

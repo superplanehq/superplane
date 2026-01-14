@@ -65,7 +65,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           newItem.date = "12-31";
         }
       } else {
-        // For timegate items (always weekly), set default days to weekdays and "All day" ON
+        // For timegate items (always weekly), set default days to weekdays and default times
         const daysField = itemDefinition.schema.find((f) => f.name === "days");
         const startTimeField = itemDefinition.schema.find((f) => f.name === "startTime");
         const endTimeField = itemDefinition.schema.find((f) => f.name === "endTime");
@@ -76,7 +76,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
         }
 
         if (startTimeField && endTimeField) {
-          // Set "All day" to ON by default (00:00 to 23:59)
+          // Set default times (00:00 to 23:59)
           newItem.startTime = "00:00";
           newItem.endTime = "23:59";
         }
