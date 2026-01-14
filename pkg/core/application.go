@@ -51,6 +51,11 @@ type Application interface {
 	Sync(ctx SyncContext) error
 
 	/*
+	 * List resources of a given type.
+	 */
+	ListResources(resourceType string, ctx ListResourcesContext) ([]ApplicationResource, error)
+
+	/*
 	 * HTTP request handler
 	 */
 	HandleRequest(ctx HTTPRequestContext)
@@ -73,6 +78,18 @@ type Application interface {
 	 * This is called by the webhook cleanup worker, for webhook records that were deleted.
 	 */
 	CleanupWebhook(ctx CleanupWebhookContext) error
+}
+
+type ApplicationResource struct {
+	Type string
+	Name string
+	ID   string
+}
+
+type ListResourcesContext struct {
+	Logger          *logrus.Entry
+	HTTP            HTTPContext
+	AppInstallation AppInstallationContext
 }
 
 type SetupWebhookContext struct {

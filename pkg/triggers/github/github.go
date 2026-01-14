@@ -84,7 +84,8 @@ func (g *GitHub) Configuration() []configuration.Field {
 			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "repository",
+					Type:           "repository",
+					UseNameAsValue: true,
 				},
 			},
 		},

@@ -62,9 +62,14 @@ func (t *OnIncident) Configuration() []configuration.Field {
 		{
 			Name:        "service",
 			Label:       "Service",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeAppInstallationResource,
 			Required:    true,
 			Placeholder: "e.g. PXXXXXX",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "service",
+				},
+			},
 		},
 		{
 			Name:        "urgencies",

@@ -21,15 +21,16 @@ const (
 	/*
 	 * Special field types
 	 */
-	FieldTypeDayInYear           = "day-in-year"
-	FieldTypeCron                = "cron"
-	FieldTypeUser                = "user"
-	FieldTypeRole                = "role"
-	FieldTypeGroup               = "group"
-	FieldTypeIntegration         = "integration"
-	FieldTypeIntegrationResource = "integration-resource"
-	FieldTypeAnyPredicateList    = "any-predicate-list"
-	FieldTypeGitRef              = "git-ref"
+	FieldTypeDayInYear               = "day-in-year"
+	FieldTypeCron                    = "cron"
+	FieldTypeUser                    = "user"
+	FieldTypeRole                    = "role"
+	FieldTypeGroup                   = "group"
+	FieldTypeIntegration             = "integration"
+	FieldTypeIntegrationResource     = "integration-resource"
+	FieldTypeAppInstallationResource = "app-installation-resource"
+	FieldTypeAnyPredicateList        = "any-predicate-list"
+	FieldTypeGitRef                  = "git-ref"
 )
 
 type Field struct {
@@ -113,7 +114,8 @@ type TypeOptions struct {
  * ResourceTypeOptions specifies which resource type to display
  */
 type ResourceTypeOptions struct {
-	Type string `json:"type"`
+	Type           string `json:"type"`
+	UseNameAsValue bool   `json:"use_name_as_value,omitempty"`
 }
 
 /*

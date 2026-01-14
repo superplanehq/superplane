@@ -16,6 +16,7 @@ import { ListFieldRenderer } from "./ListFieldRenderer";
 import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
 import { IntegrationFieldRenderer } from "./IntegrationFieldRenderer";
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
+import { AppInstallationResourceFieldRenderer } from "./AppInstallationResourceFieldRenderer";
 import { TimeFieldRenderer } from "./TimeFieldRenderer";
 import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
 import { CronFieldRenderer } from "./CronFieldRenderer";
@@ -37,6 +38,8 @@ import { AuthorizationDomainType } from "@/api-client";
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
   domainId?: string;
   domainType?: AuthorizationDomainType;
+  appInstallationId?: string;
+  organizationId?: string;
   hasError?: boolean;
   validationErrors?: ValidationError[] | Set<string>;
   fieldPath?: string;
@@ -52,6 +55,8 @@ export const ConfigurationFieldRenderer = ({
   allValues = {},
   domainId,
   domainType,
+  appInstallationId,
+  organizationId,
   hasError = false,
   validationErrors,
   fieldPath,
@@ -208,7 +213,16 @@ export const ConfigurationFieldRenderer = ({
     return null;
   }
   const renderField = () => {
-    const commonProps = { field, value, onChange, allValues, hasError: hasFieldError, autocompleteExampleObj };
+    const commonProps = {
+      field,
+      value,
+      onChange,
+      allValues,
+      hasError: hasFieldError,
+      autocompleteExampleObj,
+      appInstallationId,
+      organizationId,
+    };
 
     switch (field.type) {
       case "string":
@@ -270,6 +284,17 @@ export const ConfigurationFieldRenderer = ({
             allValues={allValues}
             domainId={domainId}
             domainType={domainType}
+          />
+        );
+
+      case "app-installation-resource":
+        return (
+          <AppInstallationResourceFieldRenderer
+            field={field}
+            value={value as string}
+            onChange={onChange}
+            organizationId={organizationId}
+            appInstallationId={appInstallationId}
           />
         );
 

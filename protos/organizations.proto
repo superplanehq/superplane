@@ -127,6 +127,17 @@ service Organizations {
     };
   }
 
+  rpc ListApplicationResources(ListApplicationResourcesRequest) returns (ListApplicationResourcesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/applications/{installation_id}/resources"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List application resources";
+      description: "Lists resources for an application installation";
+      tags: "Organization";
+    };
+  }
+
   rpc InstallApplication(InstallApplicationRequest) returns (InstallApplicationResponse) {
     option (google.api.http) = {
       post: "/api/v1/organizations/{id}/applications"
@@ -263,6 +274,22 @@ message DescribeApplicationRequest {
 
 message DescribeApplicationResponse {
   AppInstallation installation = 1;
+}
+
+message ListApplicationResourcesRequest {
+  string id = 1;
+  string installation_id = 2;
+  string type = 3;
+}
+
+message ListApplicationResourcesResponse {
+  repeated AppInstallationResourceRef resources = 1;
+}
+
+message AppInstallationResourceRef {
+  string type = 1;
+  string name = 2;
+  string id = 3;
 }
 
 message UpdateApplicationRequest {

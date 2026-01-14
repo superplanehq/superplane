@@ -464,6 +464,11 @@ func validateFieldValue(field Field, value any) error {
 			return fmt.Errorf("must be a string")
 		}
 
+	case FieldTypeAppInstallationResource:
+		if _, ok := value.(string); !ok {
+			return fmt.Errorf("must be a string")
+		}
+
 	case FieldTypeGitRef:
 		// Git reference is represented as a string (e.g., refs/heads/main, refs/tags/v1.0.0)
 		if _, ok := value.(string); !ok {

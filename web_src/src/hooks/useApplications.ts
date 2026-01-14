@@ -3,6 +3,7 @@ import {
   applicationsListApplications,
   organizationsListApplications,
   organizationsDescribeApplication,
+  organizationsListApplicationResources,
   organizationsInstallApplication,
   organizationsUpdateApplication,
   organizationsUninstallApplication,
@@ -15,6 +16,8 @@ export const applicationKeys = {
   installed: (organizationId: string) => [...applicationKeys.all, "installed", organizationId] as const,
   installation: (organizationId: string, installationId: string) =>
     [...applicationKeys.installed(organizationId), installationId] as const,
+  resources: (organizationId: string, installationId: string, resourceType: string) =>
+    [...applicationKeys.installation(organizationId, installationId), "resources", resourceType] as const,
 };
 
 // Hook to fetch available applications (catalog)
@@ -63,6 +66,24 @@ export const useApplicationInstallation = (organizationId: string, installationI
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!organizationId && !!installationId,
+  });
+};
+
+export const useApplicationResources = (organizationId: string, installationId: string, resourceType: string) => {
+  return useQuery({
+    queryKey: applicationKeys.resources(organizationId, installationId, resourceType),
+    queryFn: async () => {
+      const response = await organizationsListApplicationResources(
+        withOrganizationHeader({
+          path: { id: organizationId, installationId },
+          query: { type: resourceType },
+        }),
+      );
+      return response.data?.resources || [];
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!organizationId && !!installationId && !!resourceType,
   });
 };
 

@@ -52,8 +52,14 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 		{
 			Name:     "repository",
 			Label:    "Repository",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeAppInstallationResource,
 			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "repository",
+					UseNameAsValue: true,
+				},
+			},
 		},
 		{
 			Name:     "issueNumber",
@@ -137,11 +143,6 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	var config UpdateIssueConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	var nodeMetadata NodeMetadata
-	if err := mapstructure.Decode(ctx.NodeMetadata.Get(), &nodeMetadata); err != nil {
-		return fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
 	var appMetadata Metadata

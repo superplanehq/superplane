@@ -279,6 +279,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                               allValues={configuration}
                               domainId={organizationId}
                               domainType="DOMAIN_TYPE_ORGANIZATION"
+                              organizationId={organizationId}
                             />
                           );
                         })}
