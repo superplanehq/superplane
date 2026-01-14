@@ -300,6 +300,22 @@ func (tg *TimeGate) validateSpec(spec Spec) error {
 		return fmt.Errorf("at least one time window item is required")
 	}
 
+	// Validate timezone
+	if spec.Timezone == "" {
+		return fmt.Errorf("timezone is required")
+	}
+
+	validTimezones := map[string]bool{
+		"-12": true, "-11": true, "-10": true, "-9": true, "-8": true, "-7": true,
+		"-6": true, "-5": true, "-4": true, "-3": true, "-2": true, "-1": true,
+		"0": true, "1": true, "2": true, "3": true, "4": true, "5": true,
+		"5.5": true, "6": true, "7": true, "8": true, "9": true, "9.5": true,
+		"10": true, "11": true, "12": true, "13": true, "14": true,
+	}
+	if !validTimezones[spec.Timezone] {
+		return fmt.Errorf("invalid timezone '%s': must be one of the valid timezone offsets (e.g., -5, 0, 5.5, 9)", spec.Timezone)
+	}
+
 	validDays := map[string]bool{
 		"monday": true, "tuesday": true, "wednesday": true, "thursday": true,
 		"friday": true, "saturday": true, "sunday": true,
@@ -347,7 +363,7 @@ func (tg *TimeGate) validateSpec(spec Spec) error {
 				return fmt.Errorf("exclude date %d: startTime error: %w", i, err)
 			}
 
-			endTime := startTime + 1 // Default endTime if not provided
+			endTime := 1439 // Default endTime to 23:59 (end of day) if not provided
 			if excludeDate.EndTime != "" {
 				endTime, err = parseTimeString(excludeDate.EndTime)
 				if err != nil {
@@ -466,13 +482,27 @@ func (tg *TimeGate) configEqual(a, b Spec) bool {
 			return false
 		}
 
-		aDays := make(map[string]bool)
+		// Count occurrences in both slices to detect duplicates
+		aDaysCount := make(map[string]int)
 		for _, day := range itemA.Days {
-			aDays[day] = true
+			aDaysCount[day]++
 		}
 
+		bDaysCount := make(map[string]int)
 		for _, day := range itemB.Days {
-			if !aDays[day] {
+			bDaysCount[day]++
+		}
+
+		// Check that all days in A exist in B with same count
+		for day, count := range aDaysCount {
+			if bDaysCount[day] != count {
+				return false
+			}
+		}
+
+		// Check that all days in B exist in A (symmetric check)
+		for day, count := range bDaysCount {
+			if aDaysCount[day] != count {
 				return false
 			}
 		}
@@ -483,15 +513,29 @@ func (tg *TimeGate) configEqual(a, b Spec) bool {
 		return false
 	}
 
-	aExcludes := make(map[string]ExcludeDate)
+	// Count occurrences in both slices to detect duplicates
+	aExcludesCount := make(map[string]int)
 	for _, excludeDate := range a.ExcludeDates {
 		key := fmt.Sprintf("%s:%s:%s", excludeDate.Date, excludeDate.StartTime, excludeDate.EndTime)
-		aExcludes[key] = excludeDate
+		aExcludesCount[key]++
 	}
 
+	bExcludesCount := make(map[string]int)
 	for _, excludeDate := range b.ExcludeDates {
 		key := fmt.Sprintf("%s:%s:%s", excludeDate.Date, excludeDate.StartTime, excludeDate.EndTime)
-		if _, exists := aExcludes[key]; !exists {
+		bExcludesCount[key]++
+	}
+
+	// Check that all exclude dates in A exist in B with same count
+	for key, count := range aExcludesCount {
+		if bExcludesCount[key] != count {
+			return false
+		}
+	}
+
+	// Check that all exclude dates in B exist in A (symmetric check)
+	for key, count := range bExcludesCount {
+		if aExcludesCount[key] != count {
 			return false
 		}
 	}
@@ -551,24 +595,100 @@ func (tg *TimeGate) findNextIncludeWeeklyTimeWithExcludes(now time.Time, item Ti
 		dayString := getDayString(checkDate.Weekday())
 
 		if contains(item.Days, dayString) {
-			startHour := startTime / 60
-			startMinute := startTime % 60
+			var candidates []time.Time
 
-			candidateTime := time.Date(
-				checkDate.Year(), checkDate.Month(), checkDate.Day(),
-				startHour, startMinute, 0, 0, now.Location(),
-			)
+			// For today (i == 0), we need to check multiple candidates:
+			// 1. Window start time (if after current time)
+			// 2. Exclusion end times (if after current time and within window)
+			if i == 0 {
+				// Check window start time
+				startHour := startTime / 60
+				startMinute := startTime % 60
+				windowStartTime := time.Date(
+					checkDate.Year(), checkDate.Month(), checkDate.Day(),
+					startHour, startMinute, 0, 0, now.Location(),
+				)
 
-			// Check if the candidate time (with window start time) is excluded
-			if tg.isDateExcluded(candidateTime, excludeDates) {
-				continue
+				if windowStartTime.After(now) && !tg.isDateExcluded(windowStartTime, excludeDates) {
+					candidates = append(candidates, windowStartTime)
+				}
+
+				// Check exclusion end times for this day
+				dateStr := fmt.Sprintf("%02d-%02d", int(checkDate.Month()), checkDate.Day())
+				for _, excludeDate := range excludeDates {
+					if excludeDate.Date != dateStr {
+						continue
+					}
+
+					// Skip if no end time (all-day exclusion)
+					if excludeDate.EndTime == "" {
+						continue
+					}
+
+					// Skip if no start time (all-day exclusion)
+					if excludeDate.StartTime == "" {
+						continue
+					}
+
+					excludeStartTime, err := parseTimeString(excludeDate.StartTime)
+					if err != nil {
+						continue
+					}
+
+					excludeEndTime, err := parseTimeString(excludeDate.EndTime)
+					if err != nil {
+						continue
+					}
+
+					// Only consider exclusion end time if current time is within this exclusion
+					if !isTimeInRange(currentTime, excludeStartTime, excludeEndTime) {
+						continue
+					}
+
+					// Check if exclusion end time is after current time and within window
+					if excludeEndTime > currentTime && isTimeInRange(excludeEndTime, startTime, endTime) {
+						excludeEndHour := excludeEndTime / 60
+						excludeEndMinute := excludeEndTime % 60
+						excludeEndCandidate := time.Date(
+							checkDate.Year(), checkDate.Month(), checkDate.Day(),
+							excludeEndHour, excludeEndMinute, 0, 0, now.Location(),
+						)
+
+						// Exclusion end time is valid (it's when the exclusion ends)
+						// We don't check isDateExcluded here because the exclusion end time
+						// itself would be marked as excluded (inclusive range), but we want
+						// to use it as a candidate since it's when the exclusion ends
+						candidates = append(candidates, excludeEndCandidate)
+					}
+				}
+
+				// Return the earliest candidate if any found
+				if len(candidates) > 0 {
+					earliest := candidates[0]
+					for _, candidate := range candidates[1:] {
+						if candidate.Before(earliest) {
+							earliest = candidate
+						}
+					}
+					return earliest
+				}
+			} else {
+				// For future days, just check window start time
+				startHour := startTime / 60
+				startMinute := startTime % 60
+
+				candidateTime := time.Date(
+					checkDate.Year(), checkDate.Month(), checkDate.Day(),
+					startHour, startMinute, 0, 0, now.Location(),
+				)
+
+				// Check if the candidate time (with window start time) is excluded
+				if tg.isDateExcluded(candidateTime, excludeDates) {
+					continue
+				}
+
+				return candidateTime
 			}
-
-			if i == 0 && !candidateTime.After(now) {
-				continue
-			}
-
-			return candidateTime
 		}
 	}
 
@@ -592,7 +712,7 @@ func (tg *TimeGate) isDateExcluded(date time.Time, excludeDates []ExcludeDate) b
 
 		// Check if current time is within the excluded time range
 		startTime, _ := parseTimeString(excludeDate.StartTime)
-		endTime := startTime + 1
+		endTime := 1439 // Default endTime to 23:59 (end of day) if not provided
 		if excludeDate.EndTime != "" {
 			endTime, _ = parseTimeString(excludeDate.EndTime)
 		}

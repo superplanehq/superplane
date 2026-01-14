@@ -72,7 +72,7 @@ export function SettingsTab({
         delete filtered[field.name];
       }
     });
-    if (Object.values(configuration).length === 0 || !configuration) {
+    if (!configuration || Object.values(configuration).length === 0) {
       return filtered;
     }
     return { ...filtered, ...configuration };
@@ -195,7 +195,7 @@ export function SettingsTab({
   // Sync state when props change
   useEffect(() => {
     let newConfig;
-    if (Object.values(configuration).length === 0 || !configuration) {
+    if (!configuration || Object.values(configuration).length === 0) {
       newConfig = defaultValuesWithoutToggles;
     } else {
       newConfig = { ...defaultValuesWithoutToggles, ...configuration };

@@ -369,6 +369,51 @@ func TestValidateSpec(t *testing.T) {
 			hasError: true,
 			errorMsg: "invalid day 'invalid_day'",
 		},
+		{
+			name: "empty timezone",
+			spec: Spec{
+				Items: []TimeGateItem{
+					{
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday"},
+					},
+				},
+				Timezone: "",
+			},
+			hasError: true,
+			errorMsg: "timezone is required",
+		},
+		{
+			name: "invalid timezone",
+			spec: Spec{
+				Items: []TimeGateItem{
+					{
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday"},
+					},
+				},
+				Timezone: "invalid",
+			},
+			hasError: true,
+			errorMsg: "invalid timezone 'invalid'",
+		},
+		{
+			name: "invalid timezone offset",
+			spec: Spec{
+				Items: []TimeGateItem{
+					{
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday"},
+					},
+				},
+				Timezone: "15",
+			},
+			hasError: true,
+			errorMsg: "invalid timezone '15'",
+		},
 	}
 
 	for _, tt := range tests {
@@ -485,6 +530,53 @@ func TestConfigEqual(t *testing.T) {
 						EndTime:   "17:00",
 						Days:      []string{"wednesday"},
 					},
+				},
+				Timezone: "0",
+			},
+			expected: false,
+		},
+		{
+			name:  "duplicate days in B should not equal unique days in A",
+			specA: baseSpec,
+			specB: Spec{
+				Items: []TimeGateItem{
+					{
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday", "monday"}, // duplicate, but same length
+					},
+				},
+				Timezone: "0",
+			},
+			expected: false,
+		},
+		{
+			name: "duplicate exclude dates in B should not equal unique exclude dates in A",
+			specA: Spec{
+				Items: []TimeGateItem{
+					{
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday", "tuesday"},
+					},
+				},
+				ExcludeDates: []ExcludeDate{
+					{Date: "12-25", StartTime: "", EndTime: ""},
+					{Date: "12-26", StartTime: "", EndTime: ""},
+				},
+				Timezone: "0",
+			},
+			specB: Spec{
+				Items: []TimeGateItem{
+					{
+						StartTime: "09:00",
+						EndTime:   "17:00",
+						Days:      []string{"monday", "tuesday"},
+					},
+				},
+				ExcludeDates: []ExcludeDate{
+					{Date: "12-25", StartTime: "", EndTime: ""},
+					{Date: "12-25", StartTime: "", EndTime: ""}, // duplicate
 				},
 				Timezone: "0",
 			},
