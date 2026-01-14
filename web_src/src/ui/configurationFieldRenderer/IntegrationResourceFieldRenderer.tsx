@@ -22,7 +22,6 @@ export const IntegrationResourceFieldRenderer = ({
   domainType,
 }: IntegrationResourceFieldRendererProps) => {
   const resourceType = field.typeOptions?.resource?.type;
-  const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
 
   // Find the integration field by looking at the visibility conditions
   // The integration field should be referenced in the visibility condition
@@ -100,8 +99,7 @@ export const IntegrationResourceFieldRenderer = ({
     );
   }
 
-  const selectedValue =
-    useNameAsValue && value ? (resources.find((resource) => resource.id === value)?.name ?? value) : (value ?? "");
+  const selectedValue = value ?? "";
 
   return (
     <Select value={selectedValue} onValueChange={(val) => onChange(val || undefined)}>
@@ -110,10 +108,7 @@ export const IntegrationResourceFieldRenderer = ({
       </SelectTrigger>
       <SelectContent>
         {resources.map((resource) => (
-          <SelectItem
-            key={resource.id ?? resource.name}
-            value={useNameAsValue ? (resource.name ?? resource.id ?? "") : (resource.id ?? resource.name ?? "")}
-          >
+          <SelectItem key={resource.id ?? resource.name} value={resource.id ?? resource.name ?? ""}>
             {resource.name}
           </SelectItem>
         ))}
