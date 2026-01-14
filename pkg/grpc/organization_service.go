@@ -75,6 +75,11 @@ func (s *OrganizationService) DescribeApplication(ctx context.Context, req *pb.D
 	return organizations.DescribeApplication(ctx, s.registry, orgID, req.InstallationId)
 }
 
+func (s *OrganizationService) ListApplicationResources(ctx context.Context, req *pb.ListApplicationResourcesRequest) (*pb.ListApplicationResourcesResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListApplicationResources(ctx, s.registry, orgID, req.InstallationId, req.Type)
+}
+
 func (s *OrganizationService) InstallApplication(ctx context.Context, req *pb.InstallApplicationRequest) (*pb.InstallApplicationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.InstallApplication(

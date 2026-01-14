@@ -323,6 +323,8 @@ export function SettingsTab({
                   allValues={nodeConfiguration}
                   domainId={domainId}
                   domainType={domainType}
+                  organizationId={domainId}
+                  appInstallationId={selectedAppInstallation?.id}
                   hasError={
                     showValidation &&
                     (validationErrors.has(fieldName) ||

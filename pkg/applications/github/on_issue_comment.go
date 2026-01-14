@@ -43,8 +43,13 @@ func (i *OnIssueComment) Configuration() []configuration.Field {
 		{
 			Name:     "repository",
 			Label:    "Repository",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeAppInstallationResource,
 			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "repository",
+				},
+			},
 		},
 		{
 			Name:        "contentFilter",

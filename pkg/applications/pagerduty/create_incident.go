@@ -78,10 +78,15 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 		{
 			Name:        "service",
 			Label:       "Service",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeAppInstallationResource,
 			Required:    true,
 			Description: "The ID of the PagerDuty service to create incident for",
 			Placeholder: "e.g. PXXXXXX",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "service",
+				},
+			},
 		},
 	}
 }

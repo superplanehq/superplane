@@ -106,6 +106,7 @@ docs/NodeWidgetRef.md
 docs/OrganizationAPI.md
 docs/OrganizationsAppInstallation.md
 docs/OrganizationsAppInstallationMetadata.md
+docs/OrganizationsAppInstallationResourceRef.md
 docs/OrganizationsAppInstallationSpec.md
 docs/OrganizationsAppInstallationStatus.md
 docs/OrganizationsBrowserAction.md
@@ -116,6 +117,7 @@ docs/OrganizationsDescribeOrganizationResponse.md
 docs/OrganizationsInstallApplicationBody.md
 docs/OrganizationsInstallApplicationResponse.md
 docs/OrganizationsInvitation.md
+docs/OrganizationsListApplicationResourcesResponse.md
 docs/OrganizationsListInvitationsResponse.md
 docs/OrganizationsOrganization.md
 docs/OrganizationsOrganizationMetadata.md
@@ -284,6 +286,7 @@ model_node_trigger_ref.go
 model_node_widget_ref.go
 model_organizations_app_installation.go
 model_organizations_app_installation_metadata.go
+model_organizations_app_installation_resource_ref.go
 model_organizations_app_installation_spec.go
 model_organizations_app_installation_status.go
 model_organizations_browser_action.go
@@ -294,6 +297,7 @@ model_organizations_describe_organization_response.go
 model_organizations_install_application_body.go
 model_organizations_install_application_response.go
 model_organizations_invitation.go
+model_organizations_list_application_resources_response.go
 model_organizations_list_invitations_response.go
 model_organizations_organization.go
 model_organizations_organization_metadata.go

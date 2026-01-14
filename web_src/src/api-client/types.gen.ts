@@ -443,6 +443,12 @@ export type OrganizationsAppInstallationMetadata = {
   updatedAt?: string;
 };
 
+export type OrganizationsAppInstallationResourceRef = {
+  type?: string;
+  name?: string;
+  id?: string;
+};
+
 export type OrganizationsAppInstallationSpec = {
   appName?: string;
   configuration?: {
@@ -507,6 +513,10 @@ export type OrganizationsInvitation = {
   email?: string;
   state?: string;
   createdAt?: string;
+};
+
+export type OrganizationsListApplicationResourcesResponse = {
+  resources?: Array<OrganizationsAppInstallationResourceRef>;
 };
 
 export type OrganizationsListInvitationsResponse = {
@@ -1949,6 +1959,38 @@ export type OrganizationsUpdateApplicationResponses = {
 
 export type OrganizationsUpdateApplicationResponse2 =
   OrganizationsUpdateApplicationResponses[keyof OrganizationsUpdateApplicationResponses];
+
+export type OrganizationsListApplicationResourcesData = {
+  body?: never;
+  path: {
+    id: string;
+    installationId: string;
+  };
+  query?: {
+    type?: string;
+  };
+  url: "/api/v1/organizations/{id}/applications/{installationId}/resources";
+};
+
+export type OrganizationsListApplicationResourcesErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsListApplicationResourcesError =
+  OrganizationsListApplicationResourcesErrors[keyof OrganizationsListApplicationResourcesErrors];
+
+export type OrganizationsListApplicationResourcesResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsListApplicationResourcesResponse;
+};
+
+export type OrganizationsListApplicationResourcesResponse2 =
+  OrganizationsListApplicationResourcesResponses[keyof OrganizationsListApplicationResourcesResponses];
 
 export type OrganizationsListInvitationsData = {
   body?: never;

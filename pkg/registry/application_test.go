@@ -23,6 +23,10 @@ func (p *panickingApplication) Configuration() []configuration.Field { return ni
 func (p *panickingApplication) Components() []core.Component         { return nil }
 func (p *panickingApplication) Triggers() []core.Trigger             { return nil }
 func (p *panickingApplication) Sync(ctx core.SyncContext) error      { panic("sync panic") }
+
+func (p *panickingApplication) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
+	panic("list resources panic")
+}
 func (p *panickingApplication) HandleRequest(ctx core.HTTPRequestContext) {
 	panic("handle request panic")
 }

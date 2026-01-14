@@ -77,6 +77,17 @@ func (s *PanicableApplication) Sync(ctx core.SyncContext) (err error) {
 	return s.underlying.Sync(ctx)
 }
 
+func (s *PanicableApplication) ListResources(resourceType string, ctx core.ListResourcesContext) (resources []core.ApplicationResource, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			resources = nil
+			err = fmt.Errorf("application %s panicked in ListResources(): %v",
+				s.underlying.Name(), r)
+		}
+	}()
+	return s.underlying.ListResources(resourceType, ctx)
+}
+
 func (s *PanicableApplication) HandleRequest(ctx core.HTTPRequestContext) {
 	defer func() {
 		if r := recover(); r != nil {

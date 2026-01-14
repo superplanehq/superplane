@@ -98,6 +98,9 @@ import type {
   OrganizationsUpdateApplicationData,
   OrganizationsUpdateApplicationResponse2,
   OrganizationsUpdateApplicationError,
+  OrganizationsListApplicationResourcesData,
+  OrganizationsListApplicationResourcesResponse2,
+  OrganizationsListApplicationResourcesError,
   OrganizationsListInvitationsData,
   OrganizationsListInvitationsResponse2,
   OrganizationsListInvitationsError,
@@ -781,6 +784,23 @@ export const organizationsUpdateApplication = <ThrowOnError extends boolean = tr
       "Content-Type": "application/json",
       ...options?.headers,
     },
+  });
+};
+
+/**
+ * List application resources
+ * Lists resources for an application installation
+ */
+export const organizationsListApplicationResources = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsListApplicationResourcesData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    OrganizationsListApplicationResourcesResponse2,
+    OrganizationsListApplicationResourcesError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/applications/{installationId}/resources",
+    ...options,
   });
 };
 

@@ -47,8 +47,13 @@ func (p *OnPipelineDone) Configuration() []configuration.Field {
 		{
 			Name:     "project",
 			Label:    "Project",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeAppInstallationResource,
 			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "project",
+				},
+			},
 		},
 	}
 }
