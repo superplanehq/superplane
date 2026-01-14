@@ -59,8 +59,8 @@ func (c *CreateResponse) Configuration() []configuration.Field {
 			Label:       "Model",
 			Type:        configuration.FieldTypeAppInstallationResource,
 			Required:    true,
-			Default:     "gpt-4.1-mini",
-			Placeholder: "e.g. gpt-4.1-mini",
+			Default:     "gpt-5.2",
+			Placeholder: "e.g. gpt-5.2",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "model",
