@@ -29,7 +29,7 @@ import {
   triggerRenderers as pagerdutyTriggerRenderers,
   eventStateRegistry as pagerdutyEventStateRegistry,
 } from "./pagerduty/index";
-import { timeGateMapper } from "./timegate";
+import { timeGateMapper, TIMEGATE_STATE_REGISTRY } from "./timegate";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
@@ -84,6 +84,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   http: HTTP_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
+  time_gate: TIMEGATE_STATE_REGISTRY,
 };
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {

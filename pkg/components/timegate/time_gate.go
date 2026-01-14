@@ -38,7 +38,23 @@ const (
 type TimeGate struct{}
 
 type Metadata struct {
-	NextValidTime *string `json:"nextValidTime"`
+	NextValidTime *string          `json:"nextValidTime"`
+	PushedThrough *PushThroughInfo `json:"pushedThrough,omitempty"`
+	CancelledBy   *CancelInfo      `json:"cancelledBy,omitempty"`
+}
+
+type PushThroughInfo struct {
+	At     string `json:"at"`     // RFC3339 timestamp
+	UserID string `json:"userId"` // User ID
+	Email  string `json:"email"`  // User email
+	Name   string `json:"name"`   // User name
+}
+
+type CancelInfo struct {
+	At     string `json:"at"`     // RFC3339 timestamp
+	UserID string `json:"userId"` // User ID
+	Email  string `json:"email"`  // User email
+	Name   string `json:"name"`   // User name
 }
 
 type TimeGateItem struct {
@@ -426,6 +442,36 @@ func (tg *TimeGate) HandlePushThrough(ctx core.ActionContext) error {
 		return nil
 	}
 
+	// Store push through information in metadata
+	user := ctx.Auth.AuthenticatedUser()
+	pushThroughInfo := PushThroughInfo{
+		At:     time.Now().Format(time.RFC3339),
+		UserID: user.ID,
+		Email:  user.Email,
+		Name:   user.Name,
+	}
+
+	// Get existing metadata
+	existingMetadata := Metadata{}
+	existingMetaData := ctx.Metadata.Get()
+	if existingMetaData != nil {
+		if err := mapstructure.Decode(existingMetaData, &existingMetadata); err != nil {
+			// If decode fails, try to read as map
+			if metaMap, ok := existingMetaData.(map[string]any); ok {
+				if nextValidTime, ok := metaMap["nextValidTime"].(string); ok {
+					existingMetadata.NextValidTime = &nextValidTime
+				}
+			}
+		}
+	}
+
+	// Set updated metadata with push through info
+	existingMetadata.PushedThrough = &pushThroughInfo
+	err := ctx.Metadata.Set(existingMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to store push through metadata: %w", err)
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"timegate.finished",
@@ -689,6 +735,38 @@ func (tg *TimeGate) parseDayInYear(dayStr string) (int, int, error) {
 }
 
 func (tg *TimeGate) Cancel(ctx core.ExecutionContext) error {
+	// Store cancellation information in metadata
+	user := ctx.Auth.AuthenticatedUser()
+	if user != nil {
+		cancelInfo := CancelInfo{
+			At:     time.Now().Format(time.RFC3339),
+			UserID: user.ID,
+			Email:  user.Email,
+			Name:   user.Name,
+		}
+
+		// Get existing metadata
+		existingMetadata := Metadata{}
+		existingMetaData := ctx.Metadata.Get()
+		if existingMetaData != nil {
+			if err := mapstructure.Decode(existingMetaData, &existingMetadata); err != nil {
+				// If decode fails, try to read as map
+				if metaMap, ok := existingMetaData.(map[string]any); ok {
+					if nextValidTime, ok := metaMap["nextValidTime"].(string); ok {
+						existingMetadata.NextValidTime = &nextValidTime
+					}
+				}
+			}
+		}
+
+		// Set updated metadata with cancellation info
+		existingMetadata.CancelledBy = &cancelInfo
+		err := ctx.Metadata.Set(existingMetadata)
+		if err != nil {
+			return fmt.Errorf("failed to store cancellation metadata: %w", err)
+		}
+	}
+
 	return nil
 }
 
