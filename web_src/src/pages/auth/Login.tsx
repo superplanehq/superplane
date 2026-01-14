@@ -5,6 +5,7 @@ import { useAccount } from "../../contexts/AccountContext";
 type AuthConfig = {
   providers: string[];
   passwordLoginEnabled: boolean;
+  signupEnabled: boolean;
 };
 
 const isValidRedirectPath = (path: string | null): path is string => {
@@ -47,6 +48,7 @@ export const Login: React.FC = () => {
   const [authConfig, setAuthConfig] = useState<AuthConfig>({
     providers: [],
     passwordLoginEnabled: false,
+    signupEnabled: false,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +57,15 @@ export const Login: React.FC = () => {
 
   const redirectParam = searchParams.get("redirect");
   const safeRedirect = useMemo(() => getSafeRedirectPath(redirectParam), [redirectParam]);
+
+  const inviteToken = useMemo(() => {
+    if (!safeRedirect || !safeRedirect.startsWith("/invite/")) {
+      return "";
+    }
+
+    const parts = safeRedirect.split("/");
+    return parts.length >= 3 ? parts[2] : "";
+  }, [safeRedirect]);
 
   useEffect(() => {
     if (!accountLoading && account) {
@@ -77,6 +88,7 @@ export const Login: React.FC = () => {
           setAuthConfig({
             providers: data.providers || [],
             passwordLoginEnabled: Boolean(data.passwordLoginEnabled),
+            signupEnabled: Boolean(data.signupEnabled),
           });
         }
       } catch (err) {
@@ -99,7 +111,9 @@ export const Login: React.FC = () => {
 
   const providers = authConfig.providers || [];
   const hasProviders = providers.length > 0;
+  const canSignupWithPassword = authConfig.passwordLoginEnabled && (authConfig.signupEnabled || inviteToken);
   const redirectQuery = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
+  const signupQuery = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
 
   return (
     <div
@@ -121,8 +135,8 @@ export const Login: React.FC = () => {
           background: "#1e2938",
           textAlign: "center",
           paddingBottom: "2rem",
-          maxWidth: "320px",
-          width: "90%",
+          maxWidth: "420px",
+          width: "92%",
         }}
       >
         <div style={{ padding: "1.5rem 1.5rem 1.25rem", display: "flex", justifyContent: "center" }}>
@@ -150,7 +164,7 @@ export const Login: React.FC = () => {
               borderTop: "1px solid #3d4859",
             }}
           >
-            Continue with
+            Login with
           </div>
         )}
 
@@ -161,7 +175,7 @@ export const Login: React.FC = () => {
             style={{
               padding: "12px",
               margin: "0 auto 12px",
-              width: "80%",
+              width: "90%",
               borderRadius: "8px",
               backgroundColor: "#7f1d1d",
               color: "#fca5a5",
@@ -184,17 +198,18 @@ export const Login: React.FC = () => {
                 padding: "12px 24px",
                 borderRadius: "8px",
                 textDecoration: "none",
-                width: "80%",
+                width: "90%",
                 boxSizing: "border-box",
                 marginBottom: "12px",
                 fontWeight: 500,
                 background: provider === "github" ? "#7f92b0" : "#6584b4",
                 color: "#1e2938",
+                position: "relative",
               }}
             >
               {provider === "github" && (
                 <svg
-                  style={{ width: "20px", height: "20px", marginRight: "8px" }}
+                  style={{ width: "20px", height: "20px", position: "absolute", left: "20px" }}
                   viewBox="0 0 24 24"
                   fill="currentColor"
                 >
@@ -203,7 +218,7 @@ export const Login: React.FC = () => {
               )}
               {provider === "google" && (
                 <svg
-                  style={{ width: "20px", height: "20px", marginRight: "8px" }}
+                  style={{ width: "20px", height: "20px", position: "absolute", left: "20px" }}
                   viewBox="0 0 24 24"
                   fill="currentColor"
                 >
@@ -213,7 +228,7 @@ export const Login: React.FC = () => {
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
               )}
-              {getProviderLabel(provider)}
+              <span>{getProviderLabel(provider)}</span>
             </a>
           ))}
 
@@ -227,23 +242,39 @@ export const Login: React.FC = () => {
               padding: "12px 24px",
               borderRadius: "8px",
               textDecoration: "none",
-              width: "80%",
+              width: "90%",
               boxSizing: "border-box",
               marginBottom: "12px",
               fontWeight: 500,
               background: "#6584b4",
               color: "#1e2938",
+              position: "relative",
             }}
           >
-            <svg style={{ width: "20px", height: "20px", marginRight: "8px" }} viewBox="0 0 24 24" fill="currentColor">
+            <svg style={{ width: "20px", height: "20px", position: "absolute", left: "20px" }} viewBox="0 0 24 24" fill="currentColor">
               <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
             </svg>
-            Email & Password
+            <span>Email & Password</span>
           </a>
         )}
 
         {!loading && !hasProviders && !authConfig.passwordLoginEnabled && (
           <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>No login methods are configured.</div>
+        )}
+
+        {!loading && canSignupWithPassword && (
+          <div style={{ marginTop: "16px", fontSize: "14px", color: "#94a9ca" }}>
+            {"Don't have an account? "}
+            <a
+              href={`/signup${signupQuery}`}
+              style={{
+                color: "#c7d3ea",
+                textDecoration: "underline",
+              }}
+            >
+              Create an account
+            </a>
+          </div>
         )}
       </div>
     </div>

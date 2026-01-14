@@ -1,20 +1,47 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-const EmailLogin: React.FC = () => {
+const EmailSignup: React.FC = () => {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
 
   const redirectParam = searchParams.get("redirect") || "";
 
+  const inviteToken = useMemo(() => {
+    try {
+      const decoded = decodeURIComponent(redirectParam);
+      if (!decoded.startsWith("/invite/")) {
+        return "";
+      }
+
+      const parts = decoded.split("/");
+      return parts.length >= 3 ? parts[2] : "";
+    } catch {
+      return "";
+    }
+  }, [redirectParam]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email.trim() || !password) {
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("First and last names are required");
+      return;
+    }
+
+    if (!email.trim() || !password || !confirmPassword) {
       setError("Email and password are required");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
       return;
     }
 
@@ -23,10 +50,14 @@ const EmailLogin: React.FC = () => {
 
     try {
       const formData = new URLSearchParams();
+      formData.append("name", `${firstName.trim()} ${lastName.trim()}`);
       formData.append("email", email.trim());
       formData.append("password", password);
+      if (inviteToken) {
+        formData.append("invite_token", inviteToken);
+      }
 
-      const url = redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : "/login";
+      const url = redirectParam ? `/signup?redirect=${encodeURIComponent(redirectParam)}` : "/signup";
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -37,23 +68,21 @@ const EmailLogin: React.FC = () => {
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          setError("Invalid email or password");
+        if (response.status === 409) {
+          setError("Account already exists. Please sign in.");
         } else {
-          setError("Login failed. Please try again.");
+          const errorText = await response.text();
+          setError(errorText || "Signup failed. Please try again.");
         }
         setLoading(false);
         return;
       }
 
-      // If there's a redirect param, use it
       if (redirectParam) {
         window.location.href = redirectParam;
         return;
       }
 
-      // If no redirect param, check if user has exactly one organization
-      // and redirect to it automatically
       try {
         const orgsResponse = await fetch("/organizations", {
           credentials: "include",
@@ -62,19 +91,17 @@ const EmailLogin: React.FC = () => {
         if (orgsResponse.ok) {
           const organizations = await orgsResponse.json();
           if (organizations.length === 1) {
-            // User has exactly one organization, redirect to it
             window.location.href = `/${organizations[0].id}`;
             return;
           }
         }
-      } catch (err) {
-        // If fetching organizations fails, fall through to default redirect
+      } catch {
+        // fall through to default redirect
       }
 
-      // Default: redirect to home (organization select page)
       const finalURL = response.url || "/";
       window.location.href = finalURL;
-    } catch (err) {
+    } catch {
       setError("Network error occurred");
       setLoading(false);
     }
@@ -127,7 +154,9 @@ const EmailLogin: React.FC = () => {
             paddingTop: "1rem",
             borderTop: "1px solid #3d4859",
           }}
-        />
+        >
+          Create your account
+        </div>
 
         <form onSubmit={handleSubmit} style={{ width: "80%", margin: "0 auto 1.5rem", textAlign: "left" }}>
           {error && (
@@ -145,28 +174,47 @@ const EmailLogin: React.FC = () => {
             </div>
           )}
 
-          {isSignupMode && (
-            <input
-              type="text"
-              name="name"
-              placeholder="Full name"
-              required
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                marginBottom: "12px",
-                borderRadius: "8px",
-                border: "1px solid #3d4859",
-                background: "#2a3441",
-                color: "#F9FAFC",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
-          )}
+          <input
+            type="text"
+            name="first_name"
+            placeholder="First name"
+            required
+            autoComplete="given-name"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px",
+              marginBottom: "12px",
+              borderRadius: "8px",
+              border: "1px solid #3d4859",
+              background: "#2a3441",
+              color: "#F9FAFC",
+              fontSize: "14px",
+              boxSizing: "border-box",
+            }}
+          />
+
+          <input
+            type="text"
+            name="last_name"
+            placeholder="Last name"
+            required
+            autoComplete="family-name"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px",
+              marginBottom: "12px",
+              borderRadius: "8px",
+              border: "1px solid #3d4859",
+              background: "#2a3441",
+              color: "#F9FAFC",
+              fontSize: "14px",
+              boxSizing: "border-box",
+            }}
+          />
 
           <input
             type="email"
@@ -194,9 +242,30 @@ const EmailLogin: React.FC = () => {
             name="password"
             placeholder="Password"
             required
-            autoComplete="current-password"
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px",
+              marginBottom: "12px",
+              borderRadius: "8px",
+              border: "1px solid #3d4859",
+              background: "#2a3441",
+              color: "#F9FAFC",
+              fontSize: "14px",
+              boxSizing: "border-box",
+            }}
+          />
+
+          <input
+            type="password"
+            name="confirm_password"
+            placeholder="Repeat password"
+            required
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             style={{
               width: "100%",
               padding: "12px",
@@ -226,7 +295,7 @@ const EmailLogin: React.FC = () => {
               transition: "all 0.2s",
             }}
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Creating account..." : "Create account"}
           </button>
         </form>
 
@@ -247,4 +316,4 @@ const EmailLogin: React.FC = () => {
   );
 };
 
-export default EmailLogin;
+export default EmailSignup;

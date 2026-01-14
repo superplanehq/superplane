@@ -10,7 +10,6 @@ import AuthGuard from "./components/AuthGuard";
 import { AccountProvider } from "./contexts/AccountContext";
 import { useAccount } from "./contexts/AccountContext";
 import { isCustomComponentsEnabled } from "./lib/env";
-import EmailLogin from "./pages/auth/EmailLogin";
 import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
@@ -59,7 +58,9 @@ function AppRouter() {
         <Routes>
           {/* public routes */}
           <Route path="login" element={<Login />} />
-          <Route path="login/email" element={<EmailLogin />} />
+          <Route path="login/email" element={<Login />} />
+          <Route path="signup" element={<Login />} />
+          <Route path="signup/email" element={<Login />} />
           <Route path="create" element={<OrganizationCreate />} />
           <Route path="setup" element={<OwnerSetup />} />
 

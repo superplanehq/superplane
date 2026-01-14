@@ -1,84 +1,118 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useAccount } from "../../contexts/AccountContext";
 
-const EmailLogin: React.FC = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+type AuthConfig = {
+  providers: string[];
+  passwordLoginEnabled: boolean;
+  signupEnabled: boolean;
+};
+
+const isValidRedirectPath = (path: string | null): path is string => {
+  if (!path || path[0] !== "/") {
+    return false;
+  }
+
+  if (path.length > 1 && path[1] === "/") {
+    return false;
+  }
+
+  return true;
+};
+
+const getSafeRedirectPath = (rawRedirect: string | null): string | null => {
+  if (!rawRedirect) {
+    return null;
+  }
+
+  try {
+    const decoded = decodeURIComponent(rawRedirect);
+    return isValidRedirectPath(decoded) ? decoded : null;
+  } catch {
+    return null;
+  }
+};
+
+const getProviderLabel = (provider: string) => {
+  switch (provider) {
+    case "github":
+      return "GitHub";
+    case "google":
+      return "Google";
+    default:
+      return provider.charAt(0).toUpperCase() + provider.slice(1);
+  }
+};
+
+export const Signup: React.FC = () => {
+  const [authConfig, setAuthConfig] = useState<AuthConfig>({
+    providers: [],
+    passwordLoginEnabled: false,
+    signupEnabled: false,
+  });
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
+  const { account, loading: accountLoading } = useAccount();
 
-  const redirectParam = searchParams.get("redirect") || "";
+  const redirectParam = searchParams.get("redirect");
+  const safeRedirect = useMemo(() => getSafeRedirectPath(redirectParam), [redirectParam]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!email.trim() || !password) {
-      setError("Email and password are required");
-      return;
+  const inviteToken = useMemo(() => {
+    if (!safeRedirect || !safeRedirect.startsWith("/invite/")) {
+      return "";
     }
 
-    setLoading(true);
-    setError(null);
+    const parts = safeRedirect.split("/");
+    return parts.length >= 3 ? parts[2] : "";
+  }, [safeRedirect]);
 
-    try {
-      const formData = new URLSearchParams();
-      formData.append("email", email.trim());
-      formData.append("password", password);
+  useEffect(() => {
+    if (!accountLoading && account) {
+      window.location.href = safeRedirect || "/";
+    }
+  }, [account, accountLoading, safeRedirect]);
 
-      const url = redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : "/login";
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        credentials: "include",
-        body: formData.toString(),
-      });
+  useEffect(() => {
+    let canceled = false;
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          setError("Invalid email or password");
-        } else {
-          setError("Login failed. Please try again.");
-        }
-        setLoading(false);
-        return;
-      }
-
-      // If there's a redirect param, use it
-      if (redirectParam) {
-        window.location.href = redirectParam;
-        return;
-      }
-
-      // If no redirect param, check if user has exactly one organization
-      // and redirect to it automatically
+    const fetchAuthConfig = async () => {
       try {
-        const orgsResponse = await fetch("/organizations", {
-          credentials: "include",
-        });
+        const response = await fetch("/auth/config");
+        if (!response.ok) {
+          throw new Error("Failed to load auth configuration");
+        }
 
-        if (orgsResponse.ok) {
-          const organizations = await orgsResponse.json();
-          if (organizations.length === 1) {
-            // User has exactly one organization, redirect to it
-            window.location.href = `/${organizations[0].id}`;
-            return;
-          }
+        const data = (await response.json()) as AuthConfig;
+        if (!canceled) {
+          setAuthConfig({
+            providers: data.providers || [],
+            passwordLoginEnabled: Boolean(data.passwordLoginEnabled),
+            signupEnabled: Boolean(data.signupEnabled),
+          });
         }
       } catch (err) {
-        // If fetching organizations fails, fall through to default redirect
+        if (!canceled) {
+          setError("Failed to load signup options.");
+        }
+      } finally {
+        if (!canceled) {
+          setLoading(false);
+        }
       }
+    };
 
-      // Default: redirect to home (organization select page)
-      const finalURL = response.url || "/";
-      window.location.href = finalURL;
-    } catch (err) {
-      setError("Network error occurred");
-      setLoading(false);
-    }
-  };
+    fetchAuthConfig();
+
+    return () => {
+      canceled = true;
+    };
+  }, []);
+
+  const providers = authConfig.providers || [];
+  const canSignup = authConfig.signupEnabled || inviteToken;
+  const canSignupWithPassword = authConfig.passwordLoginEnabled && canSignup;
+  const redirectQuery = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
 
   return (
     <div
@@ -100,8 +134,8 @@ const EmailLogin: React.FC = () => {
           background: "#1e2938",
           textAlign: "center",
           paddingBottom: "2rem",
-          maxWidth: "320px",
-          width: "90%",
+          maxWidth: "420px",
+          width: "92%",
         }}
       >
         <div style={{ padding: "1.5rem 1.5rem 1.25rem", display: "flex", justifyContent: "center" }}>
@@ -127,124 +161,130 @@ const EmailLogin: React.FC = () => {
             paddingTop: "1rem",
             borderTop: "1px solid #3d4859",
           }}
-        />
+        >
+          Sign up with
+        </div>
 
-        <form onSubmit={handleSubmit} style={{ width: "80%", margin: "0 auto 1.5rem", textAlign: "left" }}>
-          {error && (
-            <div
+        {loading && <div style={{ color: "#94a9ca", fontSize: "14px", paddingBottom: "1rem" }}>Loading...</div>}
+
+        {error && (
+          <div
+            style={{
+              padding: "12px",
+              margin: "0 auto 12px",
+              width: "90%",
+              borderRadius: "8px",
+              backgroundColor: "#7f1d1d",
+              color: "#fca5a5",
+              fontSize: "14px",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {!loading && !canSignup && (
+          <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>
+            Signups are currently disabled.
+          </div>
+        )}
+
+        {!loading &&
+          canSignup &&
+          providers.map((provider) => (
+            <a
+              key={provider}
+              href={`/auth/${provider}${redirectQuery}`}
               style={{
-                padding: "12px",
-                marginBottom: "12px",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "12px 24px",
                 borderRadius: "8px",
-                backgroundColor: "#7f1d1d",
-                color: "#fca5a5",
-                fontSize: "14px",
+                textDecoration: "none",
+                width: "90%",
+                boxSizing: "border-box",
+                marginBottom: "12px",
+                fontWeight: 500,
+                background: provider === "github" ? "#7f92b0" : "#6584b4",
+                color: "#1e2938",
+                position: "relative",
               }}
             >
-              {error}
-            </div>
-          )}
+              {provider === "github" && (
+                <svg
+                  style={{ width: "20px", height: "20px", position: "absolute", left: "20px" }}
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                </svg>
+              )}
+              {provider === "google" && (
+                <svg
+                  style={{ width: "20px", height: "20px", position: "absolute", left: "20px" }}
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                </svg>
+              )}
+              <span>{getProviderLabel(provider)}</span>
+            </a>
+          ))}
 
-          {isSignupMode && (
-            <input
-              type="text"
-              name="name"
-              placeholder="Full name"
-              required
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                marginBottom: "12px",
-                borderRadius: "8px",
-                border: "1px solid #3d4859",
-                background: "#2a3441",
-                color: "#F9FAFC",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
-          )}
-
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+        {!loading && canSignupWithPassword && (
+          <a
+            href={`/signup/email${redirectQuery}`}
             style={{
-              width: "100%",
-              padding: "12px",
-              marginBottom: "12px",
-              borderRadius: "8px",
-              border: "1px solid #3d4859",
-              background: "#2a3441",
-              color: "#F9FAFC",
-              fontSize: "14px",
-              boxSizing: "border-box",
-            }}
-          />
-
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "12px",
-              marginBottom: "12px",
-              borderRadius: "8px",
-              border: "1px solid #3d4859",
-              background: "#2a3441",
-              color: "#F9FAFC",
-              fontSize: "14px",
-              boxSizing: "border-box",
-            }}
-          />
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: "100%",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
               padding: "12px 24px",
               borderRadius: "8px",
-              border: "none",
-              background: loading ? "#5472a3" : "#6584b4",
-              color: "#1e2938",
-              fontWeight: 500,
-              fontSize: "14px",
-              cursor: loading ? "not-allowed" : "pointer",
-              transition: "all 0.2s",
-            }}
-          >
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
-
-        <div style={{ marginTop: "1rem" }}>
-          <a
-            href={redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : "/login"}
-            style={{
-              color: "#94a9ca",
               textDecoration: "none",
-              fontSize: "14px",
+              width: "90%",
+              boxSizing: "border-box",
+              marginBottom: "12px",
+              fontWeight: 500,
+              background: "#6584b4",
+              color: "#1e2938",
+              position: "relative",
             }}
           >
-            ← Back
+            <svg style={{ width: "20px", height: "20px", position: "absolute", left: "20px" }} viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
+            </svg>
+            <span>Email & Password</span>
           </a>
-        </div>
+        )}
+
+        {!loading && canSignup && !providers.length && !authConfig.passwordLoginEnabled && (
+          <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>
+            No signup methods are configured.
+          </div>
+        )}
+
+        {!loading && (
+          <div style={{ marginTop: "16px", fontSize: "14px", color: "#94a9ca" }}>
+            Already have an account?{" "}
+            <a
+              href={`/login${redirectQuery}`}
+              style={{
+                color: "#c7d3ea",
+                textDecoration: "underline",
+              }}
+            >
+              Sign in
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-export default EmailLogin;
+export default Signup;
