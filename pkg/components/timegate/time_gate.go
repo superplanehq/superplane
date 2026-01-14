@@ -85,7 +85,7 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "items",
-			Label:       "Time Windows",
+			Label:       "Time Window",
 			Type:        configuration.FieldTypeList,
 			Required:    true,
 			Description: "Items will wait until the next valid time window is reached",
