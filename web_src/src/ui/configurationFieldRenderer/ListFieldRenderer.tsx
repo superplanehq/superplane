@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
 import { showErrorToast } from "@/utils/toast";
+import { TimeRangeWithAllDay } from "./TimeRangeWithAllDay";
 
 interface ExtendedFieldRendererProps extends FieldRendererProps {
   validationErrors?: ValidationError[] | Set<string>;
@@ -84,47 +85,152 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           <div className="flex-1">
             {itemDefinition?.type === "object" && itemDefinition.schema ? (
               <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
-                {itemDefinition.schema.map((schemaField) => {
-                  const nestedFieldPath = `${fieldPath}[${index}].${schemaField.name}`;
-                  const hasNestedError = (() => {
-                    if (!validationErrors) return false;
+                {(() => {
+                  // Check if we have a type field (for timegate items)
+                  const typeField = itemDefinition.schema.find((f) => f.name === "type");
+                  const startTimeField = itemDefinition.schema.find((f) => f.name === "startTime");
+                  const endTimeField = itemDefinition.schema.find((f) => f.name === "endTime");
+                  
+                  // For timegate, render type field first, then handle time fields specially, then other fields
+                  if (typeField) {
+                    const itemValues =
+                      item && typeof item === "object"
+                        ? (item as Record<string, unknown>)
+                        : ({} as Record<string, unknown>);
+                    const nestedValues = isApprovalItemsList
+                      ? {
+                          ...itemValues,
+                          __listItems: items,
+                          __itemIndex: index,
+                          __isApprovalList: true,
+                        }
+                      : itemValues;
 
-                    if (validationErrors instanceof Set) {
-                      return validationErrors.has(nestedFieldPath);
-                    } else {
-                      return validationErrors.some((error) => error.field === nestedFieldPath);
-                    }
-                  })();
-
-                  const itemValues =
-                    item && typeof item === "object"
-                      ? (item as Record<string, unknown>)
-                      : ({} as Record<string, unknown>);
-                  const nestedValues = isApprovalItemsList
-                    ? {
-                        ...itemValues,
-                        __listItems: items,
-                        __itemIndex: index,
-                        __isApprovalList: true,
+                    const getNestedError = (fieldName: string) => {
+                      const nestedFieldPath = `${fieldPath}[${index}].${fieldName}`;
+                      if (!validationErrors) return false;
+                      if (validationErrors instanceof Set) {
+                        return validationErrors.has(nestedFieldPath);
+                      } else {
+                        return validationErrors.some((error) => error.field === nestedFieldPath);
                       }
-                    : itemValues;
+                    };
 
-                  return (
-                    <ConfigurationFieldRenderer
-                      key={schemaField.name}
-                      field={schemaField}
-                      value={itemValues[schemaField.name!]}
-                      onChange={(val) => {
-                        const newItem = { ...itemValues, [schemaField.name!]: val };
-                        updateItem(index, newItem);
-                      }}
-                      allValues={nestedValues}
-                      domainId={domainId}
-                      domainType={domainType}
-                      hasError={hasNestedError}
-                    />
-                  );
-                })}
+                    const hasTimeError = getNestedError("startTime") || getNestedError("endTime");
+
+                    return (
+                      <>
+                        <ConfigurationFieldRenderer
+                          field={typeField}
+                          value={itemValues[typeField.name!]}
+                          onChange={(val) => {
+                            const newItem = { ...itemValues, [typeField.name!]: val };
+                            updateItem(index, newItem);
+                          }}
+                          allValues={nestedValues}
+                          domainId={domainId}
+                          domainType={domainType}
+                          hasError={getNestedError(typeField.name!)}
+                        />
+                        {/* Render time range with "All day" toggle if both time fields exist */}
+                        {startTimeField && endTimeField && (
+                          <TimeRangeWithAllDay
+                            startTime={itemValues.startTime as string | undefined}
+                            endTime={itemValues.endTime as string | undefined}
+                            onStartTimeChange={(val) => {
+                              const newItem = { ...itemValues, startTime: val };
+                              updateItem(index, newItem);
+                            }}
+                            onEndTimeChange={(val) => {
+                              const newItem = { ...itemValues, endTime: val };
+                              updateItem(index, newItem);
+                            }}
+                            onBothTimesChange={(startVal, endVal) => {
+                              // Update both times atomically
+                              const newItem = { ...itemValues, startTime: startVal, endTime: endVal };
+                              updateItem(index, newItem);
+                            }}
+                            hasError={hasTimeError}
+                          />
+                        )}
+                        {itemDefinition.schema
+                          .filter((f) => f.name !== "type" && f.name !== "startTime" && f.name !== "endTime")
+                          .map((schemaField) => {
+                            const itemValues =
+                              item && typeof item === "object"
+                                ? (item as Record<string, unknown>)
+                                : ({} as Record<string, unknown>);
+                            const nestedValues = isApprovalItemsList
+                              ? {
+                                  ...itemValues,
+                                  __listItems: items,
+                                  __itemIndex: index,
+                                  __isApprovalList: true,
+                                }
+                              : itemValues;
+
+                            return (
+                              <ConfigurationFieldRenderer
+                                key={schemaField.name}
+                                field={schemaField}
+                                value={itemValues[schemaField.name!]}
+                                onChange={(val) => {
+                                  const newItem = { ...itemValues, [schemaField.name!]: val };
+                                  updateItem(index, newItem);
+                                }}
+                                allValues={nestedValues}
+                                domainId={domainId}
+                                domainType={domainType}
+                                hasError={getNestedError(schemaField.name!)}
+                              />
+                            );
+                          })}
+                      </>
+                    );
+                  }
+
+                  // Default rendering for other fields
+                  return itemDefinition.schema.map((schemaField) => {
+                    const nestedFieldPath = `${fieldPath}[${index}].${schemaField.name}`;
+                    const hasNestedError = (() => {
+                      if (!validationErrors) return false;
+                      if (validationErrors instanceof Set) {
+                        return validationErrors.has(nestedFieldPath);
+                      } else {
+                        return validationErrors.some((error) => error.field === nestedFieldPath);
+                      }
+                    })();
+
+                    const itemValues =
+                      item && typeof item === "object"
+                        ? (item as Record<string, unknown>)
+                        : ({} as Record<string, unknown>);
+                    const nestedValues = isApprovalItemsList
+                      ? {
+                          ...itemValues,
+                          __listItems: items,
+                          __itemIndex: index,
+                          __isApprovalList: true,
+                        }
+                      : itemValues;
+
+                    return (
+                      <ConfigurationFieldRenderer
+                        key={schemaField.name}
+                        field={schemaField}
+                        value={itemValues[schemaField.name!]}
+                        onChange={(val) => {
+                          const newItem = { ...itemValues, [schemaField.name!]: val };
+                          updateItem(index, newItem);
+                        }}
+                        allValues={nestedValues}
+                        domainId={domainId}
+                        domainType={domainType}
+                        hasError={hasNestedError}
+                      />
+                    );
+                  });
+                })()}
               </div>
             ) : (
               <Input

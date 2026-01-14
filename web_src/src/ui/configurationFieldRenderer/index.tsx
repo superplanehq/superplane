@@ -8,7 +8,9 @@ import { XMLFieldRenderer } from "./XMLFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
 import { BooleanFieldRenderer } from "./BooleanFieldRenderer";
 import { SelectFieldRenderer } from "./SelectFieldRenderer";
+import { RadioButtonFieldRenderer } from "./RadioButtonFieldRenderer";
 import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
+import { DaysOfWeekToggle } from "./DaysOfWeekToggle";
 import { DateFieldRenderer } from "./DateFieldRenderer";
 import { DateTimeFieldRenderer } from "./DateTimeFieldRenderer";
 import { UrlFieldRenderer } from "./UrlFieldRenderer";
@@ -226,9 +228,18 @@ export const ConfigurationFieldRenderer = ({
         return <BooleanFieldRenderer {...commonProps} />;
 
       case "select":
+        // Use radio buttons for select fields with exactly 2 options (like Mode and Type)
+        const selectOptions = field.typeOptions?.select?.options ?? [];
+        if (selectOptions.length === 2) {
+          return <RadioButtonFieldRenderer {...commonProps} />;
+        }
         return <SelectFieldRenderer {...commonProps} />;
 
       case "multi-select":
+        // Use special toggle component for days of week field
+        if (field.name === "days") {
+          return <DaysOfWeekToggle {...commonProps} />;
+        }
         return <MultiSelectFieldRenderer {...commonProps} />;
 
       case "date":
@@ -391,30 +402,44 @@ export const ConfigurationFieldRenderer = ({
     );
   }
 
+  // Check if this field uses tabs (select with 2 options)
+  const usesTabs = field.type === "select" && field.typeOptions?.select?.options?.length === 2;
+  
+  // Check if this is the items field (Time Windows) - hide label for it
+  const isItemsField = field.name === "items";
+  
+  // Check if this is the days field - hide label for it
+  const isDaysField = field.name === "days";
+  
+  // Check if this is a time field that's handled by TimeRangeWithAllDay - hide label for it
+  const isTimeFieldInRange = field.name === "startTime" || field.name === "endTime";
+  
   // For all other field types, render label above field
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3">
-        {isTogglable && (
-          <Switch
-            checked={isEnabled}
-            onCheckedChange={handleToggleChange}
-            className={`${hasFieldError ? "border-red-500 border-2" : ""}`}
-          />
-        )}
-        <Label className={`block text-left ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
-          {field.label || field.name}
-          {isRequired && <span className="text-red-500 ml-1">*</span>}
-          {hasFieldError &&
-            ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
-              (!enableRealtimeValidation &&
-                validationErrors &&
-                isRequired &&
-                (value === undefined || value === null || value === ""))) && (
-              <span className="text-red-500 text-xs ml-2">- required field</span>
-            )}
-        </Label>
-      </div>
+      {!usesTabs && !isItemsField && !isDaysField && !isTimeFieldInRange && (
+        <div className="flex items-center gap-3">
+          {isTogglable && (
+            <Switch
+              checked={isEnabled}
+              onCheckedChange={handleToggleChange}
+              className={`${hasFieldError ? "border-red-500 border-2" : ""}`}
+            />
+          )}
+          <Label className={`block text-left ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
+            {field.label || field.name}
+            {isRequired && <span className="text-red-500 ml-1">*</span>}
+            {hasFieldError &&
+              ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
+                (!enableRealtimeValidation &&
+                  validationErrors &&
+                  isRequired &&
+                  (value === undefined || value === null || value === ""))) && (
+                <span className="text-red-500 text-xs ml-2">- required field</span>
+              )}
+          </Label>
+        </div>
+      )}
       {isEnabled && (
         <div className="flex items-center gap-2">
           <div className="flex-1">{renderField()}</div>
