@@ -170,6 +170,11 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 								Label:    "Date",
 								Type:     configuration.FieldTypeDate,
 								Required: true,
+								TypeOptions: &configuration.TypeOptions{
+									Date: &configuration.DateTypeOptions{
+										Format: "01-02", // MM-DD format for recurring dates
+									},
+								},
 							},
 							{
 								Name:        "startTime",
