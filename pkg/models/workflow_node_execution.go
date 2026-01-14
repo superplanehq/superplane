@@ -512,6 +512,19 @@ func (e *WorkflowNodeExecution) GetOutputsInTransaction(tx *gorm.DB) ([]Workflow
 	return events, nil
 }
 
+func ListWorkflowEventsForExecutionsInTransaction(tx *gorm.DB, executionIDs []uuid.UUID) ([]WorkflowEvent, error) {
+	var events []WorkflowEvent
+	err := tx.
+		Where("execution_id IN ?", executionIDs).
+		Find(&events).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
 func (e *WorkflowNodeExecution) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, runAt *time.Time) error {
 	return tx.Create(&WorkflowNodeRequest{
 		WorkflowID:  e.WorkflowID,

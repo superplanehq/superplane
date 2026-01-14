@@ -933,69 +933,63 @@ export function WorkflowPageV2() {
       const workflowNodes = workflow?.spec?.nodes || [];
       const workflowEdges = workflow?.spec?.edges || [];
 
-      const latestExecution = nodeExecutionsMap[nodeId]?.[0];
-      if (latestExecution?.input && Object.keys(latestExecution.input).length > 0) {
-        return latestExecution.input as Record<string, unknown>;
-      }
-
       const currentNode = workflowNodes.find((node) => node.id === nodeId);
+      const chainNodeIds = new Set<string>();
+
       if (currentNode?.type === "TYPE_TRIGGER") {
-        const latestEvent = nodeEventsMap[nodeId]?.[0];
-        if (latestEvent?.data && Object.keys(latestEvent.data).length > 0) {
-          return latestEvent.data as Record<string, unknown>;
-        }
+        chainNodeIds.add(nodeId);
+      }
+
+      const stack = workflowEdges
+        .filter((edge) => edge.targetId === nodeId && edge.sourceId)
+        .map((edge) => edge.sourceId as string);
+
+      while (stack.length > 0) {
+        const nextId = stack.pop();
+        if (!nextId || chainNodeIds.has(nextId)) continue;
+        chainNodeIds.add(nextId);
+        workflowEdges
+          .filter((edge) => edge.targetId === nextId && edge.sourceId)
+          .forEach((edge) => {
+            if (edge.sourceId) {
+              stack.push(edge.sourceId);
+            }
+          });
+      }
+
+      if (chainNodeIds.size === 0) {
         return null;
       }
 
-      const incomingEdges = workflowEdges.filter((edge) => edge.targetId === nodeId && edge.sourceId);
-      if (incomingEdges.length === 0) {
-        return null;
-      }
+      const exampleObj: Record<string, unknown> = {};
 
-      const candidates: Array<{ payload: Record<string, unknown>; timestamp?: string }> = [];
-      for (const edge of incomingEdges) {
-        const sourceId = edge.sourceId;
-        if (!sourceId) continue;
+      chainNodeIds.forEach((chainNodeId) => {
+        const chainNode = workflowNodes.find((node) => node.id === chainNodeId);
+        if (!chainNode) return;
 
-        const sourceNode = workflowNodes.find((node) => node.id === sourceId);
-        if (!sourceNode) continue;
-
-        if (sourceNode.type === "TYPE_TRIGGER") {
-          const sourceEvent = nodeEventsMap[sourceId]?.[0];
-          if (sourceEvent?.data && Object.keys(sourceEvent.data).length > 0) {
-            candidates.push({ payload: sourceEvent.data as Record<string, unknown>, timestamp: sourceEvent.createdAt });
+        if (chainNode.type === "TYPE_TRIGGER") {
+          const latestEvent = nodeEventsMap[chainNodeId]?.[0];
+          if (latestEvent?.data && Object.keys(latestEvent.data).length > 0) {
+            exampleObj[chainNodeId] = latestEvent.data as Record<string, unknown>;
           }
-          continue;
+          return;
         }
 
-        const sourceExecution = nodeExecutionsMap[sourceId]?.[0];
-        if (!sourceExecution?.outputs) continue;
+        const latestExecution = nodeExecutionsMap[chainNodeId]?.find(
+          (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
+        );
+        if (!latestExecution?.outputs) return;
 
-        const outputData: unknown[] = Object.values(sourceExecution.outputs)?.find((output) => {
-          return Array.isArray(output) && output?.length > 0;
+        const outputData: unknown[] = Object.values(latestExecution.outputs)?.find((output) => {
+          return Array.isArray(output) && output.length > 0;
         }) as unknown[];
 
         if (outputData?.length > 0) {
-          candidates.push({
-            payload: outputData[0] as Record<string, unknown>,
-            timestamp: sourceExecution.updatedAt || sourceExecution.createdAt,
-          });
+          exampleObj[chainNodeId] = outputData[0] as Record<string, unknown>;
         }
-      }
+      });
 
-      if (candidates.length === 0) {
-        return null;
-      }
-
-      const latestCandidate = candidates.reduce((latest, current) => {
-        if (!latest) return current;
-        if (!current.timestamp) return latest;
-        if (!latest.timestamp) return current;
-        return new Date(current.timestamp).getTime() > new Date(latest.timestamp).getTime() ? current : latest;
-      }, candidates[0]);
-
-      console.log("Autocomplete example object for node", nodeId, latestCandidate.payload);
-      return latestCandidate.payload;
+      return Object.keys(exampleObj).length > 0 ? exampleObj : null;
     },
     [workflow, nodeExecutionsMap, nodeEventsMap],
   );

@@ -49,6 +49,7 @@ docs/ComponentsPosition.md
 docs/ConfigurationAnyPredicateListTypeOptions.md
 docs/ConfigurationDateTimeTypeOptions.md
 docs/ConfigurationDateTypeOptions.md
+docs/ConfigurationExpressionTypeOptions.md
 docs/ConfigurationField.md
 docs/ConfigurationIntegrationTypeOptions.md
 docs/ConfigurationListItemDefinition.md
@@ -233,6 +234,7 @@ model_components_position.go
 model_configuration_any_predicate_list_type_options.go
 model_configuration_date_time_type_options.go
 model_configuration_date_type_options.go
+model_configuration_expression_type_options.go
 model_configuration_field.go
 model_configuration_integration_type_options.go
 model_configuration_list_item_definition.go

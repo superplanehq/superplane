@@ -3,14 +3,7 @@ import { Search } from "lucide-react";
 
 import { BuiltInEdge, useReactFlow, type Node, type PanelProps } from "@xyflow/react";
 
-import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -81,9 +74,7 @@ export function NodeSearchInternal({ onSearch, onSelectNode, open, onOpenChange 
 
       {open && (
         <CommandList>
-          {searchResults.length === 0 ? (
-            <CommandEmpty>No results found. {searchString}</CommandEmpty>
-          ) : (
+          {searchResults.length === 0 ? null : (
             <CommandGroup heading="Components">
               {searchResults.map((node) => {
                 const isAnnotationNode = (node.data as { type?: string })?.type === "annotation";

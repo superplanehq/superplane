@@ -503,7 +503,7 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 				// Invalid expression that will fail during Build()
 				Configuration: datatypes.NewJSONType(map[string]any{
-					"field": "{{ chain('nonexistent-node').default[0] }}",
+					"field": "{{ $[\"nonexistent-node\"].data }}",
 				}),
 			},
 		},
@@ -679,7 +679,7 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t
 				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
 				// Invalid expression that will fail during Build()
 				Configuration: map[string]any{
-					"field": "{{ chain('nonexistent-node').default[0] }}",
+					"field": "{{ $[\"nonexistent-node\"].data }}",
 				},
 			},
 		},

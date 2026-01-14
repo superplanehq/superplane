@@ -4,7 +4,7 @@ import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteIn
 import { FieldRendererProps } from "./types";
 import { toTestId } from "@/utils/testID";
 
-export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
+export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
   onChange,
@@ -21,7 +21,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
         onChange={(e) => onChange(e.target.value || undefined)}
         placeholder={field.placeholder || ""}
         className={hasError ? "border-red-500 border-2" : ""}
-        data-testid={toTestId(`string-field-${field.name}`)}
+        data-testid={toTestId(`expression-field-${field.name}`)}
       />
     );
   }
@@ -32,13 +32,10 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       value={currentValue}
       onChange={(nextValue) => onChange(nextValue || undefined)}
       placeholder={field.placeholder || ""}
-      startWord="{{"
-      prefix="{{ $"
-      suffix=" }}"
       inputSize="md"
       showValuePreview
       className={hasError ? "after:ring-2 after:ring-red-500" : ""}
-      data-testid={toTestId(`string-field-${field.name}`)}
+      data-testid={toTestId(`expression-field-${field.name}`)}
     />
   );
 };
