@@ -10,6 +10,7 @@ import { TimeRangeWithAllDay } from "./TimeRangeWithAllDay";
 interface ExtendedFieldRendererProps extends FieldRendererProps {
   validationErrors?: ValidationError[] | Set<string>;
   fieldPath?: string;
+  allValues?: Record<string, unknown>;
 }
 
 export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
@@ -21,6 +22,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   hasError: _hasError,
   validationErrors,
   fieldPath = field.name || "",
+  allValues = {},
 }) => {
   const items = Array.isArray(value) ? value : [];
   const listOptions = field.typeOptions?.list;
@@ -49,8 +51,22 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   };
 
   const addItem = () => {
-    const newItem = itemDefinition?.type === "object" ? {} : itemDefinition?.type === "number" ? 0 : "";
-    onChange([...items, newItem]);
+    if (itemDefinition?.type === "object" && itemDefinition.schema) {
+      // Initialize with default values from field definitions
+      const newItem: Record<string, unknown> = {};
+      
+      // Find the type field and set its default value (first option for select fields)
+      const typeField = itemDefinition.schema.find((f) => f.name === "type");
+      if (typeField && typeField.type === "select" && typeField.typeOptions?.select?.options && typeField.typeOptions.select.options.length > 0) {
+        // Use the first option as default (which should be "weekly")
+        newItem.type = typeField.typeOptions.select.options[0].value;
+      }
+      
+      onChange([...items, newItem]);
+    } else {
+      const newItem = itemDefinition?.type === "number" ? 0 : "";
+      onChange([...items, newItem]);
+    }
   };
 
   const removeItem = (index: number) => {
@@ -78,10 +94,33 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     onChange(newItems);
   };
 
+  // Check if this is timegate items field and determine label based on when_to_run
+  const isTimegateItems = field.name === "items";
+  const whenToRun = allValues?.when_to_run as string | undefined;
+  const getTimeWindowsLabel = () => {
+    if (!isTimegateItems || !whenToRun) return null;
+    
+    if (whenToRun === "custom_include" || whenToRun === "template_working_hours" || whenToRun === "template_weekends") {
+      return "Allowed time windows";
+    } else if (whenToRun === "custom_exclude" || whenToRun === "template_outside_working_hours" || whenToRun === "template_no_weekends") {
+      return "Blocked time windows";
+    }
+    return null;
+  };
+
+  const timeWindowsLabel = getTimeWindowsLabel();
+
   return (
     <div className="space-y-3">
-      {items.map((item, index) => (
-        <div key={index} className="flex gap-2 items-center">
+      {timeWindowsLabel && (
+        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {timeWindowsLabel}
+        </div>
+      )}
+      {items.map((item, index) => {
+        const itemType = (item && typeof item === "object" ? (item as Record<string, unknown>).type : undefined) as string | undefined;
+        return (
+        <div key={`item-${index}-${itemType || 'new'}`} className="flex gap-2 items-center">
           <div className="flex-1">
             {itemDefinition?.type === "object" && itemDefinition.schema ? (
               <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
@@ -91,6 +130,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                   const startTimeField = itemDefinition.schema.find((f) => f.name === "startTime");
                   const endTimeField = itemDefinition.schema.find((f) => f.name === "endTime");
                   const dateField = itemDefinition.schema.find((f) => f.name === "date");
+                  const daysField = itemDefinition.schema.find((f) => f.name === "days");
                   
                   // For timegate, render type field first, then handle time fields specially, then other fields
                   if (typeField) {
@@ -118,12 +158,18 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                     };
 
                     const hasTimeError = getNestedError("startTime") || getNestedError("endTime");
-                    const itemType = itemValues.type as string | undefined;
+                    // Get itemType from itemValues, or fallback to default (first option) if not set
+                    let itemType = itemValues.type as string | undefined;
+                    if (!itemType && typeField.type === "select" && typeField.typeOptions?.select?.options && typeField.typeOptions.select.options.length > 0) {
+                      itemType = typeField.typeOptions.select.options[0].value as string;
+                    }
                     const isSpecificDate = itemType === "specific_dates";
+                    const isWeekly = itemType === "weekly";
 
                     return (
                       <>
                         <ConfigurationFieldRenderer
+                          key={`type-${index}-${itemType}`}
                           field={typeField}
                           value={itemValues[typeField.name!]}
                           onChange={(val) => {
@@ -135,9 +181,26 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                           domainType={domainType}
                           hasError={getNestedError(typeField.name!)}
                         />
+                        {/* Render days field for weekly */}
+                        {isWeekly && daysField && (
+                          <ConfigurationFieldRenderer
+                            key={`days-${index}-${itemType}`}
+                            field={daysField}
+                            value={itemValues[daysField.name!]}
+                            onChange={(val) => {
+                              const newItem = { ...itemValues, [daysField.name!]: val };
+                              updateItem(index, newItem);
+                            }}
+                            allValues={nestedValues}
+                            domainId={domainId}
+                            domainType={domainType}
+                            hasError={getNestedError(daysField.name!)}
+                          />
+                        )}
                         {/* Render date field for specific dates */}
                         {isSpecificDate && dateField && (
                           <ConfigurationFieldRenderer
+                            key={`date-${index}-${itemType}`}
                             field={dateField}
                             value={itemValues[dateField.name!]}
                             onChange={(val) => {
@@ -153,6 +216,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                         {/* Render time range with "All day" toggle if both time fields exist */}
                         {startTimeField && endTimeField && (
                           <TimeRangeWithAllDay
+                            key={`time-range-${index}-${itemType}`}
                             startTime={itemValues.startTime as string | undefined}
                             endTime={itemValues.endTime as string | undefined}
                             onStartTimeChange={(val) => {
@@ -169,10 +233,11 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                               updateItem(index, newItem);
                             }}
                             hasError={hasTimeError}
+                            itemType={itemType}
                           />
                         )}
                         {itemDefinition.schema
-                          .filter((f) => f.name !== "type" && f.name !== "startTime" && f.name !== "endTime" && f.name !== "date")
+                          .filter((f) => f.name !== "type" && f.name !== "startTime" && f.name !== "endTime" && f.name !== "date" && f.name !== "days")
                           .map((schemaField) => {
                             const itemValues =
                               item && typeof item === "object"
@@ -270,7 +335,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
             <Trash2 className="h-4 w-4 text-red-500" />
           </Button>
         </div>
-      ))}
+        );
+      })}
       <Button variant="outline" onClick={addItem} className="w-full mt-3">
         <Plus className="h-4 w-4 mr-2" />
         Add {itemLabel}

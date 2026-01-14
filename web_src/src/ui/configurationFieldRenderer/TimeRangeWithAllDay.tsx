@@ -10,6 +10,7 @@ interface TimeRangeWithAllDayProps {
   onEndTimeChange: (value: string | undefined) => void;
   onBothTimesChange?: (startTime: string | undefined, endTime: string | undefined) => void;
   hasError?: boolean;
+  itemType?: string; // "weekly" or "specific_dates"
 }
 
 export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
@@ -19,7 +20,9 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
   onEndTimeChange,
   onBothTimesChange,
   hasError,
+  itemType,
 }) => {
+  const isWeekly = itemType === "weekly";
   // Check if "All day" is enabled (both times are set to full day range)
   const isAllDay = useMemo(() => {
     return startTime === "00:00" && endTime === "23:59";
@@ -58,6 +61,55 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
     }
   };
 
+  // For weekly type, show "All day" at the bottom; for specific_dates, show at top
+  if (isWeekly) {
+    return (
+      <div className="flex items-center gap-3">
+        {/* All day toggle - on the left for weekly */}
+        <div className="flex items-center gap-3">
+          <Switch
+            checked={isAllDay}
+            onCheckedChange={handleAllDayToggle}
+            id="all-day-toggle"
+          />
+          <Label htmlFor="all-day-toggle" className="cursor-pointer">
+            All day
+          </Label>
+        </div>
+
+        {/* Time inputs - only show when "All day" is OFF, on the right */}
+        {!isAllDay && (
+          <div className="flex items-center gap-0 flex-1">
+            <div className="flex-1">
+              <TimePickerField
+                field={{ name: "startTime", label: "Start Time", type: "time" } as any}
+                value={startTime}
+                onChange={(val) => onStartTimeChange(val as string | undefined)}
+                hasError={hasError}
+                allValues={{ startTime, endTime }}
+                className="rounded-r-none border-r-0"
+              />
+            </div>
+            <div className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 border-l-0 border-r-0 flex items-center justify-center font-medium">
+              -
+            </div>
+            <div className="flex-1">
+              <TimePickerField
+                field={{ name: "endTime", label: "End Time", type: "time" } as any}
+                value={endTime}
+                onChange={(val) => onEndTimeChange(val as string | undefined)}
+                hasError={hasError}
+                allValues={{ startTime, endTime }}
+                className="rounded-l-none"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // For specific_dates, keep original layout (All day at top)
   return (
     <div className="flex items-center gap-3">
       {/* All day toggle */}

@@ -336,6 +336,7 @@ export const ConfigurationFieldRenderer = ({
             domainType={domainType}
             validationErrors={validationErrors}
             fieldPath={fieldPath || field.name}
+            allValues={allValues}
           />
         );
 

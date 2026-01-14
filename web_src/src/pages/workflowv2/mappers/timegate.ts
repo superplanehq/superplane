@@ -62,8 +62,12 @@ function getTimeGateMetadataList(node: ComponentsNode): MetadataItem[] {
 }
 
 function getTimeGateModeLabel(whenToRun: string | undefined, mode: string | undefined): string {
-  if (whenToRun && whenToRun !== "custom") {
+  if (whenToRun) {
     switch (whenToRun) {
+      case "custom_include":
+        return "Run only during custom time window";
+      case "custom_exclude":
+        return "Don't run during custom time windows";
       case "template_working_hours":
         return "Run during working hours";
       case "template_outside_working_hours":

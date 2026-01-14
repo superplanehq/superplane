@@ -397,11 +397,12 @@ export function SettingsTab({
                         // Pre-fill mode and items with template values
                         newConfig.mode = templateData.mode;
                         newConfig.items = templateData.items;
-                      } else if (value === "custom") {
-                        // When switching to custom, keep existing values if they exist
-                        // Otherwise default mode to include
-                        if (!newConfig.mode) {
+                      } else if (value === "custom_include" || value === "custom_exclude") {
+                        // When switching to custom, derive mode from when_to_run
+                        if (value === "custom_include") {
                           newConfig.mode = "include";
+                        } else if (value === "custom_exclude") {
+                          newConfig.mode = "exclude";
                         }
                         // Keep items as-is (user may have already configured them)
                       }

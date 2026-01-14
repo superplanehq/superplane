@@ -21,6 +21,10 @@ const (
 	TimeGateIncludeMode = "include"
 	TimeGateExcludeMode = "exclude"
 
+	// Custom modes (replaces "custom" option)
+	TimeGateCustomInclude = "custom_include" // "Run only during custom time window"
+	TimeGateCustomExclude = "custom_exclude" // "Don't run during custom time windows"
+
 	// Template modes
 	TimeGateTemplateWorkingHours        = "template_working_hours"
 	TimeGateTemplateOutsideWorkingHours = "template_outside_working_hours"
@@ -87,8 +91,12 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{
-							Label: "Custom",
-							Value: "custom",
+							Label: "Run only during custom time window",
+							Value: TimeGateCustomInclude,
+						},
+						{
+							Label: "Don't run during custom time windows",
+							Value: TimeGateCustomExclude,
 						},
 						{
 							Label: "Run during working hours",
@@ -111,32 +119,6 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "mode",
-			Label:    "Mode",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{
-							Label: "Include",
-							Value: TimeGateIncludeMode,
-						},
-						{
-							Label: "Exclude",
-							Value: TimeGateExcludeMode,
-						},
-					},
-				},
-			},
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "when_to_run",
-					Values: []string{"custom", TimeGateTemplateWorkingHours, TimeGateTemplateOutsideWorkingHours, TimeGateTemplateWeekends, TimeGateTemplateNoWeekends},
-				},
-			},
-		},
-		{
 			Name:        "items",
 			Label:       "Time Windows",
 			Type:        configuration.FieldTypeList,
@@ -145,7 +127,7 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "when_to_run",
-					Values: []string{"custom", TimeGateTemplateWorkingHours, TimeGateTemplateOutsideWorkingHours, TimeGateTemplateWeekends, TimeGateTemplateNoWeekends},
+					Values: []string{TimeGateCustomInclude, TimeGateCustomExclude, TimeGateTemplateWorkingHours, TimeGateTemplateOutsideWorkingHours, TimeGateTemplateWeekends, TimeGateTemplateNoWeekends},
 				},
 			},
 			TypeOptions: &configuration.TypeOptions{
@@ -317,8 +299,15 @@ func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	// Derive mode from when_to_run if it's a custom option
+	if spec.WhenToRun == TimeGateCustomInclude {
+		spec.Mode = TimeGateIncludeMode
+	} else if spec.WhenToRun == TimeGateCustomExclude {
+		spec.Mode = TimeGateExcludeMode
+	}
+
 	// Convert template to actual mode and items if a template is selected
-	if spec.WhenToRun != "" && spec.WhenToRun != "custom" {
+	if spec.WhenToRun != "" && spec.WhenToRun != TimeGateCustomInclude && spec.WhenToRun != TimeGateCustomExclude {
 		spec = tg.convertTemplateToSpec(spec)
 	}
 
