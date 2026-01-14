@@ -58,7 +58,7 @@ func (t *OnAppMention) Setup(ctx core.TriggerContext) error {
 	// If subscription ID is already set, nothing to do.
 	//
 	var metadata AppMentionMetadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
@@ -79,7 +79,7 @@ func (t *OnAppMention) Setup(ctx core.TriggerContext) error {
 		return errors.New("channel is required")
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext)
+	client, err := NewClient(ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("failed to create Slack client: %w", err)
 	}
@@ -89,7 +89,7 @@ func (t *OnAppMention) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("channel validation failed: %w", err)
 	}
 
-	subscriptionID, err := ctx.AppInstallationContext.Subscribe(SubscriptionConfiguration{
+	subscriptionID, err := ctx.AppInstallation.Subscribe(SubscriptionConfiguration{
 		EventTypes: []string{"app_mention"},
 	})
 
@@ -97,7 +97,7 @@ func (t *OnAppMention) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to subscribe to app events: %w", err)
 	}
 
-	return ctx.MetadataContext.Set(AppMentionMetadata{
+	return ctx.Metadata.Set(AppMentionMetadata{
 		AppSubscriptionID: subscriptionID,
 		Channel: &ChannelMetadata{
 			ID:   channelInfo.ID,

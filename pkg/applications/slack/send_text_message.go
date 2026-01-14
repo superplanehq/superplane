@@ -78,7 +78,7 @@ func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
 		return errors.New("channel is required")
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext)
+	client, err := NewClient(ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("failed to create Slack client: %w", err)
 	}
@@ -95,7 +95,7 @@ func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
 		},
 	}
 
-	return ctx.MetadataContext.Set(metadata)
+	return ctx.Metadata.Set(metadata)
 }
 
 func (c *SendTextMessage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -112,7 +112,7 @@ func (c *SendTextMessage) Execute(ctx core.ExecutionContext) error {
 		return errors.New("channel is required")
 	}
 
-	client, err := NewClient(ctx.AppInstallationContext)
+	client, err := NewClient(ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("failed to create Slack client: %w", err)
 	}
@@ -126,7 +126,7 @@ func (c *SendTextMessage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
 
-	return ctx.ExecutionStateContext.Emit(
+	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"slack.message.sent",
 		[]any{response.Message},
