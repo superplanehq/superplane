@@ -38,12 +38,11 @@ type Metadata struct {
 }
 
 type TimeGateItem struct {
-	Type           string   `json:"type"`                     // "weekly" or "specific_dates"
-	Days           []string `json:"days,omitempty"`           // For weekly type
-	StartTime      string   `json:"startTime"`                // Required for both types
-	EndTime        string   `json:"endTime"`                  // Required for both types
-	StartDayInYear string   `json:"startDayInYear,omitempty"` // For specific_dates type
-	EndDayInYear   string   `json:"endDayInYear,omitempty"`   // For specific_dates type
+	Type      string   `json:"type"`                // "weekly" or "specific_dates"
+	Days      []string `json:"days,omitempty"`      // For weekly type
+	Date      string   `json:"date,omitempty"`      // For specific_dates type (YYYY-MM-DD format)
+	StartTime string   `json:"startTime"`          // Required for both types
+	EndTime   string   `json:"endTime"`            // Required for both types
 }
 
 type Spec struct {
@@ -207,28 +206,10 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 								},
 							},
 							{
-								Name:        "startDayInYear",
-								Label:       "Start Day (MM/DD)",
-								Type:        configuration.FieldTypeDayInYear,
-								Description: "Start day in MM/DD format (e.g., 12/25 for Christmas)",
-								VisibilityConditions: []configuration.VisibilityCondition{
-									{
-										Field:  "type",
-										Values: []string{TimeGateItemTypeSpecificDate},
-									},
-								},
-								RequiredConditions: []configuration.RequiredCondition{
-									{
-										Field:  "type",
-										Values: []string{TimeGateItemTypeSpecificDate},
-									},
-								},
-							},
-							{
-								Name:        "endDayInYear",
-								Label:       "End Day (MM/DD)",
-								Type:        configuration.FieldTypeDayInYear,
-								Description: "End day in MM/DD format (e.g., 01/01 for New Year)",
+								Name:        "date",
+								Label:       "Specific Date",
+								Type:        configuration.FieldTypeDate,
+								Description: "Select a specific date (YYYY-MM-DD format)",
 								VisibilityConditions: []configuration.VisibilityCondition{
 									{
 										Field:  "type",
@@ -455,27 +436,14 @@ func (tg *TimeGate) validateSpec(spec Spec) error {
 		}
 
 		if item.Type == TimeGateItemTypeSpecificDate {
-			if item.StartDayInYear == "" || item.EndDayInYear == "" {
-				return fmt.Errorf("item %d: startDayInYear and endDayInYear are required for specific_dates type", i)
+			if item.Date == "" {
+				return fmt.Errorf("item %d: date is required for specific_dates type", i)
 			}
 
-			err := tg.validateDayInYear(item.StartDayInYear)
+			// Validate date format (YYYY-MM-DD)
+			_, err := time.Parse("2006-01-02", item.Date)
 			if err != nil {
-				return fmt.Errorf("item %d: startDayInYear error: %w", i, err)
-			}
-
-			err = tg.validateDayInYear(item.EndDayInYear)
-			if err != nil {
-				return fmt.Errorf("item %d: endDayInYear error: %w", i, err)
-			}
-
-			startMonth, startDay, _ := tg.parseDayInYear(item.StartDayInYear)
-			endMonth, endDay, _ := tg.parseDayInYear(item.EndDayInYear)
-
-			// For cross-year ranges (e.g., 12/25 to 01/05), we allow this
-			// Same day is allowed (e.g., 07/04 to 07/04 for Independence Day)
-			if startMonth == endMonth && startDay > endDay {
-				return fmt.Errorf("item %d: start day (%s) must be before or same as end day (%s) when in the same month", i, item.StartDayInYear, item.EndDayInYear)
+				return fmt.Errorf("item %d: date must be in YYYY-MM-DD format, got: %s", i, item.Date)
 			}
 		}
 	}
@@ -575,7 +543,7 @@ func (tg *TimeGate) configEqual(a, b Spec) bool {
 		}
 
 		if itemA.Type == TimeGateItemTypeSpecificDate {
-			if itemA.StartDayInYear != itemB.StartDayInYear || itemA.EndDayInYear != itemB.EndDayInYear {
+			if itemA.Date != itemB.Date {
 				return false
 			}
 		}
@@ -787,12 +755,8 @@ func (tg *TimeGate) isInExcludedWeeklyWindow(now time.Time, item TimeGateItem) (
 }
 
 func (tg *TimeGate) isInExcludedSpecificWindow(now time.Time, item TimeGateItem) (time.Time, bool) {
-	startMonth, startDay, err := tg.parseDayInYear(item.StartDayInYear)
-	if err != nil {
-		return time.Time{}, false
-	}
-
-	endMonth, endDay, err := tg.parseDayInYear(item.EndDayInYear)
+	// Parse the date (YYYY-MM-DD format)
+	selectedDate, err := time.Parse("2006-01-02", item.Date)
 	if err != nil {
 		return time.Time{}, false
 	}
@@ -800,38 +764,13 @@ func (tg *TimeGate) isInExcludedSpecificWindow(now time.Time, item TimeGateItem)
 	startTime, _ := parseTimeString(item.StartTime)
 	endTime, _ := parseTimeString(item.EndTime)
 
-	currentYear := now.Year()
-
-	// Create the start and end datetime for this year
-	startDateTime := time.Date(currentYear, time.Month(startMonth), startDay,
+	// Create the start and end datetime for the selected date
+	startDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
 		startTime/60, startTime%60, 0, 0, now.Location())
-	endDateTime := time.Date(currentYear, time.Month(endMonth), endDay,
+	endDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
 		endTime/60, endTime%60, 0, 0, now.Location())
 
-	// Handle cross-year ranges (e.g., Dec 25 to Jan 5)
-	if startMonth > endMonth {
-		// If we're before the start date, we're outside the excluded range
-		if now.Before(startDateTime) {
-			return time.Time{}, false
-		}
-		// If we're after start date but before new year, we're in the excluded range
-		if now.After(startDateTime) && now.Month() >= time.Month(startMonth) {
-			// Need to wait until next year's end date
-			nextEndDateTime := time.Date(currentYear+1, time.Month(endMonth), endDay,
-				endTime/60, endTime%60, 0, 0, now.Location())
-			return nextEndDateTime, true
-		}
-		// If we're in the new year and before end date, we're in the excluded range
-		endDateTime = time.Date(currentYear+1, time.Month(endMonth), endDay,
-			endTime/60, endTime%60, 0, 0, now.Location())
-		if now.Before(endDateTime) && now.Month() <= time.Month(endMonth) {
-			return endDateTime, true
-		}
-		// We're after the end date, so we're outside the excluded range
-		return time.Time{}, false
-	}
-
-	// Normal same-year range
+	// Check if we're within the excluded time window on this date
 	if now.Before(startDateTime) || now.After(endDateTime) {
 		return time.Time{}, false
 	}
@@ -938,12 +877,8 @@ func (tg *TimeGate) parseDayInYear(dayStr string) (int, int, error) {
 }
 
 func (tg *TimeGate) findNextIncludeSpecificTime(now time.Time, item TimeGateItem) time.Time {
-	startMonth, startDay, err := tg.parseDayInYear(item.StartDayInYear)
-	if err != nil {
-		return time.Time{}
-	}
-
-	endMonth, endDay, err := tg.parseDayInYear(item.EndDayInYear)
+	// Parse the date (YYYY-MM-DD format)
+	selectedDate, err := time.Parse("2006-01-02", item.Date)
 	if err != nil {
 		return time.Time{}
 	}
@@ -951,52 +886,25 @@ func (tg *TimeGate) findNextIncludeSpecificTime(now time.Time, item TimeGateItem
 	startTime, _ := parseTimeString(item.StartTime)
 	endTime, _ := parseTimeString(item.EndTime)
 
-	currentYear := now.Year()
-
-	// Create the start and end datetime for this year
-	startDateTime := time.Date(currentYear, time.Month(startMonth), startDay,
+	// Create the start and end datetime for the selected date
+	startDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
 		startTime/60, startTime%60, 0, 0, now.Location())
-	endDateTime := time.Date(currentYear, time.Month(endMonth), endDay,
+	endDateTime := time.Date(selectedDate.Year(), selectedDate.Month(), selectedDate.Day(),
 		endTime/60, endTime%60, 0, 0, now.Location())
 
-	// Handle cross-year ranges (e.g., Dec 25 to Jan 5)
-	if startMonth > endMonth {
-		// If we're before the start date, use this year's dates
-		if now.Before(startDateTime) {
-			return startDateTime
-		}
-		// If we're after start date but before new year, we're in the range
-		if now.After(startDateTime) && now.Month() >= time.Month(startMonth) {
-			return now
-		}
-		// If we're in the new year and before end date, we're in the range
-		endDateTime = time.Date(currentYear+1, time.Month(endMonth), endDay,
-			endTime/60, endTime%60, 0, 0, now.Location())
-		if now.Before(endDateTime) && now.Month() <= time.Month(endMonth) {
-			return now
-		}
-		// Check next year's start date
-		nextStartDateTime := time.Date(currentYear+1, time.Month(startMonth), startDay,
-			startTime/60, startTime%60, 0, 0, now.Location())
-		if now.Before(nextStartDateTime) {
-			return nextStartDateTime
-		}
-		return time.Time{}
-	}
-
-	// Normal same-year range
+	// If we're within the time window on this date, return now
 	if now.After(startDateTime) && now.Before(endDateTime) {
 		return now
 	}
 
+	// If we're before the start time on this date, return start time
 	if now.Before(startDateTime) {
 		return startDateTime
 	}
 
-	// Check next year
-	nextStartDateTime := time.Date(currentYear+1, time.Month(startMonth), startDay,
-		startTime/60, startTime%60, 0, 0, now.Location())
-	return nextStartDateTime
+	// We're after the end time on this date, so this date has passed
+	// Return zero time to indicate no valid time found
+	return time.Time{}
 }
 
 func (tg *TimeGate) Cancel(ctx core.ExecutionContext) error {

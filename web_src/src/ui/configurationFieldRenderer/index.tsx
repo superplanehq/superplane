@@ -414,10 +414,13 @@ export const ConfigurationFieldRenderer = ({
   // Check if this is a time field that's handled by TimeRangeWithAllDay - hide label for it
   const isTimeFieldInRange = field.name === "startTime" || field.name === "endTime";
   
+  // Check if this is the date field for specific dates - hide label for it (will be shown in custom renderer)
+  const isDateFieldInList = field.name === "date";
+  
   // For all other field types, render label above field
   return (
     <div className="space-y-2">
-      {!usesTabs && !isItemsField && !isDaysField && !isTimeFieldInRange && (
+      {!usesTabs && !isItemsField && !isDaysField && !isTimeFieldInRange && !isDateFieldInList && (
         <div className="flex items-center gap-3">
           {isTogglable && (
             <Switch

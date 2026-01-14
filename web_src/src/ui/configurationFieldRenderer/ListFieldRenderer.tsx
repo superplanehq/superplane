@@ -90,6 +90,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                   const typeField = itemDefinition.schema.find((f) => f.name === "type");
                   const startTimeField = itemDefinition.schema.find((f) => f.name === "startTime");
                   const endTimeField = itemDefinition.schema.find((f) => f.name === "endTime");
+                  const dateField = itemDefinition.schema.find((f) => f.name === "date");
                   
                   // For timegate, render type field first, then handle time fields specially, then other fields
                   if (typeField) {
@@ -117,6 +118,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                     };
 
                     const hasTimeError = getNestedError("startTime") || getNestedError("endTime");
+                    const itemType = itemValues.type as string | undefined;
+                    const isSpecificDate = itemType === "specific_dates";
 
                     return (
                       <>
@@ -132,6 +135,21 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                           domainType={domainType}
                           hasError={getNestedError(typeField.name!)}
                         />
+                        {/* Render date field for specific dates */}
+                        {isSpecificDate && dateField && (
+                          <ConfigurationFieldRenderer
+                            field={dateField}
+                            value={itemValues[dateField.name!]}
+                            onChange={(val) => {
+                              const newItem = { ...itemValues, [dateField.name!]: val };
+                              updateItem(index, newItem);
+                            }}
+                            allValues={nestedValues}
+                            domainId={domainId}
+                            domainType={domainType}
+                            hasError={getNestedError(dateField.name!)}
+                          />
+                        )}
                         {/* Render time range with "All day" toggle if both time fields exist */}
                         {startTimeField && endTimeField && (
                           <TimeRangeWithAllDay
@@ -154,7 +172,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                           />
                         )}
                         {itemDefinition.schema
-                          .filter((f) => f.name !== "type" && f.name !== "startTime" && f.name !== "endTime")
+                          .filter((f) => f.name !== "type" && f.name !== "startTime" && f.name !== "endTime" && f.name !== "date")
                           .map((schemaField) => {
                             const itemValues =
                               item && typeof item === "object"

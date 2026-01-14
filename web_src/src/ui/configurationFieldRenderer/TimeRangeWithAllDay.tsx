@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo } from "react";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/ui/switch";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { TimePickerField } from "./TimePickerField";
 
 interface TimeRangeWithAllDayProps {
   startTime: string | undefined;
@@ -75,27 +74,25 @@ export const TimeRangeWithAllDay: React.FC<TimeRangeWithAllDayProps> = ({
 
       {/* Time inputs - only show when "All day" is OFF */}
       {!isAllDay && (
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-3 items-end">
           <div className="flex-1">
             <Label className="text-sm text-gray-600 dark:text-gray-400 mb-1 block">Start Time</Label>
-            <Input
-              type="time"
-              value={startTime || ""}
-              onChange={(e) => onStartTimeChange(e.target.value || undefined)}
-              className={cn(hasError && "border-red-500 border-2")}
-              min="00:00"
-              max={endTime || "23:59"}
+            <TimePickerField
+              field={{ name: "startTime", label: "Start Time", type: "time" } as any}
+              value={startTime}
+              onChange={(val) => onStartTimeChange(val as string | undefined)}
+              hasError={hasError}
+              allValues={{ startTime, endTime }}
             />
           </div>
           <div className="flex-1">
             <Label className="text-sm text-gray-600 dark:text-gray-400 mb-1 block">End Time</Label>
-            <Input
-              type="time"
-              value={endTime || ""}
-              onChange={(e) => onEndTimeChange(e.target.value || undefined)}
-              className={cn(hasError && "border-red-500 border-2")}
-              min={startTime || "00:00"}
-              max="23:59"
+            <TimePickerField
+              field={{ name: "endTime", label: "End Time", type: "time" } as any}
+              value={endTime}
+              onChange={(val) => onEndTimeChange(val as string | undefined)}
+              hasError={hasError}
+              allValues={{ startTime, endTime }}
             />
           </div>
         </div>
