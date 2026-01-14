@@ -1436,11 +1436,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-<<<<<<< HEAD
-20260114103950	f
-=======
 20260210120000	f
->>>>>>> 73563baf7 (Fix link display)
 \.
 
 
