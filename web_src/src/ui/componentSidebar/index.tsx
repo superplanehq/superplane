@@ -224,6 +224,23 @@ export const ComponentSidebar = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
   const [justCopied, setJustCopied] = useState(false);
+  const autocompleteExampleObj = React.useMemo(() => {
+    for (const event of latestEvents) {
+      if (event.kind === "execution" && event.originalExecution?.input) {
+        return event.originalExecution.input as Record<string, unknown>;
+      }
+      if (event.kind === "trigger" && event.originalEvent?.data) {
+        return event.originalEvent.data as Record<string, unknown>;
+      }
+      if (event.originalExecution?.input) {
+        return event.originalExecution.input as Record<string, unknown>;
+      }
+      if (event.originalEvent?.data) {
+        return event.originalEvent.data as Record<string, unknown>;
+      }
+    }
+    return null;
+  }, [latestEvents]);
 
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {
@@ -629,6 +646,7 @@ export const ComponentSidebar = ({
                   appName={appName}
                   appInstallationRef={appInstallationRef}
                   installedApplications={installedApplications}
+                  autocompleteExampleObj={{ $: autocompleteExampleObj }}
                 />
               </TabsContent>
             )}

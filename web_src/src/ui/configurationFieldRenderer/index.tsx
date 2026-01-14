@@ -57,6 +57,7 @@ export const ConfigurationFieldRenderer = ({
   fieldPath,
   realtimeValidationErrors,
   enableRealtimeValidation = false,
+  autocompleteExampleObj,
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
@@ -207,7 +208,7 @@ export const ConfigurationFieldRenderer = ({
     return null;
   }
   const renderField = () => {
-    const commonProps = { field, value, onChange, allValues, hasError: hasFieldError };
+    const commonProps = { field, value, onChange, allValues, hasError: hasFieldError, autocompleteExampleObj };
 
     switch (field.type) {
       case "string":

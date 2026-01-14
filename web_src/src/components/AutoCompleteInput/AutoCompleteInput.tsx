@@ -295,11 +295,8 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           data-slot="control"
           className={twMerge([
             "relative block w-full",
-            "before:absolute before:inset-px before:rounded-[calc(var(--radius-lg)-1px)] before:bg-white before:shadow-sm",
-            "dark:before:hidden",
-            "after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-transparent after:ring-inset sm:focus-within:after:ring-2 sm:focus-within:after:ring-blue-500",
-            "has-data-disabled:opacity-50 has-data-disabled:before:bg-gray-950/5 has-data-disabled:before:shadow-none",
-            "has-data-invalid:before:shadow-red-500/10",
+            "focus-within:ring-ring/50",
+            "has-data-disabled:opacity-50",
             className,
           ])}
         >
@@ -326,17 +323,17 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             placeholder={placeholder}
             disabled={disabled}
             className={twMerge([
-              "relative block w-full appearance-none rounded-lg border border-gray-950/10 hover:border-gray-950/20 dark:border-white/10 dark:hover:border-white/20",
-              "bg-transparent dark:bg-white/5",
-              "text-gray-950 placeholder:text-gray-500 dark:text-white",
-              "focus:outline-none",
-              "invalid:border-red-500 dark:invalid:border-red-500",
-              "disabled:border-gray-950/20 dark:disabled:border-white/15 dark:disabled:bg-white/2.5",
+              "font-sm bg-white border-gray-300 shadow-xs file:text-foreground placeholder:text-gray-500 selection:bg-primary selection:text-primary-foreground",
+              "relative block w-full min-w-0 appearance-none rounded-md border px-3 py-1 text-base outline-none",
+              "file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
+              "focus-visible:border-gray-500 focus-visible:ring-ring/50",
+              "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+              "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
               // Size variants
-              inputSize === "xs" && "px-2 py-1 text-xs",
-              inputSize === "sm" && "px-2 py-1.5 text-sm",
-              inputSize === "md" && "px-3 py-2 text-base sm:px-3 sm:py-1.5 sm:text-sm",
-              inputSize === "lg" && "px-4 py-3 text-lg",
+              inputSize === "xs" && "h-7 px-2 text-xs",
+              inputSize === "sm" && "h-8 px-2 text-sm",
+              inputSize === "md" && "h-9 px-3 text-base md:text-sm",
+              inputSize === "lg" && "h-11 px-4 text-lg",
             ])}
             {...rest}
           />
