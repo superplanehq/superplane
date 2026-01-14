@@ -133,7 +133,7 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "when_to_run",
-					Values: []string{"custom"},
+					Values: []string{"custom", TimeGateTemplateWorkingHours, TimeGateTemplateOutsideWorkingHours, TimeGateTemplateWeekends, TimeGateTemplateNoWeekends},
 				},
 			},
 		},
@@ -141,18 +141,12 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 			Name:        "items",
 			Label:       "Time Windows",
 			Type:        configuration.FieldTypeList,
-			Required:    false,
+			Required:    true,
 			Description: "List of time windows to include or exclude",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "when_to_run",
-					Values: []string{"custom"},
-				},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{
-					Field:  "when_to_run",
-					Values: []string{"custom"},
+					Values: []string{"custom", TimeGateTemplateWorkingHours, TimeGateTemplateOutsideWorkingHours, TimeGateTemplateWeekends, TimeGateTemplateNoWeekends},
 				},
 			},
 			TypeOptions: &configuration.TypeOptions{

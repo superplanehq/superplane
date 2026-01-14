@@ -394,14 +394,16 @@ export function SettingsTab({
                     if (fieldName === "when_to_run" && typeof value === "string") {
                       const templateData = getTemplateData(value);
                       if (templateData) {
+                        // Pre-fill mode and items with template values
                         newConfig.mode = templateData.mode;
                         newConfig.items = templateData.items;
                       } else if (value === "custom") {
-                        // Clear items when switching to custom, let user configure manually
-                        // Keep existing mode if set, otherwise default to include
+                        // When switching to custom, keep existing values if they exist
+                        // Otherwise default mode to include
                         if (!newConfig.mode) {
                           newConfig.mode = "include";
                         }
+                        // Keep items as-is (user may have already configured them)
                       }
                     }
                     
