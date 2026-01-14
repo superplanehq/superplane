@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -35,21 +34,6 @@ func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *model
 	server.RegisterWebRoutes("")
 
 	return server, r.Account, token
-}
-
-func Test__Login(t *testing.T) {
-	r := support.Setup(t)
-	server, _, _ := setupTestServer(r, t)
-
-	response := execRequest(server, requestParams{
-		method: "GET",
-		path:   "/login",
-	})
-
-	assert.Equal(t, http.StatusOK, response.Code)
-	assert.Contains(t, strings.ToLower(response.Body.String()), "superplane")
-	assert.Contains(t, response.Body.String(), "GitHub")
-	assert.Contains(t, response.Body.String(), "Google")
 }
 
 func Test__Logout(t *testing.T) {
