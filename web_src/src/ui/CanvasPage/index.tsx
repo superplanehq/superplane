@@ -139,6 +139,7 @@ export interface CanvasPageProps {
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
+  getAutocompleteExampleObj?: (nodeId: string) => Record<string, unknown> | null;
   onNodeConfigurationSave?: (
     nodeId: string,
     configuration: Record<string, any>,
@@ -827,6 +828,7 @@ function CanvasPage(props: CanvasPageProps) {
             getSidebarData={props.getSidebarData}
             loadSidebarData={props.loadSidebarData}
             getTabData={props.getTabData}
+            getAutocompleteExampleObj={props.getAutocompleteExampleObj}
             onCancelQueueItem={handleCancelQueueItem}
             onPushThrough={handlePushThrough}
             onCancelExecution={handleCancelExecution}
@@ -895,6 +897,7 @@ function Sidebar({
   getSidebarData,
   loadSidebarData,
   getTabData,
+  getAutocompleteExampleObj,
   onCancelQueueItem,
   onPushThrough,
   onCancelExecution,
@@ -940,6 +943,7 @@ function Sidebar({
   getSidebarData?: (nodeId: string) => SidebarData | null;
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
+  getAutocompleteExampleObj?: (nodeId: string) => Record<string, unknown> | null;
   onCancelQueueItem?: (id: string) => void;
   onPushThrough?: (executionId: string) => void;
   onCancelExecution?: (executionId: string) => void;
@@ -1017,6 +1021,13 @@ function Sidebar({
       setNextInQueueEvents(sidebarData.nextInQueueEvents);
     }
   }, [sidebarData?.latestEvents, sidebarData?.nextInQueueEvents]);
+
+  const autocompleteExampleObj = useMemo(() => {
+    if (!state.componentSidebar.selectedNodeId || !getAutocompleteExampleObj) {
+      return undefined;
+    }
+    return getAutocompleteExampleObj(state.componentSidebar.selectedNodeId);
+  }, [state.componentSidebar.selectedNodeId, getAutocompleteExampleObj]);
 
   if (!sidebarData) {
     return null;
@@ -1107,6 +1118,7 @@ function Sidebar({
       appName={editingNodeData?.appName}
       appInstallationRef={editingNodeData?.appInstallationRef}
       installedApplications={installedApplications}
+      autocompleteExampleObj={autocompleteExampleObj}
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}

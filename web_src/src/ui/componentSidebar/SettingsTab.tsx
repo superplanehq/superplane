@@ -34,6 +34,7 @@ interface SettingsTabProps {
   appName?: string;
   appInstallationRef?: ComponentsAppInstallationRef;
   installedApplications?: OrganizationsAppInstallation[];
+  autocompleteExampleObj?: Record<string, unknown> | null;
 }
 
 export function SettingsTab({
@@ -50,6 +51,7 @@ export function SettingsTab({
   appName,
   appInstallationRef,
   installedApplications = [],
+  autocompleteExampleObj,
 }: SettingsTabProps) {
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
@@ -333,6 +335,7 @@ export function SettingsTab({
                   fieldPath={fieldName}
                   realtimeValidationErrors={realtimeValidationErrors}
                   enableRealtimeValidation={true}
+                  autocompleteExampleObj={autocompleteExampleObj}
                 />
               );
             })}

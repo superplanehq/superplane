@@ -20,6 +20,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   hasError: _hasError,
   validationErrors,
   fieldPath = field.name || "",
+  autocompleteExampleObj,
 }) => {
   const items = Array.isArray(value) ? value : [];
   const listOptions = field.typeOptions?.list;
@@ -122,6 +123,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                       domainId={domainId}
                       domainType={domainType}
                       hasError={hasNestedError}
+                      autocompleteExampleObj={autocompleteExampleObj}
                     />
                   );
                 })}
