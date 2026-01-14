@@ -106,7 +106,8 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "project",
+					Type:           "project",
+					UseNameAsValue: true,
 				},
 			},
 		},

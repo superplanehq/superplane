@@ -51,7 +51,8 @@ func (p *OnPipelineDone) Configuration() []configuration.Field {
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "project",
+					Type:           "project",
+					UseNameAsValue: true,
 				},
 			},
 		},
