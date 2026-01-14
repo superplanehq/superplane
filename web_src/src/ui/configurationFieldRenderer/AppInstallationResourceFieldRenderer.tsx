@@ -1,5 +1,5 @@
-import React from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
+import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCompleteSelect";
+import { Select, SelectTrigger, SelectValue } from "../select";
 import { ConfigurationField } from "../../api-client";
 import { useApplicationResources } from "@/hooks/useApplications";
 import { toTestId } from "@/utils/testID";
@@ -20,6 +20,7 @@ export const AppInstallationResourceFieldRenderer = ({
   appInstallationId,
 }: AppInstallationResourceFieldRendererProps) => {
   const resourceType = field.typeOptions?.resource?.type;
+  const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
 
   const {
     data: resources,
@@ -53,18 +54,26 @@ export const AppInstallationResourceFieldRenderer = ({
     );
   }
 
+  const options: AutoCompleteOption[] = resources
+    .map((resource) => {
+      const optionValue = useNameAsValue ? (resource.name ?? resource.id ?? "") : (resource.id ?? resource.name ?? "");
+      const optionLabel = resource.name ?? resource.id ?? "Unnamed resource";
+      if (!optionValue) return null;
+      return { value: optionValue, label: optionLabel };
+    })
+    .filter((option): option is AutoCompleteOption => option !== null);
+
+  const selectedValue =
+    useNameAsValue && value ? (resources.find((resource) => resource.id === value)?.name ?? value) : (value ?? "");
+
   return (
-    <Select value={value ?? ""} onValueChange={(val) => onChange(val || undefined)}>
-      <SelectTrigger className="w-full" data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>
-        <SelectValue placeholder={`Select ${resourceType}`} />
-      </SelectTrigger>
-      <SelectContent>
-        {resources.map((resource) => (
-          <SelectItem key={resource.id ?? resource.name} value={resource.id ?? resource.name ?? ""}>
-            {resource.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>
+      <AutoCompleteSelect
+        options={options}
+        value={selectedValue}
+        onChange={(val) => onChange(val || undefined)}
+        placeholder={`Select ${resourceType}`}
+      />
+    </div>
   );
 };

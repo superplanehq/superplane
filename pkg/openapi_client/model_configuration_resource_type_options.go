@@ -20,7 +20,8 @@ var _ MappedNullable = &ConfigurationResourceTypeOptions{}
 
 // ConfigurationResourceTypeOptions struct for ConfigurationResourceTypeOptions
 type ConfigurationResourceTypeOptions struct {
-	Type *string `json:"type,omitempty"`
+	Type           *string `json:"type,omitempty"`
+	UseNameAsValue *bool   `json:"useNameAsValue,omitempty"`
 }
 
 // NewConfigurationResourceTypeOptions instantiates a new ConfigurationResourceTypeOptions object
@@ -72,6 +73,38 @@ func (o *ConfigurationResourceTypeOptions) SetType(v string) {
 	o.Type = &v
 }
 
+// GetUseNameAsValue returns the UseNameAsValue field value if set, zero value otherwise.
+func (o *ConfigurationResourceTypeOptions) GetUseNameAsValue() bool {
+	if o == nil || IsNil(o.UseNameAsValue) {
+		var ret bool
+		return ret
+	}
+	return *o.UseNameAsValue
+}
+
+// GetUseNameAsValueOk returns a tuple with the UseNameAsValue field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationResourceTypeOptions) GetUseNameAsValueOk() (*bool, bool) {
+	if o == nil || IsNil(o.UseNameAsValue) {
+		return nil, false
+	}
+	return o.UseNameAsValue, true
+}
+
+// HasUseNameAsValue returns a boolean if a field has been set.
+func (o *ConfigurationResourceTypeOptions) HasUseNameAsValue() bool {
+	if o != nil && !IsNil(o.UseNameAsValue) {
+		return true
+	}
+
+	return false
+}
+
+// SetUseNameAsValue gets a reference to the given bool and assigns it to the UseNameAsValue field.
+func (o *ConfigurationResourceTypeOptions) SetUseNameAsValue(v bool) {
+	o.UseNameAsValue = &v
+}
+
 func (o ConfigurationResourceTypeOptions) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -84,6 +117,9 @@ func (o ConfigurationResourceTypeOptions) ToMap() (map[string]interface{}, error
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Type) {
 		toSerialize["type"] = o.Type
+	}
+	if !IsNil(o.UseNameAsValue) {
+		toSerialize["useNameAsValue"] = o.UseNameAsValue
 	}
 	return toSerialize, nil
 }

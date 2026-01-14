@@ -3387,6 +3387,9 @@
       "properties": {
         "type": {
           "type": "string"
+        },
+        "useNameAsValue": {
+          "type": "boolean"
         }
       }
     },

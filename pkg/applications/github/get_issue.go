@@ -52,7 +52,8 @@ func (c *GetIssue) Configuration() []configuration.Field {
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "repository",
+					Type:           "repository",
+					UseNameAsValue: true,
 				},
 			},
 		},

@@ -114,7 +114,8 @@ type TypeOptions struct {
  * ResourceTypeOptions specifies which resource type to display
  */
 type ResourceTypeOptions struct {
-	Type string `json:"type"`
+	Type           string `json:"type"`
+	UseNameAsValue bool   `json:"use_name_as_value,omitempty"`
 }
 
 /*

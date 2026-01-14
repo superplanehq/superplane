@@ -2,7 +2,6 @@ package github
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"slices"
 	"strings"
@@ -63,22 +62,18 @@ func ensureRepoInMetadata(ctx core.MetadataContext, app core.AppInstallationCont
 }
 
 func getRepositoryFromConfiguration(c any) string {
-	log.Printf("%v", c)
 	configMap, ok := c.(map[string]any)
 	if !ok {
-		log.Printf("A")
 		return ""
 	}
 
 	r, ok := configMap["repository"]
 	if !ok {
-		log.Printf("B")
 		return ""
 	}
 
 	repository, ok := r.(string)
 	if !ok {
-		log.Printf("C")
 		return ""
 	}
 
