@@ -90,7 +90,7 @@ func (c *UpdateRelease) Configuration() []configuration.Field {
 			Name:        "tagName",
 			Label:       "Tag Name",
 			Type:        configuration.FieldTypeString,
-			Placeholder: "e.g., v1.0.0 or {{event.data.release.tag_name}}",
+			Placeholder: "e.g., v1.0.0 or {{$.data.tag_name}}",
 			Description: "Git tag identifying the release to update. Supports template variables from previous steps.",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
