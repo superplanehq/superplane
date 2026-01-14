@@ -136,7 +136,7 @@ export function AutoCompleteSelect({
   }, [refs.reference, refs.floating]);
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0 overflow-hidden">
       <div
         ref={refs.setReference}
         className={twMerge(
@@ -156,7 +156,7 @@ export function AutoCompleteSelect({
           role="combobox"
           aria-expanded={isOpen}
           aria-haspopup="listbox"
-          className="flex-1 bg-transparent border-none outline-none placeholder:text-gray-500"
+          className="flex-1 min-w-0 bg-transparent border-none outline-none placeholder:text-gray-500 truncate"
           placeholder={selectedOption ? selectedOption.label : placeholder}
           value={query}
           onChange={handleInputChange}

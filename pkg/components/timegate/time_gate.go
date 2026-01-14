@@ -90,7 +90,7 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 			Label:       "Time Windows",
 			Type:        configuration.FieldTypeList,
 			Required:    true,
-			Description: "List of time windows (all work as allow mode)",
+			Description: "Items will wait until the next valid time window is reached",
 			Default:     `[{"days":["monday","tuesday","wednesday","thursday","friday"],"startTime":"09:00","endTime":"17:00"}]`,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
@@ -158,7 +158,7 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 			Label:       "Exclude Dates",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Description: "List of dates to exclude (MM-DD format, e.g., 12-31 for December 31st)",
+			Description: "Override the rules above for specific dates like holidays.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Excluded Date",
@@ -586,7 +586,6 @@ func (tg *TimeGate) isDateExcluded(date time.Time, excludeDates []ExcludeDate) b
 	return false
 }
 
-
 func (tg *TimeGate) parseTimezone(timezoneStr string) *time.Location {
 	if timezoneStr == "" {
 		return time.UTC
@@ -683,7 +682,6 @@ func (tg *TimeGate) parseDayInYear(dayStr string) (int, int, error) {
 
 	return month, day, nil
 }
-
 
 func (tg *TimeGate) Cancel(ctx core.ExecutionContext) error {
 	return nil
