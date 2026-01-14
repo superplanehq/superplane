@@ -147,7 +147,7 @@ func Test__UpdateRelease__Configuration(t *testing.T) {
 			switch field.Name {
 			case "tagName":
 				assert.Contains(t, field.Placeholder, "v1.0.0")
-				assert.Contains(t, field.Placeholder, "event.data.release.tag_name")
+				assert.Contains(t, field.Placeholder, "$.data.tag_name")
 				assert.Contains(t, field.Description, "template variables")
 			case "name":
 				assert.Contains(t, field.Description, "leave empty to keep current")
