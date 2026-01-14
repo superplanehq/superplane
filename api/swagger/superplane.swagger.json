@@ -3197,6 +3197,19 @@
         }
       }
     },
+    "ConfigurationExpressionTypeOptions": {
+      "type": "object",
+      "properties": {
+        "minLength": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxLength": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
     "ConfigurationField": {
       "type": "object",
       "properties": {
@@ -3441,6 +3454,9 @@
         },
         "string": {
           "$ref": "#/definitions/ConfigurationStringTypeOptions"
+        },
+        "expression": {
+          "$ref": "#/definitions/ConfigurationExpressionTypeOptions"
         },
         "text": {
           "$ref": "#/definitions/ConfigurationTextTypeOptions"

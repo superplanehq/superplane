@@ -10,6 +10,7 @@ import {
   isValidIdentifier,
   parsePathSegments,
 } from "./core";
+import { start } from "repl";
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"input">, "onChange" | "size"> {
   exampleObj: Record<string, unknown> | null;
@@ -76,13 +77,17 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       };
     };
 
-    const isInsideDoubleBraces = (text: string, position: number) => {
-      const openIndex = text.lastIndexOf("{{", position);
+    const isAllowedToSuggest = (text: string, position: number) => {
+      if (!props.startWord || !props.suffix) {
+        return true;
+      }
+
+      const openIndex = text.lastIndexOf(props.startWord, position);
       if (openIndex === -1) {
         return false;
       }
 
-      const closeIndex = text.indexOf("}}", openIndex + 2);
+      const closeIndex = text.indexOf(props.suffix, openIndex + 2);
       if (closeIndex !== -1 && position > closeIndex) {
         return false;
       }
@@ -186,7 +191,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
         return;
       }
 
-      if (!isInsideDoubleBraces(inputValue, cursorPosition)) {
+      if (!isAllowedToSuggest(inputValue, cursorPosition)) {
         previousWordLength.current = word.length;
         setSuggestions([]);
         setIsOpen(false);
@@ -246,6 +251,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
         if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
           setIsOpen(false);
           setIsFocused(false);
+          inputRef.current?.blur();
           setHighlightedIndex(-1);
           setHighlightedValue(undefined);
         }
@@ -274,7 +280,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
         isInsertAtCursor &&
         beforeCursor.endsWith(startWord) &&
         !afterCursor.startsWith("}") &&
-        !isInsideDoubleBraces(inputValue, cursorPosition)
+        !isAllowedToSuggest(inputValue, cursorPosition)
       ) {
         const composedValue = replaceWordAtCursor(newValue, cursorPosition, `${prefix || ""}${suffix || ""}`);
         setInputValue(composedValue);

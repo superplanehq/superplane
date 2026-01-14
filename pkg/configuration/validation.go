@@ -99,6 +99,30 @@ func validateString(field Field, value any) error {
 	return nil
 }
 
+func validateExpression(field Field, value any) error {
+	text, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be an expression string")
+	}
+
+	if field.TypeOptions == nil || field.TypeOptions.Expression == nil {
+		return nil
+	}
+
+	options := field.TypeOptions.Expression
+	textLength := len(text)
+
+	if options.MinLength != nil && textLength < *options.MinLength {
+		return fmt.Errorf("must be at least %d characters", *options.MinLength)
+	}
+
+	if options.MaxLength != nil && textLength > *options.MaxLength {
+		return fmt.Errorf("must be at most %d characters", *options.MaxLength)
+	}
+
+	return nil
+}
+
 func validateText(field Field, value any) error {
 	text, ok := value.(string)
 	if !ok {
@@ -436,6 +460,9 @@ func validateFieldValue(field Field, value any) error {
 	switch field.Type {
 	case FieldTypeString:
 		return validateString(field, value)
+
+	case FieldTypeExpression:
+		return validateExpression(field, value)
 
 	case FieldTypeText:
 		return validateText(field, value)

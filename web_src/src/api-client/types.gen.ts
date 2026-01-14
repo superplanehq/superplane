@@ -151,6 +151,11 @@ export type ConfigurationDateTypeOptions = {
   format?: string;
 };
 
+export type ConfigurationExpressionTypeOptions = {
+  minLength?: number;
+  maxLength?: number;
+};
+
 export type ConfigurationField = {
   name?: string;
   type?: string;
@@ -239,6 +244,7 @@ export type ConfigurationTypeOptions = {
   datetime?: ConfigurationDateTimeTypeOptions;
   anyPredicateList?: ConfigurationAnyPredicateListTypeOptions;
   string?: ConfigurationStringTypeOptions;
+  expression?: ConfigurationExpressionTypeOptions;
   text?: ConfigurationTextTypeOptions;
 };
 

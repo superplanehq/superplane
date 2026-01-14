@@ -54,7 +54,7 @@ func (f *Filter) Configuration() []configuration.Field {
 		{
 			Name:        "expression",
 			Label:       "Filter Expression",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeExpression,
 			Description: "Boolean expression to filter data",
 			Required:    true,
 		},
