@@ -81,9 +81,7 @@ export function NodeSearchInternal({ onSearch, onSelectNode, open, onOpenChange 
 
       {open && (
         <CommandList>
-          {searchResults.length === 0 ? (
-            <CommandEmpty>No results found. {searchString}</CommandEmpty>
-          ) : (
+          {searchResults.length === 0 ? null : (
             <CommandGroup heading="Components">
               {searchResults.map((node) => {
                 const isAnnotationNode = (node.data as { type?: string })?.type === "annotation";
