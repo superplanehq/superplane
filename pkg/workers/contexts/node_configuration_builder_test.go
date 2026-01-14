@@ -44,25 +44,26 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	//
 	// Emit root event
 	//
-	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, map[string]any{
+	rootEventData := map[string]any{
 		"user":    "john",
 		"action":  "login",
 		"success": true,
 		"count":   42,
-	})
+	}
+	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, rootEventData)
 
 	//
-	// Use root() function to get information from the root event
+	// Use message chain access to get information from the root event
 	//
 	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
 		WithRootEvent(&rootEvent.ID).
-		WithInput(map[string]any{"test": "value"})
+		WithInput(map[string]any{triggerNode: rootEventData})
 
 	configuration := map[string]any{
-		"user":    "{{ root().user }}",
-		"action":  "{{ root().action }}",
-		"success": "{{ root().success }}",
-		"count":   "{{ root().count }}",
+		"user":    "{{ $[\"" + triggerNode + "\"].user }}",
+		"action":  "{{ $[\"" + triggerNode + "\"].action }}",
+		"success": "{{ $[\"" + triggerNode + "\"].success }}",
+		"count":   "{{ $[\"" + triggerNode + "\"].count }}",
 	}
 
 	result, err := builder.Build(configuration)
@@ -88,15 +89,15 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_NoRootEvent(t *testing
 	)
 
 	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
-		WithInput(map[string]any{"test": "value"})
+		WithInput(map[string]any{})
 
 	configuration := map[string]any{
-		"field": "{{ root().data }}",
+		"field": "{{ $[\"node-1\"].data }}",
 	}
 
 	_, err := builder.Build(configuration)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no root event found")
+	assert.Contains(t, err.Error(), "not found in execution chain")
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
@@ -120,11 +121,13 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 			},
 			{
 				NodeID: node1,
+				Name:   "First Node",
 				Type:   models.NodeTypeComponent,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
 			{
 				NodeID: node2,
+				Name:   "Second Node",
 				Type:   models.NodeTypeComponent,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
@@ -156,10 +159,11 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 		rootEvent.ID,
 		nil,
 	)
-	event1 := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, node1, "default", &execution1.ID, map[string]any{
+	node1Data := map[string]any{
 		"step":   1,
 		"result": "first",
-	})
+	}
+	event1 := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, node1, "default", &execution1.ID, node1Data)
 
 	//
 	// Simulate execution for second node
@@ -173,27 +177,30 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 		&execution1.ID,
 	)
 
-	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, node2, "default", &execution2.ID, map[string]any{
+	node2Data := map[string]any{
 		"step":   2,
 		"result": "second",
-	})
+	}
+	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, node2, "default", &execution2.ID, node2Data)
 
 	//
-	// Now test chain() function from node3 perspective
+	// Now test message chain access from node3 perspective
 	//
 	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
 		WithPreviousExecution(&execution2.ID).
 		WithRootEvent(&rootEvent.ID).
-		WithInput(map[string]any{"test": "value"})
+		WithInput(map[string]any{node2: node2Data})
 
 	configuration := map[string]any{
-		"from_node1": "{{ chain(\"" + node1 + "\").default[0].result }}",
-		"from_node2": "{{ chain(\"" + node2 + "\").default[0].step }}",
+		"from_node1":      "{{ $[\"" + node1 + "\"].result }}",
+		"from_node1_name": "{{ $[\"First Node\"].result }}",
+		"from_node2":      "{{ $[\"" + node2 + "\"].step }}",
 	}
 
 	result, err := builder.Build(configuration)
 	require.NoError(t, err)
 	assert.Equal(t, "first", result["from_node1"])
+	assert.Equal(t, "first", result["from_node1_name"])
 	assert.Equal(t, "2", result["from_node2"])
 }
 
@@ -212,15 +219,15 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NoPreviousExecution(t
 	)
 
 	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
-		WithInput(map[string]any{"test": "value"})
+		WithInput(map[string]any{})
 
 	configuration := map[string]any{
-		"field": "{{ chain(\"node-1\").default[0].data }}",
+		"field": "{{ $[\"node-1\"].data }}",
 	}
 
 	_, err := builder.Build(configuration)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no previous execution")
+	assert.Contains(t, err.Error(), "not found in execution chain")
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NodeNotInChain(t *testing.T) {
@@ -245,10 +252,10 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NodeNotInChain(t *tes
 
 	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
 		WithPreviousExecution(&execution1.ID).
-		WithInput(map[string]any{"test": "value"})
+		WithInput(map[string]any{})
 
 	configuration := map[string]any{
-		"field": "{{ chain(\"nonexistent-node\").default[0].data }}",
+		"field": "{{ $[\"nonexistent-node\"].data }}",
 	}
 
 	_, err := builder.Build(configuration)
@@ -332,12 +339,12 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Root(t *testing.T) {
 		ForBlueprintNode(blueprintWorkflowNode).
 		WithRootEvent(&rootEvent.ID).
 		WithPreviousExecution(&blueprintExecution.ID).
-		WithInput(map[string]any{"internal": "data"})
+		WithInput(map[string]any{triggerNode: rootEventData})
 
 	configuration := map[string]any{
-		"username": "{{ root().username }}",
-		"email":    "{{ root().email }}",
-		"age":      "{{ root().age }}",
+		"username": "{{ $[\"" + triggerNode + "\"].username }}",
+		"email":    "{{ $[\"" + triggerNode + "\"].email }}",
+		"age":      "{{ $[\"" + triggerNode + "\"].age }}",
 	}
 
 	result, err := builder.Build(configuration)
@@ -429,10 +436,11 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 		&blueprintExecution.ID,
 	)
 
-	event1 := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "bp-node-1", "default", &bpNode1Execution.ID, map[string]any{
+	bpNode1Data := map[string]any{
 		"processed": true,
 		"value":     "from-first-node",
-	})
+	}
+	event1 := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "bp-node-1", "default", &bpNode1Execution.ID, bpNode1Data)
 
 	//
 	// Create second blueprint node child execution
@@ -449,7 +457,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 	require.NoError(t, database.Conn().Save(&bpNode2Execution).Error)
 
 	//
-	// Test chain() from bp-node-2 perspective
+	// Test message chain access from bp-node-2 perspective
 	//
 	blueprintWorkflowNode, err := models.FindWorkflowNode(database.Conn(), workflow.ID, blueprintNode)
 	require.NoError(t, err)
@@ -458,11 +466,11 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 		ForBlueprintNode(blueprintWorkflowNode).
 		WithPreviousExecution(&bpNode2Execution.ID).
 		WithRootEvent(&rootEvent.ID).
-		WithInput(map[string]any{"test": "value"})
+		WithInput(map[string]any{"bp-node-1": bpNode1Data})
 
 	configuration := map[string]any{
-		"processed": "{{ chain(\"bp-node-1\").default[0].processed }}",
-		"value":     "{{ chain(\"bp-node-1\").default[0].value }}",
+		"processed": "{{ $[\"bp-node-1\"].processed }}",
+		"value":     "{{ $[\"bp-node-1\"].value }}",
 	}
 
 	result, err := builder.Build(configuration)
@@ -531,7 +539,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config(t *testing.T) {
 	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
 		ForBlueprintNode(blueprintWorkflowNode).
 		WithRootEvent(&rootEvent.ID).
-		WithInput(map[string]any{"input": "data"})
+		WithInput(map[string]any{blueprintNode: map[string]any{"input": "data"}})
 
 	configuration := map[string]any{
 		"key":      "{{ config.api_key }}",
@@ -578,7 +586,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config_NotAvailableForWork
 	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
 	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
 		WithRootEvent(&rootEvent.ID).
-		WithInput(rootEvent.Data.Data())
+		WithInput(map[string]any{"node-1": rootEvent.Data.Data()})
 
 	_, err := builder.Build(map[string]any{"field": "{{ config.field }}"})
 	require.Error(t, err)
@@ -604,24 +612,25 @@ func Test_NodeConfigurationBuilder_ComplexNesting(t *testing.T) {
 			"name":  "John",
 			"email": "john@example.com",
 		},
-		"items": []any{"apple", "banana", "cherry"},
+		"items":  []any{"apple", "banana", "cherry"},
+		"prefix": "user",
 	}
 	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "node-1", "default", nil, rootEventData)
 
 	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
 		WithRootEvent(&rootEvent.ID).
-		WithInput(map[string]any{"prefix": "user"})
+		WithInput(map[string]any{"node-1": rootEventData})
 
 	configuration := map[string]any{
 		"nested": map[string]any{
-			"user_name":  "{{ root().user.name }}",
-			"user_email": "{{ root().user.email }}",
+			"user_name":  "{{ $[\"node-1\"].user.name }}",
+			"user_email": "{{ $[\"node-1\"].user.email }}",
 		},
 		"array_field": []any{
-			"{{ $.prefix }}",
-			"{{ root().user.name }}",
+			"{{ $[\"node-1\"].prefix }}",
+			"{{ $[\"node-1\"].user.name }}",
 			map[string]any{
-				"inner": "{{ root().user.email }}",
+				"inner": "{{ $[\"node-1\"].user.email }}",
 			},
 		},
 	}
@@ -656,8 +665,6 @@ func Test_NodeConfigurationBuilder_InputVariable(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-
 	inputData := map[string]any{
 		"name":   "Alice",
 		"age":    25,
@@ -667,16 +674,18 @@ func Test_NodeConfigurationBuilder_InputVariable(t *testing.T) {
 		},
 	}
 
+	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "node-1", "default", nil, inputData)
+
 	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
 		WithRootEvent(&rootEvent.ID).
-		WithInput(inputData)
+		WithInput(map[string]any{"node-1": inputData})
 
 	configuration := map[string]any{
-		"name":     "{{ $.name }}",
-		"age":      "{{ $.age }}",
-		"active":   "{{ $.active }}",
-		"role":     "{{ $.metadata.role }}",
-		"combined": "User {{ $.name }} is {{ $.age }} years old",
+		"name":     "{{ $[\"node-1\"].name }}",
+		"age":      "{{ $[\"node-1\"].age }}",
+		"active":   "{{ $[\"node-1\"].active }}",
+		"role":     "{{ $[\"node-1\"].metadata.role }}",
+		"combined": "User {{ $[\"node-1\"].name }} is {{ $[\"node-1\"].age }} years old",
 	}
 
 	result, err := builder.Build(configuration)

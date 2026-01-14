@@ -160,6 +160,11 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 		return fmt.Errorf("error finding input: %v", err)
 	}
 
+	inputEvent, err := models.FindWorkflowEventInTransaction(tx, execution.EventID)
+	if err != nil {
+		return fmt.Errorf("error finding input event: %v", err)
+	}
+
 	//
 	// Build the configuration for the first node.
 	// If we have an error here, we should fail the execution,
@@ -170,7 +175,7 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 		WithRootEvent(&execution.RootEventID).
 		WithPreviousExecution(&execution.ID).
 		ForBlueprintNode(node).
-		WithInput(input).
+		WithInput(map[string]any{inputEvent.NodeID: input}).
 		Build(firstNode.Configuration)
 
 	if err != nil {
