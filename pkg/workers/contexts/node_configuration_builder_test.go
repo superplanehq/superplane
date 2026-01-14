@@ -121,13 +121,11 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 			},
 			{
 				NodeID: node1,
-				Name:   "First Node",
 				Type:   models.NodeTypeComponent,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
 			{
 				NodeID: node2,
-				Name:   "Second Node",
 				Type:   models.NodeTypeComponent,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
@@ -192,15 +190,13 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 		WithInput(map[string]any{node2: node2Data})
 
 	configuration := map[string]any{
-		"from_node1":      "{{ $[\"" + node1 + "\"].result }}",
-		"from_node1_name": "{{ $[\"First Node\"].result }}",
-		"from_node2":      "{{ $[\"" + node2 + "\"].step }}",
+		"from_node1": "{{ $[\"" + node1 + "\"].result }}",
+		"from_node2": "{{ $[\"" + node2 + "\"].step }}",
 	}
 
 	result, err := builder.Build(configuration)
 	require.NoError(t, err)
 	assert.Equal(t, "first", result["from_node1"])
-	assert.Equal(t, "first", result["from_node1_name"])
 	assert.Equal(t, "2", result["from_node2"])
 }
 

@@ -241,28 +241,15 @@ func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string) (map[strin
 		return nil, err
 	}
 
-	nodeByName := make(map[string]string, len(nodes))
 	nodeIDs := make(map[string]struct{}, len(nodes))
 	for _, node := range nodes {
 		nodeIDs[node.NodeID] = struct{}{}
-		if node.Name == "" {
-			continue
-		}
-
-		if _, ok := nodeByName[node.Name]; !ok {
-			nodeByName[node.Name] = node.NodeID
-		}
 	}
 
 	refToNodeID := make(map[string]string, len(nodeRefs))
 	for _, nodeRef := range nodeRefs {
 		if _, ok := nodeIDs[nodeRef]; ok {
 			refToNodeID[nodeRef] = nodeRef
-			continue
-		}
-
-		if nodeID, ok := nodeByName[nodeRef]; ok {
-			refToNodeID[nodeRef] = nodeID
 			continue
 		}
 
