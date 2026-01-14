@@ -709,7 +709,7 @@ func (s *Server) acceptInviteLink(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err = s.authService.AssignRole(user.ID.String(), models.RoleOrgOwner, org.ID.String(), models.DomainTypeOrganization)
+	err = s.authService.AssignRole(user.ID.String(), models.RoleOrgViewer, org.ID.String(), models.DomainTypeOrganization)
 	if err != nil {
 		tx.Rollback()
 		http.Error(w, "failed to accept invite", http.StatusInternalServerError)
