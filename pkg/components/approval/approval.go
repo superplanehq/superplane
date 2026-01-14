@@ -591,7 +591,7 @@ func (a *Approval) notifyApprovers(ctx core.ExecutionContext, metadata *Metadata
 	}
 
 	title := "Approval required"
-	body := "A canvas run item is waiting for your approval. Please access the URL below to handle it."
+	body := "A canvas run item is waiting for your approval. Please visit the URL below to handle it."
 
 	receivers := core.NotificationReceivers{}
 	emailSet := map[string]struct{}{}
