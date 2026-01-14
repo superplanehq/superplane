@@ -10,11 +10,13 @@ interface Account {
 interface AccountContextType {
   account: Account | null;
   loading: boolean;
+  setupRequired: boolean;
 }
 
 const AccountContext = createContext<AccountContextType>({
   account: null,
   loading: true,
+  setupRequired: false,
 });
 
 export const useAccount = () => {
@@ -32,6 +34,7 @@ interface AccountProviderProps {
 export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) => {
   const [account, setAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
+  const [setupRequired, setSetupRequired] = useState(false);
 
   useEffect(() => {
     const fetchAccount = async () => {
@@ -41,6 +44,11 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
           credentials: "include",
           redirect: "manual", // Don't follow redirects, check status code instead
         });
+
+        if (response.status === 409 && response.headers.get("X-Owner-Setup-Required") === "true") {
+          setSetupRequired(true);
+          return;
+        }
 
         if (response.status === 200) {
           const accountData = await response.json();
@@ -58,5 +66,5 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
     fetchAccount();
   }, []);
 
-  return <AccountContext.Provider value={{ account, loading }}>{children}</AccountContext.Provider>;
+  return <AccountContext.Provider value={{ account, loading, setupRequired }}>{children}</AccountContext.Provider>;
 };

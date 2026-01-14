@@ -80,6 +80,12 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			if IsOwnerSetupRequired() {
 				path := r.URL.Path
 
+				if isAccountAPIPath(path) {
+					w.Header().Set("X-Owner-Setup-Required", "true")
+					http.Error(w, "Owner setup required", http.StatusConflict)
+					return
+				}
+
 				// Allow the setup flow and static assets through without auth
 				if isOwnerSetupAllowedPath(path) {
 					next.ServeHTTP(w, r)
@@ -106,6 +112,11 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 
 			accountID, err := getAccountFromCookie(r, jwtSigner)
 			if err != nil {
+				if isAccountAPIPath(r.URL.Path) {
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+
 				authentication.ClearAccountCookie(w, r)
 				redirectToLoginWithOriginalURL(w, r)
 				return
@@ -113,6 +124,11 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 
 			account, err := models.FindAccountByID(accountID)
 			if err != nil {
+				if isAccountAPIPath(r.URL.Path) {
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+
 				authentication.ClearAccountCookie(w, r)
 				redirectToLoginWithOriginalURL(w, r)
 				return
@@ -234,6 +250,15 @@ func isOwnerSetupAllowedPath(path string) bool {
 	}
 
 	return false
+}
+
+func isAccountAPIPath(path string) bool {
+	switch path {
+	case "/account", "/organizations":
+		return true
+	default:
+		return false
+	}
 }
 
 func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, error) {

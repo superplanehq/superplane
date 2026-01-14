@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,6 +16,8 @@ func TestOwnerSetupFlow(t *testing.T) {
 	t.Run("completing owner setup via UI creates owner and redirects to home", func(t *testing.T) {
 		steps := &ownerSetupSteps{t: t}
 		steps.start()
+		steps.visitRootPage()
+		steps.assertRedirectedToSetup()
 		steps.visitSetupPage()
 		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
 		steps.assertOwnerAndOrganizationCreated()
@@ -25,6 +28,8 @@ func TestOwnerSetupFlow(t *testing.T) {
 	t.Run("can complete owner setup with SMTP configuration", func(t *testing.T) {
 		steps := &ownerSetupSteps{t: t}
 		steps.start()
+		steps.visitRootPage()
+		steps.assertRedirectedToSetup()
 		steps.visitSetupPage()
 		steps.fillInOwnerDetails("smtp-owner@example.com", "SMTP", "Owner", "Password1")
 		steps.chooseSMTPSetup()
@@ -38,6 +43,8 @@ func TestOwnerSetupFlow(t *testing.T) {
 	t.Run("can login with email and password after owner setup", func(t *testing.T) {
 		steps := &ownerSetupSteps{t: t}
 		steps.start()
+		steps.visitRootPage()
+		steps.assertRedirectedToSetup()
 		steps.visitSetupPage()
 		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
 		steps.assertOwnerAndOrganizationCreated()
@@ -66,6 +73,24 @@ func (s *ownerSetupSteps) start() {
 
 func (s *ownerSetupSteps) visitSetupPage() {
 	s.session.Visit("/setup")
+}
+
+func (s *ownerSetupSteps) visitRootPage() {
+	s.session.Visit("/")
+}
+
+func (s *ownerSetupSteps) assertRedirectedToSetup() {
+	// Give the router a moment to handle the redirect.
+	for i := 0; i < 10; i++ {
+		currentURL := s.session.Page().URL()
+		if strings.Contains(currentURL, "/setup") {
+			return
+		}
+		s.session.Sleep(200)
+	}
+
+	currentURL := s.session.Page().URL()
+	assert.Contains(s.t, currentURL, "/setup", "expected to be redirected to owner setup")
 }
 
 func (s *ownerSetupSteps) fillInOwnerDetailsAndSubmit(email, firstName, lastName, password string) {
