@@ -42,6 +42,13 @@ func CreateAppSubscriptionInTransaction(tx *gorm.DB, node *WorkflowNode, install
 	return &s, nil
 }
 
+func DeleteAppSubscriptionsForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {
+	return tx.
+		Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).
+		Delete(&AppInstallationSubscription{}).
+		Error
+}
+
 type NodeSubscription struct {
 	WorkflowID    uuid.UUID
 	NodeID        string

@@ -1,6 +1,7 @@
 import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
+import { formatRelativeTime } from "@/utils/timezone";
 import { TriggerProps } from "@/ui/trigger";
 
 interface OnAppMentionConfiguration {
@@ -30,7 +31,7 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as AppMentionEventData | undefined;
     const title = eventData?.text?.trim() ? eventData.text : "App mention";
-    const subtitle = [eventData?.user, eventData?.channel].filter(Boolean).join(" • ");
+    const subtitle = formatRelativeTime(event.createdAt);
 
     return {
       title,
@@ -76,7 +77,7 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data?.data as AppMentionEventData | undefined;
       const title = eventData?.text?.trim() ? eventData.text : "App mention";
-      const subtitle = [eventData?.user, eventData?.channel].filter(Boolean).join(" • ");
+      const subtitle = formatRelativeTime(lastEvent.createdAt);
 
       props.lastEventData = {
         title,
