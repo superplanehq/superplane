@@ -326,14 +326,15 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 
 func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
 	pbField := &configpb.Field{
-		Name:        field.Name,
-		Label:       field.Label,
-		Type:        field.Type,
-		Description: field.Description,
-		Required:    field.Required,
-		Sensitive:   &field.Sensitive,
-		Togglable:   &field.Togglable,
-		TypeOptions: typeOptionsToProto(field.TypeOptions),
+		Name:               field.Name,
+		Label:              field.Label,
+		Type:               field.Type,
+		Description:        field.Description,
+		Required:           field.Required,
+		Sensitive:          &field.Sensitive,
+		Togglable:          &field.Togglable,
+		DisallowExpression: &field.DisallowExpression,
+		TypeOptions:        typeOptionsToProto(field.TypeOptions),
 	}
 
 	if field.Default != nil {
@@ -634,6 +635,18 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 
 	if pbField.Placeholder != nil {
 		field.Placeholder = *pbField.Placeholder
+	}
+
+	if pbField.DisallowExpression != nil {
+		field.DisallowExpression = *pbField.DisallowExpression
+	}
+
+	if pbField.Sensitive != nil {
+		field.Sensitive = *pbField.Sensitive
+	}
+
+	if pbField.Togglable != nil {
+		field.Togglable = *pbField.Togglable
 	}
 
 	if len(pbField.VisibilityConditions) > 0 {
