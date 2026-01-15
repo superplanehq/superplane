@@ -64,9 +64,7 @@ export function Members({ organizationId }: MembersProps) {
       return [];
     }
 
-    const matchedUser = users.find(
-      (user) => user.metadata?.email?.toLowerCase() === account.email.toLowerCase(),
-    );
+    const matchedUser = users.find((user) => user.metadata?.email?.toLowerCase() === account.email.toLowerCase());
     return matchedUser?.status?.roleAssignments?.map((role) => role.roleName) ?? [];
   }, [account?.email, users]);
 
@@ -308,9 +306,7 @@ export function Members({ organizationId }: MembersProps) {
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
-          <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">
-            Invite link to add members
-          </Text>
+          <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">Invite link to add members</Text>
           <Text className="text-sm text-gray-500 dark:text-gray-400">
             Reach out to an organization owner or admin to invite new members.
           </Text>
