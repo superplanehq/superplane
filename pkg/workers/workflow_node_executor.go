@@ -258,11 +258,13 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		return fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
 	}
 
-	input, err := execution.GetInput(tx)
+	inputEvent, err := models.FindWorkflowEventInTransaction(tx, execution.EventID)
 	if err != nil {
-		logger.Errorf("failed to get execution inputs: %v", err)
-		return fmt.Errorf("failed to get execution inputs: %w", err)
+		logger.Errorf("failed to find input event: %v", err)
+		return fmt.Errorf("failed to find input event: %w", err)
 	}
+
+	input := inputEvent.Data.Data()
 
 	workflow, err := models.FindWorkflowWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 	if err != nil {
@@ -275,6 +277,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		WorkflowID:     execution.WorkflowID.String(),
 		OrganizationID: workflow.OrganizationID.String(),
 		NodeID:         execution.NodeID,
+		SourceNodeID:   inputEvent.NodeID,
 		BaseURL:        w.baseURL,
 		Configuration:  execution.Configuration.Data(),
 		Data:           input,
@@ -286,6 +289,19 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
 		Integration:    contexts.NewIntegrationContext(tx, w.registry),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
+	}
+	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
+		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
+			WithRootEvent(&execution.RootEventID).
+			WithInput(map[string]any{inputEvent.NodeID: input})
+		if execution.PreviousExecutionID != nil {
+			builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
+		}
+		chain, err := builder.BuildMessageChainForExpression(expression)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"$": chain}, nil
 	}
 
 	if node.AppInstallationID != nil {

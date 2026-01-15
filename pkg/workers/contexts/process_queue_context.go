@@ -73,6 +73,19 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 		SourceNodeID:  event.NodeID,
 		Input:         event.Data.Data(),
 	}
+	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
+		builder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
+			WithRootEvent(&queueItem.RootEventID).
+			WithInput(map[string]any{event.NodeID: event.Data.Data()})
+		if event.ExecutionID != nil {
+			builder = builder.WithPreviousExecution(event.ExecutionID)
+		}
+		chain, err := builder.BuildMessageChainForExpression(expression)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"$": chain}, nil
+	}
 
 	ctx.CreateExecution = func() (*core.ExecutionContext, error) {
 		now := time.Now()
