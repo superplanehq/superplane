@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -127,7 +128,12 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 	logger = logging.WithQueueItem(logger, *queueItem)
 	logger.Info("Processing queue item")
 
-	ctx, err := contexts.BuildProcessQueueContext(w.registry.GetHTTPClient(), tx, node, queueItem)
+	configFields, err := w.configurationFieldsForNode(tx, node)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ctx, err := contexts.BuildProcessQueueContext(w.registry.GetHTTPClient(), tx, node, queueItem, configFields)
 	if err != nil {
 
 		//
@@ -175,6 +181,36 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 	}
 
 	return []*uuid.UUID{executionID}, queueItem, err
+}
+
+func (w *WorkflowNodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.WorkflowNode) ([]configuration.Field, error) {
+	ref := node.Ref.Data()
+	switch node.Type {
+	case models.NodeTypeComponent:
+		if ref.Component == nil || ref.Component.Name == "" {
+			return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
+		}
+
+		comp, err := w.registry.GetComponent(ref.Component.Name)
+		if err != nil {
+			return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+		}
+
+		return comp.Configuration(), nil
+	case models.NodeTypeBlueprint:
+		if ref.Blueprint == nil || ref.Blueprint.ID == "" {
+			return nil, fmt.Errorf("node %s has no blueprint reference", node.NodeID)
+		}
+
+		blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, ref.Blueprint.ID)
+		if err != nil {
+			return nil, fmt.Errorf("blueprint %s not found: %w", ref.Blueprint.ID, err)
+		}
+
+		return blueprint.Configuration, nil
+	default:
+		return nil, nil
+	}
 }
 
 func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, node *models.WorkflowNode) (*uuid.UUID, error) {

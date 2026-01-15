@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -29,7 +30,7 @@ func (e *ConfigurationBuildError) Unwrap() error {
 	return e.Err
 }
 
-func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models.WorkflowNode, queueItem *models.WorkflowNodeQueueItem) (*core.ProcessQueueContext, error) {
+func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models.WorkflowNode, queueItem *models.WorkflowNodeQueueItem, configFields []configuration.Field) (*core.ProcessQueueContext, error) {
 	event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
 	if err != nil {
 		return nil, err
@@ -39,6 +40,9 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
+	if len(configFields) > 0 {
+		configBuilder = configBuilder.WithConfigurationFields(configFields)
+	}
 
 	if node.ParentNodeID != nil {
 		parent, err := models.FindWorkflowNode(tx, node.WorkflowID, *node.ParentNodeID)

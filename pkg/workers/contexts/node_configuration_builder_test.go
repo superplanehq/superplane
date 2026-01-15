@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -726,4 +727,61 @@ func Test_NodeConfigurationBuilder_NoExpression(t *testing.T) {
 	assert.Equal(t, 42, result["number"])
 	assert.Equal(t, true, result["boolean"])
 	assert.Nil(t, result["null_value"])
+}
+
+func Test_NodeConfigurationBuilder_DisallowExpression_ListItems(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{NodeID: "node-1", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+		WithInput(map[string]any{
+			"node-1": map[string]any{
+				"allowed":    "resolved",
+				"disallowed": "raw",
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{
+				Name: "items",
+				Type: configuration.FieldTypeList,
+				TypeOptions: &configuration.TypeOptions{
+					List: &configuration.ListTypeOptions{
+						ItemDefinition: &configuration.ListItemDefinition{
+							Type: configuration.FieldTypeObject,
+							Schema: []configuration.Field{
+								{Name: "allowed", Type: configuration.FieldTypeString},
+								{Name: "disallowed", Type: configuration.FieldTypeString, DisallowExpression: true},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	configuration := map[string]any{
+		"items": []any{
+			map[string]any{
+				"allowed":    "{{ $[\"node-1\"].allowed }}",
+				"disallowed": "{{ $[\"node-1\"].disallowed }}",
+			},
+		},
+	}
+
+	result, err := builder.Build(configuration)
+	require.NoError(t, err)
+
+	items := result["items"].([]any)
+	item := items[0].(map[string]any)
+	assert.Equal(t, "resolved", item["allowed"])
+	assert.Equal(t, "{{ $[\"node-1\"].disallowed }}", item["disallowed"])
 }

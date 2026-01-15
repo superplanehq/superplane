@@ -31,6 +31,11 @@ type Application interface {
 	Description() string
 
 	/*
+	 * Markdown-formatted instructions shown in the installation modal.
+	 */
+	InstallationInstructions() string
+
+	/*
 	 * The configuration fields of the application.
 	 */
 	Configuration() []configuration.Field
@@ -80,6 +85,36 @@ type Application interface {
 	CleanupWebhook(ctx CleanupWebhookContext) error
 }
 
+type AppComponent interface {
+
+	/*
+	 * AppComponent inherits all the methods from Component interface,
+	 * and adds a couple more, which are only applicable to app components.
+	 */
+	Component
+
+	OnAppMessage(ctx AppMessageContext) error
+}
+
+type AppTrigger interface {
+
+	/*
+	 * Inherits all the methods from Trigger interface,
+	 * and adds a couple more, which are only applicable to app triggers.
+	 */
+	Trigger
+
+	OnAppMessage(ctx AppMessageContext) error
+}
+
+type AppMessageContext struct {
+	Message         any
+	Configuration   any
+	Logger          *logrus.Entry
+	AppInstallation AppInstallationContext
+	Events          EventContext
+}
+
 type ApplicationResource struct {
 	Type string
 	Name string
@@ -95,6 +130,7 @@ type ListResourcesContext struct {
 type SetupWebhookContext struct {
 	HTTP            HTTPContext
 	Webhook         WebhookContext
+	Logger          *logrus.Entry
 	AppInstallation AppInstallationContext
 }
 
@@ -160,9 +196,24 @@ type AppInstallationContext interface {
 	RequestWebhook(configuration any) error
 
 	/*
+	 * Subscribe to app events.
+	 */
+	Subscribe(any) (*uuid.UUID, error)
+
+	/*
 	 * Schedule a sync call for the app installation.
 	 */
 	ScheduleResync(interval time.Duration) error
+
+	/*
+	 * List app installation subscriptions from nodes.
+	 */
+	ListSubscriptions() ([]AppSubscriptionContext, error)
+}
+
+type AppSubscriptionContext interface {
+	Configuration() any
+	SendMessage(any) error
 }
 
 type InstallationSecret struct {

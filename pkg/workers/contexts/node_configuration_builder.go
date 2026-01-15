@@ -9,6 +9,7 @@ import (
 	"github.com/expr-lang/expr/ast"
 	"github.com/expr-lang/expr/parser"
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -22,6 +23,7 @@ type NodeConfigurationBuilder struct {
 	rootEventID         *uuid.UUID
 	input               any
 	parentBlueprintNode *models.WorkflowNode
+	configurationFields []configuration.Field
 }
 
 func NewNodeConfigurationBuilder(tx *gorm.DB, workflowID uuid.UUID) *NodeConfigurationBuilder {
@@ -51,7 +53,16 @@ func (b *NodeConfigurationBuilder) WithInput(input any) *NodeConfigurationBuilde
 	return b
 }
 
+func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuration.Field) *NodeConfigurationBuilder {
+	b.configurationFields = fields
+	return b
+}
+
 func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[string]any, error) {
+	if len(b.configurationFields) > 0 {
+		return b.resolveWithSchema(configuration, b.configurationFields)
+	}
+
 	resolved, err := b.resolve(configuration)
 	if err != nil {
 		return nil, err
@@ -69,6 +80,80 @@ func (b *NodeConfigurationBuilder) resolve(configuration map[string]any) (map[st
 			return nil, fmt.Errorf("error resolving field %s: %w", k, err)
 		}
 		result[k] = resolved
+	}
+
+	return result, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveWithSchema(config map[string]any, fields []configuration.Field) (map[string]any, error) {
+	result := make(map[string]any, len(config))
+	fieldsByName := make(map[string]configuration.Field, len(fields))
+	for _, field := range fields {
+		fieldsByName[field.Name] = field
+	}
+
+	for key, value := range config {
+		field, ok := fieldsByName[key]
+		if !ok {
+			resolved, err := b.resolveValue(value)
+			if err != nil {
+				return nil, fmt.Errorf("error resolving field %s: %w", key, err)
+			}
+			result[key] = resolved
+			continue
+		}
+
+		resolved, err := b.resolveFieldValue(value, field)
+		if err != nil {
+			return nil, fmt.Errorf("error resolving field %s: %w", key, err)
+		}
+		result[key] = resolved
+	}
+
+	return result, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configuration.Field) (any, error) {
+	if field.DisallowExpression {
+		return value, nil
+	}
+
+	if field.TypeOptions != nil {
+		if field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
+			if obj, ok := asAnyMap(value); ok {
+				return b.resolveWithSchema(obj, field.TypeOptions.Object.Schema)
+			}
+		}
+
+		if field.TypeOptions.List != nil && field.TypeOptions.List.ItemDefinition != nil {
+			if list, ok := value.([]any); ok {
+				return b.resolveListItems(list, field.TypeOptions.List.ItemDefinition)
+			}
+		}
+	}
+
+	return b.resolveValue(value)
+}
+
+func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configuration.ListItemDefinition) ([]any, error) {
+	result := make([]any, len(list))
+	for i, item := range list {
+		if itemDef.Type == configuration.FieldTypeObject && len(itemDef.Schema) > 0 {
+			if itemMap, ok := asAnyMap(item); ok {
+				resolved, err := b.resolveWithSchema(itemMap, itemDef.Schema)
+				if err != nil {
+					return nil, fmt.Errorf("list item %d: %w", i, err)
+				}
+				result[i] = resolved
+				continue
+			}
+		}
+
+		resolved, err := b.resolveValue(item)
+		if err != nil {
+			return nil, fmt.Errorf("list item %d: %w", i, err)
+		}
+		result[i] = resolved
 	}
 
 	return result, nil
@@ -102,6 +187,21 @@ func (b *NodeConfigurationBuilder) resolveValue(value any) (any, error) {
 
 	default:
 		return v, nil
+	}
+}
+
+func asAnyMap(value any) (map[string]any, bool) {
+	switch typed := value.(type) {
+	case map[string]any:
+		return typed, true
+	case map[string]string:
+		anyMap := make(map[string]any, len(typed))
+		for key, value := range typed {
+			anyMap[key] = value
+		}
+		return anyMap, true
+	default:
+		return nil, false
 	}
 }
 

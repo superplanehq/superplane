@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -171,12 +172,26 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 	// since this means the first node has improper configuration,
 	// and the user should be aware of this.
 	//
-	config, err := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
+	configBuilder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 		WithRootEvent(&execution.RootEventID).
 		WithPreviousExecution(&execution.ID).
 		ForBlueprintNode(node).
-		WithInput(map[string]any{inputEvent.NodeID: input}).
-		Build(firstNode.Configuration)
+		WithInput(map[string]any{inputEvent.NodeID: input})
+
+	configFields, err := w.configurationFieldsForBlueprintNode(tx, *firstNode)
+	if err != nil {
+		err = execution.FailInTransaction(
+			tx,
+			models.WorkflowNodeExecutionResultReasonError,
+			fmt.Sprintf("error resolving configuration schema for execution of node %s: %v", firstNode.ID, err),
+		)
+		return nil
+	}
+	if len(configFields) > 0 {
+		configBuilder = configBuilder.WithConfigurationFields(configFields)
+	}
+
+	config, err := configBuilder.Build(firstNode.Configuration)
 
 	if err != nil {
 		err = execution.FailInTransaction(
@@ -196,6 +211,31 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 	err = execution.StartInTransaction(tx)
 
 	return err
+}
+
+func (w *WorkflowNodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, node models.Node) ([]configuration.Field, error) {
+	switch {
+	case node.Ref.Component != nil && node.Ref.Component.Name != "":
+		comp, err := w.registry.GetComponent(node.Ref.Component.Name)
+		if err != nil {
+			return nil, fmt.Errorf("component %s not found: %w", node.Ref.Component.Name, err)
+		}
+		return comp.Configuration(), nil
+	case node.Ref.Trigger != nil && node.Ref.Trigger.Name != "":
+		trigger, err := w.registry.GetTrigger(node.Ref.Trigger.Name)
+		if err != nil {
+			return nil, fmt.Errorf("trigger %s not found: %w", node.Ref.Trigger.Name, err)
+		}
+		return trigger.Configuration(), nil
+	case node.Ref.Blueprint != nil && node.Ref.Blueprint.ID != "":
+		blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, node.Ref.Blueprint.ID)
+		if err != nil {
+			return nil, fmt.Errorf("blueprint %s not found: %w", node.Ref.Blueprint.ID, err)
+		}
+		return blueprint.Configuration, nil
+	default:
+		return nil, nil
+	}
 }
 
 func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.WorkflowNodeExecution, node *models.WorkflowNode) error {

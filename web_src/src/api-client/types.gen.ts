@@ -15,6 +15,7 @@ export type ApplicationsApplicationDefinition = {
   configuration?: Array<ConfigurationField>;
   components?: Array<ComponentsComponent>;
   triggers?: Array<TriggersTrigger>;
+  installationInstructions?: string;
 };
 
 export type AuthToken = {
@@ -170,6 +171,7 @@ export type ConfigurationField = {
   placeholder?: string;
   sensitive?: boolean;
   togglable?: boolean;
+  disallowExpression?: boolean;
 };
 
 export type ConfigurationIntegrationTypeOptions = {

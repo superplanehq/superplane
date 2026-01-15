@@ -3051,6 +3051,9 @@
             "type": "object",
             "$ref": "#/definitions/TriggersTrigger"
           }
+        },
+        "installationInstructions": {
+          "type": "string"
         }
       }
     },
@@ -3472,6 +3475,9 @@
           "type": "boolean"
         },
         "togglable": {
+          "type": "boolean"
+        },
+        "disallowExpression": {
           "type": "boolean"
         }
       }
