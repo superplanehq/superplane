@@ -2,10 +2,10 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Box, GitBranch, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { CreateCanvasModal } from "../../components/CreateCanvasModal";
 import { CreateCustomComponentModal } from "../../components/CreateCustomComponentModal";
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../../components/Dialog/dialog";
+import { Dialog, DialogActions, DialogDescription, DialogTitle } from "../../components/Dialog/dialog";
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "../../components/Dropdown/dropdown";
 import { Heading } from "../../components/Heading/heading";
 import { Input } from "../../components/Input/input";
@@ -558,6 +558,8 @@ interface WorkflowActionsMenuProps {
 function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActionsMenuProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const deleteWorkflowMutation = useDeleteWorkflow(organizationId);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const closeDialog = () => {
     setIsDialogOpen(false);
@@ -569,6 +571,15 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
   };
 
   const handleDelete = async () => {
+    // If we're currently viewing this workflow, navigate immediately to prevent 404
+    const currentPath = location.pathname;
+    const workflowPath = `/${organizationId}/workflows/${workflow.id}`;
+    const isViewingWorkflow = currentPath === workflowPath || currentPath.startsWith(`${workflowPath}/`);
+    
+    if (isViewingWorkflow) {
+      navigate(`/${organizationId}`);
+    }
+    
     try {
       await deleteWorkflowMutation.mutateAsync(workflow.id);
       showSuccessToast("Canvas deleted successfully");
@@ -614,20 +625,11 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
       </div>
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
-        <DialogTitle className="text-red-900 dark:text-red-100">Delete canvas</DialogTitle>
-        <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
-          This action cannot be undone. Are you sure you want to delete this canvas?
+        <DialogTitle className="text-gray-800 dark:text-red-100">Delete "{workflow.name}"?</DialogTitle>
+        <DialogDescription className="text-sm text-gray-800 dark:text-gray-400">
+          This cannot be undone. Are you sure you want to continue?
         </DialogDescription>
-        <DialogBody>
-          <Text className="text-sm text-gray-500 dark:text-gray-400">
-            Deleting <span className="font-medium text-gray-800 dark:text-gray-100">{workflow.name}</span> will remove
-            its automations and history.
-          </Text>
-        </DialogBody>
         <DialogActions>
-          <Button variant="secondary" onClick={closeDialog}>
-            Cancel
-          </Button>
           <Button
             variant="destructive"
             onClick={handleDelete}
@@ -636,6 +638,9 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
           >
             <Trash2 size={16} />
             {deleteWorkflowMutation.isPending ? "Deleting..." : "Delete"}
+          </Button>
+          <Button variant="outline" onClick={closeDialog}>
+            Cancel
           </Button>
         </DialogActions>
       </Dialog>
@@ -708,20 +713,11 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
       </div>
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
-        <DialogTitle className="text-red-900 dark:text-red-100">Delete Bundle</DialogTitle>
-        <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
-          This action cannot be undone. Are you sure you want to delete this Bundle?
+        <DialogTitle className="text-gray-800 dark:text-red-100">Delete "{blueprint.name}"?</DialogTitle>
+        <DialogDescription className="text-sm text-gray-800 dark:text-gray-400">
+          This cannot be undone. Are you sure you want to continue?
         </DialogDescription>
-        <DialogBody>
-          <Text className="text-sm text-gray-500 dark:text-gray-400">
-            Deleting <span className="font-medium text-gray-800 dark:text-gray-100">{blueprint.name}</span> will
-            permanently remove it.
-          </Text>
-        </DialogBody>
         <DialogActions>
-          <Button variant="secondary" onClick={closeDialog}>
-            Cancel
-          </Button>
           <Button
             variant="destructive"
             onClick={handleDelete}
@@ -730,6 +726,9 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
           >
             <Trash2 size={16} />
             {deleteBlueprintMutation.isPending ? "Deleting..." : "Delete"}
+          </Button>
+          <Button variant="outline" onClick={closeDialog}>
+            Cancel
           </Button>
         </DialogActions>
       </Dialog>

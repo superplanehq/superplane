@@ -117,8 +117,17 @@ export const useCreateWorkflow = (organizationId: string) => {
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
+      // Invalidate the list to refresh the canvas list
       queryClient.invalidateQueries({ queryKey: workflowKeys.list(organizationId) });
+      
+      // Set the workflow detail in cache immediately so it's available when navigating
+      if (response?.data?.workflow?.metadata?.id) {
+        queryClient.setQueryData(
+          workflowKeys.detail(organizationId, response.data.workflow.metadata.id),
+          response.data.workflow,
+        );
+      }
     },
   });
 };
@@ -164,7 +173,10 @@ export const useDeleteWorkflow = (organizationId: string) => {
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (_, workflowId) => {
+      // Remove the workflow detail from cache to prevent 404 errors
+      queryClient.removeQueries({ queryKey: workflowKeys.detail(organizationId, workflowId) });
+      // Invalidate the list to refresh the canvas list
       queryClient.invalidateQueries({ queryKey: workflowKeys.list(organizationId) });
     },
   });
