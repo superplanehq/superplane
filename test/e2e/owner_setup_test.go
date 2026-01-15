@@ -95,7 +95,7 @@ func (s *ownerSetupSteps) assertRedirectedToSetup() {
 func (s *ownerSetupSteps) fillInOwnerDetailsAndSubmit(email, firstName, lastName, password string) {
 	s.fillInOwnerDetails(email, firstName, lastName, password)
 	s.session.Click(q.Text("Next"))
-	s.session.Click(q.Text("Skip for now"))
+	s.session.Click(q.Text("Do this later"))
 	// Poll for setup to complete - wait for organization to be created in database
 	s.waitForSetupToComplete()
 }
