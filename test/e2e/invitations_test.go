@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	pw "github.com/playwright-community/playwright-go"
@@ -50,6 +51,16 @@ func TestInvitations(t *testing.T) {
 		steps.disableInviteLink(token)
 		steps.visitInviteLink(token)
 		steps.assertInviteLinkDisabled()
+	})
+
+	t.Run("viewer sees invite link access message", func(t *testing.T) {
+		steps.startLoggedIn()
+		token := steps.createInviteLink()
+		invitee := steps.createInviteeAccount()
+		steps.loginAs(invitee)
+		steps.acceptInvite(token)
+		steps.visitMembersSettings()
+		steps.assertViewerInviteLinkMessage()
 	})
 }
 
@@ -110,6 +121,10 @@ func (s *invitationSteps) visitInviteLink(token string) {
 	s.session.Visit("/invite/" + token)
 }
 
+func (s *invitationSteps) visitMembersSettings() {
+	s.session.Visit(fmt.Sprintf("/%s/settings/members", s.session.OrgID.String()))
+}
+
 func (s *invitationSteps) followInviteLinkToLogin(token string) {
 	s.session.Visit("/invite/" + token)
 	waitErr := s.session.Page().WaitForURL("**/login?redirect=**", pw.PageWaitForURLOptions{
@@ -148,6 +163,15 @@ func (s *invitationSteps) disableInviteLink(token string) {
 
 func (s *invitationSteps) assertInviteLinkDisabled() {
 	s.session.AssertText("Invite link not available")
+}
+
+func (s *invitationSteps) assertViewerInviteLinkMessage() {
+	s.session.AssertText("Invite link to add members")
+	s.session.AssertText("Reach out to an organization owner or admin to invite new members.")
+
+	copyLinkVisible, err := s.session.Page().Locator("text=Copy link").IsVisible()
+	require.NoError(s.t, err)
+	require.False(s.t, copyLinkVisible)
 }
 
 func (s *invitationSteps) assertInviteeViewerRole(email string) {
