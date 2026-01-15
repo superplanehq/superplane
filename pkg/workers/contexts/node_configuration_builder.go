@@ -234,6 +234,15 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 	return result, nil
 }
 
+func (b *NodeConfigurationBuilder) BuildMessageChainForExpression(expression string) (map[string]any, error) {
+	referencedNodes, err := parseReferencedNodes(expression)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.buildMessageChain(referencedNodes)
+}
+
 func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
 	referencedNodes, err := parseReferencedNodes(expression)
 	if err != nil {
