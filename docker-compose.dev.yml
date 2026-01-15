@@ -62,7 +62,7 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@notifications.superplane.com}
-      BLOCK_SIGNUP: yes
+      BLOCK_SIGNUP: ${BLOCK_SIGNUP:-yes}
       ENABLE_PASSWORD_LOGIN: "yes"
       OTEL_ENABLED: "yes"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
