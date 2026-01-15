@@ -4,10 +4,21 @@ import { FieldRendererProps } from "./types";
 import { resolveIcon } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
+import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
-export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const TextFieldRenderer: React.FC<FieldRendererProps> = ({
+  field,
+  value,
+  onChange,
+  hasError,
+  autocompleteExampleObj,
+}) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const { handleEditorMount } = useMonacoExpressionAutocomplete({
+    autocompleteExampleObj,
+    languageId: "plaintext",
+  });
 
   const copyToClipboard = () => {
     const textToCopy = (value as string) || "";
@@ -43,6 +54,13 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
     bracketPairColorization: {
       enabled: false,
     },
+    suggestOnTriggerCharacters: true,
+    quickSuggestions: {
+      other: true,
+      strings: true,
+      comments: false,
+    },
+    wordBasedSuggestions: "off" as const,
   };
 
   return (
@@ -69,6 +87,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
             defaultLanguage="plaintext"
             value={editorValue}
             onChange={handleEditorChange}
+            onMount={handleEditorMount}
             theme="vs"
             options={editorOptions}
           />
@@ -99,6 +118,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
               defaultLanguage="plaintext"
               value={editorValue}
               onChange={handleEditorChange}
+              onMount={handleEditorMount}
               theme="vs"
               options={{
                 ...editorOptions,
