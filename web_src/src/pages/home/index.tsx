@@ -1,18 +1,24 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Box, GitBranch, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Box, GitBranch, MoreVertical, Palette, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { CreateCanvasModal } from "../../components/CreateCanvasModal";
 import { CreateCustomComponentModal } from "../../components/CreateCustomComponentModal";
 import { Dialog, DialogActions, DialogDescription, DialogTitle } from "../../components/Dialog/dialog";
-import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "../../components/Dropdown/dropdown";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../ui/dropdownMenu";
 import { Heading } from "../../components/Heading/heading";
 import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 import { useBlueprints, useDeleteBlueprint } from "../../hooks/useBlueprintData";
-import { useDeleteWorkflow, useWorkflows } from "../../hooks/useWorkflowData";
+import { useDeleteWorkflow, useWorkflows, workflowKeys } from "../../hooks/useWorkflowData";
 import { resolveIcon } from "../../lib/utils";
 import { isCustomComponentsEnabled } from "../../lib/env";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
@@ -148,18 +154,24 @@ const HomePage = () => {
       <main className="w-full h-full flex flex-column flex-grow-1">
         <div className="bg-slate-100 w-full flex-grow-1">
           <div className="p-8">
-            <PageHeader activeTab={activeTab} onNewClick={onNewClick} />
+            {!(activeTab === "canvases" && workflows.length === 0 && !searchQuery) && (
+              <PageHeader activeTab={activeTab} onNewClick={onNewClick} />
+            )}
 
-            <Tabs
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              blueprints={filteredBlueprints}
-              workflows={filteredWorkflows}
-            />
+            {!(activeTab === "canvases" && workflows.length === 0 && !searchQuery) && (
+              <>
+                <Tabs
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  blueprints={filteredBlueprints}
+                  workflows={filteredWorkflows}
+                />
 
-            <div className="flex flex-col sm:flex-row gap-4 mb-6 justify-between">
-              <SearchBar activeTab={activeTab} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-            </div>
+                <div className="flex flex-col sm:flex-row gap-4 mb-6 justify-between">
+                  <SearchBar activeTab={activeTab} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+                </div>
+              </>
+            )}
 
             {isLoading ? (
               <LoadingState activeTab={activeTab} />
@@ -173,6 +185,7 @@ const HomePage = () => {
                 organizationId={organizationId}
                 searchQuery={searchQuery}
                 onEditWorkflow={canvasModalState.onOpenEdit}
+                onNewClick={onNewClick}
               />
             )}
           </div>
@@ -305,6 +318,7 @@ function Content({
   organizationId,
   searchQuery,
   onEditWorkflow,
+  onNewClick,
 }: {
   activeTab: TabType;
   filteredBlueprints: BlueprintCardData[];
@@ -312,10 +326,11 @@ function Content({
   organizationId: string;
   searchQuery: string;
   onEditWorkflow: (workflow: WorkflowCardData) => void;
+  onNewClick: () => void;
 }) {
   if (activeTab === "canvases") {
     if (filteredWorkflows.length === 0) {
-      return <CanvasesEmptyState searchQuery={searchQuery} />;
+      return <CanvasesEmptyState searchQuery={searchQuery} onNewClick={onNewClick} />;
     }
 
     return (
@@ -350,16 +365,33 @@ function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
   );
 }
 
-function CanvasesEmptyState({ searchQuery }: { searchQuery: string }) {
+function CanvasesEmptyState({ searchQuery, onNewClick }: { searchQuery: string; onNewClick: () => void }) {
+  // Show different state when there's a search query vs when it's truly empty
+  if (searchQuery) {
+    return (
+      <div className="text-center py-12">
+        <GitBranch className="mx-auto text-gray-400 mb-4" size={48} />
+        <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
+          No canvases found
+        </Heading>
+        <Text className="text-gray-500 dark:text-gray-400 mb-6">
+          Try adjusting your search criteria.
+        </Text>
+      </div>
+    );
+  }
+
+  // Empty state when there are no canvases at all
   return (
     <div className="text-center py-12">
-      <GitBranch className="mx-auto text-gray-400 mb-4" size={48} />
-      <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
-        {searchQuery ? "No canvases found" : "No canvases yet"}
-      </Heading>
-      <Text className="text-gray-500 dark:text-gray-400 mb-6">
-        {searchQuery ? "Try adjusting your search criteria." : "Get started by creating your first canvas."}
-      </Text>
+      <Palette className="mx-auto text-gray-800 dark:text-gray-300 mb-4" size={24} />
+      <p className="text-sm text-gray-800 dark:text-gray-300 mb-6">
+        Create your first Canvas
+      </p>
+      <Button onClick={onNewClick} size="sm">
+        <Plus size={16} />
+        New Canvas
+      </Button>
     </div>
   );
 }
@@ -374,7 +406,7 @@ function WorkflowGridView({ filteredWorkflows, organizationId, onEditWorkflow }:
   const navigate = useNavigate();
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {filteredWorkflows.map((workflow) => (
         <WorkflowCard
           key={workflow.id}
@@ -471,7 +503,7 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
   if (!positionedNodes.length) {
     return (
       <div className="p-4 border-b border-gray-200">
-        <div className="h-28 w-full rounded-sm border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 flex items-center justify-center text-[13px] text-gray-500 dark:text-gray-400">
+        <div className="h-28 w-full rounded-sm border border-dashed border-gray-300 dark:border-gray-700 bg-transparent flex items-center justify-center text-[13px] text-gray-500 dark:text-gray-400">
           The canvas is empty
         </div>
       </div>
@@ -560,6 +592,7 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
   const deleteWorkflowMutation = useDeleteWorkflow(organizationId);
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   const closeDialog = () => {
     setIsDialogOpen(false);
@@ -571,13 +604,28 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
   };
 
   const handleDelete = async () => {
-    // If we're currently viewing this workflow, navigate immediately to prevent 404
+    // If we're currently viewing this workflow, navigate immediately and remove from cache to prevent 404
     const currentPath = location.pathname;
     const workflowPath = `/${organizationId}/workflows/${workflow.id}`;
     const isViewingWorkflow = currentPath === workflowPath || currentPath.startsWith(`${workflowPath}/`);
     
     if (isViewingWorkflow) {
-      navigate(`/${organizationId}`);
+      // Remove from cache FIRST to prevent any queries from running
+      queryClient.removeQueries({ queryKey: workflowKeys.detail(organizationId, workflow.id) });
+      // Navigate immediately with replace to avoid back button issues and prevent 404 flash
+      navigate(`/${organizationId}`, { replace: true });
+      // Then delete (fire and forget)
+      deleteWorkflowMutation.mutate(workflow.id, {
+        onSuccess: () => {
+          showSuccessToast("Canvas deleted successfully");
+          closeDialog();
+        },
+        onError: (error) => {
+          console.error("Failed to delete canvas:", error);
+          showErrorToast("Failed to delete canvas");
+        },
+      });
+      return;
     }
     
     try {
@@ -593,35 +641,38 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
   return (
     <>
       <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
-        <Dropdown>
-          <DropdownButton
-            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
-            aria-label="Canvas actions"
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            asChild
             onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}
-            disabled={deleteWorkflowMutation.isPending}
           >
-            <MoreVertical size={16} />
-          </DropdownButton>
-          <DropdownMenu>
-            <DropdownItem
+            <button
+              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Canvas actions"
+              disabled={deleteWorkflowMutation.isPending}
+            >
+              <MoreVertical size={16} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
               onClick={(event: MouseEvent<HTMLElement>) => {
                 event.stopPropagation();
                 onEdit(workflow);
               }}
             >
-              <span className="flex items-center gap-2">
-                <Pencil size={16} />
-                Edit
-              </span>
-            </DropdownItem>
-            <DropdownItem onClick={openDialog} className="text-red-600 dark:text-red-400">
-              <span className="flex items-center gap-2">
-                <Trash2 size={16} />
-                Delete
-              </span>
-            </DropdownItem>
-          </DropdownMenu>
-        </Dropdown>
+              <Pencil size={16} />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={openDialog}
+              className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+            >
+              <Trash2 size={16} />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
@@ -681,35 +732,38 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
   return (
     <>
       <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
-        <Dropdown>
-          <DropdownButton
-            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
-            aria-label="Component actions"
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            asChild
             onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}
-            disabled={deleteBlueprintMutation.isPending}
           >
-            <MoreVertical size={16} />
-          </DropdownButton>
-          <DropdownMenu>
-            <DropdownItem
+            <button
+              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Component actions"
+              disabled={deleteBlueprintMutation.isPending}
+            >
+              <MoreVertical size={16} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
               onClick={(event: MouseEvent<HTMLElement>) => {
                 event.stopPropagation();
                 navigate(`/${organizationId}/custom-components/${blueprint.id}`);
               }}
             >
-              <span className="flex items-center gap-2">
-                <Pencil size={16} />
-                Edit
-              </span>
-            </DropdownItem>
-            <DropdownItem onClick={openDialog} className="text-red-600 dark:text-red-400">
-              <span className="flex items-center gap-2">
-                <Trash2 size={16} />
-                Delete
-              </span>
-            </DropdownItem>
-          </DropdownMenu>
-        </Dropdown>
+              <Pencil size={16} />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={openDialog}
+              className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+            >
+              <Trash2 size={16} />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
@@ -745,7 +799,7 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
   const navigate = useNavigate();
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {filteredBlueprints.map((blueprint) => {
         const IconComponent = resolveIcon("component");
         const handleNavigate = () => navigate(`/${organizationId}/custom-components/${blueprint.id}`);

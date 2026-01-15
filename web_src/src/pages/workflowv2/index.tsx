@@ -192,6 +192,7 @@ export function WorkflowPageV2() {
   const initializeFromWorkflow = useNodeExecutionStore((state) => state.initializeFromWorkflow);
 
   // Redirect to home page if workflow is not found (404)
+  // Use replace to avoid back button issues and prevent 404 flash
   useEffect(() => {
     if (workflowError && !workflowLoading) {
       // Check if it's a 404 error
@@ -203,7 +204,7 @@ export function WorkflowPageV2() {
         (workflowError as any)?.message?.includes("404");
       
       if (is404 && organizationId) {
-        navigate(`/${organizationId}`);
+        navigate(`/${organizationId}`, { replace: true });
       }
     }
   }, [workflowError, workflowLoading, navigate, organizationId]);

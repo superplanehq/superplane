@@ -167,6 +167,9 @@ export const useDeleteWorkflow = (organizationId: string) => {
 
   return useMutation({
     mutationFn: async (workflowId: string) => {
+      // Remove from cache immediately before deletion to prevent 404 flash
+      queryClient.removeQueries({ queryKey: workflowKeys.detail(organizationId, workflowId) });
+      
       return await workflowsDeleteWorkflow(
         withOrganizationHeader({
           path: { id: workflowId },
@@ -174,7 +177,7 @@ export const useDeleteWorkflow = (organizationId: string) => {
       );
     },
     onSuccess: (_, workflowId) => {
-      // Remove the workflow detail from cache to prevent 404 errors
+      // Ensure it's removed (in case it wasn't already)
       queryClient.removeQueries({ queryKey: workflowKeys.detail(organizationId, workflowId) });
       // Invalidate the list to refresh the canvas list
       queryClient.invalidateQueries({ queryKey: workflowKeys.list(organizationId) });
