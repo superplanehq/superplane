@@ -325,9 +325,18 @@ func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	statusCode, err := verifySignature(ctx, "workflow_run")
+	statusCode, err := verifySignature(ctx)
 	if err != nil {
 		return statusCode, err
+	}
+
+	eventType := ctx.Headers.Get("X-GitHub-Event")
+	if eventType == "" {
+		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
+	}
+
+	if eventType != "workflow_run" {
+		return http.StatusOK, nil
 	}
 
 	// If statusCode is 200 but not the right event type, just ignore
