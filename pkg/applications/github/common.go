@@ -80,22 +80,10 @@ func getRepositoryFromConfiguration(c any) string {
 	return repository
 }
 
-func verifySignature(ctx core.WebhookRequestContext, expectedType string) (int, error) {
+func verifySignature(ctx core.WebhookRequestContext) (int, error) {
 	signature := ctx.Headers.Get("X-Hub-Signature-256")
 	if signature == "" {
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
-	}
-
-	eventType := ctx.Headers.Get("X-GitHub-Event")
-	if eventType == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
-	}
-
-	//
-	// If event is not of the expect type, we ignore it.
-	//
-	if eventType != expectedType {
-		return http.StatusOK, nil
 	}
 
 	signature = strings.TrimPrefix(signature, "sha256=")

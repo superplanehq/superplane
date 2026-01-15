@@ -108,7 +108,16 @@ func (t *OnBranchCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	code, err := verifySignature(ctx, "create")
+	eventType := ctx.Headers.Get("X-GitHub-Event")
+	if eventType == "" {
+		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
+	}
+
+	if eventType != "create" {
+		return http.StatusOK, nil
+	}
+
+	code, err := verifySignature(ctx)
 	if err != nil {
 		return code, err
 	}

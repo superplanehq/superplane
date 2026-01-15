@@ -38,7 +38,7 @@ const meta = {
           </Avatar>
           <div className="space-y-1">
             <h4 className="text-sm font-semibold">@superplanehq</h4>
-            <p className="text-sm">Superplane UI components and patterns to build workflows faster.</p>
+            <p className="text-sm">SuperPlane UI components and patterns to build workflows faster.</p>
             <div className="flex items-center pt-2 text-xs text-muted-foreground">
               <CalendarDays className="mr-2 h-4 w-4 opacity-70" />
               Joined March 2023

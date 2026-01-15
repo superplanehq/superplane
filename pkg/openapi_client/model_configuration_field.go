@@ -33,6 +33,7 @@ type ConfigurationField struct {
 	Placeholder          *string                            `json:"placeholder,omitempty"`
 	Sensitive            *bool                              `json:"sensitive,omitempty"`
 	Togglable            *bool                              `json:"togglable,omitempty"`
+	DisallowExpression   *bool                              `json:"disallowExpression,omitempty"`
 }
 
 // NewConfigurationField instantiates a new ConfigurationField object
@@ -468,6 +469,38 @@ func (o *ConfigurationField) SetTogglable(v bool) {
 	o.Togglable = &v
 }
 
+// GetDisallowExpression returns the DisallowExpression field value if set, zero value otherwise.
+func (o *ConfigurationField) GetDisallowExpression() bool {
+	if o == nil || IsNil(o.DisallowExpression) {
+		var ret bool
+		return ret
+	}
+	return *o.DisallowExpression
+}
+
+// GetDisallowExpressionOk returns a tuple with the DisallowExpression field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationField) GetDisallowExpressionOk() (*bool, bool) {
+	if o == nil || IsNil(o.DisallowExpression) {
+		return nil, false
+	}
+	return o.DisallowExpression, true
+}
+
+// HasDisallowExpression returns a boolean if a field has been set.
+func (o *ConfigurationField) HasDisallowExpression() bool {
+	if o != nil && !IsNil(o.DisallowExpression) {
+		return true
+	}
+
+	return false
+}
+
+// SetDisallowExpression gets a reference to the given bool and assigns it to the DisallowExpression field.
+func (o *ConfigurationField) SetDisallowExpression(v bool) {
+	o.DisallowExpression = &v
+}
+
 func (o ConfigurationField) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -516,6 +549,9 @@ func (o ConfigurationField) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Togglable) {
 		toSerialize["togglable"] = o.Togglable
+	}
+	if !IsNil(o.DisallowExpression) {
+		toSerialize["disallowExpression"] = o.DisallowExpression
 	}
 	return toSerialize, nil
 }

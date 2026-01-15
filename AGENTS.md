@@ -21,7 +21,7 @@
 - After editing JS code, always run `make format.js` to make sure that the files are consistently formatted
 - After editing Golang code, always run `make format.go` to make sure that files are consistently formatted
 - After updating GoLang code, always check it with `make lint && make check.build.app`
-- To generate DB migrations, use `make db.migration.create NAME=<name>`. Always use dashes instead of underscores in the name. We do not write migrations to rollback, so leave the `*.down.sql` files empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>`, where DB_NAME can be `superplane_dev` or `superplane_test`
+- **NEVER MANUALLY CREATE MIGRATION FILES**. ALWAYS use `make db.migration.create NAME=<name>` to generate DB migrations. Always use dashes instead of underscores in the name. We do not write migrations to rollback, so leave the `*.down.sql` files empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>`, where DB_NAME can be `superplane_dev` or `superplane_test`
 - When validating enum fields in protobuf requests, ensure that the enums are properly mapped to constants in the `pkg/models` package. Check the `Proto*` and `*ToProto` functions in pkg/grpc/actions/common.go.
 - When adding a new worker in pkg/workers, always add its startup to `cmd/server/main.go`, and update the docker compose files with the new environment variables that are needed.
 - After adding new API endpoints, ensure the new endpoints have their authorization covered in `pkg/authorization/interceptor.go`
@@ -41,6 +41,7 @@
 - GoLang: when checking for the existence of an item on a list, use `slice.Contains` or `slice.ContainsFunc`
 - When naming variables, avoid names like `*Str` or `*UUID`; Go is a typed language, we don't need types in the variables names
 - When writing tests that require specific timestamps to be used, always use timestamps based off of `time.Now()`, instead of absolute times created with `time.Date`
+- The name of the application is "SuperPlane", not "Superplane" in all user-facing text (user interfaces, emails, notifications, documentation, etc.).
 
 ## Database Transaction Guidelines
 

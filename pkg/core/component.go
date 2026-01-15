@@ -118,9 +118,11 @@ type ExecutionContext struct {
 	WorkflowID      string
 	OrganizationID  string
 	NodeID          string
+	SourceNodeID    string
 	BaseURL         string
 	Data            any
 	Configuration   any
+	ExpressionEnv   func(expression string) (map[string]any, error)
 	Logger          *log.Entry
 	HTTP            HTTPContext
 	Metadata        MetadataContext
@@ -252,6 +254,7 @@ type ProcessQueueContext struct {
 	SourceNodeID  string
 	Configuration any
 	Input         any
+	ExpressionEnv func(expression string) (map[string]any, error)
 
 	//
 	// Deletes the queue item

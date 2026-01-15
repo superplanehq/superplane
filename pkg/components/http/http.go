@@ -206,11 +206,12 @@ func (e *HTTP) Configuration() []configuration.Field {
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
 							{
-								Name:        "name",
-								Type:        configuration.FieldTypeString,
-								Label:       "Header Name",
-								Required:    true,
-								Placeholder: "Content-Type",
+								Name:               "name",
+								Type:               configuration.FieldTypeString,
+								Label:              "Header Name",
+								Required:           true,
+								Placeholder:        "Content-Type",
+								DisallowExpression: true,
 							},
 							{
 								Name:        "value",
