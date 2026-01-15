@@ -26,6 +26,9 @@ const (
 	Organizations_CreateInvitation_FullMethodName         = "/Superplane.Organizations.Organizations/CreateInvitation"
 	Organizations_ListInvitations_FullMethodName          = "/Superplane.Organizations.Organizations/ListInvitations"
 	Organizations_RemoveInvitation_FullMethodName         = "/Superplane.Organizations.Organizations/RemoveInvitation"
+	Organizations_GetInviteLink_FullMethodName            = "/Superplane.Organizations.Organizations/GetInviteLink"
+	Organizations_UpdateInviteLink_FullMethodName         = "/Superplane.Organizations.Organizations/UpdateInviteLink"
+	Organizations_ResetInviteLink_FullMethodName          = "/Superplane.Organizations.Organizations/ResetInviteLink"
 	Organizations_ListApplications_FullMethodName         = "/Superplane.Organizations.Organizations/ListApplications"
 	Organizations_DescribeApplication_FullMethodName      = "/Superplane.Organizations.Organizations/DescribeApplication"
 	Organizations_ListApplicationResources_FullMethodName = "/Superplane.Organizations.Organizations/ListApplicationResources"
@@ -45,6 +48,9 @@ type OrganizationsClient interface {
 	CreateInvitation(ctx context.Context, in *CreateInvitationRequest, opts ...grpc.CallOption) (*CreateInvitationResponse, error)
 	ListInvitations(ctx context.Context, in *ListInvitationsRequest, opts ...grpc.CallOption) (*ListInvitationsResponse, error)
 	RemoveInvitation(ctx context.Context, in *RemoveInvitationRequest, opts ...grpc.CallOption) (*RemoveInvitationResponse, error)
+	GetInviteLink(ctx context.Context, in *GetInviteLinkRequest, opts ...grpc.CallOption) (*GetInviteLinkResponse, error)
+	UpdateInviteLink(ctx context.Context, in *UpdateInviteLinkRequest, opts ...grpc.CallOption) (*UpdateInviteLinkResponse, error)
+	ResetInviteLink(ctx context.Context, in *ResetInviteLinkRequest, opts ...grpc.CallOption) (*ResetInviteLinkResponse, error)
 	ListApplications(ctx context.Context, in *ListApplicationsRequest, opts ...grpc.CallOption) (*ListApplicationsResponse, error)
 	DescribeApplication(ctx context.Context, in *DescribeApplicationRequest, opts ...grpc.CallOption) (*DescribeApplicationResponse, error)
 	ListApplicationResources(ctx context.Context, in *ListApplicationResourcesRequest, opts ...grpc.CallOption) (*ListApplicationResourcesResponse, error)
@@ -131,6 +137,36 @@ func (c *organizationsClient) RemoveInvitation(ctx context.Context, in *RemoveIn
 	return out, nil
 }
 
+func (c *organizationsClient) GetInviteLink(ctx context.Context, in *GetInviteLinkRequest, opts ...grpc.CallOption) (*GetInviteLinkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetInviteLinkResponse)
+	err := c.cc.Invoke(ctx, Organizations_GetInviteLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) UpdateInviteLink(ctx context.Context, in *UpdateInviteLinkRequest, opts ...grpc.CallOption) (*UpdateInviteLinkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateInviteLinkResponse)
+	err := c.cc.Invoke(ctx, Organizations_UpdateInviteLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) ResetInviteLink(ctx context.Context, in *ResetInviteLinkRequest, opts ...grpc.CallOption) (*ResetInviteLinkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResetInviteLinkResponse)
+	err := c.cc.Invoke(ctx, Organizations_ResetInviteLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *organizationsClient) ListApplications(ctx context.Context, in *ListApplicationsRequest, opts ...grpc.CallOption) (*ListApplicationsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListApplicationsResponse)
@@ -202,6 +238,9 @@ type OrganizationsServer interface {
 	CreateInvitation(context.Context, *CreateInvitationRequest) (*CreateInvitationResponse, error)
 	ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error)
 	RemoveInvitation(context.Context, *RemoveInvitationRequest) (*RemoveInvitationResponse, error)
+	GetInviteLink(context.Context, *GetInviteLinkRequest) (*GetInviteLinkResponse, error)
+	UpdateInviteLink(context.Context, *UpdateInviteLinkRequest) (*UpdateInviteLinkResponse, error)
+	ResetInviteLink(context.Context, *ResetInviteLinkRequest) (*ResetInviteLinkResponse, error)
 	ListApplications(context.Context, *ListApplicationsRequest) (*ListApplicationsResponse, error)
 	DescribeApplication(context.Context, *DescribeApplicationRequest) (*DescribeApplicationResponse, error)
 	ListApplicationResources(context.Context, *ListApplicationResourcesRequest) (*ListApplicationResourcesResponse, error)
@@ -237,6 +276,15 @@ func (UnimplementedOrganizationsServer) ListInvitations(context.Context, *ListIn
 }
 func (UnimplementedOrganizationsServer) RemoveInvitation(context.Context, *RemoveInvitationRequest) (*RemoveInvitationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveInvitation not implemented")
+}
+func (UnimplementedOrganizationsServer) GetInviteLink(context.Context, *GetInviteLinkRequest) (*GetInviteLinkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetInviteLink not implemented")
+}
+func (UnimplementedOrganizationsServer) UpdateInviteLink(context.Context, *UpdateInviteLinkRequest) (*UpdateInviteLinkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateInviteLink not implemented")
+}
+func (UnimplementedOrganizationsServer) ResetInviteLink(context.Context, *ResetInviteLinkRequest) (*ResetInviteLinkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResetInviteLink not implemented")
 }
 func (UnimplementedOrganizationsServer) ListApplications(context.Context, *ListApplicationsRequest) (*ListApplicationsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListApplications not implemented")
@@ -402,6 +450,60 @@ func _Organizations_RemoveInvitation_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_GetInviteLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetInviteLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).GetInviteLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_GetInviteLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).GetInviteLink(ctx, req.(*GetInviteLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_UpdateInviteLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateInviteLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).UpdateInviteLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_UpdateInviteLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).UpdateInviteLink(ctx, req.(*UpdateInviteLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_ResetInviteLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResetInviteLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).ResetInviteLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_ResetInviteLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).ResetInviteLink(ctx, req.(*ResetInviteLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Organizations_ListApplications_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListApplicationsRequest)
 	if err := dec(in); err != nil {
@@ -544,6 +646,18 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveInvitation",
 			Handler:    _Organizations_RemoveInvitation_Handler,
+		},
+		{
+			MethodName: "GetInviteLink",
+			Handler:    _Organizations_GetInviteLink_Handler,
+		},
+		{
+			MethodName: "UpdateInviteLink",
+			Handler:    _Organizations_UpdateInviteLink_Handler,
+		},
+		{
+			MethodName: "ResetInviteLink",
+			Handler:    _Organizations_ResetInviteLink_Handler,
 		},
 		{
 			MethodName: "ListApplications",

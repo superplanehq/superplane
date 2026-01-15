@@ -73,7 +73,7 @@ func (o *OrganizationsGetInviteLinkResponse) SetInviteLink(v OrganizationsInvite
 }
 
 func (o OrganizationsGetInviteLinkResponse) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,5 +123,3 @@ func (v *NullableOrganizationsGetInviteLinkResponse) UnmarshalJSON(src []byte) e
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

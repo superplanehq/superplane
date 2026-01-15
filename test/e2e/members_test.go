@@ -66,5 +66,3 @@ func (s *membersSteps) assertMembersCount(label string) {
 func (s *membersSteps) assertMemberVisible(email string) {
 	s.session.AssertText(email)
 }
-
- 

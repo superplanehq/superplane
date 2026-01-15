@@ -332,18 +332,16 @@ export const Login: React.FC = () => {
           </svg>
         </div>
 
-          <div
-            style={{
-              color: "#94a9ca",
-              margin: "0 0 1.25rem",
-              paddingTop: "1rem",
-              borderTop: "1px solid #3d4859",
-            }}
-          ></div>
+        <div
+          style={{
+            color: "#94a9ca",
+            margin: "0 0 1.25rem",
+            paddingTop: "1rem",
+            borderTop: "1px solid #3d4859",
+          }}
+        ></div>
 
-        {configLoading && (
-          <div style={{ color: "#94a9ca", fontSize: "14px", paddingBottom: "1rem" }}>Loading...</div>
-        )}
+        {configLoading && <div style={{ color: "#94a9ca", fontSize: "14px", paddingBottom: "1rem" }}>Loading...</div>}
 
         {configError && (
           <div
@@ -408,9 +406,7 @@ export const Login: React.FC = () => {
             </a>
           ))}
 
-        {!configLoading &&
-          showProviderButtons &&
-          (isSignupMode ? canSignupWithPassword : canLoginWithPassword) && (
+        {!configLoading && showProviderButtons && (isSignupMode ? canSignupWithPassword : canLoginWithPassword) && (
           <div
             style={{
               display: "flex",
@@ -429,15 +425,11 @@ export const Login: React.FC = () => {
         )}
 
         {!configLoading && isSignupMode && !canSignup && (
-          <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>
-            Signups are currently disabled.
-          </div>
+          <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>Signups are currently disabled.</div>
         )}
 
         {!configLoading && !isSignupMode && !showProviderButtons && !canLoginWithPassword && !canSignupWithPassword && (
-          <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>
-            No login methods are configured.
-          </div>
+          <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>No login methods are configured.</div>
         )}
 
         {!configLoading && formError && (
