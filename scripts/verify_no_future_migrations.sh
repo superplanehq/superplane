@@ -30,20 +30,35 @@ yellow ""
 migration_dir="db/migrations"
 future_migrations=()
 
-for file in "$migration_dir"/*.sql; do
-  if [ -f "$file" ]; then
-    # Extract just the filename
-    filename=$(basename "$file")
-    
-    # Extract the timestamp (first 14 characters: YYYYMMDDHHMMSS)
-    timestamp="${filename:0:14}"
-    
-    # Check if this is a valid timestamp (14 digits)
-    if [[ $timestamp =~ ^[0-9]{14}$ ]]; then
-      # Compare timestamps as numbers
-      if [ "$timestamp" -gt "$current_timestamp" ]; then
-        future_migrations+=("$filename (timestamp: $timestamp)")
-      fi
+# Check if migration directory exists
+if [ ! -d "$migration_dir" ]; then
+  red "Error: Migration directory '$migration_dir' does not exist"
+  exit 1
+fi
+
+# Use nullglob to handle case when no .sql files exist
+shopt -s nullglob
+files=("$migration_dir"/*.sql)
+shopt -u nullglob
+
+if [ ${#files[@]} -eq 0 ]; then
+  yellow "No migration files found in $migration_dir"
+  green "✓ No migrations to check"
+  exit 0
+fi
+
+for file in "${files[@]}"; do
+  # Extract just the filename
+  filename=$(basename "$file")
+  
+  # Extract the timestamp (first 14 characters: YYYYMMDDHHMMSS)
+  timestamp="${filename:0:14}"
+  
+  # Check if this is a valid timestamp (14 digits)
+  if [[ $timestamp =~ ^[0-9]{14}$ ]]; then
+    # Compare timestamps as numbers using arithmetic comparison
+    if (( timestamp > current_timestamp )); then
+      future_migrations+=("$filename (timestamp: $timestamp)")
     fi
   fi
 done
