@@ -165,53 +165,72 @@ func (t *OnIssueStatus) checkIssues(ctx core.TriggerActionContext) error {
 		ctx.Logger.Warnf("Error executing Prometheus query: %v", err)
 		// Continue to reschedule even if query fails
 	} else {
-		// The response["data"] is a PrometheusResponseData struct, not a map
-		// We need to convert it to access the result field
-		dataValue := response["data"]
-		var dataMap map[string]any
-
-		if dataMapValue, ok := dataValue.(map[string]any); ok {
-			dataMap = dataMapValue
-		} else {
-			// If it's a struct, marshal and unmarshal it to convert to map
-			jsonBytes, marshalErr := json.Marshal(dataValue)
-			if marshalErr != nil {
-				ctx.Logger.Warnf("Failed to marshal response data: %v", marshalErr)
-			} else {
-				unmarshalErr := json.Unmarshal(jsonBytes, &dataMap)
-				if unmarshalErr != nil {
-					ctx.Logger.Warnf("Failed to unmarshal response data: %v", unmarshalErr)
-				}
-			}
-		}
-
-		if dataMap != nil {
-			result, ok := dataMap["result"].([]interface{})
-			if !ok {
-				ctx.Logger.Warnf("Unexpected response format: result is not an array, got %T", dataMap["result"])
-			} else if len(result) > 0 {
-				// Issues detected - emit event
-				payload := map[string]any{
-					"query":   query,
-					"dataset": dataset,
-					"results": result,
-					"count":   len(result),
-				}
-
-				err = ctx.Events.Emit("dash0.issue.detected", payload)
-				if err != nil {
-					ctx.Logger.Errorf("Error emitting event: %v", err)
-					// Continue to reschedule even if emit fails
-				} else {
-					ctx.Logger.Infof("Issues detected: %d issue(s) found", len(result))
-				}
-			}
-		}
+		t.processQueryResults(ctx, response, query, dataset)
 	}
 
+	return t.rescheduleCheck(ctx, config)
+}
+
+func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, response map[string]any, query, dataset string) {
+	dataValue := response["data"]
+	dataMap := t.convertDataToMap(dataValue, ctx)
+	if dataMap == nil {
+		return
+	}
+
+	result, ok := dataMap["result"].([]interface{})
+	if !ok {
+		ctx.Logger.Warnf("Unexpected response format: result is not an array, got %T", dataMap["result"])
+		return
+	}
+
+	if len(result) == 0 {
+		return
+	}
+
+	// Issues detected - emit event
+	payload := map[string]any{
+		"query":   query,
+		"dataset": dataset,
+		"results": result,
+		"count":   len(result),
+	}
+
+	err := ctx.Events.Emit("dash0.issue.detected", payload)
+	if err != nil {
+		ctx.Logger.Errorf("Error emitting event: %v", err)
+		return
+	}
+
+	ctx.Logger.Infof("Issues detected: %d issue(s) found", len(result))
+}
+
+func (t *OnIssueStatus) convertDataToMap(dataValue any, ctx core.TriggerActionContext) map[string]any {
+	if dataMapValue, ok := dataValue.(map[string]any); ok {
+		return dataMapValue
+	}
+
+	// If it's a struct, marshal and unmarshal it to convert to map
+	jsonBytes, err := json.Marshal(dataValue)
+	if err != nil {
+		ctx.Logger.Warnf("Failed to marshal response data: %v", err)
+		return nil
+	}
+
+	var dataMap map[string]any
+	err = json.Unmarshal(jsonBytes, &dataMap)
+	if err != nil {
+		ctx.Logger.Warnf("Failed to unmarshal response data: %v", err)
+		return nil
+	}
+
+	return dataMap
+}
+
+func (t *OnIssueStatus) rescheduleCheck(ctx core.TriggerActionContext, config OnIssueStatusConfiguration) error {
 	// Reschedule next check
 	var existingMetadata OnIssueStatusMetadata
-	err = mapstructure.Decode(ctx.Metadata.Get(), &existingMetadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &existingMetadata)
 	if err != nil {
 		// Use current time as reference if metadata is invalid
 		nowStr := time.Now().Format(time.RFC3339)
