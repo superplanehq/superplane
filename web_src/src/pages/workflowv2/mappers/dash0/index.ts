@@ -1,8 +1,8 @@
 import { ComponentBaseMapper, TriggerRenderer, EventStateRegistry } from "../types";
-import { queryGraphQLMapper } from "./query_graphql";
+import { queryPrometheusMapper } from "./query_prometheus";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
-  queryGraphQL: queryGraphQLMapper,
+  queryPrometheus: queryPrometheusMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
