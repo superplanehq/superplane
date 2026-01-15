@@ -533,7 +533,26 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 
 func allowSignupFromRequest(r *http.Request) bool {
 	redirectURL := getRedirectURL(r)
-	return strings.HasPrefix(redirectURL, "/invite/")
+	if !strings.HasPrefix(redirectURL, "/invite/") {
+		return false
+	}
+
+	parsedURL, err := url.Parse(redirectURL)
+	if err != nil {
+		return false
+	}
+
+	inviteToken := strings.TrimPrefix(parsedURL.Path, "/invite/")
+	if inviteToken == "" || strings.Contains(inviteToken, "/") {
+		return false
+	}
+
+	inviteLink, err := models.FindInviteLinkByToken(inviteToken)
+	if err != nil || !inviteLink.Enabled {
+		return false
+	}
+
+	return true
 }
 
 func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account, gothUser goth.User) error {
