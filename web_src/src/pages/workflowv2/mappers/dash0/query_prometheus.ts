@@ -38,7 +38,7 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
 
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, string> {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
-    
+
     if (!outputs || !outputs.default || outputs.default.length === 0) {
       return { Response: "No data returned" };
     }
@@ -68,9 +68,8 @@ function metadataList(node: ComponentsNode): MetadataItem[] {
 
   if (configuration?.query) {
     // Show a preview of the query (first 50 chars)
-    const queryPreview = configuration.query.length > 50
-      ? configuration.query.substring(0, 50) + "..."
-      : configuration.query;
+    const queryPreview =
+      configuration.query.length > 50 ? configuration.query.substring(0, 50) + "..." : configuration.query;
     metadata.push({ icon: "code", label: queryPreview });
   }
 

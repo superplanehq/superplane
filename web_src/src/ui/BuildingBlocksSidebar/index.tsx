@@ -308,7 +308,7 @@ function CategorySection({
       <ItemGroup>
         {allBlocks.map((block) => {
           const iconSlug = block.type === "blueprint" ? "component" : block.icon || "zap";
-          
+
           // Use SVG icons for application components/triggers
           const appLogoMap: Record<string, string> = {
             github: githubIcon,

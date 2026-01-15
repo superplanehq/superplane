@@ -1,5 +1,4 @@
 import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
-import { formatRelativeTime } from "@/utils/timezone";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { TriggerRenderer } from "../types";
 import { TriggerProps } from "@/ui/trigger";
@@ -75,10 +74,7 @@ function calculateNextTrigger(
   return nextTrigger;
 }
 
-function formatNextTrigger(
-  configuration: OnIssueStatusConfiguration,
-  metadata?: OnIssueStatusMetadata,
-): string {
+function formatNextTrigger(configuration: OnIssueStatusConfiguration, metadata?: OnIssueStatusMetadata): string {
   const nextTrigger = calculateNextTrigger(configuration, metadata);
 
   if (!nextTrigger) {
@@ -141,11 +137,7 @@ export const onIssueStatusTriggerRenderer: TriggerRenderer = {
     return values;
   },
 
-  getTriggerProps: (
-    node: ComponentsNode,
-    trigger: TriggersTrigger,
-    lastEvent?: WorkflowsWorkflowEvent,
-  ) => {
+  getTriggerProps: (node: ComponentsNode, _trigger: TriggersTrigger, lastEvent?: WorkflowsWorkflowEvent) => {
     const configuration = node.configuration as unknown as OnIssueStatusConfiguration;
     const metadata = node.metadata as unknown as OnIssueStatusMetadata;
 
