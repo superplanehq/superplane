@@ -2616,7 +2616,7 @@ const file_organizations_proto_rawDesc = "" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"r\n" +
 	"\x11InvitationCreated\x12#\n" +
 	"\rinvitation_id\x18\x01 \x01(\tR\finvitationId\x128\n" +
-	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xfb#\n" +
+	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xe8%\n" +
 	"\rOrganizations\x12\xa7\x02\n" +
 	"\x14DescribeOrganization\x125.Superplane.Organizations.DescribeOrganizationRequest\x1a6.Superplane.Organizations.DescribeOrganizationResponse\"\x9f\x01\x92Az\n" +
 	"\fOrganization\x12\x18Get organization details\x1aPReturns the details of a specific organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/organizations/{id}\x12\x96\x02\n" +
@@ -2638,7 +2638,9 @@ const file_organizations_proto_rawDesc = "" +
 	"\x10UpdateInviteLink\x121.Superplane.Organizations.UpdateInviteLinkRequest\x1a2.Superplane.Organizations.UpdateInviteLinkResponse\"\x9f\x01\x92Ak\n" +
 	"\fOrganization\x12\"Update an organization invite link\x1a7Enables or disables the invite link for an organization\x82\xd3\xe4\x93\x02+:\x01*2&/api/v1/organizations/{id}/invite-link\x12\x98\x02\n" +
 	"\x0fResetInviteLink\x120.Superplane.Organizations.ResetInviteLinkRequest\x1a1.Superplane.Organizations.ResetInviteLinkResponse\"\x9f\x01\x92Ah\n" +
-	"\fOrganization\x12!Reset an organization invite link\x1a5Generates a new invite link token for an organization\x82\xd3\xe4\x93\x02.\",/api/v1/organizations/{id}/invite-link/reset\x12\x95\x02\n" +
+	"\fOrganization\x12!Reset an organization invite link\x1a5Generates a new invite link token for an organization\x82\xd3\xe4\x93\x02.\",/api/v1/organizations/{id}/invite-link/reset\x12\xea\x01\n" +
+	"\x10AcceptInviteLink\x12$.Superplane.Organizations.InviteLink\x1a\x17.google.protobuf.Struct\"\x96\x01\x92Ah\n" +
+	"\fOrganization\x12\x15Accept an invite link\x1aAAccepts an organization invite link for the authenticated account\x82\xd3\xe4\x93\x02%\"#/api/v1/invite-links/{token}/accept\x12\x95\x02\n" +
 	"\x10ListApplications\x121.Superplane.Organizations.ListApplicationsRequest\x1a2.Superplane.Organizations.ListApplicationsResponse\"\x99\x01\x92Ag\n" +
 	"\fOrganization\x12$List applications in an organization\x1a1Returns a list of applications in an organization\x82\xd3\xe4\x93\x02)\x12'/api/v1/organizations/{id}/applications\x12\xc1\x02\n" +
 	"\x13DescribeApplication\x124.Superplane.Organizations.DescribeApplicationRequest\x1a5.Superplane.Organizations.DescribeApplicationResponse\"\xbc\x01\x92Ax\n" +
@@ -2765,30 +2767,32 @@ var file_organizations_proto_depIdxs = []int32{
 	15, // 42: Superplane.Organizations.Organizations.GetInviteLink:input_type -> Superplane.Organizations.GetInviteLinkRequest
 	17, // 43: Superplane.Organizations.Organizations.UpdateInviteLink:input_type -> Superplane.Organizations.UpdateInviteLinkRequest
 	19, // 44: Superplane.Organizations.Organizations.ResetInviteLink:input_type -> Superplane.Organizations.ResetInviteLinkRequest
-	23, // 45: Superplane.Organizations.Organizations.ListApplications:input_type -> Superplane.Organizations.ListApplicationsRequest
-	27, // 46: Superplane.Organizations.Organizations.DescribeApplication:input_type -> Superplane.Organizations.DescribeApplicationRequest
-	29, // 47: Superplane.Organizations.Organizations.ListApplicationResources:input_type -> Superplane.Organizations.ListApplicationResourcesRequest
-	25, // 48: Superplane.Organizations.Organizations.InstallApplication:input_type -> Superplane.Organizations.InstallApplicationRequest
-	32, // 49: Superplane.Organizations.Organizations.UpdateApplication:input_type -> Superplane.Organizations.UpdateApplicationRequest
-	34, // 50: Superplane.Organizations.Organizations.UninstallApplication:input_type -> Superplane.Organizations.UninstallApplicationRequest
-	2,  // 51: Superplane.Organizations.Organizations.DescribeOrganization:output_type -> Superplane.Organizations.DescribeOrganizationResponse
-	4,  // 52: Superplane.Organizations.Organizations.UpdateOrganization:output_type -> Superplane.Organizations.UpdateOrganizationResponse
-	6,  // 53: Superplane.Organizations.Organizations.DeleteOrganization:output_type -> Superplane.Organizations.DeleteOrganizationResponse
-	22, // 54: Superplane.Organizations.Organizations.RemoveUser:output_type -> Superplane.Organizations.RemoveUserResponse
-	10, // 55: Superplane.Organizations.Organizations.CreateInvitation:output_type -> Superplane.Organizations.CreateInvitationResponse
-	12, // 56: Superplane.Organizations.Organizations.ListInvitations:output_type -> Superplane.Organizations.ListInvitationsResponse
-	14, // 57: Superplane.Organizations.Organizations.RemoveInvitation:output_type -> Superplane.Organizations.RemoveInvitationResponse
-	16, // 58: Superplane.Organizations.Organizations.GetInviteLink:output_type -> Superplane.Organizations.GetInviteLinkResponse
-	18, // 59: Superplane.Organizations.Organizations.UpdateInviteLink:output_type -> Superplane.Organizations.UpdateInviteLinkResponse
-	20, // 60: Superplane.Organizations.Organizations.ResetInviteLink:output_type -> Superplane.Organizations.ResetInviteLinkResponse
-	24, // 61: Superplane.Organizations.Organizations.ListApplications:output_type -> Superplane.Organizations.ListApplicationsResponse
-	28, // 62: Superplane.Organizations.Organizations.DescribeApplication:output_type -> Superplane.Organizations.DescribeApplicationResponse
-	30, // 63: Superplane.Organizations.Organizations.ListApplicationResources:output_type -> Superplane.Organizations.ListApplicationResourcesResponse
-	26, // 64: Superplane.Organizations.Organizations.InstallApplication:output_type -> Superplane.Organizations.InstallApplicationResponse
-	33, // 65: Superplane.Organizations.Organizations.UpdateApplication:output_type -> Superplane.Organizations.UpdateApplicationResponse
-	35, // 66: Superplane.Organizations.Organizations.UninstallApplication:output_type -> Superplane.Organizations.UninstallApplicationResponse
-	51, // [51:67] is the sub-list for method output_type
-	35, // [35:51] is the sub-list for method input_type
+	8,  // 45: Superplane.Organizations.Organizations.AcceptInviteLink:input_type -> Superplane.Organizations.InviteLink
+	23, // 46: Superplane.Organizations.Organizations.ListApplications:input_type -> Superplane.Organizations.ListApplicationsRequest
+	27, // 47: Superplane.Organizations.Organizations.DescribeApplication:input_type -> Superplane.Organizations.DescribeApplicationRequest
+	29, // 48: Superplane.Organizations.Organizations.ListApplicationResources:input_type -> Superplane.Organizations.ListApplicationResourcesRequest
+	25, // 49: Superplane.Organizations.Organizations.InstallApplication:input_type -> Superplane.Organizations.InstallApplicationRequest
+	32, // 50: Superplane.Organizations.Organizations.UpdateApplication:input_type -> Superplane.Organizations.UpdateApplicationRequest
+	34, // 51: Superplane.Organizations.Organizations.UninstallApplication:input_type -> Superplane.Organizations.UninstallApplicationRequest
+	2,  // 52: Superplane.Organizations.Organizations.DescribeOrganization:output_type -> Superplane.Organizations.DescribeOrganizationResponse
+	4,  // 53: Superplane.Organizations.Organizations.UpdateOrganization:output_type -> Superplane.Organizations.UpdateOrganizationResponse
+	6,  // 54: Superplane.Organizations.Organizations.DeleteOrganization:output_type -> Superplane.Organizations.DeleteOrganizationResponse
+	22, // 55: Superplane.Organizations.Organizations.RemoveUser:output_type -> Superplane.Organizations.RemoveUserResponse
+	10, // 56: Superplane.Organizations.Organizations.CreateInvitation:output_type -> Superplane.Organizations.CreateInvitationResponse
+	12, // 57: Superplane.Organizations.Organizations.ListInvitations:output_type -> Superplane.Organizations.ListInvitationsResponse
+	14, // 58: Superplane.Organizations.Organizations.RemoveInvitation:output_type -> Superplane.Organizations.RemoveInvitationResponse
+	16, // 59: Superplane.Organizations.Organizations.GetInviteLink:output_type -> Superplane.Organizations.GetInviteLinkResponse
+	18, // 60: Superplane.Organizations.Organizations.UpdateInviteLink:output_type -> Superplane.Organizations.UpdateInviteLinkResponse
+	20, // 61: Superplane.Organizations.Organizations.ResetInviteLink:output_type -> Superplane.Organizations.ResetInviteLinkResponse
+	49, // 62: Superplane.Organizations.Organizations.AcceptInviteLink:output_type -> google.protobuf.Struct
+	24, // 63: Superplane.Organizations.Organizations.ListApplications:output_type -> Superplane.Organizations.ListApplicationsResponse
+	28, // 64: Superplane.Organizations.Organizations.DescribeApplication:output_type -> Superplane.Organizations.DescribeApplicationResponse
+	30, // 65: Superplane.Organizations.Organizations.ListApplicationResources:output_type -> Superplane.Organizations.ListApplicationResourcesResponse
+	26, // 66: Superplane.Organizations.Organizations.InstallApplication:output_type -> Superplane.Organizations.InstallApplicationResponse
+	33, // 67: Superplane.Organizations.Organizations.UpdateApplication:output_type -> Superplane.Organizations.UpdateApplicationResponse
+	35, // 68: Superplane.Organizations.Organizations.UninstallApplication:output_type -> Superplane.Organizations.UninstallApplicationResponse
+	52, // [52:69] is the sub-list for method output_type
+	35, // [35:52] is the sub-list for method input_type
 	35, // [35:35] is the sub-list for extension type_name
 	35, // [35:35] is the sub-list for extension extendee
 	0,  // [0:35] is the sub-list for field type_name

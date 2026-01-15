@@ -68,6 +68,9 @@ import type {
   IntegrationsListResourcesData,
   IntegrationsListResourcesResponse2,
   IntegrationsListResourcesError,
+  OrganizationsAcceptInviteLinkData,
+  OrganizationsAcceptInviteLinkResponse,
+  OrganizationsAcceptInviteLinkError,
   MeMeData,
   MeMeResponse,
   MeMeError,
@@ -620,6 +623,23 @@ export const integrationsListResources = <ThrowOnError extends boolean = true>(
     ThrowOnError
   >({
     url: "/api/v1/integrations/{idOrName}/resources",
+    ...options,
+  });
+};
+
+/**
+ * Accept an invite link
+ * Accepts an organization invite link for the authenticated account
+ */
+export const organizationsAcceptInviteLink = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsAcceptInviteLinkData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).post<
+    OrganizationsAcceptInviteLinkResponse,
+    OrganizationsAcceptInviteLinkError,
+    ThrowOnError
+  >({
+    url: "/api/v1/invite-links/{token}/accept",
     ...options,
   });
 };

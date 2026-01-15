@@ -139,6 +139,17 @@ service Organizations {
     };
   }
 
+  rpc AcceptInviteLink(InviteLink) returns (google.protobuf.Struct) {
+    option (google.api.http) = {
+      post: "/api/v1/invite-links/{token}/accept"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Accept an invite link";
+      description: "Accepts an organization invite link for the authenticated account";
+      tags: "Organization";
+    };
+  }
+
   rpc ListApplications(ListApplicationsRequest) returns (ListApplicationsResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/applications"

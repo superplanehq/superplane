@@ -1707,6 +1707,43 @@ export type IntegrationsListResourcesResponses = {
 export type IntegrationsListResourcesResponse2 =
   IntegrationsListResourcesResponses[keyof IntegrationsListResourcesResponses];
 
+export type OrganizationsAcceptInviteLinkData = {
+  body?: never;
+  path: {
+    token: string;
+  };
+  query?: {
+    id?: string;
+    organizationId?: string;
+    enabled?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+  url: "/api/v1/invite-links/{token}/accept";
+};
+
+export type OrganizationsAcceptInviteLinkErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsAcceptInviteLinkError =
+  OrganizationsAcceptInviteLinkErrors[keyof OrganizationsAcceptInviteLinkErrors];
+
+export type OrganizationsAcceptInviteLinkResponses = {
+  /**
+   * A successful response.
+   */
+  200: {
+    [key: string]: unknown;
+  };
+};
+
+export type OrganizationsAcceptInviteLinkResponse =
+  OrganizationsAcceptInviteLinkResponses[keyof OrganizationsAcceptInviteLinkResponses];
+
 export type MeMeData = {
   body?: never;
   path?: never;

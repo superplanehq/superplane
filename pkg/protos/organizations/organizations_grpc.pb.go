@@ -8,6 +8,7 @@ package organizations
 
 import (
 	context "context"
+	_struct "github.com/golang/protobuf/ptypes/struct"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -29,6 +30,7 @@ const (
 	Organizations_GetInviteLink_FullMethodName            = "/Superplane.Organizations.Organizations/GetInviteLink"
 	Organizations_UpdateInviteLink_FullMethodName         = "/Superplane.Organizations.Organizations/UpdateInviteLink"
 	Organizations_ResetInviteLink_FullMethodName          = "/Superplane.Organizations.Organizations/ResetInviteLink"
+	Organizations_AcceptInviteLink_FullMethodName         = "/Superplane.Organizations.Organizations/AcceptInviteLink"
 	Organizations_ListApplications_FullMethodName         = "/Superplane.Organizations.Organizations/ListApplications"
 	Organizations_DescribeApplication_FullMethodName      = "/Superplane.Organizations.Organizations/DescribeApplication"
 	Organizations_ListApplicationResources_FullMethodName = "/Superplane.Organizations.Organizations/ListApplicationResources"
@@ -51,6 +53,7 @@ type OrganizationsClient interface {
 	GetInviteLink(ctx context.Context, in *GetInviteLinkRequest, opts ...grpc.CallOption) (*GetInviteLinkResponse, error)
 	UpdateInviteLink(ctx context.Context, in *UpdateInviteLinkRequest, opts ...grpc.CallOption) (*UpdateInviteLinkResponse, error)
 	ResetInviteLink(ctx context.Context, in *ResetInviteLinkRequest, opts ...grpc.CallOption) (*ResetInviteLinkResponse, error)
+	AcceptInviteLink(ctx context.Context, in *InviteLink, opts ...grpc.CallOption) (*_struct.Struct, error)
 	ListApplications(ctx context.Context, in *ListApplicationsRequest, opts ...grpc.CallOption) (*ListApplicationsResponse, error)
 	DescribeApplication(ctx context.Context, in *DescribeApplicationRequest, opts ...grpc.CallOption) (*DescribeApplicationResponse, error)
 	ListApplicationResources(ctx context.Context, in *ListApplicationResourcesRequest, opts ...grpc.CallOption) (*ListApplicationResourcesResponse, error)
@@ -167,6 +170,16 @@ func (c *organizationsClient) ResetInviteLink(ctx context.Context, in *ResetInvi
 	return out, nil
 }
 
+func (c *organizationsClient) AcceptInviteLink(ctx context.Context, in *InviteLink, opts ...grpc.CallOption) (*_struct.Struct, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(_struct.Struct)
+	err := c.cc.Invoke(ctx, Organizations_AcceptInviteLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *organizationsClient) ListApplications(ctx context.Context, in *ListApplicationsRequest, opts ...grpc.CallOption) (*ListApplicationsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListApplicationsResponse)
@@ -241,6 +254,7 @@ type OrganizationsServer interface {
 	GetInviteLink(context.Context, *GetInviteLinkRequest) (*GetInviteLinkResponse, error)
 	UpdateInviteLink(context.Context, *UpdateInviteLinkRequest) (*UpdateInviteLinkResponse, error)
 	ResetInviteLink(context.Context, *ResetInviteLinkRequest) (*ResetInviteLinkResponse, error)
+	AcceptInviteLink(context.Context, *InviteLink) (*_struct.Struct, error)
 	ListApplications(context.Context, *ListApplicationsRequest) (*ListApplicationsResponse, error)
 	DescribeApplication(context.Context, *DescribeApplicationRequest) (*DescribeApplicationResponse, error)
 	ListApplicationResources(context.Context, *ListApplicationResourcesRequest) (*ListApplicationResourcesResponse, error)
@@ -285,6 +299,9 @@ func (UnimplementedOrganizationsServer) UpdateInviteLink(context.Context, *Updat
 }
 func (UnimplementedOrganizationsServer) ResetInviteLink(context.Context, *ResetInviteLinkRequest) (*ResetInviteLinkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResetInviteLink not implemented")
+}
+func (UnimplementedOrganizationsServer) AcceptInviteLink(context.Context, *InviteLink) (*_struct.Struct, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AcceptInviteLink not implemented")
 }
 func (UnimplementedOrganizationsServer) ListApplications(context.Context, *ListApplicationsRequest) (*ListApplicationsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListApplications not implemented")
@@ -504,6 +521,24 @@ func _Organizations_ResetInviteLink_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_AcceptInviteLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InviteLink)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).AcceptInviteLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_AcceptInviteLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).AcceptInviteLink(ctx, req.(*InviteLink))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Organizations_ListApplications_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListApplicationsRequest)
 	if err := dec(in); err != nil {
@@ -658,6 +693,10 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResetInviteLink",
 			Handler:    _Organizations_ResetInviteLink_Handler,
+		},
+		{
+			MethodName: "AcceptInviteLink",
+			Handler:    _Organizations_AcceptInviteLink_Handler,
 		},
 		{
 			MethodName: "ListApplications",
