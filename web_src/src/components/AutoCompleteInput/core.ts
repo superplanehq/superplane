@@ -244,6 +244,7 @@ export function flattenForAutocomplete(obj: any) {
  */
 export function getAutocompleteSuggestions(flattenedData: any, currentPath: string) {
   if (!currentPath) {
+    console.log("flattenedData", flattenedData , "currentPath", currentPath);
     const topLevelKeys = Object.keys(flattenedData).filter((key) => key.endsWith("-0"));
 
     if (topLevelKeys.length > 0) {
