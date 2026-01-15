@@ -130,6 +130,9 @@ dev.db.console:
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
 
+check.db.migrations:
+	bash ./scripts/verify_no_future_migrations.sh
+
 check.build.ui:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "cd web_src && npm run build"
 
