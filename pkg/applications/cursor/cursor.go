@@ -19,6 +19,19 @@ type Configuration struct {
 	APIKey string `json:"apiKey"`
 }
 
+type Metadata struct {
+	Webhook *WebhookMetadata `json:"webhook,omitempty"`
+}
+
+type WebhookMetadata struct {
+	URL    string `json:"url"`
+	Secret string `json:"secret"`
+}
+
+type WebhookConfiguration struct {
+	Event string `json:"event"`
+}
+
 func (c *Cursor) Name() string {
 	return "cursor"
 }
@@ -86,7 +99,18 @@ func (c *Cursor) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (c *Cursor) CompareWebhookConfig(a, b any) (bool, error) {
-	return true, nil
+	configA := WebhookConfiguration{}
+	configB := WebhookConfiguration{}
+
+	if err := mapstructure.Decode(a, &configA); err != nil {
+		return false, err
+	}
+
+	if err := mapstructure.Decode(b, &configB); err != nil {
+		return false, err
+	}
+
+	return configA.Event == configB.Event, nil
 }
 
 func (c *Cursor) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
@@ -94,6 +118,22 @@ func (c *Cursor) ListResources(resourceType string, ctx core.ListResourcesContex
 }
 
 func (c *Cursor) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata); err != nil {
+		return nil, err
+	}
+
+	secret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return nil, fmt.Errorf("error getting webhook secret: %v", err)
+	}
+
+	metadata.Webhook = &WebhookMetadata{
+		URL:    ctx.Webhook.GetURL(),
+		Secret: string(secret),
+	}
+	ctx.AppInstallation.SetMetadata(metadata)
+
 	return nil, nil
 }
 
