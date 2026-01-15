@@ -11,6 +11,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+const (
+	// MaxResponseSize limits the size of Prometheus API responses to prevent excessive memory usage
+	// 1MB should be sufficient for most Prometheus queries while preventing abuse
+	MaxResponseSize = 1 * 1024 * 1024 // 1MB
+)
+
 type Client struct {
 	Token   string
 	BaseURL string
@@ -61,9 +67,16 @@ func (c *Client) execRequest(method, url string, body io.Reader, contentType str
 	}
 	defer res.Body.Close()
 
-	responseBody, err := io.ReadAll(res.Body)
+	// Limit response size to prevent excessive memory usage
+	limitedReader := io.LimitReader(res.Body, MaxResponseSize)
+	responseBody, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, fmt.Errorf("error reading body: %v", err)
+	}
+
+	// Check if we hit the limit (response was truncated)
+	if len(responseBody) >= MaxResponseSize {
+		return nil, fmt.Errorf("response too large: exceeds maximum size of %d bytes", MaxResponseSize)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
