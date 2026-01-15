@@ -20,6 +20,7 @@ import (
 
 	// Import integrations, components and triggers to register them via init()
 	_ "github.com/superplanehq/superplane/pkg/applications/github"
+	_ "github.com/superplanehq/superplane/pkg/applications/openai"
 	_ "github.com/superplanehq/superplane/pkg/applications/pagerduty"
 	_ "github.com/superplanehq/superplane/pkg/applications/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/applications/slack"

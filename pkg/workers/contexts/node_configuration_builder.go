@@ -3,10 +3,11 @@ package contexts
 import (
 	"fmt"
 	"regexp"
-	"slices"
 	"time"
 
 	"github.com/expr-lang/expr"
+	"github.com/expr-lang/expr/ast"
+	"github.com/expr-lang/expr/parser"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -134,7 +135,17 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 }
 
 func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
-	env := map[string]any{"$": b.input}
+	referencedNodes, err := parseReferencedNodes(expression)
+	if err != nil {
+		return "", err
+	}
+
+	messageChain, err := b.buildMessageChain(referencedNodes)
+	if err != nil {
+		return "", err
+	}
+
+	env := map[string]any{"$": messageChain}
 
 	if b.parentBlueprintNode != nil {
 		env["config"] = b.parentBlueprintNode.Configuration.Data()
@@ -145,55 +156,7 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 		expr.AsAny(),
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
-
-		//
-		// Access data from any node in the chain with chain("<NODE ID>").*
-		//
-		expr.Function("chain", func(params ...any) (any, error) {
-			nodeID, ok := params[0].(string)
-			if !ok {
-				return nil, fmt.Errorf("bad parameter")
-			}
-
-			if b.previousExecutionID == nil {
-				return nil, fmt.Errorf("no previous execution")
-			}
-
-			execution, err := b.findExecutionInChain(nodeID)
-			if err != nil {
-				return nil, err
-			}
-
-			events, err := execution.GetOutputs()
-			if err != nil {
-				return nil, err
-			}
-
-			outputs := make(map[string][]any)
-			for _, event := range events {
-				outputs[event.Channel] = append(outputs[event.Channel], event.Data.Data())
-			}
-
-			return outputs, nil
-		}),
 	}
-
-	//
-	// Access the data from the root event with root().*
-	// Only available on workflow-level nodes.
-	//
-	exprOptions = append(exprOptions, expr.Function("root", func(params ...any) (any, error) {
-		if b.rootEventID == nil {
-			return nil, fmt.Errorf("no root event found")
-		}
-
-		e, err := models.FindWorkflowEventInTransaction(b.tx, *b.rootEventID)
-		if err != nil {
-			return nil, err
-		}
-
-		return e.Data.Data(), nil
-	}))
 
 	vm, err := expr.Compile(expression, exprOptions...)
 	if err != nil {
@@ -208,21 +171,189 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 	return output, nil
 }
 
-func (b *NodeConfigurationBuilder) findExecutionInChain(nodeID string) (*models.WorkflowNodeExecution, error) {
-	executionsInChain, err := b.listExecutionsInChain()
+func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (map[string]any, error) {
+	messageChain := map[string]any{}
+	inputMap := extractInputMap(b.input)
+	for key, value := range inputMap {
+		messageChain[key] = value
+	}
+
+	if len(referencedNodes) == 0 {
+		return messageChain, nil
+	}
+
+	unresolved := unresolvedNodeRefs(referencedNodes, messageChain)
+	if len(unresolved) == 0 {
+		return messageChain, nil
+	}
+
+	refToNodeID, err := b.resolveNodeRefs(unresolved)
 	if err != nil {
 		return nil, err
 	}
 
-	i := slices.IndexFunc(executionsInChain, func(execution models.WorkflowNodeExecution) bool {
-		return execution.NodeID == nodeID
-	})
-
-	if i == -1 {
-		return nil, fmt.Errorf("node %s not found in execution chain", nodeID)
+	rootEvent, err := b.fetchRootEvent()
+	if err != nil {
+		return nil, err
 	}
 
-	return &executionsInChain[i], nil
+	chainRefs := populateFromInputOrRoot(messageChain, inputMap, rootEvent, refToNodeID)
+
+	if len(chainRefs) == 0 {
+		return messageChain, nil
+	}
+
+	if b.previousExecutionID == nil {
+		return nil, fmt.Errorf("node %s not found in execution chain", unresolved[0])
+	}
+
+	err = b.populateFromExecutions(messageChain, chainRefs)
+	if err != nil {
+		return nil, err
+	}
+
+	return messageChain, nil
+}
+
+func extractInputMap(input any) map[string]any {
+	inputMap := map[string]any{}
+	if input, ok := input.(map[string]any); ok {
+		return input
+	}
+
+	return inputMap
+}
+
+func unresolvedNodeRefs(referencedNodes []string, messageChain map[string]any) []string {
+	unresolved := make([]string, 0, len(referencedNodes))
+	for _, nodeRef := range referencedNodes {
+		if _, ok := messageChain[nodeRef]; !ok {
+			unresolved = append(unresolved, nodeRef)
+		}
+	}
+
+	return unresolved
+}
+
+func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string) (map[string]string, error) {
+	nodes, err := models.FindWorkflowNodesInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeIDs := make(map[string]struct{}, len(nodes))
+	for _, node := range nodes {
+		nodeIDs[node.NodeID] = struct{}{}
+	}
+
+	refToNodeID := make(map[string]string, len(nodeRefs))
+	for _, nodeRef := range nodeRefs {
+		if _, ok := nodeIDs[nodeRef]; ok {
+			refToNodeID[nodeRef] = nodeRef
+			continue
+		}
+
+		return nil, fmt.Errorf("node %s not found in execution chain", nodeRef)
+	}
+
+	return refToNodeID, nil
+}
+
+func (b *NodeConfigurationBuilder) fetchRootEvent() (*models.WorkflowEvent, error) {
+	if b.rootEventID == nil {
+		return nil, nil
+	}
+
+	rootEvent, err := models.FindWorkflowEventInTransaction(b.tx, *b.rootEventID)
+	if err != nil {
+		return nil, err
+	}
+
+	return rootEvent, nil
+}
+
+func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]any, rootEvent *models.WorkflowEvent, refToNodeID map[string]string) map[string]string {
+	chainRefs := make(map[string]string, len(refToNodeID))
+	for nodeRef, nodeID := range refToNodeID {
+		if value, ok := inputMap[nodeID]; ok {
+			if _, exists := messageChain[nodeRef]; !exists {
+				messageChain[nodeRef] = value
+			}
+			continue
+		}
+
+		if rootEvent != nil && rootEvent.NodeID == nodeID {
+			if _, exists := messageChain[nodeRef]; !exists {
+				messageChain[nodeRef] = rootEvent.Data.Data()
+			}
+			continue
+		}
+
+		chainRefs[nodeRef] = nodeID
+	}
+
+	return chainRefs
+}
+
+func (b *NodeConfigurationBuilder) populateFromExecutions(messageChain map[string]any, chainRefs map[string]string) error {
+	executionsInChain, err := b.listExecutionsInChain()
+	if err != nil {
+		return err
+	}
+
+	executionByNode := make(map[string]models.WorkflowNodeExecution, len(executionsInChain))
+	for _, execution := range executionsInChain {
+		executionByNode[execution.NodeID] = execution
+	}
+
+	executionIDs := make([]uuid.UUID, 0, len(chainRefs))
+	executionIDByRef := make(map[string]uuid.UUID, len(chainRefs))
+	for nodeRef, nodeID := range chainRefs {
+		execution, ok := executionByNode[nodeID]
+		if !ok {
+			return fmt.Errorf("node %s not found in execution chain", nodeRef)
+		}
+		executionIDs = append(executionIDs, execution.ID)
+		executionIDByRef[nodeRef] = execution.ID
+	}
+
+	events, err := models.ListWorkflowEventsForExecutionsInTransaction(b.tx, executionIDs)
+	if err != nil {
+		return err
+	}
+
+	latestByExecution := latestEventByExecution(events, executionIDs)
+	for nodeRef, executionID := range executionIDByRef {
+		event, ok := latestByExecution[executionID]
+		if !ok {
+			return fmt.Errorf("node %s has no outputs", nodeRef)
+		}
+
+		messageChain[nodeRef] = event.Data.Data()
+	}
+
+	return nil
+}
+
+func latestEventByExecution(events []models.WorkflowEvent, executionIDs []uuid.UUID) map[uuid.UUID]models.WorkflowEvent {
+	latestByExecution := make(map[uuid.UUID]models.WorkflowEvent, len(executionIDs))
+	for _, event := range events {
+		if event.ExecutionID == nil {
+			continue
+		}
+
+		latest, ok := latestByExecution[*event.ExecutionID]
+		if !ok || event.CreatedAt == nil {
+			latestByExecution[*event.ExecutionID] = event
+			continue
+		}
+
+		if latest.CreatedAt == nil || event.CreatedAt.After(*latest.CreatedAt) {
+			latestByExecution[*event.ExecutionID] = event
+		}
+	}
+
+	return latestByExecution
 }
 
 func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNodeExecution, error) {
@@ -282,4 +413,56 @@ func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNod
 	}
 
 	return executions, nil
+}
+
+func parseReferencedNodes(expression string) ([]string, error) {
+	tree, err := parser.Parse(expression)
+	if err != nil {
+		return nil, err
+	}
+
+	collector := &nodeReferenceCollector{
+		seen: make(map[string]struct{}),
+	}
+
+	ast.Walk(&tree.Node, collector)
+
+	return collector.identifiers, nil
+}
+
+type nodeReferenceCollector struct {
+	identifiers []string
+	seen        map[string]struct{}
+}
+
+func (c *nodeReferenceCollector) Visit(node *ast.Node) {
+	member, ok := (*node).(*ast.MemberNode)
+	if !ok {
+		return
+	}
+
+	root, ok := member.Node.(*ast.IdentifierNode)
+	if !ok || root.Value != "$" {
+		return
+	}
+
+	switch property := member.Property.(type) {
+	case *ast.StringNode:
+		c.add(property.Value)
+	case *ast.IdentifierNode:
+		c.add(property.Value)
+	}
+}
+
+func (c *nodeReferenceCollector) add(value string) {
+	if value == "" {
+		return
+	}
+
+	if _, ok := c.seen[value]; ok {
+		return
+	}
+
+	c.seen[value] = struct{}{}
+	c.identifiers = append(c.identifiers, value)
 }

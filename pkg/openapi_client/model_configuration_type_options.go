@@ -32,6 +32,7 @@ type ConfigurationTypeOptions struct {
 	Datetime         *ConfigurationDateTimeTypeOptions         `json:"datetime,omitempty"`
 	AnyPredicateList *ConfigurationAnyPredicateListTypeOptions `json:"anyPredicateList,omitempty"`
 	String           *ConfigurationStringTypeOptions           `json:"string,omitempty"`
+	Expression       *ConfigurationExpressionTypeOptions       `json:"expression,omitempty"`
 	Text             *ConfigurationTextTypeOptions             `json:"text,omitempty"`
 }
 
@@ -436,6 +437,38 @@ func (o *ConfigurationTypeOptions) SetString(v ConfigurationStringTypeOptions) {
 	o.String = &v
 }
 
+// GetExpression returns the Expression field value if set, zero value otherwise.
+func (o *ConfigurationTypeOptions) GetExpression() ConfigurationExpressionTypeOptions {
+	if o == nil || IsNil(o.Expression) {
+		var ret ConfigurationExpressionTypeOptions
+		return ret
+	}
+	return *o.Expression
+}
+
+// GetExpressionOk returns a tuple with the Expression field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationTypeOptions) GetExpressionOk() (*ConfigurationExpressionTypeOptions, bool) {
+	if o == nil || IsNil(o.Expression) {
+		return nil, false
+	}
+	return o.Expression, true
+}
+
+// HasExpression returns a boolean if a field has been set.
+func (o *ConfigurationTypeOptions) HasExpression() bool {
+	if o != nil && !IsNil(o.Expression) {
+		return true
+	}
+
+	return false
+}
+
+// SetExpression gets a reference to the given ConfigurationExpressionTypeOptions and assigns it to the Expression field.
+func (o *ConfigurationTypeOptions) SetExpression(v ConfigurationExpressionTypeOptions) {
+	o.Expression = &v
+}
+
 // GetText returns the Text field value if set, zero value otherwise.
 func (o *ConfigurationTypeOptions) GetText() ConfigurationTextTypeOptions {
 	if o == nil || IsNil(o.Text) {
@@ -513,6 +546,9 @@ func (o ConfigurationTypeOptions) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.String) {
 		toSerialize["string"] = o.String
+	}
+	if !IsNil(o.Expression) {
+		toSerialize["expression"] = o.Expression
 	}
 	if !IsNil(o.Text) {
 		toSerialize["text"] = o.Text

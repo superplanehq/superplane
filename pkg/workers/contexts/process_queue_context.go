@@ -38,7 +38,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 	configBuilder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
-		WithInput(event.Data.Data())
+		WithInput(map[string]any{event.NodeID: event.Data.Data()})
 
 	if node.ParentNodeID != nil {
 		parent, err := models.FindWorkflowNode(tx, node.WorkflowID, *node.ParentNodeID)

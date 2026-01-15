@@ -154,6 +154,7 @@ export interface CanvasPageProps {
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
+  onNodesPositionChange?: (updates: Array<{ nodeId: string; position: { x: number; y: number } }>) => void;
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
   onPushThrough?: (nodeId: string, executionId: string) => void;
   onCancelExecution?: (nodeId: string, executionId: string) => void;
@@ -1278,6 +1279,14 @@ function CanvasContent({
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
+  // Determine selection key code to support both Control (Windows/Linux) and Meta (Mac)
+  // Similar to existing keyboard shortcuts that check (e.ctrlKey || e.metaKey)
+  const selectionKey = useMemo(() => {
+    // Check if running on Mac to use Meta (Cmd) key, otherwise use Control (Ctrl) key
+    const isMac = navigator.platform.toLowerCase().includes("mac");
+    return isMac ? "Meta" : "Control";
+  }, []);
+
   // Use refs to avoid recreating callbacks when state changes
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1294,6 +1303,8 @@ function CanvasContent({
 
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
+  const [isSelectionModeEnabled, setIsSelectionModeEnabled] = useState(false);
+  const [isTemporarilyEnabled, setIsTemporarilyEnabled] = useState(false);
   const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(false);
   const [logFilter, setLogFilter] = useState<LogTypeFilter>(new Set());
   const [logScope, setLogScope] = useState<LogScopeFilter>("all");
@@ -1523,6 +1534,45 @@ function CanvasContent({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleToggleCollapse]);
+
+  // Handle temporary selection mode activation with Cmd/Ctrl
+  // When button is OFF and user presses Cmd/Ctrl, visually enable the button
+  // When Cmd/Ctrl is released, visually disable the button (if it was temporarily enabled)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // If button is off and user presses Cmd/Ctrl, temporarily enable it visually
+      if (!isSelectionModeEnabled && !isTemporarilyEnabled && (e.ctrlKey || e.metaKey)) {
+        setIsSelectionModeEnabled(true);
+        setIsTemporarilyEnabled(true);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // If button was temporarily enabled and user releases Cmd/Ctrl, disable it
+      if (isTemporarilyEnabled && !e.ctrlKey && !e.metaKey) {
+        setIsSelectionModeEnabled(false);
+        setIsTemporarilyEnabled(false);
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      // If button was temporarily enabled and user releases mouse, disable it
+      // Only if Cmd/Ctrl is not still pressed
+      if (isTemporarilyEnabled && !e.ctrlKey && !e.metaKey) {
+        setIsSelectionModeEnabled(false);
+        setIsTemporarilyEnabled(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keyup", handleKeyUp);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keyup", handleKeyUp);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isSelectionModeEnabled, isTemporarilyEnabled]);
 
   const handlePaneClick = useCallback(() => {
     // Do not close sidebar or reset state while creating a new component
@@ -1851,8 +1901,14 @@ function CanvasContent({
             zoomOnPinch={true}
             zoomOnDoubleClick={false}
             panOnScroll={true}
-            panOnDrag={true}
-            selectionOnDrag={false}
+            panOnDrag={!isSelectionModeEnabled || isTemporarilyEnabled}
+            selectionOnDrag={true}
+            {...(isSelectionModeEnabled && !isTemporarilyEnabled
+              ? {}
+              : {
+                  selectionKeyCode: selectionKey,
+                  multiSelectionKeyCode: selectionKey,
+                })}
             panOnScrollSpeed={0.8}
             nodesDraggable={true}
             nodesConnectable={!!onEdgeCreate}
@@ -1875,7 +1931,15 @@ function CanvasContent({
             className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
-            <ZoomSlider position="bottom-left" orientation="horizontal">
+            <ZoomSlider
+              position="bottom-left"
+              orientation="horizontal"
+              isSelectionModeEnabled={isSelectionModeEnabled}
+              onSelectionModeToggle={() => {
+                setIsSelectionModeEnabled((prev) => !prev);
+                setIsTemporarilyEnabled(false);
+              }}
+            >
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
@@ -1910,7 +1974,7 @@ function CanvasContent({
             <Panel
               position="bottom-left"
               className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex gap-0.5 rounded-sm p-0.5"
-              style={{ marginLeft: 256 }}
+              style={{ marginLeft: 304 }}
             >
               <Tooltip>
                 <TooltipTrigger asChild>

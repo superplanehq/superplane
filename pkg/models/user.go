@@ -150,6 +150,18 @@ func FindMaybeDeletedUserByEmail(orgID, email string) (*User, error) {
 	return &user, err
 }
 
+func FindMaybeDeletedUserByEmailInTransaction(tx *gorm.DB, orgID, email string) (*User, error) {
+	var user User
+
+	err := tx.Unscoped().
+		Where("organization_id = ?", orgID).
+		Where("email = ?", utils.NormalizeEmail(email)).
+		First(&user).
+		Error
+
+	return &user, err
+}
+
 func FindActiveUserByTokenHash(tokenHash string) (*User, error) {
 	var user User
 

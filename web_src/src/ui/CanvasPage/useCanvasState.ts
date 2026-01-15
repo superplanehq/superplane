@@ -1,4 +1,4 @@
-import type { Edge, EdgeChange, Node, NodeChange } from "@xyflow/react";
+import type { Edge, EdgeChange, Node, NodeChange, NodePositionChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AiProps, CanvasPageProps } from ".";
@@ -160,12 +160,31 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
       }
 
       // Check for position changes and notify parent
-      changes.forEach((change) => {
-        if (change.type === "position" && change.position && change.dragging === false && props.onNodePositionChange) {
-          // Only notify when dragging ends (dragging === false)
-          props.onNodePositionChange(change.id, change.position);
+      // Collect all position changes that ended (dragging === false)
+      const positionChanges = changes.filter(
+        (change): change is NodePositionChange & { position: { x: number; y: number } } =>
+          change.type === "position" &&
+          change.position !== undefined &&
+          change.dragging === false &&
+          typeof change.position.x === "number" &&
+          typeof change.position.y === "number",
+      );
+
+      if (positionChanges.length > 0) {
+        // If batch update is supported, use it for multiple nodes
+        if (positionChanges.length > 1 && props.onNodesPositionChange) {
+          const updates = positionChanges.map((change) => ({
+            nodeId: change.id,
+            position: change.position,
+          }));
+          props.onNodesPositionChange(updates);
+        } else if (props.onNodePositionChange) {
+          // Fall back to individual updates for single node or when batch is not supported
+          positionChanges.forEach((change) => {
+            props.onNodePositionChange!(change.id, change.position);
+          });
         }
-      });
+      }
 
       setNodes((nds) => applyNodeChanges(changes, nds));
     },

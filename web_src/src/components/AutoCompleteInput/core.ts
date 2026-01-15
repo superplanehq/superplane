@@ -10,26 +10,140 @@ export function getValueAtPath(obj: any, path: string): any {
   if (!obj || !path) return undefined;
 
   try {
-    const parts = path.split(".").flatMap((part) => {
-      const arrayMatch = part.match(/^(.+?)\[(\d+)\]$/);
-      if (arrayMatch) {
-        return [arrayMatch[1], parseInt(arrayMatch[2])];
-      }
-      return [part];
-    });
-
+    const parts = parsePathSegments(path);
     let current = obj;
     for (const part of parts) {
       if (current === null || current === undefined) {
         return undefined;
       }
-      current = current[part];
+      current = current[part as keyof typeof current];
     }
 
     return current;
   } catch {
     return undefined;
   }
+}
+
+export function parsePathSegments(path: string): Array<string | number> {
+  const segments: Array<string | number> = [];
+  if (!path) {
+    return segments;
+  }
+
+  let i = 0;
+  if (path[i] === "$") {
+    i += 1;
+    if (path[i] === ".") {
+      i += 1;
+    }
+  }
+
+  while (i < path.length) {
+    const char = path[i];
+
+    if (char === ".") {
+      i += 1;
+      continue;
+    }
+
+    if (char === "[") {
+      i += 1;
+      if (i >= path.length) break;
+
+      const quote = path[i];
+      if (quote === "'" || quote === '"') {
+        i += 1;
+        let value = "";
+        while (i < path.length) {
+          const nextChar = path[i];
+          if (nextChar === "\\" && i + 1 < path.length) {
+            value += path[i + 1];
+            i += 2;
+            continue;
+          }
+          if (nextChar === quote) {
+            i += 1;
+            break;
+          }
+          value += nextChar;
+          i += 1;
+        }
+        while (i < path.length && path[i] !== "]") {
+          i += 1;
+        }
+        if (path[i] === "]") {
+          i += 1;
+        }
+        segments.push(value);
+        continue;
+      }
+
+      let numberValue = "";
+      while (i < path.length && /\d/.test(path[i])) {
+        numberValue += path[i];
+        i += 1;
+      }
+      while (i < path.length && path[i] !== "]") {
+        i += 1;
+      }
+      if (path[i] === "]") {
+        i += 1;
+      }
+      if (numberValue !== "") {
+        segments.push(Number(numberValue));
+      }
+      continue;
+    }
+
+    let value = "";
+    while (i < path.length && path[i] !== "." && path[i] !== "[") {
+      value += path[i];
+      i += 1;
+    }
+    if (value !== "") {
+      segments.push(value);
+    }
+  }
+
+  return segments;
+}
+
+export function buildLookupPath(segments: Array<string | number>): string {
+  let path = "";
+  segments.forEach((segment) => {
+    if (typeof segment === "number") {
+      path += `[${segment}]`;
+      return;
+    }
+
+    path = path ? `${path}.${segment}` : segment;
+  });
+
+  return path;
+}
+
+export function isValidIdentifier(value: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
+}
+
+export function formatDisplayPath(segments: Array<string | number>, includeDollar = false): string {
+  let path = includeDollar ? "$" : "";
+  segments.forEach((segment) => {
+    if (typeof segment === "number") {
+      path += `[${segment}]`;
+      return;
+    }
+
+    if (isValidIdentifier(segment)) {
+      path += path ? `.${segment}` : segment;
+      return;
+    }
+
+    path += `["${segment}"]`;
+  });
+
+  return path;
 }
 
 /**

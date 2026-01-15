@@ -6,6 +6,7 @@ const (
 	 */
 	FieldTypeString      = "string"
 	FieldTypeText        = "text"
+	FieldTypeExpression  = "expression"
 	FieldTypeXML         = "xml"
 	FieldTypeNumber      = "number"
 	FieldTypeBool        = "boolean"
@@ -95,6 +96,7 @@ type TypeOptions struct {
 	Number           *NumberTypeOptions           `json:"number,omitempty"`
 	String           *StringTypeOptions           `json:"string,omitempty"`
 	Text             *TextTypeOptions             `json:"text,omitempty"`
+	Expression       *ExpressionTypeOptions       `json:"expression,omitempty"`
 	Select           *SelectTypeOptions           `json:"select,omitempty"`
 	MultiSelect      *MultiSelectTypeOptions      `json:"multi_select,omitempty"`
 	Integration      *IntegrationTypeOptions      `json:"integration,omitempty"`
@@ -130,6 +132,11 @@ type NumberTypeOptions struct {
  * StringTypeOptions specifies constraints for string fields
  */
 type StringTypeOptions struct {
+	MinLength *int `json:"min_length,omitempty"`
+	MaxLength *int `json:"max_length,omitempty"`
+}
+
+type ExpressionTypeOptions struct {
 	MinLength *int `json:"min_length,omitempty"`
 	MaxLength *int `json:"max_length,omitempty"`
 }

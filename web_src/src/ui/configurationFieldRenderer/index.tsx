@@ -3,6 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/ui/switch";
 import { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
+import { ExpressionFieldRenderer } from "./ExpressionFieldRenderer";
 import { TextFieldRenderer } from "./TextFieldRenderer";
 import { XMLFieldRenderer } from "./XMLFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
@@ -227,6 +228,9 @@ export const ConfigurationFieldRenderer = ({
     switch (field.type) {
       case "string":
         return <StringFieldRenderer {...commonProps} />;
+
+      case "expression":
+        return <ExpressionFieldRenderer {...commonProps} />;
 
       case "text":
         return <TextFieldRenderer {...commonProps} />;

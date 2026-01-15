@@ -33,7 +33,8 @@ message TypeOptions {
   optional DateTimeTypeOptions datetime = 10;
   optional AnyPredicateListTypeOptions any_predicate_list = 11;
   optional StringTypeOptions string = 12;
-  optional TextTypeOptions text = 13;
+  optional ExpressionTypeOptions expression = 13;
+  optional TextTypeOptions text = 14;
 }
 
 message NumberTypeOptions {
@@ -42,6 +43,11 @@ message NumberTypeOptions {
 }
 
 message StringTypeOptions {
+  optional int32 min_length = 1;
+  optional int32 max_length = 2;
+}
+
+message ExpressionTypeOptions {
   optional int32 min_length = 1;
   optional int32 max_length = 2;
 }

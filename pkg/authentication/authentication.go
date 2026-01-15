@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -89,6 +90,7 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/auth/config", a.handleAuthConfig).Methods("GET")
 	if a.passwordLoginEnabled {
 		router.HandleFunc("/login", a.handlePasswordLogin).Methods("POST")
+		router.HandleFunc("/signup", a.handlePasswordSignup).Methods("POST")
 	}
 
 	//
@@ -147,7 +149,7 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		AccessToken: "dev-token-" + provider,
 	}
 
-	account, err := a.FindOrCreateAccountForProvider(mockUser)
+	account, err := a.findOrCreateAccountForProvider(mockUser, allowSignupFromRequest(r))
 
 	if err != nil {
 		if err.Error() == SignupDisabledError {
@@ -182,7 +184,7 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account, err := a.FindOrCreateAccountForProvider(gothUser)
+	account, err := a.findOrCreateAccountForProvider(gothUser, allowSignupFromRequest(r))
 	if err != nil {
 		if err.Error() == SignupDisabledError {
 			http.Error(w, SignupDisabledError, http.StatusForbidden)
@@ -242,8 +244,7 @@ func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, acc
 			return err
 		}
 
-		// TODO: Rollback to member once RBAC is fully available
-		err = a.authService.AssignRole(user.ID.String(), models.RoleOrgOwner, invitation.OrganizationID.String(), models.DomainTypeOrganization)
+		err = a.authService.AssignRole(user.ID.String(), models.RoleOrgViewer, invitation.OrganizationID.String(), models.DomainTypeOrganization)
 		if err != nil {
 			return err
 		}
@@ -298,9 +299,11 @@ func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 	response := struct {
 		Providers            []string `json:"providers"`
 		PasswordLoginEnabled bool     `json:"passwordLoginEnabled"`
+		SignupEnabled        bool     `json:"signupEnabled"`
 	}{
 		Providers:            providerNames,
 		PasswordLoginEnabled: a.passwordLoginEnabled,
+		SignupEnabled:        !a.blockSignup,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -386,7 +389,111 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
+func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
+	if !a.passwordLoginEnabled {
+		http.Error(w, "Password login is not enabled", http.StatusForbidden)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	name := r.FormValue("name")
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+	inviteToken := r.FormValue("invite_token")
+
+	if name == "" || email == "" || password == "" {
+		http.Error(w, "Name, email, and password are required", http.StatusBadRequest)
+		return
+	}
+
+	if a.blockSignup && inviteToken == "" {
+		http.Error(w, SignupDisabledError, http.StatusForbidden)
+		return
+	}
+
+	if inviteToken != "" {
+		inviteLink, err := models.FindInviteLinkByToken(inviteToken)
+		if err != nil || !inviteLink.Enabled {
+			http.Error(w, "invite link not found or disabled", http.StatusForbidden)
+			return
+		}
+	}
+
+	if _, err := models.FindAccountByEmail(email); err == nil {
+		http.Error(w, "Account already exists", http.StatusConflict)
+		return
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	tx := database.Conn().Begin()
+	if tx.Error != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	account, err := models.CreateAccountInTransaction(tx, name, email)
+	if err != nil {
+		tx.Rollback()
+		http.Error(w, "Failed to create account", http.StatusInternalServerError)
+		return
+	}
+
+	passwordHash, err := crypto.HashPassword(password)
+	if err != nil {
+		tx.Rollback()
+		http.Error(w, "Failed to create account", http.StatusInternalServerError)
+		return
+	}
+
+	_, err = models.CreateAccountPasswordAuthInTransaction(tx, account.ID, passwordHash)
+	if err != nil {
+		tx.Rollback()
+		http.Error(w, "Failed to create account", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		http.Error(w, "Failed to create account", http.StatusInternalServerError)
+		return
+	}
+
+	if err := a.acceptPendingInvitations(account); err != nil {
+		log.Errorf("Error accepting pending invitations for %s: %v", account.Email, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "account_token",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(24 * time.Hour.Seconds()),
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	redirectURL := getRedirectURL(r)
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+}
+
 func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {
+	return a.findOrCreateAccountForProvider(gothUser, false)
+}
+
+func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup bool) (*models.Account, error) {
 	account, err := models.FindAccountByProvider(gothUser.Provider, gothUser.UserID)
 
 	if err == nil {
@@ -411,7 +518,7 @@ func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Ac
 		return account, nil
 	}
 
-	if a.blockSignup {
+	if a.blockSignup && !allowSignup {
 		log.Warnf("Signup blocked for email: %s", gothUser.Email)
 		return nil, fmt.Errorf(SignupDisabledError)
 	}
@@ -422,6 +529,30 @@ func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Ac
 	}
 
 	return account, nil
+}
+
+func allowSignupFromRequest(r *http.Request) bool {
+	redirectURL := getRedirectURL(r)
+	if !strings.HasPrefix(redirectURL, "/invite/") {
+		return false
+	}
+
+	parsedURL, err := url.Parse(redirectURL)
+	if err != nil {
+		return false
+	}
+
+	inviteToken := strings.TrimPrefix(parsedURL.Path, "/invite/")
+	if inviteToken == "" || strings.Contains(inviteToken, "/") {
+		return false
+	}
+
+	inviteLink, err := models.FindInviteLinkByToken(inviteToken)
+	if err != nil || !inviteLink.Enabled {
+		return false
+	}
+
+	return true
 }
 
 func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account, gothUser goth.User) error {

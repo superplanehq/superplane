@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { twMerge } from "tailwind-merge";
 import {
+  buildLookupPath,
+  formatDisplayPath,
   flattenForAutocomplete,
   getAutocompleteSuggestions,
   getAutocompleteSuggestionsWithTypes,
   getValueAtPath,
+  isValidIdentifier,
+  parsePathSegments,
 } from "./core";
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"input">, "onChange" | "size"> {
@@ -49,6 +53,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     const [flattenedData, setFlattenedData] = useState<Record<string, string[]>>({});
     const [highlightedValue, setHighlightedValue] = useState<unknown>(undefined);
     const previousWordLength = useRef<number>(0);
+    const previousInputValue = useRef<string>(value);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -71,6 +76,44 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       };
     };
 
+    const isAllowedToSuggest = (text: string, position: number) => {
+      if (!props.startWord || !props.suffix) {
+        return true;
+      }
+
+      const openIndex = text.lastIndexOf(props.startWord, position);
+      if (openIndex === -1) {
+        return false;
+      }
+
+      const closeIndex = text.indexOf(props.suffix, openIndex + 2);
+      if (closeIndex !== -1 && position > closeIndex) {
+        return false;
+      }
+
+      return true;
+    };
+
+    const getNormalizedPath = (rawWord: string) => {
+      return buildLookupPath(parsePathSegments(rawWord));
+    };
+
+    const getPathContext = (rawWord: string, normalizedWord: string) => {
+      if (!normalizedWord) {
+        return { basePath: "", lastKey: "" };
+      }
+
+      if (rawWord.endsWith(".")) {
+        return { basePath: normalizedWord, lastKey: "" };
+      }
+
+      const parts = normalizedWord.split(".");
+      return {
+        basePath: parts.slice(0, -1).join("."),
+        lastKey: parts[parts.length - 1] ?? "",
+      };
+    };
+
     // Helper function to replace word at cursor position
     const replaceWordAtCursor = (text: string, position: number, newWord: string) => {
       const { start, end } = getWordAtCursor(text, position);
@@ -81,14 +124,20 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     const buildFullPath = (suggestion: string) => {
       const cursorPosition = inputRef.current?.selectionStart || 0;
       const { word } = getWordAtCursor(inputValue, cursorPosition);
-      const allPreviousKeys = word.split(".");
-      const withoutLastKey = allPreviousKeys.slice(0, -1).join(".");
+      const normalizedWord = getNormalizedPath(word);
+      const { basePath } = getPathContext(word, normalizedWord);
 
-      return suggestion.startsWith(withoutLastKey)
-        ? suggestion
-        : withoutLastKey
-          ? `${withoutLastKey}.${suggestion}`
-          : suggestion;
+      return suggestion.startsWith(basePath) ? suggestion : basePath ? `${basePath}.${suggestion}` : suggestion;
+    };
+
+    const formatSuggestionLabel = (suggestion: string) => {
+      if (suggestion.match(/\[/)) {
+        return suggestion;
+      }
+      if (isValidIdentifier(suggestion)) {
+        return suggestion;
+      }
+      return `["${suggestion}"]`;
     };
 
     // Flatten the example object when it changes
@@ -104,6 +153,10 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     }, [value]);
 
     useEffect(() => {
+      previousInputValue.current = inputValue;
+    }, [inputValue]);
+
+    useEffect(() => {
       if (!flattenedData || !isFocused) {
         setSuggestions([]);
         setIsOpen(false);
@@ -111,6 +164,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       }
 
       const cursorPosition = inputRef.current?.selectionStart || 0;
+      const prevChar = cursorPosition > 0 ? inputValue[cursorPosition - 1] : "";
       const { word } = getWordAtCursor(inputValue, cursorPosition);
 
       if (word === "") {
@@ -120,18 +174,33 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
         return;
       }
 
-      if (startWord && word === startWord && previousWordLength.current < word.length) {
-        const newValue = replaceWordAtCursor(inputValue, cursorPosition, prefix || "");
-        setInputValue(newValue);
-        onChange?.(newValue);
+      if (prevChar === " ") {
+        previousWordLength.current = word.length;
         setSuggestions([]);
         setIsOpen(false);
+        setHighlightedValue(undefined);
         return;
       }
 
-      const lastKey = word.split(".").slice(-1)[0];
-      const parsedInput = word.split(".").slice(0, -1).join(".");
-      const basePath = parsedInput || "";
+      if (word.startsWith("[") && !word.startsWith("$")) {
+        previousWordLength.current = word.length;
+        setSuggestions([]);
+        setIsOpen(false);
+        setHighlightedValue(undefined);
+        return;
+      }
+
+      if (!isAllowedToSuggest(inputValue, cursorPosition)) {
+        previousWordLength.current = word.length;
+        setSuggestions([]);
+        setIsOpen(false);
+        setHighlightedValue(undefined);
+        return;
+      }
+
+      const normalizedWord = getNormalizedPath(word);
+      const { basePath, lastKey } = getPathContext(word, normalizedWord);
+      const parsedInput = basePath;
 
       const newSuggestions = getAutocompleteSuggestionsWithTypes(
         flattenedData,
@@ -160,6 +229,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       setIsOpen(
         allSuggestions.length > 0 ||
           (allSuggestions.length === 0 && word.endsWith(".")) ||
+          word === "$" ||
           (!exampleObj && word.endsWith(".")),
       );
       const nextHighlightedIndex = showValuePreview && allSuggestions.length > 0 ? 0 : -1;
@@ -180,6 +250,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
         if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
           setIsOpen(false);
           setIsFocused(false);
+          inputRef.current?.blur();
           setHighlightedIndex(-1);
           setHighlightedValue(undefined);
         }
@@ -191,35 +262,72 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const newValue = e.target.value;
+      const cursorPosition = e.target.selectionStart ?? newValue.length;
+      const { word, start } = getWordAtCursor(newValue, cursorPosition);
+      const beforeCursor = newValue.slice(0, cursorPosition);
+      const afterCursor = newValue.slice(cursorPosition);
+      const priorValue = previousInputValue.current;
+      const wasSingleCharInsert = newValue.length === priorValue.length + 1;
+      const insertedChar = wasSingleCharInsert ? newValue[cursorPosition - 1] : "";
+      const isInsertAtCursor = wasSingleCharInsert && priorValue === `${beforeCursor.slice(0, -1)}${afterCursor}`;
+
+      if (
+        startWord &&
+        word === startWord &&
+        previousWordLength.current < word.length &&
+        insertedChar === "{" &&
+        isInsertAtCursor &&
+        beforeCursor.endsWith(startWord) &&
+        !afterCursor.startsWith("}") &&
+        !isAllowedToSuggest(inputValue, cursorPosition)
+      ) {
+        const composedValue = replaceWordAtCursor(newValue, cursorPosition, `${prefix || ""}${suffix || ""}`);
+        setInputValue(composedValue);
+        onChange?.(composedValue);
+        setSuggestions([]);
+        setIsOpen(false);
+        requestAnimationFrame(() => {
+          const cursorTarget = start + (prefix || "").length;
+          inputRef.current?.setSelectionRange(cursorTarget, cursorTarget);
+        });
+        return;
+      }
+
       setInputValue(newValue);
       onChange?.(newValue);
     };
 
     const handleSuggestionClick = (suggestionItem: { suggestion: string; type: string }) => {
       const cursorPosition = inputRef.current?.selectionStart || 0;
-      const { word } = getWordAtCursor(inputValue, cursorPosition);
-
-      const allPreviousKeys = word.split(".");
-      const withoutLastKey = allPreviousKeys.slice(0, -1).join(".");
-      let newValue = suggestionItem.suggestion.startsWith(withoutLastKey)
+      const { word, start } = getWordAtCursor(inputValue, cursorPosition);
+      const normalizedWord = getNormalizedPath(word);
+      const { basePath } = getPathContext(word, normalizedWord);
+      const normalizedPath = suggestionItem.suggestion.startsWith(basePath)
         ? suggestionItem.suggestion
-        : `${withoutLastKey}.${suggestionItem.suggestion}`;
-      const nextSuggestions = getAutocompleteSuggestions(flattenedData, newValue);
+        : basePath
+          ? `${basePath}.${suggestionItem.suggestion}`
+          : suggestionItem.suggestion;
+      const nextSuggestions = getAutocompleteSuggestions(flattenedData, normalizedPath);
       const nextSuggestionsAreArraySuggestions = nextSuggestions.some((suggestion: string) =>
         suggestion.match(/\[\d+\]$/),
       );
-      const isArrayKey = nextSuggestions.length > 0 && nextSuggestionsAreArraySuggestions;
       const isObjectKey = nextSuggestions.length > 0 && !nextSuggestionsAreArraySuggestions;
+      const displayPath = formatDisplayPath(parsePathSegments(normalizedPath), true);
+      let newValue = displayPath;
+      let cursorOffset = displayPath.length;
       if (isObjectKey) {
-        newValue += ".";
-      } else if (!isArrayKey) {
-        newValue = `${newValue}${suffix}`;
+        newValue = `${displayPath}.`;
+        cursorOffset = displayPath.length + 1;
       }
 
       newValue = replaceWordAtCursor(inputValue, cursorPosition, newValue);
       setInputValue(newValue);
       onChange?.(newValue);
       setHighlightedIndex(-1);
+      requestAnimationFrame(() => {
+        const cursorTarget = start + cursorOffset;
+        inputRef.current?.setSelectionRange(cursorTarget, cursorTarget);
+      });
 
       if (nextSuggestions.length === 0) {
         setIsOpen(false);
@@ -390,7 +498,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
                   }
                 }}
               >
-                <span>{suggestionItem.suggestion}</span>
+                <span>{formatSuggestionLabel(suggestionItem.suggestion)}</span>
                 <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">{suggestionItem.type}</span>
               </div>
             ))}

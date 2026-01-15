@@ -277,6 +277,20 @@ CREATE TABLE public.organization_invitations (
 
 
 --
+-- Name: organization_invite_links; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_invite_links (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    token uuid NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
 -- Name: organizations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -676,6 +690,30 @@ ALTER TABLE ONLY public.integrations
 
 ALTER TABLE ONLY public.organization_invitations
     ADD CONSTRAINT organization_invitations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_invite_links organization_invite_links_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invite_links
+    ADD CONSTRAINT organization_invite_links_organization_id_key UNIQUE (organization_id);
+
+
+--
+-- Name: organization_invite_links organization_invite_links_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invite_links
+    ADD CONSTRAINT organization_invite_links_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_invite_links organization_invite_links_token_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invite_links
+    ADD CONSTRAINT organization_invite_links_token_key UNIQUE (token);
 
 
 --
@@ -1275,6 +1313,14 @@ ALTER TABLE ONLY public.organization_invitations
 
 
 --
+-- Name: organization_invite_links organization_invite_links_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invite_links
+    ADD CONSTRAINT organization_invite_links_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: users users_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1466,7 +1512,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260114145029	f
+20260115110107	f
 \.
 
 

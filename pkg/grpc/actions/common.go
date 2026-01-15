@@ -120,6 +120,24 @@ func stringTypeOptionsToProto(opts *configuration.StringTypeOptions) *configpb.S
 	return pbOpts
 }
 
+func expressionTypeOptionsToProto(opts *configuration.ExpressionTypeOptions) *configpb.ExpressionTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.ExpressionTypeOptions{}
+	if opts.MinLength != nil {
+		minLength := int32(*opts.MinLength)
+		pbOpts.MinLength = &minLength
+	}
+	if opts.MaxLength != nil {
+		maxLength := int32(*opts.MaxLength)
+		pbOpts.MaxLength = &maxLength
+	}
+
+	return pbOpts
+}
+
 func textTypeOptionsToProto(opts *configuration.TextTypeOptions) *configpb.TextTypeOptions {
 	if opts == nil {
 		return nil
@@ -291,6 +309,7 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 	return &configpb.TypeOptions{
 		Number:           numberTypeOptionsToProto(opts.Number),
 		String_:          stringTypeOptionsToProto(opts.String),
+		Expression:       expressionTypeOptionsToProto(opts.Expression),
 		Text:             textTypeOptionsToProto(opts.Text),
 		Select:           selectTypeOptionsToProto(opts.Select),
 		MultiSelect:      multiSelectTypeOptionsToProto(opts.MultiSelect),
@@ -393,6 +412,23 @@ func protoToStringTypeOptions(pbOpts *configpb.StringTypeOptions) *configuration
 		opts.MaxLength = &maxLength
 	}
 
+	return opts
+}
+
+func protoToExpressionTypeOptions(pbOpts *configpb.ExpressionTypeOptions) *configuration.ExpressionTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.ExpressionTypeOptions{}
+	if pbOpts.MinLength != nil {
+		minLength := int(*pbOpts.MinLength)
+		opts.MinLength = &minLength
+	}
+	if pbOpts.MaxLength != nil {
+		maxLength := int(*pbOpts.MaxLength)
+		opts.MaxLength = &maxLength
+	}
 	return opts
 }
 
@@ -567,6 +603,7 @@ func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions
 	return &configuration.TypeOptions{
 		Number:           protoToNumberTypeOptions(pbOpts.Number),
 		String:           protoToStringTypeOptions(pbOpts.String_),
+		Expression:       protoToExpressionTypeOptions(pbOpts.Expression),
 		Text:             protoToTextTypeOptions(pbOpts.Text),
 		Select:           protoToSelectTypeOptions(pbOpts.Select),
 		MultiSelect:      protoToMultiSelectTypeOptions(pbOpts.MultiSelect),
@@ -908,6 +945,8 @@ func defaultValueToProto(value any) *string {
 func defaultValueFromProto(fieldType, defaultValue string) any {
 	switch fieldType {
 	case configuration.FieldTypeString:
+		fallthrough
+	case configuration.FieldTypeExpression:
 		fallthrough
 	case configuration.FieldTypeText:
 		fallthrough

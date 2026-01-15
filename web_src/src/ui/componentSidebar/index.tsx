@@ -231,22 +231,31 @@ export const ComponentSidebar = ({
       return autocompleteExampleObj;
     }
 
+    if (!nodeId) {
+      return null;
+    }
+
+    const fallback: Record<string, unknown> = {};
     for (const event of latestEvents) {
       if (event.kind === "execution" && event.originalExecution?.input) {
-        return event.originalExecution.input as Record<string, unknown>;
+        fallback[nodeId] = event.originalExecution.input as Record<string, unknown>;
+        break;
       }
       if (event.kind === "trigger" && event.originalEvent?.data) {
-        return event.originalEvent.data as Record<string, unknown>;
+        fallback[nodeId] = event.originalEvent.data as Record<string, unknown>;
+        break;
       }
       if (event.originalExecution?.input) {
-        return event.originalExecution.input as Record<string, unknown>;
+        fallback[nodeId] = event.originalExecution.input as Record<string, unknown>;
+        break;
       }
       if (event.originalEvent?.data) {
-        return event.originalEvent.data as Record<string, unknown>;
+        fallback[nodeId] = event.originalEvent.data as Record<string, unknown>;
+        break;
       }
     }
-    return null;
-  }, [autocompleteExampleObj, latestEvents]);
+    return Object.keys(fallback).length > 0 ? fallback : null;
+  }, [autocompleteExampleObj, latestEvents, nodeId]);
 
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {
@@ -652,7 +661,7 @@ export const ComponentSidebar = ({
                   appName={appName}
                   appInstallationRef={appInstallationRef}
                   installedApplications={installedApplications}
-                  autocompleteExampleObj={resolvedAutocompleteExampleObj ? { $: resolvedAutocompleteExampleObj } : null}
+                  autocompleteExampleObj={resolvedAutocompleteExampleObj}
                 />
               </TabsContent>
             )}

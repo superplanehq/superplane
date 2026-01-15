@@ -882,6 +882,70 @@
         ]
       }
     },
+    "/api/v1/invite-links/{token}/accept": {
+      "post": {
+        "summary": "Accept an invite link",
+        "description": "Accepts an organization invite link for the authenticated account",
+        "operationId": "Organizations_AcceptInviteLink",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "enabled",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "createdAt",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          },
+          {
+            "name": "updatedAt",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "summary": "Get current user",
@@ -1360,6 +1424,108 @@
           },
           {
             "name": "invitationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/api/v1/organizations/{id}/invite-link": {
+      "get": {
+        "summary": "Get an organization invite link",
+        "description": "Returns the invite link for an organization",
+        "operationId": "Organizations_GetInviteLink",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsGetInviteLinkResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "patch": {
+        "summary": "Update an organization invite link",
+        "description": "Enables or disables the invite link for an organization",
+        "operationId": "Organizations_UpdateInviteLink",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateInviteLinkResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateInviteLinkBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/api/v1/organizations/{id}/invite-link/reset": {
+      "post": {
+        "summary": "Reset an organization invite link",
+        "description": "Generates a new invite link token for an organization",
+        "operationId": "Organizations_ResetInviteLink",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsResetInviteLinkResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -3244,6 +3410,19 @@
         }
       }
     },
+    "ConfigurationExpressionTypeOptions": {
+      "type": "object",
+      "properties": {
+        "minLength": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxLength": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
     "ConfigurationField": {
       "type": "object",
       "properties": {
@@ -3491,6 +3670,9 @@
         },
         "string": {
           "$ref": "#/definitions/ConfigurationStringTypeOptions"
+        },
+        "expression": {
+          "$ref": "#/definitions/ConfigurationExpressionTypeOptions"
         },
         "text": {
           "$ref": "#/definitions/ConfigurationTextTypeOptions"
@@ -4061,6 +4243,14 @@
         }
       }
     },
+    "OrganizationsGetInviteLinkResponse": {
+      "type": "object",
+      "properties": {
+        "inviteLink": {
+          "$ref": "#/definitions/OrganizationsInviteLink"
+        }
+      }
+    },
     "OrganizationsInstallApplicationBody": {
       "type": "object",
       "properties": {
@@ -4099,6 +4289,31 @@
           "type": "string"
         },
         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "OrganizationsInviteLink": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
           "type": "string",
           "format": "date-time"
         }
@@ -4164,6 +4379,14 @@
     "OrganizationsRemoveUserResponse": {
       "type": "object"
     },
+    "OrganizationsResetInviteLinkResponse": {
+      "type": "object",
+      "properties": {
+        "inviteLink": {
+          "$ref": "#/definitions/OrganizationsInviteLink"
+        }
+      }
+    },
     "OrganizationsUninstallApplicationResponse": {
       "type": "object"
     },
@@ -4180,6 +4403,22 @@
       "properties": {
         "installation": {
           "$ref": "#/definitions/OrganizationsAppInstallation"
+        }
+      }
+    },
+    "OrganizationsUpdateInviteLinkBody": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "OrganizationsUpdateInviteLinkResponse": {
+      "type": "object",
+      "properties": {
+        "inviteLink": {
+          "$ref": "#/definitions/OrganizationsInviteLink"
         }
       }
     },

@@ -32,8 +32,8 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       value={currentValue}
       onChange={(nextValue) => onChange(nextValue || undefined)}
       placeholder={field.placeholder || ""}
-      startWord="{"
-      prefix="{{ $."
+      startWord="{{"
+      prefix="{{ $"
       suffix=" }}"
       inputSize="md"
       showValuePreview

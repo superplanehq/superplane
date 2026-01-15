@@ -18,10 +18,168 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // OrganizationAPIService OrganizationAPI service
 type OrganizationAPIService service
+
+type ApiOrganizationsAcceptInviteLinkRequest struct {
+	ctx            context.Context
+	ApiService     *OrganizationAPIService
+	token          string
+	id             *string
+	organizationId *string
+	enabled        *bool
+	createdAt      *time.Time
+	updatedAt      *time.Time
+}
+
+func (r ApiOrganizationsAcceptInviteLinkRequest) Id(id string) ApiOrganizationsAcceptInviteLinkRequest {
+	r.id = &id
+	return r
+}
+
+func (r ApiOrganizationsAcceptInviteLinkRequest) OrganizationId(organizationId string) ApiOrganizationsAcceptInviteLinkRequest {
+	r.organizationId = &organizationId
+	return r
+}
+
+func (r ApiOrganizationsAcceptInviteLinkRequest) Enabled(enabled bool) ApiOrganizationsAcceptInviteLinkRequest {
+	r.enabled = &enabled
+	return r
+}
+
+func (r ApiOrganizationsAcceptInviteLinkRequest) CreatedAt(createdAt time.Time) ApiOrganizationsAcceptInviteLinkRequest {
+	r.createdAt = &createdAt
+	return r
+}
+
+func (r ApiOrganizationsAcceptInviteLinkRequest) UpdatedAt(updatedAt time.Time) ApiOrganizationsAcceptInviteLinkRequest {
+	r.updatedAt = &updatedAt
+	return r
+}
+
+func (r ApiOrganizationsAcceptInviteLinkRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.OrganizationsAcceptInviteLinkExecute(r)
+}
+
+/*
+OrganizationsAcceptInviteLink Accept an invite link
+
+Accepts an organization invite link for the authenticated account
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param token
+	@return ApiOrganizationsAcceptInviteLinkRequest
+*/
+func (a *OrganizationAPIService) OrganizationsAcceptInviteLink(ctx context.Context, token string) ApiOrganizationsAcceptInviteLinkRequest {
+	return ApiOrganizationsAcceptInviteLinkRequest{
+		ApiService: a,
+		ctx:        ctx,
+		token:      token,
+	}
+}
+
+// Execute executes the request
+//
+//	@return map[string]interface{}
+func (a *OrganizationAPIService) OrganizationsAcceptInviteLinkExecute(r ApiOrganizationsAcceptInviteLinkRequest) (map[string]interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsAcceptInviteLink")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/invite-links/{token}/accept"
+	localVarPath = strings.Replace(localVarPath, "{"+"token"+"}", url.PathEscape(parameterValueToString(r.token, "token")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.id != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "id", r.id, "", "")
+	}
+	if r.organizationId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "organizationId", r.organizationId, "", "")
+	}
+	if r.enabled != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "enabled", r.enabled, "", "")
+	}
+	if r.createdAt != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "createdAt", r.createdAt, "", "")
+	}
+	if r.updatedAt != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "updatedAt", r.updatedAt, "", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
 
 type ApiOrganizationsCreateInvitationRequest struct {
 	ctx        context.Context
@@ -418,6 +576,118 @@ func (a *OrganizationAPIService) OrganizationsDescribeOrganizationExecute(r ApiO
 	}
 
 	localVarPath := localBasePath + "/api/v1/organizations/{id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiOrganizationsGetInviteLinkRequest struct {
+	ctx        context.Context
+	ApiService *OrganizationAPIService
+	id         string
+}
+
+func (r ApiOrganizationsGetInviteLinkRequest) Execute() (*OrganizationsGetInviteLinkResponse, *http.Response, error) {
+	return r.ApiService.OrganizationsGetInviteLinkExecute(r)
+}
+
+/*
+OrganizationsGetInviteLink Get an organization invite link
+
+Returns the invite link for an organization
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiOrganizationsGetInviteLinkRequest
+*/
+func (a *OrganizationAPIService) OrganizationsGetInviteLink(ctx context.Context, id string) ApiOrganizationsGetInviteLinkRequest {
+	return ApiOrganizationsGetInviteLinkRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return OrganizationsGetInviteLinkResponse
+func (a *OrganizationAPIService) OrganizationsGetInviteLinkExecute(r ApiOrganizationsGetInviteLinkRequest) (*OrganizationsGetInviteLinkResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *OrganizationsGetInviteLinkResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsGetInviteLink")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/invite-link"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -1190,6 +1460,118 @@ func (a *OrganizationAPIService) OrganizationsRemoveUserExecute(r ApiOrganizatio
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiOrganizationsResetInviteLinkRequest struct {
+	ctx        context.Context
+	ApiService *OrganizationAPIService
+	id         string
+}
+
+func (r ApiOrganizationsResetInviteLinkRequest) Execute() (*OrganizationsResetInviteLinkResponse, *http.Response, error) {
+	return r.ApiService.OrganizationsResetInviteLinkExecute(r)
+}
+
+/*
+OrganizationsResetInviteLink Reset an organization invite link
+
+Generates a new invite link token for an organization
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiOrganizationsResetInviteLinkRequest
+*/
+func (a *OrganizationAPIService) OrganizationsResetInviteLink(ctx context.Context, id string) ApiOrganizationsResetInviteLinkRequest {
+	return ApiOrganizationsResetInviteLinkRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return OrganizationsResetInviteLinkResponse
+func (a *OrganizationAPIService) OrganizationsResetInviteLinkExecute(r ApiOrganizationsResetInviteLinkRequest) (*OrganizationsResetInviteLinkResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *OrganizationsResetInviteLinkResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsResetInviteLink")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/invite-link/reset"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiOrganizationsUninstallApplicationRequest struct {
 	ctx            context.Context
 	ApiService     *OrganizationAPIService
@@ -1361,6 +1743,129 @@ func (a *OrganizationAPIService) OrganizationsUpdateApplicationExecute(r ApiOrga
 	localVarPath := localBasePath + "/api/v1/organizations/{id}/applications/{installationId}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"installationId"+"}", url.PathEscape(parameterValueToString(r.installationId, "installationId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiOrganizationsUpdateInviteLinkRequest struct {
+	ctx        context.Context
+	ApiService *OrganizationAPIService
+	id         string
+	body       *OrganizationsUpdateInviteLinkBody
+}
+
+func (r ApiOrganizationsUpdateInviteLinkRequest) Body(body OrganizationsUpdateInviteLinkBody) ApiOrganizationsUpdateInviteLinkRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiOrganizationsUpdateInviteLinkRequest) Execute() (*OrganizationsUpdateInviteLinkResponse, *http.Response, error) {
+	return r.ApiService.OrganizationsUpdateInviteLinkExecute(r)
+}
+
+/*
+OrganizationsUpdateInviteLink Update an organization invite link
+
+Enables or disables the invite link for an organization
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiOrganizationsUpdateInviteLinkRequest
+*/
+func (a *OrganizationAPIService) OrganizationsUpdateInviteLink(ctx context.Context, id string) ApiOrganizationsUpdateInviteLinkRequest {
+	return ApiOrganizationsUpdateInviteLinkRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return OrganizationsUpdateInviteLinkResponse
+func (a *OrganizationAPIService) OrganizationsUpdateInviteLinkExecute(r ApiOrganizationsUpdateInviteLinkRequest) (*OrganizationsUpdateInviteLinkResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPatch
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *OrganizationsUpdateInviteLinkResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsUpdateInviteLink")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/invite-link"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

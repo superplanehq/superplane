@@ -98,6 +98,7 @@ func TruncateTables() error {
 			users,
 			organizations,
 			organization_invitations,
+			organization_invite_links,
 			app_installations,
 			app_installation_secrets,
 			app_installation_requests,

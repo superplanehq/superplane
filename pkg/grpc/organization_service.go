@@ -7,6 +7,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type OrganizationService struct {
@@ -65,6 +69,30 @@ func (s *OrganizationService) RemoveInvitation(ctx context.Context, req *pb.Remo
 	return organizations.RemoveInvitation(ctx, s.authorizationService, orgID, req.InvitationId)
 }
 
+func (s *OrganizationService) GetInviteLink(ctx context.Context, req *pb.GetInviteLinkRequest) (*pb.GetInviteLinkResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.GetInviteLink(orgID)
+}
+
+func (s *OrganizationService) UpdateInviteLink(ctx context.Context, req *pb.UpdateInviteLinkRequest) (*pb.UpdateInviteLinkResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateInviteLink(orgID, req.Enabled)
+}
+
+func (s *OrganizationService) ResetInviteLink(ctx context.Context, req *pb.ResetInviteLinkRequest) (*pb.ResetInviteLinkResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ResetInviteLink(orgID)
+}
+
+func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {
+	accountID, err := accountIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return organizations.AcceptInviteLink(ctx, s.authorizationService, accountID, req.Token)
+}
+
 func (s *OrganizationService) ListApplications(ctx context.Context, req *pb.ListApplicationsRequest) (*pb.ListApplicationsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.ListApplications(ctx, s.registry, orgID)
@@ -110,4 +138,18 @@ func (s *OrganizationService) UpdateApplication(ctx context.Context, req *pb.Upd
 func (s *OrganizationService) UninstallApplication(ctx context.Context, req *pb.UninstallApplicationRequest) (*pb.UninstallApplicationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.UninstallApplication(ctx, orgID, req.InstallationId)
+}
+
+func accountIDFromContext(ctx context.Context) (string, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "", status.Error(codes.Unauthenticated, "account not found")
+	}
+
+	accountMeta := md.Get("x-account-id")
+	if len(accountMeta) == 0 || accountMeta[0] == "" {
+		return "", status.Error(codes.Unauthenticated, "account not found")
+	}
+
+	return accountMeta[0], nil
 }

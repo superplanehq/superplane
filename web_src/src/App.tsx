@@ -10,7 +10,6 @@ import AuthGuard from "./components/AuthGuard";
 import { AccountProvider } from "./contexts/AccountContext";
 import { useAccount } from "./contexts/AccountContext";
 import { isCustomComponentsEnabled } from "./lib/env";
-import EmailLogin from "./pages/auth/EmailLogin";
 import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
@@ -20,6 +19,7 @@ import HomePage from "./pages/home";
 import NodeRunPage from "./pages/node-run";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
+import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -56,14 +56,16 @@ function AppRouter() {
     <BrowserRouter>
       <SetupGuard>
         <Routes>
-          {/* Auth routes */}
+          {/* public routes */}
           <Route path="login" element={<Login />} />
-          <Route path="login/email" element={<EmailLogin />} />
           <Route path="create" element={<OrganizationCreate />} />
           <Route path="setup" element={<OwnerSetup />} />
 
           {/* Organization selection and creation */}
-          <Route path="" element={<OrganizationSelect />} />
+          <Route path="" element={withAuthOnly(OrganizationSelect)} />
+
+          {/* Invite link acceptance */}
+          <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
 
           {/* Organization-scoped protected routes */}
           <Route path=":organizationId">
