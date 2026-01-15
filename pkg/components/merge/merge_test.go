@@ -44,7 +44,7 @@ func Test_Merge_StopIfExpression(t *testing.T) {
 
 	steps.CreateWorkflow()
 	steps.SetMergeConfiguration(map[string]any{
-		"stopIfExpression": "$.result == \"fail\"",
+		"stopIfExpression": "$[\"process-1\"].result == \"fail\"",
 	})
 
 	steps.CreateEventsWithData(
@@ -75,12 +75,12 @@ func Test_Merge_StopIfExpression_SourceNodeReference(t *testing.T) {
 
 	steps.CreateWorkflow()
 	steps.SetMergeConfiguration(map[string]any{
-		"stopIfExpression": "$[\"process-1\"].data.result == \"fail\"",
+		"stopIfExpression": "$[\"process-1\"].result == \"fail\"",
 	})
 
 	steps.CreateEventsWithData(
-		map[string]any{"data": map[string]any{"result": "fail"}},
-		map[string]any{"data": map[string]any{"result": "ok"}},
+		map[string]any{"result": "fail"},
+		map[string]any{"result": "ok"},
 	)
 	steps.CreateQueueItems()
 
@@ -126,19 +126,17 @@ func TestMerge_ExpressionEnv_UsesContextEnv(t *testing.T) {
 			return map[string]any{
 				"$": map[string]any{
 					"other-node": map[string]any{
-						"data": map[string]any{
-							"result": "ok",
-						},
+						"result": "ok",
 					},
 				},
 			}, nil
 		},
 	}
 
-	env, err := expressionEnv(ctx, "$[\"other-node\"].data.result == \"ok\"")
+	env, err := expressionEnv(ctx, "$[\"other-node\"].result == \"ok\"")
 	require.NoError(t, err)
 
-	vm, err := expr.Compile("$[\"other-node\"].data.result == \"ok\"", expr.Env(env), expr.AsBool())
+	vm, err := expr.Compile("$[\"other-node\"].result == \"ok\"", expr.Env(env), expr.AsBool())
 	require.NoError(t, err)
 
 	out, err := expr.Run(vm, env)
