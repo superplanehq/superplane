@@ -23,7 +23,7 @@ export const timeGateMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: "clock",
-      headerColor: "bg-white",
+      headerColor: "",
       iconColor: getColorClass("black"),
       iconBackground: "bg-white",
       collapsed: node.isCollapsed,
