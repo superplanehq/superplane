@@ -165,7 +165,7 @@ export const useRole = (organizationId: string, roleName: string) => {
   });
 };
 
-export const useOrganizationInviteLink = (organizationId: string) => {
+export const useOrganizationInviteLink = (organizationId: string, enabled = true) => {
   return useQuery({
     queryKey: organizationKeys.inviteLink(organizationId),
     queryFn: async () => {
@@ -178,7 +178,7 @@ export const useOrganizationInviteLink = (organizationId: string) => {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!organizationId,
+    enabled: !!organizationId && enabled,
   });
 };
 

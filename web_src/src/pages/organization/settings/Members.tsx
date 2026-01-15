@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useAccount } from "@/contexts/AccountContext";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Badge } from "../../../components/Badge/badge";
 import {
@@ -44,6 +45,7 @@ interface MembersProps {
 }
 
 export function Members({ organizationId }: MembersProps) {
+  const { account } = useAccount();
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Member | null;
     direction: "asc" | "desc";
@@ -57,11 +59,26 @@ export function Members({ organizationId }: MembersProps) {
     isLoading: loadingRoles,
     error: rolesError,
   } = useOrganizationRoles(organizationId);
+  const currentUserRoleNames = useMemo(() => {
+    if (!account?.email) {
+      return [];
+    }
+
+    const matchedUser = users.find(
+      (user) => user.metadata?.email?.toLowerCase() === account.email.toLowerCase(),
+    );
+    return matchedUser?.status?.roleAssignments?.map((role) => role.roleName) ?? [];
+  }, [account?.email, users]);
+
+  const canManageInviteLink = currentUserRoleNames.some(
+    (roleName) => roleName === "org_owner" || roleName === "org_admin",
+  );
+
   const {
     data: inviteLink,
     isLoading: loadingInviteLink,
     error: inviteLinkError,
-  } = useOrganizationInviteLink(organizationId);
+  } = useOrganizationInviteLink(organizationId, canManageInviteLink);
 
   // Mutations for role assignment and user removal
   const assignRoleMutation = useAssignRole(organizationId);
@@ -89,7 +106,7 @@ export function Members({ organizationId }: MembersProps) {
   }, [inviteLink?.token]);
 
   const inviteLinkErrorMessage = inviteLinkError ? getApiErrorMessage(inviteLinkError) : null;
-  const showInviteLinkSection = inviteLinkErrorMessage !== "Not found";
+  const showInviteLinkSection = canManageInviteLink && inviteLinkErrorMessage !== "Not found";
   const inviteLinkEnabled = inviteLink?.enabled ?? false;
   const inviteLinkBusy = updateInviteLinkMutation.isPending || resetInviteLinkMutation.isPending;
 
@@ -231,7 +248,7 @@ export function Members({ organizationId }: MembersProps) {
         </div>
       )}
 
-      {showInviteLinkSection && (
+      {showInviteLinkSection ? (
         <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
           <div className="flex items-start justify-between gap-6">
             <div>
@@ -292,6 +309,15 @@ export function Members({ organizationId }: MembersProps) {
               </Button>
             </div>
           )}
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+          <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">
+            Invite link to add members
+          </Text>
+          <Text className="text-sm text-gray-500 dark:text-gray-400">
+            Reach out to an organization owner or admin to invite new members.
+          </Text>
         </div>
       )}
 
