@@ -297,9 +297,9 @@ const OwnerSetup: React.FC = () => {
             )}
 
             <div className="text-left">
-              <h4 className="text-lg font-semibold text-gray-800 dark:text-white">Configure SMTP?</h4>
+              <h4 className="text-lg font-semibold text-gray-800 dark:text-white">Set up email delivery?</h4>
               <Text className="text-gray-500 dark:text-gray-400">
-                You can set up email delivery now or skip and configure it later.
+                Configure SMTP now to receive notifications. You can skip and set it up later.
               </Text>
             </div>
 
@@ -308,7 +308,7 @@ const OwnerSetup: React.FC = () => {
                 Set up SMTP
               </Button>
               <Button type="button" className="w-full" variant="secondary" disabled={loading} onClick={handleSkipSMTP}>
-                Skip for now
+                Do this later
               </Button>
             </div>
           </div>
