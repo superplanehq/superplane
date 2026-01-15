@@ -128,3 +128,21 @@ func (s *PanicableComponent) Cancel(ctx core.ExecutionContext) (err error) {
 	}()
 	return s.underlying.Cancel(ctx)
 }
+
+func (s *PanicableComponent) OnAppMessage(ctx core.AppMessageContext) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ctx.Logger.Errorf("Component %s panicked in OnAppMessage(): %v\nStack: %s",
+				s.underlying.Name(), r, debug.Stack())
+			err = fmt.Errorf("component %s panicked in OnAppMessage(): %v",
+				s.underlying.Name(), r)
+		}
+	}()
+
+	appComponent, ok := s.underlying.(core.AppComponent)
+	if !ok {
+		return fmt.Errorf("component %s is not an app component", s.underlying.Name())
+	}
+
+	return appComponent.OnAppMessage(ctx)
+}

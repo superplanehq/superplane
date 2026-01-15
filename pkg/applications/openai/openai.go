@@ -58,6 +58,10 @@ func (o *OpenAI) Triggers() []core.Trigger {
 	return []core.Trigger{}
 }
 
+func (o *OpenAI) InstallationInstructions() string {
+	return ""
+}
+
 func (o *OpenAI) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {

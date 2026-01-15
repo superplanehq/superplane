@@ -19,6 +19,7 @@ func (p *panickingApplication) Name() string                         { return "p
 func (p *panickingApplication) Label() string                        { return "Panicking App" }
 func (p *panickingApplication) Icon() string                         { return "icon" }
 func (p *panickingApplication) Description() string                  { return "description" }
+func (p *panickingApplication) InstallationInstructions() string     { return "instructions" }
 func (p *panickingApplication) Configuration() []configuration.Field { return nil }
 func (p *panickingApplication) Components() []core.Component         { return nil }
 func (p *panickingApplication) Triggers() []core.Trigger             { return nil }
