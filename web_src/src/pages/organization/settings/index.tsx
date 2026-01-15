@@ -169,7 +169,7 @@ export function OrganizationSettings() {
     },
     integrations: {
       title: "Integrations",
-      description: "Connect external tools and services to extend Superplane.",
+      description: "Connect external tools and services to extend SuperPlane.",
     },
     applications: {
       title: "Applications",
@@ -197,7 +197,7 @@ export function OrganizationSettings() {
               className="w-7 h-7"
               aria-label="Go to Canvases"
             >
-              <img src={SuperplaneLogo} alt="Superplane" className="w-7 h-7 object-contain" />
+              <img src={SuperplaneLogo} alt="SuperPlane" className="w-7 h-7 object-contain" />
             </button>
           </SidebarSection>
           <SidebarSection className="p-4 border-t border-gray-300">
