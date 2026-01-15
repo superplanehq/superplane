@@ -151,6 +151,7 @@ func (p *PagerDuty) Configuration() []configuration.Field {
 func (p *PagerDuty) Components() []core.Component {
 	return []core.Component{
 		&CreateIncident{},
+		&UpdateIncident{},
 	}
 }
 
