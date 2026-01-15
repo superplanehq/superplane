@@ -193,7 +193,7 @@ export const useMonacoExpressionAutocomplete = ({
                   ? `${basePath}.${suggestionItem.suggestion}`
                   : suggestionItem.suggestion;
               const nextSuggestions = getAutocompleteSuggestions(flattenedData, normalizedPath);
-              const nextSuggestionsAreArraySuggestions = nextSuggestions.some((suggestion) =>
+              const nextSuggestionsAreArraySuggestions = nextSuggestions.some((suggestion: string) =>
                 suggestion.match(/\[\d+\]$/),
               );
               const isObjectKey = nextSuggestions.length > 0 && !nextSuggestionsAreArraySuggestions;
