@@ -139,7 +139,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		node, err := workflow.FindNode("node-1")
 		require.NoError(t, err)
 		node.Configuration = datatypes.NewJSONType(map[string]any{
-			"customName": "Run: {{ $[\"node-1\"].data.message }}",
+			"customName": "Run: {{ $[\"node-1\"].message }}",
 		})
 		require.NoError(t, database.Conn().Save(node).Error)
 
