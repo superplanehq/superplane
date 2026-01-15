@@ -17,10 +17,10 @@ type QueryPrometheus struct{}
 type QueryPrometheusSpec struct {
 	Query   string  `json:"query"`
 	Dataset string  `json:"dataset"`
-	Type    string  `json:"type"` // "instant" or "range"
+	Type    string  `json:"type"`            // "instant" or "range"
 	Start   *string `json:"start,omitempty"` // For range queries, e.g., "now-5m"
 	End     *string `json:"end,omitempty"`   // For range queries, e.g., "now"
-	Step    *string `json:"step,omitempty"` // For range queries, e.g., "15s"
+	Step    *string `json:"step,omitempty"`  // For range queries, e.g., "15s"
 }
 
 func (q *QueryPrometheus) Name() string {

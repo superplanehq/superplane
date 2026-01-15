@@ -79,8 +79,8 @@ type PrometheusResponse struct {
 }
 
 type PrometheusResponseData struct {
-	ResultType string                      `json:"resultType"`
-	Result     []PrometheusQueryResult    `json:"result"`
+	ResultType string                  `json:"resultType"`
+	Result     []PrometheusQueryResult `json:"result"`
 }
 
 type PrometheusQueryResult struct {
