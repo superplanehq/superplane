@@ -111,9 +111,7 @@ func (t *OnIssueStatus) Setup(ctx core.TriggerContext) error {
 	//
 	// Always schedule the next and save the next trigger in the metadata.
 	//
-	timeUntil := time.Until(*nextTrigger)
-	ctx.Logger.Infof("Scheduling first issue check in %v (at %v)", timeUntil, nextTrigger.Format(time.RFC3339))
-	err = ctx.Requests.ScheduleActionCall("checkIssues", map[string]any{}, timeUntil)
+	err = ctx.Requests.ScheduleActionCall("checkIssues", map[string]any{}, time.Until(*nextTrigger))
 	if err != nil {
 		return fmt.Errorf("error scheduling action call: %w", err)
 	}
@@ -144,8 +142,6 @@ func (t *OnIssueStatus) HandleAction(ctx core.TriggerActionContext) (map[string]
 }
 
 func (t *OnIssueStatus) checkIssues(ctx core.TriggerActionContext) error {
-	ctx.Logger.Infof("Starting issue status check")
-
 	config := OnIssueStatusConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
@@ -156,33 +152,28 @@ func (t *OnIssueStatus) checkIssues(ctx core.TriggerActionContext) error {
 		return fmt.Errorf("minutesInterval is required")
 	}
 
-	// Create dash0 client
 	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("error creating dash0 client: %w", err)
 	}
 
-	// Execute Prometheus query to check for issues
 	query := `{otel_metric_name="dash0.issue.status"} >= 1`
 	dataset := "default"
 
-	ctx.Logger.Infof("Executing Prometheus query: %s (dataset: %s)", query, dataset)
 	response, err := client.ExecutePrometheusInstantQuery(query, dataset)
 	if err != nil {
 		ctx.Logger.Warnf("Error executing Prometheus query: %v", err)
 		// Continue to reschedule even if query fails
 	} else {
-		ctx.Logger.Infof("Query executed successfully, checking results")
 		// The response["data"] is a PrometheusResponseData struct, not a map
 		// We need to convert it to access the result field
 		dataValue := response["data"]
-		
-		// Try to convert to map via JSON marshaling/unmarshaling
 		var dataMap map[string]any
+
 		if dataMapValue, ok := dataValue.(map[string]any); ok {
 			dataMap = dataMapValue
 		} else {
-			// If it's a struct, we need to marshal and unmarshal it
+			// If it's a struct, marshal and unmarshal it to convert to map
 			jsonBytes, marshalErr := json.Marshal(dataValue)
 			if marshalErr != nil {
 				ctx.Logger.Warnf("Failed to marshal response data: %v", marshalErr)
@@ -193,31 +184,26 @@ func (t *OnIssueStatus) checkIssues(ctx core.TriggerActionContext) error {
 				}
 			}
 		}
-		
+
 		if dataMap != nil {
 			result, ok := dataMap["result"].([]interface{})
 			if !ok {
 				ctx.Logger.Warnf("Unexpected response format: result is not an array, got %T", dataMap["result"])
-			} else {
-				ctx.Logger.Infof("Query returned %d results", len(result))
-				if len(result) > 0 {
-					// Issues detected - emit event
-					payload := map[string]any{
-						"query":   query,
-						"dataset": dataset,
-						"results": result,
-						"count":   len(result),
-					}
+			} else if len(result) > 0 {
+				// Issues detected - emit event
+				payload := map[string]any{
+					"query":   query,
+					"dataset": dataset,
+					"results": result,
+					"count":   len(result),
+				}
 
-					err = ctx.Events.Emit("dash0.issue.detected", payload)
-					if err != nil {
-						ctx.Logger.Errorf("Error emitting event: %v", err)
-						// Continue to reschedule even if emit fails
-					} else {
-						ctx.Logger.Infof("Issues detected: %d issues found, event emitted", len(result))
-					}
+				err = ctx.Events.Emit("dash0.issue.detected", payload)
+				if err != nil {
+					ctx.Logger.Errorf("Error emitting event: %v", err)
+					// Continue to reschedule even if emit fails
 				} else {
-					ctx.Logger.Infof("No issues detected (query returned empty results)")
+					ctx.Logger.Infof("Issues detected: %d issue(s) found", len(result))
 				}
 			}
 		}
@@ -227,7 +213,6 @@ func (t *OnIssueStatus) checkIssues(ctx core.TriggerActionContext) error {
 	var existingMetadata OnIssueStatusMetadata
 	err = mapstructure.Decode(ctx.Metadata.Get(), &existingMetadata)
 	if err != nil {
-		ctx.Logger.Warnf("Failed to parse existing metadata, using defaults: %v", err)
 		// Use current time as reference if metadata is invalid
 		nowStr := time.Now().Format(time.RFC3339)
 		existingMetadata = OnIssueStatusMetadata{
@@ -241,16 +226,12 @@ func (t *OnIssueStatus) checkIssues(ctx core.TriggerActionContext) error {
 		return fmt.Errorf("error calculating next trigger: %w", err)
 	}
 
-	timeUntil := time.Until(*nextTrigger)
-	ctx.Logger.Infof("Rescheduling next issue check in %v (at %v)", timeUntil, nextTrigger.Format(time.RFC3339))
-	err = ctx.Requests.ScheduleActionCall("checkIssues", map[string]any{}, timeUntil)
+	err = ctx.Requests.ScheduleActionCall("checkIssues", map[string]any{}, time.Until(*nextTrigger))
 	if err != nil {
 		return fmt.Errorf("error rescheduling action call: %w", err)
 	}
 
 	formatted := nextTrigger.Format(time.RFC3339)
-	ctx.Logger.Infof("Next issue check scheduled at: %v", formatted)
-
 	return ctx.Metadata.Set(OnIssueStatusMetadata{
 		NextTrigger:   &formatted,
 		ReferenceTime: existingMetadata.ReferenceTime,
