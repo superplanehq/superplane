@@ -65,6 +65,7 @@ func ListAppSubscriptions(tx *gorm.DB, installationID uuid.UUID) ([]NodeSubscrip
 		Select("wn.workflow_id as workflow_id, wn.node_id as node_id, wn.type as node_type, wn.ref as node_ref, s.configuration as configuration").
 		Joins("INNER JOIN workflow_nodes AS wn ON wn.workflow_id = s.workflow_id AND wn.node_id = s.node_id").
 		Where("s.installation_id = ?", installationID).
+		Where("wn.deleted_at IS NULL").
 		Scan(&subscriptions).
 		Error
 

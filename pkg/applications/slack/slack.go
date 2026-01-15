@@ -271,8 +271,9 @@ func (s *Slack) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 type EventPayload struct {
-	Type  string         `json:"type"`
-	Event map[string]any `json:"event"`
+	Type      string         `json:"type"`
+	Event     map[string]any `json:"event"`
+	Challenge string         `json:"challenge"`
 }
 
 func (s *Slack) handleEvent(ctx core.HTTPRequestContext, body []byte) {
@@ -285,7 +286,7 @@ func (s *Slack) handleEvent(ctx core.HTTPRequestContext, body []byte) {
 	}
 
 	if payload.Type == "url_verification" {
-		s.handleChallenge(ctx, payload.Event)
+		s.handleChallenge(ctx, payload)
 		return
 	}
 
@@ -320,19 +321,21 @@ func (s *Slack) handleEvent(ctx core.HTTPRequestContext, body []byte) {
 	}
 }
 
-func (s *Slack) handleChallenge(ctx core.HTTPRequestContext, event any) {
-	eventMap, ok := event.(map[string]any)
-	if !ok {
+func (s *Slack) handleChallenge(ctx core.HTTPRequestContext, payload EventPayload) {
+	if payload.Challenge == "" {
+		ctx.Logger.Errorf("missing challenge in event payload")
+		ctx.Response.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	challenge, ok := eventMap["challenge"].(string)
-	if !ok {
+	challenge := payload.Challenge
+	ctx.Response.WriteHeader(http.StatusOK)
+	_, err := ctx.Response.Write([]byte(challenge))
+	if err != nil {
+		ctx.Logger.Errorf("error writing challenge: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	ctx.Response.WriteHeader(200)
-	ctx.Response.Write([]byte(challenge))
 }
 
 func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {

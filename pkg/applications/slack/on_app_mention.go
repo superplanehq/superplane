@@ -1,7 +1,6 @@
 package slack
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -74,23 +73,25 @@ func (t *OnAppMention) Setup(ctx core.TriggerContext) error {
 	//
 	// Validate channel configuration
 	//
-	var config SendTextMessageConfiguration
+	var config OnAppMentionConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.Channel == "" {
-		return errors.New("channel is required")
-	}
+	//
+	// If channel is defined, validate it.
+	//
+	var channelInfo *ChannelInfo
+	if config.Channel != "" {
+		client, err := NewClient(ctx.AppInstallation)
+		if err != nil {
+			return fmt.Errorf("failed to create Slack client: %w", err)
+		}
 
-	client, err := NewClient(ctx.AppInstallation)
-	if err != nil {
-		return fmt.Errorf("failed to create Slack client: %w", err)
-	}
-
-	channelInfo, err := client.GetChannelInfo(config.Channel)
-	if err != nil {
-		return fmt.Errorf("channel validation failed: %w", err)
+		channelInfo, err = client.GetChannelInfo(config.Channel)
+		if err != nil {
+			return fmt.Errorf("channel validation failed: %w", err)
+		}
 	}
 
 	subscriptionID, err := ctx.AppInstallation.Subscribe(SubscriptionConfiguration{
@@ -102,13 +103,16 @@ func (t *OnAppMention) Setup(ctx core.TriggerContext) error {
 	}
 
 	s := subscriptionID.String()
-	return ctx.Metadata.Set(AppMentionMetadata{
-		AppSubscriptionID: &s,
-		Channel: &ChannelMetadata{
+	newMetadata := AppMentionMetadata{AppSubscriptionID: &s}
+
+	if channelInfo != nil {
+		newMetadata.Channel = &ChannelMetadata{
 			ID:   channelInfo.ID,
 			Name: channelInfo.Name,
-		},
-	})
+		}
+	}
+
+	return ctx.Metadata.Set(newMetadata)
 }
 
 func (t *OnAppMention) Actions() []core.Action {

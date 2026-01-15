@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -158,5 +159,43 @@ func Test__Slack__ReadAndVerify(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, body, got)
+	})
+}
+
+func Test__Slack__HandleEvent__Challenge(t *testing.T) {
+	s := &Slack{}
+
+	t.Run("missing challenge -> 400", func(t *testing.T) {
+		payload := EventPayload{
+			Type: "url_verification",
+		}
+		body, err := json.Marshal(payload)
+		require.NoError(t, err)
+
+		recorder := httptest.NewRecorder()
+		s.handleEvent(core.HTTPRequestContext{
+			Logger:   logrus.NewEntry(logrus.New()),
+			Response: recorder,
+		}, body)
+
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+
+	t.Run("challenge present -> 200 with body", func(t *testing.T) {
+		payload := EventPayload{
+			Type:      "url_verification",
+			Challenge: "challenge-token",
+		}
+		body, err := json.Marshal(payload)
+		require.NoError(t, err)
+
+		recorder := httptest.NewRecorder()
+		s.handleEvent(core.HTTPRequestContext{
+			Logger:   logrus.NewEntry(logrus.New()),
+			Response: recorder,
+		}, body)
+
+		assert.Equal(t, http.StatusOK, recorder.Code)
+		assert.Equal(t, "challenge-token", recorder.Body.String())
 	})
 }
