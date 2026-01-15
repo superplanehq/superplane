@@ -245,11 +245,15 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
+	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)
+	protectedAccountGRPCHandler := accountAuthMiddleware(s.grpcGatewayAccountHandler(grpcGatewayMux))
+
 	s.Router.PathPrefix("/api/v1/users").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/groups").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/roles").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/invite-links").Handler(protectedAccountGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/applications").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
@@ -265,7 +269,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 func headersMatcher(key string) (string, bool) {
 	switch key {
-	case "X-User-Id", "X-Organization-Id":
+	case "X-User-Id", "X-Organization-Id", "X-Account-Id":
 		return key, true
 	default:
 		return runtime.DefaultHeaderMatcher(key)
@@ -286,6 +290,23 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 		*r2.URL = *r.URL
 		r2.Header.Set("x-User-id", user.ID.String())
 		r2.Header.Set("x-Organization-id", user.OrganizationID.String())
+		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
+	})
+}
+
+func (s *Server) grpcGatewayAccountHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		account, ok := middleware.GetAccountFromContext(r.Context())
+		if !ok {
+			http.Error(w, "Account not found in context", http.StatusUnauthorized)
+			return
+		}
+
+		r2 := new(http.Request)
+		*r2 = *r
+		r2.URL = new(url.URL)
+		*r2.URL = *r.URL
+		r2.Header.Set("x-account-id", account.ID.String())
 		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
 	})
 }

@@ -45,6 +45,7 @@ blocks:
         - name: "Check: DB structure"
           commands:
             - make check.db.structure
+            - make check.db.migrations
 
         - name: "Check: Go Format"
           commands:

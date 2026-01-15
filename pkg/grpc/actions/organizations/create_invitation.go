@@ -65,9 +65,8 @@ func handleExistingUser(authService authorization.Authorization, authenticatedUs
 
 		//
 		// TODO: this is not using the transaction properly
-		// TODO: Rollback to member once RBAC is fully available
 		//
-		return authService.AssignRole(user.ID.String(), models.RoleOrgOwner, orgID.String(), models.DomainTypeOrganization)
+		return authService.AssignRole(user.ID.String(), models.RoleOrgViewer, orgID.String(), models.DomainTypeOrganization)
 	})
 
 	if err != nil {
@@ -121,9 +120,8 @@ func handleNewUser(authService authorization.Authorization, orgID, userID uuid.U
 
 	//
 	// TODO: this is not using the transaction properly
-	// TODO: Rollback to member once RBAC is fully available
 	//
-	err = authService.AssignRole(user.ID.String(), models.RoleOrgOwner, orgID.String(), models.DomainTypeOrganization)
+	err = authService.AssignRole(user.ID.String(), models.RoleOrgViewer, orgID.String(), models.DomainTypeOrganization)
 	if err != nil {
 		tx.Rollback()
 		return nil, err

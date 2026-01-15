@@ -195,7 +195,7 @@ func (c *CreateRelease) Execute(ctx core.ExecutionContext) error {
 	//
 	var body string
 	if config.GenerateReleaseNotes {
-		generatedNotes, err := c.generateReleaseNotes(ctx, client, appMetadata.Owner, config.Repository, tagName)
+		generatedNotes, err := c.generateReleaseNotes(client, appMetadata.Owner, config.Repository, tagName)
 		if err != nil {
 			return fmt.Errorf("failed to generate release notes: %w", err)
 		}
@@ -333,7 +333,7 @@ func (c *CreateRelease) incrementVersion(currentTag string, strategy string) (st
 	// Parse the current version using regex
 	//
 	matches := semverRegex.FindStringSubmatch(currentTag)
-	if matches == nil || len(matches) < 5 {
+	if len(matches) < 5 {
 		return "", fmt.Errorf("invalid version format: %s. Expected semantic version like v1.2.3", currentTag)
 	}
 
@@ -366,7 +366,7 @@ func (c *CreateRelease) incrementVersion(currentTag string, strategy string) (st
 	return newTag, nil
 }
 
-func (c *CreateRelease) generateReleaseNotes(ctx core.ExecutionContext, client *github.Client, owner, repo, tagName string) (string, error) {
+func (c *CreateRelease) generateReleaseNotes(client *github.Client, owner, repo, tagName string) (string, error) {
 	opts := &github.GenerateNotesOptions{
 		TagName: tagName,
 	}

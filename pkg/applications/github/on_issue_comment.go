@@ -100,7 +100,16 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	code, err := verifySignature(ctx, "issue_comment")
+	eventType := ctx.Headers.Get("X-GitHub-Event")
+	if eventType == "" {
+		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
+	}
+
+	if eventType != "issue_comment" {
+		return http.StatusOK, nil
+	}
+
+	code, err := verifySignature(ctx)
 	if err != nil {
 		return code, err
 	}
