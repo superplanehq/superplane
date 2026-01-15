@@ -3476,6 +3476,9 @@
         },
         "togglable": {
           "type": "boolean"
+        },
+        "disallowExpression": {
+          "type": "boolean"
         }
       }
     },

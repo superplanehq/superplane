@@ -171,6 +171,7 @@ export type ConfigurationField = {
   placeholder?: string;
   sensitive?: boolean;
   togglable?: boolean;
+  disallowExpression?: boolean;
 };
 
 export type ConfigurationIntegrationTypeOptions = {
