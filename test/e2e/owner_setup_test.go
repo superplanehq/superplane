@@ -51,7 +51,6 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.assertRedirectedToOrganizationHome()
 		steps.clearCookies()
 		steps.visitLoginPage()
-		steps.clickEmailPasswordLogin()
 		steps.fillInEmailAndPassword("owner@example.com", "Password1")
 		steps.submitLoginForm()
 		steps.assertRedirectedToOrganizationHome()
@@ -197,17 +196,12 @@ func (s *ownerSetupSteps) visitLoginPage() {
 	s.session.Sleep(500) // wait for page load
 }
 
-func (s *ownerSetupSteps) clickEmailPasswordLogin() {
-	s.session.Click(q.Text("Email & Password"))
-	s.session.Sleep(500) // wait for navigation
-}
-
 func (s *ownerSetupSteps) fillInEmailAndPassword(email, password string) {
 	s.session.FillIn(q.Locator(`input[type="email"]`), email)
 	s.session.FillIn(q.Locator(`input[type="password"]`), password)
 }
 
 func (s *ownerSetupSteps) submitLoginForm() {
-	s.session.Click(q.Text("Sign in"))
+	s.session.Click(q.Text("Login"))
 	s.session.Sleep(1000) // wait for redirect
 }
