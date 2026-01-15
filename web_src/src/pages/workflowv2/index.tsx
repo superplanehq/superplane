@@ -2220,7 +2220,7 @@ export function WorkflowPageV2() {
           navigate(`/${organizationId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`);
         }
       }}
-      title={workflow.metadata?.name!}
+      title={workflow?.metadata?.name || "Canvas"}
       nodes={nodes}
       edges={edges}
       organizationId={organizationId}
@@ -2291,7 +2291,7 @@ export function WorkflowPageV2() {
           href: `/${organizationId}`,
         },
         {
-          label: workflow.metadata?.name!,
+          label: workflow?.metadata?.name || "Canvas",
         },
       ]}
     />

@@ -28,6 +28,7 @@ import {
   User as UserIcon,
   Users,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { isRBACEnabled } from "@/lib/env";
 
 export function OrganizationSettings() {
@@ -78,7 +79,7 @@ export function OrganizationSettings() {
     label: string;
     href?: string;
     action?: () => void;
-    Icon: typeof Building;
+    Icon: LucideIcon;
   };
 
   const sectionIds = ["profile", "general", "members", "groups", "roles", "integrations", "applications"];

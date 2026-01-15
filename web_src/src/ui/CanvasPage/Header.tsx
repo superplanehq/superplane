@@ -1,5 +1,4 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import { resolveIcon } from "@/lib/utils";
 import { Undo2, ChevronDown, Palette, Home } from "lucide-react";
 import { Button } from "../button";
 import { Switch } from "../switch";
@@ -50,7 +49,23 @@ export function Header({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const currentWorkflowName = breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].label : "";
+  // Get the workflow name from the workflows list if workflowId is available
+  // Otherwise, use breadcrumbs[1] which is always the workflow name (index 0 is "Canvases")
+  // Fall back to the last breadcrumb item if neither is available
+  const currentWorkflowName = (() => {
+    if (workflowId) {
+      const workflow = workflows.find((w) => w.metadata?.id === workflowId);
+      if (workflow?.metadata?.name) {
+        return workflow.metadata.name;
+      }
+    }
+    // breadcrumbs[1] is always the workflow name (index 0 is "Canvases")
+    if (breadcrumbs.length > 1 && breadcrumbs[1]?.label) {
+      return breadcrumbs[1].label;
+    }
+    // Fall back to last breadcrumb if no workflow name found
+    return breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].label : "";
+  })();
 
   useEffect(() => {
     if (!isMenuOpen) return;
