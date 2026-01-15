@@ -20,10 +20,10 @@ func Test__OnIssueStatus__Setup(t *testing.T) {
 	t.Run("minutesInterval is required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Logger:         log.NewEntry(log.StandardLogger()),
+			Logger:          log.NewEntry(log.StandardLogger()),
 			AppInstallation: appCtx,
-			Metadata:       &contexts.MetadataContext{},
-			Configuration:  map[string]any{},
+			Metadata:        &contexts.MetadataContext{},
+			Configuration:   map[string]any{},
 		})
 
 		require.ErrorContains(t, err, "minutesInterval is required")
@@ -32,19 +32,19 @@ func Test__OnIssueStatus__Setup(t *testing.T) {
 	t.Run("minutesInterval must be between 1 and 59", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Logger:         log.NewEntry(log.StandardLogger()),
+			Logger:          log.NewEntry(log.StandardLogger()),
 			AppInstallation: appCtx,
-			Metadata:       &contexts.MetadataContext{},
-			Configuration:  map[string]any{"minutesInterval": 0},
+			Metadata:        &contexts.MetadataContext{},
+			Configuration:   map[string]any{"minutesInterval": 0},
 		})
 
 		require.ErrorContains(t, err, "minutesInterval must be between 1 and 59")
 
 		err = trigger.Setup(core.TriggerContext{
-			Logger:         log.NewEntry(log.StandardLogger()),
+			Logger:          log.NewEntry(log.StandardLogger()),
 			AppInstallation: appCtx,
-			Metadata:       &contexts.MetadataContext{},
-			Configuration:  map[string]any{"minutesInterval": 60},
+			Metadata:        &contexts.MetadataContext{},
+			Configuration:   map[string]any{"minutesInterval": 60},
 		})
 
 		require.ErrorContains(t, err, "minutesInterval must be between 1 and 59")
@@ -62,11 +62,11 @@ func Test__OnIssueStatus__Setup(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
 
 		err := trigger.Setup(core.TriggerContext{
-			Logger:         log.NewEntry(log.StandardLogger()),
+			Logger:          log.NewEntry(log.StandardLogger()),
 			AppInstallation: appCtx,
-			Metadata:       metadataCtx,
-			Requests:       requestCtx,
-			Configuration:  map[string]any{"minutesInterval": 5},
+			Metadata:        metadataCtx,
+			Requests:        requestCtx,
+			Configuration:   map[string]any{"minutesInterval": 5},
 		})
 
 		require.NoError(t, err)
@@ -88,11 +88,11 @@ func Test__OnIssueStatus__Setup(t *testing.T) {
 
 		// First setup
 		err := trigger.Setup(core.TriggerContext{
-			Logger:         log.NewEntry(log.StandardLogger()),
+			Logger:          log.NewEntry(log.StandardLogger()),
 			AppInstallation: appCtx,
-			Metadata:       metadataCtx,
-			Requests:       requestCtx,
-			Configuration:  map[string]any{"minutesInterval": 5},
+			Metadata:        metadataCtx,
+			Requests:        requestCtx,
+			Configuration:   map[string]any{"minutesInterval": 5},
 		})
 		require.NoError(t, err)
 
@@ -101,11 +101,11 @@ func Test__OnIssueStatus__Setup(t *testing.T) {
 		// Second setup with same config
 		requestCtx2 := &contexts.RequestContext{}
 		err = trigger.Setup(core.TriggerContext{
-			Logger:         log.NewEntry(log.StandardLogger()),
+			Logger:          log.NewEntry(log.StandardLogger()),
 			AppInstallation: appCtx,
-			Metadata:       metadataCtx,
-			Requests:       requestCtx2,
-			Configuration:  map[string]any{"minutesInterval": 5},
+			Metadata:        metadataCtx,
+			Requests:        requestCtx2,
+			Configuration:   map[string]any{"minutesInterval": 5},
 		})
 		require.NoError(t, err)
 
@@ -162,12 +162,12 @@ func Test__OnIssueStatus__HandleAction(t *testing.T) {
 			Configuration: map[string]any{
 				"minutesInterval": 5,
 			},
-			Logger:         log.NewEntry(log.StandardLogger()),
-			HTTP:           httpContext,
+			Logger:          log.NewEntry(log.StandardLogger()),
+			HTTP:            httpContext,
 			AppInstallation: appCtx,
-			Events:         eventCtx,
-			Requests:       requestCtx,
-			Metadata:       metadataCtx,
+			Events:          eventCtx,
+			Requests:        requestCtx,
+			Metadata:        metadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -219,12 +219,12 @@ func Test__OnIssueStatus__HandleAction(t *testing.T) {
 			Configuration: map[string]any{
 				"minutesInterval": 5,
 			},
-			Logger:         log.NewEntry(log.StandardLogger()),
-			HTTP:           httpContext,
+			Logger:          log.NewEntry(log.StandardLogger()),
+			HTTP:            httpContext,
 			AppInstallation: appCtx,
-			Events:         eventCtx,
-			Requests:       requestCtx,
-			Metadata:       metadataCtx,
+			Events:          eventCtx,
+			Requests:        requestCtx,
+			Metadata:        metadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -262,12 +262,12 @@ func Test__OnIssueStatus__HandleAction(t *testing.T) {
 			Configuration: map[string]any{
 				"minutesInterval": 5,
 			},
-			Logger:         log.NewEntry(log.StandardLogger()),
-			HTTP:           httpContext,
+			Logger:          log.NewEntry(log.StandardLogger()),
+			HTTP:            httpContext,
 			AppInstallation: appCtx,
-			Events:         eventCtx,
-			Requests:       requestCtx,
-			Metadata:       metadataCtx,
+			Events:          eventCtx,
+			Requests:        requestCtx,
+			Metadata:        metadataCtx,
 		})
 
 		require.NoError(t, err)
