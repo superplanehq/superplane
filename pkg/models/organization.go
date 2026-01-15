@@ -92,6 +92,11 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		Error
 
 	if err == nil {
+		_, inviteErr := CreateInviteLinkInTransaction(tx, organization.ID)
+		if inviteErr != nil {
+			return nil, inviteErr
+		}
+
 		return &organization, nil
 	}
 

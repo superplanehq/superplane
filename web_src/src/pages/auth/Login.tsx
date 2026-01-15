@@ -5,6 +5,7 @@ import { useAccount } from "../../contexts/AccountContext";
 type AuthConfig = {
   providers: string[];
   passwordLoginEnabled: boolean;
+  signupEnabled: boolean;
 };
 
 const isValidRedirectPath = (path: string | null): path is string => {
@@ -47,14 +48,34 @@ export const Login: React.FC = () => {
   const [authConfig, setAuthConfig] = useState<AuthConfig>({
     providers: [],
     passwordLoginEnabled: false,
+    signupEnabled: false,
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [isSignupMode, setIsSignupMode] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [signupFirstName, setSignupFirstName] = useState("");
+  const [signupLastName, setSignupLastName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [searchParams] = useSearchParams();
   const { account, loading: accountLoading } = useAccount();
 
   const redirectParam = searchParams.get("redirect");
   const safeRedirect = useMemo(() => getSafeRedirectPath(redirectParam), [redirectParam]);
+
+  const inviteToken = useMemo(() => {
+    if (!safeRedirect || !safeRedirect.startsWith("/invite/")) {
+      return "";
+    }
+
+    const parts = safeRedirect.split("/");
+    return parts.length >= 3 ? parts[2] : "";
+  }, [safeRedirect]);
 
   useEffect(() => {
     if (!accountLoading && account) {
@@ -77,15 +98,16 @@ export const Login: React.FC = () => {
           setAuthConfig({
             providers: data.providers || [],
             passwordLoginEnabled: Boolean(data.passwordLoginEnabled),
+            signupEnabled: Boolean(data.signupEnabled),
           });
         }
       } catch (err) {
         if (!canceled) {
-          setError("Failed to load login options.");
+          setConfigError("Failed to load login options.");
         }
       } finally {
         if (!canceled) {
-          setLoading(false);
+          setConfigLoading(false);
         }
       }
     };
@@ -98,8 +120,177 @@ export const Login: React.FC = () => {
   }, []);
 
   const providers = authConfig.providers || [];
-  const hasProviders = providers.length > 0;
+  const allowedProviders = ["google", "github"];
+  const activeProviders = allowedProviders.filter((provider) => providers.includes(provider));
+  const hasProviders = activeProviders.length > 0;
+  const canSignup = authConfig.signupEnabled || inviteToken;
+  const canSignupWithPassword = authConfig.passwordLoginEnabled && canSignup;
+  const canLoginWithPassword = authConfig.passwordLoginEnabled;
   const redirectQuery = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
+  const redirectTarget = safeRedirect || "";
+  const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
+
+  useEffect(() => {
+    if (!canSignup && isSignupMode) {
+      setIsSignupMode(false);
+      setFormError(null);
+    }
+  }, [canSignup, isSignupMode]);
+
+  const handleToggleMode = (nextMode: "login" | "signup") => {
+    setIsSignupMode(nextMode === "signup");
+    setFormError(null);
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!loginEmail.trim() || !loginPassword) {
+      setFormError("Email and password are required");
+      return;
+    }
+
+    setSubmitLoading(true);
+
+    try {
+      const formData = new URLSearchParams();
+      formData.append("email", loginEmail.trim());
+      formData.append("password", loginPassword);
+
+      const url = redirectTarget ? `/login?redirect=${encodeURIComponent(redirectTarget)}` : "/login";
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        credentials: "include",
+        body: formData.toString(),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          setFormError("Invalid email or password");
+        } else {
+          setFormError("Login failed. Please try again.");
+        }
+        setSubmitLoading(false);
+        return;
+      }
+
+      if (redirectTarget) {
+        window.location.href = redirectTarget;
+        return;
+      }
+
+      try {
+        const orgsResponse = await fetch("/organizations", {
+          credentials: "include",
+        });
+
+        if (orgsResponse.ok) {
+          const organizations = await orgsResponse.json();
+          if (organizations.length === 1) {
+            window.location.href = `/${organizations[0].id}`;
+            return;
+          }
+        }
+      } catch {
+        // fall through to default redirect
+      }
+
+      const finalURL = response.url || "/";
+      window.location.href = finalURL;
+    } catch {
+      setFormError("Network error occurred");
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!canSignup) {
+      setFormError("Signups are currently disabled.");
+      return;
+    }
+
+    if (!signupFirstName.trim() || !signupLastName.trim()) {
+      setFormError("First and last names are required");
+      return;
+    }
+
+    if (!signupEmail.trim() || !signupPassword || !signupConfirmPassword) {
+      setFormError("Email and password are required");
+      return;
+    }
+
+    if (signupPassword !== signupConfirmPassword) {
+      setFormError("Passwords do not match");
+      return;
+    }
+
+    setSubmitLoading(true);
+
+    try {
+      const formData = new URLSearchParams();
+      formData.append("name", `${signupFirstName.trim()} ${signupLastName.trim()}`);
+      formData.append("email", signupEmail.trim());
+      formData.append("password", signupPassword);
+      if (inviteToken) {
+        formData.append("invite_token", inviteToken);
+      }
+
+      const url = redirectTarget ? `/signup?redirect=${encodeURIComponent(redirectTarget)}` : "/signup";
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        credentials: "include",
+        body: formData.toString(),
+      });
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          setFormError("Account already exists. Please sign in.");
+        } else {
+          const errorText = await response.text();
+          setFormError(errorText || "Signup failed. Please try again.");
+        }
+        setSubmitLoading(false);
+        return;
+      }
+
+      if (redirectTarget) {
+        window.location.href = redirectTarget;
+        return;
+      }
+
+      try {
+        const orgsResponse = await fetch("/organizations", {
+          credentials: "include",
+        });
+
+        if (orgsResponse.ok) {
+          const organizations = await orgsResponse.json();
+          if (organizations.length === 1) {
+            window.location.href = `/${organizations[0].id}`;
+            return;
+          }
+        }
+      } catch {
+        // fall through to default redirect
+      }
+
+      const finalURL = response.url || "/";
+      window.location.href = finalURL;
+    } catch {
+      setFormError("Network error occurred");
+      setSubmitLoading(false);
+    }
+  };
 
   return (
     <div
@@ -121,8 +312,8 @@ export const Login: React.FC = () => {
           background: "#1e2938",
           textAlign: "center",
           paddingBottom: "2rem",
-          maxWidth: "320px",
-          width: "90%",
+          maxWidth: "420px",
+          width: "92%",
         }}
       >
         <div style={{ padding: "1.5rem 1.5rem 1.25rem", display: "flex", justifyContent: "center" }}>
@@ -141,39 +332,36 @@ export const Login: React.FC = () => {
           </svg>
         </div>
 
-        {hasProviders && (
-          <div
-            style={{
-              color: "#94a9ca",
-              margin: "0 0 1.25rem",
-              paddingTop: "1rem",
-              borderTop: "1px solid #3d4859",
-            }}
-          >
-            Continue with
-          </div>
-        )}
+        <div
+          style={{
+            color: "#94a9ca",
+            margin: "0 0 1.25rem",
+            paddingTop: "1rem",
+            borderTop: "1px solid #3d4859",
+          }}
+        ></div>
 
-        {loading && <div style={{ color: "#94a9ca", fontSize: "14px", paddingBottom: "1rem" }}>Loading...</div>}
+        {configLoading && <div style={{ color: "#94a9ca", fontSize: "14px", paddingBottom: "1rem" }}>Loading...</div>}
 
-        {error && (
+        {configError && (
           <div
             style={{
               padding: "12px",
               margin: "0 auto 12px",
-              width: "80%",
+              width: "90%",
               borderRadius: "8px",
               backgroundColor: "#7f1d1d",
               color: "#fca5a5",
               fontSize: "14px",
             }}
           >
-            {error}
+            {configError}
           </div>
         )}
 
-        {!loading &&
-          providers.map((provider) => (
+        {!configLoading &&
+          showProviderButtons &&
+          activeProviders.map((provider) => (
             <a
               key={provider}
               href={`/auth/${provider}${redirectQuery}`}
@@ -184,17 +372,18 @@ export const Login: React.FC = () => {
                 padding: "12px 24px",
                 borderRadius: "8px",
                 textDecoration: "none",
-                width: "80%",
+                width: "90%",
                 boxSizing: "border-box",
                 marginBottom: "12px",
                 fontWeight: 500,
                 background: provider === "github" ? "#7f92b0" : "#6584b4",
                 color: "#1e2938",
+                position: "relative",
               }}
             >
               {provider === "github" && (
                 <svg
-                  style={{ width: "20px", height: "20px", marginRight: "8px" }}
+                  style={{ width: "20px", height: "20px", position: "absolute", left: "20px" }}
                   viewBox="0 0 24 24"
                   fill="currentColor"
                 >
@@ -203,7 +392,7 @@ export const Login: React.FC = () => {
               )}
               {provider === "google" && (
                 <svg
-                  style={{ width: "20px", height: "20px", marginRight: "8px" }}
+                  style={{ width: "20px", height: "20px", position: "absolute", left: "20px" }}
                   viewBox="0 0 24 24"
                   fill="currentColor"
                 >
@@ -213,37 +402,286 @@ export const Login: React.FC = () => {
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
               )}
-              {getProviderLabel(provider)}
+              <span>Continue with {getProviderLabel(provider)}</span>
             </a>
           ))}
 
-        {!loading && authConfig.passwordLoginEnabled && (
-          <a
-            href={`/login/email${redirectQuery}`}
+        {!configLoading && showProviderButtons && (isSignupMode ? canSignupWithPassword : canLoginWithPassword) && (
+          <div
             style={{
-              display: "inline-flex",
+              display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              padding: "12px 24px",
-              borderRadius: "8px",
-              textDecoration: "none",
-              width: "80%",
-              boxSizing: "border-box",
-              marginBottom: "12px",
-              fontWeight: 500,
-              background: "#6584b4",
-              color: "#1e2938",
+              gap: "12px",
+              color: "#94a9ca",
+              fontSize: "13px",
+              width: "90%",
+              margin: "8px auto 16px",
             }}
           >
-            <svg style={{ width: "20px", height: "20px", marginRight: "8px" }} viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
-            </svg>
-            Email & Password
-          </a>
+            <div style={{ flex: 1, height: "1px", backgroundColor: "#3d4859" }} />
+            <span>or</span>
+            <div style={{ flex: 1, height: "1px", backgroundColor: "#3d4859" }} />
+          </div>
         )}
 
-        {!loading && !hasProviders && !authConfig.passwordLoginEnabled && (
+        {!configLoading && isSignupMode && !canSignup && (
+          <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>Signups are currently disabled.</div>
+        )}
+
+        {!configLoading && !isSignupMode && !showProviderButtons && !canLoginWithPassword && !canSignupWithPassword && (
           <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>No login methods are configured.</div>
+        )}
+
+        {!configLoading && formError && (
+          <div
+            style={{
+              padding: "12px",
+              margin: "0 auto 12px",
+              width: "90%",
+              borderRadius: "8px",
+              backgroundColor: "#7f1d1d",
+              color: "#fca5a5",
+              fontSize: "14px",
+            }}
+          >
+            {formError}
+          </div>
+        )}
+
+        {!configLoading && !isSignupMode && canLoginWithPassword && (
+          <form onSubmit={handleLoginSubmit} style={{ width: "90%", margin: "0 auto 12px", textAlign: "left" }}>
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              required
+              autoComplete="email"
+              value={loginEmail}
+              onChange={(e) => setLoginEmail(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                marginBottom: "12px",
+                borderRadius: "8px",
+                border: "1px solid #3d4859",
+                background: "#2a3441",
+                color: "#F9FAFC",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+            />
+
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              required
+              autoComplete="current-password"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                marginBottom: "12px",
+                borderRadius: "8px",
+                border: "1px solid #3d4859",
+                background: "#2a3441",
+                color: "#F9FAFC",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+            />
+
+            <button
+              type="submit"
+              disabled={submitLoading}
+              style={{
+                width: "100%",
+                padding: "12px 24px",
+                borderRadius: "8px",
+                border: "none",
+                background: submitLoading ? "#5472a3" : "#6584b4",
+                color: "#1e2938",
+                fontWeight: 500,
+                fontSize: "14px",
+                cursor: submitLoading ? "not-allowed" : "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              {submitLoading ? "Logging in..." : "Login"}
+            </button>
+          </form>
+        )}
+
+        {!configLoading && isSignupMode && canSignupWithPassword && (
+          <form onSubmit={handleSignupSubmit} style={{ width: "90%", margin: "0 auto 12px", textAlign: "left" }}>
+            <input
+              type="text"
+              name="firstName"
+              placeholder="First name"
+              required
+              autoComplete="given-name"
+              value={signupFirstName}
+              onChange={(e) => setSignupFirstName(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                marginBottom: "12px",
+                borderRadius: "8px",
+                border: "1px solid #3d4859",
+                background: "#2a3441",
+                color: "#F9FAFC",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+            />
+
+            <input
+              type="text"
+              name="lastName"
+              placeholder="Last name"
+              required
+              autoComplete="family-name"
+              value={signupLastName}
+              onChange={(e) => setSignupLastName(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                marginBottom: "12px",
+                borderRadius: "8px",
+                border: "1px solid #3d4859",
+                background: "#2a3441",
+                color: "#F9FAFC",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+            />
+
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              required
+              autoComplete="email"
+              value={signupEmail}
+              onChange={(e) => setSignupEmail(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                marginBottom: "12px",
+                borderRadius: "8px",
+                border: "1px solid #3d4859",
+                background: "#2a3441",
+                color: "#F9FAFC",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+            />
+
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              required
+              autoComplete="new-password"
+              value={signupPassword}
+              onChange={(e) => setSignupPassword(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                marginBottom: "12px",
+                borderRadius: "8px",
+                border: "1px solid #3d4859",
+                background: "#2a3441",
+                color: "#F9FAFC",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+            />
+
+            <input
+              type="password"
+              name="passwordConfirm"
+              placeholder="Repeat password"
+              required
+              autoComplete="new-password"
+              value={signupConfirmPassword}
+              onChange={(e) => setSignupConfirmPassword(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                marginBottom: "12px",
+                borderRadius: "8px",
+                border: "1px solid #3d4859",
+                background: "#2a3441",
+                color: "#F9FAFC",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+            />
+
+            <button
+              type="submit"
+              disabled={submitLoading || !canSignup}
+              style={{
+                width: "100%",
+                padding: "12px 24px",
+                borderRadius: "8px",
+                border: "none",
+                background: submitLoading ? "#5472a3" : "#6584b4",
+                color: "#1e2938",
+                fontWeight: 500,
+                fontSize: "14px",
+                cursor: submitLoading || !canSignup ? "not-allowed" : "pointer",
+                transition: "all 0.2s",
+                opacity: canSignup ? 1 : 0.7,
+              }}
+            >
+              {submitLoading ? "Creating account..." : "Create account"}
+            </button>
+          </form>
+        )}
+
+        {!configLoading && !isSignupMode && canSignup && (
+          <div style={{ marginTop: "16px", fontSize: "14px", color: "#94a9ca" }}>
+            {"Don't have an account? "}
+            <button
+              type="button"
+              onClick={() => handleToggleMode("signup")}
+              style={{
+                color: "#c7d3ea",
+                textDecoration: "underline",
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontSize: "14px",
+              }}
+            >
+              Create an account
+            </button>
+          </div>
+        )}
+
+        {!configLoading && isSignupMode && (
+          <div style={{ marginTop: "16px", fontSize: "14px", color: "#94a9ca" }}>
+            Already have an account?{" "}
+            <button
+              type="button"
+              onClick={() => handleToggleMode("login")}
+              style={{
+                color: "#c7d3ea",
+                textDecoration: "underline",
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontSize: "14px",
+              }}
+            >
+              Sign in
+            </button>
+          </div>
         )}
       </div>
     </div>

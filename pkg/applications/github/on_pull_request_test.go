@@ -18,8 +18,10 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 	eventType := "pull_request"
 
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("X-GitHub-Event", eventType)
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers: http.Header{},
+			Headers: headers,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)

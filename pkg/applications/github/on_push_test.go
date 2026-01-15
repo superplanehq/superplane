@@ -18,8 +18,10 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 	trigger := &OnPush{}
 
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("X-GitHub-Event", "push")
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers: http.Header{},
+			Headers: headers,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -38,6 +40,35 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, code)
 		assert.ErrorContains(t, err, "missing X-GitHub-Event header")
+	})
+
+	t.Run("event is not push -> 200", func(t *testing.T) {
+		body := []byte(`{}`)
+
+		secret := "test-secret"
+		h := hmac.New(sha256.New, []byte(secret))
+		h.Write(body)
+		signature := fmt.Sprintf("%x", h.Sum(nil))
+
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256="+signature)
+		headers.Set("X-GitHub-Event", "ping")
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"repository": "test",
+				"refs":       []configuration.Predicate{},
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Zero(t, eventContext.Count())
 	})
 
 	t.Run("invalid signature -> 403", func(t *testing.T) {

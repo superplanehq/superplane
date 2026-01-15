@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useAccount } from "@/contexts/AccountContext";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Badge } from "../../../components/Badge/badge";
 import {
@@ -12,18 +13,20 @@ import {
 import { Icon } from "../../../components/Icon";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { Text } from "../../../components/Text/text";
-import { Textarea } from "../../../components/Textarea/textarea";
 import {
   useAssignRole,
-  useCreateInvitation,
-  useOrganizationInvitations,
+  useOrganizationInviteLink,
   useOrganizationRoles,
   useOrganizationUsers,
-  useRemoveInvitation,
   useRemoveOrganizationSubject,
+  useResetOrganizationInviteLink,
+  useUpdateOrganizationInviteLink,
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { isRBACEnabled } from "@/lib/env";
+import { Switch } from "@/ui/switch";
+import { getApiErrorMessage } from "@/utils/errors";
+import { showErrorToast, showSuccessToast } from "@/utils/toast";
 
 interface Member {
   id: string;
@@ -37,34 +40,17 @@ interface Member {
   status: "active";
 }
 
-interface PendingInvitation {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  roleName: string;
-  initials: string;
-  type: "invitation";
-  status: "pending";
-  createdAt?: string;
-  state?: string;
-}
-
-type UnifiedMember = Member | PendingInvitation;
-
 interface MembersProps {
   organizationId: string;
 }
 
 export function Members({ organizationId }: MembersProps) {
+  const { account } = useAccount();
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof UnifiedMember | null;
+    key: keyof Member | null;
     direction: "asc" | "desc";
   }>({ key: null, direction: "asc" });
-  const [emailsInput, setEmailsInput] = useState("");
-  const [invitationError, setInvitationError] = useState<string | null>(null);
   const [removalError, setRemovalError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"all" | "active" | "invited">("all");
 
   // Use React Query hooks for data fetching
   const { data: users = [], isLoading: loadingMembers, error: usersError } = useOrganizationUsers(organizationId);
@@ -73,28 +59,32 @@ export function Members({ organizationId }: MembersProps) {
     isLoading: loadingRoles,
     error: rolesError,
   } = useOrganizationRoles(organizationId);
+  const currentUserRoleNames = useMemo(() => {
+    if (!account?.email) {
+      return [];
+    }
 
-  // Fetch pending invitations
+    const matchedUser = users.find((user) => user.metadata?.email?.toLowerCase() === account.email.toLowerCase());
+    return matchedUser?.status?.roleAssignments?.map((role) => role.roleName) ?? [];
+  }, [account?.email, users]);
+
+  const canManageInviteLink = currentUserRoleNames.some(
+    (roleName) => roleName === "org_owner" || roleName === "org_admin",
+  );
+
   const {
-    data: invitations = [],
-    isLoading: loadingInvitations,
-    error: invitationsError,
-  } = useOrganizationInvitations(organizationId);
+    data: inviteLink,
+    isLoading: loadingInviteLink,
+    error: inviteLinkError,
+  } = useOrganizationInviteLink(organizationId, canManageInviteLink);
 
   // Mutations for role assignment and user removal
   const assignRoleMutation = useAssignRole(organizationId);
   const removeUserMutation = useRemoveOrganizationSubject(organizationId);
-  const removeInvitationMutation = useRemoveInvitation(organizationId);
+  const updateInviteLinkMutation = useUpdateOrganizationInviteLink(organizationId);
+  const resetInviteLinkMutation = useResetOrganizationInviteLink(organizationId);
 
-  // Create invitation mutation
-  const createInvitationMutation = useCreateInvitation(organizationId, {
-    onError: (error: Error) => {
-      setInvitationError(error.message);
-    },
-  });
-
-  const error = usersError || rolesError || invitationsError;
-  const isInviting = createInvitationMutation.isPending;
+  const error = usersError || rolesError;
   const ownerIds = useMemo(() => {
     const ids = users
       .filter((user) => user.status?.roleAssignments?.some((role) => role.roleName === "org_owner"))
@@ -103,6 +93,20 @@ export function Members({ organizationId }: MembersProps) {
 
     return new Set(ids);
   }, [users]);
+
+  const inviteLinkUrl = useMemo(() => {
+    if (!inviteLink?.token) {
+      return "";
+    }
+
+    const origin = typeof window === "undefined" ? "" : window.location.origin;
+    return `${origin}/invite/${inviteLink.token}`;
+  }, [inviteLink?.token]);
+
+  const inviteLinkErrorMessage = inviteLinkError ? getApiErrorMessage(inviteLinkError) : null;
+  const showInviteLinkSection = canManageInviteLink && inviteLinkErrorMessage !== "Not found";
+  const inviteLinkEnabled = inviteLink?.enabled ?? false;
+  const inviteLinkBusy = updateInviteLinkMutation.isPending || resetInviteLinkMutation.isPending;
 
   // Transform users to Member interface format
   const members = useMemo(() => {
@@ -134,40 +138,14 @@ export function Members({ organizationId }: MembersProps) {
     });
   }, [users]);
 
-  // Transform invitations to PendingInvitation interface format
-  const pendingInvitations = useMemo(() => {
-    return invitations.map((invitation): PendingInvitation => {
-      const name = invitation.email?.split("@")[0] || "Unknown";
-      const initials = name.charAt(0).toUpperCase();
-
-      return {
-        id: invitation.id || "",
-        name: name,
-        email: invitation.email || "",
-        role: "Invited",
-        roleName: "pending",
-        initials: initials,
-        type: "invitation",
-        status: "pending",
-        createdAt: invitation.createdAt,
-        state: invitation.state,
-      };
-    });
-  }, [invitations]);
-
-  // Combine members and invitations
-  const unifiedMembers = useMemo(() => {
-    return [...members, ...pendingInvitations];
-  }, [members, pendingInvitations]);
-
-  const handleSort = (key: keyof UnifiedMember) => {
+  const handleSort = (key: keyof Member) => {
     setSortConfig((prevConfig) => ({
       key,
       direction: prevConfig.key === key && prevConfig.direction === "asc" ? "desc" : "asc",
     }));
   };
 
-  const getSortIcon = (columnKey: keyof UnifiedMember) => {
+  const getSortIcon = (columnKey: keyof Member) => {
     if (sortConfig.key !== columnKey) {
       return "chevrons-up-down";
     }
@@ -175,9 +153,9 @@ export function Members({ organizationId }: MembersProps) {
   };
 
   const getSortedMembers = () => {
-    if (!sortConfig.key) return unifiedMembers;
+    if (!sortConfig.key) return members;
 
-    return [...unifiedMembers].sort((a, b) => {
+    return [...members].sort((a, b) => {
       const aValue = a[sortConfig.key!];
       const bValue = b[sortConfig.key!];
 
@@ -195,19 +173,6 @@ export function Members({ organizationId }: MembersProps) {
     });
   };
 
-  const getFilteredMembers = () => {
-    const sorted = getSortedMembers();
-    let filtered = sorted;
-
-    // Apply tab filter
-    if (activeTab === "active") {
-      filtered = sorted.filter((member) => member.type === "member");
-    } else if (activeTab === "invited") {
-      filtered = sorted.filter((member) => member.type === "invitation");
-    }
-    return filtered;
-  };
-
   const handleRoleChange = async (memberId: string, newRoleName: string) => {
     try {
       await assignRoleMutation.mutateAsync({
@@ -219,7 +184,7 @@ export function Members({ organizationId }: MembersProps) {
     }
   };
 
-  const handleMemberRemove = async (member: UnifiedMember) => {
+  const handleMemberRemove = async (member: Member) => {
     if (member.type === "member" && ownerIds.has(member.id) && ownerIds.size <= 1) {
       setRemovalError("You must have at least one organization owner.");
       return;
@@ -231,8 +196,6 @@ export function Members({ organizationId }: MembersProps) {
         await removeUserMutation.mutateAsync({
           userId: member.id,
         });
-      } else {
-        await removeInvitationMutation.mutateAsync(member.id);
       }
     } catch (err) {
       setRemovalError("Unable to remove this member.");
@@ -240,73 +203,36 @@ export function Members({ organizationId }: MembersProps) {
     }
   };
 
-  const isEmailValid = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+  const handleInviteLinkToggle = async (enabled: boolean) => {
+    try {
+      await updateInviteLinkMutation.mutateAsync(enabled);
+    } catch (err) {
+      console.error("Error updating invite link:", err);
+      showErrorToast("Failed to update invite link.");
+    }
   };
 
-  const handleEmailsSubmit = async () => {
-    if (!emailsInput.trim()) return;
+  const handleInviteLinkReset = async () => {
+    try {
+      await resetInviteLinkMutation.mutateAsync();
+      showSuccessToast("Invite link reset.");
+    } catch (err) {
+      console.error("Error resetting invite link:", err);
+      showErrorToast("Failed to reset invite link.");
+    }
+  };
+
+  const handleCopyInviteLink = async () => {
+    if (!inviteLinkUrl) return;
 
     try {
-      const emails = emailsInput
-        .split(",")
-        .map((email) => email.trim())
-        .filter((email) => email.length > 0 && isEmailValid(email));
-
-      // Process each email
-      for (const email of emails) {
-        await createInvitationMutation.mutateAsync(email);
-      }
-
-      setEmailsInput("");
-      setInvitationError(null);
-    } catch {
-      console.error("Failed to send invitations");
+      await navigator.clipboard.writeText(inviteLinkUrl);
+      showSuccessToast("Invite link copied.");
+    } catch (err) {
+      console.error("Error copying invite link:", err);
+      showErrorToast("Failed to copy invite link.");
     }
   };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleEmailsSubmit();
-    }
-  };
-
-  const getStateBadge = (member: UnifiedMember) => {
-    if (member.type === "member") {
-      return <Badge color="green">Active</Badge>;
-    } else {
-      return <Badge color="yellow">Invited</Badge>;
-    }
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "N/A";
-
-    const date = new Date(dateString);
-
-    if (isNaN(date.getTime())) {
-      console.error("Invalid date string:", dateString);
-      return "Invalid Date";
-    }
-
-    return date.toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const getTabCounts = () => {
-    const activeCount = members.length;
-    const invitedCount = pendingInvitations.length;
-    const totalCount = activeCount + invitedCount;
-
-    return { activeCount, invitedCount, totalCount };
-  };
-
-  const { activeCount, invitedCount, totalCount } = getTabCounts();
 
   return (
     <div className="space-y-6 pt-6">
@@ -316,83 +242,82 @@ export function Members({ organizationId }: MembersProps) {
         </div>
       )}
 
-      {/* Send Invitations Section */}
-      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">Invite new members</Text>
-            <Text className="text-sm text-gray-500 dark:text-gray-400">
-              Add people to your organization by sending them an invitation
-            </Text>
+      {showInviteLinkSection ? (
+        <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">
+                Invite link to add members
+              </Text>
+              <Text className="text-sm text-gray-500 dark:text-gray-400">
+                Only people with owner and admin roles can see this.
+                {inviteLinkEnabled && (
+                  <>
+                    {" "}
+                    You can also{" "}
+                    <button
+                      type="button"
+                      className="text-blue-600 hover:underline disabled:text-gray-400"
+                      onClick={handleInviteLinkReset}
+                      disabled={loadingInviteLink || inviteLinkBusy}
+                    >
+                      generate a new link
+                    </button>
+                    .
+                  </>
+                )}
+              </Text>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={inviteLinkEnabled}
+                onCheckedChange={handleInviteLinkToggle}
+                disabled={loadingInviteLink || inviteLinkBusy}
+                aria-label="Toggle invite link"
+              />
+            </div>
           </div>
-        </div>
 
-        {invitationError && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <p className="text-sm">{invitationError}</p>
-          </div>
-        )}
+          {inviteLinkErrorMessage && inviteLinkErrorMessage !== "Not found" && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mt-4">
+              <p className="text-sm">{inviteLinkErrorMessage}</p>
+            </div>
+          )}
 
-        {/* Email Input Section */}
-        <div className="space-y-4">
-          <Textarea
-            rows={1}
-            placeholder="Email addresses, separated by commas"
-            className="flex-1"
-            value={emailsInput}
-            onChange={(e) => setEmailsInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-          <Button
-            className="flex items-center"
-            onClick={handleEmailsSubmit}
-            disabled={!emailsInput.trim() || isInviting}
-          >
-            <Icon name="send" />
-            {isInviting ? "Sending..." : "Send Invitations"}
-          </Button>
+          {!inviteLinkEnabled && !loadingInviteLink && (
+            <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">Invite link is currently disabled.</div>
+          )}
+
+          {inviteLinkEnabled && inviteLinkUrl && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="flex-1 rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 break-all">
+                {inviteLinkUrl}
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleCopyInviteLink}
+                disabled={!inviteLinkUrl || loadingInviteLink || inviteLinkBusy}
+              >
+                <Icon name="copy" />
+                Copy link
+              </Button>
+            </div>
+          )}
         </div>
-      </div>
+      ) : (
+        <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+          <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">Invite link to add members</Text>
+          <Text className="text-sm text-gray-500 dark:text-gray-400">
+            Reach out to an organization owner or admin to invite new members.
+          </Text>
+        </div>
+      )}
 
       {/* Members List */}
       <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              {/* Tab Navigation */}
-              <div className="flex border border-gray-300 dark:border-gray-700 rounded-lg p-1">
-                <button
-                  onClick={() => setActiveTab("all")}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                    activeTab === "all"
-                      ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-white"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
-                  }`}
-                >
-                  All ({totalCount})
-                </button>
-                <button
-                  onClick={() => setActiveTab("active")}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                    activeTab === "active"
-                      ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-white"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
-                  }`}
-                >
-                  Active ({activeCount})
-                </button>
-                <button
-                  onClick={() => setActiveTab("invited")}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                    activeTab === "invited"
-                      ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-white"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
-                  }`}
-                >
-                  Invited ({invitedCount})
-                </button>
-              </div>
-            </div>
+            <Text className="text-sm font-medium text-gray-600 dark:text-gray-300">Members ({members.length})</Text>
           </div>
         </div>
 
@@ -402,7 +327,7 @@ export function Members({ organizationId }: MembersProps) {
               <p>{removalError}</p>
             </div>
           )}
-          {loadingMembers || loadingInvitations ? (
+          {loadingMembers ? (
             <div className="flex justify-center items-center h-32">
               <p className="text-gray-500 dark:text-gray-400">Loading...</p>
             </div>
@@ -452,63 +377,52 @@ export function Members({ organizationId }: MembersProps) {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {getFilteredMembers().map((member) => (
+                {getSortedMembers().map((member) => (
                   <TableRow key={member.id} className="last:[&>td]:border-b-0">
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <Avatar
-                          src={member.type === "member" ? member.avatar : undefined}
-                          initials={member.initials}
-                          className="size-8"
-                        />
+                        <Avatar src={member.avatar} initials={member.initials} className="size-8" />
                         <div>
                           <div className="text-sm font-medium text-gray-800 dark:text-white">{member.name}</div>
-                          {member.type === "invitation" && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Invited {formatDate(member.createdAt)}
-                            </div>
-                          )}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>{member.email}</TableCell>
                     {isRBACEnabled() && (
                       <TableCell>
-                        {member.type === "member" ? (
-                          <Dropdown>
-                            <DropdownButton className="flex items-center gap-2 text-sm">
-                              {member.role}
-                              <Icon name="chevron-down" />
-                            </DropdownButton>
-                            <DropdownMenu>
-                              {organizationRoles.map((role) => (
-                                <DropdownItem
-                                  key={role.metadata?.name}
-                                  onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
-                                  disabled={loadingRoles}
-                                >
-                                  <DropdownLabel>{role.spec?.displayName || role.metadata?.name}</DropdownLabel>
-                                  {role.spec?.description && (
-                                    <DropdownDescription>{role.spec?.description}</DropdownDescription>
-                                  )}
-                                </DropdownItem>
-                              ))}
-                              {loadingRoles && (
-                                <DropdownItem disabled>
-                                  <DropdownLabel>Loading roles...</DropdownLabel>
-                                </DropdownItem>
-                              )}
-                            </DropdownMenu>
-                          </Dropdown>
-                        ) : (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">-</span>
-                        )}
+                        <Dropdown>
+                          <DropdownButton className="flex items-center gap-2 text-sm">
+                            {member.role}
+                            <Icon name="chevron-down" />
+                          </DropdownButton>
+                          <DropdownMenu>
+                            {organizationRoles.map((role) => (
+                              <DropdownItem
+                                key={role.metadata?.name}
+                                onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
+                                disabled={loadingRoles}
+                              >
+                                <DropdownLabel>{role.spec?.displayName || role.metadata?.name}</DropdownLabel>
+                                {role.spec?.description && (
+                                  <DropdownDescription>{role.spec?.description}</DropdownDescription>
+                                )}
+                              </DropdownItem>
+                            ))}
+                            {loadingRoles && (
+                              <DropdownItem disabled>
+                                <DropdownLabel>Loading roles...</DropdownLabel>
+                              </DropdownItem>
+                            )}
+                          </DropdownMenu>
+                        </Dropdown>
                       </TableCell>
                     )}
-                    <TableCell>{getStateBadge(member)}</TableCell>
+                    <TableCell>
+                      <Badge color="green">Active</Badge>
+                    </TableCell>
                     <TableCell>
                       <div className="flex justify-end">
-                        {member.type === "member" && ownerIds.has(member.id) && ownerIds.size <= 1 ? (
+                        {ownerIds.has(member.id) && ownerIds.size <= 1 ? (
                           <Dropdown>
                             <DropdownButton className="flex items-center gap-2 text-sm">
                               <Icon name="ellipsis-vertical" size="sm" />
@@ -531,7 +445,7 @@ export function Members({ organizationId }: MembersProps) {
                                 onClick={() => handleMemberRemove(member)}
                               >
                                 <Icon name="x" size="sm" />
-                                {member.type === "member" ? "Remove" : "Cancel invitation"}
+                                Remove
                               </DropdownItem>
                             </DropdownMenu>
                           </Dropdown>
@@ -540,7 +454,7 @@ export function Members({ organizationId }: MembersProps) {
                     </TableCell>
                   </TableRow>
                 ))}
-                {getFilteredMembers().length === 0 && (
+                {getSortedMembers().length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8">
                       <div className="text-gray-500 dark:text-gray-400">

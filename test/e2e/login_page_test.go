@@ -18,7 +18,7 @@ func TestLoginPage(t *testing.T) {
 		steps.Start()
 		steps.VisitProtectedRandomURL()
 		steps.AssertRedirectedToLoginWithRedirectParam()
-		steps.AssertEmailLoginHasRedirectParam()
+		steps.AssertAuthLinksHaveRedirectParam()
 	})
 
 	t.Run("after login user should be redirected back original URL", func(t *testing.T) {
@@ -73,7 +73,7 @@ func (steps *TestLoginPageSteps) VisitProtectedRandomURL() {
 }
 
 func (steps *TestLoginPageSteps) AssertLoginPageVisible() {
-	steps.session.AssertVisible(q.Text("Email & Password"))
+	steps.session.AssertVisible(q.Text("Login"))
 }
 
 func (steps *TestLoginPageSteps) AssertRedirectedToLoginWithRedirectParam() {
@@ -91,12 +91,20 @@ func (steps *TestLoginPageSteps) AssertRedirectedFromLoginPage() {
 	assert.False(steps.t, strings.Contains(currentURL, "/login"), "expected to redirect away from login, got %s", currentURL)
 }
 
-func (steps *TestLoginPageSteps) AssertEmailLoginHasRedirectParam() {
-	link := steps.session.Page().Locator(`a[href^="/login/email"]`).First()
-	href, err := link.GetAttribute("href")
+func (steps *TestLoginPageSteps) AssertAuthLinksHaveRedirectParam() {
+	links := steps.session.Page().Locator(`a[href^="/auth/"]`)
+	count, err := links.Count()
 	assert.NoError(steps.t, err)
-	assert.NotEmpty(steps.t, href)
-	assert.Contains(steps.t, href, "redirect=")
+	if count == 0 {
+		return
+	}
+
+	for i := 0; i < count; i++ {
+		href, hrefErr := links.Nth(i).GetAttribute("href")
+		assert.NoError(steps.t, hrefErr)
+		assert.NotEmpty(steps.t, href)
+		assert.Contains(steps.t, href, "redirect=")
+	}
 }
 
 func (steps *TestLoginPageSteps) LoginAndReturnToRedirectedURL() {

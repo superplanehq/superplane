@@ -105,6 +105,51 @@ service Organizations {
     };
   }
 
+  rpc GetInviteLink(GetInviteLinkRequest) returns (GetInviteLinkResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/invite-link"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get an organization invite link";
+      description: "Returns the invite link for an organization";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateInviteLink(UpdateInviteLinkRequest) returns (UpdateInviteLinkResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id}/invite-link"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update an organization invite link";
+      description: "Enables or disables the invite link for an organization";
+      tags: "Organization";
+    };
+  }
+
+  rpc ResetInviteLink(ResetInviteLinkRequest) returns (ResetInviteLinkResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/invite-link/reset"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Reset an organization invite link";
+      description: "Generates a new invite link token for an organization";
+      tags: "Organization";
+    };
+  }
+
+  rpc AcceptInviteLink(InviteLink) returns (google.protobuf.Struct) {
+    option (google.api.http) = {
+      post: "/api/v1/invite-links/{token}/accept"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Accept an invite link";
+      description: "Accepts an organization invite link for the authenticated account";
+      tags: "Organization";
+    };
+  }
+
   rpc ListApplications(ListApplicationsRequest) returns (ListApplicationsResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/applications"
@@ -217,6 +262,15 @@ message Invitation {
   google.protobuf.Timestamp created_at = 5;
 }
 
+message InviteLink {
+  string id = 1;
+  string organization_id = 2;
+  string token = 3;
+  bool enabled = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
 message CreateInvitationRequest {
   string id = 1;
   string email = 2;
@@ -240,6 +294,31 @@ message RemoveInvitationRequest {
 }
 
 message RemoveInvitationResponse {}
+
+message GetInviteLinkRequest {
+  string id = 1;
+}
+
+message GetInviteLinkResponse {
+  InviteLink invite_link = 1;
+}
+
+message UpdateInviteLinkRequest {
+  string id = 1;
+  bool enabled = 2;
+}
+
+message UpdateInviteLinkResponse {
+  InviteLink invite_link = 1;
+}
+
+message ResetInviteLinkRequest {
+  string id = 1;
+}
+
+message ResetInviteLinkResponse {
+  InviteLink invite_link = 1;
+}
 
 message RemoveUserRequest {
   string id = 1;

@@ -18,8 +18,11 @@ func Test__OnBranchCreated__HandleWebhook(t *testing.T) {
 	trigger := &OnBranchCreated{}
 
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("X-GitHub-Event", "create")
+
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers: http.Header{},
+			Headers: headers,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
