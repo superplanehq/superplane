@@ -165,7 +165,7 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 
 	appEnv := os.Getenv("APP_ENV")
 	templateDir := os.Getenv("TEMPLATE_DIR")
-	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes" || os.Getenv("BLOCK_SINGUP") == "yes"
+	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
 
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
 	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
