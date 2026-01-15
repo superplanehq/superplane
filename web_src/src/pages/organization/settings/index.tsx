@@ -19,11 +19,11 @@ import { cn } from "@/lib/utils";
 import {
   AppWindow,
   ArrowRightLeft,
-  Building,
   CircleUser,
+  Home,
   LogOut,
-  Palette,
   Plug,
+  Settings,
   Shield,
   User as UserIcon,
   Users,
@@ -99,8 +99,8 @@ export function OrganizationSettings() {
   const userEmail = user?.email || "";
 
   const organizationLinks: NavLink[] = [
-    { id: "canvases", label: "Canvases", href: `/${organizationId}`, Icon: Palette },
-    { id: "general", label: "Settings", href: `/${organizationId}/settings/general`, Icon: Building },
+    { id: "canvases", label: "Canvases", href: `/${organizationId}`, Icon: Home },
+    { id: "general", label: "Settings", href: `/${organizationId}/settings/general`, Icon: Settings },
     { id: "members", label: "Members", href: `/${organizationId}/settings/members`, Icon: UserIcon },
     { id: "groups", label: "Groups", href: `/${organizationId}/settings/groups`, Icon: Users },
     ...(isRBACEnabled()

@@ -145,6 +145,7 @@ const HomePage = () => {
       canvasModalState.onOpen();
     }
   };
+  const showTabs = false;
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
@@ -160,12 +161,14 @@ const HomePage = () => {
 
             {!(activeTab === "canvases" && workflows.length === 0 && !searchQuery) && (
               <>
-                <Tabs
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  blueprints={filteredBlueprints}
-                  workflows={filteredWorkflows}
-                />
+                {showTabs && (
+                  <Tabs
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    blueprints={filteredBlueprints}
+                    workflows={filteredWorkflows}
+                  />
+                )}
 
                 <div className="flex flex-col sm:flex-row gap-4 mb-6 justify-between">
                   <SearchBar activeTab={activeTab} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
