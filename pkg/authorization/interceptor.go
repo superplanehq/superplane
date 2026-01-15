@@ -81,7 +81,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbOrganization.Organizations_RemoveInvitation_FullMethodName:     {Resource: "member", Action: "delete", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_UpdateOrganization_FullMethodName:   {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_CreateInvitation_FullMethodName:     {Resource: "member", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_GetInviteLink_FullMethodName:        {Resource: "member", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_GetInviteLink_FullMethodName:        {Resource: "member", Action: "create", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_UpdateInviteLink_FullMethodName:     {Resource: "member", Action: "create", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_ResetInviteLink_FullMethodName:      {Resource: "member", Action: "create", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_RemoveUser_FullMethodName:           {Resource: "member", Action: "delete", DomainType: models.DomainTypeOrganization},
