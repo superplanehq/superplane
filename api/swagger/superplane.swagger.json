@@ -2885,6 +2885,9 @@
             "type": "object",
             "$ref": "#/definitions/TriggersTrigger"
           }
+        },
+        "installationInstructions": {
+          "type": "string"
         }
       }
     },

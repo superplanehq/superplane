@@ -12,7 +12,8 @@ CREATE TABLE app_installation_subscriptions (
   PRIMARY KEY (id),
   FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE,
   FOREIGN KEY (installation_id) REFERENCES app_installations(id) ON DELETE CASCADE,
-  FOREIGN KEY (workflow_id, node_id) REFERENCES workflow_nodes(workflow_id, node_id) ON DELETE CASCADE
+  FOREIGN KEY (workflow_id, node_id) REFERENCES workflow_nodes(workflow_id, node_id) ON DELETE CASCADE,
+  UNIQUE (installation_id, workflow_id, node_id)
 );
 
 CREATE INDEX idx_app_installation_subscriptions_installation ON app_installation_subscriptions(installation_id);

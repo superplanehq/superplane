@@ -76,6 +76,10 @@ func (p *PagerDuty) Description() string {
 	return "Manage and react to incidents in PagerDuty"
 }
 
+func (p *PagerDuty) InstallationInstructions() string {
+	return ""
+}
+
 func (p *PagerDuty) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

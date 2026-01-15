@@ -47,7 +47,7 @@ func Test__OnAppMention__Setup(t *testing.T) {
 		assert.Nil(t, stored.Channel)
 	})
 
-	t.Run("metadata already set -> no-op", func(t *testing.T) {
+	t.Run("same channel -> no-op", func(t *testing.T) {
 		subscriptionID := uuid.NewString()
 		metadata := &contexts.MetadataContext{Metadata: AppMentionMetadata{
 			AppSubscriptionID: &subscriptionID,
@@ -63,6 +63,44 @@ func Test__OnAppMention__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Empty(t, appCtx.Subscriptions)
+	})
+
+	t.Run("different channel -> subscribes and stores channel metadata", func(t *testing.T) {
+		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
+			assert.Equal(t, "https://slack.com/api/conversations.info", req.URL.Scheme+"://"+req.URL.Host+req.URL.Path)
+			assert.Equal(t, "C456", req.URL.Query().Get("channel"))
+			return jsonResponse(http.StatusOK, `{"ok": true, "channel": {"id": "C456", "name": "random"}}`), nil
+		})
+
+		subscriptionID := uuid.NewString()
+		metadata := &contexts.MetadataContext{
+			Metadata: AppMentionMetadata{
+				AppSubscriptionID: &subscriptionID,
+				Channel:           &ChannelMetadata{ID: "C123", Name: "general"},
+			},
+		}
+
+		appCtx := &contexts.AppInstallationContext{
+			Configuration: map[string]any{
+				"botToken": "token-123",
+			},
+		}
+
+		err := trigger.Setup(core.TriggerContext{
+			AppInstallation: appCtx,
+			Metadata:        metadata,
+			Configuration:   map[string]any{"channel": "C456"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, appCtx.Subscriptions, 0)
+
+		stored, ok := metadata.Metadata.(AppMentionMetadata)
+		require.True(t, ok)
+		require.NotNil(t, stored.AppSubscriptionID)
+		require.NotNil(t, stored.Channel)
+		assert.Equal(t, "C456", stored.Channel.ID)
+		assert.Equal(t, "random", stored.Channel.Name)
 	})
 
 	t.Run("valid configuration -> subscribes and stores metadata", func(t *testing.T) {
@@ -125,7 +163,11 @@ func Test__OnAppMention__Setup(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.Len(t, appCtx.Subscriptions, 1)
+
+		//
+		// Does not subscribe again
+		//
+		require.Len(t, appCtx.Subscriptions, 0)
 
 		stored, ok := metadata.Metadata.(AppMentionMetadata)
 		require.True(t, ok)

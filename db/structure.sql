@@ -583,6 +583,14 @@ ALTER TABLE ONLY public.app_installation_secrets
 
 
 --
+-- Name: app_installation_subscriptions app_installation_subscription_installation_id_workflow_id_n_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_installation_subscriptions
+    ADD CONSTRAINT app_installation_subscription_installation_id_workflow_id_n_key UNIQUE (installation_id, workflow_id, node_id);
+
+
+--
 -- Name: app_installation_subscriptions app_installation_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 

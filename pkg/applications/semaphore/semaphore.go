@@ -41,6 +41,10 @@ func (s *Semaphore) Description() string {
 	return "Run and react to your Semaphore workflows"
 }
 
+func (s *Semaphore) InstallationInstructions() string {
+	return ""
+}
+
 func (s *Semaphore) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

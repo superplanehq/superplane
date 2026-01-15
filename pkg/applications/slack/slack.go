@@ -23,12 +23,17 @@ import (
 const (
 	appBootstrapDescription = `
 To complete the Slack app setup:
-1.  The "**Create Slack App**" button/link will take you to Slack with the app manifest pre-filled
-2.  Review the manifest and click "**Next**", then "**Create**"
+1.  The "**Continue**" button will take you to Slack with the app manifest pre-filled
+2.  Choose the workspace, and click "**Next**"
+3.  Review the manifest, and click "**Create**"
 3.  **Get Signing Secret**: In "Basic Information" section, copy the "**Signing Secret**"
 4.  **Install App**: In OAuth & Permissions, click "**Install to Workspace**" and authorize
 5.  **Get Bot Token**: In "OAuth & Permissions", copy the "**Bot User OAuth Token**"
 6.  **Update Configuration**: Paste the "Bot User OAuth Token" and "Signing Secret" into the app installation configuration fields in SuperPlane and save
+`
+	installationInstructions = `
+You can install the Slack app without the **Bot Token** and **Signing Secret**.
+After installation, follow the setup prompt to create the Slack app and add those values.
 `
 )
 
@@ -61,6 +66,10 @@ func (s *Slack) Icon() string {
 
 func (s *Slack) Description() string {
 	return "Send and react to Slack messages and interactions"
+}
+
+func (s *Slack) InstallationInstructions() string {
+	return installationInstructions
 }
 
 func (s *Slack) Configuration() []configuration.Field {
@@ -329,11 +338,9 @@ func (s *Slack) handleChallenge(ctx core.HTTPRequestContext, payload EventPayloa
 	}
 
 	challenge := payload.Challenge
-	ctx.Response.WriteHeader(http.StatusOK)
 	_, err := ctx.Response.Write([]byte(challenge))
 	if err != nil {
 		ctx.Logger.Errorf("error writing challenge: %v", err)
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }

@@ -31,6 +31,11 @@ type Application interface {
 	Description() string
 
 	/*
+	 * Markdown-formatted instructions shown in the installation modal.
+	 */
+	InstallationInstructions() string
+
+	/*
 	 * The configuration fields of the application.
 	 */
 	Configuration() []configuration.Field
