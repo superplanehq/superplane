@@ -57,20 +57,6 @@ type NodeSubscription struct {
 	Configuration datatypes.JSONType[any]
 }
 
-func FindAppSubscriptionForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string, installationID uuid.UUID) (*NodeSubscription, error) {
-	var subscription NodeSubscription
-	err := tx.
-		Where("workflow_id = ? AND node_id = ? AND installation_id = ?", workflowID, nodeID, installationID).
-		First(&subscription).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &subscription, nil
-}
-
 func ListAppSubscriptions(tx *gorm.DB, installationID uuid.UUID) ([]NodeSubscription, error) {
 	var subscriptions []NodeSubscription
 
