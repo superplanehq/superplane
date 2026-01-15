@@ -1,17 +1,24 @@
-export interface QueryGraphQLConfiguration {
+export interface QueryPrometheusConfiguration {
   query: string;
-  variables?: Record<string, any>;
+  dataset: string;
+  type: "instant" | "range";
+  start?: string;
+  end?: string;
+  step?: string;
 }
 
-export interface QueryGraphQLMetadata {
+export interface QueryPrometheusMetadata {
   // No metadata needed initially
 }
 
-export interface GraphQLResponse {
-  data?: Record<string, any>;
-  errors?: Array<{
-    message: string;
-    locations?: Array<{ line: number; column: number }>;
-    path?: any[];
-  }>;
+export interface PrometheusResponse {
+  status: string;
+  data: {
+    resultType: string;
+    result: Array<{
+      metric: Record<string, string>;
+      value?: [number, string];
+      values?: Array<[number, string]>;
+    }>;
+  };
 }

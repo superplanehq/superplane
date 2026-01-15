@@ -37,7 +37,7 @@ func (d *Dash0) Icon() string {
 }
 
 func (d *Dash0) Description() string {
-	return "Connect to Dash0 to query data using GraphQL"
+	return "Connect to Dash0 to query data using Prometheus API"
 }
 
 func (d *Dash0) Configuration() []configuration.Field {
@@ -52,18 +52,18 @@ func (d *Dash0) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "baseURL",
-			Label:       "Base URL",
+			Label:       "Prometheus API Base URL",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Your Dash0 Cloud API base URL. Find this in your Dash0 dashboard under Organization Settings > Endpoints Reference. Example: https://your-organization.dash0.com (without /graphql)",
-			Placeholder: "https://your-organization.dash0.com",
+			Description: "Your Dash0 Prometheus API base URL. Find this in Dash0 dashboard: Organization Settings > Endpoints > Prometheus API. You can use either the full endpoint URL (https://api.us-west-2.aws.dash0.com/api/prometheus) or just the base URL (https://api.us-west-2.aws.dash0.com)",
+			Placeholder: "https://api.us-west-2.aws.dash0.com",
 		},
 	}
 }
 
 func (d *Dash0) Components() []core.Component {
 	return []core.Component{
-		&QueryGraphQL{},
+		&QueryPrometheus{},
 	}
 }
 
@@ -92,9 +92,9 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	// Test with a simple introspection query to validate the connection
-	testQuery := `query { __typename }`
-	_, err = client.ExecuteGraphQL(testQuery, nil)
+	// Test with a simple PromQL query to validate the connection
+	testQuery := "up"
+	_, err = client.ExecutePrometheusInstantQuery(testQuery, "default")
 	if err != nil {
 		return fmt.Errorf("error validating connection: %v", err)
 	}

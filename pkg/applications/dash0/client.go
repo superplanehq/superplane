@@ -1,11 +1,11 @@
 package dash0
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -23,17 +23,18 @@ func NewClient(http core.HTTPContext, ctx core.AppInstallationContext) (*Client,
 		return nil, fmt.Errorf("error getting api token: %v", err)
 	}
 
-	// Default to empty - user must provide their organization-specific URL
-	// Dash0 Cloud uses organization-specific URLs like https://your-org.dash0.com
 	baseURL := ""
 	baseURLConfig, err := ctx.GetConfig("baseURL")
 	if err == nil && baseURLConfig != nil && len(baseURLConfig) > 0 {
 		baseURL = strings.TrimSuffix(string(baseURLConfig), "/")
 	}
-	
+
 	if baseURL == "" {
 		return nil, fmt.Errorf("baseURL is required for Dash0 Cloud. Find your API URL in Dash0 dashboard under Organization Settings > Endpoints Reference")
 	}
+
+	// Strip /api/prometheus if user included it in the base URL
+	baseURL = strings.TrimSuffix(baseURL, "/api/prometheus")
 
 	return &Client{
 		Token:   string(apiToken),
@@ -42,15 +43,17 @@ func NewClient(http core.HTTPContext, ctx core.AppInstallationContext) (*Client,
 	}, nil
 }
 
-func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
+func (c *Client) execRequest(method, url string, body io.Reader, contentType string) ([]byte, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("error building request: %v", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -70,58 +73,77 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	return responseBody, nil
 }
 
-type GraphQLRequest struct {
-	Query     string         `json:"query"`
-	Variables map[string]any `json:"variables,omitempty"`
+type PrometheusResponse struct {
+	Status string                 `json:"status"`
+	Data   PrometheusResponseData `json:"data"`
 }
 
-type GraphQLResponse struct {
-	Data   map[string]any `json:"data"`
-	Errors []GraphQLError  `json:"errors,omitempty"`
+type PrometheusResponseData struct {
+	ResultType string                      `json:"resultType"`
+	Result     []PrometheusQueryResult    `json:"result"`
 }
 
-type GraphQLError struct {
-	Message   string                 `json:"message"`
-	Locations []GraphQLErrorLocation `json:"locations,omitempty"`
-	Path      []any                  `json:"path,omitempty"`
+type PrometheusQueryResult struct {
+	Metric map[string]string `json:"metric"`
+	Value  []interface{}     `json:"value,omitempty"`  // For instant queries: [timestamp, value]
+	Values [][]interface{}   `json:"values,omitempty"` // For range queries: [[timestamp, value], ...]
 }
 
-type GraphQLErrorLocation struct {
-	Line   int `json:"line"`
-	Column int `json:"column"`
-}
+func (c *Client) ExecutePrometheusInstantQuery(promQLQuery, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/prometheus/api/v1/query", c.BaseURL)
 
-func (c *Client) ExecuteGraphQL(query string, variables map[string]any) (map[string]any, error) {
-	request := GraphQLRequest{
-		Query:     query,
-		Variables: variables,
-	}
+	data := url.Values{}
+	data.Set("dataset", dataset)
+	data.Set("query", promQLQuery)
 
-	body, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling request: %v", err)
-	}
-
-	url := fmt.Sprintf("%s/graphql", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	responseBody, err := c.execRequest(http.MethodPost, apiURL, strings.NewReader(data.Encode()), "application/x-www-form-urlencoded")
 	if err != nil {
 		return nil, err
 	}
 
-	var response GraphQLResponse
+	var response PrometheusResponse
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
-	// Check for GraphQL errors
-	if len(response.Errors) > 0 {
-		errorMessages := make([]string, len(response.Errors))
-		for i, err := range response.Errors {
-			errorMessages[i] = err.Message
-		}
-		return nil, fmt.Errorf("graphql errors: %s", strings.Join(errorMessages, "; "))
+	if response.Status != "success" {
+		return nil, fmt.Errorf("prometheus query failed with status: %s", response.Status)
 	}
 
-	return response.Data, nil
+	return map[string]any{
+		"status": response.Status,
+		"data":   response.Data,
+	}, nil
+}
+
+func (c *Client) ExecutePrometheusRangeQuery(promQLQuery, dataset, start, end, step string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/prometheus/api/v1/query_range", c.BaseURL)
+
+	data := url.Values{}
+	data.Set("dataset", dataset)
+	data.Set("query", promQLQuery)
+	data.Set("start", start)
+	data.Set("end", end)
+	data.Set("step", step)
+
+	responseBody, err := c.execRequest(http.MethodPost, apiURL, strings.NewReader(data.Encode()), "application/x-www-form-urlencoded")
+	if err != nil {
+		return nil, err
+	}
+
+	var response PrometheusResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if response.Status != "success" {
+		return nil, fmt.Errorf("prometheus query failed with status: %s", response.Status)
+	}
+
+	return map[string]any{
+		"status": response.Status,
+		"data":   response.Data,
+	}, nil
 }

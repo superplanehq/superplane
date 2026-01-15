@@ -10,9 +10,9 @@ import { getState, getStateMap, getTriggerRenderer } from "..";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import { QueryGraphQLConfiguration } from "./types";
+import { QueryPrometheusConfiguration } from "./types";
 
-export const queryGraphQLMapper: ComponentBaseMapper = {
+export const queryPrometheusMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
@@ -38,14 +38,19 @@ export const queryGraphQLMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default: OutputPayload[] };
-    const responseData = outputs.default[0]?.data as Record<string, any>;
+    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    
+    if (!outputs || !outputs.default || outputs.default.length === 0) {
+      return { Response: "No data returned" };
+    }
+
+    const responseData = outputs.default[0]?.data as Record<string, any> | undefined;
 
     if (!responseData) {
       return { Response: "No data returned" };
     }
 
-    // Format the GraphQL response data for display
+    // Format the Prometheus response data for display
     const details: Record<string, string> = {};
     try {
       const formatted = JSON.stringify(responseData, null, 2);
@@ -60,7 +65,7 @@ export const queryGraphQLMapper: ComponentBaseMapper = {
 
 function metadataList(node: ComponentsNode): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as QueryGraphQLConfiguration;
+  const configuration = node.configuration as QueryPrometheusConfiguration;
 
   if (configuration?.query) {
     // Show a preview of the query (first 50 chars)
@@ -70,11 +75,12 @@ function metadataList(node: ComponentsNode): MetadataItem[] {
     metadata.push({ icon: "code", label: queryPreview });
   }
 
-  if (configuration?.variables && Object.keys(configuration.variables).length > 0) {
-    metadata.push({
-      icon: "settings",
-      label: `${Object.keys(configuration.variables).length} variable(s)`,
-    });
+  if (configuration?.dataset) {
+    metadata.push({ icon: "database", label: `Dataset: ${configuration.dataset}` });
+  }
+
+  if (configuration?.type) {
+    metadata.push({ icon: "funnel", label: `Type: ${configuration.type}` });
   }
 
   return metadata;
