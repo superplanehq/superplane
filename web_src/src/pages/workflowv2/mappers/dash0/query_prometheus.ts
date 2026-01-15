@@ -5,7 +5,6 @@ import {
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
@@ -25,9 +24,9 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
 
     return {
       iconSrc: dash0Icon,
-      iconBackground: "bg-blue-500",
-      headerColor: getBackgroundColorClass(componentDefinition.color),
-      collapsedBackground: getBackgroundColorClass(componentDefinition.color),
+      iconBackground: "bg-white",
+      headerColor: "bg-white",
+      collapsedBackground: "bg-white",
       collapsed: node.isCollapsed,
       title: node.name!,
       eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
@@ -65,7 +64,7 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
 
 function metadataList(node: ComponentsNode): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as QueryPrometheusConfiguration;
+  const configuration = node.configuration as unknown as QueryPrometheusConfiguration;
 
   if (configuration?.query) {
     // Show a preview of the query (first 50 chars)
