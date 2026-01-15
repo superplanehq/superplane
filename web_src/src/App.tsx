@@ -58,9 +58,6 @@ function AppRouter() {
         <Routes>
           {/* public routes */}
           <Route path="login" element={<Login />} />
-          <Route path="login/email" element={<Login />} />
-          <Route path="signup" element={<Login />} />
-          <Route path="signup/email" element={<Login />} />
           <Route path="create" element={<OrganizationCreate />} />
           <Route path="setup" element={<OwnerSetup />} />
 
