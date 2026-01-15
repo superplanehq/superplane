@@ -15,11 +15,13 @@ import (
 
 func Test__OnIssue__HandleWebhook(t *testing.T) {
 	trigger := &OnIssue{}
-	eventType := "issue"
+	eventType := "issues"
 
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("X-GitHub-Event", eventType)
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers: http.Header{},
+			Headers: headers,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)

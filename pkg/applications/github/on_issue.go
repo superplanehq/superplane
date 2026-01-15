@@ -120,7 +120,16 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	code, err := verifySignature(ctx, "issue")
+	eventType := ctx.Headers.Get("X-GitHub-Event")
+	if eventType == "" {
+		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
+	}
+
+	if eventType != "issues" {
+		return http.StatusOK, nil
+	}
+
+	code, err := verifySignature(ctx)
 	if err != nil {
 		return code, err
 	}
