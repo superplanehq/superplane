@@ -100,7 +100,16 @@ func (p *OnPullRequestReviewComment) HandleWebhook(ctx core.WebhookRequestContex
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	code, err := verifySignature(ctx, "pull_request_review_comment")
+	eventType := ctx.Headers.Get("X-GitHub-Event")
+	if eventType == "" {
+		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
+	}
+
+	if eventType != "pull_request_review_comment" {
+		return http.StatusOK, nil
+	}
+
+	code, err := verifySignature(ctx)
 	if err != nil {
 		return code, err
 	}
