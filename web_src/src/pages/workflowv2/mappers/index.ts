@@ -29,6 +29,11 @@ import {
   triggerRenderers as pagerdutyTriggerRenderers,
   eventStateRegistry as pagerdutyEventStateRegistry,
 } from "./pagerduty/index";
+import {
+  componentMappers as dash0ComponentMappers,
+  triggerRenderers as dash0TriggerRenderers,
+  eventStateRegistry as dash0EventStateRegistry,
+} from "./dash0/index";
 import { timeGateMapper } from "./timegate";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper } from "./wait";
@@ -60,18 +65,21 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
   pagerduty: pagerdutyComponentMappers,
+  dash0: dash0ComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
+  dash0: dash0TriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
+  dash0: dash0EventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
