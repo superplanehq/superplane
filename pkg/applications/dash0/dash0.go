@@ -16,8 +16,8 @@ func init() {
 type Dash0 struct{}
 
 type Configuration struct {
-	APIToken *string `json:"apiToken"`
-	BaseURL  *string `json:"baseURL"`
+	APIToken string `json:"apiToken"`
+	BaseURL  string `json:"baseURL"`
 }
 
 type Metadata struct {
@@ -80,11 +80,11 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode config: %v", err)
 	}
 
-	if configuration.APIToken == nil || *configuration.APIToken == "" {
+	if configuration.APIToken == "" {
 		return fmt.Errorf("apiToken is required")
 	}
 
-	if configuration.BaseURL == nil || *configuration.BaseURL == "" {
+	if configuration.BaseURL == "" {
 		return fmt.Errorf("baseURL is required for Dash0 Cloud. Find your API URL in Dash0 dashboard under Organization Settings > Endpoints Reference")
 	}
 
