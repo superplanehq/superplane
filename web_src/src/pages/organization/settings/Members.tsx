@@ -236,10 +236,6 @@ export function Members({ organizationId }: MembersProps) {
     }
   };
 
-  const getStateBadge = (member: Member) => {
-    return <Badge color="green">Active</Badge>;
-  };
-
   return (
     <div className="space-y-6 pt-6">
       {error && (
@@ -425,7 +421,9 @@ export function Members({ organizationId }: MembersProps) {
                         </Dropdown>
                       </TableCell>
                     )}
-                    <TableCell>{getStateBadge(member)}</TableCell>
+                    <TableCell>
+                      <Badge color="green">Active</Badge>
+                    </TableCell>
                     <TableCell>
                       <div className="flex justify-end">
                         {ownerIds.has(member.id) && ownerIds.size <= 1 ? (

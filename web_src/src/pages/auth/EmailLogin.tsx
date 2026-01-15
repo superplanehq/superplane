@@ -145,29 +145,6 @@ const EmailLogin: React.FC = () => {
             </div>
           )}
 
-          {isSignupMode && (
-            <input
-              type="text"
-              name="name"
-              placeholder="Full name"
-              required
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                marginBottom: "12px",
-                borderRadius: "8px",
-                border: "1px solid #3d4859",
-                background: "#2a3441",
-                color: "#F9FAFC",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
-          )}
-
           <input
             type="email"
             name="email"
