@@ -13,6 +13,19 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
 }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
 
+  if (field.disallowExpression) {
+    return (
+      <Input
+        type={field.sensitive ? "password" : "text"}
+        value={currentValue}
+        onChange={(e) => onChange(e.target.value || undefined)}
+        placeholder={field.placeholder || ""}
+        className={hasError ? "border-red-500 border-2" : ""}
+        data-testid={toTestId(`string-field-${field.name}`)}
+      />
+    );
+  }
+
   if (field.sensitive) {
     return (
       <Input
