@@ -68,6 +68,9 @@ import type {
   IntegrationsListResourcesData,
   IntegrationsListResourcesResponse2,
   IntegrationsListResourcesError,
+  OrganizationsAcceptInviteLinkData,
+  OrganizationsAcceptInviteLinkResponse,
+  OrganizationsAcceptInviteLinkError,
   MeMeData,
   MeMeResponse,
   MeMeError,
@@ -110,6 +113,15 @@ import type {
   OrganizationsRemoveInvitationData,
   OrganizationsRemoveInvitationResponse2,
   OrganizationsRemoveInvitationError,
+  OrganizationsGetInviteLinkData,
+  OrganizationsGetInviteLinkResponse2,
+  OrganizationsGetInviteLinkError,
+  OrganizationsUpdateInviteLinkData,
+  OrganizationsUpdateInviteLinkResponse2,
+  OrganizationsUpdateInviteLinkError,
+  OrganizationsResetInviteLinkData,
+  OrganizationsResetInviteLinkResponse2,
+  OrganizationsResetInviteLinkError,
   OrganizationsRemoveUserData,
   OrganizationsRemoveUserResponse2,
   OrganizationsRemoveUserError,
@@ -616,6 +628,23 @@ export const integrationsListResources = <ThrowOnError extends boolean = true>(
 };
 
 /**
+ * Accept an invite link
+ * Accepts an organization invite link for the authenticated account
+ */
+export const organizationsAcceptInviteLink = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsAcceptInviteLinkData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).post<
+    OrganizationsAcceptInviteLinkResponse,
+    OrganizationsAcceptInviteLinkError,
+    ThrowOnError
+  >({
+    url: "/api/v1/invite-links/{token}/accept",
+    ...options,
+  });
+};
+
+/**
  * Get current user
  * Returns the currently authenticated user
  */
@@ -855,6 +884,61 @@ export const organizationsRemoveInvitation = <ThrowOnError extends boolean = tru
     ThrowOnError
   >({
     url: "/api/v1/organizations/{id}/invitations/{invitationId}",
+    ...options,
+  });
+};
+
+/**
+ * Get an organization invite link
+ * Returns the invite link for an organization
+ */
+export const organizationsGetInviteLink = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsGetInviteLinkData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    OrganizationsGetInviteLinkResponse2,
+    OrganizationsGetInviteLinkError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/invite-link",
+    ...options,
+  });
+};
+
+/**
+ * Update an organization invite link
+ * Enables or disables the invite link for an organization
+ */
+export const organizationsUpdateInviteLink = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsUpdateInviteLinkData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).patch<
+    OrganizationsUpdateInviteLinkResponse2,
+    OrganizationsUpdateInviteLinkError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/invite-link",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * Reset an organization invite link
+ * Generates a new invite link token for an organization
+ */
+export const organizationsResetInviteLink = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsResetInviteLinkData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).post<
+    OrganizationsResetInviteLinkResponse2,
+    OrganizationsResetInviteLinkError,
+    ThrowOnError
+  >({
+    url: "/api/v1/organizations/{id}/invite-link/reset",
     ...options,
   });
 };

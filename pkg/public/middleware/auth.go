@@ -257,7 +257,7 @@ func isAccountAPIPath(path string) bool {
 	case "/account", "/organizations":
 		return true
 	default:
-		return false
+		return strings.HasPrefix(path, "/api/v1/invite-links/")
 	}
 }
 

@@ -502,6 +502,10 @@ export type OrganizationsDescribeOrganizationResponse = {
   organization?: OrganizationsOrganization;
 };
 
+export type OrganizationsGetInviteLinkResponse = {
+  inviteLink?: OrganizationsInviteLink;
+};
+
 export type OrganizationsInstallApplicationBody = {
   appName?: string;
   installationName?: string;
@@ -520,6 +524,15 @@ export type OrganizationsInvitation = {
   email?: string;
   state?: string;
   createdAt?: string;
+};
+
+export type OrganizationsInviteLink = {
+  id?: string;
+  organizationId?: string;
+  token?: string;
+  enabled?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type OrganizationsListApplicationResourcesResponse = {
@@ -550,6 +563,10 @@ export type OrganizationsRemoveUserResponse = {
   [key: string]: unknown;
 };
 
+export type OrganizationsResetInviteLinkResponse = {
+  inviteLink?: OrganizationsInviteLink;
+};
+
 export type OrganizationsUninstallApplicationResponse = {
   [key: string]: unknown;
 };
@@ -562,6 +579,14 @@ export type OrganizationsUpdateApplicationBody = {
 
 export type OrganizationsUpdateApplicationResponse = {
   installation?: OrganizationsAppInstallation;
+};
+
+export type OrganizationsUpdateInviteLinkBody = {
+  enabled?: boolean;
+};
+
+export type OrganizationsUpdateInviteLinkResponse = {
+  inviteLink?: OrganizationsInviteLink;
 };
 
 export type OrganizationsUpdateOrganizationBody = {
@@ -1682,6 +1707,43 @@ export type IntegrationsListResourcesResponses = {
 export type IntegrationsListResourcesResponse2 =
   IntegrationsListResourcesResponses[keyof IntegrationsListResourcesResponses];
 
+export type OrganizationsAcceptInviteLinkData = {
+  body?: never;
+  path: {
+    token: string;
+  };
+  query?: {
+    id?: string;
+    organizationId?: string;
+    enabled?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+  url: "/api/v1/invite-links/{token}/accept";
+};
+
+export type OrganizationsAcceptInviteLinkErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsAcceptInviteLinkError =
+  OrganizationsAcceptInviteLinkErrors[keyof OrganizationsAcceptInviteLinkErrors];
+
+export type OrganizationsAcceptInviteLinkResponses = {
+  /**
+   * A successful response.
+   */
+  200: {
+    [key: string]: unknown;
+  };
+};
+
+export type OrganizationsAcceptInviteLinkResponse =
+  OrganizationsAcceptInviteLinkResponses[keyof OrganizationsAcceptInviteLinkResponses];
+
 export type MeMeData = {
   body?: never;
   path?: never;
@@ -2086,6 +2148,92 @@ export type OrganizationsRemoveInvitationResponses = {
 
 export type OrganizationsRemoveInvitationResponse2 =
   OrganizationsRemoveInvitationResponses[keyof OrganizationsRemoveInvitationResponses];
+
+export type OrganizationsGetInviteLinkData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/organizations/{id}/invite-link";
+};
+
+export type OrganizationsGetInviteLinkErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsGetInviteLinkError = OrganizationsGetInviteLinkErrors[keyof OrganizationsGetInviteLinkErrors];
+
+export type OrganizationsGetInviteLinkResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsGetInviteLinkResponse;
+};
+
+export type OrganizationsGetInviteLinkResponse2 =
+  OrganizationsGetInviteLinkResponses[keyof OrganizationsGetInviteLinkResponses];
+
+export type OrganizationsUpdateInviteLinkData = {
+  body: OrganizationsUpdateInviteLinkBody;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/organizations/{id}/invite-link";
+};
+
+export type OrganizationsUpdateInviteLinkErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsUpdateInviteLinkError =
+  OrganizationsUpdateInviteLinkErrors[keyof OrganizationsUpdateInviteLinkErrors];
+
+export type OrganizationsUpdateInviteLinkResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsUpdateInviteLinkResponse;
+};
+
+export type OrganizationsUpdateInviteLinkResponse2 =
+  OrganizationsUpdateInviteLinkResponses[keyof OrganizationsUpdateInviteLinkResponses];
+
+export type OrganizationsResetInviteLinkData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/organizations/{id}/invite-link/reset";
+};
+
+export type OrganizationsResetInviteLinkErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type OrganizationsResetInviteLinkError =
+  OrganizationsResetInviteLinkErrors[keyof OrganizationsResetInviteLinkErrors];
+
+export type OrganizationsResetInviteLinkResponses = {
+  /**
+   * A successful response.
+   */
+  200: OrganizationsResetInviteLinkResponse;
+};
+
+export type OrganizationsResetInviteLinkResponse2 =
+  OrganizationsResetInviteLinkResponses[keyof OrganizationsResetInviteLinkResponses];
 
 export type OrganizationsRemoveUserData = {
   body?: never;
