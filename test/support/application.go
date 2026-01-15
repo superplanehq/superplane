@@ -31,6 +31,10 @@ func (t *DummyApplication) Icon() string {
 	return "test"
 }
 
+func (t *DummyApplication) InstallationInstructions() string {
+	return "Just a dummy application used in unit tests"
+}
+
 func (t *DummyApplication) Description() string {
 	return "Just a dummy application used in unit tests"
 }

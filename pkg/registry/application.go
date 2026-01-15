@@ -40,6 +40,10 @@ func (s *PanicableApplication) Description() string {
 	return s.underlying.Description()
 }
 
+func (s *PanicableApplication) InstallationInstructions() string {
+	return s.underlying.InstallationInstructions()
+}
+
 func (s *PanicableApplication) Configuration() []configuration.Field {
 	return s.underlying.Configuration()
 }

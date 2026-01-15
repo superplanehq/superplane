@@ -29,6 +29,11 @@ import {
   triggerRenderers as pagerdutyTriggerRenderers,
   eventStateRegistry as pagerdutyEventStateRegistry,
 } from "./pagerduty/index";
+import {
+  componentMappers as slackComponentMappers,
+  triggerRenderers as slackTriggerRenderers,
+  eventStateRegistry as slackEventStateRegistry,
+} from "./slack";
 import { timeGateMapper } from "./timegate";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper } from "./wait";
@@ -60,18 +65,21 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
   pagerduty: pagerdutyComponentMappers,
+  slack: slackComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
+  slack: slackTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
+  slack: slackEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
