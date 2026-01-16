@@ -12,7 +12,7 @@ export const noopMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
+    componentDefinition: ComponentsComponent | undefined,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     _?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {

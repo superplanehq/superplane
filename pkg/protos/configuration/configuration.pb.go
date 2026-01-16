@@ -741,6 +741,7 @@ type ResourceTypeOptions struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Type           string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
 	UseNameAsValue bool                   `protobuf:"varint,2,opt,name=use_name_as_value,json=useNameAsValue,proto3" json:"use_name_as_value,omitempty"`
+	Multi          bool                   `protobuf:"varint,3,opt,name=multi,proto3" json:"multi,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -785,6 +786,13 @@ func (x *ResourceTypeOptions) GetType() string {
 func (x *ResourceTypeOptions) GetUseNameAsValue() bool {
 	if x != nil {
 		return x.UseNameAsValue
+	}
+	return false
+}
+
+func (x *ResourceTypeOptions) GetMulti() bool {
+	if x != nil {
+		return x.Multi
 	}
 	return false
 }
@@ -1295,10 +1303,11 @@ const file_configuration_proto_rawDesc = "" +
 	"\x11SelectTypeOptions\x12@\n" +
 	"\aoptions\x18\x01 \x03(\v2&.Superplane.Configuration.SelectOptionR\aoptions\"Z\n" +
 	"\x16MultiSelectTypeOptions\x12@\n" +
-	"\aoptions\x18\x01 \x03(\v2&.Superplane.Configuration.SelectOptionR\aoptions\"T\n" +
+	"\aoptions\x18\x01 \x03(\v2&.Superplane.Configuration.SelectOptionR\aoptions\"j\n" +
 	"\x13ResourceTypeOptions\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12)\n" +
-	"\x11use_name_as_value\x18\x02 \x01(\bR\x0euseNameAsValue\"\x87\x01\n" +
+	"\x11use_name_as_value\x18\x02 \x01(\bR\x0euseNameAsValue\x12\x14\n" +
+	"\x05multi\x18\x03 \x01(\bR\x05multi\"\x87\x01\n" +
 	"\x0fListTypeOptions\x12U\n" +
 	"\x0fitem_definition\x18\x01 \x01(\v2,.Superplane.Configuration.ListItemDefinitionR\x0eitemDefinition\x12\x1d\n" +
 	"\n" +

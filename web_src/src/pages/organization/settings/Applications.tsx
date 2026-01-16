@@ -18,6 +18,7 @@ import { Icon } from "@/components/Icon";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface ApplicationsProps {
@@ -45,6 +46,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
     "open-ai": openAiIcon,
     semaphore: SemaphoreLogo,
     pagerduty: pagerDutyIcon,
+    dash0: dash0Icon,
   };
 
   const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {

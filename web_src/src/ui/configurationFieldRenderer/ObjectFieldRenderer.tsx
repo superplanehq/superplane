@@ -5,6 +5,7 @@ import { ConfigurationFieldRenderer } from "./index";
 import { resolveIcon } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
+import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
 export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
@@ -23,6 +24,10 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   );
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const { handleEditorMount } = useMonacoExpressionAutocomplete({
+    autocompleteExampleObj,
+    languageId: "json",
+  });
 
   const objectOptions = field.typeOptions?.object;
   const schema = objectOptions?.schema;
@@ -68,6 +73,13 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
       cursorBlinking: "smooth" as const,
       contextmenu: true,
       selectOnLineNumbers: true,
+      suggestOnTriggerCharacters: true,
+      quickSuggestions: {
+        other: true,
+        strings: true,
+        comments: false,
+      },
+      wordBasedSuggestions: "off" as const,
     };
 
     return (
@@ -94,6 +106,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
               defaultLanguage="json"
               value={editorValue}
               onChange={handleEditorChange}
+              onMount={handleEditorMount}
               theme="vs"
               options={editorOptions}
             />
@@ -125,6 +138,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
                 defaultLanguage="json"
                 value={editorValue}
                 onChange={handleEditorChange}
+                onMount={handleEditorMount}
                 theme="vs"
                 options={{
                   ...editorOptions,

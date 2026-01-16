@@ -28,6 +28,11 @@ import {
   eventStateRegistry as pagerdutyEventStateRegistry,
 } from "./pagerduty/index";
 import {
+  componentMappers as dash0ComponentMappers,
+  triggerRenderers as dash0TriggerRenderers,
+  eventStateRegistry as dash0EventStateRegistry,
+} from "./dash0/index";
+import {
   componentMappers as slackComponentMappers,
   triggerRenderers as slackTriggerRenderers,
   eventStateRegistry as slackEventStateRegistry,
@@ -61,6 +66,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
   pagerduty: pagerdutyComponentMappers,
+  dash0: dash0ComponentMappers,
   slack: slackComponentMappers,
 };
 
@@ -68,6 +74,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
+  dash0: dash0TriggerRenderers,
   slack: slackTriggerRenderers,
 };
 
@@ -75,6 +82,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
+  dash0: dash0EventStateRegistry,
   slack: slackEventStateRegistry,
 };
 

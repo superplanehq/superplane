@@ -984,10 +984,14 @@ export function WorkflowPageV2() {
       }
 
       const exampleObj: Record<string, unknown> = {};
+      const nodeNames: Record<string, string> = {};
 
       chainNodeIds.forEach((chainNodeId) => {
         const chainNode = workflowNodes.find((node) => node.id === chainNodeId);
         if (!chainNode) return;
+        if (chainNode.name) {
+          nodeNames[chainNodeId] = chainNode.name;
+        }
 
         if (chainNode.type === "TYPE_TRIGGER") {
           const latestEvent = nodeEventsMap[chainNodeId]?.[0];
@@ -1011,7 +1015,21 @@ export function WorkflowPageV2() {
         }
       });
 
-      return Object.keys(exampleObj).length > 0 ? exampleObj : null;
+      if (Object.keys(exampleObj).length === 0) {
+        return null;
+      }
+
+      if (Object.keys(nodeNames).length > 0) {
+        exampleObj.__nodeNames = nodeNames;
+        Object.entries(nodeNames).forEach(([nodeId, nodeName]) => {
+          const value = exampleObj[nodeId];
+          if (value && typeof value === "object" && !Array.isArray(value)) {
+            (value as Record<string, unknown>).__nodeName = nodeName;
+          }
+        });
+      }
+
+      return exampleObj;
     },
     [workflow, nodeExecutionsMap, nodeEventsMap],
   );

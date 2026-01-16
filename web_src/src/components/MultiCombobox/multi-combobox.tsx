@@ -231,7 +231,7 @@ export function MultiCombobox<T extends { id: string }>({
                       }}
                       className="ml-1 hover:bg-gray-50 dark:hover:bg-gray-800/30 rounded transition-colors"
                     >
-                      <Icon name="close" size="sm" />
+                      <Icon name="x" size="sm" />
                     </button>
                   </span>
                 );
