@@ -17,10 +17,10 @@ export const noopMapper: ComponentBaseMapper = {
     _?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition?.name || node.component?.name || "noop";
+    const componentName = componentDefinition?.name ?? "noop";
 
     return {
-      iconSlug: componentDefinition?.icon || "circle-off",
+      iconSlug: componentDefinition?.icon ?? "circle-off",
       headerColor: "",
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",

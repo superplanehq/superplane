@@ -481,16 +481,6 @@ func validateFieldValue(field Field, value any) error {
 	case FieldTypeMultiSelect:
 		return validateMultiSelect(field, value)
 
-	case FieldTypeIntegration:
-		if _, ok := value.(string); !ok {
-			return fmt.Errorf("must be a string")
-		}
-
-	case FieldTypeIntegrationResource:
-		if _, ok := value.(string); !ok {
-			return fmt.Errorf("must be a string")
-		}
-
 	case FieldTypeAppInstallationResource:
 		// If Multi is true, validate as array of strings
 		// Otherwise, validate as a single string

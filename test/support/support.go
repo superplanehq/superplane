@@ -30,9 +30,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
-	_ "github.com/superplanehq/superplane/pkg/triggers/github"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
-	_ "github.com/superplanehq/superplane/pkg/triggers/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
 )
