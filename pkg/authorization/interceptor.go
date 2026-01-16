@@ -7,7 +7,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
-	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbOrganization "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecrets "github.com/superplanehq/superplane/pkg/protos/secrets"
@@ -44,13 +43,6 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbSecrets.Secrets_DescribeSecret_FullMethodName: {Resource: "secret", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbSecrets.Secrets_ListSecrets_FullMethodName:    {Resource: "secret", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbSecrets.Secrets_DeleteSecret_FullMethodName:   {Resource: "secret", Action: "delete", DomainType: models.DomainTypeOrganization},
-
-		// Integrations rules
-		pbIntegrations.Integrations_DescribeIntegration_FullMethodName: {Resource: "integration", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbIntegrations.Integrations_ListIntegrations_FullMethodName:    {Resource: "integration", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbIntegrations.Integrations_ListResources_FullMethodName:       {Resource: "integration", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbIntegrations.Integrations_CreateIntegration_FullMethodName:   {Resource: "integration", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbIntegrations.Integrations_UpdateIntegration_FullMethodName:   {Resource: "integration", Action: "update", DomainType: models.DomainTypeOrganization},
 
 		// Groups rules
 		pbGroups.Groups_CreateGroup_FullMethodName:         {Resource: "group", Action: "create", DomainType: models.DomainTypeOrganization},

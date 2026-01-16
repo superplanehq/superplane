@@ -158,8 +158,7 @@ func (m *mockWebhookContext) ResetSecret() ([]byte, []byte, error) {
 	return []byte("test-secret"), []byte("test-secret"), nil
 }
 
-func (m *mockWebhookContext) Setup(options *core.WebhookSetupOptions) (string, error) {
-
+func (m *mockWebhookContext) Setup() (string, error) {
 	webhookID := uuid.New()
 	m.Node.WebhookID = &webhookID
 	baseURL := m.GetBaseURL()

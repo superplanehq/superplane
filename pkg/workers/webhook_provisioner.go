@@ -2,7 +2,6 @@ package workers
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -79,10 +77,6 @@ func (w *WebhookProvisioner) LockAndProcessWebhook(webhook models.Webhook) error
 }
 
 func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook) error {
-	if webhook.IntegrationID != nil {
-		return w.processIntegrationWebhook(tx, webhook)
-	}
-
 	if webhook.AppInstallationID != nil {
 		return w.processAppInstallationWebhook(tx, webhook)
 	}
@@ -105,42 +99,6 @@ func (w *WebhookProvisioner) processAppInstallationWebhook(tx *gorm.DB, webhook 
 		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		Webhook:         contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
 		AppInstallation: contexts.NewAppInstallationContext(tx, nil, appInstallation, w.encryptor, w.registry),
-	})
-
-	if err != nil {
-		return w.handleWebhookError(tx, webhook, err)
-	}
-
-	return webhook.ReadyWithMetadata(tx, webhookMetadata)
-}
-
-func (w *WebhookProvisioner) processIntegrationWebhook(tx *gorm.DB, webhook *models.Webhook) error {
-	integration, err := models.FindIntegrationByIDInTransaction(tx, *webhook.IntegrationID)
-	if err != nil {
-		return w.handleWebhookError(tx, webhook, err)
-	}
-
-	secret, err := w.encryptor.Decrypt(context.Background(), webhook.Secret, []byte(webhook.ID.String()))
-	if err != nil {
-		return w.handleWebhookError(tx, webhook, err)
-	}
-
-	resourceManager, err := w.registry.NewResourceManagerInTransaction(context.Background(), tx, integration)
-	if err != nil {
-		return w.handleWebhookError(tx, webhook, err)
-	}
-
-	webhookResource := webhook.Resource.Data()
-	resource, err := resourceManager.Get(webhookResource.Type, webhookResource.ID)
-	if err != nil {
-		return w.handleWebhookError(tx, webhook, err)
-	}
-
-	webhookMetadata, err := resourceManager.SetupWebhook(integrations.WebhookOptions{
-		Resource:      resource,
-		Configuration: webhook.Configuration.Data(),
-		URL:           fmt.Sprintf("%s/api/v1/webhooks/%s", w.baseURL, webhook.ID.String()),
-		Secret:        secret,
 	})
 
 	if err != nil {
