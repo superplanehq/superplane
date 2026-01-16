@@ -56,7 +56,7 @@ func (c *Cursor) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "Cursor API key",
+			Description: "Cursor API key (from Cursor dashboard → Settings → API Keys)",
 		},
 	}
 }
