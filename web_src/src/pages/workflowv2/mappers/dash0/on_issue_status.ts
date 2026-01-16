@@ -14,6 +14,7 @@ interface OnIssueStatusConfiguration {
 interface OnIssueStatusMetadata {
   nextTrigger?: string;
   referenceTime?: string;
+  lastCheck?: string;
 }
 
 interface OnIssueStatusEventData {
@@ -85,6 +86,18 @@ function calculateNextTrigger(
   }
 
   return nextTrigger;
+}
+
+function formatLastCheck(metadata?: OnIssueStatusMetadata): string {
+  if (!metadata?.lastCheck) {
+    return "Never";
+  }
+
+  try {
+    return formatTimeAgo(new Date(metadata.lastCheck));
+  } catch {
+    return "Never";
+  }
 }
 
 function formatNextTrigger(configuration: OnIssueStatusConfiguration, metadata?: OnIssueStatusMetadata): string {
@@ -262,6 +275,10 @@ export const onIssueStatusTriggerRenderer: TriggerRenderer = {
         {
           icon: "clock",
           label: formatFrequency(configuration),
+        },
+        {
+          icon: "check",
+          label: `Last check: ${formatLastCheck(metadata)}`,
         },
         {
           icon: "arrow-big-right",
