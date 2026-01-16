@@ -91,7 +91,7 @@ func (w *Webhook) Setup(ctx core.TriggerContext) error {
 	}
 
 	if metadata.URL == "" {
-		webhookURL, err := ctx.Webhook.Setup(nil)
+		webhookURL, err := ctx.Webhook.Setup()
 		if err != nil {
 			return fmt.Errorf("failed to setup webhook: %w", err)
 		}

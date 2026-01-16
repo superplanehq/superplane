@@ -324,7 +324,6 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		HTTP:          contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
-		Integration:   contexts.NewIntegrationContext(tx, registry),
 		Events:        contexts.NewEventContext(tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
 	}
@@ -367,7 +366,6 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 		HTTP:          contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
-		Integration:   contexts.NewIntegrationContext(tx, registry),
 	}
 
 	if node.AppInstallationID != nil {
