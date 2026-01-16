@@ -107,7 +107,31 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 }
 
 func (d *Dash0) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
-	return []core.ApplicationResource{}, nil
+	if resourceType != "check-rule" {
+		return []core.ApplicationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	if err != nil {
+		return nil, fmt.Errorf("error creating dash0 client: %w", err)
+	}
+
+	checkRules, err := client.ListCheckRules()
+	if err != nil {
+		ctx.Logger.Warnf("Error fetching check rules: %v", err)
+		return []core.ApplicationResource{}, nil
+	}
+
+	resources := make([]core.ApplicationResource, 0, len(checkRules))
+	for _, rule := range checkRules {
+		resources = append(resources, core.ApplicationResource{
+			Type: resourceType,
+			Name: rule.Name,
+			ID:   rule.ID,
+		})
+	}
+
+	return resources, nil
 }
 
 func (d *Dash0) HandleRequest(ctx core.HTTPRequestContext) {
