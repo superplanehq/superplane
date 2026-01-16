@@ -20,9 +20,9 @@ type OnIssueStatusConfiguration struct {
 }
 
 type OnIssueStatusMetadata struct {
-	NextTrigger    *string   `json:"nextTrigger"`
-	ReferenceTime  *string   `json:"referenceTime"` // Time when schedule was first set up
-	LastCheck      *string   `json:"lastCheck,omitempty"` // Time when the last check was performed
+	NextTrigger        *string  `json:"nextTrigger"`
+	ReferenceTime      *string  `json:"referenceTime"`                // Time when schedule was first set up
+	LastCheck          *string  `json:"lastCheck,omitempty"`          // Time when the last check was performed
 	LastDetectedChecks []string `json:"lastDetectedChecks,omitempty"` // List of check identifiers from the last event emission
 }
 
@@ -451,7 +451,7 @@ func (t *OnIssueStatus) rescheduleCheck(ctx core.TriggerActionContext, config On
 	metadata := OnIssueStatusMetadata{
 		NextTrigger:        &formatted,
 		ReferenceTime:      existingMetadata.ReferenceTime,
-		LastCheck:          existingMetadata.LastCheck, // Preserve existing last check by default
+		LastCheck:          existingMetadata.LastCheck,          // Preserve existing last check by default
 		LastDetectedChecks: existingMetadata.LastDetectedChecks, // Preserve last detected checks
 	}
 
