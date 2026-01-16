@@ -43,10 +43,10 @@ func (l *ListIssues) OutputChannels(configuration any) []core.OutputChannel {
 func (l *ListIssues) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:     "checkRules",
-			Label:    "Check Rules",
-			Type:     configuration.FieldTypeAppInstallationResource,
-			Required: false,
+			Name:      "checkRules",
+			Label:     "Check Rules",
+			Type:      configuration.FieldTypeAppInstallationResource,
+			Required:  false,
 			Togglable: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -110,7 +110,7 @@ func (l *ListIssues) filterIssuesByCheckRules(data map[string]any, checkRuleName
 	// Create sets for both names and IDs for efficient lookup
 	checkRuleNameSet := make(map[string]bool, len(checkRuleNames))
 	checkRuleIDSet := make(map[string]bool, len(checkRuleNames))
-	
+
 	// Build a mapping from name to ID
 	nameToID := make(map[string]string, len(allCheckRules))
 	for _, rule := range allCheckRules {
@@ -119,7 +119,7 @@ func (l *ListIssues) filterIssuesByCheckRules(data map[string]any, checkRuleName
 			nameToID[rule.ID] = rule.ID // Handle case where name is empty
 		}
 	}
-	
+
 	// Add selected names and their corresponding IDs to the sets
 	for _, name := range checkRuleNames {
 		checkRuleNameSet[name] = true
@@ -186,7 +186,7 @@ func (l *ListIssues) filterIssuesByCheckRules(data map[string]any, checkRuleName
 		// Common label names: check_rule, check_rule_name, check_rule_id, rule_name, check_name, check
 		var checkRuleValue string
 		labelNamesToCheck := []string{"check_rule", "check_rule_name", "check_rule_id", "rule_name", "check_name", "check", "check_id", "rule_id"}
-		
+
 		for _, labelName := range labelNamesToCheck {
 			if labelValue, exists := metricValue[labelName]; exists && labelValue != "" {
 				checkRuleValue = labelValue

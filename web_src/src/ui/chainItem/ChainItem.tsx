@@ -423,34 +423,45 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                               <div key={`${issue.checkName}-${issueIndex}`} className="flex flex-col">
                                 <div className="flex items-start gap-2">
                                   {/* Status badge replaces the dot */}
-                                  <span className={`text-xs font-medium px-1 py-0.5 rounded flex-shrink-0 uppercase leading-tight self-start ${
-                                    issue.status === "critical" 
-                                      ? "bg-red-100 text-red-700" 
-                                      : "bg-yellow-100 text-yellow-700"
-                                  }`}>
+                                  <span
+                                    className={`text-xs font-medium px-1 py-0.5 rounded flex-shrink-0 uppercase leading-tight self-start ${
+                                      issue.status === "critical"
+                                        ? "bg-red-100 text-red-700"
+                                        : "bg-yellow-100 text-yellow-700"
+                                    }`}
+                                  >
                                     {issue.status}
                                   </span>
-                                  
+
                                   <div className="flex-1 min-w-0">
                                     {/* Check name */}
                                     <div className="mb-1">
-                                      <span className="text-[13px] font-semibold text-gray-900 break-words" title={issue.checkName}>
+                                      <span
+                                        className="text-[13px] font-semibold text-gray-900 break-words"
+                                        title={issue.checkName}
+                                      >
                                         {issue.checkName}
                                       </span>
                                     </div>
                                   </div>
                                 </div>
-                                
+
                                 {/* Check summary - spans full width below badge */}
                                 {issue.checkSummary && (
-                                  <div className="text-[12px] text-gray-700 break-words mt-1 w-full" title={issue.checkSummary}>
+                                  <div
+                                    className="text-[12px] text-gray-700 break-words mt-1 w-full"
+                                    title={issue.checkSummary}
+                                  >
                                     {issue.checkSummary}
                                   </div>
                                 )}
-                                
+
                                 {/* Check description - spans full width below badge */}
                                 {issue.checkDescription && (
-                                  <div className="text-[12px] text-gray-500 italic break-words mt-1 w-full" title={issue.checkDescription}>
+                                  <div
+                                    className="text-[12px] text-gray-500 italic break-words mt-1 w-full"
+                                    title={issue.checkDescription}
+                                  >
                                     {issue.checkDescription}
                                   </div>
                                 )}

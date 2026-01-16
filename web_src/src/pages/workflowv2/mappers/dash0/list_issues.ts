@@ -4,7 +4,14 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseProps, EventSection, ComponentBaseSpec, EventState, EventStateMap, DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import {
+  ComponentBaseProps,
+  EventSection,
+  ComponentBaseSpec,
+  EventState,
+  EventStateMap,
+  DEFAULT_EVENT_STATE_MAP,
+} from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { ComponentBaseMapper, OutputPayload, EventStateRegistry, StateFunction } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
@@ -25,7 +32,7 @@ export const listIssuesMapper: ComponentBaseMapper = {
 
     const configuration = node.configuration as unknown as ListIssuesConfiguration;
     const specs = getSpecs(configuration);
-    
+
     return {
       iconSrc: dash0Icon,
       iconBackground: "bg-white",
@@ -41,18 +48,14 @@ export const listIssuesMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(
-    _node: ComponentsNode,
-    execution: WorkflowsWorkflowNodeExecution,
-    additionalData?: unknown,
-  ): string {
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution, additionalData?: unknown): string {
     // Check if this is being called from ChainItem (which passes additionalData as undefined or a different structure)
     // For ChainItem, just return the time without counts
     const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
-    
+
     // If additionalData is explicitly a marker object indicating ChainItem context, skip counts
     // Otherwise, include counts for SidebarEventItem
-    if (additionalData && typeof additionalData === 'object' && 'skipIssueCounts' in additionalData) {
+    if (additionalData && typeof additionalData === "object" && "skipIssueCounts" in additionalData) {
       return timeAgo;
     }
 
@@ -103,12 +106,12 @@ export const listIssuesMapper: ComponentBaseMapper = {
     }
 
     const results = responseData.data.result;
-    
+
     // Parse issues from Prometheus response
     const issues = results.map((result) => {
       const metric = result.metric || {};
       const value = result.value;
-      
+
       // Extract status from value: [timestamp, "status"]
       let status: "degraded" | "critical" = "degraded";
       if (value && Array.isArray(value) && value.length >= 2) {
@@ -208,7 +211,7 @@ export const listIssuesStateFunction: StateFunction = (execution: WorkflowsWorkf
   // Only analyze issue status for finished, successful executions
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
-    
+
     if (!outputs || !outputs.default || outputs.default.length === 0) {
       return "clear";
     }
@@ -225,7 +228,7 @@ export const listIssuesStateFunction: StateFunction = (execution: WorkflowsWorkf
     }
 
     const results = responseData.data.result;
-    
+
     // No issues found
     if (results.length === 0) {
       return "clear";
@@ -271,7 +274,7 @@ export const LIST_ISSUES_STATE_REGISTRY: EventStateRegistry = {
 
 function getIssueCounts(execution: WorkflowsWorkflowNodeExecution): { critical: number; degraded: number } {
   const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
-  
+
   if (!outputs || !outputs.default || outputs.default.length === 0) {
     return { critical: 0, degraded: 0 };
   }
@@ -287,7 +290,7 @@ function getIssueCounts(execution: WorkflowsWorkflowNodeExecution): { critical: 
   }
 
   const results = responseData.data.result;
-  
+
   let critical = 0;
   let degraded = 0;
 

@@ -72,7 +72,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{},
+			Configuration:   map[string]any{},
 			HTTP:            httpContext,
 			AppInstallation: appCtx,
 			ExecutionState:  execCtx,
@@ -88,7 +88,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 		require.Len(t, httpContext.Requests, 1)
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/prometheus/api/v1/query")
 		assert.Equal(t, "Bearer token123", httpContext.Requests[0].Header.Get("Authorization"))
-		
+
 		// Verify the request body contains the correct query
 		body, err := io.ReadAll(httpContext.Requests[0].Body)
 		require.NoError(t, err)
@@ -116,7 +116,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{},
+			Configuration:   map[string]any{},
 			HTTP:            httpContext,
 			AppInstallation: appCtx,
 			ExecutionState:  execCtx,
@@ -206,7 +206,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 		// Payload structure: {type, timestamp, data: {status, data: {resultType, result: [...]}}}
 		payload := execCtx.Payloads[0].(map[string]any)
 		responseData := payload["data"].(map[string]any)
-		
+
 		// The data field can be either a struct or map, handle both
 		var results []any
 		if dataSection, ok := responseData["data"].(map[string]any); ok {
@@ -219,7 +219,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 		} else {
 			t.Fatal("unable to extract results from payload")
 		}
-		
+
 		// Should only have 2 results (issue-1 and issue-3, both with rule-1)
 		assert.Len(t, results, 2)
 	})
@@ -285,7 +285,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 		// Payload structure: {type, timestamp, data: {status, data: {resultType, result: [...]}}}
 		payload := execCtx.Payloads[0].(map[string]any)
 		responseData := payload["data"].(map[string]any)
-		
+
 		// The data field can be either a struct or map, handle both
 		var results []any
 		if dataSection, ok := responseData["data"].(map[string]any); ok {
@@ -298,7 +298,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 		} else {
 			t.Fatal("unable to extract results from payload")
 		}
-		
+
 		// Should have all 2 results when check rules are empty
 		assert.Len(t, results, 2)
 	})
