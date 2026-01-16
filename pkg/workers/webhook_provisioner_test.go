@@ -2,12 +2,14 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -24,7 +26,7 @@ func (m *BadEncryptor) Decrypt(ctx context.Context, ciphertext []byte, aad []byt
 	return nil, fmt.Errorf("oops")
 }
 
-func Test__WebhookProvisioner_WithoutIntegration(t *testing.T) {
+func Test__WebhookProvisioner_WithoutAppInstallation(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -48,27 +50,35 @@ func Test__WebhookProvisioner_WithoutIntegration(t *testing.T) {
 	assert.Equal(t, 0, updatedWebhook.RetryCount)
 }
 
-func Test__WebhookProvisioner_RetryOnDecryptionFailure(t *testing.T) {
+func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
 	provisioner := NewWebhookProvisioner("https://example.com", &BadEncryptor{}, r.Registry)
 
-	integration := &models.Integration{
-		ID:         uuid.New(),
-		DomainType: "organization",
-		DomainID:   r.Organization.ID,
-		Type:       "github",
-		CreatedBy:  uuid.New(),
-	}
-	require.NoError(t, database.Conn().Create(integration).Error)
+	r.Registry.Applications["dummy"] = support.NewDummyApplicationWithSetupWebhook(
+		nil,
+		func(ctx core.SetupWebhookContext) (any, error) {
+			return nil, errors.New("oops")
+		},
+	)
+
+	installation, err := models.CreateAppInstallation(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		nil,
+	)
+
+	require.NoError(t, err)
 
 	webhookID := uuid.New()
 	webhook := models.Webhook{
-		ID:            webhookID,
-		State:         models.WebhookStatePending,
-		Secret:        []byte("encrypted-secret"),
-		IntegrationID: &integration.ID,
+		ID:                webhookID,
+		State:             models.WebhookStatePending,
+		Secret:            []byte("encrypted-secret"),
+		AppInstallationID: &installation.ID,
 		Resource: datatypes.NewJSONType(models.WebhookResource{
 			Type: "repository",
 			ID:   "123",
@@ -79,7 +89,7 @@ func Test__WebhookProvisioner_RetryOnDecryptionFailure(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
-	err := provisioner.LockAndProcessWebhook(webhook)
+	err = provisioner.LockAndProcessWebhook(webhook)
 	require.NoError(t, err)
 
 	updatedWebhook, err := models.FindWebhook(webhookID)
@@ -94,21 +104,28 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 
 	provisioner := NewWebhookProvisioner("https://example.com", &BadEncryptor{}, r.Registry)
 
-	integration := &models.Integration{
-		ID:         uuid.New(),
-		DomainType: "organization",
-		DomainID:   r.Organization.ID,
-		Type:       "github",
-		CreatedBy:  uuid.New(),
-	}
-	require.NoError(t, database.Conn().Create(integration).Error)
+	r.Registry.Applications["dummy"] = support.NewDummyApplicationWithSetupWebhook(
+		nil,
+		func(ctx core.SetupWebhookContext) (any, error) {
+			return nil, errors.New("oops")
+		},
+	)
+
+	installation, err := models.CreateAppInstallation(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		nil,
+	)
+	require.NoError(t, err)
 
 	webhookID := uuid.New()
 	webhook := models.Webhook{
-		ID:            webhookID,
-		State:         models.WebhookStatePending,
-		Secret:        []byte("encrypted-secret"),
-		IntegrationID: &integration.ID,
+		ID:                webhookID,
+		State:             models.WebhookStatePending,
+		Secret:            []byte("encrypted-secret"),
+		AppInstallationID: &installation.ID,
 		Resource: datatypes.NewJSONType(models.WebhookResource{
 			Type: "repository",
 			ID:   "123",
@@ -119,7 +136,7 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
-	err := provisioner.LockAndProcessWebhook(webhook)
+	err = provisioner.LockAndProcessWebhook(webhook)
 	require.NoError(t, err)
 
 	updatedWebhook, err := models.FindWebhook(webhookID)

@@ -18,10 +18,6 @@ export type ApplicationsApplicationDefinition = {
   installationInstructions?: string;
 };
 
-export type AuthToken = {
-  valueFrom?: IntegrationsValueFrom;
-};
-
 export type AuthorizationDomainType = "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
 
 export type AuthorizationPermission = {
@@ -174,10 +170,6 @@ export type ConfigurationField = {
   disallowExpression?: boolean;
 };
 
-export type ConfigurationIntegrationTypeOptions = {
-  type?: string;
-};
-
 export type ConfigurationListItemDefinition = {
   type?: string;
   schema?: Array<ConfigurationField>;
@@ -239,7 +231,6 @@ export type ConfigurationTypeOptions = {
   number?: ConfigurationNumberTypeOptions;
   select?: ConfigurationSelectTypeOptions;
   multiSelect?: ConfigurationMultiSelectTypeOptions;
-  integration?: ConfigurationIntegrationTypeOptions;
   list?: ConfigurationListTypeOptions;
   object?: ConfigurationObjectTypeOptions;
   resource?: ConfigurationResourceTypeOptions;
@@ -344,80 +335,6 @@ export type GroupsUpdateGroupBody = {
 
 export type GroupsUpdateGroupResponse = {
   group?: GroupsGroup;
-};
-
-export type IntegrationAuth = {
-  use?: IntegrationAuthType;
-  token?: AuthToken;
-};
-
-export type IntegrationAuthType = "AUTH_TYPE_NONE" | "AUTH_TYPE_TOKEN" | "AUTH_TYPE_OIDC";
-
-export type IntegrationsCreateIntegrationRequest = {
-  domainType?: AuthorizationDomainType;
-  domainId?: string;
-  integration?: IntegrationsIntegration;
-};
-
-export type IntegrationsCreateIntegrationResponse = {
-  integration?: IntegrationsIntegration;
-};
-
-export type IntegrationsDescribeIntegrationResponse = {
-  integration?: IntegrationsIntegration;
-};
-
-export type IntegrationsIntegration = {
-  metadata?: IntegrationsIntegrationMetadata;
-  spec?: IntegrationsIntegrationSpec;
-};
-
-export type IntegrationsIntegrationMetadata = {
-  id?: string;
-  name?: string;
-  createdBy?: string;
-  createdAt?: string;
-  domainType?: AuthorizationDomainType;
-  domainId?: string;
-};
-
-export type IntegrationsIntegrationSpec = {
-  type?: string;
-  url?: string;
-  auth?: IntegrationAuth;
-};
-
-export type IntegrationsListIntegrationsResponse = {
-  integrations?: Array<IntegrationsIntegration>;
-};
-
-export type IntegrationsListResourcesResponse = {
-  resources?: Array<IntegrationsResourceRef>;
-};
-
-export type IntegrationsResourceRef = {
-  type?: string;
-  name?: string;
-  id?: string;
-};
-
-export type IntegrationsUpdateIntegrationBody = {
-  domainType?: AuthorizationDomainType;
-  domainId?: string;
-  integration?: IntegrationsIntegration;
-};
-
-export type IntegrationsUpdateIntegrationResponse = {
-  integration?: IntegrationsIntegration;
-};
-
-export type IntegrationsValueFrom = {
-  secret?: IntegrationsValueFromSecret;
-};
-
-export type IntegrationsValueFromSecret = {
-  name?: string;
-  key?: string;
 };
 
 export type MeRegenerateTokenResponse = {
@@ -1559,156 +1476,6 @@ export type GroupsRemoveUserFromGroupResponses = {
 
 export type GroupsRemoveUserFromGroupResponse2 =
   GroupsRemoveUserFromGroupResponses[keyof GroupsRemoveUserFromGroupResponses];
-
-export type IntegrationsListIntegrationsData = {
-  body?: never;
-  path?: never;
-  query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
-    domainId?: string;
-  };
-  url: "/api/v1/integrations";
-};
-
-export type IntegrationsListIntegrationsErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type IntegrationsListIntegrationsError =
-  IntegrationsListIntegrationsErrors[keyof IntegrationsListIntegrationsErrors];
-
-export type IntegrationsListIntegrationsResponses = {
-  /**
-   * A successful response.
-   */
-  200: IntegrationsListIntegrationsResponse;
-};
-
-export type IntegrationsListIntegrationsResponse2 =
-  IntegrationsListIntegrationsResponses[keyof IntegrationsListIntegrationsResponses];
-
-export type IntegrationsCreateIntegrationData = {
-  body: IntegrationsCreateIntegrationRequest;
-  path?: never;
-  query?: never;
-  url: "/api/v1/integrations";
-};
-
-export type IntegrationsCreateIntegrationErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type IntegrationsCreateIntegrationError =
-  IntegrationsCreateIntegrationErrors[keyof IntegrationsCreateIntegrationErrors];
-
-export type IntegrationsCreateIntegrationResponses = {
-  /**
-   * A successful response.
-   */
-  200: IntegrationsCreateIntegrationResponse;
-};
-
-export type IntegrationsCreateIntegrationResponse2 =
-  IntegrationsCreateIntegrationResponses[keyof IntegrationsCreateIntegrationResponses];
-
-export type IntegrationsDescribeIntegrationData = {
-  body?: never;
-  path: {
-    idOrName: string;
-  };
-  query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
-    domainId?: string;
-  };
-  url: "/api/v1/integrations/{idOrName}";
-};
-
-export type IntegrationsDescribeIntegrationErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type IntegrationsDescribeIntegrationError =
-  IntegrationsDescribeIntegrationErrors[keyof IntegrationsDescribeIntegrationErrors];
-
-export type IntegrationsDescribeIntegrationResponses = {
-  /**
-   * A successful response.
-   */
-  200: IntegrationsDescribeIntegrationResponse;
-};
-
-export type IntegrationsDescribeIntegrationResponse2 =
-  IntegrationsDescribeIntegrationResponses[keyof IntegrationsDescribeIntegrationResponses];
-
-export type IntegrationsUpdateIntegrationData = {
-  body: IntegrationsUpdateIntegrationBody;
-  path: {
-    idOrName: string;
-  };
-  query?: never;
-  url: "/api/v1/integrations/{idOrName}";
-};
-
-export type IntegrationsUpdateIntegrationErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type IntegrationsUpdateIntegrationError =
-  IntegrationsUpdateIntegrationErrors[keyof IntegrationsUpdateIntegrationErrors];
-
-export type IntegrationsUpdateIntegrationResponses = {
-  /**
-   * A successful response.
-   */
-  200: IntegrationsUpdateIntegrationResponse;
-};
-
-export type IntegrationsUpdateIntegrationResponse2 =
-  IntegrationsUpdateIntegrationResponses[keyof IntegrationsUpdateIntegrationResponses];
-
-export type IntegrationsListResourcesData = {
-  body?: never;
-  path: {
-    idOrName: string;
-  };
-  query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
-    domainId?: string;
-    type?: string;
-  };
-  url: "/api/v1/integrations/{idOrName}/resources";
-};
-
-export type IntegrationsListResourcesErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type IntegrationsListResourcesError = IntegrationsListResourcesErrors[keyof IntegrationsListResourcesErrors];
-
-export type IntegrationsListResourcesResponses = {
-  /**
-   * A successful response.
-   */
-  200: IntegrationsListResourcesResponse;
-};
-
-export type IntegrationsListResourcesResponse2 =
-  IntegrationsListResourcesResponses[keyof IntegrationsListResourcesResponses];
 
 export type OrganizationsAcceptInviteLinkData = {
   body?: never;

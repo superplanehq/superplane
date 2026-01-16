@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -83,10 +82,6 @@ func (w *WebhookCleanupWorker) processWebhook(tx *gorm.DB, webhook *models.Webho
 		return w.processAppInstallationWebhook(tx, webhook)
 	}
 
-	if webhook.IntegrationID != nil {
-		return w.processIntegrationWebhook(tx, webhook)
-	}
-
 	return tx.Unscoped().Delete(webhook).Error
 }
 
@@ -105,36 +100,6 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhoo
 		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		Webhook:         contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
 		AppInstallation: contexts.NewAppInstallationContext(tx, nil, appInstallation, w.encryptor, w.registry),
-	})
-
-	if err != nil {
-		return err
-	}
-
-	return tx.Unscoped().Delete(webhook).Error
-}
-
-func (w *WebhookCleanupWorker) processIntegrationWebhook(tx *gorm.DB, webhook *models.Webhook) error {
-	integration, err := models.FindIntegrationByIDInTransaction(tx, *webhook.IntegrationID)
-	if err != nil {
-		return err
-	}
-
-	resourceManager, err := w.registry.NewResourceManagerInTransaction(context.Background(), tx, integration)
-	if err != nil {
-		return err
-	}
-
-	webhookResource := webhook.Resource.Data()
-	resource, err := resourceManager.Get(webhookResource.Type, webhookResource.ID)
-	if err != nil {
-		return err
-	}
-
-	err = resourceManager.CleanupWebhook(integrations.WebhookOptions{
-		Resource:      resource,
-		Configuration: webhook.Configuration.Data(),
-		Metadata:      webhook.Metadata.Data(),
 	})
 
 	if err != nil {

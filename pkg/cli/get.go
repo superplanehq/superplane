@@ -45,35 +45,6 @@ var getSecretCmd = &cobra.Command{
 	},
 }
 
-var getIntegrationCmd = &cobra.Command{
-	Use:     "integration [ID_OR_NAME]",
-	Short:   "Get integration details",
-	Long:    `Get details about a specific integration`,
-	Aliases: []string{"integrations"},
-	Args:    cobra.ExactArgs(1),
-
-	Run: func(cmd *cobra.Command, args []string) {
-		idOrName := args[0]
-		c := DefaultClient()
-		domainType, domainID := getDomainOrExit(c, cmd)
-		response, httpResponse, err := c.IntegrationAPI.
-			IntegrationsDescribeIntegration(context.Background(), idOrName).
-			DomainId(domainID).
-			DomainType(domainType).
-			Execute()
-
-		if err != nil {
-			b, _ := io.ReadAll(httpResponse.Body)
-			fmt.Printf("%s\n", string(b))
-			os.Exit(1)
-		}
-
-		out, err := yaml.Marshal(response.Integration)
-		Check(err)
-		fmt.Printf("%s", string(out))
-	},
-}
-
 // Root describe command
 var getCmd = &cobra.Command{
 	Use:     "get",
@@ -85,5 +56,4 @@ var getCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(getCmd)
 	getCmd.AddCommand(getSecretCmd)
-	getCmd.AddCommand(getIntegrationCmd)
 }

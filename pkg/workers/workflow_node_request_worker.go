@@ -212,7 +212,6 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Integration:    contexts.NewIntegrationContext(tx, w.registry),
 		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, node.WorkflowID),
 	}
 
@@ -287,7 +286,6 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Integration:    contexts.NewIntegrationContext(tx, w.registry),
 		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 	}
 

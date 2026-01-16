@@ -22,6 +22,7 @@ var _ MappedNullable = &ConfigurationResourceTypeOptions{}
 type ConfigurationResourceTypeOptions struct {
 	Type           *string `json:"type,omitempty"`
 	UseNameAsValue *bool   `json:"useNameAsValue,omitempty"`
+	Multi          *bool   `json:"multi,omitempty"`
 }
 
 // NewConfigurationResourceTypeOptions instantiates a new ConfigurationResourceTypeOptions object
@@ -105,6 +106,38 @@ func (o *ConfigurationResourceTypeOptions) SetUseNameAsValue(v bool) {
 	o.UseNameAsValue = &v
 }
 
+// GetMulti returns the Multi field value if set, zero value otherwise.
+func (o *ConfigurationResourceTypeOptions) GetMulti() bool {
+	if o == nil || IsNil(o.Multi) {
+		var ret bool
+		return ret
+	}
+	return *o.Multi
+}
+
+// GetMultiOk returns a tuple with the Multi field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationResourceTypeOptions) GetMultiOk() (*bool, bool) {
+	if o == nil || IsNil(o.Multi) {
+		return nil, false
+	}
+	return o.Multi, true
+}
+
+// HasMulti returns a boolean if a field has been set.
+func (o *ConfigurationResourceTypeOptions) HasMulti() bool {
+	if o != nil && !IsNil(o.Multi) {
+		return true
+	}
+
+	return false
+}
+
+// SetMulti gets a reference to the given bool and assigns it to the Multi field.
+func (o *ConfigurationResourceTypeOptions) SetMulti(v bool) {
+	o.Multi = &v
+}
+
 func (o ConfigurationResourceTypeOptions) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o ConfigurationResourceTypeOptions) ToMap() (map[string]interface{}, error
 	}
 	if !IsNil(o.UseNameAsValue) {
 		toSerialize["useNameAsValue"] = o.UseNameAsValue
+	}
+	if !IsNil(o.Multi) {
+		toSerialize["multi"] = o.Multi
 	}
 	return toSerialize, nil
 }
