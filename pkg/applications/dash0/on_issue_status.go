@@ -62,10 +62,10 @@ func (t *OnIssueStatus) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "checkRules",
-			Label:    "Check Rules",
-			Type:     configuration.FieldTypeAppInstallationResource,
-			Required: false,
+			Name:      "checkRules",
+			Label:     "Check Rules",
+			Type:      configuration.FieldTypeAppInstallationResource,
+			Required:  false,
 			Togglable: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
