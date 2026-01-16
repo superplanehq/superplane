@@ -85,7 +85,12 @@ export const ConfigurationFieldRenderer = ({
                 ? selectOptions[0].value
                 : "";
           onChange(initialValue);
-        } else if (field.type === "list" || field.type === "multi-select" || field.type === "any-predicate-list") {
+        } else if (
+          field.type === "list" ||
+          field.type === "multi-select" ||
+          field.type === "any-predicate-list" ||
+          (field.type === "app-installation-resource" && field.typeOptions?.resource?.multi)
+        ) {
           onChange(Array.isArray(parsedDefaultValue) ? parsedDefaultValue : []);
         } else if (field.type === "object") {
           onChange(
@@ -270,7 +275,7 @@ export const ConfigurationFieldRenderer = ({
         return (
           <AppInstallationResourceFieldRenderer
             field={field}
-            value={value as string}
+            value={value as string | string[] | undefined}
             onChange={onChange}
             organizationId={organizationId}
             appInstallationId={appInstallationId}
@@ -442,13 +447,6 @@ export const ConfigurationFieldRenderer = ({
       {field.description && (
         <p className="text-xs text-gray-500 dark:text-gray-400 text-left bg-gray-50 dark:bg-gray-800 p-2 rounded">
           {field.description}
-        </p>
-      )}
-
-      {/* Display type-specific help text */}
-      {field.typeOptions?.number?.min !== undefined && field.typeOptions?.number?.max !== undefined && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 text-left">
-          Range: {field.typeOptions.number.min} - {field.typeOptions.number.max}
         </p>
       )}
     </div>

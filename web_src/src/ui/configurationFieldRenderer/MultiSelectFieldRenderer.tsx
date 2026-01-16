@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { FieldRendererProps } from "./types";
 import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
 
@@ -11,12 +11,14 @@ interface SelectOption {
 export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const multiSelectOptions = field.typeOptions?.multiSelect?.options ?? [];
 
-  // Convert options to the format expected by MultiCombobox
-  const comboboxOptions: SelectOption[] = multiSelectOptions.map((opt) => ({
-    id: opt.value!,
-    label: opt.label!,
-    value: opt.value!,
-  }));
+  // Convert static options to SelectOption format
+  const comboboxOptions: SelectOption[] = useMemo(() => {
+    return multiSelectOptions.map((opt) => ({
+      id: opt.value!,
+      label: opt.label!,
+      value: opt.value!,
+    }));
+  }, [multiSelectOptions]);
 
   // Set initial value on first render if no value is present but there's a default
   useEffect(() => {
@@ -59,7 +61,7 @@ export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, 
       placeholder={`Select ${field.label || field.name}...`}
       value={selectedOptions}
       onChange={handleChange}
-      showButton={true}
+      showButton={false}
     >
       {(option) => <MultiComboboxLabel>{option.label}</MultiComboboxLabel>}
     </MultiCombobox>

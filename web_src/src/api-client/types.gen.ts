@@ -209,6 +209,7 @@ export type ConfigurationRequiredCondition = {
 export type ConfigurationResourceTypeOptions = {
   type?: string;
   useNameAsValue?: boolean;
+  multi?: boolean;
 };
 
 export type ConfigurationSelectOption = {

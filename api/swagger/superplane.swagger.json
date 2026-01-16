@@ -3575,6 +3575,9 @@
         },
         "useNameAsValue": {
           "type": "boolean"
+        },
+        "multi": {
+          "type": "boolean"
         }
       }
     },
