@@ -241,6 +241,13 @@ export function WorkflowPageV2() {
   }, [workflow]);
 
   useEffect(() => {
+    setHasUnsavedChanges(false);
+    setHasNonPositionalUnsavedChanges(false);
+    setInitialWorkflowSnapshot(null);
+    lastSavedWorkflowRef.current = null;
+  }, [workflowId]);
+
+  useEffect(() => {
     if (isTemplate) {
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
@@ -2161,11 +2168,14 @@ export function WorkflowPageV2() {
     async (data: { name: string; description?: string; templateId?: string }) => {
       if (!workflow || !organizationId) return;
 
+      const latestWorkflow =
+        queryClient.getQueryData<WorkflowsWorkflow>(workflowKeys.detail(organizationId, workflowId!)) || workflow;
+
       const result = await createWorkflowMutation.mutateAsync({
         name: data.name,
         description: data.description,
-        nodes: workflow.spec?.nodes,
-        edges: workflow.spec?.edges,
+        nodes: latestWorkflow.spec?.nodes,
+        edges: latestWorkflow.spec?.edges,
       });
 
       if (result?.data?.workflow?.metadata?.id) {
@@ -2173,7 +2183,7 @@ export function WorkflowPageV2() {
         navigate(`/${organizationId}/workflows/${result.data.workflow.metadata.id}`);
       }
     },
-    [workflow, organizationId, createWorkflowMutation, navigate],
+    [workflow, organizationId, createWorkflowMutation, navigate, queryClient, workflowId],
   );
 
   // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
