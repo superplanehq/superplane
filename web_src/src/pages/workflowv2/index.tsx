@@ -996,7 +996,7 @@ export function WorkflowPageV2() {
         if (chainNode.type === "TYPE_TRIGGER") {
           const latestEvent = nodeEventsMap[chainNodeId]?.[0];
           if (latestEvent?.data && Object.keys(latestEvent.data).length > 0) {
-            exampleObj[chainNodeId] = latestEvent.data as Record<string, unknown>;
+            exampleObj[chainNodeId] = { ...(latestEvent.data || {}) } as Record<string, unknown>;
           }
           return;
         }
@@ -1011,7 +1011,7 @@ export function WorkflowPageV2() {
         }) as unknown[];
 
         if (outputData?.length > 0) {
-          exampleObj[chainNodeId] = outputData[0] as Record<string, unknown>;
+          exampleObj[chainNodeId] = { ...(outputData?.[0] || {}) } as Record<string, unknown>;
         }
       });
 
