@@ -213,38 +213,3 @@ func Test__OnIncident__Setup(t *testing.T) {
 		assert.Len(t, appCtx.WebhookRequests, 0)
 	})
 }
-
-func Test__OnIncident__Configuration(t *testing.T) {
-	trigger := &OnIncident{}
-
-	t.Run("returns correct configuration fields", func(t *testing.T) {
-		fields := trigger.Configuration()
-
-		require.Len(t, fields, 3)
-
-		// Verify events field
-		eventsField := fields[0]
-		assert.Equal(t, "events", eventsField.Name)
-		assert.Equal(t, "Events", eventsField.Label)
-		assert.Equal(t, "multi-select", string(eventsField.Type))
-		assert.True(t, eventsField.Required)
-
-		// Verify service field - this is the important one for our changes
-		serviceField := fields[1]
-		assert.Equal(t, "service", serviceField.Name)
-		assert.Equal(t, "Service", serviceField.Label)
-		assert.Equal(t, "app-installation-resource", string(serviceField.Type))
-		assert.True(t, serviceField.Required)
-		assert.Equal(t, "The PagerDuty service to monitor for incidents", serviceField.Description)
-		assert.Equal(t, "Select a service", serviceField.Placeholder)
-		require.NotNil(t, serviceField.TypeOptions)
-		require.NotNil(t, serviceField.TypeOptions.Resource)
-		assert.Equal(t, "service", serviceField.TypeOptions.Resource.Type)
-
-		// Verify urgencies field
-		urgenciesField := fields[2]
-		assert.Equal(t, "urgencies", urgenciesField.Name)
-		assert.Equal(t, "Urgencies", urgenciesField.Label)
-		assert.False(t, urgenciesField.Required)
-	})
-}

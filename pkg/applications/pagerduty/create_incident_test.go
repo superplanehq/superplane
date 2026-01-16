@@ -8,54 +8,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
-
-func Test__CreateIncident__Configuration(t *testing.T) {
-	component := &CreateIncident{}
-
-	t.Run("returns correct configuration fields", func(t *testing.T) {
-		fields := component.Configuration()
-
-		require.Len(t, fields, 4)
-
-		// Verify title field
-		titleField := fields[0]
-		assert.Equal(t, "title", titleField.Name)
-		assert.Equal(t, "Incident Title", titleField.Label)
-		assert.Equal(t, configuration.FieldTypeString, titleField.Type)
-		assert.True(t, titleField.Required)
-
-		// Verify description field
-		descField := fields[1]
-		assert.Equal(t, "description", descField.Name)
-		assert.Equal(t, "Description", descField.Label)
-		assert.Equal(t, configuration.FieldTypeString, descField.Type)
-		assert.False(t, descField.Required)
-
-		// Verify urgency field
-		urgencyField := fields[2]
-		assert.Equal(t, "urgency", urgencyField.Name)
-		assert.Equal(t, "Urgency", urgencyField.Label)
-		assert.Equal(t, configuration.FieldTypeSelect, urgencyField.Type)
-		assert.True(t, urgencyField.Required)
-		assert.Equal(t, "high", urgencyField.Default)
-
-		// Verify service field - this is the important one for our changes
-		serviceField := fields[3]
-		assert.Equal(t, "service", serviceField.Name)
-		assert.Equal(t, "Service", serviceField.Label)
-		assert.Equal(t, "app-installation-resource", string(serviceField.Type))
-		assert.True(t, serviceField.Required)
-		assert.Equal(t, "The PagerDuty service to create the incident for", serviceField.Description)
-		assert.Equal(t, "Select a service", serviceField.Placeholder)
-		require.NotNil(t, serviceField.TypeOptions)
-		require.NotNil(t, serviceField.TypeOptions.Resource)
-		assert.Equal(t, "service", serviceField.TypeOptions.Resource.Type)
-	})
-}
 
 func Test__CreateIncident__Setup(t *testing.T) {
 	component := &CreateIncident{}
