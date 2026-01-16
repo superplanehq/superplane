@@ -38,6 +38,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 				CreatedAt:      timestamppb.New(*workflow.CreatedAt),
 				UpdatedAt:      timestamppb.New(*workflow.UpdatedAt),
 				CreatedBy:      createdBy,
+				IsTemplate:     workflow.IsTemplate,
 			},
 			Spec: &pb.Workflow_Spec{
 				Nodes: actions.NodesToProto(workflow.Nodes),
@@ -99,6 +100,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 			CreatedAt:      timestamppb.New(*workflow.CreatedAt),
 			UpdatedAt:      timestamppb.New(*workflow.UpdatedAt),
 			CreatedBy:      createdBy,
+			IsTemplate:     workflow.IsTemplate,
 		},
 		Spec: &pb.Workflow_Spec{
 			Nodes: actions.NodesToProto(workflow.Nodes),

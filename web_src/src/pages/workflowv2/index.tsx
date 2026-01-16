@@ -3,6 +3,7 @@ import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { Loader2, Puzzle } from "lucide-react";
+import * as yaml from "js-yaml";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -29,6 +30,7 @@ import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { useAvailableApplications, useInstalledApplications } from "@/hooks/useApplications";
 import {
   eventExecutionsQueryOptions,
+  useCreateWorkflow,
   useTriggers,
   useUpdateWorkflow,
   useWorkflow,
@@ -54,6 +56,8 @@ import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { CreateCanvasModal } from "@/components/CreateCanvasModal";
+import { Button } from "@/components/ui/button";
 import {
   getComponentAdditionalDataBuilder,
   getComponentBaseMapper,
@@ -114,6 +118,11 @@ export function WorkflowPageV2() {
   const { data: workflowEventsResponse } = useWorkflowEvents(workflowId!);
 
   usePageTitle([workflow?.metadata?.name || "Canvas"]);
+
+  const isTemplate = workflow?.metadata?.isTemplate ?? false;
+  const isDev = import.meta.env.DEV;
+  const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
+  const createWorkflowMutation = useCreateWorkflow(organizationId!);
 
   // Warm up org users and roles cache so approval specs can pretty-print
   // user IDs as emails and role names as display names.
@@ -183,6 +192,7 @@ export function WorkflowPageV2() {
     }
     return true;
   });
+  const canAutoSave = isAutoSaveEnabled && !isTemplate;
 
   // Revert functionality - track initial workflow snapshot
   const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<WorkflowsWorkflow | null>(null);
@@ -231,6 +241,20 @@ export function WorkflowPageV2() {
       lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(workflow));
     }
   }, [workflow]);
+
+  useEffect(() => {
+    setHasUnsavedChanges(false);
+    setHasNonPositionalUnsavedChanges(false);
+    setInitialWorkflowSnapshot(null);
+    lastSavedWorkflowRef.current = null;
+  }, [workflowId]);
+
+  useEffect(() => {
+    if (isTemplate) {
+      setHasUnsavedChanges(false);
+      setHasNonPositionalUnsavedChanges(false);
+    }
+  }, [isTemplate, workflowId]);
 
   // Build maps from store for canvas display (using initial data from workflow.status and websocket updates)
   // Rebuild whenever store version changes (indicates data was updated)
@@ -328,13 +352,17 @@ export function WorkflowPageV2() {
 
         try {
           // Check if auto-save is disabled
-          if (!isAutoSaveEnabled) {
+          if (!canAutoSave) {
             return;
           }
 
           // Check if there are unsaved structural changes
           // If so, skip auto-save to avoid saving those changes accidentally
           if (hasNonPositionalUnsavedChanges) {
+            return;
+          }
+
+          if (isTemplate) {
             return;
           }
 
@@ -455,7 +483,8 @@ export function WorkflowPageV2() {
       updateWorkflowMutation,
       queryClient,
       hasNonPositionalUnsavedChanges,
-      isAutoSaveEnabled,
+      canAutoSave,
+      isTemplate,
     ],
   );
 
@@ -1038,6 +1067,12 @@ export function WorkflowPageV2() {
     async (workflowToSave?: WorkflowsWorkflow, options?: { showToast?: boolean }) => {
       const targetWorkflow = workflowToSave || workflow;
       if (!targetWorkflow || !organizationId || !workflowId) return;
+      if (isTemplate) {
+        if (options?.showToast !== false) {
+          showErrorToast("Template canvases are read-only");
+        }
+        return;
+      }
       const shouldRestoreFocus = options?.showToast === false;
       const focusedNoteId = shouldRestoreFocus ? getActiveNoteId() : null;
       const changeSummary = summarizeWorkflowChanges({
@@ -1098,7 +1133,7 @@ export function WorkflowPageV2() {
         }
       }
     },
-    [workflow, organizationId, workflowId, updateWorkflowMutation],
+    [workflow, organizationId, workflowId, updateWorkflowMutation, isTemplate],
   );
 
   const getNodeEditData = useCallback(
@@ -1218,7 +1253,7 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1231,7 +1266,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1244,7 +1279,11 @@ export function WorkflowPageV2() {
         const annotationUpdates = new Map(pendingAnnotationUpdatesRef.current);
         if (annotationUpdates.size === 0) return;
 
-        if (!isAutoSaveEnabled) {
+        if (!canAutoSave) {
+          return;
+        }
+
+        if (isTemplate) {
           return;
         }
 
@@ -1289,7 +1328,7 @@ export function WorkflowPageV2() {
           }
         });
       }, 600),
-    [organizationId, workflowId, queryClient, handleSaveWorkflow, isAutoSaveEnabled],
+    [organizationId, workflowId, queryClient, handleSaveWorkflow, canAutoSave, isTemplate],
   );
 
   const handleAnnotationUpdate = useCallback(
@@ -1326,7 +1365,7 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
         pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...updates });
         debouncedAnnotationAutoSave();
@@ -1341,7 +1380,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       debouncedAnnotationAutoSave,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1425,7 +1464,7 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1441,7 +1480,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1490,7 +1529,7 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1505,7 +1544,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1596,7 +1635,7 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1609,7 +1648,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1642,7 +1681,7 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1655,7 +1694,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1685,7 +1724,7 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1698,7 +1737,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1743,7 +1782,7 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1756,7 +1795,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1796,7 +1835,7 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         pendingPositionUpdatesRef.current.set(nodeId, roundedPosition);
 
         debouncedAutoSave();
@@ -1811,7 +1850,7 @@ export function WorkflowPageV2() {
       workflowId,
       queryClient,
       debouncedAutoSave,
-      isAutoSaveEnabled,
+      canAutoSave,
       saveWorkflowSnapshot,
       markUnsavedChange,
     ],
@@ -1852,7 +1891,7 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         // Add all position updates to pending updates
         positionMap.forEach((position, nodeId) => {
           pendingPositionUpdatesRef.current.set(nodeId, position);
@@ -1870,7 +1909,7 @@ export function WorkflowPageV2() {
       workflowId,
       queryClient,
       debouncedAutoSave,
-      isAutoSaveEnabled,
+      canAutoSave,
       saveWorkflowSnapshot,
       markUnsavedChange,
     ],
@@ -1909,7 +1948,7 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1922,7 +1961,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -2031,7 +2070,7 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -2045,7 +2084,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -2053,6 +2092,10 @@ export function WorkflowPageV2() {
   const handleSave = useCallback(
     async (canvasNodes: CanvasNode[]) => {
       if (!workflow || !organizationId || !workflowId) return;
+      if (isTemplate) {
+        showErrorToast("Template canvases are read-only");
+        return;
+      }
 
       // Map canvas nodes back to ComponentsNode format with updated positions
       const updatedNodes = workflow.spec?.nodes?.map((node) => {
@@ -2120,7 +2163,116 @@ export function WorkflowPageV2() {
         showErrorToast(errorMessage);
       }
     },
-    [workflow, organizationId, workflowId, updateWorkflowMutation],
+    [workflow, organizationId, workflowId, updateWorkflowMutation, isTemplate],
+  );
+
+  const getYamlExportPayload = useCallback(
+    (canvasNodes: CanvasNode[]) => {
+      if (!workflow) return null;
+
+      const updatedNodes =
+        workflow.spec?.nodes?.map((node) => {
+          const canvasNode = canvasNodes.find((cn) => cn.id === node.id);
+          const componentType = (canvasNode?.data?.type as string) || "";
+          if (canvasNode) {
+            return {
+              ...node,
+              position: {
+                x: Math.round(canvasNode.position.x),
+                y: Math.round(canvasNode.position.y),
+              },
+              isCollapsed: (canvasNode.data[componentType] as { collapsed: boolean })?.collapsed || false,
+            };
+          }
+          return node;
+        }) || [];
+
+      const exportWorkflow = {
+        metadata: {
+          name: workflow.metadata?.name || "Canvas",
+          description: workflow.metadata?.description || "",
+          isTemplate: workflow.metadata?.isTemplate ?? false,
+        },
+        spec: {
+          nodes: updatedNodes,
+          edges: workflow.spec?.edges || [],
+        },
+      };
+
+      const yamlText = yaml.dump(exportWorkflow, {
+        forceQuotes: true,
+        quotingType: '"',
+        lineWidth: 0,
+      });
+
+      const safeName = (workflow.metadata?.name || "canvas")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+      const filename = `${safeName || "canvas"}.yaml`;
+
+      return { yamlText, filename };
+    },
+    [workflow],
+  );
+
+  const handleExportYamlDownload = useCallback(
+    (canvasNodes: CanvasNode[]) => {
+      const payload = getYamlExportPayload(canvasNodes);
+      if (!payload) return;
+
+      const blob = new Blob([payload.yamlText], { type: "text/yaml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = payload.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      showSuccessToast("Canvas exported as YAML");
+    },
+    [getYamlExportPayload],
+  );
+
+  const handleExportYamlCopy = useCallback(
+    async (canvasNodes: CanvasNode[]) => {
+      const payload = getYamlExportPayload(canvasNodes);
+      if (!payload) return;
+
+      try {
+        await navigator.clipboard.writeText(payload.yamlText);
+        showSuccessToast("YAML copied to clipboard");
+      } catch (error) {
+        console.error("Failed to copy YAML to clipboard:", error);
+        showErrorToast("Failed to copy YAML to clipboard");
+      }
+    },
+    [getYamlExportPayload],
+  );
+
+  const handleUseTemplateSubmit = useCallback(
+    async (data: { name: string; description?: string; templateId?: string }) => {
+      if (!workflow || !organizationId) return;
+
+      const latestWorkflow =
+        queryClient.getQueryData<WorkflowsWorkflow>(workflowKeys.detail(organizationId, workflowId!)) || workflow;
+
+      const result = await createWorkflowMutation.mutateAsync({
+        name: data.name,
+        description: data.description,
+        nodes: latestWorkflow.spec?.nodes,
+        edges: latestWorkflow.spec?.edges,
+      });
+
+      if (result?.data?.workflow?.metadata?.id) {
+        setIsUseTemplateOpen(false);
+        navigate(`/${organizationId}/workflows/${result.data.workflow.metadata.id}`);
+      }
+    },
+    [workflow, organizationId, createWorkflowMutation, navigate, queryClient, workflowId],
   );
 
   // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
@@ -2226,97 +2378,136 @@ export function WorkflowPageV2() {
   }
 
   const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
+  const templateBanner = isTemplate ? (
+    <div className="bg-slate-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm font-medium text-gray-900">Template preview</p>
+        <p className="text-xs text-gray-500">Read-only template. Save your edits to a new canvas.</p>
+      </div>
+      <Button size="sm" onClick={() => setIsUseTemplateOpen(true)}>
+        {hasUnsavedChanges ? "Save changes to new canvas" : "Use template"}
+      </Button>
+    </div>
+  ) : null;
 
   return (
-    <CanvasPage
-      // Persist right sidebar in query params
-      initialSidebar={{
-        isOpen: searchParams.get("sidebar") === "1",
-        nodeId: searchParams.get("node") || null,
-      }}
-      onSidebarChange={handleSidebarChange}
-      onNodeExpand={(nodeId) => {
-        const latestExecution = nodeExecutionsMap[nodeId]?.[0];
-        const executionId = latestExecution?.id;
-        if (executionId) {
-          navigate(`/${organizationId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`);
+    <>
+      <CanvasPage
+        // Persist right sidebar in query params
+        initialSidebar={{
+          isOpen: searchParams.get("sidebar") === "1",
+          nodeId: searchParams.get("node") || null,
+        }}
+        onSidebarChange={handleSidebarChange}
+        onNodeExpand={(nodeId) => {
+          const latestExecution = nodeExecutionsMap[nodeId]?.[0];
+          const executionId = latestExecution?.id;
+          if (executionId) {
+            navigate(`/${organizationId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`);
+          }
+        }}
+        title={workflow?.metadata?.name || "Canvas"}
+        headerBanner={templateBanner}
+        nodes={nodes}
+        edges={edges}
+        organizationId={organizationId}
+        onDirty={() => markUnsavedChange("structural")}
+        getSidebarData={getSidebarData}
+        loadSidebarData={loadSidebarData}
+        getTabData={getTabData}
+        getNodeEditData={getNodeEditData}
+        getAutocompleteExampleObj={getAutocompleteExampleObj}
+        getCustomField={getCustomField}
+        onNodeConfigurationSave={handleNodeConfigurationSave}
+        onAnnotationUpdate={handleAnnotationUpdate}
+        onSave={isTemplate ? undefined : handleSave}
+        onEdgeCreate={handleEdgeCreate}
+        onNodeDelete={handleNodeDelete}
+        onEdgeDelete={handleEdgeDelete}
+        onNodePositionChange={handleNodePositionChange}
+        onNodesPositionChange={handleNodesPositionChange}
+        onToggleView={handleNodeCollapseChange}
+        onToggleCollapse={() => markUnsavedChange("structural")}
+        onRun={handleRun}
+        onDuplicate={handleNodeDuplicate}
+        onConfigure={handleConfigure}
+        buildingBlocks={buildingBlocks}
+        onNodeAdd={handleNodeAdd}
+        onPlaceholderAdd={handlePlaceholderAdd}
+        onPlaceholderConfigure={handlePlaceholderConfigure}
+        installedApplications={installedApplications}
+        hasFitToViewRef={hasFitToViewRef}
+        hasUserToggledSidebarRef={hasUserToggledSidebarRef}
+        isSidebarOpenRef={isSidebarOpenRef}
+        viewportRef={viewportRef}
+        initialFocusNodeId={initialFocusNodeIdRef.current}
+        unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
+        saveIsPrimary={hasUnsavedChanges && !isTemplate}
+        saveButtonHidden={isTemplate || !hasUnsavedChanges}
+        onUndo={isTemplate ? undefined : handleRevert}
+        canUndo={!isTemplate && !isAutoSaveEnabled && initialWorkflowSnapshot !== null}
+        isAutoSaveEnabled={isAutoSaveEnabled && !isTemplate}
+        onToggleAutoSave={isTemplate ? undefined : handleToggleAutoSave}
+        onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
+        onExportYamlDownload={isDev ? handleExportYamlDownload : undefined}
+        runDisabled={hasRunBlockingChanges || isTemplate}
+        runDisabledTooltip={
+          isTemplate
+            ? "Templates are read-only"
+            : hasRunBlockingChanges
+              ? "Save canvas changes before running"
+              : undefined
         }
-      }}
-      title={workflow?.metadata?.name || "Canvas"}
-      nodes={nodes}
-      edges={edges}
-      organizationId={organizationId}
-      onDirty={() => markUnsavedChange("structural")}
-      getSidebarData={getSidebarData}
-      loadSidebarData={loadSidebarData}
-      getTabData={getTabData}
-      getNodeEditData={getNodeEditData}
-      getAutocompleteExampleObj={getAutocompleteExampleObj}
-      getCustomField={getCustomField}
-      onNodeConfigurationSave={handleNodeConfigurationSave}
-      onAnnotationUpdate={handleAnnotationUpdate}
-      onSave={handleSave}
-      onEdgeCreate={handleEdgeCreate}
-      onNodeDelete={handleNodeDelete}
-      onEdgeDelete={handleEdgeDelete}
-      onNodePositionChange={handleNodePositionChange}
-      onNodesPositionChange={handleNodesPositionChange}
-      onToggleView={handleNodeCollapseChange}
-      onToggleCollapse={() => markUnsavedChange("structural")}
-      onRun={handleRun}
-      onDuplicate={handleNodeDuplicate}
-      onConfigure={handleConfigure}
-      buildingBlocks={buildingBlocks}
-      onNodeAdd={handleNodeAdd}
-      onPlaceholderAdd={handlePlaceholderAdd}
-      onPlaceholderConfigure={handlePlaceholderConfigure}
-      installedApplications={installedApplications}
-      hasFitToViewRef={hasFitToViewRef}
-      hasUserToggledSidebarRef={hasUserToggledSidebarRef}
-      isSidebarOpenRef={isSidebarOpenRef}
-      viewportRef={viewportRef}
-      initialFocusNodeId={initialFocusNodeIdRef.current}
-      unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
-      saveIsPrimary={hasUnsavedChanges}
-      saveButtonHidden={!hasUnsavedChanges}
-      onUndo={handleRevert}
-      canUndo={!isAutoSaveEnabled && initialWorkflowSnapshot !== null}
-      isAutoSaveEnabled={isAutoSaveEnabled}
-      onToggleAutoSave={handleToggleAutoSave}
-      runDisabled={hasRunBlockingChanges}
-      runDisabledTooltip={hasRunBlockingChanges ? "Save canvas changes before running" : undefined}
-      onCancelQueueItem={onCancelQueueItem}
-      onPushThrough={onPushThrough}
-      supportsPushThrough={supportsPushThrough}
-      onCancelExecution={onCancelExecution}
-      getAllHistoryEvents={getAllHistoryEvents}
-      onLoadMoreHistory={handleLoadMoreHistory}
-      getHasMoreHistory={getHasMoreHistory}
-      getLoadingMoreHistory={getLoadingMoreHistory}
-      onLoadMoreQueue={onLoadMoreQueue}
-      getAllQueueEvents={getAllQueueEvents}
-      getHasMoreQueue={getHasMoreQueue}
-      getLoadingMoreQueue={getLoadingMoreQueue}
-      onReEmit={handleReEmit}
-      loadExecutionChain={loadExecutionChain}
-      getExecutionState={getExecutionState}
-      workflowNodes={workflow?.spec?.nodes}
-      components={components}
-      triggers={triggers}
-      blueprints={blueprints}
-      logEntries={logEntries}
-      focusRequest={focusRequest}
-      onExecutionChainHandled={handleExecutionChainHandled}
-      breadcrumbs={[
-        {
-          label: "Canvases",
-          href: `/${organizationId}`,
-        },
-        {
-          label: workflow?.metadata?.name || "Canvas",
-        },
-      ]}
-    />
+        onCancelQueueItem={onCancelQueueItem}
+        onPushThrough={onPushThrough}
+        supportsPushThrough={supportsPushThrough}
+        onCancelExecution={onCancelExecution}
+        getAllHistoryEvents={getAllHistoryEvents}
+        onLoadMoreHistory={handleLoadMoreHistory}
+        getHasMoreHistory={getHasMoreHistory}
+        getLoadingMoreHistory={getLoadingMoreHistory}
+        onLoadMoreQueue={onLoadMoreQueue}
+        getAllQueueEvents={getAllQueueEvents}
+        getHasMoreQueue={getHasMoreQueue}
+        getLoadingMoreQueue={getLoadingMoreQueue}
+        onReEmit={handleReEmit}
+        loadExecutionChain={loadExecutionChain}
+        getExecutionState={getExecutionState}
+        workflowNodes={workflow?.spec?.nodes}
+        components={components}
+        triggers={triggers}
+        blueprints={blueprints}
+        logEntries={logEntries}
+        focusRequest={focusRequest}
+        onExecutionChainHandled={handleExecutionChainHandled}
+        breadcrumbs={[
+          {
+            label: isTemplate ? "Templates" : "Canvases",
+            href: `/${organizationId}`,
+          },
+          {
+            label: workflow?.metadata?.name || (isTemplate ? "Template" : "Canvas"),
+          },
+        ]}
+      />
+      {workflow ? (
+        <CreateCanvasModal
+          isOpen={isUseTemplateOpen}
+          onClose={() => setIsUseTemplateOpen(false)}
+          onSubmit={handleUseTemplateSubmit}
+          isLoading={createWorkflowMutation.isPending}
+          templates={[
+            {
+              id: workflow.metadata?.id || "",
+              name: workflow.metadata?.name || "Untitled template",
+              description: workflow.metadata?.description,
+            },
+          ]}
+          defaultTemplateId={workflow.metadata?.id || ""}
+          mode="create"
+        />
+      ) : null}
+    </>
   );
 }
 

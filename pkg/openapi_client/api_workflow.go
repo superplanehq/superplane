@@ -367,8 +367,14 @@ func (a *WorkflowAPIService) WorkflowsDescribeWorkflowExecute(r ApiWorkflowsDesc
 }
 
 type ApiWorkflowsListWorkflowsRequest struct {
-	ctx        context.Context
-	ApiService *WorkflowAPIService
+	ctx              context.Context
+	ApiService       *WorkflowAPIService
+	includeTemplates *bool
+}
+
+func (r ApiWorkflowsListWorkflowsRequest) IncludeTemplates(includeTemplates bool) ApiWorkflowsListWorkflowsRequest {
+	r.includeTemplates = &includeTemplates
+	return r
 }
 
 func (r ApiWorkflowsListWorkflowsRequest) Execute() (*WorkflowsListWorkflowsResponse, *http.Response, error) {
@@ -412,6 +418,9 @@ func (a *WorkflowAPIService) WorkflowsListWorkflowsExecute(r ApiWorkflowsListWor
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.includeTemplates != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includeTemplates", r.includeTemplates, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 

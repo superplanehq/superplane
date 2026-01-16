@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -32,7 +33,16 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 
 	existingWorkflow, err := models.FindWorkflow(uuid.MustParse(organizationID), workflowID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if _, templateErr := models.FindWorkflowTemplate(workflowID); templateErr == nil {
+				return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
+			}
+		}
 		return nil, status.Errorf(codes.NotFound, "workflow not found: %v", err)
+	}
+
+	if existingWorkflow.IsTemplate {
+		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
 	nodes, edges, err := ParseWorkflow(registry, organizationID, pbWorkflow)
