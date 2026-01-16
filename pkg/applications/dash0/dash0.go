@@ -40,6 +40,10 @@ func (d *Dash0) Description() string {
 	return "Connect to Dash0 to query data using Prometheus API"
 }
 
+func (d *Dash0) InstallationInstructions() string {
+	return ""
+}
+
 func (d *Dash0) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
