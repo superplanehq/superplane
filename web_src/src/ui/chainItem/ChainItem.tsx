@@ -75,6 +75,13 @@ type ApprovalTimelineEntry = {
   comment?: string;
 };
 
+type IssueListEntry = {
+  status: "degraded" | "critical";
+  checkName: string;
+  checkSummary?: string;
+  checkDescription?: string;
+};
+
 interface ChainItemProps {
   item: ChainItemData;
   index: number;
@@ -124,8 +131,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     }
 
     const mapper = getComponentBaseMapper(item.workflowNode.component.name);
-    return mapper.subtitle?.(item.workflowNode, item.originalExecution, item.additionalData);
-  }, [item.workflowNode, item.originalExecution, item.additionalData]);
+    // Pass a marker to indicate this is from ChainItem, so subtitle can skip issue counts
+    return mapper.subtitle?.(item.workflowNode, item.originalExecution, { skipIssueCounts: true });
+  }, [item.workflowNode, item.originalExecution]);
 
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
@@ -171,6 +179,18 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         "status" in entry &&
         typeof (entry as ApprovalTimelineEntry).label === "string" &&
         typeof (entry as ApprovalTimelineEntry).status === "string",
+    );
+  };
+  const isIssuesList = (value: unknown): value is IssueListEntry[] => {
+    if (!Array.isArray(value)) return false;
+    return value.every(
+      (entry) =>
+        entry &&
+        typeof entry === "object" &&
+        "status" in entry &&
+        ((entry as IssueListEntry).status === "degraded" || (entry as IssueListEntry).status === "critical") &&
+        "checkName" in entry &&
+        typeof (entry as IssueListEntry).checkName === "string",
     );
   };
   const getApprovalStatusColor = (status: string) => {
@@ -382,6 +402,68 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                 )}
                                 {entry.comment && (
                                   <div className="text-[12px] text-gray-500 italic break-words">"{entry.comment}"</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (isIssuesList(value)) {
+                    return (
+                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                          {key}:
+                        </span>
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
+                          <div className="flex flex-col gap-4">
+                            {value.map((issue, issueIndex) => (
+                              <div key={`${issue.checkName}-${issueIndex}`} className="flex flex-col">
+                                <div className="flex items-start gap-2">
+                                  {/* Status badge replaces the dot */}
+                                  <span
+                                    className={`text-xs font-medium px-1 py-0.5 rounded flex-shrink-0 uppercase leading-tight self-start ${
+                                      issue.status === "critical"
+                                        ? "bg-red-100 text-red-700"
+                                        : "bg-yellow-100 text-yellow-700"
+                                    }`}
+                                  >
+                                    {issue.status}
+                                  </span>
+
+                                  <div className="flex-1 min-w-0">
+                                    {/* Check name */}
+                                    <div className="mb-1">
+                                      <span
+                                        className="text-[13px] font-semibold text-gray-900 break-words"
+                                        title={issue.checkName}
+                                      >
+                                        {issue.checkName}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Check summary - spans full width below badge */}
+                                {issue.checkSummary && (
+                                  <div
+                                    className="text-[12px] text-gray-700 break-words mt-1 w-full"
+                                    title={issue.checkSummary}
+                                  >
+                                    {issue.checkSummary}
+                                  </div>
+                                )}
+
+                                {/* Check description - spans full width below badge */}
+                                {issue.checkDescription && (
+                                  <div
+                                    className="text-[12px] text-gray-500 italic break-words mt-1 w-full"
+                                    title={issue.checkDescription}
+                                  >
+                                    {issue.checkDescription}
+                                  </div>
                                 )}
                               </div>
                             ))}
