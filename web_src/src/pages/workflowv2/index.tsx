@@ -239,6 +239,13 @@ export function WorkflowPageV2() {
     }
   }, [workflow]);
 
+  useEffect(() => {
+    if (isTemplate) {
+      setHasUnsavedChanges(false);
+      setHasNonPositionalUnsavedChanges(false);
+    }
+  }, [isTemplate, workflowId]);
+
   // Build maps from store for canvas display (using initial data from workflow.status and websocket updates)
   // Rebuild whenever store version changes (indicates data was updated)
   const { nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap } = useMemo<{
@@ -283,15 +290,12 @@ export function WorkflowPageV2() {
   // Revert to initial state
   const markUnsavedChange = useCallback(
     (kind: UnsavedChangeKind) => {
-      if (isTemplate) {
-        return;
-      }
       setHasUnsavedChanges(true);
       if (kind === "structural") {
         setHasNonPositionalUnsavedChanges(true);
       }
     },
-    [isTemplate],
+    [],
   );
 
   const handleRevert = useCallback(() => {
@@ -2281,10 +2285,10 @@ export function WorkflowPageV2() {
     <div className="bg-slate-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p className="text-sm font-medium text-gray-900">Template preview</p>
-        <p className="text-xs text-gray-500">Any changes you make will not be saved.</p>
+        <p className="text-xs text-gray-500">Read-only template. Save your edits to a new canvas.</p>
       </div>
       <Button size="sm" onClick={() => setIsUseTemplateOpen(true)}>
-        Use template
+        {hasUnsavedChanges ? "Save changes to new canvas" : "Use template"}
       </Button>
     </div>
   ) : null;
