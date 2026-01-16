@@ -1,235 +1,42 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { flattenForAutocomplete, getAutocompleteSuggestions } from "./core";
+import { describe, it, expect } from "vitest";
+import { getSuggestions } from "./core";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-describe("flattenForAutocomplete", () => {
-  it("should flatten a simple object with root level keys", () => {
-    const obj = { name: "John", age: 30 };
-    const result = flattenForAutocomplete(obj);
-
-    expect(result["root-0"]).toEqual(["name", "age"]);
+describe("getSuggestions", () => {
+  it("suggests env keys after $ trigger", () => {
+    const suggestions = getSuggestions("take($", "take($".length, { foo: 1, bar: 2 });
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("foo");
+    expect(suggestions.some((item) => item.insertText === '$["foo"]')).toBe(true);
   });
 
-  it("should flatten nested objects", () => {
-    const obj = {
-      user: {
-        name: "John",
-        address: {
-          city: "NYC",
-        },
-      },
-    };
-    const result = flattenForAutocomplete(obj);
-
-    expect(result["root-0"]).toEqual(["user"]);
-    expect(result["user-0"]).toEqual(["name", "address"]);
-    expect(result["user.address-1"]).toEqual(["city"]);
+  it("suggests dot fields based on resolved globals", () => {
+    const suggestions = getSuggestions("$.user.", "$.user.".length, { user: { name: "Ana", age: 33 } });
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("name");
+    expect(labels).toContain("age");
   });
 
-  it("should handle arrays correctly", () => {
-    const obj = {
-      items: [
-        { id: 1, name: "Item 1" },
-        { id: 2, name: "Item 2" },
-      ],
-    };
-    const result = flattenForAutocomplete(obj);
-
-    expect(result["root-0"]).toEqual(["items"]);
-    expect(result["items-0"]).toContain("items[0]");
-    expect(result["items-0"]).toContain("items[1]");
-    expect(result["items[0]-1"]).toEqual(["id", "name"]);
-    expect(result["items[1]-1"]).toEqual(["id", "name"]);
+  it("adds a dot for expandable fields but skips empty objects", () => {
+    const suggestions = getSuggestions("$.user.", "$.user.".length, {
+      user: { filled: { ok: true }, empty: {} },
+    });
+    const filled = suggestions.find((item) => item.label === "filled");
+    const empty = suggestions.find((item) => item.label === "empty");
+    expect(filled?.insertText).toBe("filled.");
+    expect(empty?.insertText).toBe("empty");
   });
 
-  it("should handle nested arrays and objects", () => {
-    const obj = {
-      someField: {
-        adasd: [
-          {
-            test: {
-              dasdsa: "dsadsad",
-              teasdas: 123213,
-            },
-          },
-        ],
-      },
-    };
-    const result = flattenForAutocomplete(obj);
-
-    expect(result["root-0"]).toEqual(["someField"]);
-    expect(result["someField-0"]).toEqual(["adasd"]);
-    expect(result["someField.adasd-1"]).toContain("someField.adasd[0]");
-    expect(result["someField.adasd[0]-2"]).toEqual(["test"]);
-    expect(result["someField.adasd[0].test-3"]).toEqual(["dasdsa", "teasdas"]);
+  it("filters out internal metadata keys from dot suggestions", () => {
+    const suggestions = getSuggestions("$.user.", "$.user.".length, {
+      user: { name: "Ana", __nodeName: "User Node" },
+    });
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("name");
+    expect(labels).not.toContain("__nodeName");
   });
 
-  it("should handle null and undefined values", () => {
-    const obj = {
-      value1: null,
-      value2: undefined,
-      nested: {
-        value3: null,
-      },
-    };
-    const result = flattenForAutocomplete(obj);
-
-    expect(result["root-0"]).toEqual(["value1", "value2", "nested"]);
-    expect(result["nested-0"]).toEqual(["value3"]);
-  });
-
-  it("should handle empty objects", () => {
-    const obj = {};
-    const result = flattenForAutocomplete(obj);
-
-    expect(result["root-0"]).toEqual([]);
-  });
-
-  it("should handle empty arrays", () => {
-    const obj = {
-      items: [],
-    };
-    const result = flattenForAutocomplete(obj);
-
-    expect(result["root-0"]).toEqual(["items"]);
-    expect(result["items-0"]).toBeUndefined();
-  });
-});
-
-describe("getAutocompleteSuggestions", () => {
-  const testData = {
-    someField: {
-      adasd: [
-        {
-          test: {
-            dasdsa: "dsadsad",
-            teasdas: 123213,
-          },
-        },
-      ],
-    },
-  };
-
-  let flattened: any;
-
-  beforeEach(() => {
-    flattened = flattenForAutocomplete(testData);
-  });
-
-  it("should return root level keys when path is empty", () => {
-    const suggestions = getAutocompleteSuggestions(flattened, "");
-
-    expect(suggestions).toContain("someField");
-  });
-
-  it("should return nested keys for a given path", () => {
-    const suggestions = getAutocompleteSuggestions(flattened, "someField");
-
-    expect(suggestions).toEqual(["adasd"]);
-  });
-
-  it("should return array indices for array paths", () => {
-    const suggestions = getAutocompleteSuggestions(flattened, "someField.adasd");
-
-    expect(suggestions).toContain("someField.adasd[0]");
-  });
-
-  it("should return object keys after array index", () => {
-    const suggestions = getAutocompleteSuggestions(flattened, "someField.adasd[0]");
-
-    expect(suggestions).toEqual(["test"]);
-  });
-
-  it("should return nested object keys", () => {
-    const suggestions = getAutocompleteSuggestions(flattened, "someField.adasd[0].test");
-
-    expect(suggestions).toEqual(expect.arrayContaining(["dasdsa", "teasdas"]));
-    expect(suggestions).toHaveLength(2);
-  });
-
-  it("should return empty array for non-existent paths", () => {
-    const suggestions = getAutocompleteSuggestions(flattened, "nonexistent.path");
-
-    expect(suggestions).toEqual([]);
-  });
-
-  it("should handle deep nesting correctly", () => {
-    const deepData = {
-      level1: {
-        level2: {
-          level3: {
-            level4: "value",
-          },
-        },
-      },
-    };
-    const deepFlattened = flattenForAutocomplete(deepData);
-
-    expect(getAutocompleteSuggestions(deepFlattened, "")).toContain("level1");
-    expect(getAutocompleteSuggestions(deepFlattened, "level1")).toEqual(["level2"]);
-    expect(getAutocompleteSuggestions(deepFlattened, "level1.level2")).toEqual(["level3"]);
-    expect(getAutocompleteSuggestions(deepFlattened, "level1.level2.level3")).toEqual(["level4"]);
-  });
-
-  it("should handle multiple array items", () => {
-    const arrayData = {
-      users: [
-        { name: "Alice", age: 30 },
-        { name: "Bob", age: 25 },
-      ],
-    };
-    const arrayFlattened = flattenForAutocomplete(arrayData);
-
-    const suggestions = getAutocompleteSuggestions(arrayFlattened, "users");
-    expect(suggestions).toContain("users[0]");
-    expect(suggestions).toContain("users[1]");
-
-    const user0Suggestions = getAutocompleteSuggestions(arrayFlattened, "users[0]");
-    expect(user0Suggestions).toEqual(expect.arrayContaining(["name", "age"]));
-  });
-});
-
-describe("Integration tests", () => {
-  it("should provide correct autocomplete flow for complex nested structure", () => {
-    const data = {
-      company: {
-        departments: [
-          {
-            name: "Engineering",
-            employees: [
-              { id: 1, name: "Alice" },
-              { id: 2, name: "Bob" },
-            ],
-          },
-        ],
-      },
-    };
-
-    const flattened = flattenForAutocomplete(data);
-
-    // Start typing
-    expect(getAutocompleteSuggestions(flattened, "")).toContain("company");
-
-    // Type "company."
-    expect(getAutocompleteSuggestions(flattened, "company")).toEqual(["departments"]);
-
-    // Type "company.departments"
-    expect(getAutocompleteSuggestions(flattened, "company.departments")).toContain("company.departments[0]");
-
-    // Type "company.departments[0]."
-    expect(getAutocompleteSuggestions(flattened, "company.departments[0]")).toEqual(
-      expect.arrayContaining(["name", "employees"]),
-    );
-
-    // Type "company.departments[0].employees"
-    expect(getAutocompleteSuggestions(flattened, "company.departments[0].employees")).toContain(
-      "company.departments[0].employees[0]",
-    );
-
-    // Type "company.departments[0].employees[0]."
-    expect(getAutocompleteSuggestions(flattened, "company.departments[0].employees[0]")).toEqual(
-      expect.arrayContaining(["id", "name"]),
-    );
+  it("includes built-in functions by prefix", () => {
+    const suggestions = getSuggestions("tr", 2, {});
+    expect(suggestions.some((item) => item.label === "trim")).toBe(true);
   });
 });

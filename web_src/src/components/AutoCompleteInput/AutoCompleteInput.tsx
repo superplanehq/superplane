@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { twMerge } from "tailwind-merge";
-import {
-  buildLookupPath,
-  formatDisplayPath,
-  flattenForAutocomplete,
-  getAutocompleteSuggestions,
-  getAutocompleteSuggestionsWithTypes,
-  getValueAtPath,
-  isValidIdentifier,
-  parsePathSegments,
-} from "./core";
+import { getSuggestions } from "./core";
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"input">, "onChange" | "size"> {
   exampleObj: Record<string, unknown> | null;
@@ -24,9 +15,8 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   inputSize?: "xs" | "sm" | "md" | "lg";
   noExampleObjectText?: string;
   showValuePreview?: boolean;
+  quickTip?: string;
 }
-
-let blurTimeout: NodeJS.Timeout;
 
 export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
   function AutoCompleteInputRender(props, forwardedRef) {
@@ -43,15 +33,16 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       inputSize = "md",
       noExampleObjectText = "No suggestions found",
       showValuePreview = false,
+      quickTip,
       ...rest
     } = props;
     const [inputValue, setInputValue] = useState(value);
-    const [suggestions, setSuggestions] = useState<Array<{ suggestion: string; type: string }>>([]);
+    const [suggestions, setSuggestions] = useState<Array<ReturnType<typeof getSuggestions>[number]>>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
-    const [flattenedData, setFlattenedData] = useState<Record<string, string[]>>({});
     const [highlightedValue, setHighlightedValue] = useState<unknown>(undefined);
+    const [cursorPosition, setCursorPosition] = useState(0);
     const previousWordLength = useRef<number>(0);
     const previousInputValue = useRef<string>(value);
 
@@ -87,66 +78,327 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       }
 
       const closeIndex = text.indexOf(props.suffix, openIndex + 2);
-      if (closeIndex !== -1 && position > closeIndex) {
+      if (closeIndex !== -1 && position - 1 > closeIndex) {
         return false;
       }
 
       return true;
     };
 
-    const getNormalizedPath = (rawWord: string) => {
-      return buildLookupPath(parsePathSegments(rawWord));
-    };
-
-    const getPathContext = (rawWord: string, normalizedWord: string) => {
-      if (!normalizedWord) {
-        return { basePath: "", lastKey: "" };
+    const getExpressionContext = (text: string, cursor: number) => {
+      if (!startWord || !suffix) {
+        return {
+          expressionText: text,
+          expressionCursor: cursor,
+          startOffset: 0,
+          endOffset: text.length,
+        };
       }
 
-      if (rawWord.endsWith(".")) {
-        return { basePath: normalizedWord, lastKey: "" };
+      const openIndex = text.lastIndexOf(startWord, cursor);
+      if (openIndex === -1) {
+        return null;
       }
 
-      const parts = normalizedWord.split(".");
+      const closeIndex = text.indexOf(suffix, openIndex + startWord.length);
+      if (closeIndex !== -1 && cursor - 1 > closeIndex) {
+        return null;
+      }
+
+      const startOffset = openIndex + startWord.length;
+      const endOffset = closeIndex === -1 ? text.length : closeIndex;
       return {
-        basePath: parts.slice(0, -1).join("."),
-        lastKey: parts[parts.length - 1] ?? "",
+        expressionText: text.slice(startOffset, endOffset),
+        expressionCursor: Math.max(0, cursor - startOffset),
+        startOffset,
+        endOffset,
       };
     };
 
-    // Helper function to replace word at cursor position
-    const replaceWordAtCursor = (text: string, position: number, newWord: string) => {
-      const { start, end } = getWordAtCursor(text, position);
-      return text.substring(0, start) + newWord + text.substring(end);
+    const getSuggestionInsertText = (suggestion: ReturnType<typeof getSuggestions>[number]) => {
+      if (suggestion.kind === "function") {
+        return `${suggestion.label}()`;
+      }
+      return suggestion.insertText ?? suggestion.label;
     };
 
-    // Helper function to build full path for a suggestion
-    const buildFullPath = (suggestion: string) => {
-      const cursorPosition = inputRef.current?.selectionStart || 0;
-      const { word } = getWordAtCursor(inputValue, cursorPosition);
-      const normalizedWord = getNormalizedPath(word);
-      const { basePath } = getPathContext(word, normalizedWord);
+    const formatFunctionSignature = (suggestion: ReturnType<typeof getSuggestions>[number]) => {
+      if (suggestion.kind !== "function") {
+        return "";
+      }
 
-      return suggestion.startsWith(basePath) ? suggestion : basePath ? `${basePath}.${suggestion}` : suggestion;
+      const insertText = suggestion.insertText ?? `${suggestion.label}()`;
+      const openParen = insertText.indexOf("(");
+      const closeParen = insertText.lastIndexOf(")");
+      if (openParen === -1 || closeParen === -1 || closeParen <= openParen) {
+        return "()";
+      }
+
+      let params = insertText.slice(openParen + 1, closeParen);
+      params = params.replace(/\$\{\d+:([^}]+)\}/g, "$1");
+      params = params.replace(/\$\{\d+\}/g, "");
+      params = params.replace(/\$0/g, "");
+      params = params.replace(/\s+/g, " ").trim();
+      params = params.replace(/\s+,/g, ",").replace(/,\s+/g, ", ");
+
+      return `(${params})`;
     };
 
-    const formatSuggestionLabel = (suggestion: string) => {
-      if (suggestion.match(/\[/)) {
-        return suggestion;
+    const getReplacementRange = (left: string, insertText: string) => {
+      const envBracketMatch = left.match(/\$env\s*\[\s*(['"])([^'"]*)$/);
+      if (envBracketMatch) {
+        const partial = envBracketMatch[2] ?? "";
+        return { start: left.length - (partial.length + 1), end: left.length };
       }
-      if (isValidIdentifier(suggestion)) {
-        return suggestion;
+
+      const dollarBracketMatch = left.match(/\$\s*\[\s*(['"])([^'"]*)$/);
+      if (dollarBracketMatch) {
+        const partial = dollarBracketMatch[2] ?? "";
+        return { start: left.length - (partial.length + 1), end: left.length };
       }
-      return `["${suggestion}"]`;
+
+      const envTriggerMatch = left.match(/\$env\s*\[\s*$/);
+      if (envTriggerMatch && envTriggerMatch.index !== undefined) {
+        return { start: envTriggerMatch.index, end: left.length };
+      }
+
+      const dollarTriggerMatch = left.match(/\$\s*\[\s*$|\$\s*$/);
+      if (dollarTriggerMatch && dollarTriggerMatch.index !== undefined) {
+        return { start: dollarTriggerMatch.index, end: left.length };
+      }
+
+      const dotMatch = left.match(/(.+?)\.\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
+      if (dotMatch) {
+        const memberPrefix = dotMatch[2] ?? "";
+        let start = left.length - memberPrefix.length;
+        if (insertText.startsWith("[") && left[start - 1] === ".") {
+          start -= 1;
+        }
+        return { start, end: left.length };
+      }
+
+      const identMatch = left.match(/[$A-Za-z_][$A-Za-z0-9_]*$/);
+      if (identMatch) {
+        return { start: left.length - identMatch[0].length, end: left.length };
+      }
+
+      return { start: left.length, end: left.length };
     };
 
-    // Flatten the example object when it changes
-    useEffect(() => {
-      if (exampleObj) {
-        const flattened = flattenForAutocomplete(exampleObj);
-        setFlattenedData(flattened);
+    const extractTailPathExpression = (expr: string) => {
+      const s = expr.trim();
+      let bracketDepth = 0;
+      let inSingle = false;
+      let inDouble = false;
+
+      const isEscaped = (idx: number) => {
+        let backslashes = 0;
+        for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) {
+          backslashes++;
+        }
+        return backslashes % 2 === 1;
+      };
+
+      const isStopChar = (ch: string) =>
+        ch === "(" ||
+        ch === ")" ||
+        ch === "," ||
+        ch === ";" ||
+        ch === ":" ||
+        ch === "?" ||
+        ch === "+" ||
+        ch === "-" ||
+        ch === "*" ||
+        ch === "/" ||
+        ch === "%" ||
+        ch === "|" ||
+        ch === "&" ||
+        ch === "!" ||
+        ch === "=" ||
+        ch === "<" ||
+        ch === ">" ||
+        ch === "\n" ||
+        ch === "\r" ||
+        ch === "\t" ||
+        ch === " ";
+
+      let start = -1;
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+
+        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+        if (inSingle || inDouble) continue;
+
+        if (ch === "[") {
+          bracketDepth++;
+          continue;
+        }
+        if (ch === "]") {
+          bracketDepth = Math.max(0, bracketDepth - 1);
+          continue;
+        }
+
+        if (bracketDepth === 0 && ch === "$") {
+          start = i;
+        }
       }
-    }, [exampleObj]);
+
+      if (start === -1) return "";
+
+      bracketDepth = 0;
+      inSingle = false;
+      inDouble = false;
+      let end = s.length;
+
+      for (let i = start; i < s.length; i++) {
+        const ch = s[i];
+
+        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+        if (inSingle || inDouble) continue;
+
+        if (ch === "[") {
+          bracketDepth++;
+          continue;
+        }
+        if (ch === "]") {
+          bracketDepth = Math.max(0, bracketDepth - 1);
+          continue;
+        }
+
+        if (bracketDepth === 0 && i > start && isStopChar(ch)) {
+          end = i;
+          break;
+        }
+      }
+
+      return s.slice(start, end).trim();
+    };
+
+    const resolveExpressionValue = (expression: string, globals: Record<string, unknown>) => {
+      const tailExpr = extractTailPathExpression(expression);
+      if (!tailExpr) return undefined;
+
+      const stripWhitespaceOutsideStrings = (input: string) => {
+        let out = "";
+        let inSingle = false;
+        let inDouble = false;
+
+        const isEscaped = (idx: number) => {
+          let backslashes = 0;
+          for (let j = idx - 1; j >= 0 && input[j] === "\\"; j--) {
+            backslashes++;
+          }
+          return backslashes % 2 === 1;
+        };
+
+        for (let i = 0; i < input.length; i++) {
+          const ch = input[i];
+          if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+          else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+          if (!inSingle && !inDouble && /\s/u.test(ch)) {
+            continue;
+          }
+          out += ch;
+        }
+
+        return out;
+      };
+
+      let expr = stripWhitespaceOutsideStrings(tailExpr);
+      if (expr.startsWith("$[")) {
+        expr = "$" + expr.slice(1);
+      }
+
+      type Token = { t: "dot" } | { t: "ident"; v: string } | { t: "key"; v: string };
+
+      const tokens: Token[] = [];
+      let i = 0;
+      const identRe = /^[$A-Za-z_][$A-Za-z0-9_]*/;
+
+      while (i < expr.length) {
+        const rest = expr.slice(i);
+
+        if (rest[0] === ".") {
+          tokens.push({ t: "dot" });
+          i += 1;
+          continue;
+        }
+
+        if (rest[0] === "[") {
+          const quotedMatch = rest.match(/^\[\s*(['"])(.*?)\1\s*\]/);
+          if (quotedMatch) {
+            tokens.push({ t: "key", v: String(quotedMatch[2] ?? "").replace(/\\(["'\\])/g, "$1") });
+            i += quotedMatch[0].length;
+            continue;
+          }
+
+          const numberMatch = rest.match(/^\[\s*(\d+)\s*\]/);
+          if (numberMatch) {
+            tokens.push({ t: "key", v: numberMatch[1] });
+            i += numberMatch[0].length;
+            continue;
+          }
+
+          return undefined;
+          continue;
+        }
+
+        const im = rest.match(identRe);
+        if (im) {
+          tokens.push({ t: "ident", v: im[0] });
+          i += im[0].length;
+          continue;
+        }
+
+        return undefined;
+      }
+
+      if (tokens[0]?.t !== "ident") return undefined;
+      let pos = 0;
+      const first = (tokens[pos] as { t: "ident"; v: string }).v;
+      pos += 1;
+
+      let cur: unknown;
+      if (first === "$" || first === "$env") cur = globals;
+      else cur = globals ? (globals as Record<string, unknown>)[first] : undefined;
+
+      while (pos < tokens.length) {
+        const tok = tokens[pos];
+
+        if (tok.t === "dot") {
+          pos += 1;
+          const next = tokens[pos];
+          if (!next) return cur;
+          if (next.t !== "ident") return undefined;
+          try {
+            cur = (cur as any)?.[next.v];
+          } catch {
+            return undefined;
+          }
+          pos += 1;
+          continue;
+        }
+
+        if (tok.t === "key") {
+          try {
+            cur = (cur as any)?.[tok.v];
+          } catch {
+            return undefined;
+          }
+          pos += 1;
+          continue;
+        }
+
+        return undefined;
+      }
+
+      return cur;
+    };
 
     useEffect(() => {
       setInputValue(value);
@@ -157,92 +409,39 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     }, [inputValue]);
 
     useEffect(() => {
-      if (!flattenedData || !isFocused) {
-        setSuggestions([]);
-        setIsOpen(false);
-        return;
-      }
-
-      const cursorPosition = inputRef.current?.selectionStart || 0;
-      const prevChar = cursorPosition > 0 ? inputValue[cursorPosition - 1] : "";
-      const { word } = getWordAtCursor(inputValue, cursorPosition);
-
-      if (word === "") {
-        previousWordLength.current = 0;
-        setSuggestions([]);
-        setIsOpen(false);
-        return;
-      }
-
-      if (prevChar === " ") {
-        previousWordLength.current = word.length;
+      if (!isFocused) {
         setSuggestions([]);
         setIsOpen(false);
         setHighlightedValue(undefined);
         return;
       }
 
-      if (word.startsWith("[") && !word.startsWith("$")) {
-        previousWordLength.current = word.length;
+      const context = getExpressionContext(inputValue, cursorPosition);
+      if (!context || !isAllowedToSuggest(inputValue, cursorPosition)) {
         setSuggestions([]);
         setIsOpen(false);
         setHighlightedValue(undefined);
         return;
       }
 
-      if (!isAllowedToSuggest(inputValue, cursorPosition)) {
-        previousWordLength.current = word.length;
-        setSuggestions([]);
-        setIsOpen(false);
-        setHighlightedValue(undefined);
-        return;
-      }
-
-      const normalizedWord = getNormalizedPath(word);
-      const { basePath, lastKey } = getPathContext(word, normalizedWord);
-      const parsedInput = basePath;
-
-      const newSuggestions = getAutocompleteSuggestionsWithTypes(
-        flattenedData,
-        parsedInput || "root",
-        basePath,
-        exampleObj,
-      );
-      const arraySuggestions = getAutocompleteSuggestionsWithTypes(
-        flattenedData,
-        parsedInput ? `${parsedInput}.${lastKey}` : lastKey,
-        basePath,
-        exampleObj,
-      ).filter(({ suggestion }) => suggestion.match(/\[\d+\]$/));
-      const similarSuggestions = newSuggestions.filter(
-        ({ suggestion }) => suggestion.startsWith(lastKey) && suggestion !== lastKey,
-      );
-
-      // Merge suggestions and remove duplicates based on suggestion text
-      const allSuggestionsMap = new Map();
-      [...arraySuggestions, ...similarSuggestions].forEach((item) => {
-        allSuggestionsMap.set(item.suggestion, item);
-      });
-      const allSuggestions = Array.from(allSuggestionsMap.values());
-
-      setSuggestions(allSuggestions);
-      setIsOpen(
-        allSuggestions.length > 0 ||
-          (allSuggestions.length === 0 && word.endsWith(".")) ||
-          word === "$" ||
-          (!exampleObj && word.endsWith(".")),
-      );
-      const nextHighlightedIndex = showValuePreview && allSuggestions.length > 0 ? 0 : -1;
+      const newSuggestions = getSuggestions(context.expressionText, context.expressionCursor, exampleObj ?? {});
+      setSuggestions(newSuggestions);
+      setIsOpen(newSuggestions.length > 0);
+      const nextHighlightedIndex = showValuePreview && newSuggestions.length > 0 ? 0 : -1;
       setHighlightedIndex(nextHighlightedIndex);
       if (exampleObj && nextHighlightedIndex >= 0) {
-        const fullPath = buildFullPath(allSuggestions[nextHighlightedIndex].suggestion);
-        const value = getValueAtPath(exampleObj, fullPath);
+        const suggestion = newSuggestions[nextHighlightedIndex];
+        const insertText = getSuggestionInsertText(suggestion);
+        const left = context.expressionText.slice(0, context.expressionCursor);
+        const range = getReplacementRange(left, insertText);
+        const nextExpression =
+          context.expressionText.slice(0, range.start) + insertText + context.expressionText.slice(range.end);
+        const value = resolveExpressionValue(nextExpression, exampleObj);
         setHighlightedValue(value);
       } else {
         setHighlightedValue(undefined);
       }
-      previousWordLength.current = word.length;
-    }, [inputValue, flattenedData, isFocused, startWord, prefix, onChange, showValuePreview, exampleObj]);
+    }, [inputValue, cursorPosition, isFocused, startWord, suffix, onChange, showValuePreview, exampleObj]);
 
     // Handle clicking outside to close suggestions
     useEffect(() => {
@@ -263,6 +462,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const newValue = e.target.value;
       const cursorPosition = e.target.selectionStart ?? newValue.length;
+      setCursorPosition(cursorPosition);
       const { word, start } = getWordAtCursor(newValue, cursorPosition);
       const beforeCursor = newValue.slice(0, cursorPosition);
       const afterCursor = newValue.slice(cursorPosition);
@@ -281,7 +481,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
         !afterCursor.startsWith("}") &&
         !isAllowedToSuggest(inputValue, cursorPosition)
       ) {
-        const composedValue = replaceWordAtCursor(newValue, cursorPosition, `${prefix || ""}${suffix || ""}`);
+        const composedValue = `${newValue.slice(0, start)}${prefix || ""}${suffix || ""}${newValue.slice(start + word.length)}`;
         setInputValue(composedValue);
         onChange?.(composedValue);
         setSuggestions([]);
@@ -295,51 +495,40 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
 
       setInputValue(newValue);
       onChange?.(newValue);
+      previousWordLength.current = word.length;
     };
 
-    const handleSuggestionClick = (suggestionItem: { suggestion: string; type: string }) => {
-      const cursorPosition = inputRef.current?.selectionStart || 0;
-      const { word, start } = getWordAtCursor(inputValue, cursorPosition);
-      const normalizedWord = getNormalizedPath(word);
-      const { basePath } = getPathContext(word, normalizedWord);
-      const normalizedPath = suggestionItem.suggestion.startsWith(basePath)
-        ? suggestionItem.suggestion
-        : basePath
-          ? `${basePath}.${suggestionItem.suggestion}`
-          : suggestionItem.suggestion;
-      const nextSuggestions = getAutocompleteSuggestions(flattenedData, normalizedPath);
-      const nextSuggestionsAreArraySuggestions = nextSuggestions.some((suggestion: string) =>
-        suggestion.match(/\[\d+\]$/),
-      );
-      const isObjectKey = nextSuggestions.length > 0 && !nextSuggestionsAreArraySuggestions;
-      const displayPath = formatDisplayPath(parsePathSegments(normalizedPath), true);
-      let newValue = displayPath;
-      let cursorOffset = displayPath.length;
-      if (isObjectKey) {
-        newValue = `${displayPath}.`;
-        cursorOffset = displayPath.length + 1;
-      }
-
-      newValue = replaceWordAtCursor(inputValue, cursorPosition, newValue);
-      setInputValue(newValue);
-      onChange?.(newValue);
-      setHighlightedIndex(-1);
+    const handleCursorChange = () => {
       requestAnimationFrame(() => {
-        const cursorTarget = start + cursorOffset;
-        inputRef.current?.setSelectionRange(cursorTarget, cursorTarget);
+        const nextCursorPosition = inputRef.current?.selectionStart ?? inputValue.length;
+        setCursorPosition(nextCursorPosition);
       });
+    };
 
-      if (nextSuggestions.length === 0) {
+    const handleSuggestionClick = (suggestionItem: ReturnType<typeof getSuggestions>[number]) => {
+      const cursorPosition = inputRef.current?.selectionStart || 0;
+      const context = getExpressionContext(inputValue, cursorPosition);
+      if (!context) {
         setIsOpen(false);
         return;
       }
 
-      clearTimeout(blurTimeout);
-      setTimeout(() => {
-        setIsFocused(true);
-        setIsOpen(true);
-        setHighlightedIndex(highlightedIndex);
-      }, 100);
+      const left = context.expressionText.slice(0, context.expressionCursor);
+      const insertText = getSuggestionInsertText(suggestionItem);
+      const range = getReplacementRange(left, insertText);
+      const nextExpression =
+        context.expressionText.slice(0, range.start) + insertText + context.expressionText.slice(range.end);
+      const newValue = inputValue.slice(0, context.startOffset) + nextExpression + inputValue.slice(context.endOffset);
+
+      setInputValue(newValue);
+      onChange?.(newValue);
+      setHighlightedIndex(-1);
+      requestAnimationFrame(() => {
+        const cursorTarget = context.startOffset + range.start + insertText.length;
+        inputRef.current?.setSelectionRange(cursorTarget, cursorTarget);
+      });
+
+      setIsOpen(false);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -351,8 +540,18 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           setHighlightedIndex((prev) => {
             const newIndex = prev < suggestions.length - 1 ? prev + 1 : 0;
             if (exampleObj && suggestions[newIndex]) {
-              const fullPath = buildFullPath(suggestions[newIndex].suggestion);
-              const value = getValueAtPath(exampleObj, fullPath);
+              const cursorPosition = inputRef.current?.selectionStart || 0;
+              const context = getExpressionContext(inputValue, cursorPosition);
+              if (!context) {
+                setHighlightedValue(undefined);
+                return newIndex;
+              }
+              const insertText = getSuggestionInsertText(suggestions[newIndex]);
+              const left = context.expressionText.slice(0, context.expressionCursor);
+              const range = getReplacementRange(left, insertText);
+              const nextExpression =
+                context.expressionText.slice(0, range.start) + insertText + context.expressionText.slice(range.end);
+              const value = resolveExpressionValue(nextExpression, exampleObj);
               setHighlightedValue(value);
             }
             return newIndex;
@@ -363,8 +562,18 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           setHighlightedIndex((prev) => {
             const newIndex = prev > 0 ? prev - 1 : suggestions.length - 1;
             if (exampleObj && suggestions[newIndex]) {
-              const fullPath = buildFullPath(suggestions[newIndex].suggestion);
-              const value = getValueAtPath(exampleObj, fullPath);
+              const cursorPosition = inputRef.current?.selectionStart || 0;
+              const context = getExpressionContext(inputValue, cursorPosition);
+              if (!context) {
+                setHighlightedValue(undefined);
+                return newIndex;
+              }
+              const insertText = getSuggestionInsertText(suggestions[newIndex]);
+              const left = context.expressionText.slice(0, context.expressionCursor);
+              const range = getReplacementRange(left, insertText);
+              const nextExpression =
+                context.expressionText.slice(0, range.start) + insertText + context.expressionText.slice(range.end);
+              const value = resolveExpressionValue(nextExpression, exampleObj);
               setHighlightedValue(value);
             }
             return newIndex;
@@ -396,8 +605,14 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       }
     }, [highlightedIndex]);
 
+    const shouldShowValuePreview =
+      showValuePreview &&
+      highlightedIndex >= 0 &&
+      highlightedValue !== undefined &&
+      (highlightedValue === null || (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue)));
+
     return (
-      <div ref={containerRef} className="relative w-full">
+      <div ref={containerRef} className={"relative w-full" + (quickTip ? " mb-3" : "")}>
         {/* Input Field */}
         <span
           data-slot="control"
@@ -414,6 +629,10 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onKeyUp={handleCursorChange}
+            onKeyDownCapture={handleCursorChange}
+            onClick={handleCursorChange}
+            onSelect={handleCursorChange}
             onFocus={() => {
               setIsFocused(true);
               if (suggestions.length > 0) {
@@ -422,7 +641,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             }}
             onBlur={() => {
               // Small delay to allow click on suggestions
-              blurTimeout = setTimeout(() => {
+              setTimeout(() => {
                 setIsFocused(false);
                 setIsOpen(false);
                 setHighlightedValue(undefined);
@@ -445,63 +664,77 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             ])}
             {...rest}
           />
-        </span>
-
-        {/* Value Preview Box */}
-        {showValuePreview &&
-          highlightedIndex >= 0 &&
-          highlightedValue !== undefined &&
-          isOpen &&
-          (highlightedValue === null || (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue))) && (
-            <div
-              className={twMerge([
-                "absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3",
-                "dark:bg-gray-800 dark:border-gray-700",
-              ])}
-            >
-              <div className="text-xs text-gray-500 dark:text-gray-300 mb-1">Value Preview:</div>
-              <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
-                {highlightedValue === null
-                  ? "null"
-                  : typeof highlightedValue === "string"
-                    ? `"${highlightedValue}"`
-                    : String(highlightedValue)}
-              </div>
-            </div>
+          {quickTip && (
+            <span className="pointer-events-none absolute -bottom-4 right-1 text-[10px] font-medium text-gray-400 bg-gray-100 rounded-b-md px-2">
+              {quickTip}
+            </span>
           )}
+        </span>
 
         {/* Suggestions Dropdown */}
         {isOpen && suggestions.length > 0 && (
-          <div
-            ref={suggestionsRef}
-            className={twMerge([
-              "absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto",
-              "dark:bg-gray-800 dark:border-gray-700",
-            ])}
-          >
-            {suggestions.map((suggestionItem, index) => (
-              <div
-                key={suggestionItem.suggestion}
-                className={twMerge([
-                  "px-3 py-2 cursor-pointer text-sm flex justify-between items-center",
-                  "hover:bg-gray-100 dark:hover:bg-gray-700",
-                  "text-gray-950 dark:text-white",
-                  highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
-                ])}
-                onClick={() => handleSuggestionClick(suggestionItem)}
-                onMouseEnter={() => {
-                  setHighlightedIndex(index);
-                  if (exampleObj) {
-                    const fullPath = buildFullPath(suggestionItem.suggestion);
-                    const value = getValueAtPath(exampleObj, fullPath);
-                    setHighlightedValue(value);
-                  }
-                }}
-              >
-                <span>{formatSuggestionLabel(suggestionItem.suggestion)}</span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">{suggestionItem.type}</span>
+          <div ref={suggestionsRef} className={twMerge(["absolute z-50 w-full mt-1 bg-transparent"])}>
+            <div className="flex flex-col sm:flex-row">
+              <div className="flex-1 overflow-auto bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 sm:rounded-lg rounded-t-lg sm:rounded-tr-none max-h-60 shadow-lg">
+                {suggestions.map((suggestionItem, index) => (
+                  <div
+                    key={`${suggestionItem.kind}-${suggestionItem.label}-${index}`}
+                    className={twMerge([
+                      "px-3 py-2 cursor-pointer text-sm flex justify-between items-center",
+                      "hover:bg-gray-100 dark:hover:bg-gray-700",
+                      "text-gray-950 dark:text-white",
+                      highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
+                    ])}
+                    onClick={() => handleSuggestionClick(suggestionItem)}
+                    onMouseEnter={() => {
+                      setHighlightedIndex(index);
+                      if (exampleObj) {
+                        const cursorPosition = inputRef.current?.selectionStart || 0;
+                        const context = getExpressionContext(inputValue, cursorPosition);
+                        if (!context) {
+                          setHighlightedValue(undefined);
+                          return;
+                        }
+                        const insertText = getSuggestionInsertText(suggestionItem);
+                        const left = context.expressionText.slice(0, context.expressionCursor);
+                        const range = getReplacementRange(left, insertText);
+                        const nextExpression =
+                          context.expressionText.slice(0, range.start) +
+                          insertText +
+                          context.expressionText.slice(range.end);
+                        const value = resolveExpressionValue(nextExpression, exampleObj);
+                        setHighlightedValue(value);
+                      }
+                    }}
+                  >
+                    <span>
+                      {suggestionItem.label}
+                      {suggestionItem.kind === "function" && (
+                        <span className="ml-2 text-gray-500">{formatFunctionSignature(suggestionItem)}</span>
+                      )}
+                      {suggestionItem.kind !== "function" && suggestionItem.labelDetail && (
+                        <span className="ml-2 text-gray-500">{suggestionItem.labelDetail}</span>
+                      )}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                      {suggestionItem.detail ?? suggestionItem.kind}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+              {shouldShowValuePreview && isOpen && (
+                <div className="border border-gray-200 dark:border-gray-700 sm:border-l-0 sm:border-t sm:max-w-[240px] sm:min-w-[200px] p-3 bg-gray-100 dark:bg-gray-700 sm:rounded-r-lg rounded-b-lg sm:rounded-bl-none h-fit self-start shadow-lg">
+                  <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Value Preview</div>
+                  <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
+                    {highlightedValue === null
+                      ? "null"
+                      : typeof highlightedValue === "string"
+                        ? `"${highlightedValue}"`
+                        : String(highlightedValue)}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

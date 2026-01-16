@@ -23,7 +23,6 @@ type ConfigurationTypeOptions struct {
 	Number           *ConfigurationNumberTypeOptions           `json:"number,omitempty"`
 	Select           *ConfigurationSelectTypeOptions           `json:"select,omitempty"`
 	MultiSelect      *ConfigurationMultiSelectTypeOptions      `json:"multiSelect,omitempty"`
-	Integration      *ConfigurationIntegrationTypeOptions      `json:"integration,omitempty"`
 	List             *ConfigurationListTypeOptions             `json:"list,omitempty"`
 	Object           *ConfigurationObjectTypeOptions           `json:"object,omitempty"`
 	Resource         *ConfigurationResourceTypeOptions         `json:"resource,omitempty"`
@@ -147,38 +146,6 @@ func (o *ConfigurationTypeOptions) HasMultiSelect() bool {
 // SetMultiSelect gets a reference to the given ConfigurationMultiSelectTypeOptions and assigns it to the MultiSelect field.
 func (o *ConfigurationTypeOptions) SetMultiSelect(v ConfigurationMultiSelectTypeOptions) {
 	o.MultiSelect = &v
-}
-
-// GetIntegration returns the Integration field value if set, zero value otherwise.
-func (o *ConfigurationTypeOptions) GetIntegration() ConfigurationIntegrationTypeOptions {
-	if o == nil || IsNil(o.Integration) {
-		var ret ConfigurationIntegrationTypeOptions
-		return ret
-	}
-	return *o.Integration
-}
-
-// GetIntegrationOk returns a tuple with the Integration field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ConfigurationTypeOptions) GetIntegrationOk() (*ConfigurationIntegrationTypeOptions, bool) {
-	if o == nil || IsNil(o.Integration) {
-		return nil, false
-	}
-	return o.Integration, true
-}
-
-// HasIntegration returns a boolean if a field has been set.
-func (o *ConfigurationTypeOptions) HasIntegration() bool {
-	if o != nil && !IsNil(o.Integration) {
-		return true
-	}
-
-	return false
-}
-
-// SetIntegration gets a reference to the given ConfigurationIntegrationTypeOptions and assigns it to the Integration field.
-func (o *ConfigurationTypeOptions) SetIntegration(v ConfigurationIntegrationTypeOptions) {
-	o.Integration = &v
 }
 
 // GetList returns the List field value if set, zero value otherwise.
@@ -519,9 +486,6 @@ func (o ConfigurationTypeOptions) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.MultiSelect) {
 		toSerialize["multiSelect"] = o.MultiSelect
-	}
-	if !IsNil(o.Integration) {
-		toSerialize["integration"] = o.Integration
 	}
 	if !IsNil(o.List) {
 		toSerialize["list"] = o.List

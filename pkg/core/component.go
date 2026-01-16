@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/integrations"
 )
 
 var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
@@ -130,7 +129,6 @@ type ExecutionContext struct {
 	ExecutionState  ExecutionStateContext
 	Requests        RequestContext
 	Auth            AuthContext
-	Integration     IntegrationContext
 	AppInstallation AppInstallationContext
 	Notifications   NotificationContext
 }
@@ -157,15 +155,7 @@ type SetupContext struct {
 	Metadata        MetadataContext
 	Requests        RequestContext
 	Auth            AuthContext
-	Integration     IntegrationContext
 	AppInstallation AppInstallationContext
-}
-
-/*
- * IntegrationContext allows components to access integrations.
- */
-type IntegrationContext interface {
-	GetIntegration(ID string) (integrations.ResourceManager, error)
 }
 
 /*
@@ -237,7 +227,6 @@ type ActionContext struct {
 	ExecutionState  ExecutionStateContext
 	Auth            AuthContext
 	Requests        RequestContext
-	Integration     IntegrationContext
 	AppInstallation AppInstallationContext
 	Notifications   NotificationContext
 }

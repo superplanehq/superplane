@@ -4,11 +4,22 @@ import { FieldRendererProps } from "./types";
 import { resolveIcon } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
+import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
-export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({
+  field,
+  value,
+  onChange,
+  hasError,
+  autocompleteExampleObj,
+}) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [validationError, setValidationError] = React.useState<string | null>(null);
+  const { handleEditorMount } = useMonacoExpressionAutocomplete({
+    autocompleteExampleObj,
+    languageId: "xml",
+  });
 
   const copyToClipboard = () => {
     const textToCopy = (value as string) || "";
@@ -69,6 +80,13 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
     bracketPairColorization: {
       enabled: true,
     },
+    suggestOnTriggerCharacters: true,
+    quickSuggestions: {
+      other: true,
+      strings: true,
+      comments: false,
+    },
+    wordBasedSuggestions: "off" as const,
   };
 
   return (
@@ -95,6 +113,7 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
             defaultLanguage="xml"
             value={editorValue}
             onChange={handleEditorChange}
+            onMount={handleEditorMount}
             theme="vs"
             options={editorOptions}
           />
@@ -126,6 +145,7 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
               defaultLanguage="xml"
               value={editorValue}
               onChange={handleEditorChange}
+              onMount={handleEditorMount}
               theme="vs"
               options={{
                 ...editorOptions,

@@ -3,10 +3,8 @@ package core
 import (
 	"net/http"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/integrations"
 )
 
 type Trigger interface {
@@ -73,15 +71,7 @@ type TriggerContext struct {
 	Requests        RequestContext
 	Events          EventContext
 	Webhook         NodeWebhookContext
-	Integration     IntegrationContext
 	AppInstallation AppInstallationContext
-}
-
-type WebhookSetupOptions struct {
-	IntegrationID     *uuid.UUID
-	AppInstallationID *uuid.UUID
-	Resource          integrations.Resource
-	Configuration     any
 }
 
 type EventContext interface {
@@ -118,7 +108,7 @@ type WebhookRequestContext struct {
 }
 
 type NodeWebhookContext interface {
-	Setup(options *WebhookSetupOptions) (string, error)
+	Setup() (string, error)
 	GetSecret() ([]byte, error)
 	ResetSecret() ([]byte, []byte, error)
 	GetBaseURL() string
