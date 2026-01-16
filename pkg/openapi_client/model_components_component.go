@@ -27,6 +27,7 @@ type ComponentsComponent struct {
 	OutputChannels []SuperplaneComponentsOutputChannel `json:"outputChannels,omitempty"`
 	Icon           *string                             `json:"icon,omitempty"`
 	Color          *string                             `json:"color,omitempty"`
+	ExampleOutput  map[string]interface{}              `json:"exampleOutput,omitempty"`
 }
 
 // NewComponentsComponent instantiates a new ComponentsComponent object
@@ -270,6 +271,38 @@ func (o *ComponentsComponent) SetColor(v string) {
 	o.Color = &v
 }
 
+// GetExampleOutput returns the ExampleOutput field value if set, zero value otherwise.
+func (o *ComponentsComponent) GetExampleOutput() map[string]interface{} {
+	if o == nil || IsNil(o.ExampleOutput) {
+		var ret map[string]interface{}
+		return ret
+	}
+	return o.ExampleOutput
+}
+
+// GetExampleOutputOk returns a tuple with the ExampleOutput field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsComponent) GetExampleOutputOk() (map[string]interface{}, bool) {
+	if o == nil || IsNil(o.ExampleOutput) {
+		return map[string]interface{}{}, false
+	}
+	return o.ExampleOutput, true
+}
+
+// HasExampleOutput returns a boolean if a field has been set.
+func (o *ComponentsComponent) HasExampleOutput() bool {
+	if o != nil && !IsNil(o.ExampleOutput) {
+		return true
+	}
+
+	return false
+}
+
+// SetExampleOutput gets a reference to the given map[string]interface{} and assigns it to the ExampleOutput field.
+func (o *ComponentsComponent) SetExampleOutput(v map[string]interface{}) {
+	o.ExampleOutput = v
+}
+
 func (o ComponentsComponent) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -300,6 +333,9 @@ func (o ComponentsComponent) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Color) {
 		toSerialize["color"] = o.Color
+	}
+	if !IsNil(o.ExampleOutput) {
+		toSerialize["exampleOutput"] = o.ExampleOutput
 	}
 	return toSerialize, nil
 }

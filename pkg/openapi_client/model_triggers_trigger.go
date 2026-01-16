@@ -20,12 +20,13 @@ var _ MappedNullable = &TriggersTrigger{}
 
 // TriggersTrigger struct for TriggersTrigger
 type TriggersTrigger struct {
-	Name          *string              `json:"name,omitempty"`
-	Label         *string              `json:"label,omitempty"`
-	Description   *string              `json:"description,omitempty"`
-	Icon          *string              `json:"icon,omitempty"`
-	Color         *string              `json:"color,omitempty"`
-	Configuration []ConfigurationField `json:"configuration,omitempty"`
+	Name          *string                `json:"name,omitempty"`
+	Label         *string                `json:"label,omitempty"`
+	Description   *string                `json:"description,omitempty"`
+	Icon          *string                `json:"icon,omitempty"`
+	Color         *string                `json:"color,omitempty"`
+	Configuration []ConfigurationField   `json:"configuration,omitempty"`
+	ExampleData   map[string]interface{} `json:"exampleData,omitempty"`
 }
 
 // NewTriggersTrigger instantiates a new TriggersTrigger object
@@ -237,6 +238,38 @@ func (o *TriggersTrigger) SetConfiguration(v []ConfigurationField) {
 	o.Configuration = v
 }
 
+// GetExampleData returns the ExampleData field value if set, zero value otherwise.
+func (o *TriggersTrigger) GetExampleData() map[string]interface{} {
+	if o == nil || IsNil(o.ExampleData) {
+		var ret map[string]interface{}
+		return ret
+	}
+	return o.ExampleData
+}
+
+// GetExampleDataOk returns a tuple with the ExampleData field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *TriggersTrigger) GetExampleDataOk() (map[string]interface{}, bool) {
+	if o == nil || IsNil(o.ExampleData) {
+		return map[string]interface{}{}, false
+	}
+	return o.ExampleData, true
+}
+
+// HasExampleData returns a boolean if a field has been set.
+func (o *TriggersTrigger) HasExampleData() bool {
+	if o != nil && !IsNil(o.ExampleData) {
+		return true
+	}
+
+	return false
+}
+
+// SetExampleData gets a reference to the given map[string]interface{} and assigns it to the ExampleData field.
+func (o *TriggersTrigger) SetExampleData(v map[string]interface{}) {
+	o.ExampleData = v
+}
+
 func (o TriggersTrigger) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -264,6 +297,9 @@ func (o TriggersTrigger) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration
+	}
+	if !IsNil(o.ExampleData) {
+		toSerialize["exampleData"] = o.ExampleData
 	}
 	return toSerialize, nil
 }
