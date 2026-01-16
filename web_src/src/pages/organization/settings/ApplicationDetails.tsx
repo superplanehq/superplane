@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { resolveIcon } from "@/lib/utils";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
@@ -34,6 +35,8 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
   const appDefinition = installation ? availableApps.find((app) => app.name === installation.spec?.appName) : undefined;
   const appLogoMap: Record<string, string> = {
     github: githubIcon,
+    openai: openAiIcon,
+    "open-ai": openAiIcon,
     semaphore: SemaphoreLogo,
     pagerduty: pagerDutyIcon,
     dash0: dash0Icon,

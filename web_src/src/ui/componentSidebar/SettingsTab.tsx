@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { isFieldRequired, isFieldVisible, parseDefaultValues, validateFieldForSubmission } from "@/utils/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
@@ -255,10 +255,10 @@ export function SettingsTab({
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
             {availableInstallations.length === 0 ? (
               // Warning when no installations available
-              <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
-                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <Alert className="bg-orange-50 dark:bg-amber-950">
+                <AlertTriangle className="h-4 w-4" />
                 <AlertTitle className="text-amber-900 dark:text-amber-100">App Installation Required</AlertTitle>
-                <AlertDescription className="text-amber-800 dark:text-amber-200">
+                <AlertDescription className="text-amber-900 dark:text-amber-200">
                   This component requires a {appName} installation.{" "}
                   <a
                     href={`/${domainId}/settings/applications`}
