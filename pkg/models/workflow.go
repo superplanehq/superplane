@@ -122,6 +122,25 @@ func FindWorkflowByName(name string, organizationID uuid.UUID) (*Workflow, error
 	return &workflow, nil
 }
 
+func FindWorkflowTemplateByName(name string) (*Workflow, error) {
+	return FindWorkflowTemplateByNameInTransaction(database.Conn(), name)
+}
+
+func FindWorkflowTemplateByNameInTransaction(tx *gorm.DB, name string) (*Workflow, error) {
+	var workflow Workflow
+	err := tx.
+		Where("is_template = ?", true).
+		Where("name = ?", name).
+		First(&workflow).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow, nil
+}
+
 func FindWorkflowInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Workflow, error) {
 	var workflow Workflow
 	err := tx.

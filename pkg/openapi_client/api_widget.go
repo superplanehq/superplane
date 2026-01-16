@@ -20,14 +20,13 @@ import (
 	"strings"
 )
 
-
 // WidgetAPIService WidgetAPI service
 type WidgetAPIService service
 
 type ApiWidgetsDescribeWidgetRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *WidgetAPIService
-	name string
+	name       string
 }
 
 func (r ApiWidgetsDescribeWidgetRequest) Execute() (*WidgetsDescribeWidgetResponse, *http.Response, error) {
@@ -39,26 +38,27 @@ WidgetsDescribeWidget Describe widget
 
 Returns a widget by its name
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param name
- @return ApiWidgetsDescribeWidgetRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param name
+	@return ApiWidgetsDescribeWidgetRequest
 */
 func (a *WidgetAPIService) WidgetsDescribeWidget(ctx context.Context, name string) ApiWidgetsDescribeWidgetRequest {
 	return ApiWidgetsDescribeWidgetRequest{
 		ApiService: a,
-		ctx: ctx,
-		name: name,
+		ctx:        ctx,
+		name:       name,
 	}
 }
 
 // Execute executes the request
-//  @return WidgetsDescribeWidgetResponse
+//
+//	@return WidgetsDescribeWidgetResponse
 func (a *WidgetAPIService) WidgetsDescribeWidgetExecute(r ApiWidgetsDescribeWidgetRequest) (*WidgetsDescribeWidgetResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *WidgetsDescribeWidgetResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *WidgetsDescribeWidgetResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WidgetAPIService.WidgetsDescribeWidget")
@@ -112,14 +112,14 @@ func (a *WidgetAPIService) WidgetsDescribeWidgetExecute(r ApiWidgetsDescribeWidg
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -136,7 +136,7 @@ func (a *WidgetAPIService) WidgetsDescribeWidgetExecute(r ApiWidgetsDescribeWidg
 }
 
 type ApiWidgetsListWidgetsRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *WidgetAPIService
 }
 
@@ -149,24 +149,25 @@ WidgetsListWidgets List widgets
 
 Returns a list of all available widgets
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiWidgetsListWidgetsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiWidgetsListWidgetsRequest
 */
 func (a *WidgetAPIService) WidgetsListWidgets(ctx context.Context) ApiWidgetsListWidgetsRequest {
 	return ApiWidgetsListWidgetsRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return WidgetsListWidgetsResponse
+//
+//	@return WidgetsListWidgetsResponse
 func (a *WidgetAPIService) WidgetsListWidgetsExecute(r ApiWidgetsListWidgetsRequest) (*WidgetsListWidgetsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *WidgetsListWidgetsResponse
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *WidgetsListWidgetsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WidgetAPIService.WidgetsListWidgets")
@@ -219,14 +220,14 @@ func (a *WidgetAPIService) WidgetsListWidgetsExecute(r ApiWidgetsListWidgetsRequ
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

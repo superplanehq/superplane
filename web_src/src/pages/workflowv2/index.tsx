@@ -29,6 +29,7 @@ import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { useAvailableApplications, useInstalledApplications } from "@/hooks/useApplications";
 import {
   eventExecutionsQueryOptions,
+  useCreateWorkflow,
   useTriggers,
   useUpdateWorkflow,
   useWorkflow,
@@ -54,6 +55,8 @@ import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { CreateCanvasModal } from "@/components/CreateCanvasModal";
+import { Button } from "@/components/ui/button";
 import {
   getComponentAdditionalDataBuilder,
   getComponentBaseMapper,
@@ -116,6 +119,8 @@ export function WorkflowPageV2() {
   usePageTitle([workflow?.metadata?.name || "Canvas"]);
 
   const isTemplate = workflow?.metadata?.isTemplate ?? false;
+  const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
+  const createWorkflowMutation = useCreateWorkflow(organizationId!);
 
   // Warm up org users and roles cache so approval specs can pretty-print
   // user IDs as emails and role names as display names.
@@ -2150,6 +2155,25 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, updateWorkflowMutation, isTemplate],
   );
 
+  const handleUseTemplateSubmit = useCallback(
+    async (data: { name: string; description?: string; templateId?: string }) => {
+      if (!workflow || !organizationId) return;
+
+      const result = await createWorkflowMutation.mutateAsync({
+        name: data.name,
+        description: data.description,
+        nodes: workflow.spec?.nodes,
+        edges: workflow.spec?.edges,
+      });
+
+      if (result?.data?.workflow?.metadata?.id) {
+        setIsUseTemplateOpen(false);
+        navigate(`/${organizationId}/workflows/${result.data.workflow.metadata.id}`);
+      }
+    },
+    [workflow, organizationId, createWorkflowMutation, navigate],
+  );
+
   // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
   const { onPushThrough, supportsPushThrough } = usePushThroughHandler({
     workflowId: workflowId!,
@@ -2253,97 +2277,134 @@ export function WorkflowPageV2() {
   }
 
   const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
+  const templateBanner = isTemplate ? (
+    <div className="bg-slate-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm font-medium text-gray-900">Template preview</p>
+        <p className="text-xs text-gray-500">Any changes you make will not be saved.</p>
+      </div>
+      <Button size="sm" onClick={() => setIsUseTemplateOpen(true)}>
+        Use template
+      </Button>
+    </div>
+  ) : null;
 
   return (
-    <CanvasPage
-      // Persist right sidebar in query params
-      initialSidebar={{
-        isOpen: searchParams.get("sidebar") === "1",
-        nodeId: searchParams.get("node") || null,
-      }}
-      onSidebarChange={handleSidebarChange}
-      onNodeExpand={(nodeId) => {
-        const latestExecution = nodeExecutionsMap[nodeId]?.[0];
-        const executionId = latestExecution?.id;
-        if (executionId) {
-          navigate(`/${organizationId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`);
+    <>
+      <CanvasPage
+        // Persist right sidebar in query params
+        initialSidebar={{
+          isOpen: searchParams.get("sidebar") === "1",
+          nodeId: searchParams.get("node") || null,
+        }}
+        onSidebarChange={handleSidebarChange}
+        onNodeExpand={(nodeId) => {
+          const latestExecution = nodeExecutionsMap[nodeId]?.[0];
+          const executionId = latestExecution?.id;
+          if (executionId) {
+            navigate(`/${organizationId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`);
+          }
+        }}
+        title={workflow?.metadata?.name || "Canvas"}
+        headerBanner={templateBanner}
+        nodes={nodes}
+        edges={edges}
+        organizationId={organizationId}
+        onDirty={() => markUnsavedChange("structural")}
+        getSidebarData={getSidebarData}
+        loadSidebarData={loadSidebarData}
+        getTabData={getTabData}
+        getNodeEditData={getNodeEditData}
+        getAutocompleteExampleObj={getAutocompleteExampleObj}
+        getCustomField={getCustomField}
+        onNodeConfigurationSave={handleNodeConfigurationSave}
+        onAnnotationUpdate={handleAnnotationUpdate}
+        onSave={isTemplate ? undefined : handleSave}
+        onEdgeCreate={handleEdgeCreate}
+        onNodeDelete={handleNodeDelete}
+        onEdgeDelete={handleEdgeDelete}
+        onNodePositionChange={handleNodePositionChange}
+        onNodesPositionChange={handleNodesPositionChange}
+        onToggleView={handleNodeCollapseChange}
+        onToggleCollapse={() => markUnsavedChange("structural")}
+        onRun={handleRun}
+        onDuplicate={handleNodeDuplicate}
+        onConfigure={handleConfigure}
+        buildingBlocks={buildingBlocks}
+        onNodeAdd={handleNodeAdd}
+        onPlaceholderAdd={handlePlaceholderAdd}
+        onPlaceholderConfigure={handlePlaceholderConfigure}
+        installedApplications={installedApplications}
+        hasFitToViewRef={hasFitToViewRef}
+        hasUserToggledSidebarRef={hasUserToggledSidebarRef}
+        isSidebarOpenRef={isSidebarOpenRef}
+        viewportRef={viewportRef}
+        initialFocusNodeId={initialFocusNodeIdRef.current}
+        unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
+        saveIsPrimary={hasUnsavedChanges && !isTemplate}
+        saveButtonHidden={isTemplate || !hasUnsavedChanges}
+        onUndo={isTemplate ? undefined : handleRevert}
+      canUndo={!isTemplate && !isAutoSaveEnabled && initialWorkflowSnapshot !== null}
+      isAutoSaveEnabled={isAutoSaveEnabled && !isTemplate}
+        onToggleAutoSave={isTemplate ? undefined : handleToggleAutoSave}
+        runDisabled={hasRunBlockingChanges || isTemplate}
+        runDisabledTooltip={
+          isTemplate
+            ? "Templates are read-only"
+            : hasRunBlockingChanges
+              ? "Save canvas changes before running"
+              : undefined
         }
-      }}
-      title={workflow?.metadata?.name || "Canvas"}
-      nodes={nodes}
-      edges={edges}
-      organizationId={organizationId}
-      onDirty={() => markUnsavedChange("structural")}
-      getSidebarData={getSidebarData}
-      loadSidebarData={loadSidebarData}
-      getTabData={getTabData}
-      getNodeEditData={getNodeEditData}
-      getAutocompleteExampleObj={getAutocompleteExampleObj}
-      getCustomField={getCustomField}
-      onNodeConfigurationSave={handleNodeConfigurationSave}
-      onAnnotationUpdate={handleAnnotationUpdate}
-      onSave={handleSave}
-      onEdgeCreate={handleEdgeCreate}
-      onNodeDelete={handleNodeDelete}
-      onEdgeDelete={handleEdgeDelete}
-      onNodePositionChange={handleNodePositionChange}
-      onNodesPositionChange={handleNodesPositionChange}
-      onToggleView={handleNodeCollapseChange}
-      onToggleCollapse={() => markUnsavedChange("structural")}
-      onRun={handleRun}
-      onDuplicate={handleNodeDuplicate}
-      onConfigure={handleConfigure}
-      buildingBlocks={buildingBlocks}
-      onNodeAdd={handleNodeAdd}
-      onPlaceholderAdd={handlePlaceholderAdd}
-      onPlaceholderConfigure={handlePlaceholderConfigure}
-      installedApplications={installedApplications}
-      hasFitToViewRef={hasFitToViewRef}
-      hasUserToggledSidebarRef={hasUserToggledSidebarRef}
-      isSidebarOpenRef={isSidebarOpenRef}
-      viewportRef={viewportRef}
-      initialFocusNodeId={initialFocusNodeIdRef.current}
-      unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
-      saveIsPrimary={hasUnsavedChanges}
-      saveButtonHidden={!hasUnsavedChanges}
-      onUndo={handleRevert}
-      canUndo={!isAutoSaveEnabled && initialWorkflowSnapshot !== null}
-      isAutoSaveEnabled={isAutoSaveEnabled}
-      onToggleAutoSave={handleToggleAutoSave}
-      runDisabled={hasRunBlockingChanges}
-      runDisabledTooltip={hasRunBlockingChanges ? "Save canvas changes before running" : undefined}
-      onCancelQueueItem={onCancelQueueItem}
-      onPushThrough={onPushThrough}
-      supportsPushThrough={supportsPushThrough}
-      onCancelExecution={onCancelExecution}
-      getAllHistoryEvents={getAllHistoryEvents}
-      onLoadMoreHistory={handleLoadMoreHistory}
-      getHasMoreHistory={getHasMoreHistory}
-      getLoadingMoreHistory={getLoadingMoreHistory}
-      onLoadMoreQueue={onLoadMoreQueue}
-      getAllQueueEvents={getAllQueueEvents}
-      getHasMoreQueue={getHasMoreQueue}
-      getLoadingMoreQueue={getLoadingMoreQueue}
-      onReEmit={handleReEmit}
-      loadExecutionChain={loadExecutionChain}
-      getExecutionState={getExecutionState}
-      workflowNodes={workflow?.spec?.nodes}
-      components={components}
-      triggers={triggers}
-      blueprints={blueprints}
-      logEntries={logEntries}
-      focusRequest={focusRequest}
-      onExecutionChainHandled={handleExecutionChainHandled}
-      breadcrumbs={[
-        {
-          label: "Canvases",
-          href: `/${organizationId}`,
-        },
-        {
-          label: workflow?.metadata?.name || "Canvas",
-        },
-      ]}
-    />
+        onCancelQueueItem={onCancelQueueItem}
+        onPushThrough={onPushThrough}
+        supportsPushThrough={supportsPushThrough}
+        onCancelExecution={onCancelExecution}
+        getAllHistoryEvents={getAllHistoryEvents}
+        onLoadMoreHistory={handleLoadMoreHistory}
+        getHasMoreHistory={getHasMoreHistory}
+        getLoadingMoreHistory={getLoadingMoreHistory}
+        onLoadMoreQueue={onLoadMoreQueue}
+        getAllQueueEvents={getAllQueueEvents}
+        getHasMoreQueue={getHasMoreQueue}
+        getLoadingMoreQueue={getLoadingMoreQueue}
+        onReEmit={handleReEmit}
+        loadExecutionChain={loadExecutionChain}
+        getExecutionState={getExecutionState}
+        workflowNodes={workflow?.spec?.nodes}
+        components={components}
+        triggers={triggers}
+        blueprints={blueprints}
+        logEntries={logEntries}
+        focusRequest={focusRequest}
+        onExecutionChainHandled={handleExecutionChainHandled}
+        breadcrumbs={[
+          {
+            label: isTemplate ? "Templates" : "Canvases",
+            href: `/${organizationId}`,
+          },
+          {
+            label: workflow?.metadata?.name || (isTemplate ? "Template" : "Canvas"),
+          },
+        ]}
+      />
+      {workflow ? (
+        <CreateCanvasModal
+          isOpen={isUseTemplateOpen}
+          onClose={() => setIsUseTemplateOpen(false)}
+          onSubmit={handleUseTemplateSubmit}
+          isLoading={createWorkflowMutation.isPending}
+          templates={[
+            {
+              id: workflow.metadata?.id || "",
+              name: workflow.metadata?.name || "Untitled template",
+              description: workflow.metadata?.description,
+            },
+          ]}
+          defaultTemplateId={workflow.metadata?.id || ""}
+          mode="create"
+        />
+      ) : null}
+    </>
   );
 }
 

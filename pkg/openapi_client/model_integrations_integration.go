@@ -21,7 +21,7 @@ var _ MappedNullable = &IntegrationsIntegration{}
 // IntegrationsIntegration struct for IntegrationsIntegration
 type IntegrationsIntegration struct {
 	Metadata *IntegrationsIntegrationMetadata `json:"metadata,omitempty"`
-	Spec *IntegrationsIntegrationSpec `json:"spec,omitempty"`
+	Spec     *IntegrationsIntegrationSpec     `json:"spec,omitempty"`
 }
 
 // NewIntegrationsIntegration instantiates a new IntegrationsIntegration object
@@ -106,7 +106,7 @@ func (o *IntegrationsIntegration) SetSpec(v IntegrationsIntegrationSpec) {
 }
 
 func (o IntegrationsIntegration) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,5 +159,3 @@ func (v *NullableIntegrationsIntegration) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

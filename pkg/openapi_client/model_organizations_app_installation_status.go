@@ -20,11 +20,11 @@ var _ MappedNullable = &OrganizationsAppInstallationStatus{}
 
 // OrganizationsAppInstallationStatus struct for OrganizationsAppInstallationStatus
 type OrganizationsAppInstallationStatus struct {
-	State *string `json:"state,omitempty"`
-	StateDescription *string `json:"stateDescription,omitempty"`
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
-	BrowserAction *OrganizationsBrowserAction `json:"browserAction,omitempty"`
-	UsedIn []AppInstallationNodeRef `json:"usedIn,omitempty"`
+	State            *string                     `json:"state,omitempty"`
+	StateDescription *string                     `json:"stateDescription,omitempty"`
+	Metadata         map[string]interface{}      `json:"metadata,omitempty"`
+	BrowserAction    *OrganizationsBrowserAction `json:"browserAction,omitempty"`
+	UsedIn           []AppInstallationNodeRef    `json:"usedIn,omitempty"`
 }
 
 // NewOrganizationsAppInstallationStatus instantiates a new OrganizationsAppInstallationStatus object
@@ -205,7 +205,7 @@ func (o *OrganizationsAppInstallationStatus) SetUsedIn(v []AppInstallationNodeRe
 }
 
 func (o OrganizationsAppInstallationStatus) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -267,5 +267,3 @@ func (v *NullableOrganizationsAppInstallationStatus) UnmarshalJSON(src []byte) e
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

@@ -14,6 +14,7 @@ interface CreateCanvasModalProps {
   isLoading?: boolean;
   initialData?: { name: string; description?: string };
   templates?: { id: string; name: string; description?: string }[];
+  defaultTemplateId?: string;
   mode?: "create" | "edit";
 }
 
@@ -27,6 +28,7 @@ export function CreateCanvasModal({
   isLoading = false,
   initialData,
   templates,
+  defaultTemplateId,
   mode = "create",
 }: CreateCanvasModalProps) {
   const [name, setName] = useState("");
@@ -40,10 +42,13 @@ export function CreateCanvasModal({
       setDescription(initialData?.description ?? "");
       setNameError("");
     }
-    if (isOpen) {
+    if (isOpen && mode === "create") {
+      setTemplateId(defaultTemplateId || "");
+    }
+    if (isOpen && mode !== "create") {
       setTemplateId("");
     }
-  }, [isOpen, initialData?.name, initialData?.description]);
+  }, [isOpen, initialData?.name, initialData?.description, defaultTemplateId, mode]);
 
   const handleClose = () => {
     setName("");

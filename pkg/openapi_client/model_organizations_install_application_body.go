@@ -20,9 +20,9 @@ var _ MappedNullable = &OrganizationsInstallApplicationBody{}
 
 // OrganizationsInstallApplicationBody struct for OrganizationsInstallApplicationBody
 type OrganizationsInstallApplicationBody struct {
-	AppName *string `json:"appName,omitempty"`
-	InstallationName *string `json:"installationName,omitempty"`
-	Configuration map[string]interface{} `json:"configuration,omitempty"`
+	AppName          *string                `json:"appName,omitempty"`
+	InstallationName *string                `json:"installationName,omitempty"`
+	Configuration    map[string]interface{} `json:"configuration,omitempty"`
 }
 
 // NewOrganizationsInstallApplicationBody instantiates a new OrganizationsInstallApplicationBody object
@@ -139,7 +139,7 @@ func (o *OrganizationsInstallApplicationBody) SetConfiguration(v map[string]inte
 }
 
 func (o OrganizationsInstallApplicationBody) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,5 +195,3 @@ func (v *NullableOrganizationsInstallApplicationBody) UnmarshalJSON(src []byte) 
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

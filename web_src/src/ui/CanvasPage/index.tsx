@@ -121,6 +121,7 @@ export interface CanvasPageProps {
   startCollapsed?: boolean;
   title?: string;
   breadcrumbs?: BreadcrumbItem[];
+  headerBanner?: React.ReactNode;
   organizationId?: string;
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
@@ -759,6 +760,7 @@ function CanvasPage(props: CanvasPageProps) {
           isAutoSaveEnabled={props.isAutoSaveEnabled}
           onToggleAutoSave={props.onToggleAutoSave}
         />
+        {props.headerBanner ? <div className="border-b border-border">{props.headerBanner}</div> : null}
       </div>
 
       {/* Main content area with sidebar and canvas */}

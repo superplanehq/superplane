@@ -21,13 +21,13 @@ var _ MappedNullable = &WorkflowsWorkflowEvent{}
 
 // WorkflowsWorkflowEvent struct for WorkflowsWorkflowEvent
 type WorkflowsWorkflowEvent struct {
-	Id *string `json:"id,omitempty"`
-	WorkflowId *string `json:"workflowId,omitempty"`
-	NodeId *string `json:"nodeId,omitempty"`
-	Channel *string `json:"channel,omitempty"`
-	CustomName *string `json:"customName,omitempty"`
-	Data map[string]interface{} `json:"data,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	Id         *string                `json:"id,omitempty"`
+	WorkflowId *string                `json:"workflowId,omitempty"`
+	NodeId     *string                `json:"nodeId,omitempty"`
+	Channel    *string                `json:"channel,omitempty"`
+	CustomName *string                `json:"customName,omitempty"`
+	Data       map[string]interface{} `json:"data,omitempty"`
+	CreatedAt  *time.Time             `json:"createdAt,omitempty"`
 }
 
 // NewWorkflowsWorkflowEvent instantiates a new WorkflowsWorkflowEvent object
@@ -272,7 +272,7 @@ func (o *WorkflowsWorkflowEvent) SetCreatedAt(v time.Time) {
 }
 
 func (o WorkflowsWorkflowEvent) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -340,5 +340,3 @@ func (v *NullableWorkflowsWorkflowEvent) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

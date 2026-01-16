@@ -20,10 +20,10 @@ var _ MappedNullable = &AppInstallationNodeRef{}
 
 // AppInstallationNodeRef struct for AppInstallationNodeRef
 type AppInstallationNodeRef struct {
-	WorkflowId *string `json:"workflowId,omitempty"`
+	WorkflowId   *string `json:"workflowId,omitempty"`
 	WorkflowName *string `json:"workflowName,omitempty"`
-	NodeId *string `json:"nodeId,omitempty"`
-	NodeName *string `json:"nodeName,omitempty"`
+	NodeId       *string `json:"nodeId,omitempty"`
+	NodeName     *string `json:"nodeName,omitempty"`
 }
 
 // NewAppInstallationNodeRef instantiates a new AppInstallationNodeRef object
@@ -172,7 +172,7 @@ func (o *AppInstallationNodeRef) SetNodeName(v string) {
 }
 
 func (o AppInstallationNodeRef) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -231,5 +231,3 @@ func (v *NullableAppInstallationNodeRef) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-
