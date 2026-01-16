@@ -1,8 +1,10 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import { resolveIcon } from "@/lib/utils";
-import { Undo2 } from "lucide-react";
+import { Undo2, ChevronDown, Palette, Home } from "lucide-react";
 import { Button } from "../button";
 import { Switch } from "../switch";
+import { useWorkflows } from "@/hooks/useWorkflowData";
+import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 
 export interface BreadcrumbItem {
   label: string;
@@ -41,76 +43,136 @@ export function Header({
   isAutoSaveEnabled,
   onToggleAutoSave,
 }: HeaderProps) {
+  const { workflowId } = useParams<{ workflowId?: string }>();
+  const navigate = useNavigate();
+  const { data: workflows = [], isLoading: workflowsLoading } = useWorkflows(organizationId || "");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // Get the workflow name from the workflows list if workflowId is available
+  // Otherwise, use breadcrumbs[1] which is always the workflow name (index 0 is "Canvases")
+  // Fall back to the last breadcrumb item if neither is available
+  const currentWorkflowName = (() => {
+    if (workflowId) {
+      const workflow = workflows.find((w) => w.metadata?.id === workflowId);
+      if (workflow?.metadata?.name) {
+        return workflow.metadata.name;
+      }
+    }
+    // breadcrumbs[1] is always the workflow name (index 0 is "Canvases")
+    if (breadcrumbs.length > 1 && breadcrumbs[1]?.label) {
+      return breadcrumbs[1].label;
+    }
+    // Fall back to last breadcrumb if no workflow name found
+    return breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].label : "";
+  })();
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const listenerOptions: AddEventListenerOptions = { capture: true };
+
+    document.addEventListener("mousedown", handlePointerDown, listenerOptions);
+    document.addEventListener("touchstart", handlePointerDown, listenerOptions);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown, listenerOptions);
+      document.removeEventListener("touchstart", handlePointerDown, listenerOptions);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMenuOpen]);
+
+  const handleWorkflowClick = (selectedWorkflowId: string) => {
+    if (selectedWorkflowId && organizationId) {
+      setIsMenuOpen(false);
+      navigate(`/${organizationId}/workflows/${selectedWorkflowId}`);
+    }
+  };
+
   return (
     <>
       <header className="bg-white border-b border-border">
         <div className="relative flex items-center justify-between h-12 px-4">
-          <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
+          <div className="flex items-center gap-3">
+            <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
 
-          {/* Breadcrumbs - Absolutely centered */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center space-x-1 text-sm text-gray-500">
-            {breadcrumbs.map((item, index) => {
-              const IconComponent = item.iconSlug ? resolveIcon(item.iconSlug) : null;
-
-              return (
-                <div key={index} className="flex items-center">
-                  {index > 0 && <div className="w-2 mx-1">/</div>}
-                  {item.href || item.onClick ? (
-                    <a
-                      href={item.href}
-                      onClick={item.onClick}
-                      className="hover:text-gray-800 transition-colors flex items-center gap-2"
-                    >
-                      {item.iconSrc && (
-                        <div
-                          className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                            item.iconBackground || ""
-                          }`}
+            {/* Canvas Dropdown */}
+            {organizationId && (
+              <div className="relative flex items-center" ref={menuRef}>
+                <button
+                  onClick={() => setIsMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-1 cursor-pointer h-7"
+                  aria-label="Open canvas menu"
+                  aria-expanded={isMenuOpen}
+                  disabled={workflowsLoading}
+                >
+                  <span className="text-sm text-gray-800 font-medium">
+                    {currentWorkflowName || (workflowsLoading ? "Loading..." : "Select canvas")}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`text-gray-400 transition-transform ${isMenuOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {isMenuOpen && !workflowsLoading && (
+                  <div className="absolute left-0 top-13 z-50 w-60 rounded-md outline outline-slate-950/15 bg-white shadow-lg">
+                    <div className="px-4 pt-3 pb-4">
+                      {/* All Canvases Link */}
+                      <div className="mb-2">
+                        <a
+                          href={organizationId ? `/${organizationId}` : "/"}
+                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:text-gray-800"
+                          onClick={() => setIsMenuOpen(false)}
                         >
-                          <img src={item.iconSrc} alt="" className="w-5 h-5" />
-                        </div>
-                      )}
-                      {IconComponent && (
-                        <div
-                          className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                            item.iconBackground || ""
-                          }`}
-                        >
-                          <IconComponent size={16} className={item.iconColor || ""} />
-                        </div>
-                      )}
-                      {item.label}
-                    </a>
-                  ) : (
-                    <span
-                      className={`flex items-center gap-1 ${
-                        index === breadcrumbs.length - 1 ? "text-gray-800 font-medium" : ""
-                      }`}
-                    >
-                      {item.iconSrc && (
-                        <div
-                          className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                            item.iconBackground || ""
-                          }`}
-                        >
-                          <img src={item.iconSrc} alt="" className="w-5 h-5" />
-                        </div>
-                      )}
-                      {IconComponent && (
-                        <div
-                          className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                            item.iconBackground || ""
-                          }`}
-                        >
-                          <IconComponent size={16} className={item.iconColor || ""} />
-                        </div>
-                      )}
-                      {item.label}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+                          <Home size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                          <span>All Canvases</span>
+                        </a>
+                      </div>
+                      {/* Divider */}
+                      <div className="border-b border-gray-300 mb-2"></div>
+                      {/* Canvas List */}
+                      <div className="mt-2 flex flex-col">
+                        {workflows.map((workflow) => {
+                          const isSelected = workflow.metadata?.id === workflowId;
+                          return (
+                            <button
+                              key={workflow.metadata?.id}
+                              type="button"
+                              onClick={() => handleWorkflowClick(workflow.metadata?.id || "")}
+                              className={`group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-left ${
+                                isSelected
+                                  ? "bg-sky-100 text-gray-800"
+                                  : "text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                              }`}
+                            >
+                              {isSelected ? (
+                                <Palette size={16} className="text-gray-800 transition group-hover:text-gray-800" />
+                              ) : (
+                                <span className="w-4" />
+                              )}
+                              <span>{workflow.metadata?.name || "Unnamed Canvas"}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right side - Auto-save toggle and Save button */}
@@ -122,7 +184,7 @@ export function Header({
             )}
             {onToggleAutoSave && (
               <div className="flex items-center gap-2">
-                <label htmlFor="auto-save-toggle" className="text-xs text-gray-600 hidden sm:inline">
+                <label htmlFor="auto-save-toggle" className="text-sm text-gray-800 hidden sm:inline">
                   Auto-save
                 </label>
                 <Switch id="auto-save-toggle" checked={isAutoSaveEnabled} onCheckedChange={onToggleAutoSave} />

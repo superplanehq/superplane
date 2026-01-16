@@ -12,6 +12,17 @@ export const resolveIcon = (slug?: string): LucideIcon => {
     return Puzzle;
   }
 
+  const normalized = slug.toLowerCase();
+  const aliases: Record<string, string> = {
+    close: "X",
+    "x-mark": "X",
+    xmark: "X",
+  };
+  const alias = aliases[normalized];
+  if (alias && (LucideIcons as Record<string, unknown>)[alias]) {
+    return (LucideIcons as Record<string, unknown>)[alias] as LucideIcon;
+  }
+
   const pascalCase = slug
     .split("-")
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))

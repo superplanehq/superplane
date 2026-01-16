@@ -43,7 +43,7 @@ export const onTagCreatedTriggerRenderer: TriggerRenderer = {
       iconSrc: githubIcon,
       iconBackground: "bg-white",
       iconColor: getColorClass(trigger.color),
-      headerColor: getBackgroundColorClass(trigger.color),
+      headerColor: "",
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: createGithubMetadataItems(metadata?.repository?.name, configuration?.tags),
     };

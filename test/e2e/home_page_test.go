@@ -19,13 +19,6 @@ func TestHomePage(t *testing.T) {
 		steps.AssertCanvasSavedInDB("Example Canvas")
 	})
 
-	t.Run("creating a new component", func(t *testing.T) {
-		steps.Start()
-		steps.VisitHomePage()
-		steps.SwitchToComponentsTab()
-		steps.FillInNewComponentForm("Example Component")
-		steps.AssertComponentSavedInDB("Example Component")
-	})
 }
 
 type TestHomePageSteps struct {

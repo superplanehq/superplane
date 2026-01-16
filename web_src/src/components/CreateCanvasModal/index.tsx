@@ -4,7 +4,7 @@ import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } fro
 import { Field, Label } from "../Fieldset/fieldset";
 import { Icon } from "../Icon";
 import { Input } from "../Input/input";
-import { Textarea } from "../Textarea/textarea";
+import { Textarea } from "../ui/textarea";
 import { Button } from "../ui/button";
 
 interface CreateCanvasModalProps {
@@ -85,7 +85,7 @@ export function CreateCanvasModal({
   return (
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
       <DialogTitle>{mode === "edit" ? "Edit canvas" : "New canvas"}</DialogTitle>
-      <DialogDescription className="text-sm">
+      <DialogDescription className="text-sm !text-[var(--color-gray-800)]">
         {mode === "edit"
           ? "Update the canvas details to keep things clear for your teammates."
           : "Create a new canvas to orchestrate your DevOps work. You can tweak the details any time."}
@@ -111,7 +111,7 @@ export function CreateCanvasModal({
                   setNameError("");
                 }
               }}
-              placeholder="Give your canvas a memorable name"
+              placeholder=""
               className={`w-full ${nameError ? "border-red-500" : ""}`}
               autoFocus
               maxLength={MAX_CANVAS_NAME_LENGTH}
@@ -131,7 +131,7 @@ export function CreateCanvasModal({
                   setDescription(e.target.value);
                 }
               }}
-              placeholder="Note what this canvas orchestrates (optional)"
+              placeholder="Describe what is does (optional)"
               rows={3}
               className="w-full"
               maxLength={MAX_CANVAS_DESCRIPTION_LENGTH}
