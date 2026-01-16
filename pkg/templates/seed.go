@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ghodss/yaml"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/workflows"
@@ -19,7 +20,7 @@ import (
 	"gorm.io/gorm"
 )
 
-//go:embed templates/*.json
+//go:embed templates/*.yaml
 var templateAssets embed.FS
 
 func SeedTemplates(registry *registry.Registry) error {
@@ -29,7 +30,7 @@ func SeedTemplates(registry *registry.Registry) error {
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue
 		}
 
@@ -38,8 +39,13 @@ func SeedTemplates(registry *registry.Registry) error {
 			return fmt.Errorf("read template %s: %w", entry.Name(), err)
 		}
 
+		jsonData, err := yaml.YAMLToJSON(data)
+		if err != nil {
+			return fmt.Errorf("parse template %s: %w", entry.Name(), err)
+		}
+
 		var workflow pb.Workflow
-		if err := protojson.Unmarshal(data, &workflow); err != nil {
+		if err := protojson.Unmarshal(jsonData, &workflow); err != nil {
 			return fmt.Errorf("parse template %s: %w", entry.Name(), err)
 		}
 

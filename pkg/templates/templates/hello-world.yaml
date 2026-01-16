@@ -1,0 +1,20 @@
+metadata:
+  name: "Hello World"
+  description: "A minimal template with a single annotation node."
+  isTemplate: true
+spec:
+  nodes:
+    - id: "hello-world"
+      name: "Hello World"
+      type: "TYPE_WIDGET"
+      configuration:
+        text: |-
+          Hello World!
+
+          Use this template as a starting point for your first canvas.
+      position:
+        x: 120
+        y: 120
+      widget:
+        name: "annotation"
+  edges: []
