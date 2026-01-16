@@ -98,7 +98,6 @@ type TypeOptions struct {
 	Expression       *ExpressionTypeOptions       `json:"expression,omitempty"`
 	Select           *SelectTypeOptions           `json:"select,omitempty"`
 	MultiSelect      *MultiSelectTypeOptions      `json:"multi_select,omitempty"`
-	Integration      *IntegrationTypeOptions      `json:"integration,omitempty"`
 	Resource         *ResourceTypeOptions         `json:"resource,omitempty"`
 	List             *ListTypeOptions             `json:"list,omitempty"`
 	AnyPredicateList *AnyPredicateListTypeOptions `json:"any_predicate_list,omitempty"`
@@ -199,13 +198,6 @@ type SelectTypeOptions struct {
  */
 type MultiSelectTypeOptions struct {
 	Options []FieldOption `json:"options"`
-}
-
-/*
- * IntegrationTypeOptions specifies which integration type to display
- */
-type IntegrationTypeOptions struct {
-	Type string `json:"type"`
 }
 
 /*

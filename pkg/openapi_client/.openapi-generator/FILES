@@ -49,7 +49,6 @@ docs/ConfigurationDateTimeTypeOptions.md
 docs/ConfigurationDateTypeOptions.md
 docs/ConfigurationExpressionTypeOptions.md
 docs/ConfigurationField.md
-docs/ConfigurationIntegrationTypeOptions.md
 docs/ConfigurationListItemDefinition.md
 docs/ConfigurationListTypeOptions.md
 docs/ConfigurationMultiSelectTypeOptions.md
@@ -222,7 +221,6 @@ model_configuration_date_time_type_options.go
 model_configuration_date_type_options.go
 model_configuration_expression_type_options.go
 model_configuration_field.go
-model_configuration_integration_type_options.go
 model_configuration_list_item_definition.go
 model_configuration_list_type_options.go
 model_configuration_multi_select_type_options.go

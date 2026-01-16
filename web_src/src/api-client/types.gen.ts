@@ -170,10 +170,6 @@ export type ConfigurationField = {
   disallowExpression?: boolean;
 };
 
-export type ConfigurationIntegrationTypeOptions = {
-  type?: string;
-};
-
 export type ConfigurationListItemDefinition = {
   type?: string;
   schema?: Array<ConfigurationField>;
@@ -234,7 +230,6 @@ export type ConfigurationTypeOptions = {
   number?: ConfigurationNumberTypeOptions;
   select?: ConfigurationSelectTypeOptions;
   multiSelect?: ConfigurationMultiSelectTypeOptions;
-  integration?: ConfigurationIntegrationTypeOptions;
   list?: ConfigurationListTypeOptions;
   object?: ConfigurationObjectTypeOptions;
   resource?: ConfigurationResourceTypeOptions;

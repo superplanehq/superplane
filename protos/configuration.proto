@@ -25,7 +25,6 @@ message TypeOptions {
   optional NumberTypeOptions number = 1;
   optional SelectTypeOptions select = 2;
   optional MultiSelectTypeOptions multi_select = 3;
-  optional IntegrationTypeOptions integration = 4;
   optional ListTypeOptions list = 5;
   optional ObjectTypeOptions object = 6;
   optional ResourceTypeOptions resource = 7;
@@ -76,10 +75,6 @@ message SelectTypeOptions {
 
 message MultiSelectTypeOptions {
   repeated SelectOption options = 1;
-}
-
-message IntegrationTypeOptions {
-  string type = 1;
 }
 
 message ResourceTypeOptions {

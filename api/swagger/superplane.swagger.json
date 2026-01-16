@@ -3254,14 +3254,6 @@
         }
       }
     },
-    "ConfigurationIntegrationTypeOptions": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        }
-      }
-    },
     "ConfigurationListItemDefinition": {
       "type": "object",
       "properties": {
@@ -3418,9 +3410,6 @@
         },
         "multiSelect": {
           "$ref": "#/definitions/ConfigurationMultiSelectTypeOptions"
-        },
-        "integration": {
-          "$ref": "#/definitions/ConfigurationIntegrationTypeOptions"
         },
         "list": {
           "$ref": "#/definitions/ConfigurationListTypeOptions"

@@ -147,16 +147,6 @@ func multiSelectTypeOptionsToProto(opts *configuration.MultiSelectTypeOptions) *
 	return pbOpts
 }
 
-func integrationTypeOptionsToProto(opts *configuration.IntegrationTypeOptions) *configpb.IntegrationTypeOptions {
-	if opts == nil {
-		return nil
-	}
-
-	return &configpb.IntegrationTypeOptions{
-		Type: opts.Type,
-	}
-}
-
 func resourceTypeOptionsToProto(opts *configuration.ResourceTypeOptions) *configpb.ResourceTypeOptions {
 	if opts == nil {
 		return nil
@@ -270,7 +260,6 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 		Text:             textTypeOptionsToProto(opts.Text),
 		Select:           selectTypeOptionsToProto(opts.Select),
 		MultiSelect:      multiSelectTypeOptionsToProto(opts.MultiSelect),
-		Integration:      integrationTypeOptionsToProto(opts.Integration),
 		Resource:         resourceTypeOptionsToProto(opts.Resource),
 		List:             listTypeOptionsToProto(opts.List),
 		AnyPredicateList: anyPredicateListTypeOptionsToProto(opts.AnyPredicateList),
@@ -442,16 +431,6 @@ func protoToMultiSelectTypeOptions(pbOpts *configpb.MultiSelectTypeOptions) *con
 	return opts
 }
 
-func protoToIntegrationTypeOptions(pbOpts *configpb.IntegrationTypeOptions) *configuration.IntegrationTypeOptions {
-	if pbOpts == nil {
-		return nil
-	}
-
-	return &configuration.IntegrationTypeOptions{
-		Type: pbOpts.Type,
-	}
-}
-
 func protoToResourceTypeOptions(pbOpts *configpb.ResourceTypeOptions) *configuration.ResourceTypeOptions {
 	if pbOpts == nil {
 		return nil
@@ -565,7 +544,6 @@ func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions
 		Text:             protoToTextTypeOptions(pbOpts.Text),
 		Select:           protoToSelectTypeOptions(pbOpts.Select),
 		MultiSelect:      protoToMultiSelectTypeOptions(pbOpts.MultiSelect),
-		Integration:      protoToIntegrationTypeOptions(pbOpts.Integration),
 		Resource:         protoToResourceTypeOptions(pbOpts.Resource),
 		List:             protoToListTypeOptions(pbOpts.List),
 		AnyPredicateList: protoToAnyPredicateListTypeOptions(pbOpts.AnyPredicateList),
