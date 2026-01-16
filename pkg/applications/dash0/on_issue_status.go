@@ -73,14 +73,12 @@ func (t *OnIssueStatus) Configuration() []configuration.Field {
 		{
 			Name:     "checkRules",
 			Label:    "Check Rules",
-			Type:     configuration.FieldTypeMultiSelect,
+			Type:     configuration.FieldTypeAppInstallationResource,
 			Required: false,
 			TypeOptions: &configuration.TypeOptions{
-				MultiSelect: &configuration.MultiSelectTypeOptions{
-					Options: []configuration.FieldOption{}, // Options will be populated dynamically from resources
-				},
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "check-rule",
+					Type:  "check-rule",
+					Multi: true,
 				},
 			},
 			Description: "Select check rules to monitor. Check rules will be fetched from your Dash0 account.",
@@ -253,7 +251,7 @@ func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, respo
 	}
 
 	// Extract check identifiers from current results
-	currentCheckIds := t.extractCheckIdentifiers(filteredResults, ctx)
+	currentCheckIds := t.extractCheckIdentifiers(filteredResults)
 
 	// Check if the set of checks has changed
 	if t.hasChecksChanged(currentCheckIds, existingMetadata.LastDetectedChecks) {
@@ -287,7 +285,7 @@ func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, respo
 
 // extractCheckIdentifiers extracts unique check identifiers from Prometheus query results
 // Uses check name from metric labels (dash0_check_name, check_rule_name, etc.)
-func (t *OnIssueStatus) extractCheckIdentifiers(results []interface{}, ctx core.TriggerActionContext) []string {
+func (t *OnIssueStatus) extractCheckIdentifiers(results []interface{}) []string {
 	checkIds := make(map[string]bool)
 	labelNames := []string{"dash0_check_name", "check_rule_name", "check_rule_id", "rule_name", "rule_id", "alertname", "alert_name"}
 

@@ -295,7 +295,7 @@ export const ConfigurationFieldRenderer = ({
         return (
           <AppInstallationResourceFieldRenderer
             field={field}
-            value={value as string}
+            value={value as string | string[] | undefined}
             onChange={onChange}
             organizationId={organizationId}
             appInstallationId={appInstallationId}
