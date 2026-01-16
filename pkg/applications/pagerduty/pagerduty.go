@@ -161,6 +161,7 @@ func (p *PagerDuty) Components() []core.Component {
 func (p *PagerDuty) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnIncident{},
+		&OnIncidentStatusUpdate{},
 	}
 }
 
