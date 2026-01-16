@@ -85,6 +85,7 @@ message IntegrationTypeOptions {
 message ResourceTypeOptions {
   string type = 1;
   bool use_name_as_value = 2;
+  bool multi = 3;
 }
 
 message ListTypeOptions {

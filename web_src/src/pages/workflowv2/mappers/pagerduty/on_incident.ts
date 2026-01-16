@@ -69,7 +69,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
       title: node.name!,
       iconSrc: pdIcon,
       iconBackground: "bg-green-500",
-      headerColor: getBackgroundColorClass(trigger.color),
+      headerColor: "",
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,
     };

@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers"
 
 	// Import integrations, components and triggers to register them via init()
+	_ "github.com/superplanehq/superplane/pkg/applications/dash0"
 	_ "github.com/superplanehq/superplane/pkg/applications/github"
 	_ "github.com/superplanehq/superplane/pkg/applications/openai"
 	_ "github.com/superplanehq/superplane/pkg/applications/pagerduty"
@@ -30,12 +31,9 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/if"
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
-	_ "github.com/superplanehq/superplane/pkg/components/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/components/timegate"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
-	_ "github.com/superplanehq/superplane/pkg/triggers/github"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
-	_ "github.com/superplanehq/superplane/pkg/triggers/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"

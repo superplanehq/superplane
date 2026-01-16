@@ -7,13 +7,11 @@ import {
 } from "./types";
 import { ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
-import { githubTriggerRenderer } from "./github";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
 import { noopMapper } from "./noop";
 import { ifMapper, IF_STATE_REGISTRY } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
-import { semaphoreMapper as oldSemaphoreMapper, SEMAPHORE_STATE_REGISTRY } from "./semaphore";
 import {
   componentMappers as semaphoreComponentMappers,
   triggerRenderers as semaphoreTriggerRenderers,
@@ -30,6 +28,11 @@ import {
   eventStateRegistry as pagerdutyEventStateRegistry,
 } from "./pagerduty/index";
 import {
+  componentMappers as dash0ComponentMappers,
+  triggerRenderers as dash0TriggerRenderers,
+  eventStateRegistry as dash0EventStateRegistry,
+} from "./dash0/index";
+import {
   componentMappers as slackComponentMappers,
   triggerRenderers as slackTriggerRenderers,
   eventStateRegistry as slackEventStateRegistry,
@@ -45,7 +48,6 @@ import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
  * Any trigger type not in this registry will use the defaultTriggerRenderer.
  */
 const triggerRenderers: Record<string, TriggerRenderer> = {
-  github: githubTriggerRenderer,
   schedule: scheduleTriggerRenderer,
   webhook: webhookTriggerRenderer,
 };
@@ -54,7 +56,6 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
   if: ifMapper,
   http: httpMapper,
-  semaphore: oldSemaphoreMapper,
   time_gate: timeGateMapper,
   filter: filterMapper,
   wait: waitMapper,
@@ -65,6 +66,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
   pagerduty: pagerdutyComponentMappers,
+  dash0: dash0ComponentMappers,
   slack: slackComponentMappers,
 };
 
@@ -72,6 +74,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
+  dash0: dash0TriggerRenderers,
   slack: slackTriggerRenderers,
 };
 
@@ -79,6 +82,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
+  dash0: dash0EventStateRegistry,
   slack: slackEventStateRegistry,
 };
 
@@ -88,7 +92,6 @@ const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBui
 
 const eventStateRegistries: Record<string, EventStateRegistry> = {
   approval: APPROVAL_STATE_REGISTRY,
-  semaphore: SEMAPHORE_STATE_REGISTRY,
   http: HTTP_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,

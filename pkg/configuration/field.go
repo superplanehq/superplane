@@ -27,8 +27,6 @@ const (
 	FieldTypeUser                    = "user"
 	FieldTypeRole                    = "role"
 	FieldTypeGroup                   = "group"
-	FieldTypeIntegration             = "integration"
-	FieldTypeIntegrationResource     = "integration-resource"
 	FieldTypeAppInstallationResource = "app-installation-resource"
 	FieldTypeAnyPredicateList        = "any-predicate-list"
 	FieldTypeGitRef                  = "git-ref"
@@ -119,6 +117,7 @@ type TypeOptions struct {
 type ResourceTypeOptions struct {
 	Type           string `json:"type"`
 	UseNameAsValue bool   `json:"use_name_as_value,omitempty"`
+	Multi          bool   `json:"multi,omitempty"` // If true, render as multi-select instead of single select
 }
 
 /*

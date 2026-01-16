@@ -33,9 +33,9 @@ export interface TriggerRenderer {
   /**
    * Display values for the root event.
    * @param event The root event from the backend
-   * @returns The values to display
+   * @returns The values to display (can include timeline arrays for special rendering)
    */
-  getRootEventValues: (event: WorkflowsWorkflowEvent) => Record<string, string>;
+  getRootEventValues: (event: WorkflowsWorkflowEvent) => Record<string, any>;
 
   /**
    * Get the title and subtitle for the trigger.

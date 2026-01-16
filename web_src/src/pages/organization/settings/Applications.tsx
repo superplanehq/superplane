@@ -16,7 +16,9 @@ import { resolveIcon } from "@/lib/utils";
 import { getApiErrorMessage } from "@/utils/errors";
 import { Icon } from "@/components/Icon";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface ApplicationsProps {
@@ -40,8 +42,11 @@ export function Applications({ organizationId }: ApplicationsProps) {
   }, [selectedApplication?.installationInstructions]);
   const appLogoMap: Record<string, string> = {
     github: githubIcon,
+    openai: openAiIcon,
+    "open-ai": openAiIcon,
     semaphore: SemaphoreLogo,
     pagerduty: pagerDutyIcon,
+    dash0: dash0Icon,
   };
 
   const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {

@@ -10,6 +10,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import dash0Icon from "@/assets/icons/integrations/dash0.svg";
+import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -241,7 +245,7 @@ export function BuildingBlocksSidebar({
         {hoveredBlock && (
           <ComponentBase
             title={hoveredBlock.label || hoveredBlock.name || "New Component"}
-            headerColor="bg-white"
+            headerColor=""
             iconSlug={hoveredBlock.icon}
             iconColor="text-gray-800"
             collapsedBackground={getBackgroundColorClass("white")}
@@ -304,6 +308,15 @@ function CategorySection({
       <ItemGroup>
         {allBlocks.map((block) => {
           const iconSlug = block.type === "blueprint" ? "component" : block.icon || "zap";
+
+          // Use SVG icons for application components/triggers
+          const appLogoMap: Record<string, string> = {
+            github: githubIcon,
+            semaphore: SemaphoreLogo,
+            pagerduty: pagerDutyIcon,
+            dash0: dash0Icon,
+          };
+          const appIconSrc = block.appName ? appLogoMap[block.appName] : undefined;
           const IconComponent = resolveIcon(iconSlug);
 
           const isLive = !!block.isLive;
@@ -381,7 +394,11 @@ function CategorySection({
               size="sm"
             >
               <ItemMedia>
-                <IconComponent size={14} className="text-gray-500" />
+                {appIconSrc ? (
+                  <img src={appIconSrc} alt={block.label || block.name} className="w-3.5 h-3.5" />
+                ) : (
+                  <IconComponent size={14} className="text-gray-500" />
+                )}
               </ItemMedia>
 
               <ItemContent>

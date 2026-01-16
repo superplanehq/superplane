@@ -106,7 +106,11 @@ export function WorkflowPageV2() {
   const { data: widgets = [], isLoading: widgetsLoading } = useWidgets();
   const { data: availableApplications = [], isLoading: applicationsLoading } = useAvailableApplications();
   const { data: installedApplications = [] } = useInstalledApplications(organizationId!);
-  const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
+  const {
+    data: workflow,
+    isLoading: workflowLoading,
+    error: workflowError,
+  } = useWorkflow(organizationId!, workflowId!);
   const { data: workflowEventsResponse } = useWorkflowEvents(workflowId!);
 
   usePageTitle([workflow?.metadata?.name || "Canvas"]);
@@ -190,6 +194,24 @@ export function WorkflowPageV2() {
   const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
   const loadNodeDataMethod = useNodeExecutionStore((state) => state.loadNodeData);
   const initializeFromWorkflow = useNodeExecutionStore((state) => state.initializeFromWorkflow);
+
+  // Redirect to home page if workflow is not found (404)
+  // Use replace to avoid back button issues and prevent 404 flash
+  useEffect(() => {
+    if (workflowError && !workflowLoading) {
+      // Check if it's a 404 error
+      const is404 =
+        (workflowError as any)?.status === 404 ||
+        (workflowError as any)?.response?.status === 404 ||
+        (workflowError as any)?.code === "NOT_FOUND" ||
+        (workflowError as any)?.message?.includes("not found") ||
+        (workflowError as any)?.message?.includes("404");
+
+      if (is404 && organizationId) {
+        navigate(`/${organizationId}`, { replace: true });
+      }
+    }
+  }, [workflowError, workflowLoading, navigate, organizationId]);
 
   // Initialize store from workflow.status on workflow load (only once per workflow)
   const hasInitializedStoreRef = useRef<string | null>(null);
@@ -2187,7 +2209,9 @@ export function WorkflowPageV2() {
     );
   }
 
-  if (!workflow) {
+  if (!workflow && !workflowLoading) {
+    // Workflow not found after loading - could be deleted or doesn't exist
+    // Show a brief message then redirect (handled by the error useEffect above)
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-4">
@@ -2218,7 +2242,7 @@ export function WorkflowPageV2() {
           navigate(`/${organizationId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`);
         }
       }}
-      title={workflow.metadata?.name!}
+      title={workflow?.metadata?.name || "Canvas"}
       nodes={nodes}
       edges={edges}
       organizationId={organizationId}
@@ -2289,7 +2313,7 @@ export function WorkflowPageV2() {
           href: `/${organizationId}`,
         },
         {
-          label: workflow.metadata?.name!,
+          label: workflow?.metadata?.name || "Canvas",
         },
       ]}
     />
