@@ -39,7 +39,7 @@ export function Roles({ organizationId }: RolesProps) {
     if (!role.metadata?.name) return;
 
     const confirmed = window.confirm(
-      `Are you sure you want to delete the role "${role.metadata?.name}"? This action cannot be undone.`,
+      `Are you sure you want to delete the role "${role.metadata?.name}"? This cannot be undone.`,
     );
 
     if (!confirmed) return;

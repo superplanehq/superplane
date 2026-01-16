@@ -609,7 +609,7 @@ export const ComponentSidebar = ({
                   >
                     Configuration
                     {nodeId && workflowNodes.find((n) => n.id === nodeId)?.errorMessage && (
-                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                      <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
                     )}
                   </button>
                 </div>
