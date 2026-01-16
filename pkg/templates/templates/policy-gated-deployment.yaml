@@ -1,0 +1,87 @@
+metadata:
+  name: "Policy-gated deployment"
+  description: "Gate deployments with a policy check, business hours, and approval."
+  isTemplate: true
+spec:
+  nodes:
+    - id: "manual-trigger"
+      name: "Deploy request"
+      type: "TYPE_TRIGGER"
+      position:
+        x: 120
+        "y": 320
+      trigger:
+        name: "start"
+    - id: "policy-filter"
+      name: "Policy check"
+      type: "TYPE_COMPONENT"
+      configuration:
+        expression: "true"
+      position:
+        x: 480
+        "y": 320
+      component:
+        name: "filter"
+    - id: "business-hours"
+      name: "Business hours"
+      type: "TYPE_COMPONENT"
+      configuration:
+        mode: "include_range"
+        startTime: "09:00"
+        endTime: "17:00"
+        timezone: "0"
+        days:
+          - "monday"
+          - "tuesday"
+          - "wednesday"
+          - "thursday"
+          - "friday"
+      position:
+        x: 860
+        "y": 320
+      component:
+        name: "time_gate"
+    - id: "approval"
+      name: "Team approval"
+      type: "TYPE_COMPONENT"
+      configuration:
+        items:
+          - type: "anyone"
+      position:
+        x: 1260
+        "y": 320
+      component:
+        name: "approval"
+    - id: "deploy"
+      name: "Deploy"
+      type: "TYPE_COMPONENT"
+      position:
+        x: 1660
+        "y": 220
+      component:
+        name: "noop"
+    - id: "rejected"
+      name: "Deployment blocked"
+      type: "TYPE_COMPONENT"
+      position:
+        x: 1660
+        "y": 500
+      component:
+        name: "noop"
+
+  edges:
+    - sourceId: "manual-trigger"
+      targetId: "policy-filter"
+      channel: "default"
+    - sourceId: "policy-filter"
+      targetId: "business-hours"
+      channel: "default"
+    - sourceId: "business-hours"
+      targetId: "approval"
+      channel: "default"
+    - sourceId: "approval"
+      targetId: "deploy"
+      channel: "approved"
+    - sourceId: "approval"
+      targetId: "rejected"
+      channel: "rejected"

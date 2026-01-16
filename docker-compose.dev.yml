@@ -58,7 +58,7 @@ services:
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
-      TEMPLATE_DIR: "/app/templates"
+      TEMPLATE_DIR: "/app/pkg/templates/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@notifications.superplane.com}

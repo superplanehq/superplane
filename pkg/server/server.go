@@ -326,6 +326,8 @@ func Start() {
 		log.Warnf("Failed to seed templates: %v", err)
 	}
 
+	templates.StartTemplateReloader(registry)
+
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
 	}

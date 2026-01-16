@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
+	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -23,8 +26,24 @@ import (
 //go:embed templates/*.yaml
 var templateAssets embed.FS
 
+var seedTemplatesLock sync.Mutex
+
 func SeedTemplates(registry *registry.Registry) error {
-	entries, err := fs.ReadDir(templateAssets, "templates")
+	seedTemplatesLock.Lock()
+	defer seedTemplatesLock.Unlock()
+
+	if os.Getenv("APP_ENV") == "development" {
+		if err := resetTemplateWorkflows(); err != nil {
+			return fmt.Errorf("reset template workflows: %w", err)
+		}
+	}
+
+	templateFS, templatesRoot, err := templateFS()
+	if err != nil {
+		return err
+	}
+
+	entries, err := fs.ReadDir(templateFS, templatesRoot)
 	if err != nil {
 		return fmt.Errorf("read template assets: %w", err)
 	}
@@ -34,7 +53,7 @@ func SeedTemplates(registry *registry.Registry) error {
 			continue
 		}
 
-		data, err := templateAssets.ReadFile("templates/" + entry.Name())
+		data, err := fs.ReadFile(templateFS, path.Join(templatesRoot, entry.Name()))
 		if err != nil {
 			return fmt.Errorf("read template %s: %w", entry.Name(), err)
 		}
@@ -65,6 +84,27 @@ func SeedTemplates(registry *registry.Registry) error {
 	}
 
 	return nil
+}
+
+func resetTemplateWorkflows() error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		var workflowIDs []uuid.UUID
+		if err := tx.Model(&models.Workflow{}).
+			Where("organization_id = ? AND is_template = true", models.TemplateOrganizationID).
+			Pluck("id", &workflowIDs).Error; err != nil {
+			return err
+		}
+
+		if len(workflowIDs) == 0 {
+			return nil
+		}
+
+		if err := tx.Where("workflow_id IN ?", workflowIDs).Delete(&models.WorkflowNode{}).Error; err != nil {
+			return err
+		}
+
+		return tx.Where("id IN ?", workflowIDs).Delete(&models.Workflow{}).Error
+	})
 }
 
 func ensureTemplateWorkflow(registry *registry.Registry, template *pb.Workflow) error {
