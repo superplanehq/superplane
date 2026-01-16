@@ -14,7 +14,8 @@ import (
 type OnIssueStatus struct{}
 
 type OnIssueStatusConfiguration struct {
-	MinutesInterval *int `json:"minutesInterval"`
+	MinutesInterval *int     `json:"minutesInterval"`
+	CheckRules      []string `json:"checkRules,omitempty"`
 }
 
 type OnIssueStatusMetadata struct {
@@ -57,6 +58,21 @@ func (t *OnIssueStatus) Configuration() []configuration.Field {
 					Max: intPtr(59),
 				},
 			},
+		},
+		{
+			Name:     "checkRules",
+			Label:    "Check Rules",
+			Type:     configuration.FieldTypeMultiSelect,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				MultiSelect: &configuration.MultiSelectTypeOptions{
+					Options: []configuration.FieldOption{}, // Options will be populated dynamically from resources
+				},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "check-rule",
+				},
+			},
+			Description: "Select check rules to monitor. Check rules will be fetched from your Dash0 account.",
 		},
 	}
 }

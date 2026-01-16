@@ -160,3 +160,50 @@ func (c *Client) ExecutePrometheusRangeQuery(promQLQuery, dataset, start, end, s
 		"data":   response.Data,
 	}, nil
 }
+
+type CheckRule struct {
+	ID   string `json:"id"`
+	Name string `json:"name,omitempty"`
+}
+
+func (c *Client) ListCheckRules() ([]CheckRule, error) {
+	apiURL := fmt.Sprintf("%s/api/alerting/check-rules", c.BaseURL)
+
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	// The API might return either:
+	// 1. A list of strings (IDs only)
+	// 2. A list of objects with id and name
+	var checkRules []CheckRule
+
+	// Try parsing as list of strings first
+	var stringList []string
+	if err := json.Unmarshal(responseBody, &stringList); err == nil {
+		// If successful, convert strings to CheckRule objects
+		checkRules = make([]CheckRule, len(stringList))
+		for i, id := range stringList {
+			checkRules[i] = CheckRule{
+				ID:   id,
+				Name: id, // Use ID as name if name is not available
+			}
+		}
+		return checkRules, nil
+	}
+
+	// Try parsing as list of CheckRule objects
+	if err := json.Unmarshal(responseBody, &checkRules); err != nil {
+		return nil, fmt.Errorf("error parsing check rules response: %v", err)
+	}
+
+	// If names are empty, use ID as name
+	for i := range checkRules {
+		if checkRules[i].Name == "" {
+			checkRules[i].Name = checkRules[i].ID
+		}
+	}
+
+	return checkRules, nil
+}
