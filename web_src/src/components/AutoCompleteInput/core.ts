@@ -36,6 +36,7 @@ export interface GetSuggestionsOptions {
   includeFunctions?: boolean;
   includeGlobals?: boolean;
   limit?: number;
+  allowInStrings?: boolean;
 }
 
 type ExprFunction = { name: string; snippet?: string };
@@ -136,7 +137,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
   globals: TGlobals,
   options: GetSuggestionsOptions = {},
 ): Suggestion[] {
-  const { includeFunctions = true, includeGlobals = true, limit = 30 } = options;
+  const { includeFunctions = true, includeGlobals = true, limit = 30, allowInStrings = false } = options;
   const left = text.slice(0, cursor);
 
   // ✅ 0) Env key trigger: after "$" or "$[" suggest keys immediately
@@ -173,7 +174,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
   }
 
   // ✅ 2) Now it's safe to suppress suggestions inside normal strings
-  if (isProbablyInsideString(left)) return [];
+  if (!allowInStrings && isProbablyInsideString(left)) return [];
 
   // 3) Dot completion
   const dotCtx = detectDotContext(left);
@@ -307,7 +308,6 @@ function detectDotContext(left: string): DotContext | null {
   if (baseExpr.includes("$")) {
     baseExpr = "$" + baseExpr.split("$").at(-1);
   }
-
 
   if (/^\d+(\.\d+)?$/.test(baseExpr)) return null;
   return { baseExpr, memberPrefix, operator };

@@ -289,9 +289,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
         return;
       }
 
-      const newSuggestions = getSuggestions(context.expressionText, context.expressionCursor, exampleObj ?? {}, {
-        dollarAliasEnv: true,
-      });
+      const newSuggestions = getSuggestions(context.expressionText, context.expressionCursor, exampleObj ?? {});
       setSuggestions(newSuggestions);
       setIsOpen(newSuggestions.length > 0);
       const nextHighlightedIndex = showValuePreview && newSuggestions.length > 0 ? 0 : -1;

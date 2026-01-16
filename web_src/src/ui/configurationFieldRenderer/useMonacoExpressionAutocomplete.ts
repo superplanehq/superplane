@@ -1,257 +1,407 @@
-import React from "react";
-import type { editor, IDisposable, languages } from "monaco-editor";
+import { useCallback, useEffect, useRef } from "react";
+import type { Monaco } from "@monaco-editor/react";
+import type { editor as MonacoEditor, IDisposable, languages as MonacoLanguages } from "monaco-editor";
 import { getSuggestions } from "@/components/AutoCompleteInput/core";
 
-interface UseMonacoExpressionAutocompleteArgs {
+type ModelContext = {
+  exampleObj: Record<string, unknown> | null;
+  startWord: string;
+  prefix: string;
+  suffix: string;
+};
+
+type UseMonacoExpressionAutocompleteProps = {
   autocompleteExampleObj?: Record<string, unknown> | null;
   languageId: string;
-}
+  startWord?: string;
+  prefix?: string;
+  suffix?: string;
+  allowOutsideExpression?: boolean;
+};
+
+const modelContextMap = new WeakMap<MonacoEditor.ITextModel, ModelContext>();
+const providerRegistry = new Map<string, IDisposable>();
+const triggerSuggestCommand = { id: "editor.action.triggerSuggest", title: "Trigger Suggest" };
+
+const getCompletionKind = (
+  monaco: Monaco,
+  kind: ReturnType<typeof getSuggestions>[number]["kind"],
+): MonacoLanguages.CompletionItemKind => {
+  switch (kind) {
+    case "function":
+      return monaco.languages.CompletionItemKind.Function;
+    case "field":
+      return monaco.languages.CompletionItemKind.Field;
+    case "keyword":
+      return monaco.languages.CompletionItemKind.Keyword;
+    case "variable":
+    default:
+      return monaco.languages.CompletionItemKind.Variable;
+  }
+};
+
+const getSuggestionInsertText = (suggestion: ReturnType<typeof getSuggestions>[number]) => {
+  if (suggestion.kind === "function") {
+    return suggestion.insertText ?? `${suggestion.label}()`;
+  }
+  return suggestion.insertText ?? suggestion.label;
+};
+
+const shouldInsertAsSnippet = (insertText: string) => /\$\{\d+:/u.test(insertText) || /\$\d/u.test(insertText);
+
+const normalizeBracketQuotes = (insertText: string) => {
+  const normalizeInner = (value: string) => value.replace(/\\"/g, '"').replace(/'/g, "\\'");
+
+  let next = insertText;
+  next = next.replace(/\$\["((?:\\.|[^"\\])*)"\]/g, (_, inner) => `$['${normalizeInner(inner)}']`);
+  next = next.replace(/\["((?:\\.|[^"\\])*)"\]/g, (_, inner) => `['${normalizeInner(inner)}']`);
+  next = next.replace(/^"((?:\\.|[^"\\])*)"$/g, (_, inner) => `'${normalizeInner(inner)}'`);
+  return next;
+};
+
+const shouldTriggerForKey = (event: any, monaco: Monaco) => {
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    return false;
+  }
+
+  const key = event.browserEvent.key;
+  if (typeof key === "string") {
+    if (key.length === 1) return true;
+    if (key === "Backspace" || key === "Delete" || key === "Enter" || key === "Tab" || key === " ") return true;
+    return false;
+  }
+
+  return (
+    event.keyCode === monaco.KeyCode.Backspace ||
+    event.keyCode === monaco.KeyCode.Delete ||
+    event.keyCode === monaco.KeyCode.Enter ||
+    event.keyCode === monaco.KeyCode.Tab ||
+    event.keyCode === monaco.KeyCode.Space
+  );
+};
+
+const getExpressionContext = (text: string, cursor: number, startWord: string, suffix: string) => {
+  const suffixToken = suffix.trimStart();
+  const openIndex = text.lastIndexOf(startWord, cursor);
+  if (openIndex === -1) {
+    return null;
+  }
+
+  const closeIndex = text.indexOf(suffixToken, openIndex + startWord.length);
+  if (closeIndex !== -1 && cursor > closeIndex) {
+    return null;
+  }
+
+  const startOffset = openIndex + startWord.length;
+  const endOffset = closeIndex === -1 ? text.length : closeIndex;
+  return {
+    expressionText: text.slice(startOffset, endOffset),
+    expressionCursor: Math.max(0, cursor - startOffset),
+    startOffset,
+    endOffset,
+  };
+};
+
+const isAllowedToSuggest = (text: string, position: number, startWord: string, suffix: string) => {
+  const suffixToken = suffix.trimStart();
+  const openIndex = text.lastIndexOf(startWord, position);
+  if (openIndex === -1) {
+    return false;
+  }
+
+  const closeIndex = text.indexOf(suffixToken, openIndex + startWord.length);
+  if (closeIndex !== -1 && position > closeIndex) {
+    return false;
+  }
+
+  return true;
+};
+
+const getReplacementRange = (left: string, insertText: string) => {
+  const envBracketMatch = left.match(/\$env\s*\[\s*(['"])([^'"]*)$/);
+  if (envBracketMatch) {
+    const partial = envBracketMatch[2] ?? "";
+    return { start: left.length - (partial.length + 1), end: left.length };
+  }
+
+  const dollarBracketMatch = left.match(/\$\s*\[\s*(['"])([^'"]*)$/);
+  if (dollarBracketMatch) {
+    const partial = dollarBracketMatch[2] ?? "";
+    return { start: left.length - (partial.length + 1), end: left.length };
+  }
+
+  const envTriggerMatch = left.match(/\$env\s*\[\s*$/);
+  if (envTriggerMatch && envTriggerMatch.index !== undefined) {
+    return { start: envTriggerMatch.index, end: left.length };
+  }
+
+  const dollarTriggerMatch = left.match(/\$\s*\[\s*$|\$\s*$/);
+  if (dollarTriggerMatch && dollarTriggerMatch.index !== undefined) {
+    return { start: dollarTriggerMatch.index, end: left.length };
+  }
+
+  const dotMatch = left.match(/(.+?)\.\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
+  if (dotMatch) {
+    const memberPrefix = dotMatch[2] ?? "";
+    let start = left.length - memberPrefix.length;
+    if (insertText.startsWith("[") && left[start - 1] === ".") {
+      start -= 1;
+    }
+    return { start, end: left.length };
+  }
+
+  const identMatch = left.match(/[$A-Za-z_][$A-Za-z0-9_]*$/);
+  if (identMatch) {
+    return { start: left.length - identMatch[0].length, end: left.length };
+  }
+
+  return { start: left.length, end: left.length };
+};
 
 export const useMonacoExpressionAutocomplete = ({
   autocompleteExampleObj,
   languageId,
-}: UseMonacoExpressionAutocompleteArgs) => {
-  const autocompleteExampleRef = React.useRef<Record<string, unknown> | null>(autocompleteExampleObj ?? null);
-  const previousValueRef = React.useRef<string>("");
-  const isApplyingAutoInsertRef = React.useRef(false);
-  const completionProviderRef = React.useRef<IDisposable | null>(null);
+  startWord = "{{",
+  prefix = "{{ $",
+  suffix = " }}",
+  allowOutsideExpression = false,
+}: UseMonacoExpressionAutocompleteProps) => {
+  const modelsRef = useRef<Set<MonacoEditor.ITextModel>>(new Set());
+  const previousValueRef = useRef<WeakMap<MonacoEditor.ITextModel, string>>(new WeakMap());
+  const applyingEditRef = useRef<Set<MonacoEditor.ITextModel>>(new Set());
 
-  React.useEffect(() => {
-    autocompleteExampleRef.current = autocompleteExampleObj ?? null;
-  }, [autocompleteExampleObj]);
+  useEffect(() => {
+    const nextExample = autocompleteExampleObj ?? null;
+    for (const model of modelsRef.current) {
+      const existing = modelContextMap.get(model);
+      if (existing) {
+        modelContextMap.set(model, { ...existing, exampleObj: nextExample, startWord, prefix, suffix });
+      }
+    }
+  }, [autocompleteExampleObj, startWord, prefix, suffix]);
 
-  React.useEffect(() => {
-    return () => {
-      completionProviderRef.current?.dispose();
-      completionProviderRef.current = null;
-    };
-  }, []);
+  const handleEditorMount = useCallback(
+    (editor: MonacoEditor.IStandaloneCodeEditor, monaco: Monaco) => {
+      const model = editor.getModel();
+      if (!model) {
+        return;
+      }
 
-  const handleEditorMount = React.useCallback(
-    (editorInstance: editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
-      const startWord = "{{";
-      const prefix = "{{ $";
-      const suffix = " }}";
+      modelsRef.current.add(model);
+      modelContextMap.set(model, { exampleObj: autocompleteExampleObj ?? null, startWord, prefix, suffix });
+      previousValueRef.current.set(model, model.getValue());
 
-      const isDelimiter = (char: string) =>
-        /\s/.test(char) || char === "," || char === ":" || char === "{" || char === "}";
-
-      const isAllowedToSuggest = (text: string, position: number) => {
-        const openIndex = text.lastIndexOf(startWord, position);
-        if (openIndex === -1) {
-          return false;
-        }
-
-        const closeIndex = text.indexOf(suffix, openIndex + startWord.length);
-        if (closeIndex !== -1 && position > closeIndex) {
-          return false;
-        }
-
-        return true;
-      };
-
-      const getExpressionContext = (text: string, cursor: number) => {
-        const openIndex = text.lastIndexOf(startWord, cursor);
-        if (openIndex === -1) {
-          return null;
-        }
-
-        const closeIndex = text.indexOf(suffix, openIndex + startWord.length);
-        if (closeIndex !== -1 && cursor > closeIndex) {
-          return null;
-        }
-
-        const startOffset = openIndex + startWord.length;
-        const endOffset = closeIndex === -1 ? text.length : closeIndex;
-        return {
-          expressionText: text.slice(startOffset, endOffset),
-          expressionCursor: Math.max(0, cursor - startOffset),
-          startOffset,
-          endOffset,
-        };
-      };
-
-      const getSuggestionInsertText = (suggestion: ReturnType<typeof getSuggestions>[number]) => {
-        if (suggestion.kind === "function") {
-          return `${suggestion.label}()`;
-        }
-        return suggestion.insertText ?? suggestion.label;
-      };
-
-      const getFilterText = (text: string, cursor: number) => {
-        const beforeCursor = text.slice(0, cursor);
-        const start = beforeCursor.lastIndexOf("$");
-        if (start === -1) {
-          return "";
-        }
-
-        let end = cursor;
-        while (end < text.length && !isDelimiter(text[end])) {
-          end += 1;
-        }
-        return text.substring(start, end);
-      };
-
-      const getReplacementRange = (left: string, insertText: string) => {
-        const envBracketMatch = left.match(/\$env\s*\[\s*(['"])([^'"]*)$/);
-        if (envBracketMatch) {
-          const partial = envBracketMatch[2] ?? "";
-          return { start: left.length - (partial.length + 1), end: left.length };
-        }
-
-        const dollarBracketMatch = left.match(/\$\s*\[\s*(['"])([^'"]*)$/);
-        if (dollarBracketMatch) {
-          const partial = dollarBracketMatch[2] ?? "";
-          return { start: left.length - (partial.length + 1), end: left.length };
-        }
-
-        const envTriggerMatch = left.match(/\$env\s*\[\s*$/);
-        if (envTriggerMatch && envTriggerMatch.index !== undefined) {
-          return { start: envTriggerMatch.index, end: left.length };
-        }
-
-        const dollarTriggerMatch = left.match(/\$\s*\[\s*$|\$\s*$/);
-        if (dollarTriggerMatch && dollarTriggerMatch.index !== undefined) {
-          return { start: dollarTriggerMatch.index, end: left.length };
-        }
-
-        const dotMatch = left.match(/(.+?)\.\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
-        if (dotMatch) {
-          const memberPrefix = dotMatch[2] ?? "";
-          let start = left.length - memberPrefix.length;
-          if (insertText.startsWith("[") && left[start - 1] === ".") {
-            start -= 1;
-          }
-          return { start, end: left.length };
-        }
-
-        const identMatch = left.match(/[$A-Za-z_][$A-Za-z0-9_]*$/);
-        if (identMatch) {
-          return { start: left.length - identMatch[0].length, end: left.length };
-        }
-
-        return { start: left.length, end: left.length };
-      };
-
-      const shouldInsertAsSnippet = (text: string) => text.includes("${");
-
-      if (!completionProviderRef.current) {
-        completionProviderRef.current = monaco.languages.registerCompletionItemProvider(languageId, {
-          triggerCharacters: [".", "[", "$"],
-          provideCompletionItems: (model, position) => {
-            const exampleObj = autocompleteExampleRef.current;
-            if (!exampleObj) {
+      if (!providerRegistry.has(languageId)) {
+        const disposable = monaco.languages.registerCompletionItemProvider(languageId, {
+          triggerCharacters: ["$", ".", "[", "'", '"'],
+          provideCompletionItems: (completionModel, position) => {
+            const context = modelContextMap.get(completionModel);
+            if (!context) {
               return { suggestions: [] };
             }
 
-            const text = model.getValue();
-            const offset = model.getOffsetAt(position);
-            const context = getExpressionContext(text, offset);
-            if (!context || !isAllowedToSuggest(text, offset)) {
+            const fullText = completionModel.getValue();
+            const cursorOffset = completionModel.getOffsetAt(position);
+            const expressionContext = allowOutsideExpression
+              ? {
+                  expressionText: fullText,
+                  expressionCursor: cursorOffset,
+                  startOffset: 0,
+                  endOffset: fullText.length,
+                }
+              : getExpressionContext(fullText, cursorOffset, context.startWord, context.suffix);
+
+            if (!expressionContext) {
               return { suggestions: [] };
             }
 
-            const newSuggestions = getSuggestions(context.expressionText, context.expressionCursor, exampleObj);
-            const left = context.expressionText.slice(0, context.expressionCursor);
-            const filterTextBase = getFilterText(context.expressionText, context.expressionCursor);
+            const wordAtPosition = completionModel.getWordUntilPosition(position);
+            const currentFilterText = wordAtPosition.word;
+            const wordRange = new monaco.Range(
+              position.lineNumber,
+              wordAtPosition.startColumn,
+              position.lineNumber,
+              wordAtPosition.endColumn,
+            );
 
-            const suggestions: languages.CompletionItem[] = newSuggestions.map((suggestionItem, index) => {
-              const insertText = getSuggestionInsertText(suggestionItem);
-              const replaceRange = getReplacementRange(left, insertText);
-              const startPos = model.getPositionAt(context.startOffset + replaceRange.start);
-              const endPos = model.getPositionAt(context.startOffset + replaceRange.end);
-              const range = new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column);
+            const suggestions = getSuggestions(
+              expressionContext.expressionText,
+              expressionContext.expressionCursor,
+              context.exampleObj ?? {},
+              { allowInStrings: allowOutsideExpression },
+            );
+
+            const left = expressionContext.expressionText.slice(0, expressionContext.expressionCursor);
+            const leftFilterMatch = left.match(/[$A-Za-z_][$A-Za-z0-9_]*$|\$$/);
+            const fallbackFilterText = leftFilterMatch?.[0] ?? currentFilterText;
+            const items = suggestions.map((suggestion) => {
+              const insertText = normalizeBracketQuotes(getSuggestionInsertText(suggestion));
+              const replacement = getReplacementRange(left, insertText);
+              const startOffset = expressionContext.startOffset + replacement.start;
+              const endOffset = expressionContext.startOffset + replacement.end;
+              const startPosition = completionModel.getPositionAt(startOffset);
+              const endPosition = completionModel.getPositionAt(endOffset);
+              let range = new monaco.Range(
+                startPosition.lineNumber,
+                startPosition.column,
+                endPosition.lineNumber,
+                endPosition.column,
+              );
+              if (!range.containsPosition(position)) {
+                range = wordRange;
+              }
+
+              const filterText = fallbackFilterText || suggestion.label;
 
               return {
-                label: suggestionItem.label,
-                kind: monaco.languages.CompletionItemKind.Field,
-                detail: suggestionItem.detail ?? suggestionItem.kind,
+                label: suggestion.label,
+                kind: getCompletionKind(monaco, suggestion.kind),
                 insertText,
                 range,
-                sortText: String(index).padStart(4, "0"),
+                detail: suggestion.detail ?? suggestion.kind,
+                filterText,
+                command: triggerSuggestCommand,
                 insertTextRules: shouldInsertAsSnippet(insertText)
                   ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
-                  : monaco.languages.CompletionItemInsertTextRule.None,
-                command: { id: "editor.action.triggerSuggest", title: "Trigger Suggest" },
+                  : undefined,
               };
             });
 
-            console.log(suggestions);
-
-            return { suggestions };
+            return { suggestions: items };
           },
         });
+
+        providerRegistry.set(languageId, disposable);
       }
 
-      previousValueRef.current = editorInstance.getValue();
-      const contentDisposable = editorInstance.onDidChangeModelContent((event) => {
-        if (isApplyingAutoInsertRef.current) {
-          return;
-        }
-
-        const model = editorInstance.getModel();
-        if (!model) {
-          return;
-        }
-
-        const position = editorInstance.getPosition();
+      const triggerSuggestIfInsideExpression = (modelStartWord: string, modelSuffix: string) => {
+        const position = editor.getPosition();
         if (!position) {
           return;
         }
 
+        const cursorOffset = model.getOffsetAt(position);
+        const expressionContext = allowOutsideExpression
+          ? {
+              expressionText: model.getValue(),
+              expressionCursor: cursorOffset,
+              startOffset: 0,
+              endOffset: model.getValue().length,
+            }
+          : getExpressionContext(model.getValue(), cursorOffset, modelStartWord, modelSuffix);
+        if (!expressionContext) {
+          return;
+        }
+
+        requestAnimationFrame(() => {
+          editor.trigger("expression-autocomplete", "editor.action.triggerSuggest", {});
+        });
+      };
+
+      const changeDisposable = editor.onDidChangeModelContent((event) => {
+        const modelContext = modelContextMap.get(model);
+        if (!modelContext) {
+          return;
+        }
+
+        if (applyingEditRef.current.has(model)) {
+          applyingEditRef.current.delete(model);
+          previousValueRef.current.set(model, model.getValue());
+          return;
+        }
+
+        const { startWord: modelStartWord, suffix: modelSuffix, prefix: modelPrefix } = modelContext;
+        const previousValue = previousValueRef.current.get(model) ?? "";
         const currentValue = model.getValue();
-        const offset = model.getOffsetAt(position);
-        const beforeCursor = currentValue.slice(0, offset);
-        const afterCursor = currentValue.slice(offset);
-        const previousValue = previousValueRef.current;
-
-        if (event.changes.length === 1) {
-          const change = event.changes[0];
-          if (
-            change.text === "{" &&
-            change.rangeLength === 0 &&
-            currentValue.length === previousValue.length + 1 &&
-            beforeCursor.endsWith(startWord) &&
-            !afterCursor.startsWith("}")
-          ) {
-            const replaceStart = offset - startWord.length;
-            const startPos = model.getPositionAt(replaceStart);
-            const endPos = model.getPositionAt(offset);
-
-            isApplyingAutoInsertRef.current = true;
-            model.pushEditOperations(
-              [],
-              [
-                {
-                  range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
-                  text: `${prefix}${suffix}`,
-                },
-              ],
-              () => null,
-            );
-            const cursorOffset = replaceStart + prefix.length;
-            const cursorPosition = model.getPositionAt(cursorOffset);
-            editorInstance.setPosition(cursorPosition);
-            editorInstance.focus();
-            editorInstance.trigger("autocomplete", "editor.action.triggerSuggest", {});
-            isApplyingAutoInsertRef.current = false;
-            previousValueRef.current = model.getValue();
-            return;
+        let shouldTriggerSuggest = false;
+        for (const change of event.changes) {
+          if (change.text !== "{" || change.rangeLength !== 0 || change.rangeOffset < 1) {
+            if (change.rangeLength === 0 && change.text) {
+              for (const char of change.text) {
+                if (char === "$" || char === "." || char === "[" || char === "'" || char === '"') {
+                  shouldTriggerSuggest = true;
+                  break;
+                }
+              }
+            }
+            if (shouldTriggerSuggest) {
+              break;
+            }
+            continue;
           }
+
+          const insertOffset = change.rangeOffset;
+          const beforeChar = previousValue[insertOffset - 1];
+          if (beforeChar !== "{") {
+            continue;
+          }
+
+          if (isAllowedToSuggest(previousValue, insertOffset, modelStartWord, modelSuffix)) {
+            continue;
+          }
+
+          if (currentValue.slice(insertOffset - 1, insertOffset + 1) !== "{{") {
+            continue;
+          }
+
+          const replaceStart = insertOffset - 1;
+          const replaceEnd = insertOffset + 1;
+          const startPosition = model.getPositionAt(replaceStart);
+          const endPosition = model.getPositionAt(replaceEnd);
+
+          applyingEditRef.current.add(model);
+          editor.executeEdits("expression-autocomplete", [
+            {
+              range: new monaco.Range(
+                startPosition.lineNumber,
+                startPosition.column,
+                endPosition.lineNumber,
+                endPosition.column,
+              ),
+              text: `${modelPrefix}${modelSuffix}`,
+            },
+          ]);
+
+          const cursorOffset = replaceStart + modelPrefix.length;
+          const cursorPosition = model.getPositionAt(cursorOffset);
+          editor.setPosition(cursorPosition);
+          editor.focus();
+          editor.trigger("expression-autocomplete", "editor.action.triggerSuggest", {});
         }
 
-        if (isAllowedToSuggest(currentValue, offset)) {
-          editorInstance.trigger("autocomplete", "editor.action.triggerSuggest", {});
+        if (shouldTriggerSuggest) {
+          triggerSuggestIfInsideExpression(modelStartWord, modelSuffix);
         }
 
-        previousValueRef.current = currentValue;
+        triggerSuggestIfInsideExpression(modelStartWord, modelSuffix);
+
+        previousValueRef.current.set(model, model.getValue());
       });
 
-      editorInstance.onDidDispose(() => {
-        contentDisposable.dispose();
+      const keydownDisposable = editor.onKeyDown((event) => {
+        const modelContext = modelContextMap.get(model);
+        if (!modelContext) {
+          return;
+        }
+
+        if (!shouldTriggerForKey(event, monaco)) {
+          return;
+        }
+
+        triggerSuggestIfInsideExpression(modelContext.startWord, modelContext.suffix);
+      });
+
+      editor.onDidDispose(() => {
+        changeDisposable.dispose();
+        keydownDisposable.dispose();
+        modelsRef.current.delete(model);
+      });
+
+      model.onWillDispose(() => {
+        modelsRef.current.delete(model);
       });
     },
-    [languageId],
+    [allowOutsideExpression, autocompleteExampleObj, languageId, prefix, startWord, suffix],
   );
 
   return { handleEditorMount };
