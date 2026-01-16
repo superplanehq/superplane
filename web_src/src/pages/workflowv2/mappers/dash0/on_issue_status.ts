@@ -7,6 +7,7 @@ import { formatTimeAgo } from "@/utils/date";
 
 interface OnIssueStatusConfiguration {
   minutesInterval?: number;
+  listenToAllCheckRules?: boolean;
   checkRules?: string[];
 }
 
@@ -18,8 +19,19 @@ interface OnIssueStatusMetadata {
 interface OnIssueStatusEventData {
   query?: string;
   dataset?: string;
-  results?: any[];
+  results?: Array<{
+    metric?: Record<string, string>;
+    value?: [number, string];
+    values?: Array<[number, string]>;
+  }>;
   count?: number;
+}
+
+interface CheckTimelineEntry {
+  label: string;
+  status: string;
+  timestamp?: string;
+  comment?: string;
 }
 
 function formatFrequency(configuration: OnIssueStatusConfiguration): string {
@@ -119,20 +131,58 @@ export const onIssueStatusTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, any> => {
     const eventData = event.data?.data as OnIssueStatusEventData;
-    const values: Record<string, string> = {};
+    const values: Record<string, any> = {};
 
-    if (eventData?.query) {
-      values["Query"] = eventData.query;
+    // Add "Received at" timestamp
+    if (event.createdAt) {
+      values["Received at"] = new Date(event.createdAt).toLocaleString();
     }
 
-    if (eventData?.dataset) {
-      values["Dataset"] = eventData.dataset;
-    }
+    // Parse results and create checks timeline
+    if (eventData?.results && Array.isArray(eventData.results)) {
+      const checks: CheckTimelineEntry[] = eventData.results.map((result) => {
+        const metric = result.metric || {};
+        
+        // Extract check name from dash0_check_name label
+        const checkName = metric["dash0_check_name"] || metric["check_rule_name"] || "Unknown Check";
 
-    if (eventData?.count !== undefined) {
-      values["Issues Found"] = eventData.count.toString();
+        // Extract summary from dash0_check_summary_template label (preferred) or description template
+        const summary = metric["dash0_check_summary_template"] || metric["dash0_check_description_template"] || "";
+
+        // Extract severity from value array (value[1] where "2" = CRITICAL, "1" = DEGRADED)
+        let severity = "UNKNOWN";
+        if (result.value && Array.isArray(result.value) && result.value.length >= 2) {
+          const severityValue = typeof result.value[1] === "string" ? parseFloat(result.value[1]) : result.value[1];
+          if (severityValue === 2) {
+            severity = "CRITICAL";
+          } else if (severityValue === 1) {
+            severity = "DEGRADED";
+          }
+        }
+
+        // Format label with status after check name, separated by middle dot
+        // We'll put both in the label and use an empty status to avoid duplication
+        const statusText = severity === "CRITICAL" ? "CRITICAL" : severity === "DEGRADED" ? "DEGRADED" : "";
+        const labelWithStatus = statusText ? `${checkName} · ${statusText}` : checkName;
+
+        return {
+          label: labelWithStatus,
+          status: "", // Empty status to avoid duplication, since it's now in the label
+          comment: summary || undefined,
+        };
+      });
+
+      if (checks.length > 0) {
+        // Use ApprovalTimelineEntry format for timeline rendering
+        values["Checks"] = checks as unknown as Array<{
+          label: string;
+          status: string;
+          timestamp?: string;
+          comment?: string;
+        }>;
+      }
     }
 
     return values;

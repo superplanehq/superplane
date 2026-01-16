@@ -14,8 +14,9 @@ import (
 type OnIssueStatus struct{}
 
 type OnIssueStatusConfiguration struct {
-	MinutesInterval *int     `json:"minutesInterval"`
-	CheckRules      []string `json:"checkRules,omitempty"`
+	MinutesInterval       *int     `json:"minutesInterval"`
+	ListenToAllCheckRules *bool    `json:"listenToAllCheckRules,omitempty"`
+	CheckRules            []string `json:"checkRules,omitempty"`
 }
 
 type OnIssueStatusMetadata struct {
@@ -60,6 +61,14 @@ func (t *OnIssueStatus) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "listenToAllCheckRules",
+			Label:       "Listen to all check rules",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     true,
+			Description: "When enabled, monitor all check rules. When disabled, select specific check rules to monitor.",
+		},
+		{
 			Name:     "checkRules",
 			Label:    "Check Rules",
 			Type:     configuration.FieldTypeMultiSelect,
@@ -73,6 +82,12 @@ func (t *OnIssueStatus) Configuration() []configuration.Field {
 				},
 			},
 			Description: "Select check rules to monitor. Check rules will be fetched from your Dash0 account.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "listenToAllCheckRules",
+					Values: []string{"false"},
+				},
+			},
 		},
 	}
 }
@@ -181,13 +196,13 @@ func (t *OnIssueStatus) checkIssues(ctx core.TriggerActionContext) error {
 		ctx.Logger.Warnf("Error executing Prometheus query: %v", err)
 		// Continue to reschedule even if query fails
 	} else {
-		t.processQueryResults(ctx, response, query, dataset)
+		t.processQueryResults(ctx, response, query, dataset, config)
 	}
 
 	return t.rescheduleCheck(ctx, config)
 }
 
-func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, response map[string]any, query, dataset string) {
+func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, response map[string]any, query, dataset string, config OnIssueStatusConfiguration) {
 	dataValue := response["data"]
 	dataMap := t.convertDataToMap(dataValue, ctx)
 	if dataMap == nil {
@@ -204,12 +219,24 @@ func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, respo
 		return
 	}
 
+	// Filter results by selected check rules if filtering is enabled
+	filteredResults := result
+	listenToAll := config.ListenToAllCheckRules == nil || *config.ListenToAllCheckRules
+	if !listenToAll && len(config.CheckRules) > 0 {
+		filteredResults = t.filterResultsByCheckRules(result, config.CheckRules, ctx)
+		if len(filteredResults) == 0 {
+			// No matching check rules found, don't emit event
+			ctx.Logger.Infof("No results match selected check rules, skipping event emission")
+			return
+		}
+	}
+
 	// Issues detected - emit event
 	payload := map[string]any{
 		"query":   query,
 		"dataset": dataset,
-		"results": result,
-		"count":   len(result),
+		"results": filteredResults,
+		"count":   len(filteredResults),
 	}
 
 	err := ctx.Events.Emit("dash0.issue.detected", payload)
@@ -218,7 +245,56 @@ func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, respo
 		return
 	}
 
-	ctx.Logger.Infof("Issues detected: %d issue(s) found", len(result))
+	ctx.Logger.Infof("Issues detected: %d issue(s) found", len(filteredResults))
+}
+
+func (t *OnIssueStatus) filterResultsByCheckRules(results []interface{}, checkRules []string, ctx core.TriggerActionContext) []interface{} {
+	if len(checkRules) == 0 {
+		return results
+	}
+
+	// Create a map for faster lookup
+	checkRuleSet := make(map[string]bool, len(checkRules))
+	for _, rule := range checkRules {
+		checkRuleSet[rule] = true
+	}
+
+	var filtered []interface{}
+	for _, resultItem := range results {
+		resultMap, ok := resultItem.(map[string]any)
+		if !ok {
+			ctx.Logger.Warnf("Unexpected result item format, skipping: %T", resultItem)
+			continue
+		}
+
+		metric, ok := resultMap["metric"].(map[string]any)
+		if !ok {
+			ctx.Logger.Warnf("Unexpected metric format, skipping: %T", resultMap["metric"])
+			continue
+		}
+
+		// Check multiple common label names that might identify the check rule
+		// Common labels: check_rule_id, check_rule_name, rule_id, rule_name, alertname, alert_name
+		labelNames := []string{"check_rule_id", "check_rule_name", "rule_id", "rule_name", "alertname", "alert_name"}
+		matched := false
+
+		for _, labelName := range labelNames {
+			if labelValue, exists := metric[labelName]; exists {
+				if labelStr, ok := labelValue.(string); ok {
+					if checkRuleSet[labelStr] {
+						matched = true
+						break
+					}
+				}
+			}
+		}
+
+		if matched {
+			filtered = append(filtered, resultItem)
+		}
+	}
+
+	return filtered
 }
 
 func (t *OnIssueStatus) convertDataToMap(dataValue any, ctx core.TriggerActionContext) map[string]any {

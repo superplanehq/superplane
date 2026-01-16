@@ -177,6 +177,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     const normalized = status.toLowerCase();
     if (normalized === "approved") return "bg-emerald-500";
     if (normalized === "rejected") return "bg-red-500";
+    if (normalized === "critical") return "bg-red-500";
+    if (normalized === "degraded") return "bg-yellow-500";
     return "bg-gray-400";
   };
 
@@ -345,16 +347,38 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                 {entryIndex < value.length - 1 && (
                                   <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
                                 )}
-                                <div className="text-[13px] text-gray-800 font-medium truncate" title={entry.label}>
-                                  {entry.label}
-                                </div>
-                                <div
-                                  className="text-[12px] text-gray-600 truncate"
-                                  title={`${entry.status}${entry.timestamp ? ` ${entry.timestamp}` : ""}`}
-                                >
-                                  {entry.status}
-                                  {entry.timestamp ? ` ${entry.timestamp}` : ""}
-                                </div>
+                                {entry.status === "" && entry.label.includes(" · ") ? (
+                                  // Handle combined label with status (e.g., "Check Name · STATUS")
+                                  <div className="text-[13px] text-gray-800 font-medium truncate" title={entry.label}>
+                                    {entry.label.split(" · ").map((part, idx, arr) => (
+                                      <span key={idx}>
+                                        {idx === 0 ? (
+                                          <span>{part}</span>
+                                        ) : (
+                                          <span>
+                                            {" · "}
+                                            <span className="text-[12px] text-gray-600 font-normal">{part}</span>
+                                          </span>
+                                        )}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="text-[13px] text-gray-800 font-medium truncate" title={entry.label}>
+                                      {entry.label}
+                                    </div>
+                                    {entry.status && (
+                                      <div
+                                        className="text-[12px] text-gray-600 truncate"
+                                        title={`${entry.status}${entry.timestamp ? ` ${entry.timestamp}` : ""}`}
+                                      >
+                                        {entry.status}
+                                        {entry.timestamp ? ` ${entry.timestamp}` : ""}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
                                 {entry.comment && (
                                   <div className="text-[12px] text-gray-500 italic break-words">"{entry.comment}"</div>
                                 )}

@@ -942,11 +942,18 @@ export function buildTabData(
 
     const eventValues = triggerRenderer.getRootEventValues(triggerEvent);
 
+    // For dash0.onIssueStatus, don't add "Created At" since "Received at" is already in eventValues
+    const isDash0OnIssueStatus = node.trigger?.name === "dash0.onIssueStatus";
+    
     tabData.current = {
       ...eventValues,
       "Event ID": triggerEvent.id,
       "Node ID": triggerEvent.nodeId,
-      "Created At": triggerEvent.createdAt ? new Date(triggerEvent.createdAt).toLocaleString() : undefined,
+      ...(isDash0OnIssueStatus
+        ? {} // "Received at" is already in eventValues
+        : {
+            "Created At": triggerEvent.createdAt ? new Date(triggerEvent.createdAt).toLocaleString() : undefined,
+          }),
     };
 
     // Payload tab: raw event data
