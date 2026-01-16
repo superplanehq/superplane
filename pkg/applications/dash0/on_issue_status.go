@@ -20,9 +20,10 @@ type OnIssueStatusConfiguration struct {
 }
 
 type OnIssueStatusMetadata struct {
-	NextTrigger   *string `json:"nextTrigger"`
-	ReferenceTime *string `json:"referenceTime"` // Time when schedule was first set up
-	LastCheck     *string `json:"lastCheck,omitempty"` // Time when the last check was performed
+	NextTrigger    *string   `json:"nextTrigger"`
+	ReferenceTime  *string   `json:"referenceTime"` // Time when schedule was first set up
+	LastCheck      *string   `json:"lastCheck,omitempty"` // Time when the last check was performed
+	LastDetectedChecks []string `json:"lastDetectedChecks,omitempty"` // List of check identifiers from the last event emission
 }
 
 func (t *OnIssueStatus) Name() string {
@@ -219,7 +220,23 @@ func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, respo
 		return
 	}
 
+	// Get existing metadata to check for last detected checks
+	var existingMetadata OnIssueStatusMetadata
+	err := mapstructure.Decode(ctx.Metadata.Get(), &existingMetadata)
+	if err != nil {
+		existingMetadata = OnIssueStatusMetadata{}
+	}
+
+	// If no issues found, clear last detected checks so returning issues will be detected as new
 	if len(result) == 0 {
+		if len(existingMetadata.LastDetectedChecks) > 0 {
+			existingMetadata.LastDetectedChecks = []string{}
+			err = ctx.Metadata.Set(existingMetadata)
+			if err != nil {
+				ctx.Logger.Warnf("Failed to clear last detected checks: %v", err)
+			}
+			ctx.Logger.Infof("No issues found, cleared last detected checks")
+		}
 		return
 	}
 
@@ -235,21 +252,103 @@ func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, respo
 		}
 	}
 
-	// Issues detected - emit event
-	payload := map[string]any{
-		"query":   query,
-		"dataset": dataset,
-		"results": filteredResults,
-		"count":   len(filteredResults),
+	// Extract check identifiers from current results
+	currentCheckIds := t.extractCheckIdentifiers(filteredResults, ctx)
+
+	// Check if the set of checks has changed
+	if t.hasChecksChanged(currentCheckIds, existingMetadata.LastDetectedChecks) {
+		// Issues detected or changed - emit event
+		payload := map[string]any{
+			"query":   query,
+			"dataset": dataset,
+			"results": filteredResults,
+			"count":   len(filteredResults),
+		}
+
+		err := ctx.Events.Emit("dash0.issue.detected", payload)
+		if err != nil {
+			ctx.Logger.Errorf("Error emitting event: %v", err)
+			return
+		}
+
+		// Update metadata with current checks
+		existingMetadata.LastDetectedChecks = currentCheckIds
+		err = ctx.Metadata.Set(existingMetadata)
+		if err != nil {
+			ctx.Logger.Warnf("Failed to update last detected checks: %v", err)
+		}
+
+		ctx.Logger.Infof("Issues detected: %d issue(s) found", len(filteredResults))
+	} else {
+		// Same checks detected, skip event emission to avoid spam
+		ctx.Logger.Infof("Same checks detected as last time, skipping event emission (checks: %v)", currentCheckIds)
+	}
+}
+
+// extractCheckIdentifiers extracts unique check identifiers from Prometheus query results
+// Uses check name from metric labels (dash0_check_name, check_rule_name, etc.)
+func (t *OnIssueStatus) extractCheckIdentifiers(results []interface{}, ctx core.TriggerActionContext) []string {
+	checkIds := make(map[string]bool)
+	labelNames := []string{"dash0_check_name", "check_rule_name", "check_rule_id", "rule_name", "rule_id", "alertname", "alert_name"}
+
+	for _, resultItem := range results {
+		resultMap, ok := resultItem.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		metric, ok := resultMap["metric"].(map[string]any)
+		if !ok {
+			continue
+		}
+
+		// Try each label name to find the check identifier
+		for _, labelName := range labelNames {
+			if labelValue, exists := metric[labelName]; exists {
+				if labelStr, ok := labelValue.(string); ok && labelStr != "" {
+					checkIds[labelStr] = true
+					break // Use first found identifier
+				}
+			}
+		}
 	}
 
-	err := ctx.Events.Emit("dash0.issue.detected", payload)
-	if err != nil {
-		ctx.Logger.Errorf("Error emitting event: %v", err)
-		return
+	// Convert map keys to slice
+	ids := make([]string, 0, len(checkIds))
+	for id := range checkIds {
+		ids = append(ids, id)
 	}
 
-	ctx.Logger.Infof("Issues detected: %d issue(s) found", len(filteredResults))
+	return ids
+}
+
+// hasChecksChanged compares two sets of check identifiers and returns true if they differ
+func (t *OnIssueStatus) hasChecksChanged(current, previous []string) bool {
+	// If no previous checks, consider it changed (first detection)
+	if len(previous) == 0 {
+		return true
+	}
+
+	// If different lengths, they've changed
+	if len(current) != len(previous) {
+		return true
+	}
+
+	// Create a map of previous checks for O(1) lookup
+	previousMap := make(map[string]bool, len(previous))
+	for _, id := range previous {
+		previousMap[id] = true
+	}
+
+	// Check if all current checks were in previous set
+	for _, id := range current {
+		if !previousMap[id] {
+			return true // New check found
+		}
+	}
+
+	// Same set of checks
+	return false
 }
 
 func (t *OnIssueStatus) filterResultsByCheckRules(results []interface{}, checkRules []string, ctx core.TriggerActionContext) []interface{} {
@@ -352,9 +451,10 @@ func (t *OnIssueStatus) rescheduleCheck(ctx core.TriggerActionContext, config On
 
 	formatted := nextTrigger.Format(time.RFC3339)
 	metadata := OnIssueStatusMetadata{
-		NextTrigger:   &formatted,
-		ReferenceTime: existingMetadata.ReferenceTime,
-		LastCheck:     existingMetadata.LastCheck, // Preserve existing last check by default
+		NextTrigger:        &formatted,
+		ReferenceTime:      existingMetadata.ReferenceTime,
+		LastCheck:          existingMetadata.LastCheck, // Preserve existing last check by default
+		LastDetectedChecks: existingMetadata.LastDetectedChecks, // Preserve last detected checks
 	}
 
 	// Update last check time if provided (when checkIssues runs)
