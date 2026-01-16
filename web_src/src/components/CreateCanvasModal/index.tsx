@@ -110,38 +110,6 @@ export function CreateCanvasModal({
 
       <DialogBody>
         <div className="space-y-6">
-          {mode === "create" && templates && templates.length > 0 ? (
-            <Field>
-              <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Start from template
-              </Label>
-              <select
-                value={templateId}
-                onChange={(e) => {
-                  setTemplateId(e.target.value);
-                  if (!description.trim()) {
-                    const selectedTemplate = templates.find((template) => template.id === e.target.value);
-                    if (selectedTemplate?.description) {
-                      setDescription(selectedTemplate.description);
-                    }
-                  }
-                }}
-                className="w-full border border-input rounded-md px-3 py-2 bg-transparent text-sm"
-              >
-                <option value="">Blank canvas</option>
-                {templates.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.name}
-                  </option>
-                ))}
-              </select>
-              {templateId ? (
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {templates.find((template) => template.id === templateId)?.description || "No description provided."}
-                </div>
-              ) : null}
-            </Field>
-          ) : null}
           <Field>
             <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Canvas name *</Label>
             <Input
