@@ -25,17 +25,16 @@ message TypeOptions {
   optional NumberTypeOptions number = 1;
   optional SelectTypeOptions select = 2;
   optional MultiSelectTypeOptions multi_select = 3;
-  optional IntegrationTypeOptions integration = 4;
-  optional ListTypeOptions list = 5;
-  optional ObjectTypeOptions object = 6;
-  optional ResourceTypeOptions resource = 7;
-  optional TimeTypeOptions time = 8;
-  optional DateTypeOptions date = 9;
-  optional DateTimeTypeOptions datetime = 10;
-  optional AnyPredicateListTypeOptions any_predicate_list = 11;
-  optional StringTypeOptions string = 12;
-  optional ExpressionTypeOptions expression = 13;
-  optional TextTypeOptions text = 14;
+  optional ListTypeOptions list = 4;
+  optional ObjectTypeOptions object = 5;
+  optional ResourceTypeOptions resource = 6;
+  optional TimeTypeOptions time = 7;
+  optional DateTypeOptions date = 8;
+  optional DateTimeTypeOptions datetime = 9;
+  optional AnyPredicateListTypeOptions any_predicate_list = 10;
+  optional StringTypeOptions string = 11;
+  optional ExpressionTypeOptions expression = 12;
+  optional TextTypeOptions text = 13;
 }
 
 message NumberTypeOptions {
@@ -76,10 +75,6 @@ message SelectTypeOptions {
 
 message MultiSelectTypeOptions {
   repeated SelectOption options = 1;
-}
-
-message IntegrationTypeOptions {
-  string type = 1;
 }
 
 message ResourceTypeOptions {

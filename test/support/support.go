@@ -40,7 +40,6 @@ type ResourceRegistry struct {
 	UserModel    *models.User
 	Organization *models.Organization
 	Account      *models.Account
-	Integration  *models.Integration
 	Encryptor    crypto.Encryptor
 	AuthService  *authorization.AuthService
 	Registry     *registry.Registry

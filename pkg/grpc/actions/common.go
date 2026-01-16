@@ -1,23 +1,18 @@
 package actions
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"slices"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
-	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	widgetpb "github.com/superplanehq/superplane/pkg/protos/widgets"
-	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -45,44 +40,6 @@ func DomainTypeToProto(domainType string) pbAuth.DomainType {
 	default:
 		return pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED
 	}
-}
-
-func ValidateIntegration(orgID uuid.UUID, integrationRef *integrationpb.IntegrationRef) (*models.Integration, error) {
-	if integrationRef.Name == "" {
-		return nil, status.Error(codes.InvalidArgument, "integration name is required")
-	}
-
-	integration, err := models.FindIntegrationByName(models.DomainTypeOrganization, orgID, integrationRef.Name)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationRef.Name)
-	}
-
-	return integration, nil
-}
-
-func ValidateResource(ctx context.Context, registry *registry.Registry, integration *models.Integration, resourceRef *integrationpb.ResourceRef) (integrations.Resource, error) {
-	if resourceRef == nil {
-		return nil, status.Error(codes.InvalidArgument, "resource reference is required")
-	}
-
-	if resourceRef.Type == "" || resourceRef.Name == "" {
-		return nil, status.Error(codes.InvalidArgument, "resource type and name are required")
-	}
-
-	//
-	// If resource record does not exist yet, we need to go to the integration to find it.
-	//
-	integrationImpl, err := registry.NewResourceManager(ctx, integration)
-	if err != nil {
-		return nil, fmt.Errorf("error starting integration implementation: %v", err)
-	}
-
-	resource, err := integrationImpl.Get(resourceRef.Type, resourceRef.Name)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%s %s not found: %v", resourceRef.Type, resourceRef.Name, err)
-	}
-
-	return resource, nil
 }
 
 func numberTypeOptionsToProto(opts *configuration.NumberTypeOptions) *configpb.NumberTypeOptions {
@@ -188,16 +145,6 @@ func multiSelectTypeOptionsToProto(opts *configuration.MultiSelectTypeOptions) *
 		}
 	}
 	return pbOpts
-}
-
-func integrationTypeOptionsToProto(opts *configuration.IntegrationTypeOptions) *configpb.IntegrationTypeOptions {
-	if opts == nil {
-		return nil
-	}
-
-	return &configpb.IntegrationTypeOptions{
-		Type: opts.Type,
-	}
 }
 
 func resourceTypeOptionsToProto(opts *configuration.ResourceTypeOptions) *configpb.ResourceTypeOptions {
@@ -314,7 +261,6 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 		Text:             textTypeOptionsToProto(opts.Text),
 		Select:           selectTypeOptionsToProto(opts.Select),
 		MultiSelect:      multiSelectTypeOptionsToProto(opts.MultiSelect),
-		Integration:      integrationTypeOptionsToProto(opts.Integration),
 		Resource:         resourceTypeOptionsToProto(opts.Resource),
 		List:             listTypeOptionsToProto(opts.List),
 		AnyPredicateList: anyPredicateListTypeOptionsToProto(opts.AnyPredicateList),
@@ -486,16 +432,6 @@ func protoToMultiSelectTypeOptions(pbOpts *configpb.MultiSelectTypeOptions) *con
 	return opts
 }
 
-func protoToIntegrationTypeOptions(pbOpts *configpb.IntegrationTypeOptions) *configuration.IntegrationTypeOptions {
-	if pbOpts == nil {
-		return nil
-	}
-
-	return &configuration.IntegrationTypeOptions{
-		Type: pbOpts.Type,
-	}
-}
-
 func protoToResourceTypeOptions(pbOpts *configpb.ResourceTypeOptions) *configuration.ResourceTypeOptions {
 	if pbOpts == nil {
 		return nil
@@ -610,7 +546,6 @@ func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions
 		Text:             protoToTextTypeOptions(pbOpts.Text),
 		Select:           protoToSelectTypeOptions(pbOpts.Select),
 		MultiSelect:      protoToMultiSelectTypeOptions(pbOpts.MultiSelect),
-		Integration:      protoToIntegrationTypeOptions(pbOpts.Integration),
 		Resource:         protoToResourceTypeOptions(pbOpts.Resource),
 		List:             protoToListTypeOptions(pbOpts.List),
 		AnyPredicateList: protoToAnyPredicateListTypeOptions(pbOpts.AnyPredicateList),

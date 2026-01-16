@@ -16,7 +16,6 @@ import (
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
-	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	mepb "github.com/superplanehq/superplane/pkg/protos/me"
 	organizationPb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
@@ -102,9 +101,6 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 
 	secretsService := NewSecretService(encryptor, authService)
 	secretPb.RegisterSecretsServer(grpcServer, secretsService)
-
-	integrationsService := NewIntegrationService(encryptor, authService, registry)
-	integrationPb.RegisterIntegrationsServer(grpcServer, integrationsService)
 
 	meService := NewMeService()
 	mepb.RegisterMeServer(grpcServer, meService)

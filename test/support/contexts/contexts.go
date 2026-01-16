@@ -44,7 +44,7 @@ func (w *WebhookContext) SetSecret(secret []byte) error {
 	return nil
 }
 
-func (w *WebhookContext) Setup(options *core.WebhookSetupOptions) (string, error) {
+func (w *WebhookContext) Setup() (string, error) {
 	id := uuid.New()
 	return id.String(), nil
 }

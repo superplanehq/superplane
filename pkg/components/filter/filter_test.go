@@ -130,7 +130,7 @@ func TestFilter_Execute_NonBooleanResult_ShouldReturnError(t *testing.T) {
 
 	err := filter.Execute(ctx)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "expression must evaluate to boolean")
+	assert.Contains(t, err.Error(), "invalid operation: bool(string)")
 }
 
 func TestFilter_Execute_NodeReferenceExpression(t *testing.T) {

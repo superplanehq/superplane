@@ -53,21 +53,6 @@ import type {
   GroupsRemoveUserFromGroupData,
   GroupsRemoveUserFromGroupResponse2,
   GroupsRemoveUserFromGroupError,
-  IntegrationsListIntegrationsData,
-  IntegrationsListIntegrationsResponse2,
-  IntegrationsListIntegrationsError,
-  IntegrationsCreateIntegrationData,
-  IntegrationsCreateIntegrationResponse2,
-  IntegrationsCreateIntegrationError,
-  IntegrationsDescribeIntegrationData,
-  IntegrationsDescribeIntegrationResponse2,
-  IntegrationsDescribeIntegrationError,
-  IntegrationsUpdateIntegrationData,
-  IntegrationsUpdateIntegrationResponse2,
-  IntegrationsUpdateIntegrationError,
-  IntegrationsListResourcesData,
-  IntegrationsListResourcesResponse2,
-  IntegrationsListResourcesError,
   OrganizationsAcceptInviteLinkData,
   OrganizationsAcceptInviteLinkResponse,
   OrganizationsAcceptInviteLinkError,
@@ -531,99 +516,6 @@ export const groupsRemoveUserFromGroup = <ThrowOnError extends boolean = true>(
       "Content-Type": "application/json",
       ...options?.headers,
     },
-  });
-};
-
-/**
- * List integrations
- * List integrations
- */
-export const integrationsListIntegrations = <ThrowOnError extends boolean = true>(
-  options?: Options<IntegrationsListIntegrationsData, ThrowOnError>,
-) => {
-  return (options?.client ?? _heyApiClient).get<
-    IntegrationsListIntegrationsResponse2,
-    IntegrationsListIntegrationsError,
-    ThrowOnError
-  >({
-    url: "/api/v1/integrations",
-    ...options,
-  });
-};
-
-/**
- * Create a new canvas integration
- * Creates a new canvas integration
- */
-export const integrationsCreateIntegration = <ThrowOnError extends boolean = true>(
-  options: Options<IntegrationsCreateIntegrationData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).post<
-    IntegrationsCreateIntegrationResponse2,
-    IntegrationsCreateIntegrationError,
-    ThrowOnError
-  >({
-    url: "/api/v1/integrations",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-};
-
-/**
- * Describe an integration
- * Describe an integration
- */
-export const integrationsDescribeIntegration = <ThrowOnError extends boolean = true>(
-  options: Options<IntegrationsDescribeIntegrationData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).get<
-    IntegrationsDescribeIntegrationResponse2,
-    IntegrationsDescribeIntegrationError,
-    ThrowOnError
-  >({
-    url: "/api/v1/integrations/{idOrName}",
-    ...options,
-  });
-};
-
-/**
- * Update an integration
- * Updates an existing integration
- */
-export const integrationsUpdateIntegration = <ThrowOnError extends boolean = true>(
-  options: Options<IntegrationsUpdateIntegrationData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).patch<
-    IntegrationsUpdateIntegrationResponse2,
-    IntegrationsUpdateIntegrationError,
-    ThrowOnError
-  >({
-    url: "/api/v1/integrations/{idOrName}",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-};
-
-/**
- * List integration resources
- * List integration resources
- */
-export const integrationsListResources = <ThrowOnError extends boolean = true>(
-  options: Options<IntegrationsListResourcesData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).get<
-    IntegrationsListResourcesResponse2,
-    IntegrationsListResourcesError,
-    ThrowOnError
-  >({
-    url: "/api/v1/integrations/{idOrName}/resources",
-    ...options,
   });
 };
 

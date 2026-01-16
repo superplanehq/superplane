@@ -10,12 +10,21 @@ import (
 //
 
 type DummyApplication struct {
-	onSync func(ctx core.SyncContext) error
+	onSync         func(ctx core.SyncContext) error
+	onSetupWebhook func(ctx core.SetupWebhookContext) (any, error)
 }
 
 func NewDummyApplication(onSync func(ctx core.SyncContext) error) *DummyApplication {
+	return NewDummyApplicationWithSetupWebhook(onSync, nil)
+}
+
+func NewDummyApplicationWithSetupWebhook(
+	onSync func(ctx core.SyncContext) error,
+	onSetupWebhook func(ctx core.SetupWebhookContext) (any, error),
+) *DummyApplication {
 	return &DummyApplication{
-		onSync: onSync,
+		onSync:         onSync,
+		onSetupWebhook: onSetupWebhook,
 	}
 }
 
@@ -52,6 +61,9 @@ func (t *DummyApplication) Triggers() []core.Trigger {
 }
 
 func (t *DummyApplication) Sync(ctx core.SyncContext) error {
+	if t.onSync == nil {
+		return nil
+	}
 	return t.onSync(ctx)
 }
 
@@ -67,7 +79,10 @@ func (t *DummyApplication) CompareWebhookConfig(a, b any) (bool, error) {
 }
 
 func (t *DummyApplication) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
+	if t.onSetupWebhook == nil {
+		return nil, nil
+	}
+	return t.onSetupWebhook(ctx)
 }
 
 func (t *DummyApplication) CleanupWebhook(ctx core.CleanupWebhookContext) error {

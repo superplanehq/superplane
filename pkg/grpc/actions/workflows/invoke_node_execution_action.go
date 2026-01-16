@@ -90,7 +90,6 @@ func InvokeNodeExecutionAction(
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
 		Auth:           contexts.NewAuthContext(tx, orgID, authService, user),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Integration:    contexts.NewIntegrationContext(tx, registry),
 		Notifications:  contexts.NewNotificationContext(tx, orgID, workflow.ID),
 	}
 
