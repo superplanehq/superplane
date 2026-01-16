@@ -23,6 +23,8 @@ export const workflowKeys = {
   all: ["workflows"] as const,
   lists: () => [...workflowKeys.all, "list"] as const,
   list: (orgId: string) => [...workflowKeys.lists(), orgId] as const,
+  templates: () => [...workflowKeys.all, "templates"] as const,
+  templateList: (orgId: string) => [...workflowKeys.templates(), orgId] as const,
   details: () => [...workflowKeys.all, "detail"] as const,
   detail: (orgId: string, id: string) => [...workflowKeys.details(), orgId, id] as const,
   nodeExecutions: () => [...workflowKeys.all, "nodeExecutions"] as const,
@@ -71,8 +73,28 @@ export const useWorkflows = (organizationId: string) => {
   return useQuery({
     queryKey: workflowKeys.list(organizationId),
     queryFn: async () => {
-      const response = await workflowsListWorkflows(withOrganizationHeader({}));
+      const response = await workflowsListWorkflows(
+        withOrganizationHeader({
+          query: { includeTemplates: false },
+        }),
+      );
       return response.data?.workflows || [];
+    },
+    enabled: !!organizationId,
+  });
+};
+
+export const useWorkflowTemplates = (organizationId: string) => {
+  return useQuery({
+    queryKey: workflowKeys.templateList(organizationId),
+    queryFn: async () => {
+      const response = await workflowsListWorkflows(
+        withOrganizationHeader({
+          query: { includeTemplates: true },
+        }),
+      );
+      const workflows = response.data?.workflows || [];
+      return workflows.filter((workflow) => workflow.metadata?.isTemplate);
     },
     enabled: !!organizationId,
   });

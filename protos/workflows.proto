@@ -211,7 +211,9 @@ service Workflows {
   }
 }
 
-message ListWorkflowsRequest {}
+message ListWorkflowsRequest {
+  bool include_templates = 1;
+}
 
 message ListWorkflowsResponse {
   repeated Workflow workflows = 1;
@@ -262,6 +264,7 @@ message Workflow {
     google.protobuf.Timestamp created_at = 5;
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
+    bool is_template = 8;
   }
 
   message Spec {

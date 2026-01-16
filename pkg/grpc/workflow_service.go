@@ -31,7 +31,7 @@ func NewWorkflowService(authService authorization.Authorization, registry *regis
 
 func (s *WorkflowService) ListWorkflows(ctx context.Context, req *pb.ListWorkflowsRequest) (*pb.ListWorkflowsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return workflows.ListWorkflows(ctx, s.registry, organizationID)
+	return workflows.ListWorkflows(ctx, s.registry, organizationID, req.IncludeTemplates)
 }
 
 func (s *WorkflowService) DescribeWorkflow(ctx context.Context, req *pb.DescribeWorkflowRequest) (*pb.DescribeWorkflowResponse, error) {

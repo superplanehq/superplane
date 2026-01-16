@@ -492,7 +492,8 @@ CREATE TABLE public.workflows (
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_by uuid,
     deleted_at timestamp without time zone,
-    nodes jsonb DEFAULT '[]'::jsonb NOT NULL
+    nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    is_template boolean DEFAULT false NOT NULL
 );
 
 
@@ -1130,6 +1131,13 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 --
 
 CREATE INDEX idx_workflows_deleted_at ON public.workflows USING btree (deleted_at);
+
+
+--
+-- Name: idx_workflows_is_template; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflows_is_template ON public.workflows USING btree (is_template);
 
 
 --

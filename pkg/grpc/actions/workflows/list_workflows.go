@@ -11,8 +11,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListWorkflows(ctx context.Context, registry *registry.Registry, organizationID string) (*pb.ListWorkflowsResponse, error) {
-	workflows, err := models.ListWorkflows(organizationID)
+func ListWorkflows(ctx context.Context, registry *registry.Registry, organizationID string, includeTemplates bool) (*pb.ListWorkflowsResponse, error) {
+	workflows, err := models.ListWorkflows(organizationID, includeTemplates)
 	if err != nil {
 		log.Errorf("failed to list workflows for organization %s: %v", organizationID, err)
 		return nil, status.Error(codes.Internal, "failed to list workflows")

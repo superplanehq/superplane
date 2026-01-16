@@ -1,51 +1,17 @@
 root = "."
-testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-  args_bin = []
-  bin = "./tmp/main"
-  cmd = "go build -o ./tmp/main cmd/server/main.go"
-  delay = 1000
-  exclude_dir = ["assets", "tmp", "vendor", "testdata", "web_src", "design", "pkg/web/assets"]
-  exclude_file = []
-  exclude_regex = ["_test.go"]
-  exclude_unchanged = false
-  follow_symlink = false
-  include_dir = []
-  include_ext = ["go", "tpl", "tmpl", "html"]
-  include_file = []
-  kill_delay = "0s"
-  log = "build-errors.log"
-  poll = true
-  poll_interval = 100
-  post_cmd = []
-  pre_cmd = []
-  rerun = false
-  rerun_delay = 500
-  send_interrupt = false
-  stop_on_error = false
-
-[color]
-  app = ""
-  build = "yellow"
-  main = "magenta"
-  runner = "green"
-  watcher = "cyan"
+cmd = "go build -o ./tmp/superplane cmd/server/main.go"
+bin = "tmp/superplane"
+include_ext = ["go", "yaml", "yml"]
+exclude_dir = ["web_src", "tmp", "build", "api/swagger", "node_modules"]
+stop_on_error = true
+send_interrupt = true
+kill_delay = "3s"
 
 [log]
-  main_only = false
-  silent = false
-  time = false
+time = true
 
 [misc]
-  clean_on_exit = false
-
-[proxy]
-  app_port = 0
-  enabled = false
-  proxy_port = 0
-
-[screen]
-  clear_on_rebuild = false
-  keep_scroll = true
+clean_on_exit = true
