@@ -30,6 +30,7 @@ export interface Suggestion {
   kind: SuggestionKind;
   insertText?: string;
   detail?: string;
+  labelDetail?: string;
 }
 
 export interface GetSuggestionsOptions {
@@ -142,7 +143,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
   // ✅ 0) Env key trigger: after "$" or "$[" suggest keys immediately
   const envTrigger = detectEnvKeyTrigger(left);
   if (envTrigger) {
-    const keys = Object.keys(globals ?? {});
+    const keys = listGlobalKeys(globals);
     return keys.slice(0, limit).map((k) => {
       const v = (globals as Record<string, unknown>)[k];
       const tailDot = isExpandableValue(v) ? "." : "";
@@ -150,7 +151,8 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
         label: k,
         kind: "variable",
         insertText: `$[${quoteKey(k, envTrigger.quote)}]${tailDot}`,
-        detail: "global",
+        detail: getValueTypeLabel(v),
+        labelDetail: formatNodeNameLabel(getNodeName(globals, k, v)),
       };
     });
   }
@@ -160,7 +162,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
   const bracketCtx = detectBracketKeyContext(left);
   if (bracketCtx) {
     const prefix = (bracketCtx.partialKey ?? "").toLowerCase();
-    const keys = Object.keys(globals ?? {});
+    const keys = listGlobalKeys(globals);
     return keys
       .filter((k) => k.toLowerCase().startsWith(prefix))
       .slice(0, limit)
@@ -168,7 +170,8 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
         label: k,
         kind: "variable",
         insertText: quoteKey(k, bracketCtx.quote), // only the key token
-        detail: "global",
+        detail: getValueTypeLabel((globals as Record<string, unknown>)[k]),
+        labelDetail: formatNodeNameLabel(getNodeName(globals, k, (globals as Record<string, unknown>)[k])),
       }));
   }
 
@@ -184,7 +187,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     const target = resolveExprToValue(resolvableBase, globals);
 
     const keys = listKeys(target);
-    
+
     const mp = (memberPrefix ?? "").toLowerCase();
 
     return keys
@@ -204,7 +207,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
             label: k,
             kind: "field" as const,
             insertText: needsQuotes ? `?.["${escapeString(k)}"]${tailDot}` : `?.${k}${tailDot}`,
-            detail: "field",
+            detail: getValueTypeLabel(fieldValue),
           };
         }
 
@@ -212,7 +215,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
           label: k,
           kind: "field" as const,
           insertText: needsQuotes ? `[${quoteKey(k, needsQuotes ? "'" : '"')}]${tailDot}` : `${k}${tailDot}`,
-          detail: "field",
+          detail: getValueTypeLabel(fieldValue),
         };
       });
   }
@@ -227,7 +230,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
         label: "$",
         kind: "variable",
         insertText: "$",
-        detail: "environment root",
+        detail: getValueTypeLabel(globals),
       });
     }
   }
@@ -259,8 +262,51 @@ function detectEnvKeyTrigger(left: string): EnvKeyTrigger | null {
   return null;
 }
 
+function listGlobalKeys(globals: Record<string, unknown>): string[] {
+  const keys = Object.keys(globals ?? {});
+  return keys.filter((key) => key !== "__nodeNames");
+}
+
 function isExpandableValue(v: unknown): boolean {
   return v !== null && typeof v === "object";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function getNodeName(globals: Record<string, unknown>, key: string, value: unknown): string | undefined {
+  if (isRecord(value)) {
+    const nodeName = value.__nodeName;
+    if (typeof nodeName === "string" && nodeName.trim()) return nodeName;
+  }
+
+  const nodeNames = isRecord(globals) ? (globals as Record<string, unknown>).__nodeNames : undefined;
+  if (isRecord(nodeNames)) {
+    const entry = nodeNames[key];
+    if (typeof entry === "string" && entry.trim()) return entry;
+    if (isRecord(entry)) {
+      const name = entry.nodeName ?? entry.name ?? entry.label;
+      if (typeof name === "string" && name.trim()) return name;
+    }
+  }
+
+  return undefined;
+}
+
+function formatNodeNameLabel(nodeName?: string): string | undefined {
+  if (!nodeName) return undefined;
+  return `- (${nodeName})`;
+}
+
+function getValueTypeLabel(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  if (typeof value === "string") return "string";
+  if (typeof value === "number") return "int";
+  if (typeof value === "boolean") return "bool";
+  if (typeof value === "object") return "object";
+  return "unknown";
 }
 
 function rankSuggestion(a: Suggestion, b: Suggestion, prefixLower: string): number {
@@ -499,7 +545,9 @@ function listKeys(value: unknown): string[] {
     for (let i = 0; i < Math.min(10, value.length); i++) keys.push(String(i));
     return keys;
   }
-  if (typeof value === "object") return Object.keys(value as Record<string, unknown>);
+  if (typeof value === "object") {
+    return Object.keys(value as Record<string, unknown>).filter((key) => !key.startsWith("__"));
+  }
   return [];
 }
 

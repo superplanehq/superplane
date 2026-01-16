@@ -649,6 +649,7 @@ export const ComponentSidebar = ({
               <TabsContent value="settings" className="mt-0">
                 <SettingsTab
                   mode={nodeConfigMode}
+                  nodeId={nodeId}
                   nodeName={nodeName}
                   nodeLabel={nodeLabel}
                   configuration={nodeConfiguration}

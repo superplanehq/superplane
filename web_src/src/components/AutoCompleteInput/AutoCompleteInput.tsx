@@ -101,7 +101,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       }
 
       const closeIndex = text.indexOf(suffix, openIndex + startWord.length);
-      if (closeIndex !== -1 && cursor -1 > closeIndex) {
+      if (closeIndex !== -1 && cursor - 1 > closeIndex) {
         return null;
       }
 
@@ -605,6 +605,12 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       }
     }, [highlightedIndex]);
 
+    const shouldShowValuePreview =
+      showValuePreview &&
+      highlightedIndex >= 0 &&
+      highlightedValue !== undefined &&
+      (highlightedValue === null || (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue)));
+
     return (
       <div ref={containerRef} className="relative w-full">
         {/* Input Field */}
@@ -625,7 +631,6 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             onKeyDown={handleKeyDown}
             onKeyUp={handleCursorChange}
             onKeyDownCapture={handleCursorChange}
-            onKeyUp={handleCursorChange}
             onClick={handleCursorChange}
             onSelect={handleCursorChange}
             onFocus={() => {
@@ -666,80 +671,70 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           )}
         </span>
 
-        {/* Value Preview Box */}
-        {showValuePreview &&
-          highlightedIndex >= 0 &&
-          highlightedValue !== undefined &&
-          isOpen &&
-          (highlightedValue === null || (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue))) && (
-            <div
-              className={twMerge([
-                "absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3",
-                "dark:bg-gray-800 dark:border-gray-700",
-              ])}
-            >
-              <div className="text-xs text-gray-500 dark:text-gray-300 mb-1">Value Preview:</div>
-              <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
-                {highlightedValue === null
-                  ? "null"
-                  : typeof highlightedValue === "string"
-                    ? `"${highlightedValue}"`
-                    : String(highlightedValue)}
-              </div>
-            </div>
-          )}
-
         {/* Suggestions Dropdown */}
         {isOpen && suggestions.length > 0 && (
-          <div
-            ref={suggestionsRef}
-            className={twMerge([
-              "absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto",
-              "dark:bg-gray-800 dark:border-gray-700",
-            ])}
-          >
-            {suggestions.map((suggestionItem, index) => (
-              <div
-                key={`${suggestionItem.kind}-${suggestionItem.label}-${index}`}
-                className={twMerge([
-                  "px-3 py-2 cursor-pointer text-sm flex justify-between items-center",
-                  "hover:bg-gray-100 dark:hover:bg-gray-700",
-                  "text-gray-950 dark:text-white",
-                  highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
-                ])}
-                onClick={() => handleSuggestionClick(suggestionItem)}
-                onMouseEnter={() => {
-                  setHighlightedIndex(index);
-                  if (exampleObj) {
-                    const cursorPosition = inputRef.current?.selectionStart || 0;
-                    const context = getExpressionContext(inputValue, cursorPosition);
-                    if (!context) {
-                      setHighlightedValue(undefined);
-                      return;
-                    }
-                    const insertText = getSuggestionInsertText(suggestionItem);
-                    const left = context.expressionText.slice(0, context.expressionCursor);
-                    const range = getReplacementRange(left, insertText);
-                    const nextExpression =
-                      context.expressionText.slice(0, range.start) +
-                      insertText +
-                      context.expressionText.slice(range.end);
-                    const value = resolveExpressionValue(nextExpression, exampleObj);
-                    setHighlightedValue(value);
-                  }
-                }}
-              >
-                <span>
-                  {suggestionItem.label}
-                  {suggestionItem.kind === "function" && (
-                    <span className="ml-2 text-gray-500">{formatFunctionSignature(suggestionItem)}</span>
-                  )}
-                </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                  {suggestionItem.detail ?? suggestionItem.kind}
-                </span>
+          <div ref={suggestionsRef} className={twMerge(["absolute z-50 w-full mt-1 bg-transparent"])}>
+            <div className="flex flex-col sm:flex-row">
+              <div className="flex-1 overflow-auto bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 sm:rounded-lg rounded-t-lg sm:rounded-tr-none max-h-60 shadow-lg">
+                {suggestions.map((suggestionItem, index) => (
+                  <div
+                    key={`${suggestionItem.kind}-${suggestionItem.label}-${index}`}
+                    className={twMerge([
+                      "px-3 py-2 cursor-pointer text-sm flex justify-between items-center",
+                      "hover:bg-gray-100 dark:hover:bg-gray-700",
+                      "text-gray-950 dark:text-white",
+                      highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
+                    ])}
+                    onClick={() => handleSuggestionClick(suggestionItem)}
+                    onMouseEnter={() => {
+                      setHighlightedIndex(index);
+                      if (exampleObj) {
+                        const cursorPosition = inputRef.current?.selectionStart || 0;
+                        const context = getExpressionContext(inputValue, cursorPosition);
+                        if (!context) {
+                          setHighlightedValue(undefined);
+                          return;
+                        }
+                        const insertText = getSuggestionInsertText(suggestionItem);
+                        const left = context.expressionText.slice(0, context.expressionCursor);
+                        const range = getReplacementRange(left, insertText);
+                        const nextExpression =
+                          context.expressionText.slice(0, range.start) +
+                          insertText +
+                          context.expressionText.slice(range.end);
+                        const value = resolveExpressionValue(nextExpression, exampleObj);
+                        setHighlightedValue(value);
+                      }
+                    }}
+                  >
+                    <span>
+                      {suggestionItem.label}
+                      {suggestionItem.kind === "function" && (
+                        <span className="ml-2 text-gray-500">{formatFunctionSignature(suggestionItem)}</span>
+                      )}
+                      {suggestionItem.kind !== "function" && suggestionItem.labelDetail && (
+                        <span className="ml-2 text-gray-500">{suggestionItem.labelDetail}</span>
+                      )}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                      {suggestionItem.detail ?? suggestionItem.kind}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+              {shouldShowValuePreview && isOpen && (
+                <div className="border border-gray-200 dark:border-gray-700 sm:border-l-0 sm:border-t sm:max-w-[240px] sm:min-w-[200px] p-3 bg-gray-100 dark:bg-gray-700 sm:rounded-r-lg rounded-b-lg sm:rounded-bl-none h-fit self-start shadow-lg">
+                  <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Value Preview</div>
+                  <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
+                    {highlightedValue === null
+                      ? "null"
+                      : typeof highlightedValue === "string"
+                        ? `"${highlightedValue}"`
+                        : String(highlightedValue)}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
