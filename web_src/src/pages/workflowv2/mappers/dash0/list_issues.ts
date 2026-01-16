@@ -75,27 +75,62 @@ export const listIssuesMapper: ComponentBaseMapper = {
     return `no issues · ${timeAgo}`;
   },
 
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, string> {
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, any> {
+    const details: Record<string, any> = {};
+
+    // Add "Checked at" timestamp
+    if (execution.createdAt) {
+      details["Checked at"] = new Date(execution.createdAt).toLocaleString();
+    }
+
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
 
     if (!outputs || !outputs.default || outputs.default.length === 0) {
-      return { Issues: "No issues found" };
+      details["Issues"] = [];
+      return details;
     }
 
-    const responseData = outputs.default[0]?.data as Record<string, any> | undefined;
-
-    if (!responseData) {
-      return { Issues: "No issues found" };
+    const payload = outputs.default[0];
+    if (!payload || !payload.data) {
+      details["Issues"] = [];
+      return details;
     }
 
-    // Format the issues response data for display
-    const details: Record<string, string> = {};
-    try {
-      const formatted = JSON.stringify(responseData, null, 2);
-      details["Issues Data"] = formatted;
-    } catch (error) {
-      details["Issues Data"] = String(responseData);
+    const responseData = payload.data as PrometheusResponse | undefined;
+    if (!responseData || !responseData.data || !responseData.data.result) {
+      details["Issues"] = [];
+      return details;
     }
+
+    const results = responseData.data.result;
+    
+    // Parse issues from Prometheus response
+    const issues = results.map((result) => {
+      const metric = result.metric || {};
+      const value = result.value;
+      
+      // Extract status from value: [timestamp, "status"]
+      let status: "degraded" | "critical" = "degraded";
+      if (value && Array.isArray(value) && value.length >= 2) {
+        const statusValue = String(value[1]);
+        status = statusValue === "2" ? "critical" : "degraded";
+      }
+
+      // Extract check information from metric labels
+      const checkName = metric["dash0_check_name"] || "Unknown Check";
+      const checkSummary = metric["dash0_check_summary_template"] || "";
+      const checkDescription = metric["dash0_check_description_template"] || "";
+
+      return {
+        status,
+        checkName,
+        checkSummary,
+        checkDescription,
+      };
+    });
+
+    // Add issues list with special type for custom rendering
+    details["Issues"] = issues;
 
     return details;
   },
@@ -295,7 +330,8 @@ function baseEventSections(
   if (countParts.length > 0) {
     eventSubtitle = `${countParts.join(", ")} · ${timeAgo}`;
   } else {
-    eventSubtitle = timeAgo;
+    // No issues found - show "no issues" with time
+    eventSubtitle = `no issues · ${timeAgo}`;
   }
 
   return [
