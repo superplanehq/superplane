@@ -14,9 +14,8 @@ import (
 type OnIssueStatus struct{}
 
 type OnIssueStatusConfiguration struct {
-	MinutesInterval       *int     `json:"minutesInterval"`
-	ListenToAllCheckRules *bool    `json:"listenToAllCheckRules,omitempty"`
-	CheckRules            []string `json:"checkRules,omitempty"`
+	MinutesInterval *int     `json:"minutesInterval"`
+	CheckRules      []string `json:"checkRules,omitempty"`
 }
 
 type OnIssueStatusMetadata struct {
@@ -63,14 +62,6 @@ func (t *OnIssueStatus) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "listenToAllCheckRules",
-			Label:       "Listen to all check rules",
-			Type:        configuration.FieldTypeBool,
-			Required:    false,
-			Default:     true,
-			Description: "When enabled, monitor all check rules. When disabled, select specific check rules to monitor.",
-		},
-		{
 			Name:     "checkRules",
 			Label:    "Check Rules",
 			Type:     configuration.FieldTypeAppInstallationResource,
@@ -81,13 +72,7 @@ func (t *OnIssueStatus) Configuration() []configuration.Field {
 					Multi: true,
 				},
 			},
-			Description: "Select check rules to monitor. Check rules will be fetched from your Dash0 account.",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "listenToAllCheckRules",
-					Values: []string{"false"},
-				},
-			},
+			Description: "Select check rules to monitor. If none selected, all check rules will be monitored. Check rules will be fetched from your Dash0 account.",
 		},
 	}
 }
@@ -238,10 +223,10 @@ func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, respo
 		return
 	}
 
-	// Filter results by selected check rules if filtering is enabled
+	// Filter results by selected check rules if any are specified
+	// If checkRules is empty, monitor all check rules (no filtering)
 	filteredResults := result
-	listenToAll := config.ListenToAllCheckRules == nil || *config.ListenToAllCheckRules
-	if !listenToAll && len(config.CheckRules) > 0 {
+	if len(config.CheckRules) > 0 {
 		filteredResults = t.filterResultsByCheckRules(result, config.CheckRules, ctx)
 		if len(filteredResults) == 0 {
 			// No matching check rules found, don't emit event

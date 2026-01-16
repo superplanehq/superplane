@@ -7,7 +7,6 @@ import { formatTimeAgo } from "@/utils/date";
 
 interface OnIssueStatusConfiguration {
   minutesInterval?: number;
-  listenToAllCheckRules?: boolean;
   checkRules?: string[];
 }
 
