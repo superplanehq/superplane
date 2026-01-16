@@ -2,11 +2,15 @@ package workflows
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -270,4 +274,71 @@ func Test__ListWorkflows__ReturnsWorkflowsWithMetadataAndSpec(t *testing.T) {
 	// Verify status is NOT present
 	//
 	assert.Nil(t, listedWorkflow.Status)
+}
+
+func Test__ListWorkflows__DoesNotReturnSoftDeletedWorkflowsWhenIncludingTemplates(t *testing.T) {
+	r := support.Setup(t)
+
+	activeWorkflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: "node-1",
+				Name:   "Node 1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	deletedWorkflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: "node-2",
+				Name:   "Node 2",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	require.NoError(t, deletedWorkflow.SoftDelete())
+
+	now := time.Now()
+	templateWorkflow := &models.Workflow{
+		ID:             uuid.New(),
+		OrganizationID: models.TemplateOrganizationID,
+		IsTemplate:     true,
+		Name:           support.RandomName("template"),
+		Description:    "Template workflow",
+		Nodes:          datatypes.NewJSONSlice([]models.Node{}),
+		Edges:          datatypes.NewJSONSlice([]models.Edge{}),
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+	require.NoError(t, database.Conn().Create(templateWorkflow).Error)
+
+	response, err := ListWorkflows(context.Background(), r.Registry, r.Organization.ID.String(), true)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+
+	workflowIDs := make([]string, len(response.Workflows))
+	for i, wf := range response.Workflows {
+		workflowIDs[i] = wf.Metadata.Id
+	}
+
+	assert.True(t, slices.Contains(workflowIDs, activeWorkflow.ID.String()))
+	assert.True(t, slices.Contains(workflowIDs, templateWorkflow.ID.String()))
+	assert.False(t, slices.Contains(workflowIDs, deletedWorkflow.ID.String()))
 }

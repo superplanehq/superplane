@@ -196,11 +196,16 @@ func FindUnscopedWorkflowInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, er
 
 func ListWorkflows(orgID string, includeTemplates bool) ([]Workflow, error) {
 	var workflows []Workflow
-	query := database.Conn().
-		Where("organization_id = ?", orgID)
-
+	var query *gorm.DB
 	if includeTemplates {
-		query = query.Or("is_template = ?", true)
+		query = database.Conn().Where(
+			"(organization_id = ?) OR (organization_id = ? AND is_template = ?)",
+			orgID,
+			TemplateOrganizationID,
+			true,
+		)
+	} else {
+		query = database.Conn().Where("organization_id = ?", orgID)
 	}
 
 	err := query.

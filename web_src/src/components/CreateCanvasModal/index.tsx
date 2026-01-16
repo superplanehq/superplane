@@ -27,7 +27,6 @@ export function CreateCanvasModal({
   onSubmit,
   isLoading = false,
   initialData,
-  templates,
   defaultTemplateId,
   mode = "create",
 }: CreateCanvasModalProps) {
