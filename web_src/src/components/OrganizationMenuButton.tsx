@@ -6,11 +6,10 @@ import { cn } from "@/lib/utils";
 import {
   AppWindow,
   ArrowRightLeft,
-  Building,
   ChevronDown,
   CircleUser,
   LogOut,
-  Palette,
+  Settings,
   Shield,
   User as UserIcon,
   Users,
@@ -83,14 +82,9 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
 
   const sidebarOrganizationLinks = [
     {
-      label: "Canvases",
-      href: organizationId ? `/${organizationId}` : "/",
-      Icon: Palette,
-    },
-    {
       label: "Settings",
       href: organizationId ? `/${organizationId}/settings/general` : "#",
-      Icon: Building,
+      Icon: Settings,
     },
     { label: "Members", href: organizationId ? `/${organizationId}/settings/members` : "#", Icon: UserIcon },
     { label: "Groups", href: organizationId ? `/${organizationId}/settings/groups` : "#", Icon: Users },
@@ -179,7 +173,7 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
                     key={link.label}
                     type="button"
                     onClick={link.onClick}
-                    className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-blue-100 hover:text-gray-800"
+                    className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
                   >
                     <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
                     <span>{link.label}</span>

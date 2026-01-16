@@ -55,7 +55,7 @@ export function Groups({ organizationId }: GroupsProps) {
 
   const handleDeleteGroup = async (groupName: string) => {
     const confirmed = window.confirm(
-      `Are you sure you want to delete the group "${groupName}"? This action cannot be undone.`,
+      `Are you sure you want to delete the group "${groupName}"? This cannot be undone.`,
     );
 
     if (!confirmed) return;

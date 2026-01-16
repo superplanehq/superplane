@@ -96,7 +96,7 @@ export const filterMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: "filter",
-      headerColor: "bg-white",
+      headerColor: "",
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: node.name!,

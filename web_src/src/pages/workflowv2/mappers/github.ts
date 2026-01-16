@@ -106,7 +106,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
       iconSrc: githubIcon,
       iconBackground: "bg-white",
       iconColor: getColorClass("black"),
-      headerColor: "bg-white",
+      headerColor: "",
       collapsedBackground: "bg-white",
       metadata: metadataItems,
     };
