@@ -998,13 +998,29 @@ export function WorkflowPageV2() {
           if (latestEvent?.data && Object.keys(latestEvent.data).length > 0) {
             exampleObj[chainNodeId] = latestEvent.data as Record<string, unknown>;
           }
+          if (exampleObj[chainNodeId]) {
+            return;
+          }
+
+          const triggerMetadata = allTriggers.find((trigger) => trigger.name === chainNode.trigger?.name);
+          const exampleData = triggerMetadata?.exampleData;
+          if (exampleData && typeof exampleData === "object" && Object.keys(exampleData).length > 0) {
+            exampleObj[chainNodeId] = exampleData as Record<string, unknown>;
+          }
           return;
         }
 
         const latestExecution = nodeExecutionsMap[chainNodeId]?.find(
           (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
         );
-        if (!latestExecution?.outputs) return;
+        if (!latestExecution?.outputs) {
+          const componentMetadata = allComponents.find((component) => component.name === chainNode.component?.name);
+          const exampleOutput = componentMetadata?.exampleOutput;
+          if (exampleOutput && typeof exampleOutput === "object" && Object.keys(exampleOutput).length > 0) {
+            exampleObj[chainNodeId] = exampleOutput as Record<string, unknown>;
+          }
+          return;
+        }
 
         const outputData: unknown[] = Object.values(latestExecution.outputs)?.find((output) => {
           return Array.isArray(output) && output.length > 0;
@@ -1012,6 +1028,13 @@ export function WorkflowPageV2() {
 
         if (outputData?.length > 0) {
           exampleObj[chainNodeId] = outputData[0] as Record<string, unknown>;
+          return;
+        }
+
+        const componentMetadata = allComponents.find((component) => component.name === chainNode.component?.name);
+        const exampleOutput = componentMetadata?.exampleOutput;
+        if (exampleOutput && typeof exampleOutput === "object" && Object.keys(exampleOutput).length > 0) {
+          exampleObj[chainNodeId] = exampleOutput as Record<string, unknown>;
         }
       });
 
@@ -1031,7 +1054,7 @@ export function WorkflowPageV2() {
 
       return exampleObj;
     },
-    [workflow, nodeExecutionsMap, nodeEventsMap],
+    [workflow, nodeExecutionsMap, nodeEventsMap, allComponents, allTriggers],
   );
 
   const handleSaveWorkflow = useCallback(
