@@ -90,7 +90,6 @@ func connect() *gorm.DB {
 func TruncateTables() error {
 	return Conn().Exec(`
 		truncate table
-			integrations,
 			secrets,
 			account_password_auth,
 			accounts,
