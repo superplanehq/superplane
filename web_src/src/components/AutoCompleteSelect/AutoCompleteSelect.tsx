@@ -148,23 +148,33 @@ export function AutoCompleteSelect({
           disabled && "opacity-50 cursor-not-allowed",
           className,
         )}
-        onClick={() => inputRef.current?.focus()}
+        onClick={() => {
+          if (!isOpen) {
+            setIsOpen(true);
+            setQuery("");
+          }
+          inputRef.current?.focus();
+        }}
       >
-        <input
-          ref={inputRef}
-          type="text"
-          role="combobox"
-          aria-expanded={isOpen}
-          aria-haspopup="listbox"
-          className="flex-1 bg-transparent border-none outline-none placeholder:text-gray-500"
-          placeholder={selectedOption ? selectedOption.label : placeholder}
-          value={query}
-          onChange={handleInputChange}
-          onFocus={handleInputFocus}
-          onBlur={handleInputBlur}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-        />
+        {!isOpen && selectedOption && query === "" ? (
+          <span className="flex-1 text-gray-800 dark:text-gray-100 truncate">{selectedOption.label}</span>
+        ) : (
+          <input
+            ref={inputRef}
+            type="text"
+            role="combobox"
+            aria-expanded={isOpen}
+            aria-haspopup="listbox"
+            className="flex-1 bg-transparent border-none outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400"
+            placeholder={placeholder}
+            value={query}
+            onChange={handleInputChange}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            onKeyDown={handleKeyDown}
+            disabled={disabled}
+          />
+        )}
         <div
           className="ml-2"
           onClick={(e) => {
