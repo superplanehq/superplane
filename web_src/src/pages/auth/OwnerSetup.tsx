@@ -193,9 +193,9 @@ const OwnerSetup: React.FC = () => {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-              <Label className="block text-left mb-2">
-                First Name <span className="text-gray-800">*</span>
-              </Label>
+                <Label className="block text-left mb-2">
+                  First Name <span className="text-gray-800">*</span>
+                </Label>
                 <InputGroup>
                   <Input
                     type="text"
@@ -211,9 +211,9 @@ const OwnerSetup: React.FC = () => {
               </div>
 
               <div>
-              <Label className="block text-left mb-2">
-                Last Name <span className="text-gray-800">*</span>
-              </Label>
+                <Label className="block text-left mb-2">
+                  Last Name <span className="text-gray-800">*</span>
+                </Label>
                 <InputGroup>
                   <Input
                     type="text"
@@ -367,9 +367,7 @@ const OwnerSetup: React.FC = () => {
             </div>
 
             <div>
-              <Label className="block text-left mb-2">
-                SMTP Username
-              </Label>
+              <Label className="block text-left mb-2">SMTP Username</Label>
               <InputGroup>
                 <Input
                   type="text"
@@ -381,9 +379,7 @@ const OwnerSetup: React.FC = () => {
             </div>
 
             <div>
-              <Label className="block text-left mb-2">
-                SMTP Password
-              </Label>
+              <Label className="block text-left mb-2">SMTP Password</Label>
               <InputGroup>
                 <Input
                   type="password"
@@ -399,9 +395,7 @@ const OwnerSetup: React.FC = () => {
             </div>
 
             <div>
-              <Label className="block text-left mb-2">
-                From Name
-              </Label>
+              <Label className="block text-left mb-2">From Name</Label>
               <InputGroup>
                 <Input
                   type="text"

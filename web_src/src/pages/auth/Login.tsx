@@ -304,9 +304,7 @@ export const Login: React.FC = () => {
           <h1 className="mt-4 !text-lg font-medium text-gray-900">
             {isSignupMode ? "Create your account" : "Welcome to SuperPlane"}
           </h1>
-          <p className="mt-1 text-sm text-gray-800">
-            {isSignupMode ? "Set up your account." : "Log in to continue."}
-          </p>
+          <p className="mt-1 text-sm text-gray-800">{isSignupMode ? "Set up your account." : "Log in to continue."}</p>
         </div>
 
         <div className="pt-8">
@@ -322,9 +320,11 @@ export const Login: React.FC = () => {
             <p className="text-sm text-gray-500">Signups are currently disabled.</p>
           )}
 
-          {!configLoading && !isSignupMode && !showProviderButtons && !canLoginWithPassword && !canSignupWithPassword && (
-            <p className="text-sm text-gray-500">No login methods are configured.</p>
-          )}
+          {!configLoading &&
+            !isSignupMode &&
+            !showProviderButtons &&
+            !canLoginWithPassword &&
+            !canSignupWithPassword && <p className="text-sm text-gray-500">No login methods are configured.</p>}
 
           {!configLoading && formError && (
             <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500">
