@@ -2,9 +2,11 @@ package cursor
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -18,6 +20,11 @@ const AgentStatusPayloadType = "cursor.agent.status_change"
 const webhookEventStatusChange = "statusChange"
 const agentStatusFinished = "FINISHED"
 const agentStatusError = "ERROR"
+const waitForWebhookAction = "waitForWebhook"
+
+var errWebhookNotReady = errors.New("cursor webhook is not ready yet")
+
+const webhookRetryInterval = 5 * time.Second
 
 type LaunchAgent struct{}
 
@@ -153,6 +160,9 @@ func (l *LaunchAgent) Execute(ctx core.ExecutionContext) error {
 
 	webhook, err := l.lookupWebhook(ctx)
 	if err != nil {
+		if errors.Is(err, errWebhookNotReady) {
+			return ctx.Requests.ScheduleActionCall(waitForWebhookAction, map[string]any{}, webhookRetryInterval)
+		}
 		return err
 	}
 
@@ -187,11 +197,21 @@ func (l *LaunchAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 }
 
 func (l *LaunchAgent) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:           waitForWebhookAction,
+			UserAccessible: false,
+		},
+	}
 }
 
 func (l *LaunchAgent) HandleAction(ctx core.ActionContext) error {
-	return nil
+	switch ctx.Name {
+	case waitForWebhookAction:
+		return l.retryLaunch(ctx)
+	default:
+		return fmt.Errorf("unknown action: %s", ctx.Name)
+	}
 }
 
 func (l *LaunchAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
@@ -297,11 +317,71 @@ func (l *LaunchAgent) lookupWebhook(ctx core.ExecutionContext) (*LaunchAgentWebh
 	}
 
 	if metadata.Webhook == nil || metadata.Webhook.URL == "" || metadata.Webhook.Secret == "" {
-		return nil, fmt.Errorf("cursor webhook is not ready yet")
+		return nil, errWebhookNotReady
 	}
 
 	return &LaunchAgentWebhook{
 		URL:    metadata.Webhook.URL,
 		Secret: metadata.Webhook.Secret,
 	}, nil
+}
+
+func (l *LaunchAgent) retryLaunch(ctx core.ActionContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	spec := LaunchAgentSpec{}
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return fmt.Errorf("failed to decode configuration: %v", err)
+	}
+
+	if err := l.validateSpec(spec); err != nil {
+		return err
+	}
+
+	metadata := LaunchAgentExecutionMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %v", err)
+	}
+
+	if metadata.Agent != nil {
+		return nil
+	}
+
+	webhook, err := l.lookupWebhook(core.ExecutionContext{
+		AppInstallation: ctx.AppInstallation,
+	})
+	if err != nil {
+		if errors.Is(err, errWebhookNotReady) {
+			return ctx.Requests.ScheduleActionCall(waitForWebhookAction, map[string]any{}, webhookRetryInterval)
+		}
+		return err
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	if err != nil {
+		return err
+	}
+
+	request := LaunchAgentRequest{
+		Prompt: LaunchAgentPrompt{Text: spec.Prompt},
+		Source: LaunchAgentSource{
+			Repository: spec.Repository,
+			Ref:        spec.Ref,
+		},
+		Target:  buildLaunchAgentTarget(spec),
+		Webhook: webhook,
+	}
+
+	response, err := client.LaunchAgent(request)
+	if err != nil {
+		return err
+	}
+
+	if err := ctx.Metadata.Set(LaunchAgentExecutionMetadata{Agent: response}); err != nil {
+		return err
+	}
+
+	return ctx.ExecutionState.SetKV("agent", response.ID)
 }
