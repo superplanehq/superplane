@@ -265,7 +265,7 @@ export function OrganizationSettings() {
         </SidebarBody>
       </Sidebar>
 
-      <div className="flex-1 overflow-auto bg-slate-50 dark:bg-gray-900">
+      <div className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-900">
         <div className="px-8 pb-8 w-full max-w-3xl mx-auto">
           <div className="pt-10 pb-8">
             <h1 className="!text-2xl font-medium text-gray-900 dark:text-white">{activeMeta.title}</h1>
