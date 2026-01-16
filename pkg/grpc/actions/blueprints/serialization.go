@@ -251,10 +251,6 @@ func ProtoToConfiguration(config []*configpb.Field) ([]configuration.Field, erro
 				if field.TypeOptions.MultiSelect == nil || len(field.TypeOptions.MultiSelect.Options) == 0 {
 					return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: options are required for multi_select type", field.Name)
 				}
-			case configuration.FieldTypeIntegration:
-				if field.TypeOptions.Integration == nil || field.TypeOptions.Integration.Type == "" {
-					return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: integration type is required for integration type", field.Name)
-				}
 			}
 		}
 
