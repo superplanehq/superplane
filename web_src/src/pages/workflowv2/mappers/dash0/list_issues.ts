@@ -70,6 +70,14 @@ function metadataList(node: ComponentsNode): MetadataItem[] {
     metadata.push({ icon: "database", label: `Dataset: ${configuration.dataset}` });
   }
 
+  if (configuration?.checkRules && configuration.checkRules.length > 0) {
+    const checkRulesLabel =
+      configuration.checkRules.length === 1
+        ? `Check Rule: ${configuration.checkRules[0]}`
+        : `Check Rules: ${configuration.checkRules.length} selected`;
+    metadata.push({ icon: "check-circle", label: checkRulesLabel });
+  }
+
   metadata.push({ icon: "alert-triangle", label: "Query: {otel_metric_name=\"dash0.issue.status\"} >= 1" });
 
   return metadata;

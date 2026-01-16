@@ -142,4 +142,183 @@ func Test__ListIssues__Execute(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to execute Prometheus query")
 	})
+
+	t.Run("filters issues by check rules when specified", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// First response: Prometheus query
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"status": "success",
+							"data": {
+								"resultType": "vector",
+								"result": [
+									{
+										"metric": {
+											"otel_metric_name": "dash0.issue.status",
+											"check_rule": "rule-1",
+											"issue_id": "issue-1"
+										},
+										"value": [1234567890, "1"]
+									},
+									{
+										"metric": {
+											"otel_metric_name": "dash0.issue.status",
+											"check_rule": "rule-2",
+											"issue_id": "issue-2"
+										},
+										"value": [1234567890, "1"]
+									},
+									{
+										"metric": {
+											"otel_metric_name": "dash0.issue.status",
+											"check_rule": "rule-1",
+											"issue_id": "issue-3"
+										},
+										"value": [1234567890, "1"]
+									}
+								]
+							}
+						}
+					`)),
+				},
+				// Second response: List check rules
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						[
+							{"id": "rule-1-id", "name": "rule-1"},
+							{"id": "rule-2-id", "name": "rule-2"}
+						]
+					`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.AppInstallationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://api.us-west-2.aws.dash0.com",
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"dataset":    "default",
+				"checkRules": []string{"rule-1"},
+			},
+			HTTP:            httpContext,
+			AppInstallation: appCtx,
+			ExecutionState:  execCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		require.Len(t, execCtx.Payloads, 1)
+
+		// Extract the filtered results
+		// Payload structure: {type, timestamp, data: {status, data: {resultType, result: [...]}}}
+		payload := execCtx.Payloads[0].(map[string]any)
+		responseData := payload["data"].(map[string]any)
+		
+		// The data field can be either a struct or map, handle both
+		var results []any
+		if dataSection, ok := responseData["data"].(map[string]any); ok {
+			results = dataSection["result"].([]any)
+		} else if dataSection, ok := responseData["data"].(PrometheusResponseData); ok {
+			results = make([]any, len(dataSection.Result))
+			for i, r := range dataSection.Result {
+				results[i] = r
+			}
+		} else {
+			t.Fatal("unable to extract results from payload")
+		}
+		
+		// Should only have 2 results (issue-1 and issue-3, both with rule-1)
+		assert.Len(t, results, 2)
+	})
+
+	t.Run("returns all issues when check rules are empty", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"status": "success",
+							"data": {
+								"resultType": "vector",
+								"result": [
+									{
+										"metric": {
+											"otel_metric_name": "dash0.issue.status",
+											"check_rule": "rule-1",
+											"issue_id": "issue-1"
+										},
+										"value": [1234567890, "1"]
+									},
+									{
+										"metric": {
+											"otel_metric_name": "dash0.issue.status",
+											"check_rule": "rule-2",
+											"issue_id": "issue-2"
+										},
+										"value": [1234567890, "1"]
+									}
+								]
+							}
+						}
+					`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.AppInstallationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://api.us-west-2.aws.dash0.com",
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"dataset":    "default",
+				"checkRules": []string{},
+			},
+			HTTP:            httpContext,
+			AppInstallation: appCtx,
+			ExecutionState:  execCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		require.Len(t, execCtx.Payloads, 1)
+
+		// Extract the results
+		// Payload structure: {type, timestamp, data: {status, data: {resultType, result: [...]}}}
+		payload := execCtx.Payloads[0].(map[string]any)
+		responseData := payload["data"].(map[string]any)
+		
+		// The data field can be either a struct or map, handle both
+		var results []any
+		if dataSection, ok := responseData["data"].(map[string]any); ok {
+			results = dataSection["result"].([]any)
+		} else if dataSection, ok := responseData["data"].(PrometheusResponseData); ok {
+			results = make([]any, len(dataSection.Result))
+			for i, r := range dataSection.Result {
+				results[i] = r
+			}
+		} else {
+			t.Fatal("unable to extract results from payload")
+		}
+		
+		// Should have all 2 results when check rules are empty
+		assert.Len(t, results, 2)
+	})
 }
