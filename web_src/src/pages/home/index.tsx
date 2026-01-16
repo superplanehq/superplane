@@ -7,12 +7,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { CreateCanvasModal } from "../../components/CreateCanvasModal";
 import { CreateCustomComponentModal } from "../../components/CreateCustomComponentModal";
 import { Dialog, DialogActions, DialogDescription, DialogTitle } from "../../components/Dialog/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../../ui/dropdownMenu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../ui/dropdownMenu";
 import { Heading } from "../../components/Heading/heading";
 import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
@@ -377,9 +372,7 @@ function CanvasesEmptyState({ searchQuery, onNewClick }: { searchQuery: string; 
         <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
           No canvases found
         </Heading>
-        <Text className="text-gray-500 dark:text-gray-400 mb-6">
-          Try adjusting your search criteria.
-        </Text>
+        <Text className="text-gray-500 dark:text-gray-400 mb-6">Try adjusting your search criteria.</Text>
       </div>
     );
   }
@@ -388,9 +381,7 @@ function CanvasesEmptyState({ searchQuery, onNewClick }: { searchQuery: string; 
   return (
     <div className="text-center py-12">
       <Palette className="mx-auto text-gray-800 dark:text-gray-300 mb-4" size={24} />
-      <p className="text-sm text-gray-800 dark:text-gray-300 mb-6">
-        Create your first Canvas
-      </p>
+      <p className="text-sm text-gray-800 dark:text-gray-300 mb-6">Create your first Canvas</p>
       <Button onClick={onNewClick} size="sm">
         <Plus size={16} />
         New Canvas
@@ -611,7 +602,7 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
     const currentPath = location.pathname;
     const workflowPath = `/${organizationId}/workflows/${workflow.id}`;
     const isViewingWorkflow = currentPath === workflowPath || currentPath.startsWith(`${workflowPath}/`);
-    
+
     if (isViewingWorkflow) {
       // Remove from cache FIRST to prevent any queries from running
       queryClient.removeQueries({ queryKey: workflowKeys.detail(organizationId, workflow.id) });
@@ -630,7 +621,7 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
       });
       return;
     }
-    
+
     try {
       await deleteWorkflowMutation.mutateAsync(workflow.id);
       showSuccessToast("Canvas deleted successfully");
@@ -645,10 +636,7 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
     <>
       <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
         <DropdownMenu>
-          <DropdownMenuTrigger
-            asChild
-            onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}
-          >
+          <DropdownMenuTrigger asChild onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}>
             <button
               className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Canvas actions"
@@ -736,10 +724,7 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
     <>
       <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
         <DropdownMenu>
-          <DropdownMenuTrigger
-            asChild
-            onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}
-          >
+          <DropdownMenuTrigger asChild onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}>
             <button
               className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Component actions"

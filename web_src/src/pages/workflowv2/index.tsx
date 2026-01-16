@@ -106,7 +106,11 @@ export function WorkflowPageV2() {
   const { data: widgets = [], isLoading: widgetsLoading } = useWidgets();
   const { data: availableApplications = [], isLoading: applicationsLoading } = useAvailableApplications();
   const { data: installedApplications = [] } = useInstalledApplications(organizationId!);
-  const { data: workflow, isLoading: workflowLoading, error: workflowError } = useWorkflow(organizationId!, workflowId!);
+  const {
+    data: workflow,
+    isLoading: workflowLoading,
+    error: workflowError,
+  } = useWorkflow(organizationId!, workflowId!);
   const { data: workflowEventsResponse } = useWorkflowEvents(workflowId!);
 
   usePageTitle([workflow?.metadata?.name || "Canvas"]);
@@ -196,13 +200,13 @@ export function WorkflowPageV2() {
   useEffect(() => {
     if (workflowError && !workflowLoading) {
       // Check if it's a 404 error
-      const is404 = 
+      const is404 =
         (workflowError as any)?.status === 404 ||
         (workflowError as any)?.response?.status === 404 ||
         (workflowError as any)?.code === "NOT_FOUND" ||
         (workflowError as any)?.message?.includes("not found") ||
         (workflowError as any)?.message?.includes("404");
-      
+
       if (is404 && organizationId) {
         navigate(`/${organizationId}`, { replace: true });
       }

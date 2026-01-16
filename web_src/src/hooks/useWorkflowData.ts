@@ -120,7 +120,7 @@ export const useCreateWorkflow = (organizationId: string) => {
     onSuccess: (response) => {
       // Invalidate the list to refresh the canvas list
       queryClient.invalidateQueries({ queryKey: workflowKeys.list(organizationId) });
-      
+
       // Set the workflow detail in cache immediately so it's available when navigating
       if (response?.data?.workflow?.metadata?.id) {
         queryClient.setQueryData(
@@ -169,7 +169,7 @@ export const useDeleteWorkflow = (organizationId: string) => {
     mutationFn: async (workflowId: string) => {
       // Remove from cache immediately before deletion to prevent 404 flash
       queryClient.removeQueries({ queryKey: workflowKeys.detail(organizationId, workflowId) });
-      
+
       return await workflowsDeleteWorkflow(
         withOrganizationHeader({
           path: { id: workflowId },
