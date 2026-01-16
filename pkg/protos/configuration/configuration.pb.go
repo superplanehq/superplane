@@ -174,16 +174,16 @@ type TypeOptions struct {
 	Number           *NumberTypeOptions           `protobuf:"bytes,1,opt,name=number,proto3,oneof" json:"number,omitempty"`
 	Select           *SelectTypeOptions           `protobuf:"bytes,2,opt,name=select,proto3,oneof" json:"select,omitempty"`
 	MultiSelect      *MultiSelectTypeOptions      `protobuf:"bytes,3,opt,name=multi_select,json=multiSelect,proto3,oneof" json:"multi_select,omitempty"`
-	List             *ListTypeOptions             `protobuf:"bytes,5,opt,name=list,proto3,oneof" json:"list,omitempty"`
-	Object           *ObjectTypeOptions           `protobuf:"bytes,6,opt,name=object,proto3,oneof" json:"object,omitempty"`
-	Resource         *ResourceTypeOptions         `protobuf:"bytes,7,opt,name=resource,proto3,oneof" json:"resource,omitempty"`
-	Time             *TimeTypeOptions             `protobuf:"bytes,8,opt,name=time,proto3,oneof" json:"time,omitempty"`
-	Date             *DateTypeOptions             `protobuf:"bytes,9,opt,name=date,proto3,oneof" json:"date,omitempty"`
-	Datetime         *DateTimeTypeOptions         `protobuf:"bytes,10,opt,name=datetime,proto3,oneof" json:"datetime,omitempty"`
-	AnyPredicateList *AnyPredicateListTypeOptions `protobuf:"bytes,11,opt,name=any_predicate_list,json=anyPredicateList,proto3,oneof" json:"any_predicate_list,omitempty"`
-	String_          *StringTypeOptions           `protobuf:"bytes,12,opt,name=string,proto3,oneof" json:"string,omitempty"`
-	Expression       *ExpressionTypeOptions       `protobuf:"bytes,13,opt,name=expression,proto3,oneof" json:"expression,omitempty"`
-	Text             *TextTypeOptions             `protobuf:"bytes,14,opt,name=text,proto3,oneof" json:"text,omitempty"`
+	List             *ListTypeOptions             `protobuf:"bytes,4,opt,name=list,proto3,oneof" json:"list,omitempty"`
+	Object           *ObjectTypeOptions           `protobuf:"bytes,5,opt,name=object,proto3,oneof" json:"object,omitempty"`
+	Resource         *ResourceTypeOptions         `protobuf:"bytes,6,opt,name=resource,proto3,oneof" json:"resource,omitempty"`
+	Time             *TimeTypeOptions             `protobuf:"bytes,7,opt,name=time,proto3,oneof" json:"time,omitempty"`
+	Date             *DateTypeOptions             `protobuf:"bytes,8,opt,name=date,proto3,oneof" json:"date,omitempty"`
+	Datetime         *DateTimeTypeOptions         `protobuf:"bytes,9,opt,name=datetime,proto3,oneof" json:"datetime,omitempty"`
+	AnyPredicateList *AnyPredicateListTypeOptions `protobuf:"bytes,10,opt,name=any_predicate_list,json=anyPredicateList,proto3,oneof" json:"any_predicate_list,omitempty"`
+	String_          *StringTypeOptions           `protobuf:"bytes,11,opt,name=string,proto3,oneof" json:"string,omitempty"`
+	Expression       *ExpressionTypeOptions       `protobuf:"bytes,12,opt,name=expression,proto3,oneof" json:"expression,omitempty"`
+	Text             *TextTypeOptions             `protobuf:"bytes,13,opt,name=text,proto3,oneof" json:"text,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -1238,20 +1238,20 @@ const file_configuration_proto_rawDesc = "" +
 	"\x06number\x18\x01 \x01(\v2+.Superplane.Configuration.NumberTypeOptionsH\x00R\x06number\x88\x01\x01\x12H\n" +
 	"\x06select\x18\x02 \x01(\v2+.Superplane.Configuration.SelectTypeOptionsH\x01R\x06select\x88\x01\x01\x12X\n" +
 	"\fmulti_select\x18\x03 \x01(\v20.Superplane.Configuration.MultiSelectTypeOptionsH\x02R\vmultiSelect\x88\x01\x01\x12B\n" +
-	"\x04list\x18\x05 \x01(\v2).Superplane.Configuration.ListTypeOptionsH\x03R\x04list\x88\x01\x01\x12H\n" +
-	"\x06object\x18\x06 \x01(\v2+.Superplane.Configuration.ObjectTypeOptionsH\x04R\x06object\x88\x01\x01\x12N\n" +
-	"\bresource\x18\a \x01(\v2-.Superplane.Configuration.ResourceTypeOptionsH\x05R\bresource\x88\x01\x01\x12B\n" +
-	"\x04time\x18\b \x01(\v2).Superplane.Configuration.TimeTypeOptionsH\x06R\x04time\x88\x01\x01\x12B\n" +
-	"\x04date\x18\t \x01(\v2).Superplane.Configuration.DateTypeOptionsH\aR\x04date\x88\x01\x01\x12N\n" +
-	"\bdatetime\x18\n" +
-	" \x01(\v2-.Superplane.Configuration.DateTimeTypeOptionsH\bR\bdatetime\x88\x01\x01\x12h\n" +
-	"\x12any_predicate_list\x18\v \x01(\v25.Superplane.Configuration.AnyPredicateListTypeOptionsH\tR\x10anyPredicateList\x88\x01\x01\x12H\n" +
-	"\x06string\x18\f \x01(\v2+.Superplane.Configuration.StringTypeOptionsH\n" +
+	"\x04list\x18\x04 \x01(\v2).Superplane.Configuration.ListTypeOptionsH\x03R\x04list\x88\x01\x01\x12H\n" +
+	"\x06object\x18\x05 \x01(\v2+.Superplane.Configuration.ObjectTypeOptionsH\x04R\x06object\x88\x01\x01\x12N\n" +
+	"\bresource\x18\x06 \x01(\v2-.Superplane.Configuration.ResourceTypeOptionsH\x05R\bresource\x88\x01\x01\x12B\n" +
+	"\x04time\x18\a \x01(\v2).Superplane.Configuration.TimeTypeOptionsH\x06R\x04time\x88\x01\x01\x12B\n" +
+	"\x04date\x18\b \x01(\v2).Superplane.Configuration.DateTypeOptionsH\aR\x04date\x88\x01\x01\x12N\n" +
+	"\bdatetime\x18\t \x01(\v2-.Superplane.Configuration.DateTimeTypeOptionsH\bR\bdatetime\x88\x01\x01\x12h\n" +
+	"\x12any_predicate_list\x18\n" +
+	" \x01(\v25.Superplane.Configuration.AnyPredicateListTypeOptionsH\tR\x10anyPredicateList\x88\x01\x01\x12H\n" +
+	"\x06string\x18\v \x01(\v2+.Superplane.Configuration.StringTypeOptionsH\n" +
 	"R\x06string\x88\x01\x01\x12T\n" +
 	"\n" +
-	"expression\x18\r \x01(\v2/.Superplane.Configuration.ExpressionTypeOptionsH\vR\n" +
+	"expression\x18\f \x01(\v2/.Superplane.Configuration.ExpressionTypeOptionsH\vR\n" +
 	"expression\x88\x01\x01\x12B\n" +
-	"\x04text\x18\x0e \x01(\v2).Superplane.Configuration.TextTypeOptionsH\fR\x04text\x88\x01\x01B\t\n" +
+	"\x04text\x18\r \x01(\v2).Superplane.Configuration.TextTypeOptionsH\fR\x04text\x88\x01\x01B\t\n" +
 	"\a_numberB\t\n" +
 	"\a_selectB\x0f\n" +
 	"\r_multi_selectB\a\n" +
