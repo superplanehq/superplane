@@ -139,7 +139,6 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
 ): Suggestion[] {
   const { includeFunctions = true, includeGlobals = true, limit = 30, allowInStrings = false } = options;
   const left = text.slice(0, cursor);
-
   // ✅ 0) Env key trigger: after "$" or "$[" suggest keys immediately
   const envTrigger = detectEnvKeyTrigger(left);
   if (envTrigger) {
@@ -185,10 +184,11 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     const target = resolveExprToValue(resolvableBase, globals);
 
     const keys = listKeys(target);
+    
     const mp = (memberPrefix ?? "").toLowerCase();
 
     return keys
-      .filter((k) => k.toLowerCase().startsWith(mp))
+      .filter((k) => k.toLowerCase().startsWith(mp) && mp !== k.toLowerCase())
       .slice(0, limit)
       .map((k) => {
         const needsQuotes = needsQuotingAsIdentifier(k);
@@ -211,7 +211,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
         return {
           label: k,
           kind: "field" as const,
-          insertText: needsQuotes ? `["${escapeString(k)}"]${tailDot}` : `${k}${tailDot}`,
+          insertText: needsQuotes ? `[${quoteKey(k, needsQuotes ? "'" : '"')}]${tailDot}` : `${k}${tailDot}`,
           detail: "field",
         };
       });
@@ -316,7 +316,7 @@ function detectDotContext(left: string): DotContext | null {
 type BracketKeyContext = { quote: "'" | '"'; partialKey: string };
 
 function detectBracketKeyContext(left: string): BracketKeyContext | null {
-  const m = left.match(/\$\s*\[\s*(['"])([^'"]*)$/);
+  const m = left.match(/(?:\$\s*|\]\s*)\[\s*(['"])([^'"]*)$/);
   if (!m) return null;
 
   const quote = (m[1] === "'" ? "'" : '"') as "'" | '"';
@@ -389,7 +389,31 @@ function extractTailPathExpression(expr: string): string {
 type Token = { t: "dot" } | { t: "ident"; v: string } | { t: "key"; v: string };
 
 function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: string, globals: TGlobals): unknown {
-  let expr = baseExpr.trim().replace(/\s+/g, "");
+  const stripWhitespaceOutsideStrings = (input: string) => {
+    let out = "";
+    let inSingle = false;
+    let inDouble = false;
+
+    const isEscaped = (idx: number) => {
+      let backslashes = 0;
+      for (let j = idx - 1; j >= 0 && input[j] === "\\"; j--) backslashes++;
+      return backslashes % 2 === 1;
+    };
+
+    for (let i = 0; i < input.length; i++) {
+      const ch = input[i];
+      if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+      else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+      if (!inSingle && !inDouble && /\s/u.test(ch)) {
+        continue;
+      }
+      out += ch;
+    }
+    return out;
+  };
+
+  let expr = stripWhitespaceOutsideStrings(baseExpr.trim());
 
   const tokens: Token[] = [];
   let i = 0;
@@ -405,10 +429,21 @@ function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: 
     }
 
     if (rest[0] === "[") {
-      const m = rest.match(/^\[\s*(['"])(.*?)\1\s*\]/);
-      if (!m) return undefined;
-      tokens.push({ t: "key", v: unescapeString(m[2] ?? "") });
-      i += m[0].length;
+      const quotedMatch = rest.match(/^\[\s*(['"])(.*?)\1\s*\]/);
+      if (quotedMatch) {
+        tokens.push({ t: "key", v: unescapeString(quotedMatch[2] ?? "") });
+        i += quotedMatch[0].length;
+        continue;
+      }
+
+      const numberMatch = rest.match(/^\[\s*(\d+)\s*\]/);
+      if (numberMatch) {
+        tokens.push({ t: "key", v: numberMatch[1] });
+        i += numberMatch[0].length;
+        continue;
+      }
+
+      return undefined;
       continue;
     }
 
@@ -460,7 +495,7 @@ function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: 
 function listKeys(value: unknown): string[] {
   if (value == null) return [];
   if (Array.isArray(value)) {
-    const keys: string[] = ["length"];
+    const keys: string[] = [];
     for (let i = 0; i < Math.min(10, value.length); i++) keys.push(String(i));
     return keys;
   }
@@ -482,6 +517,10 @@ function needsQuotingAsIdentifier(name: string): boolean {
 }
 
 function quoteKey(key: string, quote: "'" | '"'): string {
+  const escaped = escapeString(key, quote);
+  if (!Number.isNaN(Number(escaped))) {
+    return escaped;
+  }
   const q: "'" | '"' = quote === "'" ? "'" : '"';
   return q + escapeString(key, q) + q;
 }

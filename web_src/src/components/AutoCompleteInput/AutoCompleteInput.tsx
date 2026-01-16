@@ -15,6 +15,7 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   inputSize?: "xs" | "sm" | "md" | "lg";
   noExampleObjectText?: string;
   showValuePreview?: boolean;
+  quickTip?: string;
 }
 
 export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
@@ -32,6 +33,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       inputSize = "md",
       noExampleObjectText = "No suggestions found",
       showValuePreview = false,
+      quickTip,
       ...rest
     } = props;
     const [inputValue, setInputValue] = useState(value);
@@ -40,6 +42,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     const [isFocused, setIsFocused] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const [highlightedValue, setHighlightedValue] = useState<unknown>(undefined);
+    const [cursorPosition, setCursorPosition] = useState(0);
     const previousWordLength = useRef<number>(0);
     const previousInputValue = useRef<string>(value);
 
@@ -75,7 +78,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       }
 
       const closeIndex = text.indexOf(props.suffix, openIndex + 2);
-      if (closeIndex !== -1 && position > closeIndex) {
+      if (closeIndex !== -1 && position - 1 > closeIndex) {
         return false;
       }
 
@@ -98,7 +101,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       }
 
       const closeIndex = text.indexOf(suffix, openIndex + startWord.length);
-      if (closeIndex !== -1 && cursor > closeIndex) {
+      if (closeIndex !== -1 && cursor -1 > closeIndex) {
         return null;
       }
 
@@ -182,12 +185,134 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       return { start: left.length, end: left.length };
     };
 
-    const resolveExpressionValue = (expression: string, globals: Record<string, unknown>) => {
-      let expr = expression.trim();
-      if (expr.startsWith("$[")) {
-        expr = "$env" + expr.slice(1);
+    const extractTailPathExpression = (expr: string) => {
+      const s = expr.trim();
+      let bracketDepth = 0;
+      let inSingle = false;
+      let inDouble = false;
+
+      const isEscaped = (idx: number) => {
+        let backslashes = 0;
+        for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) {
+          backslashes++;
+        }
+        return backslashes % 2 === 1;
+      };
+
+      const isStopChar = (ch: string) =>
+        ch === "(" ||
+        ch === ")" ||
+        ch === "," ||
+        ch === ";" ||
+        ch === ":" ||
+        ch === "?" ||
+        ch === "+" ||
+        ch === "-" ||
+        ch === "*" ||
+        ch === "/" ||
+        ch === "%" ||
+        ch === "|" ||
+        ch === "&" ||
+        ch === "!" ||
+        ch === "=" ||
+        ch === "<" ||
+        ch === ">" ||
+        ch === "\n" ||
+        ch === "\r" ||
+        ch === "\t" ||
+        ch === " ";
+
+      let start = -1;
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+
+        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+        if (inSingle || inDouble) continue;
+
+        if (ch === "[") {
+          bracketDepth++;
+          continue;
+        }
+        if (ch === "]") {
+          bracketDepth = Math.max(0, bracketDepth - 1);
+          continue;
+        }
+
+        if (bracketDepth === 0 && ch === "$") {
+          start = i;
+        }
       }
-      expr = expr.replace(/\s+/g, "");
+
+      if (start === -1) return "";
+
+      bracketDepth = 0;
+      inSingle = false;
+      inDouble = false;
+      let end = s.length;
+
+      for (let i = start; i < s.length; i++) {
+        const ch = s[i];
+
+        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+        if (inSingle || inDouble) continue;
+
+        if (ch === "[") {
+          bracketDepth++;
+          continue;
+        }
+        if (ch === "]") {
+          bracketDepth = Math.max(0, bracketDepth - 1);
+          continue;
+        }
+
+        if (bracketDepth === 0 && i > start && isStopChar(ch)) {
+          end = i;
+          break;
+        }
+      }
+
+      return s.slice(start, end).trim();
+    };
+
+    const resolveExpressionValue = (expression: string, globals: Record<string, unknown>) => {
+      const tailExpr = extractTailPathExpression(expression);
+      if (!tailExpr) return undefined;
+
+      const stripWhitespaceOutsideStrings = (input: string) => {
+        let out = "";
+        let inSingle = false;
+        let inDouble = false;
+
+        const isEscaped = (idx: number) => {
+          let backslashes = 0;
+          for (let j = idx - 1; j >= 0 && input[j] === "\\"; j--) {
+            backslashes++;
+          }
+          return backslashes % 2 === 1;
+        };
+
+        for (let i = 0; i < input.length; i++) {
+          const ch = input[i];
+          if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+          else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+          if (!inSingle && !inDouble && /\s/u.test(ch)) {
+            continue;
+          }
+          out += ch;
+        }
+
+        return out;
+      };
+
+      let expr = stripWhitespaceOutsideStrings(tailExpr);
+      if (expr.startsWith("$[")) {
+        expr = "$" + expr.slice(1);
+      }
 
       type Token = { t: "dot" } | { t: "ident"; v: string } | { t: "key"; v: string };
 
@@ -205,10 +330,21 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
         }
 
         if (rest[0] === "[") {
-          const m = rest.match(/^\[\s*(['"])(.*?)\1\s*\]/);
-          if (!m) return undefined;
-          tokens.push({ t: "key", v: String(m[2] ?? "").replace(/\\(["'\\])/g, "$1") });
-          i += m[0].length;
+          const quotedMatch = rest.match(/^\[\s*(['"])(.*?)\1\s*\]/);
+          if (quotedMatch) {
+            tokens.push({ t: "key", v: String(quotedMatch[2] ?? "").replace(/\\(["'\\])/g, "$1") });
+            i += quotedMatch[0].length;
+            continue;
+          }
+
+          const numberMatch = rest.match(/^\[\s*(\d+)\s*\]/);
+          if (numberMatch) {
+            tokens.push({ t: "key", v: numberMatch[1] });
+            i += numberMatch[0].length;
+            continue;
+          }
+
+          return undefined;
           continue;
         }
 
@@ -228,7 +364,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       pos += 1;
 
       let cur: unknown;
-      if (first === "$env") cur = globals;
+      if (first === "$" || first === "$env") cur = globals;
       else cur = globals ? (globals as Record<string, unknown>)[first] : undefined;
 
       while (pos < tokens.length) {
@@ -280,7 +416,6 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
         return;
       }
 
-      const cursorPosition = inputRef.current?.selectionStart || 0;
       const context = getExpressionContext(inputValue, cursorPosition);
       if (!context || !isAllowedToSuggest(inputValue, cursorPosition)) {
         setSuggestions([]);
@@ -306,7 +441,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       } else {
         setHighlightedValue(undefined);
       }
-    }, [inputValue, isFocused, startWord, suffix, onChange, showValuePreview, exampleObj]);
+    }, [inputValue, cursorPosition, isFocused, startWord, suffix, onChange, showValuePreview, exampleObj]);
 
     // Handle clicking outside to close suggestions
     useEffect(() => {
@@ -327,6 +462,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const newValue = e.target.value;
       const cursorPosition = e.target.selectionStart ?? newValue.length;
+      setCursorPosition(cursorPosition);
       const { word, start } = getWordAtCursor(newValue, cursorPosition);
       const beforeCursor = newValue.slice(0, cursorPosition);
       const afterCursor = newValue.slice(cursorPosition);
@@ -360,6 +496,13 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       setInputValue(newValue);
       onChange?.(newValue);
       previousWordLength.current = word.length;
+    };
+
+    const handleCursorChange = () => {
+      requestAnimationFrame(() => {
+        const nextCursorPosition = inputRef.current?.selectionStart ?? inputValue.length;
+        setCursorPosition(nextCursorPosition);
+      });
     };
 
     const handleSuggestionClick = (suggestionItem: ReturnType<typeof getSuggestions>[number]) => {
@@ -480,6 +623,11 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onKeyUp={handleCursorChange}
+            onKeyDownCapture={handleCursorChange}
+            onKeyUp={handleCursorChange}
+            onClick={handleCursorChange}
+            onSelect={handleCursorChange}
             onFocus={() => {
               setIsFocused(true);
               if (suggestions.length > 0) {
@@ -511,6 +659,11 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             ])}
             {...rest}
           />
+          {quickTip && (
+            <span className="pointer-events-none absolute -bottom-4 right-1 text-[10px] font-medium text-gray-400 bg-gray-100 rounded-b-md px-2">
+              {quickTip}
+            </span>
+          )}
         </span>
 
         {/* Value Preview Box */}
