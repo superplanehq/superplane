@@ -347,10 +347,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                 {entryIndex < value.length - 1 && (
                                   <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
                                 )}
-                                {entry.status === "" && entry.label.includes(" · ") ? (
+                                {entry.label.includes(" · ") ? (
                                   // Handle combined label with status (e.g., "Check Name · STATUS")
+                                  // Status is in label, so we don't show the separate status line
                                   <div className="text-[13px] text-gray-800 font-medium truncate" title={entry.label}>
-                                    {entry.label.split(" · ").map((part, idx, arr) => (
+                                    {entry.label.split(" · ").map((part, idx) => (
                                       <span key={idx}>
                                         {idx === 0 ? (
                                           <span>{part}</span>
