@@ -16,6 +16,10 @@ type ListIssuesSpec struct {
 	CheckRules []string `json:"checkRules,omitempty"`
 }
 
+type ListIssuesNodeMetadata struct {
+	CheckRules []CheckRule `json:"checkRules" mapstructure:"checkRules"`
+}
+
 func (l *ListIssues) Name() string {
 	return "dash0.listIssues"
 }
@@ -61,8 +65,41 @@ func (l *ListIssues) Configuration() []configuration.Field {
 }
 
 func (l *ListIssues) Setup(ctx core.SetupContext) error {
-	// No validation needed since dataset is hardcoded to "default"
-	return nil
+	// Fetch check rules once during setup and store them in node metadata
+	// This avoids making API calls on every Execute() invocation
+	var nodeMetadata ListIssuesNodeMetadata
+	err := mapstructure.Decode(ctx.Metadata.Get(), &nodeMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode node metadata: %w", err)
+	}
+
+	//
+	// If check rules are already set, skip setup
+	//
+	if len(nodeMetadata.CheckRules) > 0 {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	if err != nil {
+		// If we can't create a client, log a warning but don't fail setup
+		// This allows the component to still work without filtering
+		ctx.Logger.Warnf("Error creating client during setup to fetch check rules: %v", err)
+		return nil
+	}
+
+	checkRules, err := client.ListCheckRules()
+	if err != nil {
+		// If we can't fetch check rules, log a warning but don't fail setup
+		// The component can still work without filtering
+		ctx.Logger.Warnf("Error fetching check rules during setup: %v", err)
+		return nil
+	}
+
+	// Store check rules in node metadata for reuse in Execute()
+	return ctx.Metadata.Set(ListIssuesNodeMetadata{
+		CheckRules: checkRules,
+	})
 }
 
 func (l *ListIssues) Execute(ctx core.ExecutionContext) error {
@@ -84,16 +121,15 @@ func (l *ListIssues) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to execute Prometheus query: %v", err)
 	}
 
-	// Filter issues by check rules if check rules are specified
-	if len(spec.CheckRules) > 0 {
-		// Get check rules to map names to IDs
-		checkRules, err := client.ListCheckRules()
-		if err != nil {
-			ctx.Logger.Warnf("Error fetching check rules for filtering: %v", err)
-			// Continue without filtering if we can't fetch check rules
-		} else {
-			data = l.filterIssuesByCheckRules(data, spec.CheckRules, checkRules)
-		}
+	// Get check rules from node metadata (stored during Setup())
+	var nodeMetadata ListIssuesNodeMetadata
+	err = mapstructure.Decode(ctx.NodeMetadata.Get(), &nodeMetadata)
+	if err != nil {
+		ctx.Logger.Warnf("Error decoding node metadata for check rules: %v", err)
+		// Continue without filtering if metadata cannot be decoded
+	} else if len(spec.CheckRules) > 0 && len(nodeMetadata.CheckRules) > 0 {
+		// Filter issues by check rules if check rules are specified in configuration
+		data = l.filterIssuesByCheckRules(data, spec.CheckRules, nodeMetadata.CheckRules)
 	}
 
 	return ctx.ExecutionState.Emit(
