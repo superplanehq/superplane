@@ -32,20 +32,6 @@ export const AppInstallationResourceFieldRenderer = ({
   // Check for multi - be explicit about truthiness since it's a boolean field
   const isMulti = Boolean(field.typeOptions?.resource?.multi);
 
-  // Debug logging for checkRules field
-  if (field.name === "checkRules") {
-    console.log("checkRules field debug:", {
-      fieldName: field.name,
-      fieldType: field.type,
-      resourceType,
-      useNameAsValue,
-      isMulti,
-      multiValue: field.typeOptions?.resource?.multi,
-      resourceOptions: field.typeOptions?.resource,
-      fullTypeOptions: field.typeOptions,
-    });
-  }
-
   const {
     data: resources,
     isLoading: isLoadingResources,
