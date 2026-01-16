@@ -87,7 +87,12 @@ export const ConfigurationFieldRenderer = ({
                 ? selectOptions[0].value
                 : "";
           onChange(initialValue);
-        } else if (field.type === "list" || field.type === "multi-select" || field.type === "any-predicate-list") {
+        } else if (
+          field.type === "list" ||
+          field.type === "multi-select" ||
+          field.type === "any-predicate-list" ||
+          (field.type === "app-installation-resource" && field.typeOptions?.resource?.multi)
+        ) {
           onChange(Array.isArray(parsedDefaultValue) ? parsedDefaultValue : []);
         } else if (field.type === "object") {
           onChange(

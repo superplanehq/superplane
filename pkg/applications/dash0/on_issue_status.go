@@ -66,13 +66,14 @@ func (t *OnIssueStatus) Configuration() []configuration.Field {
 			Label:    "Check Rules",
 			Type:     configuration.FieldTypeAppInstallationResource,
 			Required: false,
+			Togglable: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:  "check-rule",
 					Multi: true,
 				},
 			},
-			Description: "Select check rules to monitor. If none selected, all check rules will be monitored. Check rules will be fetched from your Dash0 account.",
+			Description: "Select specific check rules to monitor. When disabled, all check rules will be monitored. Check rules will be fetched from your Dash0 account.",
 		},
 	}
 }
