@@ -181,3 +181,39 @@ func TestIf_Execute_BothTrueAndFalsePathsEmitEmpty(t *testing.T) {
 		})
 	}
 }
+
+func TestIf_Execute_NodeReferenceExpression(t *testing.T) {
+	ifComponent := &If{}
+
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+
+	ctx := core.ExecutionContext{
+		Data: map[string]any{
+			"data": map[string]any{
+				"test": "value",
+			},
+		},
+		SourceNodeID:   "upstream-node",
+		Configuration:  map[string]any{"expression": "$[\"other-node\"].data.test == 'value'"},
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		ExpressionEnv: func(expression string) (map[string]any, error) {
+			return map[string]any{
+				"$": map[string]any{
+					"other-node": map[string]any{
+						"data": map[string]any{
+							"test": "value",
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	err := ifComponent.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
+	assert.Equal(t, ChannelNameTrue, stateCtx.Channel)
+}
