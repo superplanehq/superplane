@@ -64,7 +64,8 @@ func (t *OnIncident) Configuration() []configuration.Field {
 			Label:       "Service",
 			Type:        configuration.FieldTypeAppInstallationResource,
 			Required:    true,
-			Placeholder: "e.g. PXXXXXX",
+			Description: "The PagerDuty service to monitor for incidents",
+			Placeholder: "Select a service",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "service",
