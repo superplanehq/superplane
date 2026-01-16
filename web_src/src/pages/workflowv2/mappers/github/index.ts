@@ -12,6 +12,7 @@ import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper } from "./run_workflow";
 import { publishCommitStatusMapper } from "./publish_commit_status";
 import { createReleaseMapper } from "./create_release";
 import { updateReleaseMapper } from "./update_release";
+import { deleteReleaseMapper } from "./delete_release";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   runWorkflow: RUN_WORKFLOW_STATE_REGISTRY,
@@ -25,6 +26,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   publishCommitStatus: publishCommitStatusMapper,
   createRelease: createReleaseMapper,
   updateRelease: updateReleaseMapper,
+  deleteRelease: deleteReleaseMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
