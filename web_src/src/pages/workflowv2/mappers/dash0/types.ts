@@ -11,6 +11,10 @@ export interface QueryPrometheusMetadata {
   // No metadata needed initially
 }
 
+export interface ListIssuesConfiguration {
+  dataset: string;
+}
+
 export interface PrometheusResponse {
   status: string;
   data: {
