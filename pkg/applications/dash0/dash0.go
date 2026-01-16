@@ -72,9 +72,7 @@ func (d *Dash0) Components() []core.Component {
 }
 
 func (d *Dash0) Triggers() []core.Trigger {
-	return []core.Trigger{
-		&OnIssueStatus{},
-	}
+	return []core.Trigger{}
 }
 
 func (d *Dash0) Sync(ctx core.SyncContext) error {
