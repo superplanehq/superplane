@@ -53,11 +53,12 @@ type Field struct {
 	/*
 	 * Type of the field. Supported types are defined by FieldType* constants above.
 	 */
-	Type        string `json:"type"`
-	Description string `json:"description"`
-	Required    bool   `json:"required"`
-	Default     any    `json:"default"`
-	Togglable   bool   `json:"togglable"`
+	Type               string `json:"type"`
+	Description        string `json:"description"`
+	Required           bool   `json:"required"`
+	Default            any    `json:"default"`
+	Togglable          bool   `json:"togglable"`
+	DisallowExpression bool   `json:"disallow_expression"`
 
 	/*
 	 * Whether the field is sensitive (e.g., password, API token)

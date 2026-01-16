@@ -78,7 +78,7 @@ func Test__OnPipelineDone__HandleWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, eventContext.Count())
-		assert.Equal(t, "semaphore.pipelineDone", eventContext.Payloads[0].Type)
+		assert.Equal(t, "semaphore.pipeline.done", eventContext.Payloads[0].Type)
 	})
 
 	t.Run("invalid JSON body -> 400", func(t *testing.T) {

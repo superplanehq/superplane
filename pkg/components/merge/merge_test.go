@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -42,7 +44,7 @@ func Test_Merge_StopIfExpression(t *testing.T) {
 
 	steps.CreateWorkflow()
 	steps.SetMergeConfiguration(map[string]any{
-		"stopIfExpression": "$.result == \"fail\"",
+		"stopIfExpression": "$[\"process-1\"].result == \"fail\"",
 	})
 
 	steps.CreateEventsWithData(
@@ -68,6 +70,35 @@ func Test_Merge_StopIfExpression(t *testing.T) {
 	steps.AssertQueueIsEmpty()
 }
 
+func Test_Merge_StopIfExpression_SourceNodeReference(t *testing.T) {
+	steps := NewMergeTestSteps(t)
+
+	steps.CreateWorkflow()
+	steps.SetMergeConfiguration(map[string]any{
+		"stopIfExpression": "$[\"process-1\"].result == \"fail\"",
+	})
+
+	steps.CreateEventsWithData(
+		map[string]any{"result": "fail"},
+		map[string]any{"result": "ok"},
+	)
+	steps.CreateQueueItems()
+
+	m := &Merge{}
+
+	steps.ProcessFirstEventExpectFinish(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionFailed()
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
+
+	steps.ProcessSecondEventExpectNoFinish(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionFinished()
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
+
+	steps.AssertQueueIsEmpty()
+}
+
 func Test_Merge_WaitsForDistinctSources(t *testing.T) {
 	steps := NewMergeTestSteps(t)
 
@@ -85,6 +116,32 @@ func Test_Merge_WaitsForDistinctSources(t *testing.T) {
 	steps.AssertNodeIsAllowedToProcessNextQueueItem()
 
 	steps.AssertQueueIsEmpty()
+}
+
+func TestMerge_ExpressionEnv_UsesContextEnv(t *testing.T) {
+	ctx := core.ProcessQueueContext{
+		Input:        map[string]any{"result": "ignored"},
+		SourceNodeID: "source-node",
+		ExpressionEnv: func(expression string) (map[string]any, error) {
+			return map[string]any{
+				"$": map[string]any{
+					"other-node": map[string]any{
+						"result": "ok",
+					},
+				},
+			}, nil
+		},
+	}
+
+	env, err := expressionEnv(ctx, "$[\"other-node\"].result == \"ok\"")
+	require.NoError(t, err)
+
+	vm, err := expr.Compile("$[\"other-node\"].result == \"ok\"", expr.Env(env), expr.AsBool())
+	require.NoError(t, err)
+
+	out, err := expr.Run(vm, env)
+	require.NoError(t, err)
+	assert.True(t, out.(bool))
 }
 
 type MergeTestSteps struct {
@@ -355,7 +412,7 @@ func (s *MergeTestSteps) CreateSingleQueueItemForProcess1() {
 func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 	fmt.Println("Processing first event")
 
-	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1)
+	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx1)
@@ -368,7 +425,7 @@ func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 func (s *MergeTestSteps) ProcessFirstEventExpectFinish(m *Merge) {
 	fmt.Println("Processing first event (expect finish)")
 
-	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1)
+	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx1)
@@ -379,7 +436,7 @@ func (s *MergeTestSteps) ProcessFirstEventExpectFinish(m *Merge) {
 func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 	fmt.Println("Processing second event")
 
-	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2)
+	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx2)
@@ -390,7 +447,7 @@ func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 func (s *MergeTestSteps) ProcessSecondEventExpectNoFinish(m *Merge) {
 	fmt.Println("Processing second event")
 
-	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2)
+	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx2)

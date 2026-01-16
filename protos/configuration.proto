@@ -18,6 +18,7 @@ message Field {
   optional string placeholder = 11;
   optional bool sensitive = 12;
   optional bool togglable = 13;
+  optional bool disallow_expression = 14;
 }
 
 message TypeOptions {

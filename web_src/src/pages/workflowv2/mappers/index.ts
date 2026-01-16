@@ -34,6 +34,11 @@ import {
   triggerRenderers as dash0TriggerRenderers,
   eventStateRegistry as dash0EventStateRegistry,
 } from "./dash0/index";
+import {
+  componentMappers as slackComponentMappers,
+  triggerRenderers as slackTriggerRenderers,
+  eventStateRegistry as slackEventStateRegistry,
+} from "./slack";
 import { timeGateMapper } from "./timegate";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper } from "./wait";
@@ -66,6 +71,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   github: githubComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
+  slack: slackComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -73,6 +79,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   github: githubTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
   dash0: dash0TriggerRenderers,
+  slack: slackTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -80,6 +87,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
   dash0: dash0EventStateRegistry,
+  slack: slackEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

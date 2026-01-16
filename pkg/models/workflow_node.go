@@ -114,6 +114,11 @@ func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {
 		return err
 	}
 
+	err = DeleteAppSubscriptionsForNodeInTransaction(tx, node.WorkflowID, node.NodeID)
+	if err != nil {
+		return err
+	}
+
 	if node.WebhookID == nil {
 		return nil
 	}

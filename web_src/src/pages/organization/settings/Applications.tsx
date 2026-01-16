@@ -1,6 +1,7 @@
 import { AppWindow, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
 import {
   useAvailableApplications,
   useInstalledApplications,
@@ -35,6 +36,9 @@ export function Applications({ organizationId }: ApplicationsProps) {
   const installMutation = useInstallApplication(organizationId);
 
   const isLoading = loadingAvailable || loadingInstalled;
+  const selectedInstructions = useMemo(() => {
+    return selectedApplication?.installationInstructions?.trim();
+  }, [selectedApplication?.installationInstructions]);
   const appLogoMap: Record<string, string> = {
     github: githubIcon,
     semaphore: SemaphoreLogo,
@@ -249,6 +253,11 @@ export function Applications({ organizationId }: ApplicationsProps) {
                   </div>
 
                   <div className="space-y-4">
+                    {selectedInstructions && (
+                      <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-100 [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1">
+                        <ReactMarkdown>{selectedInstructions}</ReactMarkdown>
+                      </div>
+                    )}
                     {/* Installation Name Field */}
                     <div>
                       <Label className="text-gray-800 dark:text-gray-100 mb-2">

@@ -36,6 +36,7 @@ type Field struct {
 	Placeholder          *string                `protobuf:"bytes,11,opt,name=placeholder,proto3,oneof" json:"placeholder,omitempty"`
 	Sensitive            *bool                  `protobuf:"varint,12,opt,name=sensitive,proto3,oneof" json:"sensitive,omitempty"`
 	Togglable            *bool                  `protobuf:"varint,13,opt,name=togglable,proto3,oneof" json:"togglable,omitempty"`
+	DisallowExpression   *bool                  `protobuf:"varint,14,opt,name=disallow_expression,json=disallowExpression,proto3,oneof" json:"disallow_expression,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -157,6 +158,13 @@ func (x *Field) GetSensitive() bool {
 func (x *Field) GetTogglable() bool {
 	if x != nil && x.Togglable != nil {
 		return *x.Togglable
+	}
+	return false
+}
+
+func (x *Field) GetDisallowExpression() bool {
+	if x != nil && x.DisallowExpression != nil {
+		return *x.DisallowExpression
 	}
 	return false
 }
@@ -1253,7 +1261,7 @@ var File_configuration_proto protoreflect.FileDescriptor
 
 const file_configuration_proto_rawDesc = "" +
 	"\n" +
-	"\x13configuration.proto\x12\x18Superplane.Configuration\"\xcf\x05\n" +
+	"\x13configuration.proto\x12\x18Superplane.Configuration\"\x9d\x06\n" +
 	"\x05Field\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12 \n" +
@@ -1268,14 +1276,16 @@ const file_configuration_proto_rawDesc = "" +
 	" \x03(\v2(.Superplane.Configuration.ValidationRuleR\x0fvalidationRules\x12%\n" +
 	"\vplaceholder\x18\v \x01(\tH\x02R\vplaceholder\x88\x01\x01\x12!\n" +
 	"\tsensitive\x18\f \x01(\bH\x03R\tsensitive\x88\x01\x01\x12!\n" +
-	"\ttogglable\x18\r \x01(\bH\x04R\ttogglable\x88\x01\x01B\x10\n" +
+	"\ttogglable\x18\r \x01(\bH\x04R\ttogglable\x88\x01\x01\x124\n" +
+	"\x13disallow_expression\x18\x0e \x01(\bH\x05R\x12disallowExpression\x88\x01\x01B\x10\n" +
 	"\x0e_default_valueB\x0f\n" +
 	"\r_type_optionsB\x0e\n" +
 	"\f_placeholderB\f\n" +
 	"\n" +
 	"_sensitiveB\f\n" +
 	"\n" +
-	"_togglable\"\x89\n" +
+	"_togglableB\x16\n" +
+	"\x14_disallow_expression\"\x89\n" +
 	"\n" +
 	"\vTypeOptions\x12H\n" +
 	"\x06number\x18\x01 \x01(\v2+.Superplane.Configuration.NumberTypeOptionsH\x00R\x06number\x88\x01\x01\x12H\n" +

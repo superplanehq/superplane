@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Input, InputGroup } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
 import { Button } from "../../ui/button";
+import superplaneLogo from "../../assets/superplane.svg";
 
 const OwnerSetup: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -175,6 +176,7 @@ const OwnerSetup: React.FC = () => {
       <div className="max-w-lg w-full bg-white dark:bg-zinc-900 rounded-lg shadow-xl p-8">
         {step === "owner" && (
           <div className="text-center mb-8">
+            <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8" />
             <h4 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Set up owner account</h4>
             <Text className="text-gray-500 dark:text-gray-400">Create an account for this SuperPlane instance.</Text>
           </div>
@@ -295,9 +297,9 @@ const OwnerSetup: React.FC = () => {
             )}
 
             <div className="text-left">
-              <h4 className="text-lg font-semibold text-gray-800 dark:text-white">Configure SMTP?</h4>
+              <h4 className="text-lg font-semibold text-gray-800 dark:text-white">Set up email delivery?</h4>
               <Text className="text-gray-500 dark:text-gray-400">
-                You can set up email delivery now or skip and configure it later.
+                Configure SMTP now to receive notifications. You can skip and set it up later.
               </Text>
             </div>
 
@@ -306,7 +308,7 @@ const OwnerSetup: React.FC = () => {
                 Set up SMTP
               </Button>
               <Button type="button" className="w-full" variant="secondary" disabled={loading} onClick={handleSkipSMTP}>
-                Skip for now
+                Do this later
               </Button>
             </div>
           </div>

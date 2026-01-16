@@ -20,13 +20,14 @@ var _ MappedNullable = &ApplicationsApplicationDefinition{}
 
 // ApplicationsApplicationDefinition struct for ApplicationsApplicationDefinition
 type ApplicationsApplicationDefinition struct {
-	Name          *string               `json:"name,omitempty"`
-	Label         *string               `json:"label,omitempty"`
-	Icon          *string               `json:"icon,omitempty"`
-	Description   *string               `json:"description,omitempty"`
-	Configuration []ConfigurationField  `json:"configuration,omitempty"`
-	Components    []ComponentsComponent `json:"components,omitempty"`
-	Triggers      []TriggersTrigger     `json:"triggers,omitempty"`
+	Name                     *string               `json:"name,omitempty"`
+	Label                    *string               `json:"label,omitempty"`
+	Icon                     *string               `json:"icon,omitempty"`
+	Description              *string               `json:"description,omitempty"`
+	Configuration            []ConfigurationField  `json:"configuration,omitempty"`
+	Components               []ComponentsComponent `json:"components,omitempty"`
+	Triggers                 []TriggersTrigger     `json:"triggers,omitempty"`
+	InstallationInstructions *string               `json:"installationInstructions,omitempty"`
 }
 
 // NewApplicationsApplicationDefinition instantiates a new ApplicationsApplicationDefinition object
@@ -270,6 +271,38 @@ func (o *ApplicationsApplicationDefinition) SetTriggers(v []TriggersTrigger) {
 	o.Triggers = v
 }
 
+// GetInstallationInstructions returns the InstallationInstructions field value if set, zero value otherwise.
+func (o *ApplicationsApplicationDefinition) GetInstallationInstructions() string {
+	if o == nil || IsNil(o.InstallationInstructions) {
+		var ret string
+		return ret
+	}
+	return *o.InstallationInstructions
+}
+
+// GetInstallationInstructionsOk returns a tuple with the InstallationInstructions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ApplicationsApplicationDefinition) GetInstallationInstructionsOk() (*string, bool) {
+	if o == nil || IsNil(o.InstallationInstructions) {
+		return nil, false
+	}
+	return o.InstallationInstructions, true
+}
+
+// HasInstallationInstructions returns a boolean if a field has been set.
+func (o *ApplicationsApplicationDefinition) HasInstallationInstructions() bool {
+	if o != nil && !IsNil(o.InstallationInstructions) {
+		return true
+	}
+
+	return false
+}
+
+// SetInstallationInstructions gets a reference to the given string and assigns it to the InstallationInstructions field.
+func (o *ApplicationsApplicationDefinition) SetInstallationInstructions(v string) {
+	o.InstallationInstructions = &v
+}
+
 func (o ApplicationsApplicationDefinition) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -300,6 +333,9 @@ func (o ApplicationsApplicationDefinition) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.Triggers) {
 		toSerialize["triggers"] = o.Triggers
+	}
+	if !IsNil(o.InstallationInstructions) {
+		toSerialize["installationInstructions"] = o.InstallationInstructions
 	}
 	return toSerialize, nil
 }

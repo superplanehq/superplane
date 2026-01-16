@@ -11,7 +11,6 @@ import {
   CircleUser,
   LogOut,
   Palette,
-  Plug,
   Shield,
   User as UserIcon,
   Users,
@@ -98,11 +97,6 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
     ...(isRBACEnabled()
       ? [{ label: "Roles", href: organizationId ? `/${organizationId}/settings/roles` : "#", Icon: Shield }]
       : []),
-    {
-      label: "Integrations",
-      href: organizationId ? `/${organizationId}/settings/integrations` : "#",
-      Icon: Plug,
-    },
     {
       label: "Applications",
       href: organizationId ? `/${organizationId}/settings/applications` : "#",
