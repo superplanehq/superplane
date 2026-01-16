@@ -612,7 +612,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       (highlightedValue === null || (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue)));
 
     return (
-      <div ref={containerRef} className="relative w-full">
+      <div ref={containerRef} className={"relative w-full" + (quickTip ? " mb-3" : "")}>
         {/* Input Field */}
         <span
           data-slot="control"

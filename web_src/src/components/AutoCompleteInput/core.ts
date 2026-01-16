@@ -140,7 +140,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
 ): Suggestion[] {
   const { includeFunctions = true, includeGlobals = true, limit = 30, allowInStrings = false } = options;
   const left = text.slice(0, cursor);
-  // ✅ 0) Env key trigger: after "$" or "$[" suggest keys immediately
+  // 0) Env key trigger: after "$" or "$[" suggest keys immediately
   const envTrigger = detectEnvKeyTrigger(left);
   if (envTrigger) {
     const keys = listGlobalKeys(globals);
@@ -157,7 +157,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     });
   }
 
-  // ✅ 1) Bracket key completion FIRST (because you're "inside a string" by definition)
+  // 1) Bracket key completion FIRST (because you're "inside a string" by definition)
   // NOTE: Here we are completing the KEY INSIDE $["... so we do NOT append a dot.
   const bracketCtx = detectBracketKeyContext(left);
   if (bracketCtx) {
@@ -175,7 +175,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
       }));
   }
 
-  // ✅ 2) Now it's safe to suppress suggestions inside normal strings
+  // 2) Now it's safe to suppress suggestions inside normal strings
   if (!allowInStrings && isProbablyInsideString(left)) return [];
 
   // 3) Dot completion
@@ -196,7 +196,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
       .map((k) => {
         const needsQuotes = needsQuotingAsIdentifier(k);
 
-        // ✅ NEW: determine if THIS FIELD is expandable
+        // NEW: determine if THIS FIELD is expandable
         const fieldValue =
           target && (typeof target === "object" || typeof target === "function") ? getProp(target, k) : undefined;
 
@@ -268,7 +268,8 @@ function listGlobalKeys(globals: Record<string, unknown>): string[] {
 }
 
 function isExpandableValue(v: unknown): boolean {
-  return v !== null && typeof v === "object";
+  if (v === null || typeof v !== "object") return false;
+  return Object.values(v as Record<string, unknown>).length > 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -599,17 +600,3 @@ function countUnescaped(str: string, ch: "'" | '"'): number {
   }
   return count;
 }
-
-/* ------------------------- Example usage (remove in prod) ------------------------- */
-
-// const globalsExample = {
-//   user: { profile: { age: 33, name: "Pedro" } }, // object -> inserts "user."
-//   orders: [{ total: 10 }, { total: 20 }],        // array -> inserts "orders."
-//   status: "ok",                                  // primitive -> inserts "status"
-//   test: { a: 1, b: 2, nested: { z: 9 } },         // object -> inserts $["test"]. when chosen via $
-// };
-
-// console.log(getSuggestions("us", 2, globalsExample).slice(0, 5));
-// console.log(getSuggestions("$", "$".length, globalsExample).slice(0, 5));                  // $["user"]. etc
-// console.log(getSuggestions('abs($["test"].', 'abs($["test"].'.length, globalsExample));    // a, b, nested
-// console.log(getSuggestions("sta", 3, globalsExample).slice(0, 5));                          // status (no dot)
