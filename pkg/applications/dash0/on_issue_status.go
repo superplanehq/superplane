@@ -237,10 +237,10 @@ func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, respo
 	}
 
 	// Extract check identifiers from current results
-	currentCheckIds := t.extractCheckIdentifiers(filteredResults)
+	currentCheckIDs := t.extractCheckIdentifiers(filteredResults)
 
 	// Check if the set of checks has changed
-	if t.hasChecksChanged(currentCheckIds, existingMetadata.LastDetectedChecks) {
+	if t.hasChecksChanged(currentCheckIDs, existingMetadata.LastDetectedChecks) {
 		// Issues detected or changed - emit event
 		payload := map[string]any{
 			"query":   query,
@@ -256,7 +256,7 @@ func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, respo
 		}
 
 		// Update metadata with current checks
-		existingMetadata.LastDetectedChecks = currentCheckIds
+		existingMetadata.LastDetectedChecks = currentCheckIDs
 		err = ctx.Metadata.Set(existingMetadata)
 		if err != nil {
 			ctx.Logger.Warnf("Failed to update last detected checks: %v", err)
@@ -265,14 +265,14 @@ func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, respo
 		ctx.Logger.Infof("Issues detected: %d issue(s) found", len(filteredResults))
 	} else {
 		// Same checks detected, skip event emission to avoid spam
-		ctx.Logger.Infof("Same checks detected as last time, skipping event emission (checks: %v)", currentCheckIds)
+		ctx.Logger.Infof("Same checks detected as last time, skipping event emission (checks: %v)", currentCheckIDs)
 	}
 }
 
 // extractCheckIdentifiers extracts unique check identifiers from Prometheus query results
 // Uses check name from metric labels (dash0_check_name, check_rule_name, etc.)
 func (t *OnIssueStatus) extractCheckIdentifiers(results []interface{}) []string {
-	checkIds := make(map[string]bool)
+	checkIDs := make(map[string]bool)
 	labelNames := []string{"dash0_check_name", "check_rule_name", "check_rule_id", "rule_name", "rule_id", "alertname", "alert_name"}
 
 	for _, resultItem := range results {
@@ -290,7 +290,7 @@ func (t *OnIssueStatus) extractCheckIdentifiers(results []interface{}) []string 
 		for _, labelName := range labelNames {
 			if labelValue, exists := metric[labelName]; exists {
 				if labelStr, ok := labelValue.(string); ok && labelStr != "" {
-					checkIds[labelStr] = true
+					checkIDs[labelStr] = true
 					break // Use first found identifier
 				}
 			}
@@ -298,8 +298,8 @@ func (t *OnIssueStatus) extractCheckIdentifiers(results []interface{}) []string 
 	}
 
 	// Convert map keys to slice
-	ids := make([]string, 0, len(checkIds))
-	for id := range checkIds {
+	ids := make([]string, 0, len(checkIDs))
+	for id := range checkIDs {
 		ids = append(ids, id)
 	}
 
