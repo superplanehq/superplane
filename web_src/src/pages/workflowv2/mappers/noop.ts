@@ -20,7 +20,7 @@ export const noopMapper: ComponentBaseMapper = {
     const componentName = componentDefinition?.name || node.component?.name || "noop";
 
     return {
-      iconSlug: componentDefinition.icon || "circle-off",
+      iconSlug: componentDefinition?.icon || "circle-off",
       headerColor: "",
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
