@@ -21,8 +21,8 @@ var _ MappedNullable = &SuperplaneUsersUser{}
 // SuperplaneUsersUser struct for SuperplaneUsersUser
 type SuperplaneUsersUser struct {
 	Metadata *UsersUserMetadata `json:"metadata,omitempty"`
-	Spec     *UsersUserSpec     `json:"spec,omitempty"`
-	Status   *UsersUserStatus   `json:"status,omitempty"`
+	Spec *UsersUserSpec `json:"spec,omitempty"`
+	Status *UsersUserStatus `json:"status,omitempty"`
 }
 
 // NewSuperplaneUsersUser instantiates a new SuperplaneUsersUser object
@@ -139,7 +139,7 @@ func (o *SuperplaneUsersUser) SetStatus(v UsersUserStatus) {
 }
 
 func (o SuperplaneUsersUser) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,3 +195,5 @@ func (v *NullableSuperplaneUsersUser) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

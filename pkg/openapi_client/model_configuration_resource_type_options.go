@@ -20,9 +20,14 @@ var _ MappedNullable = &ConfigurationResourceTypeOptions{}
 
 // ConfigurationResourceTypeOptions struct for ConfigurationResourceTypeOptions
 type ConfigurationResourceTypeOptions struct {
+<<<<<<< HEAD
 	Type           *string `json:"type,omitempty"`
 	UseNameAsValue *bool   `json:"useNameAsValue,omitempty"`
 	Multi          *bool   `json:"multi,omitempty"`
+=======
+	Type *string `json:"type,omitempty"`
+	UseNameAsValue *bool `json:"useNameAsValue,omitempty"`
+>>>>>>> 3ac711ce9 (Bootstrap template support)
 }
 
 // NewConfigurationResourceTypeOptions instantiates a new ConfigurationResourceTypeOptions object
@@ -139,7 +144,7 @@ func (o *ConfigurationResourceTypeOptions) SetMulti(v bool) {
 }
 
 func (o ConfigurationResourceTypeOptions) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,3 +200,5 @@ func (v *NullableConfigurationResourceTypeOptions) UnmarshalJSON(src []byte) err
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

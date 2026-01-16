@@ -21,8 +21,8 @@ var _ MappedNullable = &OrganizationsAppInstallationMetadata{}
 
 // OrganizationsAppInstallationMetadata struct for OrganizationsAppInstallationMetadata
 type OrganizationsAppInstallationMetadata struct {
-	Id        *string    `json:"id,omitempty"`
-	Name      *string    `json:"name,omitempty"`
+	Id *string `json:"id,omitempty"`
+	Name *string `json:"name,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 }
@@ -173,7 +173,7 @@ func (o *OrganizationsAppInstallationMetadata) SetUpdatedAt(v time.Time) {
 }
 
 func (o OrganizationsAppInstallationMetadata) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -232,3 +232,5 @@ func (v *NullableOrganizationsAppInstallationMetadata) UnmarshalJSON(src []byte)
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

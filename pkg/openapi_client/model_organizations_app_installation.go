@@ -21,8 +21,8 @@ var _ MappedNullable = &OrganizationsAppInstallation{}
 // OrganizationsAppInstallation struct for OrganizationsAppInstallation
 type OrganizationsAppInstallation struct {
 	Metadata *OrganizationsAppInstallationMetadata `json:"metadata,omitempty"`
-	Spec     *OrganizationsAppInstallationSpec     `json:"spec,omitempty"`
-	Status   *OrganizationsAppInstallationStatus   `json:"status,omitempty"`
+	Spec *OrganizationsAppInstallationSpec `json:"spec,omitempty"`
+	Status *OrganizationsAppInstallationStatus `json:"status,omitempty"`
 }
 
 // NewOrganizationsAppInstallation instantiates a new OrganizationsAppInstallation object
@@ -139,7 +139,7 @@ func (o *OrganizationsAppInstallation) SetStatus(v OrganizationsAppInstallationS
 }
 
 func (o OrganizationsAppInstallation) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,3 +195,5 @@ func (v *NullableOrganizationsAppInstallation) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

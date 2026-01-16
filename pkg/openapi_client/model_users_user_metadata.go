@@ -21,8 +21,8 @@ var _ MappedNullable = &UsersUserMetadata{}
 
 // UsersUserMetadata struct for UsersUserMetadata
 type UsersUserMetadata struct {
-	Id        *string    `json:"id,omitempty"`
-	Email     *string    `json:"email,omitempty"`
+	Id *string `json:"id,omitempty"`
+	Email *string `json:"email,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 }
@@ -173,7 +173,7 @@ func (o *UsersUserMetadata) SetUpdatedAt(v time.Time) {
 }
 
 func (o UsersUserMetadata) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -232,3 +232,5 @@ func (v *NullableUsersUserMetadata) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

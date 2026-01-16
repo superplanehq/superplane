@@ -14,6 +14,7 @@ import (
 type Workflow struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
+	IsTemplate     bool
 	Name           string
 	Description    string
 	CreatedBy      *uuid.UUID
@@ -173,10 +174,16 @@ func FindUnscopedWorkflowInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, er
 	return &workflow, nil
 }
 
-func ListWorkflows(orgID string) ([]Workflow, error) {
+func ListWorkflows(orgID string, includeTemplates bool) ([]Workflow, error) {
 	var workflows []Workflow
-	err := database.Conn().
-		Where("organization_id = ?", orgID).
+	query := database.Conn().
+		Where("organization_id = ?", orgID)
+
+	if includeTemplates {
+		query = query.Or("is_template = ?", true)
+	}
+
+	err := query.
 		Order("name ASC").
 		Find(&workflows).
 		Error
@@ -186,6 +193,25 @@ func ListWorkflows(orgID string) ([]Workflow, error) {
 	}
 
 	return workflows, nil
+}
+
+func FindWorkflowTemplate(id uuid.UUID) (*Workflow, error) {
+	return FindWorkflowTemplateInTransaction(database.Conn(), id)
+}
+
+func FindWorkflowTemplateInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
+	var workflow Workflow
+	err := tx.
+		Where("id = ?", id).
+		Where("is_template = ?", true).
+		First(&workflow).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow, nil
 }
 
 func ListDeletedWorkflows() ([]Workflow, error) {

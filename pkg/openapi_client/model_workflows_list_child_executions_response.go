@@ -73,7 +73,7 @@ func (o *WorkflowsListChildExecutionsResponse) SetExecutions(v []WorkflowsWorkfl
 }
 
 func (o WorkflowsListChildExecutionsResponse) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,3 +123,5 @@ func (v *NullableWorkflowsListChildExecutionsResponse) UnmarshalJSON(src []byte)
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

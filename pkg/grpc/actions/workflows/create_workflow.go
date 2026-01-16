@@ -37,9 +37,16 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 	createdBy := uuid.MustParse(userID)
 
 	now := time.Now()
+	targetOrganizationID := uuid.MustParse(organizationID)
+	isTemplate := pbWorkflow.Metadata.GetIsTemplate()
+	if isTemplate {
+		targetOrganizationID = models.TemplateOrganizationID
+	}
+
 	workflow := models.Workflow{
 		ID:             uuid.New(),
-		OrganizationID: uuid.MustParse(organizationID),
+		OrganizationID: targetOrganizationID,
+		IsTemplate:     isTemplate,
 		Name:           pbWorkflow.Metadata.Name,
 		Description:    pbWorkflow.Metadata.Description,
 		CreatedBy:      &createdBy,

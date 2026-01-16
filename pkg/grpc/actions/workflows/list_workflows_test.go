@@ -15,7 +15,7 @@ import (
 func Test__ListWorkflows__ReturnsEmptyListWhenNoWorkflowsExist(t *testing.T) {
 	r := support.Setup(t)
 
-	response, err := ListWorkflows(context.Background(), r.Registry, r.Organization.ID.String())
+	response, err := ListWorkflows(context.Background(), r.Registry, r.Organization.ID.String(), false)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Empty(t, response.Workflows)
@@ -64,7 +64,7 @@ func Test__ListWorkflows__ReturnsAllWorkflowsForAnOrganization(t *testing.T) {
 	//
 	// List workflows
 	//
-	response, err := ListWorkflows(context.Background(), r.Registry, r.Organization.ID.String())
+	response, err := ListWorkflows(context.Background(), r.Registry, r.Organization.ID.String(), false)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Len(t, response.Workflows, 2)
@@ -134,7 +134,7 @@ func Test__ListWorkflows__DoesNotReturnWorkflowsFromOtherOrganizations(t *testin
 	//
 	// List workflows for original organization
 	//
-	response, err := ListWorkflows(context.Background(), r.Registry, r.Organization.ID.String())
+	response, err := ListWorkflows(context.Background(), r.Registry, r.Organization.ID.String(), false)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
@@ -181,7 +181,7 @@ func Test__ListWorkflows__ReturnsWorkflowsWithoutStatusInformation(t *testing.T)
 	//
 	// List workflows
 	//
-	response, err := ListWorkflows(context.Background(), r.Registry, r.Organization.ID.String())
+	response, err := ListWorkflows(context.Background(), r.Registry, r.Organization.ID.String(), false)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Workflows, 1)
@@ -232,7 +232,7 @@ func Test__ListWorkflows__ReturnsWorkflowsWithMetadataAndSpec(t *testing.T) {
 	//
 	// List workflows
 	//
-	response, err := ListWorkflows(context.Background(), r.Registry, r.Organization.ID.String())
+	response, err := ListWorkflows(context.Background(), r.Registry, r.Organization.ID.String(), false)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Workflows, 1)

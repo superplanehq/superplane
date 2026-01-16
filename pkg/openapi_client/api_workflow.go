@@ -20,13 +20,14 @@ import (
 	"strings"
 )
 
+
 // WorkflowAPIService WorkflowAPI service
 type WorkflowAPIService service
 
 type ApiWorkflowsCreateWorkflowRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *WorkflowAPIService
-	body       *WorkflowsCreateWorkflowRequest
+	body *WorkflowsCreateWorkflowRequest
 }
 
 func (r ApiWorkflowsCreateWorkflowRequest) Body(body WorkflowsCreateWorkflowRequest) ApiWorkflowsCreateWorkflowRequest {
@@ -43,25 +44,24 @@ WorkflowsCreateWorkflow Create workflow
 
 Creates a new workflow
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiWorkflowsCreateWorkflowRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiWorkflowsCreateWorkflowRequest
 */
 func (a *WorkflowAPIService) WorkflowsCreateWorkflow(ctx context.Context) ApiWorkflowsCreateWorkflowRequest {
 	return ApiWorkflowsCreateWorkflowRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return WorkflowsCreateWorkflowResponse
+//  @return WorkflowsCreateWorkflowResponse
 func (a *WorkflowAPIService) WorkflowsCreateWorkflowExecute(r ApiWorkflowsCreateWorkflowRequest) (*WorkflowsCreateWorkflowResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *WorkflowsCreateWorkflowResponse
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *WorkflowsCreateWorkflowResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowAPIService.WorkflowsCreateWorkflow")
@@ -119,14 +119,14 @@ func (a *WorkflowAPIService) WorkflowsCreateWorkflowExecute(r ApiWorkflowsCreate
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -143,9 +143,9 @@ func (a *WorkflowAPIService) WorkflowsCreateWorkflowExecute(r ApiWorkflowsCreate
 }
 
 type ApiWorkflowsDeleteWorkflowRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *WorkflowAPIService
-	id         string
+	id string
 }
 
 func (r ApiWorkflowsDeleteWorkflowRequest) Execute() (map[string]interface{}, *http.Response, error) {
@@ -157,27 +157,26 @@ WorkflowsDeleteWorkflow Delete workflow
 
 Deletes an existing workflow
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id
-	@return ApiWorkflowsDeleteWorkflowRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param id
+ @return ApiWorkflowsDeleteWorkflowRequest
 */
 func (a *WorkflowAPIService) WorkflowsDeleteWorkflow(ctx context.Context, id string) ApiWorkflowsDeleteWorkflowRequest {
 	return ApiWorkflowsDeleteWorkflowRequest{
 		ApiService: a,
-		ctx:        ctx,
-		id:         id,
+		ctx: ctx,
+		id: id,
 	}
 }
 
 // Execute executes the request
-//
-//	@return map[string]interface{}
+//  @return map[string]interface{}
 func (a *WorkflowAPIService) WorkflowsDeleteWorkflowExecute(r ApiWorkflowsDeleteWorkflowRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodDelete
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue map[string]interface{}
+		localVarHTTPMethod   = http.MethodDelete
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowAPIService.WorkflowsDeleteWorkflow")
@@ -231,14 +230,14 @@ func (a *WorkflowAPIService) WorkflowsDeleteWorkflowExecute(r ApiWorkflowsDelete
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -255,9 +254,9 @@ func (a *WorkflowAPIService) WorkflowsDeleteWorkflowExecute(r ApiWorkflowsDelete
 }
 
 type ApiWorkflowsDescribeWorkflowRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *WorkflowAPIService
-	id         string
+	id string
 }
 
 func (r ApiWorkflowsDescribeWorkflowRequest) Execute() (*WorkflowsDescribeWorkflowResponse, *http.Response, error) {
@@ -269,27 +268,26 @@ WorkflowsDescribeWorkflow Describe workflow
 
 Returns a workflow by ID
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id
-	@return ApiWorkflowsDescribeWorkflowRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param id
+ @return ApiWorkflowsDescribeWorkflowRequest
 */
 func (a *WorkflowAPIService) WorkflowsDescribeWorkflow(ctx context.Context, id string) ApiWorkflowsDescribeWorkflowRequest {
 	return ApiWorkflowsDescribeWorkflowRequest{
 		ApiService: a,
-		ctx:        ctx,
-		id:         id,
+		ctx: ctx,
+		id: id,
 	}
 }
 
 // Execute executes the request
-//
-//	@return WorkflowsDescribeWorkflowResponse
+//  @return WorkflowsDescribeWorkflowResponse
 func (a *WorkflowAPIService) WorkflowsDescribeWorkflowExecute(r ApiWorkflowsDescribeWorkflowRequest) (*WorkflowsDescribeWorkflowResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *WorkflowsDescribeWorkflowResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *WorkflowsDescribeWorkflowResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowAPIService.WorkflowsDescribeWorkflow")
@@ -343,14 +341,14 @@ func (a *WorkflowAPIService) WorkflowsDescribeWorkflowExecute(r ApiWorkflowsDesc
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -367,8 +365,14 @@ func (a *WorkflowAPIService) WorkflowsDescribeWorkflowExecute(r ApiWorkflowsDesc
 }
 
 type ApiWorkflowsListWorkflowsRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *WorkflowAPIService
+	includeTemplates *bool
+}
+
+func (r ApiWorkflowsListWorkflowsRequest) IncludeTemplates(includeTemplates bool) ApiWorkflowsListWorkflowsRequest {
+	r.includeTemplates = &includeTemplates
+	return r
 }
 
 func (r ApiWorkflowsListWorkflowsRequest) Execute() (*WorkflowsListWorkflowsResponse, *http.Response, error) {
@@ -380,25 +384,24 @@ WorkflowsListWorkflows List workflows
 
 Returns a list of all workflows
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiWorkflowsListWorkflowsRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiWorkflowsListWorkflowsRequest
 */
 func (a *WorkflowAPIService) WorkflowsListWorkflows(ctx context.Context) ApiWorkflowsListWorkflowsRequest {
 	return ApiWorkflowsListWorkflowsRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return WorkflowsListWorkflowsResponse
+//  @return WorkflowsListWorkflowsResponse
 func (a *WorkflowAPIService) WorkflowsListWorkflowsExecute(r ApiWorkflowsListWorkflowsRequest) (*WorkflowsListWorkflowsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *WorkflowsListWorkflowsResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *WorkflowsListWorkflowsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowAPIService.WorkflowsListWorkflows")
@@ -412,6 +415,9 @@ func (a *WorkflowAPIService) WorkflowsListWorkflowsExecute(r ApiWorkflowsListWor
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.includeTemplates != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includeTemplates", r.includeTemplates, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -451,14 +457,14 @@ func (a *WorkflowAPIService) WorkflowsListWorkflowsExecute(r ApiWorkflowsListWor
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -475,10 +481,10 @@ func (a *WorkflowAPIService) WorkflowsListWorkflowsExecute(r ApiWorkflowsListWor
 }
 
 type ApiWorkflowsUpdateWorkflowRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *WorkflowAPIService
-	id         string
-	body       *WorkflowsUpdateWorkflowBody
+	id string
+	body *WorkflowsUpdateWorkflowBody
 }
 
 func (r ApiWorkflowsUpdateWorkflowRequest) Body(body WorkflowsUpdateWorkflowBody) ApiWorkflowsUpdateWorkflowRequest {
@@ -495,27 +501,26 @@ WorkflowsUpdateWorkflow Update workflow
 
 Updates an existing workflow
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id
-	@return ApiWorkflowsUpdateWorkflowRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param id
+ @return ApiWorkflowsUpdateWorkflowRequest
 */
 func (a *WorkflowAPIService) WorkflowsUpdateWorkflow(ctx context.Context, id string) ApiWorkflowsUpdateWorkflowRequest {
 	return ApiWorkflowsUpdateWorkflowRequest{
 		ApiService: a,
-		ctx:        ctx,
-		id:         id,
+		ctx: ctx,
+		id: id,
 	}
 }
 
 // Execute executes the request
-//
-//	@return WorkflowsUpdateWorkflowResponse
+//  @return WorkflowsUpdateWorkflowResponse
 func (a *WorkflowAPIService) WorkflowsUpdateWorkflowExecute(r ApiWorkflowsUpdateWorkflowRequest) (*WorkflowsUpdateWorkflowResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodPut
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *WorkflowsUpdateWorkflowResponse
+		localVarHTTPMethod   = http.MethodPut
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *WorkflowsUpdateWorkflowResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowAPIService.WorkflowsUpdateWorkflow")
@@ -574,14 +579,14 @@ func (a *WorkflowAPIService) WorkflowsUpdateWorkflowExecute(r ApiWorkflowsUpdate
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

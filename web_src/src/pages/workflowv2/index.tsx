@@ -115,6 +115,8 @@ export function WorkflowPageV2() {
 
   usePageTitle([workflow?.metadata?.name || "Canvas"]);
 
+  const isTemplate = workflow?.metadata?.isTemplate ?? false;
+
   // Warm up org users and roles cache so approval specs can pretty-print
   // user IDs as emails and role names as display names.
   // We don't use the values directly here; loading them populates the
@@ -274,12 +276,18 @@ export function WorkflowPageV2() {
   );
 
   // Revert to initial state
-  const markUnsavedChange = useCallback((kind: UnsavedChangeKind) => {
-    setHasUnsavedChanges(true);
-    if (kind === "structural") {
-      setHasNonPositionalUnsavedChanges(true);
-    }
-  }, []);
+  const markUnsavedChange = useCallback(
+    (kind: UnsavedChangeKind) => {
+      if (isTemplate) {
+        return;
+      }
+      setHasUnsavedChanges(true);
+      if (kind === "structural") {
+        setHasNonPositionalUnsavedChanges(true);
+      }
+    },
+    [isTemplate],
+  );
 
   const handleRevert = useCallback(() => {
     if (initialWorkflowSnapshot && organizationId && workflowId) {
@@ -335,6 +343,10 @@ export function WorkflowPageV2() {
           // Check if there are unsaved structural changes
           // If so, skip auto-save to avoid saving those changes accidentally
           if (hasNonPositionalUnsavedChanges) {
+            return;
+          }
+
+          if (isTemplate) {
             return;
           }
 
@@ -456,6 +468,7 @@ export function WorkflowPageV2() {
       queryClient,
       hasNonPositionalUnsavedChanges,
       isAutoSaveEnabled,
+      isTemplate,
     ],
   );
 
@@ -1038,6 +1051,12 @@ export function WorkflowPageV2() {
     async (workflowToSave?: WorkflowsWorkflow, options?: { showToast?: boolean }) => {
       const targetWorkflow = workflowToSave || workflow;
       if (!targetWorkflow || !organizationId || !workflowId) return;
+      if (isTemplate) {
+        if (options?.showToast !== false) {
+          showErrorToast("Template canvases are read-only");
+        }
+        return;
+      }
       const shouldRestoreFocus = options?.showToast === false;
       const focusedNoteId = shouldRestoreFocus ? getActiveNoteId() : null;
       const changeSummary = summarizeWorkflowChanges({
@@ -1098,7 +1117,7 @@ export function WorkflowPageV2() {
         }
       }
     },
-    [workflow, organizationId, workflowId, updateWorkflowMutation],
+    [workflow, organizationId, workflowId, updateWorkflowMutation, isTemplate],
   );
 
   const getNodeEditData = useCallback(
@@ -1248,6 +1267,10 @@ export function WorkflowPageV2() {
           return;
         }
 
+        if (isTemplate) {
+          return;
+        }
+
         const latestWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
           workflowKeys.detail(organizationId, workflowId),
         );
@@ -1289,7 +1312,7 @@ export function WorkflowPageV2() {
           }
         });
       }, 600),
-    [organizationId, workflowId, queryClient, handleSaveWorkflow, isAutoSaveEnabled],
+    [organizationId, workflowId, queryClient, handleSaveWorkflow, isAutoSaveEnabled, isTemplate],
   );
 
   const handleAnnotationUpdate = useCallback(
@@ -2053,6 +2076,10 @@ export function WorkflowPageV2() {
   const handleSave = useCallback(
     async (canvasNodes: CanvasNode[]) => {
       if (!workflow || !organizationId || !workflowId) return;
+      if (isTemplate) {
+        showErrorToast("Template canvases are read-only");
+        return;
+      }
 
       // Map canvas nodes back to ComponentsNode format with updated positions
       const updatedNodes = workflow.spec?.nodes?.map((node) => {
@@ -2120,7 +2147,7 @@ export function WorkflowPageV2() {
         showErrorToast(errorMessage);
       }
     },
-    [workflow, organizationId, workflowId, updateWorkflowMutation],
+    [workflow, organizationId, workflowId, updateWorkflowMutation, isTemplate],
   );
 
   // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
