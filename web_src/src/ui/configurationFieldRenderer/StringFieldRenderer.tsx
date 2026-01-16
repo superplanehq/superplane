@@ -50,6 +50,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       suffix=" }}"
       inputSize="md"
       showValuePreview
+      quickTip="Tip: type `{{` to start an expression."
       className={hasError ? "after:ring-2 after:ring-red-500" : ""}
       data-testid={toTestId(`string-field-${field.name}`)}
     />
