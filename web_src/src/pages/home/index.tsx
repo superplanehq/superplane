@@ -55,6 +55,7 @@ const HomePage = () => {
 
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
+  const navigate = useNavigate();
 
   const blueprintsQuery = useBlueprints(organizationId || "");
   const {
@@ -137,7 +138,7 @@ const HomePage = () => {
     if (activeTab === "custom-components" && isCustomComponentsEnabled()) {
       customComponentModalState.onOpen();
     } else {
-      canvasModalState.onOpen();
+      navigate(`/${organizationId}/canvases/new`);
     }
   };
   const showTabs = false;

@@ -64,7 +64,7 @@ const OrganizationCreate: React.FC = () => {
       <div className="flex items-center justify-center p-8">
         <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-8 outline outline-slate-950/10">
           <div className="text-center mb-8">
-            <h4 className="text-xl font-semibold text-gray-800 mb-1">Create Organization</h4>
+            <h4 className="text-xl font-medium text-gray-800 mb-1">Create Organization</h4>
             <Text className="text-gray-800">Set up a new SuperPlane organization</Text>
           </div>
 
