@@ -8,11 +8,7 @@ interface SelectOption {
   value: string;
 }
 
-export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({
-  field,
-  value,
-  onChange,
-}) => {
+export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const multiSelectOptions = field.typeOptions?.multiSelect?.options ?? [];
 
   // Convert static options to SelectOption format

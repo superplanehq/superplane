@@ -945,7 +945,7 @@ export function buildTabData(
     // For dash0.onIssueStatus, don't add "Created At" since "Received at" is already in eventValues
     // Also don't add "Event ID" and "Node ID" for dash0.onIssueStatus
     const isDash0OnIssueStatus = node.trigger?.name === "dash0.onIssueStatus";
-    
+
     tabData.current = {
       ...eventValues,
       ...(isDash0OnIssueStatus

@@ -206,7 +206,7 @@ export const onIssueStatusTriggerRenderer: TriggerRenderer = {
     if (eventData?.results && Array.isArray(eventData.results)) {
       const checks: CheckTimelineEntry[] = eventData.results.map((result) => {
         const metric = result.metric || {};
-        
+
         // Extract check name from dash0_check_name label
         const checkName = metric["dash0_check_name"] || metric["check_rule_name"] || "Unknown Check";
 
