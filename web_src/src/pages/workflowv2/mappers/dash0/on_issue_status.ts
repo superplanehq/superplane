@@ -117,16 +117,66 @@ function formatNextTrigger(configuration: OnIssueStatusConfiguration, metadata?:
   }
 }
 
+function formatIssueTitle(eventData: OnIssueStatusEventData | undefined): string {
+  if (!eventData?.results || !Array.isArray(eventData.results)) {
+    const count = eventData?.count || 0;
+    return `${count} issue${count === 1 ? "" : "s"} detected`;
+  }
+
+  let criticalCount = 0;
+  let degradedCount = 0;
+
+  eventData.results.forEach((result) => {
+    let severity = "UNKNOWN";
+    if (result.value && Array.isArray(result.value) && result.value.length >= 2) {
+      const severityValue = typeof result.value[1] === "string" ? parseFloat(result.value[1]) : result.value[1];
+      if (severityValue === 2) {
+        severity = "CRITICAL";
+      } else if (severityValue === 1) {
+        severity = "DEGRADED";
+      }
+    }
+    // Also check for severity in labels
+    const metric = result.metric || {};
+    if (metric["severity"]) {
+      const severityLabel = metric["severity"].toUpperCase();
+      if (severityLabel === "CRITICAL" || severityLabel === "DEGRADED") {
+        severity = severityLabel;
+      }
+    }
+
+    if (severity === "CRITICAL") {
+      criticalCount++;
+    } else if (severity === "DEGRADED") {
+      degradedCount++;
+    }
+  });
+
+  const parts: string[] = [];
+  if (criticalCount > 0) {
+    parts.push(`${criticalCount} critical`);
+  }
+  if (degradedCount > 0) {
+    parts.push(`${degradedCount} degraded`);
+  }
+
+  if (parts.length === 0) {
+    const totalCount = eventData?.count || eventData.results.length;
+    return `${totalCount} issue${totalCount === 1 ? "" : "s"} detected`;
+  }
+
+  return `Issues: ${parts.join(", ")}`;
+}
+
 /**
  * Renderer for the "dash0.onIssueStatus" trigger type
  */
 export const onIssueStatusTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnIssueStatusEventData;
-    const count = eventData?.count || 0;
 
     return {
-      title: `${count} issue${count === 1 ? "" : "s"} detected`,
+      title: formatIssueTitle(eventData),
       subtitle: formatTimeAgo(new Date(event.createdAt!)),
     };
   },
@@ -163,18 +213,28 @@ export const onIssueStatusTriggerRenderer: TriggerRenderer = {
         }
 
         // Format label with status after check name, separated by middle dot
-        // We'll put both in the label and use an empty status to avoid duplication
+        // Keep status populated for dot color, but mark it as combined in label
         const statusText = severity === "CRITICAL" ? "CRITICAL" : severity === "DEGRADED" ? "DEGRADED" : "";
         const labelWithStatus = statusText ? `${checkName} · ${statusText}` : checkName;
 
         return {
           label: labelWithStatus,
-          status: "", // Empty status to avoid duplication, since it's now in the label
+          status: severity, // Keep status for dot color indicator
           comment: summary || undefined,
+          // Add a flag to indicate status is combined in label (we'll check for " · " in the renderer)
         };
       });
 
       if (checks.length > 0) {
+        // Sort checks: CRITICAL first, then DEGRADED, then others
+        checks.sort((a, b) => {
+          if (a.status === "CRITICAL" && b.status !== "CRITICAL") return -1;
+          if (a.status !== "CRITICAL" && b.status === "CRITICAL") return 1;
+          if (a.status === "DEGRADED" && b.status !== "DEGRADED") return -1;
+          if (a.status !== "DEGRADED" && b.status === "DEGRADED") return 1;
+          return 0;
+        });
+
         // Use ApprovalTimelineEntry format for timeline rendering
         values["Checks"] = checks as unknown as Array<{
           label: string;
@@ -212,10 +272,9 @@ export const onIssueStatusTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data?.data as OnIssueStatusEventData;
-      const count = eventData?.count || 0;
 
       props.lastEventData = {
-        title: `${count} issue${count === 1 ? "" : "s"} detected`,
+        title: formatIssueTitle(eventData),
         subtitle: formatTimeAgo(new Date(lastEvent.createdAt!)),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
