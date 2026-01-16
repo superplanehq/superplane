@@ -32,6 +32,11 @@ func SeedTemplates(registry *registry.Registry) error {
 	seedTemplatesLock.Lock()
 	defer seedTemplatesLock.Unlock()
 
+	if err := lockTemplateSeed(); err != nil {
+		return err
+	}
+	defer unlockTemplateSeed()
+
 	if os.Getenv("APP_ENV") == "development" {
 		if err := resetTemplateWorkflows(); err != nil {
 			return fmt.Errorf("reset template workflows: %w", err)
@@ -86,11 +91,22 @@ func SeedTemplates(registry *registry.Registry) error {
 	return nil
 }
 
+func lockTemplateSeed() error {
+	if err := database.Conn().Exec("SELECT pg_advisory_lock(?)", int64(90710439)).Error; err != nil {
+		return fmt.Errorf("lock template seed: %w", err)
+	}
+	return nil
+}
+
+func unlockTemplateSeed() {
+	_ = database.Conn().Exec("SELECT pg_advisory_unlock(?)", int64(90710439)).Error
+}
+
 func resetTemplateWorkflows() error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		var workflowIDs []uuid.UUID
 		if err := tx.Model(&models.Workflow{}).
-			Where("organization_id = ? AND is_template = true", models.TemplateOrganizationID).
+			Where("organization_id = ?", models.TemplateOrganizationID).
 			Pluck("id", &workflowIDs).Error; err != nil {
 			return err
 		}

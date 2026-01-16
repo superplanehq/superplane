@@ -3,6 +3,7 @@ import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { Loader2, Puzzle } from "lucide-react";
+import * as yaml from "js-yaml";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -119,6 +120,7 @@ export function WorkflowPageV2() {
   usePageTitle([workflow?.metadata?.name || "Canvas"]);
 
   const isTemplate = workflow?.metadata?.isTemplate ?? false;
+  const isDev = import.meta.env.DEV;
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const createWorkflowMutation = useCreateWorkflow(organizationId!);
 
@@ -2164,6 +2166,93 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, updateWorkflowMutation, isTemplate],
   );
 
+  const getYamlExportPayload = useCallback(
+    (canvasNodes: CanvasNode[]) => {
+      if (!workflow) return null;
+
+      const updatedNodes =
+        workflow.spec?.nodes?.map((node) => {
+          const canvasNode = canvasNodes.find((cn) => cn.id === node.id);
+          const componentType = (canvasNode?.data?.type as string) || "";
+          if (canvasNode) {
+            return {
+              ...node,
+              position: {
+                x: Math.round(canvasNode.position.x),
+                y: Math.round(canvasNode.position.y),
+              },
+              isCollapsed: (canvasNode.data[componentType] as { collapsed: boolean })?.collapsed || false,
+            };
+          }
+          return node;
+        }) || [];
+
+      const exportWorkflow = {
+        metadata: {
+          name: workflow.metadata?.name || "Canvas",
+          description: workflow.metadata?.description || "",
+          isTemplate: workflow.metadata?.isTemplate ?? false,
+        },
+        spec: {
+          nodes: updatedNodes,
+          edges: workflow.spec?.edges || [],
+        },
+      };
+
+      const yamlText = yaml.dump(exportWorkflow, {
+        forceQuotes: true,
+        quotingType: '"',
+        lineWidth: 0,
+      });
+
+      const safeName = (workflow.metadata?.name || "canvas")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+      const filename = `${safeName || "canvas"}.yaml`;
+
+      return { yamlText, filename };
+    },
+    [workflow],
+  );
+
+  const handleExportYamlDownload = useCallback(
+    (canvasNodes: CanvasNode[]) => {
+      const payload = getYamlExportPayload(canvasNodes);
+      if (!payload) return;
+
+      const blob = new Blob([payload.yamlText], { type: "text/yaml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = payload.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      showSuccessToast("Canvas exported as YAML");
+    },
+    [getYamlExportPayload],
+  );
+
+  const handleExportYamlCopy = useCallback(
+    async (canvasNodes: CanvasNode[]) => {
+      const payload = getYamlExportPayload(canvasNodes);
+      if (!payload) return;
+
+      try {
+        await navigator.clipboard.writeText(payload.yamlText);
+        showSuccessToast("YAML copied to clipboard");
+      } catch (error) {
+        console.error("Failed to copy YAML to clipboard:", error);
+        showErrorToast("Failed to copy YAML to clipboard");
+      }
+    },
+    [getYamlExportPayload],
+  );
+
   const handleUseTemplateSubmit = useCallback(
     async (data: { name: string; description?: string; templateId?: string }) => {
       if (!workflow || !organizationId) return;
@@ -2359,6 +2448,8 @@ export function WorkflowPageV2() {
         canUndo={!isTemplate && !isAutoSaveEnabled && initialWorkflowSnapshot !== null}
         isAutoSaveEnabled={isAutoSaveEnabled && !isTemplate}
         onToggleAutoSave={isTemplate ? undefined : handleToggleAutoSave}
+        onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
+        onExportYamlDownload={isDev ? handleExportYamlDownload : undefined}
         runDisabled={hasRunBlockingChanges || isTemplate}
         runDisabledTooltip={
           isTemplate

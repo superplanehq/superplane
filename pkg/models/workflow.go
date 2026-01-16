@@ -129,6 +129,7 @@ func FindWorkflowTemplateByName(name string) (*Workflow, error) {
 func FindWorkflowTemplateByNameInTransaction(tx *gorm.DB, name string) (*Workflow, error) {
 	var workflow Workflow
 	err := tx.
+		Where("organization_id = ?", TemplateOrganizationID).
 		Where("is_template = ?", true).
 		Where("name = ?", name).
 		First(&workflow).

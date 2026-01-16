@@ -128,6 +128,8 @@ export interface CanvasPageProps {
   saveButtonHidden?: boolean;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
+  onExportYamlCopy?: (nodes: CanvasNode[]) => void;
+  onExportYamlDownload?: (nodes: CanvasNode[]) => void;
   // Undo functionality
   onUndo?: () => void;
   canUndo?: boolean;
@@ -759,6 +761,8 @@ function CanvasPage(props: CanvasPageProps) {
           saveButtonHidden={props.saveButtonHidden}
           isAutoSaveEnabled={props.isAutoSaveEnabled}
           onToggleAutoSave={props.onToggleAutoSave}
+          onExportYamlCopy={props.onExportYamlCopy}
+          onExportYamlDownload={props.onExportYamlDownload}
         />
         {props.headerBanner ? <div className="border-b border-border">{props.headerBanner}</div> : null}
       </div>
@@ -1151,6 +1155,8 @@ function CanvasContentHeader({
   saveButtonHidden,
   isAutoSaveEnabled,
   onToggleAutoSave,
+  onExportYamlCopy,
+  onExportYamlDownload,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1162,6 +1168,8 @@ function CanvasContentHeader({
   saveButtonHidden?: boolean;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
+  onExportYamlCopy?: (nodes: CanvasNode[]) => void;
+  onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1171,6 +1179,18 @@ function CanvasContentHeader({
       onSave(stateRef.current.nodes);
     }
   }, [onSave]);
+
+  const handleExportYamlCopy = useCallback(() => {
+    if (onExportYamlCopy) {
+      onExportYamlCopy(stateRef.current.nodes);
+    }
+  }, [onExportYamlCopy]);
+
+  const handleExportYamlDownload = useCallback(() => {
+    if (onExportYamlDownload) {
+      onExportYamlDownload(stateRef.current.nodes);
+    }
+  }, [onExportYamlDownload]);
 
   const handleLogoClick = useCallback(() => {
     if (organizationId) {
@@ -1191,6 +1211,8 @@ function CanvasContentHeader({
       saveButtonHidden={saveButtonHidden}
       isAutoSaveEnabled={isAutoSaveEnabled}
       onToggleAutoSave={onToggleAutoSave}
+      onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
+      onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />
   );
 }
