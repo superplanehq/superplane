@@ -22,6 +22,7 @@ type OnIssueStatusConfiguration struct {
 type OnIssueStatusMetadata struct {
 	NextTrigger   *string `json:"nextTrigger"`
 	ReferenceTime *string `json:"referenceTime"` // Time when schedule was first set up
+	LastCheck     *string `json:"lastCheck,omitempty"` // Time when the last check was performed
 }
 
 func (t *OnIssueStatus) Name() string {
@@ -199,7 +200,10 @@ func (t *OnIssueStatus) checkIssues(ctx core.TriggerActionContext) error {
 		t.processQueryResults(ctx, response, query, dataset, config)
 	}
 
-	return t.rescheduleCheck(ctx, config)
+	// Update last check time AFTER the check is complete and reschedule
+	// This ensures lastCheck reflects when the check actually finished
+	lastCheckTime := time.Now()
+	return t.rescheduleCheck(ctx, config, &lastCheckTime)
 }
 
 func (t *OnIssueStatus) processQueryResults(ctx core.TriggerActionContext, response map[string]any, query, dataset string, config OnIssueStatusConfiguration) {
@@ -319,7 +323,7 @@ func (t *OnIssueStatus) convertDataToMap(dataValue any, ctx core.TriggerActionCo
 	return dataMap
 }
 
-func (t *OnIssueStatus) rescheduleCheck(ctx core.TriggerActionContext, config OnIssueStatusConfiguration) error {
+func (t *OnIssueStatus) rescheduleCheck(ctx core.TriggerActionContext, config OnIssueStatusConfiguration, lastCheckTime *time.Time) error {
 	// Reschedule next check
 	var existingMetadata OnIssueStatusMetadata
 	err := mapstructure.Decode(ctx.Metadata.Get(), &existingMetadata)
@@ -332,6 +336,10 @@ func (t *OnIssueStatus) rescheduleCheck(ctx core.TriggerActionContext, config On
 	}
 
 	nowUTC := time.Now()
+	if lastCheckTime != nil {
+		nowUTC = *lastCheckTime
+	}
+
 	nextTrigger, err := t.nextTrigger(*config.MinutesInterval, nowUTC, existingMetadata.ReferenceTime)
 	if err != nil {
 		return fmt.Errorf("error calculating next trigger: %w", err)
@@ -343,10 +351,19 @@ func (t *OnIssueStatus) rescheduleCheck(ctx core.TriggerActionContext, config On
 	}
 
 	formatted := nextTrigger.Format(time.RFC3339)
-	return ctx.Metadata.Set(OnIssueStatusMetadata{
+	metadata := OnIssueStatusMetadata{
 		NextTrigger:   &formatted,
 		ReferenceTime: existingMetadata.ReferenceTime,
-	})
+		LastCheck:     existingMetadata.LastCheck, // Preserve existing last check by default
+	}
+
+	// Update last check time if provided (when checkIssues runs)
+	if lastCheckTime != nil {
+		lastCheckFormatted := lastCheckTime.Format(time.RFC3339)
+		metadata.LastCheck = &lastCheckFormatted
+	}
+
+	return ctx.Metadata.Set(metadata)
 }
 
 func (t *OnIssueStatus) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
