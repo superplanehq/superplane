@@ -45,8 +45,8 @@ export const AppInstallationResourceFieldRenderer = ({
     return resources
       .map((resource) => {
         const optionValue = useNameAsValue
-          ? resource.name ?? resource.id ?? ""
-          : resource.id ?? resource.name ?? "";
+          ? (resource.name ?? resource.id ?? "")
+          : (resource.id ?? resource.name ?? "");
         const optionLabel = resource.name ?? resource.id ?? "Unnamed resource";
         if (!optionValue) return null;
         return { id: optionValue, label: optionLabel, value: optionValue };
@@ -119,8 +119,8 @@ export const AppInstallationResourceFieldRenderer = ({
     const options: AutoCompleteOption[] = resources
       .map((resource) => {
         const optionValue = useNameAsValue
-          ? resource.name ?? resource.id ?? ""
-          : resource.id ?? resource.name ?? "";
+          ? (resource.name ?? resource.id ?? "")
+          : (resource.id ?? resource.name ?? "");
         const optionLabel = resource.name ?? resource.id ?? "Unnamed resource";
         if (!optionValue) return null;
         return { value: optionValue, label: optionLabel };
@@ -129,8 +129,10 @@ export const AppInstallationResourceFieldRenderer = ({
 
     const selectedValue =
       useNameAsValue && typeof value === "string" && value
-        ? resources.find((resource) => resource.id === value)?.name ?? value
-        : (typeof value === "string" ? value : "");
+        ? (resources.find((resource) => resource.id === value)?.name ?? value)
+        : typeof value === "string"
+          ? value
+          : "";
 
     return (
       <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>

@@ -474,7 +474,6 @@ export const ConfigurationFieldRenderer = ({
           {field.description}
         </p>
       )}
-
     </div>
   );
 };
