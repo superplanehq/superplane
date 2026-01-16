@@ -18,14 +18,15 @@ import { cn } from "@/lib/utils";
 import {
   AppWindow,
   ArrowRightLeft,
-  Building,
   CircleUser,
+  Home,
   LogOut,
-  Palette,
+  Settings,
   Shield,
   User as UserIcon,
   Users,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { isRBACEnabled } from "@/lib/env";
 
 export function OrganizationSettings() {
@@ -76,7 +77,7 @@ export function OrganizationSettings() {
     label: string;
     href?: string;
     action?: () => void;
-    Icon: typeof Building;
+    Icon: LucideIcon;
   };
 
   const sectionIds = ["profile", "general", "members", "groups", "roles", "applications"];
@@ -97,8 +98,8 @@ export function OrganizationSettings() {
   const userEmail = user?.email || "";
 
   const organizationLinks: NavLink[] = [
-    { id: "canvases", label: "Canvases", href: `/${organizationId}`, Icon: Palette },
-    { id: "general", label: "Settings", href: `/${organizationId}/settings/general`, Icon: Building },
+    { id: "canvases", label: "Canvases", href: `/${organizationId}`, Icon: Home },
+    { id: "general", label: "Settings", href: `/${organizationId}/settings/general`, Icon: Settings },
     { id: "members", label: "Members", href: `/${organizationId}/settings/members`, Icon: UserIcon },
     { id: "groups", label: "Groups", href: `/${organizationId}/settings/groups`, Icon: Users },
     ...(isRBACEnabled()

@@ -70,7 +70,7 @@ export function DialogActions({ className, ...props }: React.ComponentPropsWitho
       {...props}
       className={clsx(
         className,
-        "mt-8 flex flex-col-reverse items-center justify-end gap-3 *:w-full sm:flex-row sm:*:w-auto",
+        "mt-8 flex flex-col items-center justify-start gap-3 *:w-full sm:flex-row sm:*:w-auto",
       )}
     />
   );

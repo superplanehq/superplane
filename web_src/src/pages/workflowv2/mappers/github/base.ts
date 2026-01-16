@@ -49,7 +49,7 @@ export function baseProps(
   return {
     iconSrc: githubIcon,
     iconColor: getColorClass(componentDefinition.color),
-    headerColor: getBackgroundColorClass(componentDefinition.color),
+    headerColor: "",
     collapsedBackground: getBackgroundColorClass(componentDefinition.color),
     collapsed: node.isCollapsed,
     title: node.name!,

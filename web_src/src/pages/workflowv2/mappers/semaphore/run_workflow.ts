@@ -113,7 +113,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       title: node.name!,
       iconSrc: SemaphoreLogo,
       iconSlug: componentDefinition.icon || "workflow",
-      headerColor: getBackgroundColorClass(componentDefinition?.color || "gray"),
+      headerColor: "",
       iconColor: getColorClass(componentDefinition?.color || "gray"),
       iconBackground: getBackgroundColorClass(componentDefinition?.color || "gray"),
       collapsed: node.isCollapsed,

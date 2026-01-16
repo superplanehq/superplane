@@ -117,7 +117,7 @@ function buildCanvasNode(
         iconSlug: comp?.icon || blueprint?.icon || "box",
         iconColor: getColorClass(color),
         iconBackground: getBackgroundColorClass(color),
-        headerColor: getBackgroundColorClass(color),
+        headerColor: "",
         collapsedBackground: getBackgroundColorClass(color),
         collapsed: node.isCollapsed || false,
         title: label,

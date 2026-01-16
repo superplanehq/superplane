@@ -12,16 +12,16 @@ export const noopMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
-    componentDefinition: ComponentsComponent | undefined,
+    componentDefinition: ComponentsComponent,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
     _?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition?.name || node.component?.name || "noop";
+    const componentName = componentDefinition.name || "noop";
 
     return {
-      iconSlug: componentDefinition?.icon || "circle-off",
-      headerColor: "bg-white",
+      iconSlug: componentDefinition.icon || "circle-off",
+      headerColor: "",
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
       title: node.name!,
