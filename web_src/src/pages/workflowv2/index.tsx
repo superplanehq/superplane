@@ -190,6 +190,7 @@ export function WorkflowPageV2() {
     }
     return true;
   });
+  const canAutoSave = isAutoSaveEnabled && !isTemplate;
 
   // Revert functionality - track initial workflow snapshot
   const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<WorkflowsWorkflow | null>(null);
@@ -288,15 +289,12 @@ export function WorkflowPageV2() {
   );
 
   // Revert to initial state
-  const markUnsavedChange = useCallback(
-    (kind: UnsavedChangeKind) => {
-      setHasUnsavedChanges(true);
-      if (kind === "structural") {
-        setHasNonPositionalUnsavedChanges(true);
-      }
-    },
-    [],
-  );
+  const markUnsavedChange = useCallback((kind: UnsavedChangeKind) => {
+    setHasUnsavedChanges(true);
+    if (kind === "structural") {
+      setHasNonPositionalUnsavedChanges(true);
+    }
+  }, []);
 
   const handleRevert = useCallback(() => {
     if (initialWorkflowSnapshot && organizationId && workflowId) {
@@ -345,7 +343,7 @@ export function WorkflowPageV2() {
 
         try {
           // Check if auto-save is disabled
-          if (!isAutoSaveEnabled) {
+          if (!canAutoSave) {
             return;
           }
 
@@ -476,7 +474,7 @@ export function WorkflowPageV2() {
       updateWorkflowMutation,
       queryClient,
       hasNonPositionalUnsavedChanges,
-      isAutoSaveEnabled,
+      canAutoSave,
       isTemplate,
     ],
   );
@@ -1246,7 +1244,7 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1259,7 +1257,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1272,7 +1270,7 @@ export function WorkflowPageV2() {
         const annotationUpdates = new Map(pendingAnnotationUpdatesRef.current);
         if (annotationUpdates.size === 0) return;
 
-        if (!isAutoSaveEnabled) {
+        if (!canAutoSave) {
           return;
         }
 
@@ -1321,7 +1319,7 @@ export function WorkflowPageV2() {
           }
         });
       }, 600),
-    [organizationId, workflowId, queryClient, handleSaveWorkflow, isAutoSaveEnabled, isTemplate],
+    [organizationId, workflowId, queryClient, handleSaveWorkflow, canAutoSave, isTemplate],
   );
 
   const handleAnnotationUpdate = useCallback(
@@ -1358,7 +1356,7 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
         pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...updates });
         debouncedAnnotationAutoSave();
@@ -1373,7 +1371,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       debouncedAnnotationAutoSave,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1457,7 +1455,7 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1473,7 +1471,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1522,7 +1520,7 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1537,7 +1535,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1628,7 +1626,7 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1641,7 +1639,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1674,7 +1672,7 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1687,7 +1685,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1717,7 +1715,7 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1730,7 +1728,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1775,7 +1773,7 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1788,7 +1786,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -1828,7 +1826,7 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         pendingPositionUpdatesRef.current.set(nodeId, roundedPosition);
 
         debouncedAutoSave();
@@ -1843,7 +1841,7 @@ export function WorkflowPageV2() {
       workflowId,
       queryClient,
       debouncedAutoSave,
-      isAutoSaveEnabled,
+      canAutoSave,
       saveWorkflowSnapshot,
       markUnsavedChange,
     ],
@@ -1884,7 +1882,7 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         // Add all position updates to pending updates
         positionMap.forEach((position, nodeId) => {
           pendingPositionUpdatesRef.current.set(nodeId, position);
@@ -1902,7 +1900,7 @@ export function WorkflowPageV2() {
       workflowId,
       queryClient,
       debouncedAutoSave,
-      isAutoSaveEnabled,
+      canAutoSave,
       saveWorkflowSnapshot,
       markUnsavedChange,
     ],
@@ -1941,7 +1939,7 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -1954,7 +1952,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -2063,7 +2061,7 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      if (isAutoSaveEnabled) {
+      if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
         markUnsavedChange("structural");
@@ -2077,7 +2075,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
-      isAutoSaveEnabled,
+      canAutoSave,
       markUnsavedChange,
     ],
   );
@@ -2348,8 +2346,8 @@ export function WorkflowPageV2() {
         saveIsPrimary={hasUnsavedChanges && !isTemplate}
         saveButtonHidden={isTemplate || !hasUnsavedChanges}
         onUndo={isTemplate ? undefined : handleRevert}
-      canUndo={!isTemplate && !isAutoSaveEnabled && initialWorkflowSnapshot !== null}
-      isAutoSaveEnabled={isAutoSaveEnabled && !isTemplate}
+        canUndo={!isTemplate && !isAutoSaveEnabled && initialWorkflowSnapshot !== null}
+        isAutoSaveEnabled={isAutoSaveEnabled && !isTemplate}
         onToggleAutoSave={isTemplate ? undefined : handleToggleAutoSave}
         runDisabled={hasRunBlockingChanges || isTemplate}
         runDisabledTooltip={
