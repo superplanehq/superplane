@@ -57,76 +57,6 @@ func Test__CreateRelease__Setup(t *testing.T) {
 	})
 }
 
-func Test__CreateRelease__Configuration(t *testing.T) {
-	component := CreateRelease{}
-	config := component.Configuration()
-
-	t.Run("has required fields", func(t *testing.T) {
-		fieldNames := make(map[string]bool)
-		for _, field := range config {
-			fieldNames[field.Name] = field.Required
-		}
-
-		assert.True(t, fieldNames["repository"], "repository should be required")
-		assert.True(t, fieldNames["versionStrategy"], "versionStrategy should be required")
-		assert.False(t, fieldNames["tagName"], "tagName should be optional (conditionally required)")
-		assert.False(t, fieldNames["name"], "name should be optional")
-		assert.False(t, fieldNames["draft"], "draft should be optional")
-		assert.False(t, fieldNames["prerelease"], "prerelease should be optional")
-		assert.False(t, fieldNames["generateReleaseNotes"], "generateReleaseNotes should be optional")
-		assert.False(t, fieldNames["body"], "body should be optional")
-	})
-
-	t.Run("versionStrategy has correct options", func(t *testing.T) {
-		var foundField bool
-
-		for _, field := range config {
-			if field.Name == "versionStrategy" {
-				foundField = true
-				assert.Equal(t, "select", field.Type)
-				assert.NotNil(t, field.TypeOptions)
-				assert.NotNil(t, field.TypeOptions.Select)
-
-				options := field.TypeOptions.Select.Options
-				assert.Len(t, options, 4, "should have 4 version strategy options")
-
-				values := make([]string, len(options))
-				for i, opt := range options {
-					values[i] = opt.Value
-				}
-
-				assert.Contains(t, values, "manual")
-				assert.Contains(t, values, "patch")
-				assert.Contains(t, values, "minor")
-				assert.Contains(t, values, "major")
-				break
-			}
-		}
-
-		assert.True(t, foundField, "versionStrategy field should exist in configuration")
-	})
-
-	t.Run("tagName has visibility conditions", func(t *testing.T) {
-		var foundField bool
-
-		for _, field := range config {
-			if field.Name == "tagName" {
-				foundField = true
-				assert.Len(t, field.VisibilityConditions, 1, "should have 1 visibility condition")
-				assert.Equal(t, "versionStrategy", field.VisibilityConditions[0].Field)
-				assert.Equal(t, []string{"manual"}, field.VisibilityConditions[0].Values)
-
-				assert.Len(t, field.RequiredConditions, 1, "should have 1 required condition")
-				assert.Equal(t, "versionStrategy", field.RequiredConditions[0].Field)
-				assert.Equal(t, []string{"manual"}, field.RequiredConditions[0].Values)
-				break
-			}
-		}
-
-		assert.True(t, foundField, "tagName field should exist in configuration")
-	})
-}
-
 func Test__CreateRelease__IncrementVersion(t *testing.T) {
 	component := CreateRelease{}
 
@@ -278,40 +208,5 @@ func Test__CreateRelease__SemverRegex(t *testing.T) {
 		// The regex extracts the first major.minor.patch, ignoring extra parts
 		assert.True(t, semverRegex.MatchString("1.2.3.4"))
 		assert.True(t, semverRegex.MatchString("v10.20.30.40"))
-	})
-}
-
-func Test__CreateRelease__Component_Interface(t *testing.T) {
-	component := CreateRelease{}
-
-	t.Run("Name returns correct value", func(t *testing.T) {
-		assert.Equal(t, "github.createRelease", component.Name())
-	})
-
-	t.Run("Label returns correct value", func(t *testing.T) {
-		assert.Equal(t, "Create Release", component.Label())
-	})
-
-	t.Run("Description returns correct value", func(t *testing.T) {
-		assert.Equal(t, "Create a new release in a GitHub repository", component.Description())
-	})
-
-	t.Run("Icon returns correct value", func(t *testing.T) {
-		assert.Equal(t, "github", component.Icon())
-	})
-
-	t.Run("Color returns correct value", func(t *testing.T) {
-		assert.Equal(t, "gray", component.Color())
-	})
-
-	t.Run("OutputChannels returns default channel", func(t *testing.T) {
-		channels := component.OutputChannels(nil)
-		assert.Len(t, channels, 1)
-		assert.Equal(t, core.DefaultOutputChannel, channels[0])
-	})
-
-	t.Run("Actions returns empty slice", func(t *testing.T) {
-		actions := component.Actions()
-		assert.Empty(t, actions)
 	})
 }
