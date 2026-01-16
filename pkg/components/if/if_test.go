@@ -119,7 +119,7 @@ func TestIf_Execute_NonBooleanResult_ShouldReturnError(t *testing.T) {
 
 	err := ifComponent.Execute(ctx)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "expression must evaluate to boolean")
+	assert.Contains(t, err.Error(), "invalid operation: bool(string)")
 }
 
 func TestIf_Execute_BothTrueAndFalsePathsEmitEmpty(t *testing.T) {
