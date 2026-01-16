@@ -145,8 +145,9 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	// Evaluate stop expression if provided
 	//
 	if spec.StopIfExpression != "" {
-		env := map[string]any{
-			"$": ctx.Input,
+		env, err := expressionEnv(ctx, spec.StopIfExpression)
+		if err != nil {
+			return nil, err
 		}
 
 		vm, err := expr.Compile(spec.StopIfExpression, expr.Env(env), expr.AsBool())
@@ -183,6 +184,44 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	}
 
 	return nil, nil
+}
+
+func expressionEnv(ctx core.ProcessQueueContext, expression string) (map[string]any, error) {
+	if ctx.ExpressionEnv != nil {
+		return ctx.ExpressionEnv(expression)
+	}
+
+	return buildExpressionEnv(ctx.Input, ctx.SourceNodeID), nil
+}
+
+func buildExpressionEnv(input any, sourceNodeID string) map[string]any {
+	if sourceNodeID == "" {
+		return map[string]any{"$": input}
+	}
+
+	if inputMap, ok := input.(map[string]any); ok {
+		envData := make(map[string]any, len(inputMap)+1)
+		for key, value := range inputMap {
+			envData[key] = value
+		}
+		if _, exists := envData[sourceNodeID]; !exists {
+			envData[sourceNodeID] = input
+		}
+		return map[string]any{"$": envData}
+	}
+
+	if inputMap, ok := input.(map[string]string); ok {
+		envData := make(map[string]any, len(inputMap)+1)
+		for key, value := range inputMap {
+			envData[key] = value
+		}
+		if _, exists := envData[sourceNodeID]; !exists {
+			envData[sourceNodeID] = input
+		}
+		return map[string]any{"$": envData}
+	}
+
+	return map[string]any{"$": map[string]any{sourceNodeID: input}}
 }
 
 func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup string) (*core.ExecutionContext, error) {

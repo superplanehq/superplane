@@ -14,10 +14,15 @@ export function buildBuildingBlockCategories(
   blueprints: BlueprintsBlueprint[],
   availableApplications: ApplicationsApplicationDefinition[],
 ): BuildingBlockCategory[] {
+  const deprecatedTriggerNames = new Set(["github", "semaphore"]);
+  const deprecatedComponentNames = new Set(["semaphore"]);
+  const filteredTriggers = triggers.filter((trigger) => !deprecatedTriggerNames.has(trigger.name ?? ""));
+  const filteredComponents = components.filter((component) => !deprecatedComponentNames.has(component.name ?? ""));
+
   const liveCategories: BuildingBlockCategory[] = [
     {
       name: "Triggers",
-      blocks: triggers.map(
+      blocks: filteredTriggers.map(
         (t): BuildingBlock => ({
           name: t.name!,
           label: t.label,
@@ -27,13 +32,12 @@ export function buildBuildingBlockCategories(
           icon: t.icon,
           color: t.color,
           isLive: true,
-          deprecated: t.name === "github" || t.name === "semaphore",
         }),
       ),
     },
     {
       name: "Primitives",
-      blocks: components.map(
+      blocks: filteredComponents.map(
         (c): BuildingBlock => ({
           name: c.name!,
           label: c.label,
@@ -44,7 +48,6 @@ export function buildBuildingBlockCategories(
           icon: c.icon,
           color: c.color,
           isLive: true,
-          deprecated: c.name === "semaphore",
         }),
       ),
     },

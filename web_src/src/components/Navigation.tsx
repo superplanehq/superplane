@@ -138,13 +138,6 @@ const Navigation: React.FC = () => {
                     </DropdownItem>
                   )}
 
-                  <DropdownItem href={`/${organizationId}/settings/integrations`}>
-                    <span className="flex items-center gap-x-2">
-                      <Icon name="plug" data-slot="icon" size="sm" />
-                      <DropdownLabel>Integrations</DropdownLabel>
-                    </span>
-                  </DropdownItem>
-
                   <DropdownItem href="/">
                     <span className="flex items-center gap-x-2">
                       <Icon name="arrow-left-right" data-slot="icon" size="sm" />

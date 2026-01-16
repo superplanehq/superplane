@@ -78,8 +78,9 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error setting metadata: %w", err)
 	}
 
-	env := map[string]any{
-		"$": ctx.Data,
+	env, err := expressionEnv(ctx, spec.Expression)
+	if err != nil {
+		return err
 	}
 
 	vm, err := expr.Compile(spec.Expression, []expr.Option{
@@ -112,6 +113,44 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 	}
 
 	return ctx.ExecutionState.Pass()
+}
+
+func expressionEnv(ctx core.ExecutionContext, expression string) (map[string]any, error) {
+	if ctx.ExpressionEnv != nil {
+		return ctx.ExpressionEnv(expression)
+	}
+
+	return buildExpressionEnv(ctx.Data, ctx.SourceNodeID), nil
+}
+
+func buildExpressionEnv(input any, sourceNodeID string) map[string]any {
+	if sourceNodeID == "" {
+		return map[string]any{"$": input}
+	}
+
+	if inputMap, ok := input.(map[string]any); ok {
+		envData := make(map[string]any, len(inputMap)+1)
+		for key, value := range inputMap {
+			envData[key] = value
+		}
+		if _, exists := envData[sourceNodeID]; !exists {
+			envData[sourceNodeID] = input
+		}
+		return map[string]any{"$": envData}
+	}
+
+	if inputMap, ok := input.(map[string]string); ok {
+		envData := make(map[string]any, len(inputMap)+1)
+		for key, value := range inputMap {
+			envData[key] = value
+		}
+		if _, exists := envData[sourceNodeID]; !exists {
+			envData[sourceNodeID] = input
+		}
+		return map[string]any{"$": envData}
+	}
+
+	return map[string]any{"$": map[string]any{sourceNodeID: input}}
 }
 
 func (f *Filter) Actions() []core.Action {

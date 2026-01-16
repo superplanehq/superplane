@@ -132,3 +132,39 @@ func TestFilter_Execute_NonBooleanResult_ShouldReturnError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "expression must evaluate to boolean")
 }
+
+func TestFilter_Execute_NodeReferenceExpression(t *testing.T) {
+	filter := &Filter{}
+
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+
+	ctx := core.ExecutionContext{
+		Data: map[string]any{
+			"data": map[string]any{
+				"test": "value",
+			},
+		},
+		SourceNodeID:   "upstream-node",
+		Configuration:  map[string]any{"expression": "$[\"other-node\"].data.test == 'value'"},
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		ExpressionEnv: func(expression string) (map[string]any, error) {
+			return map[string]any{
+				"$": map[string]any{
+					"other-node": map[string]any{
+						"data": map[string]any{
+							"test": "value",
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	err := filter.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
+	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+}
