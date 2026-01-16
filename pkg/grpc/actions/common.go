@@ -967,10 +967,6 @@ func defaultValueFromProto(fieldType, defaultValue string) any {
 		fallthrough
 	case configuration.FieldTypeSelect:
 		fallthrough
-	case configuration.FieldTypeIntegration:
-		fallthrough
-	case configuration.FieldTypeIntegrationResource:
-		fallthrough
 	case configuration.FieldTypeAppInstallationResource:
 		fallthrough
 	case configuration.FieldTypeTime:

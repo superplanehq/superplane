@@ -15,8 +15,6 @@ import { DateTimeFieldRenderer } from "./DateTimeFieldRenderer";
 import { UrlFieldRenderer } from "./UrlFieldRenderer";
 import { ListFieldRenderer } from "./ListFieldRenderer";
 import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
-import { IntegrationFieldRenderer } from "./IntegrationFieldRenderer";
-import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
 import { AppInstallationResourceFieldRenderer } from "./AppInstallationResourceFieldRenderer";
 import { TimeFieldRenderer } from "./TimeFieldRenderer";
 import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
@@ -267,29 +265,6 @@ export const ConfigurationFieldRenderer = ({
 
       case "cron":
         return <CronFieldRenderer {...commonProps} />;
-
-      case "integration":
-        return (
-          <IntegrationFieldRenderer
-            field={field}
-            value={value as string}
-            onChange={onChange}
-            domainId={domainId}
-            domainType={domainType}
-          />
-        );
-
-      case "integration-resource":
-        return (
-          <IntegrationResourceFieldRenderer
-            field={field}
-            value={value as string}
-            onChange={onChange}
-            allValues={allValues}
-            domainId={domainId}
-            domainType={domainType}
-          />
-        );
 
       case "app-installation-resource":
         return (

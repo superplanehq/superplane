@@ -27,8 +27,6 @@ const (
 	FieldTypeUser                    = "user"
 	FieldTypeRole                    = "role"
 	FieldTypeGroup                   = "group"
-	FieldTypeIntegration             = "integration"
-	FieldTypeIntegrationResource     = "integration-resource"
 	FieldTypeAppInstallationResource = "app-installation-resource"
 	FieldTypeAnyPredicateList        = "any-predicate-list"
 	FieldTypeGitRef                  = "git-ref"
