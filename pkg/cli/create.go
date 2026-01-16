@@ -78,54 +78,6 @@ var createCmd = &cobra.Command{
 			Check(err)
 			fmt.Printf("%s", string(out))
 
-		case "Integration":
-			// Parse YAML to map
-			var yamlData map[string]any
-			err = yaml.Unmarshal(data, &yamlData)
-			Check(err)
-
-			// Extract the metadata from the YAML
-			metadata, ok := yamlData["metadata"].(map[string]interface{})
-			if !ok {
-				Fail("Invalid Integration YAML: metadata section missing")
-			}
-
-			domainId, ok := metadata["domainId"].(string)
-			if !ok {
-				Fail("Invalid Integration YAML: domainId field missing")
-			}
-
-			domainTypeFromYaml, ok := metadata["domainType"].(string)
-			if !ok {
-				Fail("Invalid Integration YAML: domainType field missing")
-			}
-
-			var integration openapi_client.IntegrationsIntegration
-			err = yaml.Unmarshal(data, &integration)
-			Check(err)
-
-			domainType, err := openapi_client.NewAuthorizationDomainTypeFromValue(domainTypeFromYaml)
-			Check(err)
-
-			response, httpResponse, err := c.IntegrationAPI.
-				IntegrationsCreateIntegration(context.Background()).
-				Body(openapi_client.IntegrationsCreateIntegrationRequest{
-					Integration: &integration,
-					DomainId:    &domainId,
-					DomainType:  domainType,
-				}).
-				Execute()
-
-			if err != nil {
-				b, _ := io.ReadAll(httpResponse.Body)
-				fmt.Printf("%s\n", string(b))
-				os.Exit(1)
-			}
-
-			out, err := yaml.Marshal(response.Integration)
-			Check(err)
-			fmt.Printf("%s", string(out))
-
 		default:
 			Fail(fmt.Sprintf("Unsupported resource kind '%s'", kind))
 		}

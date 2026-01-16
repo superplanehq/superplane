@@ -47,6 +47,7 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
       placeholder={field.placeholder || ""}
       inputSize="md"
       showValuePreview
+      quickTip="Tip: type `$` to browse node outputs."
       className={hasError ? "after:ring-2 after:ring-red-500" : ""}
       data-testid={toTestId(`expression-field-${field.name}`)}
     />

@@ -20,9 +20,6 @@
       "name": "Secrets"
     },
     {
-      "name": "Integrations"
-    },
-    {
       "name": "Users"
     },
     {
@@ -662,223 +659,6 @@
         ],
         "tags": [
           "Groups"
-        ]
-      }
-    },
-    "/api/v1/integrations": {
-      "get": {
-        "summary": "List integrations",
-        "description": "List integrations",
-        "operationId": "Integrations_ListIntegrations",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/IntegrationsListIntegrationsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "domainType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION"
-            ],
-            "default": "DOMAIN_TYPE_UNSPECIFIED"
-          },
-          {
-            "name": "domainId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Integration"
-        ]
-      },
-      "post": {
-        "summary": "Create a new canvas integration",
-        "description": "Creates a new canvas integration",
-        "operationId": "Integrations_CreateIntegration",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/IntegrationsCreateIntegrationResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/IntegrationsCreateIntegrationRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Integration"
-        ]
-      }
-    },
-    "/api/v1/integrations/{idOrName}": {
-      "get": {
-        "summary": "Describe an integration",
-        "description": "Describe an integration",
-        "operationId": "Integrations_DescribeIntegration",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/IntegrationsDescribeIntegrationResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "idOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "domainType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION"
-            ],
-            "default": "DOMAIN_TYPE_UNSPECIFIED"
-          },
-          {
-            "name": "domainId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Integration"
-        ]
-      },
-      "patch": {
-        "summary": "Update an integration",
-        "description": "Updates an existing integration",
-        "operationId": "Integrations_UpdateIntegration",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/IntegrationsUpdateIntegrationResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "idOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/IntegrationsUpdateIntegrationBody"
-            }
-          }
-        ],
-        "tags": [
-          "Integration"
-        ]
-      }
-    },
-    "/api/v1/integrations/{idOrName}/resources": {
-      "get": {
-        "summary": "List integration resources",
-        "description": "List integration resources",
-        "operationId": "Integrations_ListResources",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/IntegrationsListResourcesResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "idOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "domainType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION"
-            ],
-            "default": "DOMAIN_TYPE_UNSPECIFIED"
-          },
-          {
-            "name": "domainId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "type",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Integration"
         ]
       }
     },
@@ -2304,6 +2084,14 @@
             }
           }
         },
+        "parameters": [
+          {
+            "name": "includeTemplates",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
         "tags": [
           "Workflow"
         ]
@@ -3057,14 +2845,6 @@
         }
       }
     },
-    "AuthToken": {
-      "type": "object",
-      "properties": {
-        "valueFrom": {
-          "$ref": "#/definitions/IntegrationsValueFrom"
-        }
-      }
-    },
     "AuthorizationDomainType": {
       "type": "string",
       "enum": [
@@ -3482,14 +3262,6 @@
         }
       }
     },
-    "ConfigurationIntegrationTypeOptions": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        }
-      }
-    },
     "ConfigurationListItemDefinition": {
       "type": "object",
       "properties": {
@@ -3649,9 +3421,6 @@
         },
         "multiSelect": {
           "$ref": "#/definitions/ConfigurationMultiSelectTypeOptions"
-        },
-        "integration": {
-          "$ref": "#/definitions/ConfigurationIntegrationTypeOptions"
         },
         "list": {
           "$ref": "#/definitions/ConfigurationListTypeOptions"
@@ -3891,184 +3660,6 @@
       "properties": {
         "group": {
           "$ref": "#/definitions/GroupsGroup"
-        }
-      }
-    },
-    "IntegrationAuth": {
-      "type": "object",
-      "properties": {
-        "use": {
-          "$ref": "#/definitions/IntegrationAuthType"
-        },
-        "token": {
-          "$ref": "#/definitions/AuthToken"
-        }
-      }
-    },
-    "IntegrationAuthType": {
-      "type": "string",
-      "enum": [
-        "AUTH_TYPE_NONE",
-        "AUTH_TYPE_TOKEN",
-        "AUTH_TYPE_OIDC"
-      ],
-      "default": "AUTH_TYPE_NONE"
-    },
-    "IntegrationsCreateIntegrationRequest": {
-      "type": "object",
-      "properties": {
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "integration": {
-          "$ref": "#/definitions/IntegrationsIntegration"
-        }
-      }
-    },
-    "IntegrationsCreateIntegrationResponse": {
-      "type": "object",
-      "properties": {
-        "integration": {
-          "$ref": "#/definitions/IntegrationsIntegration"
-        }
-      }
-    },
-    "IntegrationsDescribeIntegrationResponse": {
-      "type": "object",
-      "properties": {
-        "integration": {
-          "$ref": "#/definitions/IntegrationsIntegration"
-        }
-      }
-    },
-    "IntegrationsIntegration": {
-      "type": "object",
-      "properties": {
-        "metadata": {
-          "$ref": "#/definitions/IntegrationsIntegrationMetadata"
-        },
-        "spec": {
-          "$ref": "#/definitions/IntegrationsIntegrationSpec"
-        }
-      }
-    },
-    "IntegrationsIntegrationMetadata": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "createdBy": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        }
-      }
-    },
-    "IntegrationsIntegrationSpec": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        },
-        "url": {
-          "type": "string"
-        },
-        "auth": {
-          "$ref": "#/definitions/IntegrationAuth"
-        }
-      }
-    },
-    "IntegrationsListIntegrationsResponse": {
-      "type": "object",
-      "properties": {
-        "integrations": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/IntegrationsIntegration"
-          }
-        }
-      }
-    },
-    "IntegrationsListResourcesResponse": {
-      "type": "object",
-      "properties": {
-        "resources": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/IntegrationsResourceRef"
-          }
-        }
-      }
-    },
-    "IntegrationsResourceRef": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "id": {
-          "type": "string"
-        }
-      }
-    },
-    "IntegrationsUpdateIntegrationBody": {
-      "type": "object",
-      "properties": {
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "integration": {
-          "$ref": "#/definitions/IntegrationsIntegration"
-        }
-      }
-    },
-    "IntegrationsUpdateIntegrationResponse": {
-      "type": "object",
-      "properties": {
-        "integration": {
-          "$ref": "#/definitions/IntegrationsIntegration"
-        }
-      }
-    },
-    "IntegrationsValueFrom": {
-      "type": "object",
-      "properties": {
-        "secret": {
-          "$ref": "#/definitions/IntegrationsValueFromSecret"
-        }
-      }
-    },
-    "IntegrationsValueFromSecret": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "key": {
-          "type": "string"
         }
       }
     },
@@ -5427,6 +5018,9 @@
         },
         "createdBy": {
           "$ref": "#/definitions/SuperplaneWorkflowsUserRef"
+        },
+        "isTemplate": {
+          "type": "boolean"
         }
       }
     },

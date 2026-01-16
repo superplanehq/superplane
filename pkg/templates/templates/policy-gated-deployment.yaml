@@ -1,0 +1,131 @@
+metadata:
+  name: "Policy-gated deployment"
+  description: "Gate deployments with a policy check, business hours, and approval."
+  isTemplate: true
+spec:
+  nodes:
+    - id: "manual-trigger"
+      name: "Deploy request"
+      type: "TYPE_TRIGGER"
+      configuration: {}
+      metadata: null
+      position:
+        x: -35
+        "y": 321
+      component: null
+      blueprint: null
+      trigger:
+        name: "start"
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+    - id: "policy-filter"
+      name: "Policy check"
+      type: "TYPE_COMPONENT"
+      configuration:
+        expression: "true"
+      metadata: null
+      position:
+        x: 413
+        "y": 320
+      component:
+        name: "filter"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+    - id: "business-hours"
+      name: "Business hours"
+      type: "TYPE_COMPONENT"
+      configuration:
+        days:
+          - "monday"
+          - "tuesday"
+          - "wednesday"
+          - "thursday"
+          - "friday"
+        endTime: "17:00"
+        mode: "include_range"
+        startTime: "09:00"
+        timezone: "0"
+      metadata: null
+      position:
+        x: 864
+        "y": 320
+      component:
+        name: "time_gate"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+    - id: "approval"
+      name: "Team approval"
+      type: "TYPE_COMPONENT"
+      configuration:
+        items:
+          - type: "anyone"
+      metadata: null
+      position:
+        x: 1335
+        "y": 320
+      component:
+        name: "approval"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+    - id: "deploy"
+      name: "Deploy"
+      type: "TYPE_COMPONENT"
+      configuration: {}
+      metadata: null
+      position:
+        x: 1885
+        "y": 216
+      component:
+        name: "noop"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+    - id: "rejected"
+      name: "Deployment blocked"
+      type: "TYPE_COMPONENT"
+      configuration: {}
+      metadata: null
+      position:
+        x: 1893
+        "y": 501
+      component:
+        name: "noop"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+  edges:
+    - sourceId: "manual-trigger"
+      targetId: "policy-filter"
+      channel: "default"
+    - sourceId: "policy-filter"
+      targetId: "business-hours"
+      channel: "default"
+    - sourceId: "business-hours"
+      targetId: "approval"
+      channel: "default"
+    - sourceId: "approval"
+      targetId: "deploy"
+      channel: "approved"
+    - sourceId: "approval"
+      targetId: "rejected"
+      channel: "rejected"

@@ -18,6 +18,7 @@ import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
+  nodeId?: string;
   nodeName: string;
   nodeLabel?: string;
   configuration: Record<string, unknown>;
@@ -38,8 +39,9 @@ interface SettingsTabProps {
 }
 
 export function SettingsTab({
+  nodeId,
   nodeName,
-  nodeLabel: _nodeLabel,
+  nodeLabel,
   configuration,
   configurationFields,
   onSave,
@@ -59,6 +61,41 @@ export function SettingsTab({
   const [selectedAppInstallation, setSelectedAppInstallation] = useState<ComponentsAppInstallationRef | undefined>(
     appInstallationRef,
   );
+  const resolvedAutocompleteExampleObj = useMemo(() => {
+    if (!autocompleteExampleObj) {
+      return autocompleteExampleObj;
+    }
+
+    if (!nodeId) {
+      return autocompleteExampleObj;
+    }
+
+    const nodeNameLabel = nodeLabel || nodeName;
+    if (!nodeNameLabel) {
+      return autocompleteExampleObj;
+    }
+
+    const base = autocompleteExampleObj as Record<string, unknown>;
+    const existingNames = base.__nodeNames;
+    const nextNodeNames =
+      typeof existingNames === "object" && existingNames !== null && !Array.isArray(existingNames)
+        ? { ...(existingNames as Record<string, unknown>), [nodeId]: nodeNameLabel }
+        : { [nodeId]: nodeNameLabel };
+
+    let nextGlobals: Record<string, unknown> = { ...base, __nodeNames: nextNodeNames };
+    const currentValue = base[nodeId];
+    if (typeof currentValue === "object" && currentValue !== null && !Array.isArray(currentValue)) {
+      const currentRecord = currentValue as Record<string, unknown>;
+      if (typeof currentRecord.__nodeName !== "string") {
+        nextGlobals = {
+          ...nextGlobals,
+          [nodeId]: { ...currentRecord, __nodeName: nodeNameLabel },
+        };
+      }
+    }
+
+    return nextGlobals;
+  }, [autocompleteExampleObj, nodeId, nodeLabel, nodeName]);
 
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
@@ -352,7 +389,7 @@ export function SettingsTab({
                   fieldPath={fieldName}
                   realtimeValidationErrors={realtimeValidationErrors}
                   enableRealtimeValidation={true}
-                  autocompleteExampleObj={autocompleteExampleObj}
+                  autocompleteExampleObj={resolvedAutocompleteExampleObj}
                 />
               );
             })}

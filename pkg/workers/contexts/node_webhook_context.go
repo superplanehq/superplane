@@ -6,10 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -68,8 +66,8 @@ func (c *NodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
 	return []byte(plainKey), encryptedKey, nil
 }
 
-func (c *NodeWebhookContext) Setup(options *core.WebhookSetupOptions) (string, error) {
-	webhook, err := c.findOrCreateWebhook(options)
+func (c *NodeWebhookContext) Setup() (string, error) {
+	webhook, err := c.findOrCreateWebhook()
 	if err != nil {
 		return "", fmt.Errorf("failed to find or create webhook: %w", err)
 	}
@@ -78,7 +76,7 @@ func (c *NodeWebhookContext) Setup(options *core.WebhookSetupOptions) (string, e
 	return fmt.Sprintf("%s/webhooks/%s", c.GetBaseURL(), webhook.ID.String()), nil
 }
 
-func (c *NodeWebhookContext) findOrCreateWebhook(options *core.WebhookSetupOptions) (*models.Webhook, error) {
+func (c *NodeWebhookContext) findOrCreateWebhook() (*models.Webhook, error) {
 	//
 	// If webhook already exists, just return it
 	//
@@ -101,31 +99,6 @@ func (c *NodeWebhookContext) findOrCreateWebhook(options *core.WebhookSetupOptio
 		State:     models.WebhookStatePending,
 		Secret:    encryptedKey,
 		CreatedAt: &now,
-	}
-
-	if options == nil {
-		err = c.tx.Create(&webhook).Error
-		if err != nil {
-			return nil, err
-		}
-
-		return &webhook, nil
-	}
-
-	if options.IntegrationID != nil {
-		webhook.IntegrationID = options.IntegrationID
-	}
-
-	if options.Resource != nil {
-		webhook.Resource = datatypes.NewJSONType(models.WebhookResource{
-			ID:   options.Resource.Id(),
-			Name: options.Resource.Name(),
-			Type: options.Resource.Type(),
-		})
-	}
-
-	if options.Configuration != nil {
-		webhook.Configuration = datatypes.NewJSONType(options.Configuration)
 	}
 
 	err = c.tx.Create(&webhook).Error

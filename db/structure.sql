@@ -242,25 +242,6 @@ CREATE TABLE public.group_metadata (
 
 
 --
--- Name: integrations; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.integrations (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    name character varying(128) NOT NULL,
-    domain_type character varying(64) NOT NULL,
-    domain_id uuid NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    created_by uuid NOT NULL,
-    updated_at timestamp without time zone,
-    type character varying(64) NOT NULL,
-    url character varying(256) NOT NULL,
-    auth_type character varying(64) NOT NULL,
-    auth jsonb DEFAULT '{}'::jsonb NOT NULL
-);
-
-
---
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -375,8 +356,6 @@ CREATE TABLE public.webhooks (
     secret bytea NOT NULL,
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    integration_id uuid,
-    resource jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     deleted_at timestamp without time zone,
@@ -513,7 +492,8 @@ CREATE TABLE public.workflows (
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_by uuid,
     deleted_at timestamp without time zone,
-    nodes jsonb DEFAULT '[]'::jsonb NOT NULL
+    nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    is_template boolean DEFAULT false NOT NULL
 );
 
 
@@ -666,22 +646,6 @@ ALTER TABLE ONLY public.email_settings
 
 ALTER TABLE ONLY public.group_metadata
     ADD CONSTRAINT group_metadata_pkey PRIMARY KEY (id);
-
-
---
--- Name: integrations integrations_domain_type_domain_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.integrations
-    ADD CONSTRAINT integrations_domain_type_domain_id_name_key UNIQUE (domain_type, domain_id, name);
-
-
---
--- Name: integrations integrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.integrations
-    ADD CONSTRAINT integrations_pkey PRIMARY KEY (id);
 
 
 --
@@ -1170,6 +1134,13 @@ CREATE INDEX idx_workflows_deleted_at ON public.workflows USING btree (deleted_a
 
 
 --
+-- Name: idx_workflows_is_template; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflows_is_template ON public.workflows USING btree (is_template);
+
+
+--
 -- Name: idx_workflows_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1345,14 +1316,6 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
--- Name: webhooks webhooks_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.webhooks
-    ADD CONSTRAINT webhooks_integration_id_fkey FOREIGN KEY (integration_id) REFERENCES public.integrations(id);
-
-
---
 -- Name: workflow_events workflow_events_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1512,7 +1475,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260115110107	f
+20260116164255	f
 \.
 
 
