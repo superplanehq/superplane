@@ -1,11 +1,13 @@
 package github
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"slices"
 	"strings"
 
+	"github.com/google/go-github/v74/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -102,4 +104,74 @@ func verifySignature(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	return http.StatusOK, nil
+}
+
+func fetchReleaseByStrategy(client *github.Client, owner, repo, strategy, tagName string) (*github.RepositoryRelease, error) {
+	switch strategy {
+	case "specific":
+		// Fetch by specific tag name
+		release, _, err := client.Repositories.GetReleaseByTag(
+			context.Background(),
+			owner,
+			repo,
+			tagName,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find release with tag %s: %w", tagName, err)
+		}
+		return release, nil
+
+	case "latest":
+		// Fetch latest published release
+		release, _, err := client.Repositories.GetLatestRelease(
+			context.Background(),
+			owner,
+			repo,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch latest release: %w", err)
+		}
+		return release, nil
+
+	case "latestDraft":
+		// List releases and find the latest draft
+		releases, _, err := client.Repositories.ListReleases(
+			context.Background(),
+			owner,
+			repo,
+			&github.ListOptions{PerPage: 100},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list releases: %w", err)
+		}
+
+		for _, release := range releases {
+			if release.GetDraft() {
+				return release, nil
+			}
+		}
+		return nil, fmt.Errorf("no draft releases found")
+
+	case "latestPrerelease":
+		// List releases and find the latest prerelease
+		releases, _, err := client.Repositories.ListReleases(
+			context.Background(),
+			owner,
+			repo,
+			&github.ListOptions{PerPage: 100},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list releases: %w", err)
+		}
+
+		for _, release := range releases {
+			if release.GetPrerelease() && !release.GetDraft() {
+				return release, nil
+			}
+		}
+		return nil, fmt.Errorf("no prerelease releases found")
+
+	default:
+		return nil, fmt.Errorf("invalid release strategy: %s", strategy)
+	}
 }
