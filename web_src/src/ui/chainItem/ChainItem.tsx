@@ -124,8 +124,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     }
 
     const mapper = getComponentBaseMapper(item.workflowNode.component.name);
-    return mapper.subtitle?.(item.workflowNode, item.originalExecution, item.additionalData);
-  }, [item.workflowNode, item.originalExecution, item.additionalData]);
+    // Pass a marker to indicate this is from ChainItem, so subtitle can skip issue counts
+    return mapper.subtitle?.(item.workflowNode, item.originalExecution, { skipIssueCounts: true });
+  }, [item.workflowNode, item.originalExecution]);
 
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);

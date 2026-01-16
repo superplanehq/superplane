@@ -13,7 +13,6 @@ import (
 type ListIssues struct{}
 
 type ListIssuesSpec struct {
-	Dataset    string   `json:"dataset"`
 	CheckRules []string `json:"checkRules,omitempty"`
 }
 
@@ -44,14 +43,6 @@ func (l *ListIssues) OutputChannels(configuration any) []core.OutputChannel {
 func (l *ListIssues) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "dataset",
-			Label:       "Dataset",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Default:     "default",
-			Description: "The dataset to query",
-		},
-		{
 			Name:     "checkRules",
 			Label:    "Check Rules",
 			Type:     configuration.FieldTypeAppInstallationResource,
@@ -70,16 +61,7 @@ func (l *ListIssues) Configuration() []configuration.Field {
 }
 
 func (l *ListIssues) Setup(ctx core.SetupContext) error {
-	spec := ListIssuesSpec{}
-	err := mapstructure.Decode(ctx.Configuration, &spec)
-	if err != nil {
-		return fmt.Errorf("error decoding configuration: %v", err)
-	}
-
-	if spec.Dataset == "" {
-		return fmt.Errorf("dataset is required")
-	}
-
+	// No validation needed since dataset is hardcoded to "default"
 	return nil
 }
 
@@ -97,7 +79,7 @@ func (l *ListIssues) Execute(ctx core.ExecutionContext) error {
 
 	// Execute the query to get all current issues
 	query := `{otel_metric_name="dash0.issue.status"} >= 1`
-	data, err := client.ExecutePrometheusInstantQuery(query, spec.Dataset)
+	data, err := client.ExecutePrometheusInstantQuery(query, "default")
 	if err != nil {
 		return fmt.Errorf("failed to execute Prometheus query: %v", err)
 	}

@@ -12,7 +12,6 @@ export interface QueryPrometheusMetadata {
 }
 
 export interface ListIssuesConfiguration {
-  dataset: string;
   checkRules?: string[];
 }
 

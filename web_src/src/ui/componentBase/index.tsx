@@ -75,7 +75,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
         {section.eventSubtitle && (
           <span
             title={String(section.eventSubtitle)}
-            className="text-[13px] font-medium truncate flex-shrink-0 max-w-[50%] text-gray-950/50"
+            className="text-[13px] font-medium truncate flex-shrink-0 max-w-[65%] text-gray-950/50"
           >
             {section.showAutomaticTime && durationText ? durationText : section.eventSubtitle}
           </span>

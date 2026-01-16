@@ -15,25 +15,12 @@ import (
 func Test__ListIssues__Setup(t *testing.T) {
 	component := ListIssues{}
 
-	t.Run("dataset is required", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
-		err := component.Setup(core.SetupContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   map[string]any{"dataset": ""},
-		})
-
-		require.ErrorContains(t, err, "dataset is required")
-	})
-
 	t.Run("valid setup", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
 			AppInstallation: appCtx,
 			Metadata:        &contexts.MetadataContext{},
-			Configuration: map[string]any{
-				"dataset": "default",
-			},
+			Configuration:   map[string]any{},
 		})
 
 		require.NoError(t, err)
@@ -85,9 +72,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"dataset": "default",
-			},
+			Configuration: map[string]any{},
 			HTTP:            httpContext,
 			AppInstallation: appCtx,
 			ExecutionState:  execCtx,
@@ -131,9 +116,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"dataset": "default",
-			},
+			Configuration: map[string]any{},
 			HTTP:            httpContext,
 			AppInstallation: appCtx,
 			ExecutionState:  execCtx,
@@ -207,7 +190,6 @@ func Test__ListIssues__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dataset":    "default",
 				"checkRules": []string{"rule-1"},
 			},
 			HTTP:            httpContext,
@@ -287,7 +269,6 @@ func Test__ListIssues__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dataset":    "default",
 				"checkRules": []string{},
 			},
 			HTTP:            httpContext,
