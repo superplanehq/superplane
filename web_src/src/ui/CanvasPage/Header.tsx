@@ -5,6 +5,7 @@ import { Switch } from "../switch";
 import { useWorkflows } from "@/hooks/useWorkflowData";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
 export interface BreadcrumbItem {
   label: string;
@@ -28,6 +29,8 @@ interface HeaderProps {
   saveButtonHidden?: boolean;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
+  onExportYamlCopy?: () => void;
+  onExportYamlDownload?: () => void;
 }
 
 export function Header({
@@ -42,6 +45,8 @@ export function Header({
   saveButtonHidden,
   isAutoSaveEnabled,
   onToggleAutoSave,
+  onExportYamlCopy,
+  onExportYamlDownload,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
   const navigate = useNavigate();
@@ -177,6 +182,20 @@ export function Header({
 
           {/* Right side - Auto-save toggle and Save button */}
           <div className="flex items-center gap-3">
+            {onExportYamlCopy && onExportYamlDownload && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="flex items-center gap-1">
+                    Export YAML
+                    <ChevronDown size={14} className="text-gray-400" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={onExportYamlCopy}>Copy to Clipboard</DropdownMenuItem>
+                  <DropdownMenuItem onClick={onExportYamlDownload}>Download File</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             {unsavedMessage && (
               <span className="text-xs font-medium text-yellow-700 bg-orange-100 px-2 py-1 rounded hidden sm:inline">
                 {unsavedMessage}

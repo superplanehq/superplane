@@ -1,12 +1,20 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { useCreateWorkflow, useUpdateWorkflow } from "../../hooks/useWorkflowData";
+import { useCreateWorkflow, useUpdateWorkflow, useWorkflowTemplates } from "../../hooks/useWorkflowData";
 import type { ComponentsEdge, ComponentsNode } from "@/api-client";
 
 type ModalMode = "create" | "edit";
 
 type WorkflowSummary = {
+  id: string;
+  name: string;
+  description?: string;
+  nodes?: ComponentsNode[];
+  edges?: ComponentsEdge[];
+};
+
+type WorkflowTemplateSummary = {
   id: string;
   name: string;
   description?: string;
@@ -26,8 +34,9 @@ export function useCreateCanvasModalState() {
 
   const createMutation = useCreateWorkflow(organizationId || "");
   const updateMutation = useUpdateWorkflow(organizationId || "", modalState?.workflow?.id || "");
+  const { data: workflowTemplates = [] } = useWorkflowTemplates(organizationId || "");
 
-  const onSubmit = async (data: { name: string; description?: string }) => {
+  const onSubmit = async (data: { name: string; description?: string; templateId?: string }) => {
     if (!organizationId) {
       return;
     }
@@ -43,9 +52,12 @@ export function useCreateCanvasModalState() {
       return;
     }
 
+    const selectedTemplate = workflowTemplates.find((template) => template.metadata?.id === data.templateId);
     const result = await createMutation.mutateAsync({
       name: data.name,
       description: data.description,
+      nodes: selectedTemplate?.spec?.nodes,
+      edges: selectedTemplate?.spec?.edges,
     });
 
     if (result?.data?.workflow?.metadata?.id) {
@@ -64,6 +76,15 @@ export function useCreateCanvasModalState() {
     initialData: modalState?.workflow
       ? { name: modalState.workflow.name, description: modalState.workflow.description }
       : undefined,
+    templates: workflowTemplates
+      .filter((template) => !!template.metadata?.id)
+      .map((template) => ({
+        id: template.metadata?.id || "",
+        name: template.metadata?.name || "Untitled template",
+        description: template.metadata?.description,
+        nodes: template.spec?.nodes,
+        edges: template.spec?.edges,
+      })) as WorkflowTemplateSummary[],
     mode: modalState?.mode ?? "create",
   };
 }

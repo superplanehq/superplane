@@ -14,6 +14,7 @@ import (
 type Workflow struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
+	IsTemplate     bool
 	Name           string
 	Description    string
 	CreatedBy      *uuid.UUID
@@ -121,6 +122,26 @@ func FindWorkflowByName(name string, organizationID uuid.UUID) (*Workflow, error
 	return &workflow, nil
 }
 
+func FindWorkflowTemplateByName(name string) (*Workflow, error) {
+	return FindWorkflowTemplateByNameInTransaction(database.Conn(), name)
+}
+
+func FindWorkflowTemplateByNameInTransaction(tx *gorm.DB, name string) (*Workflow, error) {
+	var workflow Workflow
+	err := tx.
+		Where("organization_id = ?", TemplateOrganizationID).
+		Where("is_template = ?", true).
+		Where("name = ?", name).
+		First(&workflow).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow, nil
+}
+
 func FindWorkflowInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Workflow, error) {
 	var workflow Workflow
 	err := tx.
@@ -173,10 +194,21 @@ func FindUnscopedWorkflowInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, er
 	return &workflow, nil
 }
 
-func ListWorkflows(orgID string) ([]Workflow, error) {
+func ListWorkflows(orgID string, includeTemplates bool) ([]Workflow, error) {
 	var workflows []Workflow
-	err := database.Conn().
-		Where("organization_id = ?", orgID).
+	var query *gorm.DB
+	if includeTemplates {
+		query = database.Conn().Where(
+			"(organization_id = ?) OR (organization_id = ? AND is_template = ?)",
+			orgID,
+			TemplateOrganizationID,
+			true,
+		)
+	} else {
+		query = database.Conn().Where("organization_id = ?", orgID)
+	}
+
+	err := query.
 		Order("name ASC").
 		Find(&workflows).
 		Error
@@ -186,6 +218,25 @@ func ListWorkflows(orgID string) ([]Workflow, error) {
 	}
 
 	return workflows, nil
+}
+
+func FindWorkflowTemplate(id uuid.UUID) (*Workflow, error) {
+	return FindWorkflowTemplateInTransaction(database.Conn(), id)
+}
+
+func FindWorkflowTemplateInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
+	var workflow Workflow
+	err := tx.
+		Where("id = ?", id).
+		Where("is_template = ?", true).
+		First(&workflow).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow, nil
 }
 
 func ListDeletedWorkflows() ([]Workflow, error) {

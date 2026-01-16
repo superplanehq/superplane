@@ -16,6 +16,7 @@ import (
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"github.com/superplanehq/superplane/pkg/templates"
 	"github.com/superplanehq/superplane/pkg/workers"
 
 	// Import integrations, components and triggers to register them via init()
@@ -320,6 +321,12 @@ func Start() {
 	jwtSigner := jwt.NewSigner(jwtSecret)
 	oidcVerifier := crypto.NewOIDCVerifier()
 	registry := registry.NewRegistry(encryptorInstance)
+
+	if err := templates.SeedTemplates(registry); err != nil {
+		log.Warnf("Failed to seed templates: %v", err)
+	}
+
+	templates.StartTemplateReloader(registry)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcVerifier, authService)

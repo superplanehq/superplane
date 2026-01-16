@@ -10,9 +10,11 @@ import { Button } from "../ui/button";
 interface CreateCanvasModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { name: string; description?: string }) => Promise<void>;
+  onSubmit: (data: { name: string; description?: string; templateId?: string }) => Promise<void>;
   isLoading?: boolean;
   initialData?: { name: string; description?: string };
+  templates?: { id: string; name: string; description?: string }[];
+  defaultTemplateId?: string;
   mode?: "create" | "edit";
 }
 
@@ -25,11 +27,13 @@ export function CreateCanvasModal({
   onSubmit,
   isLoading = false,
   initialData,
+  defaultTemplateId,
   mode = "create",
 }: CreateCanvasModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [nameError, setNameError] = useState("");
+  const [templateId, setTemplateId] = useState("");
 
   useEffect(() => {
     if (isOpen) {
@@ -37,12 +41,19 @@ export function CreateCanvasModal({
       setDescription(initialData?.description ?? "");
       setNameError("");
     }
-  }, [isOpen, initialData?.name, initialData?.description]);
+    if (isOpen && mode === "create") {
+      setTemplateId(defaultTemplateId || "");
+    }
+    if (isOpen && mode !== "create") {
+      setTemplateId("");
+    }
+  }, [isOpen, initialData?.name, initialData?.description, defaultTemplateId, mode]);
 
   const handleClose = () => {
     setName("");
     setDescription("");
     setNameError("");
+    setTemplateId("");
     onClose();
   };
 
@@ -63,12 +74,14 @@ export function CreateCanvasModal({
       await onSubmit({
         name: name.trim(),
         description: description.trim() || undefined,
+        templateId: templateId || undefined,
       });
 
       // Reset form and close modal
       setName("");
       setDescription("");
       setNameError("");
+      setTemplateId("");
       onClose();
     } catch (error) {
       console.error("Error creating canvas:", error);
