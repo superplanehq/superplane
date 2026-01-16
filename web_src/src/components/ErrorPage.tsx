@@ -1,4 +1,3 @@
-import React from "react";
 import { AlertCircle } from "lucide-react";
 import { EmptyState } from "@/ui/emptyState";
 import { Button } from "@/components/ui/button";
