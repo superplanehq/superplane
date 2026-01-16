@@ -1,0 +1,9 @@
+{
+  "body": {
+    "event": "push",
+    "repository": "superplanehq/superplane"
+  },
+  "headers": {
+    "X-Event": ["push"]
+  }
+}

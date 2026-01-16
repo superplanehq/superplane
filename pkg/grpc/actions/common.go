@@ -973,6 +973,7 @@ func SerializeComponents(in []core.Component) []*componentpb.Component {
 		for j, field := range configFields {
 			configuration[j] = ConfigurationFieldToProto(field)
 		}
+		exampleOutput, _ := structpb.NewStruct(component.ExampleOutput())
 
 		out[i] = &componentpb.Component{
 			Name:           component.Name(),
@@ -982,6 +983,7 @@ func SerializeComponents(in []core.Component) []*componentpb.Component {
 			Color:          component.Color(),
 			OutputChannels: channels,
 			Configuration:  configuration,
+			ExampleOutput:  exampleOutput,
 		}
 	}
 
@@ -997,6 +999,7 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 		for j, field := range configFields {
 			configuration[j] = ConfigurationFieldToProto(field)
 		}
+		exampleData, _ := structpb.NewStruct(trigger.ExampleData())
 
 		out[i] = &triggerpb.Trigger{
 			Name:          trigger.Name(),
@@ -1005,6 +1008,7 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 			Icon:          trigger.Icon(),
 			Color:         trigger.Color(),
 			Configuration: configuration,
+			ExampleData:   exampleData,
 		}
 	}
 	return out

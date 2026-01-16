@@ -1,0 +1,14 @@
+{
+  "data": {
+    "started_at": "2024-01-01T12:00:00Z",
+    "finished_at": "2024-01-01T12:05:00Z",
+    "result": "completed",
+    "reason": "timeout",
+    "actor": {
+      "email": "alex@example.com",
+      "display_name": "Alex Doe"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "wait.finished"
+}

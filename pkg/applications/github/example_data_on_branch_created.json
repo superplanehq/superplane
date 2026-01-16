@@ -1,0 +1,15 @@
+{
+  "data": {
+    "ref_type": "branch",
+    "ref": "feature/new-endpoint",
+    "repository": {
+      "full_name": "acme/widgets",
+      "html_url": "https://github.com/acme/widgets"
+    },
+    "sender": {
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.branchCreated"
+}

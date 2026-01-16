@@ -1,0 +1,24 @@
+{
+  "data": {
+    "action": "created",
+    "issue": {
+      "number": 42,
+      "title": "Fix flaky build",
+      "html_url": "https://github.com/acme/widgets/issues/42"
+    },
+    "comment": {
+      "id": 5001,
+      "body": "I can reproduce this",
+      "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-5001"
+    },
+    "repository": {
+      "full_name": "acme/widgets",
+      "html_url": "https://github.com/acme/widgets"
+    },
+    "sender": {
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issueComment"
+}

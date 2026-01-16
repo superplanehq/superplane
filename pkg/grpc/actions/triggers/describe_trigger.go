@@ -7,6 +7,7 @@ import (
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func DescribeTrigger(ctx context.Context, registry *registry.Registry, name string) (*pb.DescribeTriggerResponse, error) {
@@ -22,6 +23,11 @@ func DescribeTrigger(ctx context.Context, registry *registry.Registry, name stri
 		configuration[i] = actions.ConfigurationFieldToProto(field)
 	}
 
+	var exampleData *structpb.Struct
+	if data := trigger.ExampleData(); data != nil {
+		exampleData, _ = structpb.NewStruct(data)
+	}
+
 	return &pb.DescribeTriggerResponse{
 		Trigger: &pb.Trigger{
 			Name:          trigger.Name(),
@@ -30,6 +36,7 @@ func DescribeTrigger(ctx context.Context, registry *registry.Registry, name stri
 			Icon:          trigger.Icon(),
 			Color:         trigger.Color(),
 			Configuration: configuration,
+			ExampleData:   exampleData,
 		},
 	}, nil
 }

@@ -1,0 +1,14 @@
+{
+  "data": {
+    "id": 3001,
+    "tag_name": "v1.2.3",
+    "name": "Release 1.2.3",
+    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+    "draft": false,
+    "prerelease": false,
+    "deleted_at": "2026-01-16T17:55:00Z",
+    "tag_deleted": true
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.release"
+}

@@ -1,0 +1,13 @@
+{
+  "data": {
+    "status": 200,
+    "headers": {
+      "Content-Type": ["application/json"]
+    },
+    "body": {
+      "message": "ok"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "http.request.finished"
+}

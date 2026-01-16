@@ -45,6 +45,10 @@ func (s *PanicableComponent) Color() string {
 	return s.underlying.Color()
 }
 
+func (s *PanicableComponent) ExampleOutput() map[string]any {
+	return s.underlying.ExampleOutput()
+}
+
 func (s *PanicableComponent) Configuration() []configuration.Field {
 	return s.underlying.Configuration()
 }

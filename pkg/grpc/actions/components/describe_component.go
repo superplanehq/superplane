@@ -7,6 +7,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/components"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func DescribeComponent(ctx context.Context, registry *registry.Registry, name string) (*pb.DescribeComponentResponse, error) {
@@ -29,6 +30,11 @@ func DescribeComponent(ctx context.Context, registry *registry.Registry, name st
 		configuration[i] = actions.ConfigurationFieldToProto(field)
 	}
 
+	var exampleOutput *structpb.Struct
+	if output := component.ExampleOutput(); output != nil {
+		exampleOutput, _ = structpb.NewStruct(output)
+	}
+
 	return &pb.DescribeComponentResponse{
 		Component: &pb.Component{
 			Name:           component.Name(),
@@ -38,6 +44,7 @@ func DescribeComponent(ctx context.Context, registry *registry.Registry, name st
 			Color:          component.Color(),
 			OutputChannels: channels,
 			Configuration:  configuration,
+			ExampleOutput:  exampleOutput,
 		},
 	}, nil
 }

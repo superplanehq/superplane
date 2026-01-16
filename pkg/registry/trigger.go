@@ -44,6 +44,10 @@ func (s *PanicableTrigger) Color() string {
 	return s.underlying.Color()
 }
 
+func (s *PanicableTrigger) ExampleData() map[string]any {
+	return s.underlying.ExampleData()
+}
+
 func (s *PanicableTrigger) Configuration() []configuration.Field {
 	return s.underlying.Configuration()
 }

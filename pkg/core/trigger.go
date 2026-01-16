@@ -38,6 +38,11 @@ type Trigger interface {
 	Color() string
 
 	/*
+	 * Example input data for the trigger.
+	 */
+	ExampleData() map[string]any
+
+	/*
 	 * The configuration fields exposed by the trigger.
 	 */
 	Configuration() []configuration.Field

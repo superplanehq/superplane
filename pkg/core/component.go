@@ -44,6 +44,11 @@ type Component interface {
 	Color() string
 
 	/*
+	 * Example output data for the component.
+	 */
+	ExampleOutput() map[string]any
+
+	/*
 	 * The output channels used by the component.
 	 * If none is returned, the 'default' one is used.
 	 */
