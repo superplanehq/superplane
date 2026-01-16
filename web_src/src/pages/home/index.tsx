@@ -610,15 +610,7 @@ function TemplateCard({ template, organizationId, navigate }: TemplateCardProps)
           ) : null}
 
           <div className="flex justify-between items-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left mt-1">
-              {template.createdBy?.name ? (
-                <>
-                  Created by {template.createdBy.name}, on {template.createdAt}
-                </>
-              ) : (
-                <>Created on {template.createdAt}</>
-              )}
-            </p>
+            <span className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left mt-1" />
           </div>
         </div>
       </div>
