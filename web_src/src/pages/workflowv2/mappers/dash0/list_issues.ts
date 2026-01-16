@@ -71,7 +71,8 @@ export const listIssuesMapper: ComponentBaseMapper = {
       return `${countParts.join(", ")} · ${timeAgo}`;
     }
 
-    return timeAgo;
+    // No issues found - show "no issues" with time
+    return `no issues · ${timeAgo}`;
   },
 
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, string> {
