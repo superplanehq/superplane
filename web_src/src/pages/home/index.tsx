@@ -13,7 +13,7 @@ import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 import { useBlueprints, useDeleteBlueprint } from "../../hooks/useBlueprintData";
-import { useDeleteWorkflow, useWorkflowTemplates, useWorkflows, workflowKeys } from "../../hooks/useWorkflowData";
+import { useDeleteWorkflow, useWorkflows, workflowKeys } from "../../hooks/useWorkflowData";
 import { resolveIcon } from "../../lib/utils";
 import { isCustomComponentsEnabled } from "../../lib/env";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
@@ -39,17 +39,6 @@ interface WorkflowCardData {
   description?: string;
   createdAt: string;
   type: "workflow";
-  createdBy?: { id?: string; name?: string };
-  nodes?: ComponentsNode[];
-  edges?: ComponentsEdge[];
-}
-
-interface TemplateCardData {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt: string;
-  type: "template";
   createdBy?: { id?: string; name?: string };
   nodes?: ComponentsNode[];
   edges?: ComponentsEdge[];
@@ -81,15 +70,8 @@ const HomePage = () => {
     error: workflowApiError,
   } = useWorkflows(organizationId || "");
 
-  const {
-    data: templatesData = [],
-    isLoading: templatesLoading,
-    error: templatesApiError,
-  } = useWorkflowTemplates(organizationId || "");
-
   const blueprintError = blueprintApiError ? "Failed to fetch Bundles. Please try again later." : null;
   const workflowError = workflowApiError ? "Failed to fetch workflows. Please try again later." : null;
-  const templateError = templatesApiError ? "Failed to fetch templates. Please try again later." : null;
 
   const formatDate = (value?: string) => {
     if (!value) return "Unknown";
@@ -116,28 +98,10 @@ const HomePage = () => {
     edges: workflow.spec?.edges || [],
   }));
 
-  const templates: TemplateCardData[] = (templatesData || []).map((template: any) => ({
-    id: template.metadata?.id!,
-    name: template.metadata?.name!,
-    description: template.metadata?.description,
-    createdAt: formatDate(template.metadata?.createdAt),
-    type: "template" as const,
-    createdBy: template.metadata?.createdBy,
-    nodes: template.spec?.nodes || [],
-    edges: template.spec?.edges || [],
-  }));
-
   const filteredBlueprints = blueprints.filter((blueprint) => {
     const matchesSearch =
       blueprint.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       blueprint.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
-
-  const filteredTemplates = templates.filter((template) => {
-    const matchesSearch =
-      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      template.description?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
 
@@ -149,8 +113,7 @@ const HomePage = () => {
   });
 
   const isLoading =
-    (activeTab === "custom-components" && blueprintsLoading) ||
-    (activeTab === "canvases" && (workflowsLoading || templatesLoading));
+    (activeTab === "custom-components" && blueprintsLoading) || (activeTab === "canvases" && workflowsLoading);
 
   if (isLoading) {
     return (
@@ -169,7 +132,7 @@ const HomePage = () => {
     );
   }
 
-  const error = activeTab === "custom-components" ? blueprintError : workflowError || templateError;
+  const error = activeTab === "custom-components" ? blueprintError : workflowError;
 
   const onNewClick = () => {
     if (activeTab === "custom-components" && isCustomComponentsEnabled()) {
@@ -218,7 +181,6 @@ const HomePage = () => {
                 activeTab={activeTab}
                 filteredBlueprints={filteredBlueprints}
                 filteredWorkflows={filteredWorkflows}
-                filteredTemplates={filteredTemplates}
                 organizationId={organizationId}
                 searchQuery={searchQuery}
                 onEditWorkflow={canvasModalState.onOpenEdit}
@@ -352,7 +314,6 @@ function Content({
   activeTab,
   filteredBlueprints,
   filteredWorkflows,
-  filteredTemplates,
   organizationId,
   searchQuery,
   onEditWorkflow,
@@ -361,33 +322,22 @@ function Content({
   activeTab: TabType;
   filteredBlueprints: BlueprintCardData[];
   filteredWorkflows: WorkflowCardData[];
-  filteredTemplates: TemplateCardData[];
   organizationId: string;
   searchQuery: string;
   onEditWorkflow: (workflow: WorkflowCardData) => void;
   onNewClick: () => void;
 }) {
   if (activeTab === "canvases") {
-    const hasTemplates = filteredTemplates.length > 0;
-    const hasWorkflows = filteredWorkflows.length > 0;
-
-    if (!hasTemplates && !hasWorkflows) {
+    if (filteredWorkflows.length === 0) {
       return <CanvasesEmptyState searchQuery={searchQuery} onNewClick={onNewClick} />;
     }
 
     return (
-      <div className="space-y-10">
-        {hasWorkflows ? (
-          <WorkflowGridView
-            filteredWorkflows={filteredWorkflows}
-            organizationId={organizationId}
-            onEditWorkflow={onEditWorkflow}
-          />
-        ) : (
-          <CanvasesEmptyState searchQuery={searchQuery} onNewClick={onNewClick} />
-        )}
-        {hasTemplates && <TemplateGridView filteredTemplates={filteredTemplates} organizationId={organizationId} />}
-      </div>
+      <WorkflowGridView
+        filteredWorkflows={filteredWorkflows}
+        organizationId={organizationId}
+        onEditWorkflow={onEditWorkflow}
+      />
     );
   } else if (activeTab === "custom-components") {
     if (filteredBlueprints.length === 0) {
@@ -465,30 +415,6 @@ function WorkflowGridView({ filteredWorkflows, organizationId, onEditWorkflow }:
   );
 }
 
-interface TemplateGridViewProps {
-  filteredTemplates: TemplateCardData[];
-  organizationId: string;
-}
-
-function TemplateGridView({ filteredTemplates, organizationId }: TemplateGridViewProps) {
-  const navigate = useNavigate();
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <Heading level={2} className="text-lg text-gray-900 dark:text-white">
-          Templates
-        </Heading>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredTemplates.map((template) => (
-          <TemplateCard key={template.id} template={template} organizationId={organizationId} navigate={navigate} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 interface WorkflowCardProps {
   workflow: WorkflowCardData;
   organizationId: string;
@@ -559,74 +485,6 @@ function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCa
   );
 }
 
-interface TemplateCardProps {
-  template: TemplateCardData;
-  organizationId: string;
-  navigate: any;
-}
-
-function TemplateCard({ template, organizationId, navigate }: TemplateCardProps) {
-  const handleNavigate = () => navigate(`/${organizationId}/templates/${template.id}`);
-  const previewNodes = template.nodes || [];
-  const previewEdges = template.edges || [];
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={(event) => {
-        if (event.defaultPrevented) return;
-        handleNavigate();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          handleNavigate();
-        }
-      }}
-      className="min-h-48 bg-white dark:bg-gray-950 rounded-md outline outline-slate-950/10 hover:shadow-md transition-shadow cursor-pointer group"
-    >
-      <div className="flex flex-col h-full">
-        <div className="relative">
-          <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
-          <div
-            className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-t-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-            aria-hidden
-          >
-            <span className="text-sm text-gray-800 dark:text-gray-900 bg-white/80 rounded-sm outline outline-1 outline-gray-400 dark:outline-gray-600 px-2 py-1">Preview</span>
-          </div>
-        </div>
-
-        <div className="p-4 border-t border-gray-200">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-col flex-1 min-w-0">
-              <Heading
-                level={3}
-                className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
-              >
-                <span className="truncate">{template.name}</span>
-              </Heading>
-            </div>
-            <span className="text-xs text-gray-600 bg-slate-100 rounded-full px-2 py-1">Template</span>
-          </div>
-
-          {template.description ? (
-            <div className="mb-4">
-              <Text className="text-[13px] !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
-                {template.description}
-              </Text>
-            </div>
-          ) : null}
-
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left mt-1" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 interface CanvasMiniMapProps {
   nodes?: ComponentsNode[];
   edges?: ComponentsEdge[];
@@ -640,8 +498,8 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
   if (!positionedNodes.length) {
     return (
       <div className="p-4">
-        <div className="h-28 w-full bg-transparent flex flex-col items-center justify-center pt-4 gap-1 text-[13px] text-gray-800 dark:text-gray-400">
-          <Rainbow size={24} className="text-gray-800 dark:text-gray-400" />
+        <div className="h-28 w-full bg-transparent flex flex-col items-center justify-center pt-4 gap-1 text-[13px] text-gray-500">
+          <Rainbow size={24} className="text-gray-500" />
           Canvas is empty
         </div>
       </div>

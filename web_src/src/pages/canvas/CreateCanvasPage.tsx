@@ -186,7 +186,6 @@ export function CreateCanvasPage() {
     </div>
   );
 }
-
 interface TemplateCardProps {
   template: any;
   organizationId: string;
@@ -263,8 +262,8 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
   if (!positionedNodes.length) {
     return (
       <div className="p-4">
-        <div className="h-28 w-full bg-transparent flex flex-col items-center justify-center pt-4 gap-1 text-[13px] text-gray-800 dark:text-gray-400">
-          <Rainbow size={24} className="text-gray-800 dark:text-gray-400" />
+        <div className="h-28 w-full bg-transparent flex flex-col items-center justify-center pt-4 gap-1 text-[13px] text-gray-500">
+          <Rainbow size={24} className="text-gray-500" />
           Canvas is empty
         </div>
       </div>
@@ -341,3 +340,4 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
     </div>
   );
 }
+
