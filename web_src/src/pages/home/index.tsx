@@ -66,6 +66,7 @@ const HomePage = () => {
 
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
+  const navigate = useNavigate();
 
   const blueprintsQuery = useBlueprints(organizationId || "");
   const {
@@ -174,13 +175,13 @@ const HomePage = () => {
     if (activeTab === "custom-components" && isCustomComponentsEnabled()) {
       customComponentModalState.onOpen();
     } else {
-      canvasModalState.onOpen();
+      navigate(`/${organizationId}/canvases/new`);
     }
   };
   const showTabs = false;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
       <header className="bg-white border-b border-border px-4 h-12 flex items-center">
         <OrganizationMenuButton organizationId={organizationId} />
       </header>
@@ -520,12 +521,12 @@ function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCa
       <div className="flex flex-col h-full">
         <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
 
-        <div className="p-4">
+        <div className="p-4 border-t border-gray-200">
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-col flex-1 min-w-0">
               <Heading
                 level={3}
-                className="!text-lg font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
               >
                 <span className="truncate">{workflow.name}</span>
               </Heading>
@@ -535,7 +536,7 @@ function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCa
 
           {workflow.description ? (
             <div className="mb-4">
-              <Text className="text-sm !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
+              <Text className="text-[13px] !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
                 {workflow.description}
               </Text>
             </div>
@@ -583,17 +584,25 @@ function TemplateCard({ template, organizationId, navigate }: TemplateCardProps)
           handleNavigate();
         }
       }}
-      className="min-h-48 bg-white dark:bg-gray-950 rounded-md outline outline-slate-950/10 hover:shadow-md transition-shadow cursor-pointer"
+      className="min-h-48 bg-white dark:bg-gray-950 rounded-md outline outline-slate-950/10 hover:shadow-md transition-shadow cursor-pointer group"
     >
       <div className="flex flex-col h-full">
-        <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
+        <div className="relative">
+          <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
+          <div
+            className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-t-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+            aria-hidden
+          >
+            <span className="text-sm text-gray-800 dark:text-gray-900 bg-white/80 rounded-sm outline outline-1 outline-gray-400 dark:outline-gray-600 px-2 py-1">Preview</span>
+          </div>
+        </div>
 
-        <div className="p-4">
+        <div className="p-4 border-t border-gray-200">
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-col flex-1 min-w-0">
               <Heading
                 level={3}
-                className="!text-lg font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
               >
                 <span className="truncate">{template.name}</span>
               </Heading>
@@ -603,7 +612,7 @@ function TemplateCard({ template, organizationId, navigate }: TemplateCardProps)
 
           {template.description ? (
             <div className="mb-4">
-              <Text className="text-sm !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
+              <Text className="text-[13px] !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
                 {template.description}
               </Text>
             </div>
@@ -630,7 +639,7 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
 
   if (!positionedNodes.length) {
     return (
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4">
         <div className="h-28 w-full bg-transparent flex flex-col items-center justify-center pt-4 gap-1 text-[13px] text-gray-800 dark:text-gray-400">
           <Rainbow size={24} className="text-gray-800 dark:text-gray-400" />
           Canvas is empty
@@ -665,7 +674,7 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
     ) || [];
 
   return (
-    <div className="p-4 w-full border-b border-gray-200 overflow-hidden">
+    <div className="p-4 w-full overflow-hidden">
       <svg
         viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
