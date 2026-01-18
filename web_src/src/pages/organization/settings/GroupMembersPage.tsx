@@ -134,7 +134,7 @@ export function GroupMembersPage() {
             showDivider={false}
           />
         </div>
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
           <p>{error instanceof Error ? error.message : "Failed to load group data"}</p>
         </div>
       </div>
