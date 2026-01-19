@@ -1,6 +1,7 @@
 {
   "data": {
     "status": 200,
+    "error": "Error to read request body: EOF",
     "headers": {
       "Content-Type": ["application/json"]
     },

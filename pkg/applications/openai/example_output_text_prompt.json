@@ -1,0 +1,14 @@
+{
+    "type": "openai.api.response",
+    "data": {
+        "id": "cmpl-1234567890",
+        "model": "gpt-5.2",
+        "text": "Hello, world!",
+        "usage": {
+            "input_tokens": 10,
+            "output_tokens": 10,
+            "total_tokens": 20
+        }
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

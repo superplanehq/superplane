@@ -1,8 +1,5 @@
 {
-  "data": {
-    "status": "ok",
-    "timestamp": "2024-01-01T12:00:00Z"
-  },
+  "data": {},
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "timegate.finished"
 }
