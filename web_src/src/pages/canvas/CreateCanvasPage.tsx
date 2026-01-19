@@ -224,7 +224,9 @@ function TemplateCard({ template, organizationId, navigate }: TemplateCardProps)
             className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-t-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
             aria-hidden
           >
-            <span className="text-sm text-gray-800 dark:text-gray-900 bg-white/80 rounded-sm outline outline-1 outline-gray-400 dark:outline-gray-600 px-2 py-1">Preview</span>
+            <span className="text-sm text-gray-800 dark:text-gray-900 bg-white/80 rounded-sm outline outline-1 outline-gray-400 dark:outline-gray-600 px-2 py-1">
+              Preview
+            </span>
           </div>
         </div>
 
@@ -340,4 +342,3 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
     </div>
   );
 }
-
