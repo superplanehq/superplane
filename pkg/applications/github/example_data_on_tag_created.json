@@ -2,12 +2,18 @@
   "data": {
     "ref_type": "tag",
     "ref": "v1.2.3",
+    "master_branch": "main",
+    "description": "Example repository for webhook payloads",
+    "pusher_type": "user",
     "repository": {
+      "id": 123456,
       "full_name": "acme/widgets",
       "html_url": "https://github.com/acme/widgets"
     },
     "sender": {
-      "login": "octocat"
+      "login": "octocat",
+      "id": 101,
+      "html_url": "https://github.com/octocat"
     }
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
