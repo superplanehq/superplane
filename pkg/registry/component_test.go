@@ -22,6 +22,7 @@ func (p *panickingComponent) Label() string                                  { r
 func (p *panickingComponent) Description() string                            { return "description" }
 func (p *panickingComponent) Icon() string                                   { return "icon" }
 func (p *panickingComponent) Color() string                                  { return "red" }
+func (p *panickingComponent) ExampleOutput() map[string]any                  { return nil }
 func (p *panickingComponent) Configuration() []configuration.Field           { return nil }
 func (p *panickingComponent) Actions() []core.Action                         { return nil }
 func (p *panickingComponent) OutputChannels(config any) []core.OutputChannel { return nil }

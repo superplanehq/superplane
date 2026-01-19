@@ -1,0 +1,10 @@
+{
+  "data": {
+    "groupKey": "merge-group-123",
+    "eventIDs": ["event_1", "event_2"],
+    "sources": ["node_a", "node_b"],
+    "stopEarly": false
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "merge.finished"
+}

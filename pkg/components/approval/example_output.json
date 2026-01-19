@@ -1,0 +1,23 @@
+{
+  "data": {
+    "result": "approved",
+    "records": [
+      {
+        "index": 0,
+        "type": "user",
+        "state": "approved",
+        "user": {
+          "id": "user_123",
+          "name": "Alex Doe",
+          "email": "alex@example.com"
+        },
+        "approval": {
+          "approvedAt": "2024-01-01T12:00:00Z",
+          "comment": "Looks good"
+        }
+      }
+    ]
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "approval.finished"
+}

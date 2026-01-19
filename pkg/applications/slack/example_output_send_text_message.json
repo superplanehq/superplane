@@ -1,0 +1,10 @@
+{
+  "data": {
+    "text": "Hello from SuperPlane",
+    "user": "U123456",
+    "channel": "C123456",
+    "ts": "1700000000.000100"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "slack.message.sent"
+}

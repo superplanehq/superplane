@@ -83,6 +83,9 @@ export type ComponentsComponent = {
   outputChannels?: Array<SuperplaneComponentsOutputChannel>;
   icon?: string;
   color?: string;
+  exampleOutput?: {
+    [key: string]: unknown;
+  };
 };
 
 export type ComponentsComponentAction = {
@@ -700,6 +703,9 @@ export type TriggersTrigger = {
   icon?: string;
   color?: string;
   configuration?: Array<ConfigurationField>;
+  exampleData?: {
+    [key: string]: unknown;
+  };
 };
 
 export type UsersAccountProvider = {

@@ -1,0 +1,17 @@
+{
+    "type": "dash0.issues.list",
+    "data": {
+        "status": "success",
+        "data": {
+            "resultType": "vector",
+            "result": [
+                {
+                    "metric": {"service_name": "test"},
+                    "value": [1234567890, "1"],
+                    "values": [[1234567890, "1"], [1234567900, "2"]]
+                }
+            ]
+        }
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

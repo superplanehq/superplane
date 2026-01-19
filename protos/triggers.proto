@@ -3,6 +3,7 @@ syntax = "proto3";
 package Superplane.Triggers;
 
 import "configuration.proto";
+import "google/protobuf/struct.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
@@ -69,4 +70,5 @@ message Trigger {
   string icon = 4;
   string color = 5;
   repeated Configuration.Field configuration = 6;
+  google.protobuf.Struct example_data = 7;
 }

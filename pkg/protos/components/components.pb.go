@@ -255,6 +255,7 @@ type Component struct {
 	OutputChannels []*OutputChannel       `protobuf:"bytes,5,rep,name=output_channels,json=outputChannels,proto3" json:"output_channels,omitempty"`
 	Icon           string                 `protobuf:"bytes,6,opt,name=icon,proto3" json:"icon,omitempty"`
 	Color          string                 `protobuf:"bytes,7,opt,name=color,proto3" json:"color,omitempty"`
+	ExampleOutput  *_struct.Struct        `protobuf:"bytes,8,opt,name=example_output,json=exampleOutput,proto3" json:"example_output,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -336,6 +337,13 @@ func (x *Component) GetColor() string {
 		return x.Color
 	}
 	return ""
+}
+
+func (x *Component) GetExampleOutput() *_struct.Struct {
+	if x != nil {
+		return x.ExampleOutput
+	}
+	return nil
 }
 
 type OutputChannel struct {
@@ -1148,7 +1156,7 @@ const file_components_proto_rawDesc = "" +
 	"\x18DescribeComponentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"[\n" +
 	"\x19DescribeComponentResponse\x12>\n" +
-	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\x97\x02\n" +
+	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\xd7\x02\n" +
 	"\tComponent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
@@ -1156,7 +1164,8 @@ const file_components_proto_rawDesc = "" +
 	"\rconfiguration\x18\x04 \x03(\v2\x1f.Superplane.Configuration.FieldR\rconfiguration\x12M\n" +
 	"\x0foutput_channels\x18\x05 \x03(\v2$.Superplane.Components.OutputChannelR\x0eoutputChannels\x12\x12\n" +
 	"\x04icon\x18\x06 \x01(\tR\x04icon\x12\x14\n" +
-	"\x05color\x18\a \x01(\tR\x05color\"[\n" +
+	"\x05color\x18\a \x01(\tR\x05color\x12>\n" +
+	"\x0eexample_output\x18\b \x01(\v2\x17.google.protobuf.StructR\rexampleOutput\"[\n" +
 	"\rOutputChannel\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
@@ -1274,29 +1283,30 @@ var file_components_proto_depIdxs = []int32{
 	5,  // 1: Superplane.Components.DescribeComponentResponse.component:type_name -> Superplane.Components.Component
 	19, // 2: Superplane.Components.Component.configuration:type_name -> Superplane.Configuration.Field
 	6,  // 3: Superplane.Components.Component.output_channels:type_name -> Superplane.Components.OutputChannel
-	19, // 4: Superplane.Components.ComponentAction.parameters:type_name -> Superplane.Configuration.Field
-	8,  // 5: Superplane.Components.ListComponentActionsResponse.actions:type_name -> Superplane.Components.ComponentAction
-	0,  // 6: Superplane.Components.Node.type:type_name -> Superplane.Components.Node.Type
-	20, // 7: Superplane.Components.Node.configuration:type_name -> google.protobuf.Struct
-	20, // 8: Superplane.Components.Node.metadata:type_name -> google.protobuf.Struct
-	11, // 9: Superplane.Components.Node.position:type_name -> Superplane.Components.Position
-	15, // 10: Superplane.Components.Node.component:type_name -> Superplane.Components.Node.ComponentRef
-	18, // 11: Superplane.Components.Node.blueprint:type_name -> Superplane.Components.Node.BlueprintRef
-	16, // 12: Superplane.Components.Node.trigger:type_name -> Superplane.Components.Node.TriggerRef
-	17, // 13: Superplane.Components.Node.widget:type_name -> Superplane.Components.Node.WidgetRef
-	13, // 14: Superplane.Components.Node.app_installation:type_name -> Superplane.Components.AppInstallationRef
-	21, // 15: Superplane.Components.NotificationEmailRequested.timestamp:type_name -> google.protobuf.Timestamp
-	1,  // 16: Superplane.Components.Components.ListComponents:input_type -> Superplane.Components.ListComponentsRequest
-	3,  // 17: Superplane.Components.Components.DescribeComponent:input_type -> Superplane.Components.DescribeComponentRequest
-	7,  // 18: Superplane.Components.Components.ListComponentActions:input_type -> Superplane.Components.ListComponentActionsRequest
-	2,  // 19: Superplane.Components.Components.ListComponents:output_type -> Superplane.Components.ListComponentsResponse
-	4,  // 20: Superplane.Components.Components.DescribeComponent:output_type -> Superplane.Components.DescribeComponentResponse
-	9,  // 21: Superplane.Components.Components.ListComponentActions:output_type -> Superplane.Components.ListComponentActionsResponse
-	19, // [19:22] is the sub-list for method output_type
-	16, // [16:19] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	20, // 4: Superplane.Components.Component.example_output:type_name -> google.protobuf.Struct
+	19, // 5: Superplane.Components.ComponentAction.parameters:type_name -> Superplane.Configuration.Field
+	8,  // 6: Superplane.Components.ListComponentActionsResponse.actions:type_name -> Superplane.Components.ComponentAction
+	0,  // 7: Superplane.Components.Node.type:type_name -> Superplane.Components.Node.Type
+	20, // 8: Superplane.Components.Node.configuration:type_name -> google.protobuf.Struct
+	20, // 9: Superplane.Components.Node.metadata:type_name -> google.protobuf.Struct
+	11, // 10: Superplane.Components.Node.position:type_name -> Superplane.Components.Position
+	15, // 11: Superplane.Components.Node.component:type_name -> Superplane.Components.Node.ComponentRef
+	18, // 12: Superplane.Components.Node.blueprint:type_name -> Superplane.Components.Node.BlueprintRef
+	16, // 13: Superplane.Components.Node.trigger:type_name -> Superplane.Components.Node.TriggerRef
+	17, // 14: Superplane.Components.Node.widget:type_name -> Superplane.Components.Node.WidgetRef
+	13, // 15: Superplane.Components.Node.app_installation:type_name -> Superplane.Components.AppInstallationRef
+	21, // 16: Superplane.Components.NotificationEmailRequested.timestamp:type_name -> google.protobuf.Timestamp
+	1,  // 17: Superplane.Components.Components.ListComponents:input_type -> Superplane.Components.ListComponentsRequest
+	3,  // 18: Superplane.Components.Components.DescribeComponent:input_type -> Superplane.Components.DescribeComponentRequest
+	7,  // 19: Superplane.Components.Components.ListComponentActions:input_type -> Superplane.Components.ListComponentActionsRequest
+	2,  // 20: Superplane.Components.Components.ListComponents:output_type -> Superplane.Components.ListComponentsResponse
+	4,  // 21: Superplane.Components.Components.DescribeComponent:output_type -> Superplane.Components.DescribeComponentResponse
+	9,  // 22: Superplane.Components.Components.ListComponentActions:output_type -> Superplane.Components.ListComponentActionsResponse
+	20, // [20:23] is the sub-list for method output_type
+	17, // [17:20] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_components_proto_init() }

@@ -1,0 +1,23 @@
+{
+  "data": {
+    "action": "published",
+    "release": {
+      "id": 3001,
+      "tag_name": "v1.2.3",
+      "name": "Release 1.2.3",
+      "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3"
+    },
+    "repository": {
+      "id": 123456,
+      "full_name": "acme/widgets",
+      "html_url": "https://github.com/acme/widgets"
+    },
+    "sender": {
+      "login": "octocat",
+      "id": 101,
+      "html_url": "https://github.com/octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.release"
+}

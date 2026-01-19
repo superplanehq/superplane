@@ -1,0 +1,12 @@
+{
+  "data": {
+    "state": "success",
+    "description": "All checks passed",
+    "context": "ci/build",
+    "target_url": "https://ci.example.com/builds/123",
+    "created_at": "2026-01-16T17:45:00Z",
+    "updated_at": "2026-01-16T17:45:10Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.commitStatus"
+}

@@ -1,0 +1,18 @@
+{
+  "data": {
+    "workflow": {
+      "id": "wf_123",
+      "url": "https://semaphore.example.com/workflows/wf_123"
+    },
+    "pipeline": {
+      "id": "ppl_456",
+      "state": "done",
+      "result": "passed"
+    },
+    "extra": {
+      "triggeredBy": "SuperPlane"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "semaphore.workflow.finished"
+}

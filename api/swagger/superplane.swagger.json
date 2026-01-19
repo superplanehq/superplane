@@ -3028,6 +3028,9 @@
         },
         "color": {
           "type": "string"
+        },
+        "exampleOutput": {
+          "type": "object"
         }
       }
     },
@@ -4459,6 +4462,9 @@
             "type": "object",
             "$ref": "#/definitions/ConfigurationField"
           }
+        },
+        "exampleData": {
+          "type": "object"
         }
       }
     },
