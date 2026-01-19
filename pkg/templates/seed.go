@@ -2,8 +2,8 @@ package templates
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -30,10 +30,6 @@ func Setup(registry *registry.Registry) error {
 		log.Warnf("Failed to seed templates: %v", err)
 	}
 
-	if os.Getenv("APP_ENV") == "development" {
-		startTemplateReloader(registry)
-	}
-
 	return nil
 }
 
@@ -57,7 +53,7 @@ func SeedTemplates(registry *registry.Registry) error {
 			return err
 		}
 
-		entries, err := fs.ReadDir(templateDir, ".")
+		entries, err := os.ReadDir(templateDir)
 		if err != nil {
 			return fmt.Errorf("read template assets: %w", err)
 		}
@@ -67,7 +63,7 @@ func SeedTemplates(registry *registry.Registry) error {
 				continue
 			}
 
-			data, err := fs.ReadFile(templateDir, entry.Name())
+			data, err := os.ReadFile(path.Join(templateDir, entry.Name()))
 			if err != nil {
 				return fmt.Errorf("read template %s: %w", entry.Name(), err)
 			}
@@ -102,11 +98,43 @@ func SeedTemplates(registry *registry.Registry) error {
 }
 
 func deleteAllTemplateWorkflows(tx *gorm.DB) error {
-	return tx.
+	var err error
+
+	var workflowIDs []uuid.UUID
+
+	err = tx.
+		Unscoped().
+		Model(&models.Workflow{}).
+		Where("organization_id = ?", models.TemplateOrganizationID).
+		Where("is_template = ?", true).
+		Pluck("id", &workflowIDs).Error
+
+	if err != nil {
+		return err
+	}
+
+	err = tx.
+		Unscoped().
+		Model(&models.WorkflowNode{}).
+		Where("workflow_id IN (?)", workflowIDs).
+		Delete(&models.WorkflowNode{}).Error
+
+	if err != nil {
+		return err
+	}
+
+	err = tx.
+		Unscoped().
 		Model(&models.Workflow{}).
 		Where("organization_id = ?", models.TemplateOrganizationID).
 		Where("is_template = ?", true).
 		Delete(&models.Workflow{}).Error
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func createTemplateWorkflow(tx *gorm.DB, registry *registry.Registry, template *pb.Workflow) error {
@@ -179,52 +207,11 @@ func unlockTemplateSeed(tx *gorm.DB) {
 	_ = tx.Exec("SELECT pg_advisory_unlock(?)", seedLockID).Error
 }
 
-func startTemplateReloader(registry *registry.Registry) {
-	dir, err := templateDir()
-	if err != nil {
-		log.Printf("template reloader: failed to get template directory: %v", err)
-		return
-	}
-
-	initialFingerprint, err := templateDirFingerprint(dir)
-	if err != nil {
-		log.Printf("template reloader: failed to read templates: %v", err)
-		return
-	}
-
-	go func() {
-		ticker := time.NewTicker(10 * time.Second)
-		defer ticker.Stop()
-
-		lastFingerprint := initialFingerprint
-
-		for range ticker.C {
-			fingerprint, err := templateDirFingerprint(dir)
-			if err != nil {
-				log.Printf("template reloader: failed to calculate fingerprint: %v", err)
-				continue
-			}
-
-			if fingerprint == lastFingerprint {
-				continue
-			}
-
-			err = SeedTemplates(registry)
-			if err != nil {
-				log.Printf("template reloader: failed to seed templates: %v", err)
-			}
-
-			log.Printf("template reloader: templates re-seeded")
-			lastFingerprint = fingerprint
-		}
-	}()
-}
-
-func templateDir() (fs.FS, error) {
+func templateDir() (string, error) {
 	dir := os.Getenv("TEMPLATE_DIR")
 	if dir == "" {
-		return nil, fmt.Errorf("TEMPLATE_DIR is not set")
+		return "", fmt.Errorf("TEMPLATE_DIR is not set")
 	}
 
-	return os.DirFS(dir + "/canvases"), nil
+	return path.Join(dir, "canvases"), nil
 }

@@ -58,7 +58,7 @@ services:
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
-      TEMPLATE_DIR: "/app/pkg/templates/templates"
+      TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@notifications.superplane.com}
@@ -97,7 +97,7 @@ services:
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
-    command: ["--config=/etc/otel-collector-config.yaml"]
+    command: [ "--config=/etc/otel-collector-config.yaml" ]
     volumes:
       - ./otel-collector-config.dev.yaml:/etc/otel-collector-config.yaml:ro
     ports:
@@ -112,11 +112,11 @@ services:
       POSTGRES_PASSWORD: "the-cake-is-a-lie"
     restart: "on-failure"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 3s
       timeout: 3s
       retries: 5
-  
+
   pgweb:
     image: sosedoff/pgweb
     environment:
