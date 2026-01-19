@@ -6,7 +6,7 @@ export function Text({ className, ...props }: React.ComponentPropsWithoutRef<"p"
     <p
       data-slot="text"
       {...props}
-      className={twMerge("text-base/6 text-gray-500 sm:text-sm/6 dark:text-gray-400", className)}
+      className={twMerge("text-base/6 text-red-500 sm:text-sm/6 dark:text-red-400", className)}
     />
   );
 }

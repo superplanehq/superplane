@@ -16,6 +16,7 @@ interface CreateCanvasModalProps {
   templates?: { id: string; name: string; description?: string }[];
   defaultTemplateId?: string;
   mode?: "create" | "edit";
+  fromTemplate?: boolean;
 }
 
 const MAX_CANVAS_NAME_LENGTH = 50;
@@ -29,6 +30,7 @@ export function CreateCanvasModal({
   initialData,
   defaultTemplateId,
   mode = "create",
+  fromTemplate = false,
 }: CreateCanvasModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -97,11 +99,15 @@ export function CreateCanvasModal({
 
   return (
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
-      <DialogTitle>{mode === "edit" ? "Edit canvas" : "New canvas"}</DialogTitle>
+      <DialogTitle>
+        {fromTemplate ? "New Canvas from template" : mode === "edit" ? "Edit Canvas" : "New Canvas"}
+      </DialogTitle>
       <DialogDescription className="text-sm !text-[var(--color-gray-800)]">
-        {mode === "edit"
-          ? "Update the canvas details to keep things clear for your teammates."
-          : "Create a new canvas to orchestrate your DevOps work. You can tweak the details any time."}
+        {fromTemplate
+          ? "Create a canvas from this template. Give it a name and optional description to get started."
+          : mode === "edit"
+            ? "Update the canvas details to keep things clear for your teammates."
+            : "Create a new canvas to orchestrate your DevOps work. You can tweak the details any time."}
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
         <Icon name="close" size="sm" />
@@ -166,9 +172,13 @@ export function CreateCanvasModal({
             ? isLoading
               ? "Saving..."
               : "Save changes"
-            : isLoading
-              ? "Creating canvas..."
-              : "Create canvas"}
+            : fromTemplate
+              ? isLoading
+                ? "Creating Canvas"
+                : "Create Canvas"
+              : isLoading
+                ? "Creating canvas..."
+                : "Create canvas"}
         </Button>
       </DialogActions>
     </Dialog>

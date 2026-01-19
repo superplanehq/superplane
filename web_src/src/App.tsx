@@ -15,6 +15,7 @@ import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CustomComponent } from "./pages/custom-component";
+import { CreateCanvasPage } from "./pages/canvas/CreateCanvasPage";
 import HomePage from "./pages/home";
 import NodeRunPage from "./pages/node-run";
 import { OrganizationSettings } from "./pages/organization/settings";
@@ -70,6 +71,7 @@ function AppRouter() {
           {/* Organization-scoped protected routes */}
           <Route path=":organizationId">
             <Route index element={withAuthOnly(HomePage)} />
+            <Route path="canvases/new" element={withAuthOnly(CreateCanvasPage)} />
             {isCustomComponentsEnabled() && (
               <Route path="custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
             )}
