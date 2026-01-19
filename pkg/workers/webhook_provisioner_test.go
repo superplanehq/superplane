@@ -13,7 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
-	"gorm.io/datatypes"
 )
 
 type BadEncryptor struct{}
@@ -79,13 +78,8 @@ func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
 		State:             models.WebhookStatePending,
 		Secret:            []byte("encrypted-secret"),
 		AppInstallationID: &installation.ID,
-		Resource: datatypes.NewJSONType(models.WebhookResource{
-			Type: "repository",
-			ID:   "123",
-			Name: "test-repo",
-		}),
-		RetryCount: 0,
-		MaxRetries: 3,
+		RetryCount:        0,
+		MaxRetries:        3,
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
@@ -126,13 +120,8 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 		State:             models.WebhookStatePending,
 		Secret:            []byte("encrypted-secret"),
 		AppInstallationID: &installation.ID,
-		Resource: datatypes.NewJSONType(models.WebhookResource{
-			Type: "repository",
-			ID:   "123",
-			Name: "test-repo",
-		}),
-		RetryCount: 3,
-		MaxRetries: 3,
+		RetryCount:        3,
+		MaxRetries:        3,
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 

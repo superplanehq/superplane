@@ -177,9 +177,10 @@ func (WorkflowNodeExecution_ResultReason) EnumDescriptor() ([]byte, []int) {
 }
 
 type ListWorkflowsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	IncludeTemplates bool                   `protobuf:"varint,1,opt,name=include_templates,json=includeTemplates,proto3" json:"include_templates,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ListWorkflowsRequest) Reset() {
@@ -210,6 +211,13 @@ func (x *ListWorkflowsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListWorkflowsRequest.ProtoReflect.Descriptor instead.
 func (*ListWorkflowsRequest) Descriptor() ([]byte, []int) {
 	return file_workflows_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ListWorkflowsRequest) GetIncludeTemplates() bool {
+	if x != nil {
+		return x.IncludeTemplates
+	}
+	return false
 }
 
 type ListWorkflowsResponse struct {
@@ -2645,6 +2653,7 @@ type Workflow_Metadata struct {
 	CreatedAt      *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt      *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	CreatedBy      *UserRef               `protobuf:"bytes,7,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	IsTemplate     bool                   `protobuf:"varint,8,opt,name=is_template,json=isTemplate,proto3" json:"is_template,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -2726,6 +2735,13 @@ func (x *Workflow_Metadata) GetCreatedBy() *UserRef {
 		return x.CreatedBy
 	}
 	return nil
+}
+
+func (x *Workflow_Metadata) GetIsTemplate() bool {
+	if x != nil {
+		return x.IsTemplate
+	}
+	return false
 }
 
 type Workflow_Spec struct {
@@ -2844,8 +2860,9 @@ var File_workflows_proto protoreflect.FileDescriptor
 
 const file_workflows_proto_rawDesc = "" +
 	"\n" +
-	"\x0fworkflows.proto\x12\x14Superplane.Workflows\x1a\x10components.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x16\n" +
-	"\x14ListWorkflowsRequest\"U\n" +
+	"\x0fworkflows.proto\x12\x14Superplane.Workflows\x1a\x10components.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"C\n" +
+	"\x14ListWorkflowsRequest\x12+\n" +
+	"\x11include_templates\x18\x01 \x01(\bR\x10includeTemplates\"U\n" +
 	"\x15ListWorkflowsResponse\x12<\n" +
 	"\tworkflows\x18\x01 \x03(\v2\x1e.Superplane.Workflows.WorkflowR\tworkflows\")\n" +
 	"\x17DescribeWorkflowRequest\x12\x0e\n" +
@@ -2866,11 +2883,11 @@ const file_workflows_proto_rawDesc = "" +
 	"\x16DeleteWorkflowResponse\"-\n" +
 	"\aUserRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\xe3\x06\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x84\a\n" +
 	"\bWorkflow\x12C\n" +
 	"\bmetadata\x18\x01 \x01(\v2'.Superplane.Workflows.Workflow.MetadataR\bmetadata\x127\n" +
 	"\x04spec\x18\x02 \x01(\v2#.Superplane.Workflows.Workflow.SpecR\x04spec\x12=\n" +
-	"\x06status\x18\x03 \x01(\v2%.Superplane.Workflows.Workflow.StatusR\x06status\x1a\xad\x02\n" +
+	"\x06status\x18\x03 \x01(\v2%.Superplane.Workflows.Workflow.StatusR\x06status\x1a\xce\x02\n" +
 	"\bMetadata\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x12\n" +
@@ -2881,7 +2898,9 @@ const file_workflows_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12<\n" +
 	"\n" +
-	"created_by\x18\a \x01(\v2\x1d.Superplane.Workflows.UserRefR\tcreatedBy\x1al\n" +
+	"created_by\x18\a \x01(\v2\x1d.Superplane.Workflows.UserRefR\tcreatedBy\x12\x1f\n" +
+	"\vis_template\x18\b \x01(\bR\n" +
+	"isTemplate\x1al\n" +
 	"\x04Spec\x121\n" +
 	"\x05nodes\x18\x01 \x03(\v2\x1b.Superplane.Components.NodeR\x05nodes\x121\n" +
 	"\x05edges\x18\x02 \x03(\v2\x1b.Superplane.Components.EdgeR\x05edges\x1a\xfb\x01\n" +

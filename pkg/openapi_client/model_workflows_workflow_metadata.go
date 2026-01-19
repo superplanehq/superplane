@@ -28,6 +28,7 @@ type WorkflowsWorkflowMetadata struct {
 	CreatedAt      *time.Time                  `json:"createdAt,omitempty"`
 	UpdatedAt      *time.Time                  `json:"updatedAt,omitempty"`
 	CreatedBy      *SuperplaneWorkflowsUserRef `json:"createdBy,omitempty"`
+	IsTemplate     *bool                       `json:"isTemplate,omitempty"`
 }
 
 // NewWorkflowsWorkflowMetadata instantiates a new WorkflowsWorkflowMetadata object
@@ -271,6 +272,38 @@ func (o *WorkflowsWorkflowMetadata) SetCreatedBy(v SuperplaneWorkflowsUserRef) {
 	o.CreatedBy = &v
 }
 
+// GetIsTemplate returns the IsTemplate field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowMetadata) GetIsTemplate() bool {
+	if o == nil || IsNil(o.IsTemplate) {
+		var ret bool
+		return ret
+	}
+	return *o.IsTemplate
+}
+
+// GetIsTemplateOk returns a tuple with the IsTemplate field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowMetadata) GetIsTemplateOk() (*bool, bool) {
+	if o == nil || IsNil(o.IsTemplate) {
+		return nil, false
+	}
+	return o.IsTemplate, true
+}
+
+// HasIsTemplate returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowMetadata) HasIsTemplate() bool {
+	if o != nil && !IsNil(o.IsTemplate) {
+		return true
+	}
+
+	return false
+}
+
+// SetIsTemplate gets a reference to the given bool and assigns it to the IsTemplate field.
+func (o *WorkflowsWorkflowMetadata) SetIsTemplate(v bool) {
+	o.IsTemplate = &v
+}
+
 func (o WorkflowsWorkflowMetadata) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -301,6 +334,9 @@ func (o WorkflowsWorkflowMetadata) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.CreatedBy) {
 		toSerialize["createdBy"] = o.CreatedBy
+	}
+	if !IsNil(o.IsTemplate) {
+		toSerialize["isTemplate"] = o.IsTemplate
 	}
 	return toSerialize, nil
 }

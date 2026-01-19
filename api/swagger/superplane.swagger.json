@@ -2084,6 +2084,14 @@
             }
           }
         },
+        "parameters": [
+          {
+            "name": "includeTemplates",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
         "tags": [
           "Workflow"
         ]
@@ -5016,6 +5024,9 @@
         },
         "createdBy": {
           "$ref": "#/definitions/SuperplaneWorkflowsUserRef"
+        },
+        "isTemplate": {
+          "type": "boolean"
         }
       }
     },

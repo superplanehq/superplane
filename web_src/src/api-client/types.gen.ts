@@ -936,6 +936,7 @@ export type WorkflowsWorkflowMetadata = {
   createdAt?: string;
   updatedAt?: string;
   createdBy?: SuperplaneWorkflowsUserRef;
+  isTemplate?: boolean;
 };
 
 export type WorkflowsWorkflowNodeExecution = {
@@ -2542,7 +2543,9 @@ export type WidgetsDescribeWidgetResponse2 = WidgetsDescribeWidgetResponses[keyo
 export type WorkflowsListWorkflowsData = {
   body?: never;
   path?: never;
-  query?: never;
+  query?: {
+    includeTemplates?: boolean;
+  };
   url: "/api/v1/workflows";
 };
 

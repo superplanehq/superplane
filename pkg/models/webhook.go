@@ -22,9 +22,7 @@ type Webhook struct {
 	Secret            []byte
 	Configuration     datatypes.JSONType[any]
 	Metadata          datatypes.JSONType[any]
-	IntegrationID     *uuid.UUID
 	AppInstallationID *uuid.UUID
-	Resource          datatypes.JSONType[WebhookResource]
 	RetryCount        int `gorm:"default:0"`
 	MaxRetries        int `gorm:"default:3"`
 	CreatedAt         *time.Time
