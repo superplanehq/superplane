@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import superplaneLogo from "@/assets/superplane.svg";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useAccount } from "../../contexts/AccountContext";
 
 type AuthConfig = {
@@ -293,396 +297,208 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
-        margin: 0,
-        padding: 0,
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#1E2938",
-        backgroundImage: "radial-gradient(#4A5464 1px, #1E2938 1px)",
-        backgroundSize: "6px 6px",
-      }}
-    >
-      <div
-        style={{
-          background: "#1e2938",
-          textAlign: "center",
-          paddingBottom: "2rem",
-          maxWidth: "420px",
-          width: "92%",
-        }}
-      >
-        <div style={{ padding: "1.5rem 1.5rem 1.25rem", display: "flex", justifyContent: "center" }}>
-          <svg
-            width="186"
-            height="27"
-            viewBox="0 0 186 27"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{ height: "24px" }}
-          >
-            <path
-              d="M79.2031 5.63867C80.5001 5.63867 81.6188 5.94905 82.5586 6.56934C83.5171 7.18959 84.2503 8.05418 84.7578 9.16309C85.2841 10.272 85.5468 11.569 85.5469 13.0537C85.5469 14.5573 85.2745 15.8733 84.7295 17.001C84.1844 18.1288 83.4227 19.0028 82.4453 19.623C81.4679 20.2433 80.3216 20.5537 79.0059 20.5537C77.6525 20.5537 76.5243 20.2348 75.6221 19.5957C75.0403 19.1625 74.5904 18.6182 74.2695 17.9648V26.0801H71.3369V5.9209H74.1279V8.37793C74.4801 7.64103 75.0252 7.03799 75.7637 6.56934C76.741 5.94913 77.8875 5.63869 79.2031 5.63867ZM123.366 5.63965C124.663 5.63965 125.782 5.94912 126.722 6.56934C127.68 7.18962 128.413 8.05507 128.921 9.16406C129.447 10.273 129.71 11.5699 129.71 13.0547C129.71 14.5583 129.438 15.8742 128.893 17.002C128.347 18.1296 127.586 19.0038 126.608 19.624C125.631 20.2441 124.485 20.5547 123.169 20.5547C121.816 20.5547 120.688 20.2346 119.786 19.5957C119.204 19.1624 118.754 18.6184 118.433 17.9648V26.0801H115.5V5.9209H118.291V8.37891C118.643 7.64174 119.188 7.03811 119.927 6.56934C120.904 5.94917 122.051 5.63969 123.366 5.63965ZM32.2236 18.5068C31.6629 19.086 31.0707 19.6351 30.4512 20.1514L19.5156 9.1709L25.3633 23.3477C24.6342 23.6788 23.8843 23.9718 23.1162 24.2246L17.3193 10.1709V25.3105C16.9205 25.3317 16.5183 25.3428 16.1143 25.3428L15.8242 25.3408C15.5176 25.3369 15.2118 25.3257 14.9082 25.3096V10.1191L9.09277 24.2188C8.32479 23.9652 7.57462 23.6708 6.8457 23.3389L12.6826 9.18945L1.77148 20.1465C1.15232 19.6301 0.560392 19.0812 0 18.502L16.1084 2.32617L32.2236 18.5068ZM57.3027 15.1699C57.3028 16.1657 57.5467 16.9078 58.0352 17.3965C58.5239 17.8852 59.2198 18.1299 60.1221 18.1299C60.9302 18.1298 61.6445 17.9423 62.2646 17.5664C62.9037 17.1905 63.4017 16.6734 63.7588 16.0156C64.1347 15.339 64.3232 14.5582 64.3232 13.6748V5.92188H67.2266V20.3008H64.4355V17.6182C63.9733 18.4403 63.3348 19.1186 62.5186 19.6523C61.56 20.2726 60.4602 20.583 59.2197 20.583C58.2611 20.583 57.4147 20.3859 56.6816 19.9912C55.9487 19.5777 55.3754 19.013 54.9619 18.2988C54.5674 17.5848 54.3702 16.7674 54.3701 15.8467V5.92188H57.3027V15.1699ZM45.6787 5.63867C47.3516 5.63868 48.6959 6.01475 49.7109 6.7666C50.7446 7.51845 51.3274 8.57156 51.459 9.9248H48.752C48.6392 9.24813 48.3097 8.73116 47.7646 8.37402C47.2384 7.99818 46.5147 7.80957 45.5938 7.80957C44.7293 7.80961 44.0617 7.96956 43.5918 8.28906C43.1409 8.58972 42.9161 9.0128 42.916 9.55762C42.916 10.0086 43.0847 10.3848 43.4229 10.6855C43.78 10.9863 44.3627 11.2405 45.1709 11.4473L47.5391 12.0391C48.911 12.3773 49.9452 12.9317 50.6406 13.7021C51.3361 14.454 51.6846 15.3661 51.6846 16.4375C51.6846 17.7345 51.1761 18.7494 50.1611 19.4824C49.165 20.2153 47.7651 20.582 45.9609 20.582C44.0813 20.582 42.5865 20.1688 41.4775 19.3418C40.3686 18.5148 39.7393 17.3493 39.5889 15.8457H42.2949C42.4265 16.6726 42.8027 17.3116 43.4229 17.7627C44.0619 18.195 44.9266 18.4111 46.0166 18.4111C46.9752 18.4111 47.7083 18.2416 48.2158 17.9033C48.7233 17.565 48.9775 17.086 48.9775 16.4658C48.9775 16.0147 48.8271 15.6386 48.5264 15.3379C48.2445 15.0184 47.6806 14.7556 46.835 14.5488L44.5225 14.0127C43.0752 13.6556 41.9945 13.129 41.2803 12.4336C40.5849 11.7194 40.2373 10.8453 40.2373 9.81152C40.2374 8.51471 40.7163 7.49961 41.6748 6.7666C42.6522 6.01474 43.987 5.63867 45.6787 5.63867ZM94.8838 5.63965C96.2747 5.63965 97.4782 5.93953 98.4932 6.54102C99.5269 7.12368 100.316 7.94163 100.861 8.99414C101.425 10.0467 101.707 11.2969 101.707 12.7441C101.707 12.9696 101.697 13.1859 101.679 13.3926C101.679 13.5804 101.66 13.7778 101.622 13.9844H90.585C90.7044 15.1952 91.0754 16.1727 91.6982 16.917C92.4877 17.838 93.5779 18.2988 94.9688 18.2988C95.8145 18.2988 96.5477 18.1293 97.168 17.791C97.7881 17.4339 98.2481 16.9168 98.5488 16.2402H101.312C100.843 17.5936 100.044 18.6561 98.916 19.4268C97.807 20.1974 96.4722 20.582 94.9121 20.582C93.465 20.582 92.187 20.2629 91.0781 19.624C89.9879 18.9849 89.132 18.1014 88.5117 16.9736C87.8915 15.8459 87.5811 14.549 87.5811 13.083C87.5811 11.5981 87.8819 10.3004 88.4834 9.19141C89.1037 8.06368 89.9692 7.1896 91.0781 6.56934C92.187 5.94926 93.4555 5.63967 94.8838 5.63965ZM145.62 5.63867C147.499 5.63874 148.909 6.08064 149.849 6.96387C150.788 7.8285 151.259 9.10715 151.259 10.7988V17.5371C151.259 17.9694 151.286 18.4112 151.343 18.8623C151.399 19.3133 151.484 19.7925 151.597 20.2998H148.749C148.655 19.9428 148.589 19.5483 148.552 19.1162C148.538 18.8018 148.531 18.4373 148.527 18.0234C148.172 18.761 147.646 19.3514 146.945 19.793C146.081 20.3193 145.028 20.582 143.787 20.582C142.321 20.582 141.156 20.2249 140.291 19.5107C139.426 18.7777 138.994 17.7904 138.994 16.5498C138.994 15.2719 139.446 14.2662 140.348 13.5332C141.269 12.7815 142.585 12.2739 144.295 12.0107L148.383 11.3535V10.6855C148.383 9.7647 148.148 9.07901 147.678 8.62793C147.227 8.15802 146.503 7.92285 145.507 7.92285C144.548 7.92286 143.778 8.11057 143.195 8.48633C142.631 8.86226 142.302 9.39828 142.208 10.0938H139.417C139.549 8.74059 140.159 7.65977 141.249 6.85156C142.339 6.04331 143.797 5.63867 145.62 5.63867ZM178.505 5.63867C179.896 5.63867 181.099 5.93953 182.114 6.54102C183.148 7.12368 183.937 7.94161 184.482 8.99414C185.046 10.0467 185.328 11.2968 185.328 12.7441C185.328 12.9697 185.319 13.1858 185.3 13.3926C185.3 13.5804 185.281 13.7777 185.243 13.9844H174.206C174.326 15.1951 174.697 16.1727 175.319 16.917C176.109 17.838 177.199 18.2988 178.59 18.2988C179.436 18.2988 180.169 18.1293 180.789 17.791C181.409 17.4339 181.869 16.9168 182.17 16.2402H184.934C184.464 17.5936 183.665 18.6561 182.537 19.4268C181.428 20.1974 180.093 20.582 178.533 20.582C177.086 20.582 175.808 20.2629 174.699 19.624C173.609 18.985 172.753 18.1014 172.133 16.9736C171.513 15.846 171.203 14.5489 171.203 13.083C171.203 11.5981 171.503 10.3004 172.104 9.19141C172.725 8.06364 173.59 7.18961 174.699 6.56934C175.808 5.94924 177.077 5.6387 178.505 5.63867ZM111.98 5.63965C112.413 5.63965 112.714 5.67681 112.883 5.75195V8.51465C112.789 8.47713 112.657 8.45899 112.488 8.45898C112.319 8.44019 112.112 8.43067 111.868 8.43066C110.458 8.43066 109.396 8.79721 108.682 9.53027C107.986 10.2633 107.639 11.3536 107.639 12.8008V20.3008H104.706V5.9209H107.498V8.70801C107.847 7.81577 108.355 7.11219 109.021 6.59766C109.847 5.95872 110.834 5.6397 111.98 5.63965ZM163.379 5.63965C164.92 5.63965 166.132 6.07192 167.016 6.93652C167.899 7.80116 168.341 8.94746 168.341 10.376V20.3008H165.438V11.0527C165.438 10.0565 165.183 9.3139 164.676 8.8252C164.187 8.33654 163.454 8.0918 162.477 8.0918C161.631 8.09181 160.879 8.28034 160.221 8.65625C159.582 9.03216 159.074 9.54927 158.698 10.207C158.341 10.8648 158.163 11.6448 158.163 12.5469V20.3008H155.23V5.9209H158.021V8.64844C158.486 7.79172 159.134 7.09816 159.968 6.56934C160.945 5.94926 162.082 5.63965 163.379 5.63965ZM135.725 20.2998H132.792V0H135.725V20.2998ZM144.746 13.9844C143.787 14.1347 143.063 14.389 142.574 14.7461C142.105 15.1032 141.87 15.6204 141.87 16.2969C141.87 16.9546 142.086 17.4527 142.519 17.791C142.97 18.1104 143.618 18.2705 144.464 18.2705C145.592 18.2705 146.522 17.9972 147.255 17.4521C148.007 16.9071 148.383 16.2214 148.383 15.3945V13.4092L144.746 13.9844ZM122.521 8.0918C121.242 8.09183 120.218 8.54316 119.447 9.44531C118.695 10.3287 118.319 11.56 118.319 13.1387C118.319 14.68 118.695 15.9025 119.447 16.8047C120.218 17.6881 121.252 18.1299 122.549 18.1299C123.827 18.1299 124.842 17.6785 125.594 16.7764C126.346 15.8742 126.722 14.6335 126.722 13.0547C126.722 11.4946 126.346 10.2816 125.594 9.41699C124.842 8.53374 123.817 8.0918 122.521 8.0918ZM78.3574 8.0918C77.0793 8.0918 76.0548 8.54308 75.2842 9.44531C74.5324 10.3287 74.1563 11.5598 74.1562 13.1387C74.1562 14.6799 74.5324 15.9015 75.2842 16.8037C76.0548 17.6871 77.0888 18.1289 78.3857 18.1289C79.6638 18.1289 80.6788 17.6776 81.4307 16.7754C82.1824 15.8732 82.5586 14.6324 82.5586 13.0537C82.5585 11.4938 82.1824 10.2815 81.4307 9.41699C80.6788 8.53358 79.6544 8.0918 78.3574 8.0918ZM94.8838 7.92285C93.5493 7.92289 92.4877 8.38374 91.6982 9.30469C91.1475 9.94943 90.7949 10.7766 90.6377 11.7861H98.79C98.6795 10.6671 98.3455 9.78371 97.7881 9.13574C97.0926 8.3275 96.1244 7.92285 94.8838 7.92285ZM178.505 7.92285C177.17 7.9229 176.109 8.38371 175.319 9.30469C174.769 9.94924 174.416 10.7761 174.259 11.7852H182.411C182.301 10.6666 181.966 9.78353 181.409 9.13574C180.714 8.3275 179.745 7.92285 178.505 7.92285Z"
-              fill="#F9FAFC"
-            />
-          </svg>
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 py-10">
+      <div className="max-w-sm w-full bg-white dark:bg-gray-900 rounded-lg outline outline-gray-950/10 shadow-sm p-8">
+        <div className="text-center">
+          <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto h-8 w-8" />
+          <h1 className="mt-4 !text-lg font-medium text-gray-900">
+            {isSignupMode ? "Create your account" : "Welcome to SuperPlane"}
+          </h1>
+          <p className="mt-1 text-sm text-gray-800">{isSignupMode ? "Set up your account." : "Log in to continue."}</p>
         </div>
 
-        <div
-          style={{
-            color: "#94a9ca",
-            margin: "0 0 1.25rem",
-            paddingTop: "1rem",
-            borderTop: "1px solid #3d4859",
-          }}
-        ></div>
+        <div className="pt-8">
+          {configLoading && <p className="text-sm text-gray-500">Loading...</p>}
 
-        {configLoading && <div style={{ color: "#94a9ca", fontSize: "14px", paddingBottom: "1rem" }}>Loading...</div>}
+          {configError && (
+            <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500">
+              {configError}
+            </div>
+          )}
 
-        {configError && (
-          <div
-            style={{
-              padding: "12px",
-              margin: "0 auto 12px",
-              width: "90%",
-              borderRadius: "8px",
-              backgroundColor: "#7f1d1d",
-              color: "#fca5a5",
-              fontSize: "14px",
-            }}
-          >
-            {configError}
-          </div>
-        )}
+          {!configLoading && isSignupMode && !canSignup && (
+            <p className="text-sm text-gray-500">Signups are currently disabled.</p>
+          )}
 
-        {!configLoading &&
-          showProviderButtons &&
-          activeProviders.map((provider) => (
-            <a
-              key={provider}
-              href={`/auth/${provider}${redirectQuery}`}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "12px 24px",
-                borderRadius: "8px",
-                textDecoration: "none",
-                width: "90%",
-                boxSizing: "border-box",
-                marginBottom: "12px",
-                fontWeight: 500,
-                background: provider === "github" ? "#7f92b0" : "#6584b4",
-                color: "#1e2938",
-                position: "relative",
-              }}
-            >
-              {provider === "github" && (
-                <svg
-                  style={{ width: "20px", height: "20px", position: "absolute", left: "20px" }}
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-                </svg>
-              )}
-              {provider === "google" && (
-                <svg
-                  style={{ width: "20px", height: "20px", position: "absolute", left: "20px" }}
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                </svg>
-              )}
-              <span>Continue with {getProviderLabel(provider)}</span>
-            </a>
-          ))}
+          {!configLoading &&
+            !isSignupMode &&
+            !showProviderButtons &&
+            !canLoginWithPassword &&
+            !canSignupWithPassword && <p className="text-sm text-gray-500">No login methods are configured.</p>}
 
-        {!configLoading && showProviderButtons && (isSignupMode ? canSignupWithPassword : canLoginWithPassword) && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              color: "#94a9ca",
-              fontSize: "13px",
-              width: "90%",
-              margin: "8px auto 16px",
-            }}
-          >
-            <div style={{ flex: 1, height: "1px", backgroundColor: "#3d4859" }} />
-            <span>or</span>
-            <div style={{ flex: 1, height: "1px", backgroundColor: "#3d4859" }} />
-          </div>
-        )}
+          {!configLoading && formError && (
+            <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500">
+              {formError}
+            </div>
+          )}
 
-        {!configLoading && isSignupMode && !canSignup && (
-          <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>Signups are currently disabled.</div>
-        )}
+          {!configLoading && !isSignupMode && canLoginWithPassword && (
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  name="email"
+                  placeholder="Email"
+                  required
+                  autoComplete="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                />
+              </div>
 
-        {!configLoading && !isSignupMode && !showProviderButtons && !canLoginWithPassword && !canSignupWithPassword && (
-          <div style={{ color: "#94a9ca", fontSize: "14px", padding: "0 1rem" }}>No login methods are configured.</div>
-        )}
+              <div className="space-y-2">
+                <Label>Password</Label>
+                <Input
+                  type="password"
+                  name="password"
+                  placeholder="Password"
+                  required
+                  autoComplete="current-password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                />
+              </div>
 
-        {!configLoading && formError && (
-          <div
-            style={{
-              padding: "12px",
-              margin: "0 auto 12px",
-              width: "90%",
-              borderRadius: "8px",
-              backgroundColor: "#7f1d1d",
-              color: "#fca5a5",
-              fontSize: "14px",
-            }}
-          >
-            {formError}
-          </div>
-        )}
+              <Button type="submit" disabled={submitLoading} className="w-full">
+                {submitLoading ? "Logging in..." : "Login"}
+              </Button>
+            </form>
+          )}
 
-        {!configLoading && !isSignupMode && canLoginWithPassword && (
-          <form onSubmit={handleLoginSubmit} style={{ width: "90%", margin: "0 auto 12px", textAlign: "left" }}>
-            <input
-              type="email"
-              name="email"
-              placeholder="Email"
-              required
-              autoComplete="email"
-              value={loginEmail}
-              onChange={(e) => setLoginEmail(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                marginBottom: "12px",
-                borderRadius: "8px",
-                border: "1px solid #3d4859",
-                background: "#2a3441",
-                color: "#F9FAFC",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
+          {!configLoading && isSignupMode && canSignupWithPassword && (
+            <form onSubmit={handleSignupSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>First name</Label>
+                  <Input
+                    type="text"
+                    name="firstName"
+                    placeholder="First name"
+                    required
+                    autoComplete="given-name"
+                    value={signupFirstName}
+                    onChange={(e) => setSignupFirstName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Last name</Label>
+                  <Input
+                    type="text"
+                    name="lastName"
+                    placeholder="Last name"
+                    required
+                    autoComplete="family-name"
+                    value={signupLastName}
+                    onChange={(e) => setSignupLastName(e.target.value)}
+                  />
+                </div>
+              </div>
 
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              required
-              autoComplete="current-password"
-              value={loginPassword}
-              onChange={(e) => setLoginPassword(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                marginBottom: "12px",
-                borderRadius: "8px",
-                border: "1px solid #3d4859",
-                background: "#2a3441",
-                color: "#F9FAFC",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  name="email"
+                  placeholder="Email"
+                  required
+                  autoComplete="email"
+                  value={signupEmail}
+                  onChange={(e) => setSignupEmail(e.target.value)}
+                />
+              </div>
 
-            <button
-              type="submit"
-              disabled={submitLoading}
-              style={{
-                width: "100%",
-                padding: "12px 24px",
-                borderRadius: "8px",
-                border: "none",
-                background: submitLoading ? "#5472a3" : "#6584b4",
-                color: "#1e2938",
-                fontWeight: 500,
-                fontSize: "14px",
-                cursor: submitLoading ? "not-allowed" : "pointer",
-                transition: "all 0.2s",
-              }}
-            >
-              {submitLoading ? "Logging in..." : "Login"}
-            </button>
-          </form>
-        )}
+              <div className="space-y-2">
+                <Label>Password</Label>
+                <Input
+                  type="password"
+                  name="password"
+                  placeholder="Password"
+                  required
+                  autoComplete="new-password"
+                  value={signupPassword}
+                  onChange={(e) => setSignupPassword(e.target.value)}
+                />
+              </div>
 
-        {!configLoading && isSignupMode && canSignupWithPassword && (
-          <form onSubmit={handleSignupSubmit} style={{ width: "90%", margin: "0 auto 12px", textAlign: "left" }}>
-            <input
-              type="text"
-              name="firstName"
-              placeholder="First name"
-              required
-              autoComplete="given-name"
-              value={signupFirstName}
-              onChange={(e) => setSignupFirstName(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                marginBottom: "12px",
-                borderRadius: "8px",
-                border: "1px solid #3d4859",
-                background: "#2a3441",
-                color: "#F9FAFC",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
+              <div className="space-y-2">
+                <Label>Repeat password</Label>
+                <Input
+                  type="password"
+                  name="passwordConfirm"
+                  placeholder="Repeat password"
+                  required
+                  autoComplete="new-password"
+                  value={signupConfirmPassword}
+                  onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                />
+              </div>
 
-            <input
-              type="text"
-              name="lastName"
-              placeholder="Last name"
-              required
-              autoComplete="family-name"
-              value={signupLastName}
-              onChange={(e) => setSignupLastName(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                marginBottom: "12px",
-                borderRadius: "8px",
-                border: "1px solid #3d4859",
-                background: "#2a3441",
-                color: "#F9FAFC",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
+              <Button type="submit" disabled={submitLoading || !canSignup} className="w-full">
+                {submitLoading ? "Creating account..." : "Create account"}
+              </Button>
+            </form>
+          )}
 
-            <input
-              type="email"
-              name="email"
-              placeholder="Email"
-              required
-              autoComplete="email"
-              value={signupEmail}
-              onChange={(e) => setSignupEmail(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                marginBottom: "12px",
-                borderRadius: "8px",
-                border: "1px solid #3d4859",
-                background: "#2a3441",
-                color: "#F9FAFC",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
+          {!configLoading && showProviderButtons && (isSignupMode ? canSignupWithPassword : canLoginWithPassword) && (
+            <div className="my-5 flex items-center gap-3 text-sm text-gray-800">
+              <div className="h-px flex-1 bg-gray-300" />
+              <span>or</span>
+              <div className="h-px flex-1 bg-gray-300" />
+            </div>
+          )}
 
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              required
-              autoComplete="new-password"
-              value={signupPassword}
-              onChange={(e) => setSignupPassword(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                marginBottom: "12px",
-                borderRadius: "8px",
-                border: "1px solid #3d4859",
-                background: "#2a3441",
-                color: "#F9FAFC",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
+          {!configLoading && showProviderButtons && (
+            <div className="space-y-3">
+              {activeProviders.map((provider) => (
+                <Button key={provider} variant="outline" className="w-full justify-center gap-2" asChild>
+                  <a href={`/auth/${provider}${redirectQuery}`}>
+                    {provider === "github" && (
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                      </svg>
+                    )}
+                    {provider === "google" && (
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                      </svg>
+                    )}
+                    <span>Continue with {getProviderLabel(provider)}</span>
+                  </a>
+                </Button>
+              ))}
+            </div>
+          )}
 
-            <input
-              type="password"
-              name="passwordConfirm"
-              placeholder="Repeat password"
-              required
-              autoComplete="new-password"
-              value={signupConfirmPassword}
-              onChange={(e) => setSignupConfirmPassword(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                marginBottom: "12px",
-                borderRadius: "8px",
-                border: "1px solid #3d4859",
-                background: "#2a3441",
-                color: "#F9FAFC",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
+          {!configLoading && !isSignupMode && canSignup && (
+            <div className="mt-6 text-sm text-gray-500">
+              {"Don't have an account? "}
+              <button
+                type="button"
+                onClick={() => handleToggleMode("signup")}
+                className="font-medium text-gray-900 underline underline-offset-2"
+              >
+                Create an account
+              </button>
+            </div>
+          )}
 
-            <button
-              type="submit"
-              disabled={submitLoading || !canSignup}
-              style={{
-                width: "100%",
-                padding: "12px 24px",
-                borderRadius: "8px",
-                border: "none",
-                background: submitLoading ? "#5472a3" : "#6584b4",
-                color: "#1e2938",
-                fontWeight: 500,
-                fontSize: "14px",
-                cursor: submitLoading || !canSignup ? "not-allowed" : "pointer",
-                transition: "all 0.2s",
-                opacity: canSignup ? 1 : 0.7,
-              }}
-            >
-              {submitLoading ? "Creating account..." : "Create account"}
-            </button>
-          </form>
-        )}
-
-        {!configLoading && !isSignupMode && canSignup && (
-          <div style={{ marginTop: "16px", fontSize: "14px", color: "#94a9ca" }}>
-            {"Don't have an account? "}
-            <button
-              type="button"
-              onClick={() => handleToggleMode("signup")}
-              style={{
-                color: "#c7d3ea",
-                textDecoration: "underline",
-                background: "none",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                fontSize: "14px",
-              }}
-            >
-              Create an account
-            </button>
-          </div>
-        )}
-
-        {!configLoading && isSignupMode && (
-          <div style={{ marginTop: "16px", fontSize: "14px", color: "#94a9ca" }}>
-            Already have an account?{" "}
-            <button
-              type="button"
-              onClick={() => handleToggleMode("login")}
-              style={{
-                color: "#c7d3ea",
-                textDecoration: "underline",
-                background: "none",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                fontSize: "14px",
-              }}
-            >
-              Sign in
-            </button>
-          </div>
-        )}
+          {!configLoading && isSignupMode && (
+            <div className="mt-6 text-sm text-gray-500">
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={() => handleToggleMode("login")}
+                className="font-medium text-gray-900 underline underline-offset-2"
+              >
+                Sign in
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

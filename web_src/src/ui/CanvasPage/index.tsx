@@ -764,7 +764,7 @@ function CanvasPage(props: CanvasPageProps) {
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
         />
-        {props.headerBanner ? <div className="border-b border-border">{props.headerBanner}</div> : null}
+        {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
 
       {/* Main content area with sidebar and canvas */}

@@ -237,7 +237,7 @@ export function Members({ organizationId }: MembersProps) {
   return (
     <div className="space-y-6 pt-6">
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
           <p>{error instanceof Error ? error.message : "Failed to fetch data"}</p>
         </div>
       )}
@@ -279,7 +279,7 @@ export function Members({ organizationId }: MembersProps) {
           </div>
 
           {inviteLinkErrorMessage && inviteLinkErrorMessage !== "Not found" && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mt-4">
+            <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mt-4">
               <p className="text-sm">{inviteLinkErrorMessage}</p>
             </div>
           )}
@@ -323,7 +323,7 @@ export function Members({ organizationId }: MembersProps) {
 
         <div className="px-6 pb-6">
           {removalError && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mb-4">
               <p>{removalError}</p>
             </div>
           )}

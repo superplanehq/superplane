@@ -265,7 +265,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
                     <div>
                       <Label className="text-gray-800 dark:text-gray-100 mb-2">
                         Installation Name
-                        <span className="text-red-500 ml-1">*</span>
+                        <span className="text-gray-800 ml-1">*</span>
                       </Label>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                         A unique name for this installation

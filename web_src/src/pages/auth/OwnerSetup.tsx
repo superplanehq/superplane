@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Input, InputGroup } from "../../components/Input/input";
+import { Label } from "@/components/ui/label";
 import { Text } from "../../components/Text/text";
-import { Button } from "../../ui/button";
+import { Button } from "../../components/ui/button";
 import superplaneLogo from "../../assets/superplane.svg";
 
 const OwnerSetup: React.FC = () => {
@@ -172,28 +173,66 @@ const OwnerSetup: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-zinc-900 dark:to-zinc-800 px-4">
-      <div className="max-w-lg w-full bg-white dark:bg-zinc-900 rounded-lg shadow-xl p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+      <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-lg outline outline-gray-950/10 shadow-sm p-8">
         {step === "owner" && (
           <div className="text-center mb-8">
             <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8" />
-            <h4 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Set up owner account</h4>
-            <Text className="text-gray-500 dark:text-gray-400">Create an account for this SuperPlane instance.</Text>
+            <h4 className="text-xl font-medium text-gray-800 dark:text-white mb-1">Set up owner account</h4>
+            <Text className="text-gray-800 dark:text-gray-300">Create an account for this SuperPlane instance.</Text>
           </div>
         )}
 
         {step === "owner" && (
-          <form onSubmit={handleOwnerNext} className="space-y-6">
+          <form onSubmit={handleOwnerNext} className="space-y-4">
             {error && (
               <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                 <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
               </div>
             )}
 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <Label className="block text-left mb-2">
+                  First Name <span className="text-gray-800">*</span>
+                </Label>
+                <InputGroup>
+                  <Input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="First name"
+                    className={fieldErrors.firstName ? "border-red-500" : ""}
+                  />
+                </InputGroup>
+                {fieldErrors.firstName && (
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.firstName}</p>
+                )}
+              </div>
+
+              <div>
+                <Label className="block text-left mb-2">
+                  Last Name <span className="text-gray-800">*</span>
+                </Label>
+                <InputGroup>
+                  <Input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Last name"
+                    className={fieldErrors.lastName ? "border-red-500" : ""}
+                  />
+                </InputGroup>
+                {fieldErrors.lastName && (
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.lastName}</p>
+                )}
+              </div>
+            </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-                Email <span className="text-red-500">*</span>
-              </label>
+              <Label className="block text-left mb-2">
+                Email <span className="text-gray-800">*</span>
+              </Label>
               <InputGroup>
                 <Input
                   type="email"
@@ -207,45 +246,9 @@ const OwnerSetup: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-                First Name <span className="text-red-500">*</span>
-              </label>
-              <InputGroup>
-                <Input
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="First name"
-                  className={fieldErrors.firstName ? "border-red-500" : ""}
-                />
-              </InputGroup>
-              {fieldErrors.firstName && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.firstName}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-                Last Name <span className="text-red-500">*</span>
-              </label>
-              <InputGroup>
-                <Input
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  placeholder="Last name"
-                  className={fieldErrors.lastName ? "border-red-500" : ""}
-                />
-              </InputGroup>
-              {fieldErrors.lastName && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.lastName}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-                Password <span className="text-red-500">*</span>
-              </label>
+              <Label className="block text-left mb-2">
+                Password <span className="text-gray-800">*</span>
+              </Label>
               <InputGroup>
                 <Input
                   type="password"
@@ -265,9 +268,9 @@ const OwnerSetup: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-                Confirm Password <span className="text-red-500">*</span>
-              </label>
+              <Label className="block text-left mb-2">
+                Confirm Password <span className="text-gray-800">*</span>
+              </Label>
               <InputGroup>
                 <Input
                   type="password"
@@ -297,17 +300,17 @@ const OwnerSetup: React.FC = () => {
             )}
 
             <div className="text-left">
-              <h4 className="text-lg font-semibold text-gray-800 dark:text-white">Set up email delivery?</h4>
-              <Text className="text-gray-500 dark:text-gray-400">
+              <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-2">Set up email delivery?</h4>
+              <Text className="text-gray-800 dark:text-gray-300">
                 Configure SMTP now to receive notifications. You can skip and set it up later.
               </Text>
             </div>
 
             <div className="flex gap-3">
-              <Button type="button" className="w-full" disabled={loading} onClick={handleEnableSMTP}>
+              <Button type="button" disabled={loading} onClick={handleEnableSMTP}>
                 Set up SMTP
               </Button>
-              <Button type="button" className="w-full" variant="secondary" disabled={loading} onClick={handleSkipSMTP}>
+              <Button type="button" variant="outline" disabled={loading} onClick={handleSkipSMTP}>
                 Do this later
               </Button>
             </div>
@@ -323,14 +326,14 @@ const OwnerSetup: React.FC = () => {
             )}
 
             <div className="text-left">
-              <h4 className="text-lg font-semibold text-gray-800 dark:text-white">SMTP configuration</h4>
-              <Text className="text-gray-500 dark:text-gray-400">Configure email delivery for this instance.</Text>
+              <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-2">SMTP configuration</h4>
+              <Text className="text-gray-800 dark:text-gray-300">Configure email delivery for this instance.</Text>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-                SMTP Host <span className="text-red-500">*</span>
-              </label>
+              <Label className="block text-left mb-2">
+                SMTP Host <span className="text-gray-800">*</span>
+              </Label>
               <InputGroup>
                 <Input
                   type="text"
@@ -346,9 +349,9 @@ const OwnerSetup: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-                SMTP Port <span className="text-red-500">*</span>
-              </label>
+              <Label className="block text-left mb-2">
+                SMTP Port <span className="text-gray-800">*</span>
+              </Label>
               <InputGroup>
                 <Input
                   type="text"
@@ -364,9 +367,7 @@ const OwnerSetup: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-                SMTP Username
-              </label>
+              <Label className="block text-left mb-2">SMTP Username</Label>
               <InputGroup>
                 <Input
                   type="text"
@@ -378,9 +379,7 @@ const OwnerSetup: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-                SMTP Password
-              </label>
+              <Label className="block text-left mb-2">SMTP Password</Label>
               <InputGroup>
                 <Input
                   type="password"
@@ -396,9 +395,7 @@ const OwnerSetup: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-                From Name
-              </label>
+              <Label className="block text-left mb-2">From Name</Label>
               <InputGroup>
                 <Input
                   type="text"
@@ -410,9 +407,9 @@ const OwnerSetup: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-                From Email <span className="text-red-500">*</span>
-              </label>
+              <Label className="block text-left mb-2">
+                From Email <span className="text-gray-800">*</span>
+              </Label>
               <InputGroup>
                 <Input
                   type="email"
@@ -427,10 +424,10 @@ const OwnerSetup: React.FC = () => {
               )}
             </div>
 
-            <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <Label className="inline-flex items-center gap-2">
               <input type="checkbox" checked={smtpUseTLS} onChange={(e) => setSmtpUseTLS(e.target.checked)} />
               Use TLS (STARTTLS)
-            </label>
+            </Label>
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Saving..." : "Finish setup"}

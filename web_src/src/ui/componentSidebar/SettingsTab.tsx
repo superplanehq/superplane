@@ -273,7 +273,7 @@ export function SettingsTab({
         <div className="flex flex-col gap-2 h-[60px]">
           <Label className={`min-w-[100px] text-left ${hasNodeNameError ? "text-red-600 dark:text-red-400" : ""}`}>
             Node Name
-            <span className="text-red-500 ml-1">*</span>
+            <span className="text-gray-800 ml-1">*</span>
             {hasNodeNameError && <span className="text-red-500 text-xs ml-2">- required field</span>}
           </Label>
           <Input
@@ -317,7 +317,7 @@ export function SettingsTab({
                   }`}
                 >
                   App Installation
-                  <span className="text-red-500 ml-1">*</span>
+                  <span className="text-gray-800 ml-1">*</span>
                   {showValidation && validationErrors.has("appInstallation") && (
                     <span className="text-red-500 text-xs ml-2">- required field</span>
                   )}
