@@ -322,11 +322,13 @@ func Start() {
 	oidcVerifier := crypto.NewOIDCVerifier()
 	registry := registry.NewRegistry(encryptorInstance)
 
-	if err := templates.SeedTemplates(registry); err != nil {
-		log.Warnf("Failed to seed templates: %v", err)
-	}
+	if os.Getenv("APP_ENV") == "development" {
+		if err := templates.SeedTemplates(registry); err != nil {
+			log.Warnf("Failed to seed templates: %v", err)
+		}
 
-	templates.StartTemplateReloader(registry)
+		templates.StartTemplateReloader(registry)
+	}
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
