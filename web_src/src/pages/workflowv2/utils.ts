@@ -66,10 +66,9 @@ export function mapExecutionsToSidebarEvents(
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
 
-    const primaryComponentName = currentComponentNode?.component?.name
-      ? currentComponentNode?.component?.name.split(".")[0]
-      : "";
-    const componentSubtitle = getComponentBaseMapper(primaryComponentName).subtitle?.(
+    const componentName = currentComponentNode?.component?.name || "";
+    const componentMapper = getComponentBaseMapper(componentName);
+    const componentSubtitle = componentMapper.subtitle?.(
       currentComponentNode as ComponentsNode,
       execution,
       additionalData,
