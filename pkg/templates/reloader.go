@@ -16,7 +16,7 @@ import (
 
 var templateReloadLock sync.Mutex
 
-func StartTemplateReloader(registry *registry.Registry) {
+func startTemplateReloader(registry *registry.Registry) {
 	dir, ok := templateDir()
 	if !ok {
 		return

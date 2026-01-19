@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -21,17 +20,28 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+
+	log "github.com/sirupsen/logrus"
 )
 
 //go:embed templates/*.yaml
 var templateAssets embed.FS
 
-var seedTemplatesLock sync.Mutex
+var seedLockID int64 = 1234567890
+
+func Setup(registry *registry.Registry) error {
+	log.Info("Setting up templates...")
+
+	if err := SeedTemplates(registry); err != nil {
+		log.Warnf("Failed to seed templates: %v", err)
+	}
+
+	// if os.Getenv("APP_ENV") == "development" {
+	// 	startTemplateReloader(registry)
+	// }
+}
 
 func SeedTemplates(registry *registry.Registry) error {
-	seedTemplatesLock.Lock()
-	defer seedTemplatesLock.Unlock()
-
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := lockTemplateSeed(tx); err != nil {
 			return err
@@ -94,14 +104,14 @@ func SeedTemplates(registry *registry.Registry) error {
 }
 
 func lockTemplateSeed(tx *gorm.DB) error {
-	if err := tx.Exec("SELECT pg_advisory_lock(?)", int64(90710439)).Error; err != nil {
+	if err := tx.Exec("SELECT pg_advisory_lock(?)", seedLockID).Error; err != nil {
 		return fmt.Errorf("lock template seed: %w", err)
 	}
 	return nil
 }
 
 func unlockTemplateSeed(tx *gorm.DB) {
-	_ = tx.Exec("SELECT pg_advisory_unlock(?)", int64(90710439)).Error
+	_ = tx.Exec("SELECT pg_advisory_unlock(?)", seedLockID).Error
 }
 
 func resetTemplateWorkflowsInTransaction(tx *gorm.DB) error {
