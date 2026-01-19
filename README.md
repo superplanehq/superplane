@@ -9,6 +9,12 @@ You can sign up for updates on our [website](https://superplane.com).
 
 ## Project status
 
+<p>
+  <a href="https://superplanehq.semaphoreci.com/projects/superplane"><img src="https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields" alt="CI Status on Semaphore" /></a>
+  <a href="https://github.com/superplanehq/superplane/pulse"><img src="https://img.shields.io/github/commit-activity/m/superplanehq/superplane" alt="GitHub commit activity"/></a>
+  <a href="https://discord.gg/KC78eCNsnw"><img src="https://img.shields.io/discord/1409914582239023200?label=discord" alt="Discord server" /></a>
+</p>
+
 This project is new and moving quickly. Expect rough edges and occasional
 breaking changes while we stabilize the core model and integrations.
 If you try it and hit something confusing, please [open an issue](https://github.com/superplanehq/superplane/issues/new).
@@ -62,3 +68,6 @@ Apache License 2.0. See `LICENSE`.
 
 - **[Discord](https://discord.gg/KC78eCNsnw)** - Join our community for discussions, questions, and collaboration
 - **[X](https://x.com/superplanehq)** - Follow us for updates and announcements
+
+---
+![Alt](https://repobeats.axiom.co/api/embed/1cef82bdb688577da6348f45cf13c1d0b01fad37.svg "Repobeats analytics image")
