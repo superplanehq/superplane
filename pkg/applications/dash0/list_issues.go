@@ -82,18 +82,12 @@ func (l *ListIssues) Setup(ctx core.SetupContext) error {
 
 	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
 	if err != nil {
-		// If we can't create a client, log a warning but don't fail setup
-		// This allows the component to still work without filtering
-		ctx.Logger.Warnf("Error creating client during setup to fetch check rules: %v", err)
-		return nil
+		return fmt.Errorf("error creating client during setup to fetch check rules: %w", err)
 	}
 
 	checkRules, err := client.ListCheckRules()
 	if err != nil {
-		// If we can't fetch check rules, log a warning but don't fail setup
-		// The component can still work without filtering
-		ctx.Logger.Warnf("Error fetching check rules during setup: %v", err)
-		return nil
+		return fmt.Errorf("error fetching check rules during setup: %w", err)
 	}
 
 	// Store check rules in node metadata for reuse in Execute()
@@ -139,13 +133,11 @@ func (l *ListIssues) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-// filterIssuesByCheckRules filters the Prometheus response to only include issues
-// from the specified check rules. It looks for check rule information in metric labels.
-// It matches against both check rule names and IDs since metric labels may contain either.
-func (l *ListIssues) filterIssuesByCheckRules(data map[string]any, checkRuleNames []string, allCheckRules []CheckRule) map[string]any {
-	// Create sets for both names and IDs for efficient lookup
-	checkRuleNameSet := make(map[string]bool, len(checkRuleNames))
-	checkRuleIDSet := make(map[string]bool, len(checkRuleNames))
+// buildCheckRuleLookupSets creates lookup sets for check rule names and IDs
+// to enable efficient matching during filtering.
+func buildCheckRuleLookupSets(checkRuleNames []string, allCheckRules []CheckRule) (checkRuleNameSet, checkRuleIDSet map[string]bool) {
+	checkRuleNameSet = make(map[string]bool, len(checkRuleNames))
+	checkRuleIDSet = make(map[string]bool, len(checkRuleNames))
 
 	// Build a mapping from name to ID
 	nameToID := make(map[string]string, len(allCheckRules))
@@ -167,10 +159,12 @@ func (l *ListIssues) filterIssuesByCheckRules(data map[string]any, checkRuleName
 		checkRuleIDSet[name] = true
 	}
 
-	// Extract the data structure - it can be either a struct or map
-	var resultValue []any
-	var dataValue map[string]any
+	return checkRuleNameSet, checkRuleIDSet
+}
 
+// extractPrometheusResults extracts and normalizes the Prometheus response data structure.
+// It handles both struct and map representations of the response.
+func extractPrometheusResults(data map[string]any) (resultValue []any, dataValue map[string]any, ok bool) {
 	if dataStruct, ok := data["data"].(PrometheusResponseData); ok {
 		// Convert struct to map for easier manipulation
 		resultValue = make([]any, len(dataStruct.Result))
@@ -185,13 +179,81 @@ func (l *ListIssues) filterIssuesByCheckRules(data map[string]any, checkRuleName
 			"resultType": dataStruct.ResultType,
 			"result":     resultValue,
 		}
-	} else if dataMap, ok := data["data"].(map[string]any); ok {
+		return resultValue, dataValue, true
+	}
+
+	if dataMap, ok := data["data"].(map[string]any); ok {
 		dataValue = dataMap
+		var ok bool
 		resultValue, ok = dataValue["result"].([]any)
 		if !ok {
-			return data
+			return nil, nil, false
 		}
-	} else {
+		return resultValue, dataValue, true
+	}
+
+	return nil, nil, false
+}
+
+// extractMetricFromResult extracts the metric map from a Prometheus result item.
+func extractMetricFromResult(resultItem map[string]any) (map[string]string, bool) {
+	if metricMap, ok := resultItem["metric"].(map[string]any); ok {
+		// Convert map[string]any to map[string]string
+		metricValue := make(map[string]string)
+		for k, v := range metricMap {
+			if strVal, ok := v.(string); ok {
+				metricValue[k] = strVal
+			}
+		}
+		return metricValue, true
+	}
+
+	if metricStrMap, ok := resultItem["metric"].(map[string]string); ok {
+		return metricStrMap, true
+	}
+
+	return nil, false
+}
+
+// extractCheckRuleFromMetric finds the check rule value in metric labels.
+// It checks common label names first, then falls back to checking all labels
+// for values that match the check rule sets.
+func extractCheckRuleFromMetric(metricValue map[string]string, checkRuleNameSet, checkRuleIDSet map[string]bool) string {
+	// Check various possible label names for check rule information
+	// Common label names: check_rule, check_rule_name, check_rule_id, rule_name, check_name, check
+	labelNamesToCheck := []string{"check_rule", "check_rule_name", "check_rule_id", "rule_name", "check_name", "check", "check_id", "rule_id"}
+
+	for _, labelName := range labelNamesToCheck {
+		if labelValue, exists := metricValue[labelName]; exists && labelValue != "" {
+			return labelValue
+		}
+	}
+
+	// If we didn't find a check rule in the expected labels, check all labels
+	// This helps us discover what label name is actually used
+	for labelName, labelValue := range metricValue {
+		// Skip known non-check-rule labels
+		if labelName == "otel_metric_name" || labelName == "issue_id" || labelName == "__name__" {
+			continue
+		}
+		// If this label value matches any of our check rules, use it
+		if checkRuleNameSet[labelValue] || checkRuleIDSet[labelValue] {
+			return labelValue
+		}
+	}
+
+	return ""
+}
+
+// filterIssuesByCheckRules filters the Prometheus response to only include issues
+// from the specified check rules. It looks for check rule information in metric labels.
+// It matches against both check rule names and IDs since metric labels may contain either.
+func (l *ListIssues) filterIssuesByCheckRules(data map[string]any, checkRuleNames []string, allCheckRules []CheckRule) map[string]any {
+	checkRuleNameSet, checkRuleIDSet := buildCheckRuleLookupSets(checkRuleNames, allCheckRules)
+
+	// Extract the Prometheus results data structure
+	resultValue, dataValue, ok := extractPrometheusResults(data)
+	if !ok {
 		return data
 	}
 
@@ -203,49 +265,12 @@ func (l *ListIssues) filterIssuesByCheckRules(data map[string]any, checkRuleName
 			continue
 		}
 
-		var metricValue map[string]string
-		if metricMap, ok := resultMap["metric"].(map[string]any); ok {
-			// Convert map[string]any to map[string]string
-			metricValue = make(map[string]string)
-			for k, v := range metricMap {
-				if strVal, ok := v.(string); ok {
-					metricValue[k] = strVal
-				}
-			}
-		} else if metricStrMap, ok := resultMap["metric"].(map[string]string); ok {
-			metricValue = metricStrMap
-		} else {
+		metricValue, ok := extractMetricFromResult(resultMap)
+		if !ok {
 			continue
 		}
 
-		// Check various possible label names for check rule information
-		// Common label names: check_rule, check_rule_name, check_rule_id, rule_name, check_name, check
-		var checkRuleValue string
-		labelNamesToCheck := []string{"check_rule", "check_rule_name", "check_rule_id", "rule_name", "check_name", "check", "check_id", "rule_id"}
-
-		for _, labelName := range labelNamesToCheck {
-			if labelValue, exists := metricValue[labelName]; exists && labelValue != "" {
-				checkRuleValue = labelValue
-				break
-			}
-		}
-
-		// If we didn't find a check rule in the expected labels, check all labels
-		// This helps us discover what label name is actually used
-		if checkRuleValue == "" {
-			// Check all metric labels for any value that matches our check rules
-			for labelName, labelValue := range metricValue {
-				// Skip known non-check-rule labels
-				if labelName == "otel_metric_name" || labelName == "issue_id" || labelName == "__name__" {
-					continue
-				}
-				// If this label value matches any of our check rules, use it
-				if checkRuleNameSet[labelValue] || checkRuleIDSet[labelValue] {
-					checkRuleValue = labelValue
-					break
-				}
-			}
-		}
+		checkRuleValue := extractCheckRuleFromMetric(metricValue, checkRuleNameSet, checkRuleIDSet)
 
 		// If we found a check rule value, check if it matches either the name or ID
 		// If no check rule label is found, exclude the issue when filtering is active
