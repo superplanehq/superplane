@@ -17,8 +17,9 @@ import (
 var templateReloadLock sync.Mutex
 
 func startTemplateReloader(registry *registry.Registry) {
-	dir, ok := templateDir()
-	if !ok {
+	dir, err := templateDir()
+	if err != nil {
+		log.Printf("template reloader: failed to get template directory: %v", err)
 		return
 	}
 
