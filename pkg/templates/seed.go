@@ -3,6 +3,7 @@ package templates
 import (
 	"fmt"
 	"io/fs"
+	"os"
 	"strings"
 	"time"
 
@@ -29,17 +30,21 @@ func Setup(registry *registry.Registry) error {
 		log.Warnf("Failed to seed templates: %v", err)
 	}
 
-	// if os.Getenv("APP_ENV") == "development" {
-	// 	startTemplateReloader(registry)
-	// }
+	if os.Getenv("APP_ENV") == "development" {
+		startTemplateReloader(registry)
+	}
 
 	return nil
 }
 
 func SeedTemplates(registry *registry.Registry) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := lockTemplateSeed(tx); err != nil {
+		locked, err := lockTemplateSeed(tx)
+		if err != nil {
 			return err
+		}
+		if !locked {
+			return nil
 		}
 		defer unlockTemplateSeed(tx)
 
@@ -162,13 +167,64 @@ func createTemplateWorkflow(tx *gorm.DB, registry *registry.Registry, template *
 	return nil
 }
 
-func lockTemplateSeed(tx *gorm.DB) error {
-	if err := tx.Exec("SELECT pg_advisory_lock(?)", seedLockID).Error; err != nil {
-		return fmt.Errorf("lock template seed: %w", err)
+func lockTemplateSeed(tx *gorm.DB) (bool, error) {
+	var locked bool
+	if err := tx.Raw("SELECT pg_try_advisory_lock(?)", seedLockID).Scan(&locked).Error; err != nil {
+		return false, fmt.Errorf("lock template seed: %w", err)
 	}
-	return nil
+	return locked, nil
 }
 
 func unlockTemplateSeed(tx *gorm.DB) {
 	_ = tx.Exec("SELECT pg_advisory_unlock(?)", seedLockID).Error
+}
+
+func startTemplateReloader(registry *registry.Registry) {
+	dir, err := templateDir()
+	if err != nil {
+		log.Printf("template reloader: failed to get template directory: %v", err)
+		return
+	}
+
+	initialFingerprint, err := templateDirFingerprint(dir)
+	if err != nil {
+		log.Printf("template reloader: failed to read templates: %v", err)
+		return
+	}
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		lastFingerprint := initialFingerprint
+
+		for range ticker.C {
+			fingerprint, err := templateDirFingerprint(dir)
+			if err != nil {
+				log.Printf("template reloader: failed to calculate fingerprint: %v", err)
+				continue
+			}
+
+			if fingerprint == lastFingerprint {
+				continue
+			}
+
+			err = SeedTemplates(registry)
+			if err != nil {
+				log.Printf("template reloader: failed to seed templates: %v", err)
+			}
+
+			log.Printf("template reloader: templates re-seeded")
+			lastFingerprint = fingerprint
+		}
+	}()
+}
+
+func templateDir() (fs.FS, error) {
+	dir := os.Getenv("TEMPLATE_DIR")
+	if dir == "" {
+		return nil, fmt.Errorf("TEMPLATE_DIR is not set")
+	}
+
+	return os.DirFS(dir + "/canvases"), nil
 }
