@@ -20,8 +20,4 @@ CREATE INDEX IF NOT EXISTS idx_casbin_rule_v0 ON casbin_rule(v0);
 CREATE INDEX IF NOT EXISTS idx_casbin_rule_v1 ON casbin_rule(v1);
 CREATE INDEX IF NOT EXISTS idx_casbin_rule_v2 ON casbin_rule(v2);
 
--- Create unique index for policy uniqueness (created by gorm-adapter)
--- This ensures we don't have duplicate policies in the database
-CREATE UNIQUE INDEX IF NOT EXISTS idx_casbin_rule ON casbin_rule(ptype, v0, v1, v2, v3, v4, v5);
-
 COMMIT;
