@@ -12,13 +12,17 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   autocompleteExampleObj,
 }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
+  const shouldPreserveEmpty = field.togglable === true;
 
   if (field.disallowExpression) {
     return (
       <Input
         type={field.sensitive ? "password" : "text"}
         value={currentValue}
-        onChange={(e) => onChange(e.target.value || undefined)}
+        onChange={(e) => {
+          const nextValue = e.target.value;
+          onChange(shouldPreserveEmpty ? nextValue : nextValue || undefined);
+        }}
         placeholder={field.placeholder || ""}
         className={hasError ? "border-red-500 border-2" : ""}
         data-testid={toTestId(`string-field-${field.name}`)}
@@ -31,7 +35,10 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       <Input
         type="password"
         value={currentValue}
-        onChange={(e) => onChange(e.target.value || undefined)}
+        onChange={(e) => {
+          const nextValue = e.target.value;
+          onChange(shouldPreserveEmpty ? nextValue : nextValue || undefined);
+        }}
         placeholder={field.placeholder || ""}
         className={hasError ? "border-red-500 border-2" : ""}
         data-testid={toTestId(`string-field-${field.name}`)}
@@ -43,7 +50,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
     <AutoCompleteInput
       exampleObj={autocompleteExampleObj ?? null}
       value={currentValue}
-      onChange={(nextValue) => onChange(nextValue || undefined)}
+      onChange={(nextValue) => onChange(shouldPreserveEmpty ? nextValue : nextValue || undefined)}
       placeholder={field.placeholder || ""}
       startWord="{{"
       prefix="{{ $"
