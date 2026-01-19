@@ -2402,10 +2402,10 @@ export function WorkflowPageV2() {
 
   const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
   const templateBanner = isTemplate ? (
-    <div className="bg-slate-50 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className="bg-orange-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p className="text-sm font-medium text-gray-900">Template preview</p>
-        <p className="text-xs text-gray-500">Read-only template. Save your edits to a new canvas.</p>
+        <p className="text-[13px] text-black/60">Read-only template. Save your edits to a new canvas.</p>
       </div>
       <Button size="sm" onClick={() => setIsUseTemplateOpen(true)}>
         {hasUnsavedChanges ? "Save changes to new canvas" : "Use template"}
@@ -2528,6 +2528,7 @@ export function WorkflowPageV2() {
           ]}
           defaultTemplateId={workflow.metadata?.id || ""}
           mode="create"
+          fromTemplate
         />
       ) : null}
     </>

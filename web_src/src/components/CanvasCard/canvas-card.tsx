@@ -34,7 +34,7 @@ export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasC
                   <Link to={`/${organizationId}/canvas/${canvas.id}`} className="block text-left w-full">
                     <Heading
                       level={3}
-                      className="!text-md font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                      className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
                     >
                       {canvas.name}
                     </Heading>
@@ -44,7 +44,7 @@ export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasC
             </div>
 
             <div className="mb-4">
-              <Text className="text-sm text-left text-gray-600 dark:text-gray-400 line-clamp-3 mt-2">
+              <Text className="text-[13px] text-left text-gray-600 dark:text-gray-400 line-clamp-3 mt-2">
                 {canvas.description || ""}
               </Text>
             </div>
@@ -88,7 +88,7 @@ export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasC
                 </Link>
               </div>
 
-              <Text className="text-sm text-left text-gray-600 dark:text-gray-400 mb-2 line-clamp-1 !mb-0">
+              <Text className="text-[13px] text-left text-gray-600 dark:text-gray-400 mb-2 line-clamp-1 !mb-0">
                 {canvas.description || ""}
               </Text>
             </div>
