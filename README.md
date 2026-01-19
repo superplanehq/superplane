@@ -1,46 +1,64 @@
 # SuperPlane
 
-SuperPlane is an AI-native DevOps control plane. Our mission is to build the
-platform teams use to ship and manage software in the AI era.
+SuperPlane is an **open source DevOps control plane** for defining and running
+operational workflows across the tools you already use
+(CI/CD, release management, incident response, notifications, etc.).
 
-Agents are helping us write an order of magnitude more code, while systems have
-become too complex for human-driven ops alone. We're rethinking DevOps from
-first principles for the AI era: a single control layer where engineers and
-agents safely collaborate.
+SuperPlane is currently self-hosted only. A hosted version is not available today.
+You can sign up for updates on our [website](https://superplane.com).
 
-## Key Capabilities
+## Project status
 
-- **AI-Native Architecture** - Built from the ground up for the AI era, enabling seamless collaboration between engineers and AI agents to manage increasingly complex DevOps systems
-- **Cross-Platform Workflow Orchestration** - Connect and coordinate workflows across multiple DevOps tools, platforms, and services from a single interface
-- **Event-Driven Automation** - Build workflows that automatically respond to code pushes, deployments, alerts, and custom triggers
-- **Visual Workflow Builder** - Design and manage complex DevOps processes with an intuitive visual interface and real-time status updates
-- **Operational Knowledge Centralization** - Create living documentation of your DevOps processes that's easy to understand and maintain
+This project is new and moving quickly. Expect rough edges and occasional
+breaking changes while we stabilize the core model and integrations.
+If you try it and hit something confusing, please [open an issue](https://github.com/superplanehq/superplane/issues/new).
+Early feedback is extremely valuable.
 
-## Quick Start
+## What it does
 
-The fastest way to try SuperPlane is to run the latest version of the SuperPlane
-Docker container on your own machine. You'll have a working SuperPlane instance
-in less than a minute, without provisioning any cloud infrastructure.
+- **Workflow orchestration**: Model multi-step operational workflows that span multiple systems.
+- **Event-driven automation**: Trigger workflows from pushes, deploy events, alerts, schedules, and webhooks.
+- **Control plane UI**: Design and manage DevOps processes; inspect runs, status, and history in a single place.
+- **Shared operational context**: Keep workflow definitions and operational intent in one system instead of scattered scripts.
+
+### Example use cases
+
+A few concrete things teams build with SuperPlane:
+
+- **Policy-gated production deploy**: when CI finishes green, hold outside business hours, require on-call + product approval, then trigger the deploy.
+- **Progressive delivery (10% → 30% → 60% → 100%)**: deploy in waves, wait/verify at each step, and rollback on failure with an approval gate.
+- **Release train with a multi-repo ship set**: wait for tags/builds from a set of services, fan-in once all are ready, then dispatch a coordinated deploy.
+- **“First 5 minutes” incident triage**: on incident created, fetch context in parallel (recent deploys + health signals), generate an evidence pack, and open an issue.
+
+## Quick start
+
+Run the latest demo container:
 
 ```
 docker run --rm -p 3000:3000 -v spdata:/app/data -ti ghcr.io/superplanehq/superplane-demo:stable
 ```
 
-## Production Installation
+Then open [http://localhost:3000](http://localhost:3000).
 
-For a permanent, production-ready installation, SuperPlane can be deployed on a
-single host or on Kubernetes. The single-host installation is ideal for smaller
-deployments and provides automatic SSL certificate management. Kubernetes
-deployment offers better scalability and high availability for larger teams.
+## Production installation
+
+You can deploy SuperPlane on a single host or on Kubernetes:
 
 - **[Single Host Installation](https://docs.superplane.com/installation/single-host/aws-ec2/)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
 - **[Kubernetes Installation](https://docs.superplane.com/installation/kubernetes/gke/)** - Deploy on GKE, EKS, or any Kubernetes cluster
 
 ## Contributing
 
-Found a bug or have a feature idea? Check our **[Contributing Guide](CONTRIBUTING.md)** to get started.
+We welcome your bug reports, ideas for improvement, and focused PRs.
 
-## Get In Contact
+- Read the **[Contributing Guide](CONTRIBUTING.md)** to get started.
+- Issues: use GitHub issues for bugs and feature requests.
+
+## License
+
+Apache License 2.0. See `LICENSE`.
+
+## Community
 
 - **[Discord](https://discord.gg/KC78eCNsnw)** - Join our community for discussions, questions, and collaboration
 - **[X](https://x.com/superplanehq)** - Follow us for updates and announcements
