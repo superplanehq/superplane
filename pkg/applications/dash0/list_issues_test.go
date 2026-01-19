@@ -15,15 +15,61 @@ import (
 func Test__ListIssues__Setup(t *testing.T) {
 	component := ListIssues{}
 
-	t.Run("valid setup", func(t *testing.T) {
+	t.Run("valid setup with existing metadata", func(t *testing.T) {
+		// Test that setup skips when check rules are already in metadata
+		nodeMetadataCtx := &contexts.MetadataContext{}
+		err := nodeMetadataCtx.Set(ListIssuesNodeMetadata{
+			CheckRules: []CheckRule{
+				{ID: "rule-1", Name: "rule-1"},
+			},
+		})
+		require.NoError(t, err)
+
 		appCtx := &contexts.AppInstallationContext{}
-		err := component.Setup(core.SetupContext{
+		err = component.Setup(core.SetupContext{
 			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
+			Metadata:        nodeMetadataCtx,
 			Configuration:   map[string]any{},
 		})
 
 		require.NoError(t, err)
+	})
+
+	t.Run("setup fetches check rules", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						[
+							{"id": "rule-1-id", "name": "rule-1"},
+							{"id": "rule-2-id", "name": "rule-2"}
+						]
+					`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.AppInstallationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://api.us-west-2.aws.dash0.com",
+			},
+		}
+
+		nodeMetadataCtx := &contexts.MetadataContext{}
+		err := component.Setup(core.SetupContext{
+			AppInstallation: appCtx,
+			HTTP:            httpContext,
+			Metadata:        nodeMetadataCtx,
+			Configuration:   map[string]any{},
+		})
+
+		require.NoError(t, err)
+		metadata := nodeMetadataCtx.Get().(ListIssuesNodeMetadata)
+		require.Len(t, metadata.CheckRules, 2)
+		assert.Equal(t, "rule-1-id", metadata.CheckRules[0].ID)
+		assert.Equal(t, "rule-1", metadata.CheckRules[0].Name)
 	})
 }
 
@@ -70,12 +116,14 @@ func Test__ListIssues__Execute(t *testing.T) {
 			},
 		}
 
+		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration:   map[string]any{},
 			HTTP:            httpContext,
 			AppInstallation: appCtx,
 			ExecutionState:  execCtx,
+			NodeMetadata:    nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -114,12 +162,14 @@ func Test__ListIssues__Execute(t *testing.T) {
 			},
 		}
 
+		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration:   map[string]any{},
 			HTTP:            httpContext,
 			AppInstallation: appCtx,
 			ExecutionState:  execCtx,
+			NodeMetadata:    nodeMetadataCtx,
 		})
 
 		require.Error(t, err)
@@ -187,14 +237,25 @@ func Test__ListIssues__Execute(t *testing.T) {
 			},
 		}
 
+		// Set up node metadata with check rules (as would be done during Setup())
+		nodeMetadataCtx := &contexts.MetadataContext{}
+		err := nodeMetadataCtx.Set(ListIssuesNodeMetadata{
+			CheckRules: []CheckRule{
+				{ID: "rule-1-id", Name: "rule-1"},
+				{ID: "rule-2-id", Name: "rule-2"},
+			},
+		})
+		require.NoError(t, err)
+
 		execCtx := &contexts.ExecutionStateContext{}
-		err := component.Execute(core.ExecutionContext{
+		err = component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"checkRules": []string{"rule-1"},
 			},
 			HTTP:            httpContext,
 			AppInstallation: appCtx,
 			ExecutionState:  execCtx,
+			NodeMetadata:    nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -266,6 +327,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 			},
 		}
 
+		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -274,6 +336,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 			HTTP:            httpContext,
 			AppInstallation: appCtx,
 			ExecutionState:  execCtx,
+			NodeMetadata:    nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)

@@ -116,14 +116,16 @@ func (l *ListIssues) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Get check rules from node metadata (stored during Setup())
-	var nodeMetadata ListIssuesNodeMetadata
-	err = mapstructure.Decode(ctx.NodeMetadata.Get(), &nodeMetadata)
-	if err != nil {
-		ctx.Logger.Warnf("Error decoding node metadata for check rules: %v", err)
-		// Continue without filtering if metadata cannot be decoded
-	} else if len(spec.CheckRules) > 0 && len(nodeMetadata.CheckRules) > 0 {
-		// Filter issues by check rules if check rules are specified in configuration
-		data = l.filterIssuesByCheckRules(data, spec.CheckRules, nodeMetadata.CheckRules)
+	if ctx.NodeMetadata != nil {
+		var nodeMetadata ListIssuesNodeMetadata
+		err = mapstructure.Decode(ctx.NodeMetadata.Get(), &nodeMetadata)
+		if err != nil {
+			ctx.Logger.Warnf("Error decoding node metadata for check rules: %v", err)
+			// Continue without filtering if metadata cannot be decoded
+		} else if len(spec.CheckRules) > 0 && len(nodeMetadata.CheckRules) > 0 {
+			// Filter issues by check rules if check rules are specified in configuration
+			data = l.filterIssuesByCheckRules(data, spec.CheckRules, nodeMetadata.CheckRules)
+		}
 	}
 
 	return ctx.ExecutionState.Emit(
