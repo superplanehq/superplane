@@ -959,6 +959,13 @@ CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 
 
 --
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
