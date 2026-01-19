@@ -400,6 +400,23 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       return cur;
     };
 
+    const computeHighlightedValue = React.useCallback(
+      (suggestion: ReturnType<typeof getSuggestions>[number], context: ReturnType<typeof getExpressionContext>) => {
+        if (!exampleObj || !context) return undefined;
+        if (suggestion.kind === "function") return undefined;
+
+        const insertText = getSuggestionInsertText(suggestion);
+        const left = context.expressionText.slice(0, context.expressionCursor);
+        const range = getReplacementRange(left, insertText);
+        const nextExpression =
+          context.expressionText.slice(0, range.start) + insertText + context.expressionText.slice(range.end);
+        const value = resolveExpressionValue(nextExpression, exampleObj);
+        if (typeof value === "function") return undefined;
+        return value;
+      },
+      [exampleObj],
+    );
+
     useEffect(() => {
       setInputValue(value);
     }, [value]);
@@ -429,19 +446,24 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       setIsOpen(newSuggestions.length > 0);
       const nextHighlightedIndex = showValuePreview && newSuggestions.length > 0 ? 0 : -1;
       setHighlightedIndex(nextHighlightedIndex);
-      if (exampleObj && nextHighlightedIndex >= 0) {
+      if (nextHighlightedIndex >= 0) {
         const suggestion = newSuggestions[nextHighlightedIndex];
-        const insertText = getSuggestionInsertText(suggestion);
-        const left = context.expressionText.slice(0, context.expressionCursor);
-        const range = getReplacementRange(left, insertText);
-        const nextExpression =
-          context.expressionText.slice(0, range.start) + insertText + context.expressionText.slice(range.end);
-        const value = resolveExpressionValue(nextExpression, exampleObj);
+        const value = computeHighlightedValue(suggestion, context);
         setHighlightedValue(value);
       } else {
         setHighlightedValue(undefined);
       }
-    }, [inputValue, cursorPosition, isFocused, startWord, suffix, onChange, showValuePreview, exampleObj]);
+    }, [
+      inputValue,
+      cursorPosition,
+      isFocused,
+      startWord,
+      suffix,
+      onChange,
+      showValuePreview,
+      exampleObj,
+      computeHighlightedValue,
+    ]);
 
     // Handle clicking outside to close suggestions
     useEffect(() => {
@@ -539,19 +561,10 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           e.preventDefault();
           setHighlightedIndex((prev) => {
             const newIndex = prev < suggestions.length - 1 ? prev + 1 : 0;
-            if (exampleObj && suggestions[newIndex]) {
+            if (suggestions[newIndex]) {
               const cursorPosition = inputRef.current?.selectionStart || 0;
               const context = getExpressionContext(inputValue, cursorPosition);
-              if (!context) {
-                setHighlightedValue(undefined);
-                return newIndex;
-              }
-              const insertText = getSuggestionInsertText(suggestions[newIndex]);
-              const left = context.expressionText.slice(0, context.expressionCursor);
-              const range = getReplacementRange(left, insertText);
-              const nextExpression =
-                context.expressionText.slice(0, range.start) + insertText + context.expressionText.slice(range.end);
-              const value = resolveExpressionValue(nextExpression, exampleObj);
+              const value = computeHighlightedValue(suggestions[newIndex], context);
               setHighlightedValue(value);
             }
             return newIndex;
@@ -561,19 +574,10 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           e.preventDefault();
           setHighlightedIndex((prev) => {
             const newIndex = prev > 0 ? prev - 1 : suggestions.length - 1;
-            if (exampleObj && suggestions[newIndex]) {
+            if (suggestions[newIndex]) {
               const cursorPosition = inputRef.current?.selectionStart || 0;
               const context = getExpressionContext(inputValue, cursorPosition);
-              if (!context) {
-                setHighlightedValue(undefined);
-                return newIndex;
-              }
-              const insertText = getSuggestionInsertText(suggestions[newIndex]);
-              const left = context.expressionText.slice(0, context.expressionCursor);
-              const range = getReplacementRange(left, insertText);
-              const nextExpression =
-                context.expressionText.slice(0, range.start) + insertText + context.expressionText.slice(range.end);
-              const value = resolveExpressionValue(nextExpression, exampleObj);
+              const value = computeHighlightedValue(suggestions[newIndex], context);
               setHighlightedValue(value);
             }
             return newIndex;
@@ -691,18 +695,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
                       if (exampleObj) {
                         const cursorPosition = inputRef.current?.selectionStart || 0;
                         const context = getExpressionContext(inputValue, cursorPosition);
-                        if (!context) {
-                          setHighlightedValue(undefined);
-                          return;
-                        }
-                        const insertText = getSuggestionInsertText(suggestionItem);
-                        const left = context.expressionText.slice(0, context.expressionCursor);
-                        const range = getReplacementRange(left, insertText);
-                        const nextExpression =
-                          context.expressionText.slice(0, range.start) +
-                          insertText +
-                          context.expressionText.slice(range.end);
-                        const value = resolveExpressionValue(nextExpression, exampleObj);
+                        const value = computeHighlightedValue(suggestionItem, context);
                         setHighlightedValue(value);
                       }
                     }}
