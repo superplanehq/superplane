@@ -1,0 +1,124 @@
+version: v1.0
+name: Fix Formatting
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+# This pipeline can be triggered manually via Semaphore UI or API
+# with the PR_NUMBER parameter set to the PR number to format
+global_job_config:
+  prologue:
+    commands:
+      # Install GitHub CLI for PR operations
+      - curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+      - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+      - sudo apt-get update
+      - sudo apt-get install -y gh
+      
+      # Configure git
+      - git config --global user.email "bot@superplane.app"
+      - git config --global user.name "SuperPlane Bot"
+      
+      # Authenticate with GitHub using the built-in token
+      - echo "$GITHUB_TOKEN" | gh auth login --with-token
+      
+      # Get PR information
+      - 'export PR_INFO=$(gh pr view $PR_NUMBER --json headRefName,headRepository,headRepositoryOwner,isCrossRepository --repo $SEMAPHORE_GIT_REPO_SLUG)'
+      - 'export HEAD_REF=$(echo $PR_INFO | jq -r .headRefName)'
+      - 'export HEAD_REPO_OWNER=$(echo $PR_INFO | jq -r .headRepositoryOwner.login)'
+      - 'export HEAD_REPO_NAME=$(echo $PR_INFO | jq -r .headRepository.name)'
+      - 'export IS_FORK=$(echo $PR_INFO | jq -r .isCrossRepository)'
+      
+      # Checkout the repository
+      - checkout
+      
+      # Fetch the PR branch
+      - |
+        if [ "$IS_FORK" = "true" ]; then
+          # For external PRs, add the fork as a remote and fetch
+          git remote add fork https://github.com/${HEAD_REPO_OWNER}/${HEAD_REPO_NAME}.git
+          git fetch fork $HEAD_REF
+          git checkout -b $HEAD_REF fork/$HEAD_REF
+        else
+          # For internal PRs, just checkout the branch
+          git fetch origin $HEAD_REF
+          git checkout -b $HEAD_REF origin/$HEAD_REF
+        fi
+
+blocks:
+  - name: "Format Code"
+    task:
+      secrets:
+        - name: github-token
+      env_vars:
+        - name: PR_NUMBER
+          value: ""  # This will be set when triggering the pipeline
+      jobs:
+        - name: "Fix Go and TypeScript Formatting"
+          commands:
+            # Install Go
+            - sem-version go 1.22
+            
+            # Format Go code
+            - echo "Formatting Go code..."
+            - gofmt -s -w .
+            
+            # Install Node.js and format TypeScript
+            - sem-version node 20
+            - echo "Formatting TypeScript code..."
+            - cd web_src
+            - npm ci
+            - npm run format
+            - cd ..
+            
+            # Check if there are any changes
+            - |
+              if [ -n "$(git status --porcelain)" ]; then
+                echo "Formatting changes detected. Committing and pushing..."
+                git add .
+                git commit -m "chore: auto-fix formatting for PR #${PR_NUMBER}"
+                
+                # Push changes back to the PR branch
+                if [ "$IS_FORK" = "true" ]; then
+                  # For external PRs, create a suggestion comment with the diff
+                  echo "External PR detected. Creating a comment with formatting fixes..."
+                  
+                  # Create a patch file
+                  git format-patch -1 HEAD --stdout > /tmp/formatting.patch
+                  
+                  # Create comment body in a file to avoid YAML escaping issues
+                  cat > /tmp/comment.md << 'COMMENT_EOF'
+              ## 🤖 Formatting Fixes Available
+
+              The following formatting changes are suggested for this PR. Please apply them by running:
+
+              ```bash
+              make format.go
+              make format.js
+              ```
+
+              <details>
+              <summary>View formatting diff</summary>
+
+              ```diff
+              COMMENT_EOF
+                  cat /tmp/formatting.patch >> /tmp/comment.md
+                  cat >> /tmp/comment.md << 'COMMENT_EOF'
+              ```
+
+              </details>
+              COMMENT_EOF
+                  
+                  # Post the comment on the PR
+                  gh pr comment $PR_NUMBER --body-file /tmp/comment.md --repo $SEMAPHORE_GIT_REPO_SLUG
+                  
+                  echo "Comment posted on PR #${PR_NUMBER}"
+                else
+                  # For internal PRs, push directly to the branch
+                  git push origin $HEAD_REF
+                  echo "Formatting changes committed and pushed to PR #${PR_NUMBER}"
+                fi
+              else
+                echo "No formatting changes needed."
+              fi
