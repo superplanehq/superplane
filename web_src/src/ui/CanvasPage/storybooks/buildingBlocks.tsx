@@ -103,6 +103,16 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         color: "yellow",
       },
       {
+        name: "loop",
+        label: "Loop",
+        description: "Repeat nested steps within a loop container",
+        type: "component",
+        outputChannels: [{ id: "default", label: "Default" } as any],
+        configuration: [],
+        icon: "repeat",
+        color: "sky",
+      },
+      {
         name: "cron",
         label: "Cron",
         description: "Trigger on a cron schedule",

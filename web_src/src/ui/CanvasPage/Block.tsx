@@ -1,4 +1,5 @@
 import { Composite, type CompositeProps } from "@/ui/composite";
+import { Loop, type LoopProps } from "@/ui/loop";
 import { SwitchComponent, type SwitchComponentProps } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
@@ -10,7 +11,7 @@ import { ComponentBase, ComponentBaseProps } from "../componentBase";
 import { AnnotationComponent, type AnnotationComponentProps } from "../annotationComponent";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType = "trigger" | "component" | "composite" | "merge" | "switch" | "annotation";
+type BlockType = "trigger" | "component" | "composite" | "merge" | "switch" | "annotation" | "loop";
 
 interface BlockAi {
   show: boolean;
@@ -24,6 +25,7 @@ export interface BlockData {
 
   state: BlockState;
   type: BlockType;
+  parentNodeId?: string;
 
   // last input event received by this block (for simulation display)
   lastEvent?: unknown;
@@ -48,6 +50,9 @@ export interface BlockData {
 
   // annotation node specific props
   annotation?: AnnotationComponentProps;
+
+  // loop node specific props
+  loop?: LoopProps;
 }
 
 interface BlockProps extends ComponentActionsProps {
@@ -114,6 +119,8 @@ function LeftHandle({ data, nodeId }: BlockProps) {
         return data.switch?.collapsed;
       case "component":
         return data.component?.collapsed;
+      case "loop":
+        return data.loop?.collapsed;
       default:
         return false;
     }
@@ -175,6 +182,8 @@ function RightHandle({ data, nodeId }: BlockProps) {
         return data.switch?.collapsed;
       case "component":
         return data.component?.collapsed;
+      case "loop":
+        return data.loop?.collapsed;
       default:
         return false;
     }
@@ -388,7 +397,7 @@ function BlockContent({
     onToggleView,
     onDelete,
     isCompactView,
-    onConfigure: data.type === "composite" ? onConfigure : undefined,
+    onConfigure: data.type === "composite" || data.type === "loop" ? onConfigure : undefined,
   };
 
   switch (data.type) {
@@ -425,6 +434,8 @@ function BlockContent({
         />
       );
     }
+    case "loop":
+      return <Loop {...(data.loop as LoopProps)} selected={selected} {...actionProps} />;
     default:
       throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }

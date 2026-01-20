@@ -90,8 +90,141 @@ import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
 const CANVAS_AUTO_SAVE_STORAGE_KEY = "canvas-auto-save-enabled";
+const LOOP_COMPONENT_NAME = "loop";
+const LOOP_PADDING = { x: 48, y: 40 };
+const LOOP_HEADER_OFFSET = 40;
+const DEFAULT_LOOP_SIZE = { width: 520, height: 260 };
+const DEFAULT_NODE_SIZE = { width: 368, height: 180 };
+const DEFAULT_COLLAPSED_SIZE = { width: 80, height: 80 };
+const DEFAULT_ANNOTATION_SIZE = { width: 320, height: 160 };
 
 type UnsavedChangeKind = "position" | "structural";
+
+function getParentNodeId(node: ComponentsNode): string | null {
+  const metadata = node.metadata as Record<string, unknown> | undefined;
+  const parentNodeId = metadata?.parentNodeId;
+  if (typeof parentNodeId !== "string") return null;
+  return parentNodeId.trim() ? parentNodeId : null;
+}
+
+function isLoopNode(node: ComponentsNode): boolean {
+  return node.type === "TYPE_COMPONENT" && node.component?.name === LOOP_COMPONENT_NAME;
+}
+
+function getEstimatedNodeSize(node: ComponentsNode): { width: number; height: number } {
+  if (node.isCollapsed) {
+    return DEFAULT_COLLAPSED_SIZE;
+  }
+
+  if (node.type === "TYPE_WIDGET" && node.widget?.name === "annotation") {
+    return DEFAULT_ANNOTATION_SIZE;
+  }
+
+  if (isLoopNode(node)) {
+    return DEFAULT_LOOP_SIZE;
+  }
+
+  return DEFAULT_NODE_SIZE;
+}
+
+function getLoopBounds(
+  nodes: ComponentsNode[],
+  loopNode: ComponentsNode,
+  excludeNodeId?: string,
+): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  childCount: number;
+} {
+  const children = nodes.filter(
+    (node) => node.id !== excludeNodeId && getParentNodeId(node) === loopNode.id,
+  );
+  const loopPosition = loopNode.position || { x: 0, y: 0 };
+
+  if (children.length === 0) {
+    return {
+      x: loopPosition.x ?? 0,
+      y: loopPosition.y ?? 0,
+      width: DEFAULT_LOOP_SIZE.width,
+      height: DEFAULT_LOOP_SIZE.height,
+      childCount: 0,
+    };
+  }
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  children.forEach((child) => {
+    const position = child.position || { x: 0, y: 0 };
+    const { width, height } = getEstimatedNodeSize(child);
+    const childX = position.x ?? 0;
+    const childY = position.y ?? 0;
+    minX = Math.min(minX, childX);
+    minY = Math.min(minY, childY);
+    maxX = Math.max(maxX, childX + width);
+    maxY = Math.max(maxY, childY + height);
+  });
+
+  const width = Math.max(DEFAULT_LOOP_SIZE.width, maxX - minX + LOOP_PADDING.x * 2);
+  const height = Math.max(
+    DEFAULT_LOOP_SIZE.height,
+    maxY - minY + LOOP_PADDING.y * 2 + LOOP_HEADER_OFFSET,
+  );
+
+  return {
+    x: minX - LOOP_PADDING.x,
+    y: minY - LOOP_PADDING.y - LOOP_HEADER_OFFSET,
+    width,
+    height,
+    childCount: children.length,
+  };
+}
+
+function findLoopParentForPosition(
+  nodes: ComponentsNode[],
+  position: { x: number; y: number },
+  excludeNodeId?: string,
+): string | null {
+  const loopNodes = nodes.filter((node) => isLoopNode(node) && node.id && node.id !== excludeNodeId);
+  const candidates = loopNodes
+    .map((loopNode) => {
+      const bounds = getLoopBounds(nodes, loopNode, excludeNodeId);
+      return {
+        id: loopNode.id as string,
+        area: bounds.width * bounds.height,
+        ...bounds,
+      };
+    })
+    .filter(
+      (bounds) =>
+        position.x >= bounds.x &&
+        position.x <= bounds.x + bounds.width &&
+        position.y >= bounds.y &&
+        position.y <= bounds.y + bounds.height,
+    );
+
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => a.area - b.area);
+  return candidates[0].id;
+}
+
+function updateNodeParentMetadata(node: ComponentsNode, parentNodeId: string | null): ComponentsNode {
+  const metadata = { ...(node.metadata || {}) } as Record<string, unknown>;
+  if (parentNodeId) {
+    metadata.parentNodeId = parentNodeId;
+  } else {
+    delete metadata.parentNodeId;
+  }
+
+  return {
+    ...node,
+    metadata,
+  };
+}
 
 export function WorkflowPageV2() {
   const { organizationId, workflowId } = useParams<{
@@ -1415,7 +1548,8 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
 
-      const { buildingBlock, nodeName, configuration, position, sourceConnection, appInstallationRef } = newNodeData;
+      const { buildingBlock, nodeName, configuration, position, sourceConnection, appInstallationRef, parentNodeId } =
+        newNodeData;
 
       // Filter configuration to only include visible fields
       const filteredConfiguration = filterVisibleConfiguration(configuration, buildingBlock.configuration || []);
@@ -1436,6 +1570,7 @@ export function WorkflowPageV2() {
                 ? "TYPE_WIDGET"
                 : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
+        metadata: parentNodeId ? { parentNodeId } : undefined,
         appInstallation: appInstallationRef,
         position: position
           ? {
@@ -1513,6 +1648,7 @@ export function WorkflowPageV2() {
       position: { x: number; y: number };
       sourceNodeId: string;
       sourceHandleId: string | null;
+      parentNodeId?: string | null;
     }): Promise<string> => {
       if (!workflow || !organizationId || !workflowId) return "";
 
@@ -1528,7 +1664,7 @@ export function WorkflowPageV2() {
         type: "TYPE_COMPONENT",
         // NO component/blueprint/trigger reference - causes validation error
         configuration: {},
-        metadata: {},
+        metadata: data.parentNodeId ? { parentNodeId: data.parentNodeId } : {},
         position: {
           x: Math.round(data.position.x),
           y: Math.round(data.position.y),
@@ -1839,13 +1975,24 @@ export function WorkflowPageV2() {
         y: Math.round(position.y),
       };
 
-      const updatedNodes = workflow.spec?.nodes?.map((node) =>
-        node.id === nodeId
-          ? {
-              ...node,
-              position: roundedPosition,
-            }
-          : node,
+      const nodesWithPosition =
+        workflow.spec?.nodes?.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                position: roundedPosition,
+              }
+            : node,
+        ) || [];
+
+      const targetNode = nodesWithPosition.find((node) => node.id === nodeId);
+      const nextParentNodeId =
+        targetNode && !isLoopNode(targetNode)
+          ? findLoopParentForPosition(nodesWithPosition, roundedPosition, nodeId)
+          : null;
+
+      const updatedNodes = nodesWithPosition.map((node) =>
+        node.id === nodeId && !isLoopNode(node) ? updateNodeParentMetadata(node, nextParentNodeId) : node,
       );
 
       const updatedWorkflow = {
@@ -1894,15 +2041,28 @@ export function WorkflowPageV2() {
         ]),
       );
 
-      // Update all nodes in a single operation
-      const updatedNodes = workflow.spec?.nodes?.map((node) =>
-        node.id && positionMap.has(node.id)
-          ? {
-              ...node,
-              position: positionMap.get(node.id)!,
-            }
-          : node,
-      );
+      const nodesWithPosition =
+        workflow.spec?.nodes?.map((node) =>
+          node.id && positionMap.has(node.id)
+            ? {
+                ...node,
+                position: positionMap.get(node.id)!,
+              }
+            : node,
+        ) || [];
+
+      const updatedNodes = nodesWithPosition.map((node) => {
+        if (!node.id || !positionMap.has(node.id) || isLoopNode(node)) {
+          return node;
+        }
+
+        const nextParentNodeId = findLoopParentForPosition(
+          nodesWithPosition,
+          positionMap.get(node.id) || { x: 0, y: 0 },
+          node.id,
+        );
+        return updateNodeParentMetadata(node, nextParentNodeId);
+      });
 
       const updatedWorkflow = {
         ...workflow,
@@ -2068,7 +2228,7 @@ export function WorkflowPageV2() {
       const offsetX = 50;
       const offsetY = 50;
 
-      const duplicateNode: ComponentsNode = {
+      let duplicateNode: ComponentsNode = {
         ...nodeToDuplicate,
         id: newNodeId,
         name: nodeToDuplicate.name || "node",
@@ -2079,6 +2239,15 @@ export function WorkflowPageV2() {
         // Reset collapsed state for the duplicate
         isCollapsed: false,
       };
+
+      if (!isLoopNode(duplicateNode)) {
+        const nextParentNodeId = findLoopParentForPosition(
+          [...(workflow.spec?.nodes || []), duplicateNode],
+          duplicateNode.position || { x: 0, y: 0 },
+          duplicateNode.id,
+        );
+        duplicateNode = updateNodeParentMetadata(duplicateNode, nextParentNodeId);
+      }
 
       // Add the duplicate node to the workflow
       const updatedNodes = [...(workflow.spec?.nodes || []), duplicateNode];
@@ -2658,8 +2827,14 @@ function prepareData(
   edges: CanvasEdge[];
 } {
   const edges = workflow?.spec?.edges?.map(prepareEdge) || [];
+  const orderedNodes = (workflow?.spec?.nodes || []).slice().sort((a, b) => {
+    const aIsLoop = isLoopNode(a);
+    const bIsLoop = isLoopNode(b);
+    if (aIsLoop === bIsLoop) return 0;
+    return aIsLoop ? -1 : 1;
+  });
   const nodes =
-    workflow?.spec?.nodes
+    orderedNodes
       ?.map((node) => {
         return prepareNode(
           workflow?.spec?.nodes!,
@@ -2704,6 +2879,7 @@ function prepareTriggerNode(
       type: "trigger",
       label: displayLabel,
       state: "pending" as const,
+      parentNodeId: getParentNodeId(node),
       outputChannels: ["default"],
       trigger: {
         ...triggerProps,
@@ -2744,6 +2920,7 @@ function prepareCompositeNode(
       type: "composite",
       label: displayLabel,
       state: "pending" as const,
+      parentNodeId: getParentNodeId(node),
       outputChannels: blueprintMetadata?.outputChannels?.map((c) => c.name!) || ["default"],
       composite: {
         iconSlug: BUNDLE_ICON_SLUG,
@@ -2800,6 +2977,39 @@ function prepareCompositeNode(
   }
 
   return canvasNode;
+}
+
+function prepareLoopNode(nodes: ComponentsNode[], node: ComponentsNode, components: ComponentsComponent[]): CanvasNode {
+  const componentMetadata = components.find((c) => c.name === node.component?.name);
+  const displayLabel = node.name || componentMetadata?.label || "Loop";
+  const bounds = getLoopBounds(nodes, node);
+  const color = componentMetadata?.color || "sky";
+  const iconSlug = componentMetadata?.icon || "repeat";
+
+  return {
+    id: node.id!,
+    position: { x: bounds.x, y: bounds.y },
+    draggable: bounds.childCount === 0,
+    zIndex: -1,
+    data: {
+      type: "loop",
+      label: displayLabel,
+      state: "pending" as const,
+      parentNodeId: getParentNodeId(node),
+      outputChannels: componentMetadata?.outputChannels?.map((channel) => channel.name!) || ["default"],
+      loop: {
+        title: displayLabel,
+        width: bounds.width,
+        height: bounds.height,
+        childCount: bounds.childCount,
+        iconSlug,
+        iconColor: getColorClass(color),
+        iconBackground: getBackgroundColorClass(color),
+        headerColor: getBackgroundColorClass(color),
+        collapsed: node.isCollapsed,
+      },
+    },
+  };
 }
 
 function getRunItemState(execution: WorkflowsWorkflowNodeExecution): LastRunState {
@@ -2887,6 +3097,7 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
       type: "annotation",
       label: node.name || "Annotation",
       state: "pending" as const,
+      parentNodeId: getParentNodeId(node),
       outputChannels: [], // Annotation nodes don't have output channels
       annotation: {
         title: node.name || "Annotation",
@@ -2942,6 +3153,10 @@ function prepareComponentNode(
 
   const componentNameParts = node.component?.name?.split(".") || [];
   const componentName = componentNameParts[0];
+
+  if (componentName === LOOP_COMPONENT_NAME) {
+    return prepareLoopNode(nodes, node, components);
+  }
 
   if (componentName == "merge") {
     return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
@@ -3016,6 +3231,7 @@ function prepareComponentBaseNode(
       type: "component",
       label: displayLabel,
       state: "pending" as const,
+      parentNodeId: getParentNodeId(node),
       outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
       component: {
         ...componentBaseProps,
@@ -3061,6 +3277,7 @@ function prepareMergeNode(
       type: "merge",
       label: displayLabel,
       state: "pending" as const,
+      parentNodeId: getParentNodeId(node),
       merge: {
         title: displayLabel,
         lastEvent: lastEvent,

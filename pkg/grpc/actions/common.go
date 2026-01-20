@@ -635,12 +635,18 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			errorMessage = &node.ErrorMessage
 		}
 
+		metadata := map[string]any{}
+		if node.Metadata != nil {
+			metadata = node.Metadata.AsMap()
+		}
+
 		result[i] = models.Node{
 			ID:                node.Id,
 			Name:              node.Name,
 			Type:              ProtoToNodeType(node.Type),
 			Ref:               ProtoToNodeRef(node),
 			Configuration:     node.Configuration.AsMap(),
+			Metadata:          metadata,
 			Position:          ProtoToPosition(node.Position),
 			IsCollapsed:       node.IsCollapsed,
 			AppInstallationID: appInstallationID,

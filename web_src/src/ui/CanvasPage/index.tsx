@@ -108,6 +108,7 @@ export interface NewNodeData {
   position?: { x: number; y: number };
   appName?: string;
   appInstallationRef?: ComponentsAppInstallationRef;
+  parentNodeId?: string | null;
   sourceConnection?: {
     nodeId: string;
     handleId: string | null;
@@ -183,6 +184,7 @@ export interface CanvasPageProps {
     position: { x: number; y: number };
     sourceNodeId: string;
     sourceHandleId: string | null;
+    parentNodeId?: string | null;
   }) => Promise<string>;
   onPlaceholderConfigure?: (data: {
     placeholderId: string;
@@ -249,6 +251,12 @@ const EDGE_STYLE = {
 } as const;
 
 const DEFAULT_CANVAS_ZOOM = 0.8;
+const DEFAULT_LOOP_SIZE = { width: 520, height: 260 };
+const DEFAULT_NODE_SIZE = { width: 368, height: 180 };
+const DEFAULT_COLLAPSED_SIZE = { width: 80, height: 80 };
+const DEFAULT_ANNOTATION_SIZE = { width: 320, height: 160 };
+const LOOP_PADDING = { x: 48, y: 40 };
+const LOOP_HEADER_OFFSET = 40;
 
 /*
  * nodeTypes must be defined outside of the component to prevent
@@ -350,6 +358,109 @@ function CanvasPage(props: CanvasPageProps) {
     setCurrentTab(props.focusRequest.tab);
   }, [props.focusRequest?.requestId, props.focusRequest?.tab]);
 
+  const loopBounds = useMemo(() => {
+    const estimatedSize = (node: CanvasNode) => {
+      const nodeType = (node.data as any)?.type as string;
+      const nodeData = (node.data as any)?.[nodeType] as { collapsed?: boolean } | undefined;
+      if (nodeData?.collapsed) {
+        return DEFAULT_COLLAPSED_SIZE;
+      }
+
+      if (nodeType === "annotation") {
+        return DEFAULT_ANNOTATION_SIZE;
+      }
+
+      if (nodeType === "loop") {
+        const loopData = (node.data as any)?.loop || {};
+        const width =
+          typeof loopData.width === "number" ? loopData.width : node.width ?? DEFAULT_LOOP_SIZE.width;
+        const height =
+          typeof loopData.height === "number" ? loopData.height : node.height ?? DEFAULT_LOOP_SIZE.height;
+        return { width, height };
+      }
+
+      return DEFAULT_NODE_SIZE;
+    };
+
+    const childrenByParent = new Map<string, CanvasNode[]>();
+    state.nodes.forEach((node) => {
+      const parentNodeId = (node.data as any)?.parentNodeId;
+      if (typeof parentNodeId !== "string" || !parentNodeId.trim()) {
+        return;
+      }
+      if (!childrenByParent.has(parentNodeId)) {
+        childrenByParent.set(parentNodeId, []);
+      }
+      childrenByParent.get(parentNodeId)!.push(node);
+    });
+
+    return state.nodes
+      .filter((node) => (node.data as any)?.type === "loop")
+      .map((node) => {
+        const children = childrenByParent.get(node.id) || [];
+        if (children.length === 0) {
+          const loopData = (node.data as any)?.loop || {};
+          const width =
+            typeof loopData.width === "number" ? loopData.width : node.width ?? DEFAULT_LOOP_SIZE.width;
+          const height =
+            typeof loopData.height === "number" ? loopData.height : node.height ?? DEFAULT_LOOP_SIZE.height;
+          return {
+            id: node.id,
+            x: node.position.x,
+            y: node.position.y,
+            width,
+            height,
+            area: width * height,
+          };
+        }
+
+        let minX = Number.POSITIVE_INFINITY;
+        let minY = Number.POSITIVE_INFINITY;
+        let maxX = Number.NEGATIVE_INFINITY;
+        let maxY = Number.NEGATIVE_INFINITY;
+
+        children.forEach((child) => {
+          const { width, height } = estimatedSize(child);
+          minX = Math.min(minX, child.position.x);
+          minY = Math.min(minY, child.position.y);
+          maxX = Math.max(maxX, child.position.x + width);
+          maxY = Math.max(maxY, child.position.y + height);
+        });
+
+        const width = Math.max(DEFAULT_LOOP_SIZE.width, maxX - minX + LOOP_PADDING.x * 2);
+        const height = Math.max(
+          DEFAULT_LOOP_SIZE.height,
+          maxY - minY + LOOP_PADDING.y * 2 + LOOP_HEADER_OFFSET,
+        );
+
+        return {
+          id: node.id,
+          x: minX - LOOP_PADDING.x,
+          y: minY - LOOP_PADDING.y - LOOP_HEADER_OFFSET,
+          width,
+          height,
+          area: width * height,
+        };
+      });
+  }, [state.nodes]);
+
+  const findLoopParentId = useCallback(
+    (position?: { x: number; y: number }) => {
+      if (!position) return null;
+      const candidates = loopBounds.filter(
+        (loop) =>
+          position.x >= loop.x &&
+          position.x <= loop.x + loop.width &&
+          position.y >= loop.y &&
+          position.y <= loop.y + loop.height,
+      );
+      if (candidates.length === 0) return null;
+      candidates.sort((a, b) => a.area - b.area);
+      return candidates[0].id;
+    },
+    [loopBounds],
+  );
+
   const handleNodeEdit = useCallback(
     (nodeId: string) => {
       // Check if this is a placeholder - if so, open building blocks sidebar instead
@@ -434,11 +545,15 @@ function CanvasPage(props: CanvasPageProps) {
     async (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
       if (!sourceConnection || !props.onPlaceholderAdd) return;
 
+      const adjustedPosition = { x: position.x, y: position.y - 30 };
+      const parentNodeId = findLoopParentId(adjustedPosition);
+
       // Save placeholder immediately to backend
       const placeholderId = await props.onPlaceholderAdd({
-        position: { x: position.x, y: position.y - 30 },
+        position: adjustedPosition,
         sourceNodeId: sourceConnection.nodeId,
         sourceHandleId: sourceConnection.handleId,
+        parentNodeId,
       });
 
       // Set as template node and open building blocks sidebar
@@ -446,7 +561,7 @@ function CanvasPage(props: CanvasPageProps) {
       setIsBuildingBlocksSidebarOpen(true);
       state.componentSidebar.close();
     },
-    [props, state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen],
+    [props, state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen, findLoopParentId],
   );
 
   const handlePendingConnectionNodeClick = useCallback(
@@ -508,11 +623,14 @@ function CanvasPage(props: CanvasPageProps) {
       if (pendingNode) {
         // Save immediately with defaults
         if (props.onNodeAdd) {
+          const pendingParentNodeId =
+            (pendingNode.data as any)?.parentNodeId || findLoopParentId(pendingNode.position);
           const newNodeId = await props.onNodeAdd({
             buildingBlock: block,
             nodeName: block.name || "",
             configuration: defaultConfiguration,
             position: pendingNode.position,
+            parentNodeId: pendingParentNodeId,
             sourceConnection: pendingNode.data.sourceConnection as
               | { nodeId: string; handleId: string | null }
               | undefined,
@@ -534,7 +652,7 @@ function CanvasPage(props: CanvasPageProps) {
         }
       }
     },
-    [templateNodeId, state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen],
+    [templateNodeId, state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen, findLoopParentId],
   );
 
   const handleAddNote = useCallback(async () => {
@@ -618,6 +736,7 @@ function CanvasPage(props: CanvasPageProps) {
       }
     }
 
+    const parentNodeId = findLoopParentId(position);
     const annotationBlock: BuildingBlock = {
       name: "annotation",
       label: "Annotation",
@@ -630,8 +749,9 @@ function CanvasPage(props: CanvasPageProps) {
       nodeName: "Note",
       configuration: {},
       position,
+      parentNodeId,
     });
-  }, [props, state.nodes, props.viewportRef]);
+  }, [props, state.nodes, props.viewportRef, findLoopParentId]);
 
   const handleBuildingBlockDrop = useCallback(
     async (block: BuildingBlock, position?: { x: number; y: number }) => {
@@ -648,11 +768,13 @@ function CanvasPage(props: CanvasPageProps) {
 
       // Save immediately with defaults
       if (props.onNodeAdd) {
+        const parentNodeId = position ? findLoopParentId(position) : null;
         const newNodeId = await props.onNodeAdd({
           buildingBlock: block,
           nodeName: block.name || "",
           configuration: defaultConfiguration,
           position,
+          parentNodeId,
           appName: block.appName,
         });
 
@@ -664,7 +786,7 @@ function CanvasPage(props: CanvasPageProps) {
         setCurrentTab("settings");
       }
     },
-    [state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen],
+    [state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen, findLoopParentId],
   );
 
   const handleSidebarToggle = useCallback(
@@ -1769,21 +1891,138 @@ function CanvasContent({
     return state.edges?.find((e) => e.id === hoveredEdgeId);
   }, [hoveredEdgeId, state.edges]);
 
+  const loopLayout = useMemo(() => {
+    const estimatedSize = (node: CanvasNode) => {
+      const nodeType = (node.data as any)?.type as string;
+      const nodeData = (node.data as any)?.[nodeType] as { collapsed?: boolean } | undefined;
+      if (nodeData?.collapsed) {
+        return DEFAULT_COLLAPSED_SIZE;
+      }
+
+      if (nodeType === "annotation") {
+        return DEFAULT_ANNOTATION_SIZE;
+      }
+
+      if (nodeType === "loop") {
+        const loopData = (node.data as any)?.loop || {};
+        const width =
+          typeof loopData.width === "number" ? loopData.width : node.width ?? DEFAULT_LOOP_SIZE.width;
+        const height =
+          typeof loopData.height === "number" ? loopData.height : node.height ?? DEFAULT_LOOP_SIZE.height;
+        return { width, height };
+      }
+
+      return DEFAULT_NODE_SIZE;
+    };
+
+    const childrenByParent = new Map<string, CanvasNode[]>();
+    state.nodes.forEach((node) => {
+      const parentNodeId = (node.data as any)?.parentNodeId;
+      if (typeof parentNodeId !== "string" || !parentNodeId.trim()) {
+        return;
+      }
+
+      if (!childrenByParent.has(parentNodeId)) {
+        childrenByParent.set(parentNodeId, []);
+      }
+      childrenByParent.get(parentNodeId)!.push(node);
+    });
+
+    const layout = new Map<
+      string,
+      { x: number; y: number; width: number; height: number; childCount: number }
+    >();
+
+    state.nodes
+      .filter((node) => (node.data as any)?.type === "loop")
+      .forEach((loopNode) => {
+        const loopData = (loopNode.data as any)?.loop || {};
+        const children = childrenByParent.get(loopNode.id) || [];
+        if (children.length === 0) {
+          const width =
+            typeof loopData.width === "number" ? loopData.width : loopNode.width ?? DEFAULT_LOOP_SIZE.width;
+          const height =
+            typeof loopData.height === "number" ? loopData.height : loopNode.height ?? DEFAULT_LOOP_SIZE.height;
+          layout.set(loopNode.id, {
+            x: loopNode.position.x,
+            y: loopNode.position.y,
+            width,
+            height,
+            childCount: 0,
+          });
+          return;
+        }
+
+        let minX = Number.POSITIVE_INFINITY;
+        let minY = Number.POSITIVE_INFINITY;
+        let maxX = Number.NEGATIVE_INFINITY;
+        let maxY = Number.NEGATIVE_INFINITY;
+
+        children.forEach((child) => {
+          const { width, height } = estimatedSize(child);
+          minX = Math.min(minX, child.position.x);
+          minY = Math.min(minY, child.position.y);
+          maxX = Math.max(maxX, child.position.x + width);
+          maxY = Math.max(maxY, child.position.y + height);
+        });
+
+        const width = Math.max(DEFAULT_LOOP_SIZE.width, maxX - minX + LOOP_PADDING.x * 2);
+        const height = Math.max(
+          DEFAULT_LOOP_SIZE.height,
+          maxY - minY + LOOP_PADDING.y * 2 + LOOP_HEADER_OFFSET,
+        );
+
+        layout.set(loopNode.id, {
+          x: minX - LOOP_PADDING.x,
+          y: minY - LOOP_PADDING.y - LOOP_HEADER_OFFSET,
+          width,
+          height,
+          childCount: children.length,
+        });
+      });
+
+    return layout;
+  }, [state.nodes]);
+
   const nodesWithCallbacks = useMemo(() => {
     const hasHighlightedNodes = highlightedNodeIds.size > 0;
-    return state.nodes.map((node) => ({
-      ...node,
-      data: {
+    return state.nodes.map((node) => {
+      const layout = loopLayout.get(node.id);
+      const data = {
         ...node.data,
+        ...(layout
+          ? {
+              loop: {
+                ...(node.data as any)?.loop,
+                width: layout.width,
+                height: layout.height,
+                childCount: layout.childCount,
+              },
+            }
+          : {}),
         _callbacksRef: callbacksRef,
         _hoveredEdge: hoveredEdge,
         _connectingFrom: connectingFrom,
         _allEdges: state.edges,
         _isHighlighted: highlightedNodeIds.has(node.id),
         _hasHighlightedNodes: hasHighlightedNodes,
-      },
-    }));
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds]);
+      };
+
+      if (!layout) {
+        const parentNodeId = (node.data as any)?.parentNodeId;
+        const isChildNode = typeof parentNodeId === "string" && parentNodeId.trim().length > 0;
+        return { ...node, data, zIndex: isChildNode ? 1 : node.zIndex };
+      }
+
+      return {
+        ...node,
+        position: { x: layout.x, y: layout.y },
+        draggable: layout.childCount === 0,
+        zIndex: 0,
+        data,
+      };
+    });
+  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, loopLayout]);
 
   const edgeTypes = useMemo(
     () => ({
