@@ -8,7 +8,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 INTEGRATIONS_DIR="$REPO_ROOT/pkg/applications"
 
 # Get list of integrations (directories only, excluding . and ..)
-integrations=$(find "$INTEGRATIONS_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+integrations=$(find "$INTEGRATIONS_DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
 
 if [ -z "$integrations" ]; then
   echo "No integrations found."
