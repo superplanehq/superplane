@@ -3,12 +3,7 @@ import { Input } from "@/components/ui/input";
 import { FieldRendererProps } from "./types";
 import { toTestId } from "@/utils/testID";
 
-export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({
-  field,
-  value,
-  onChange,
-  allValues = {},
-}) => {
+export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, allValues = {} }) => {
   useEffect(() => {
     if ((value === undefined || value === null) && field.defaultValue !== undefined) {
       const defaultVal = field.defaultValue as string;

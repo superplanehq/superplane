@@ -359,9 +359,7 @@ export const ConfigurationFieldRenderer = ({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          {isTogglable && (
-            <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />
-          )}
+          {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
           {isEnabled && renderField()}
           <Label className="text-left cursor-pointer">
             {field.label || field.name}
@@ -405,9 +403,7 @@ export const ConfigurationFieldRenderer = ({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        {isTogglable && (
-          <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />
-        )}
+        {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
         <Label className="block text-left">
           {field.label || field.name}
           {isRequired && <span className="text-gray-800 ml-1">*</span>}

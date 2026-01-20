@@ -3,12 +3,7 @@ import { Input } from "@/components/ui/input";
 import { FieldRendererProps } from "./types";
 import { toTestId } from "@/utils/testID";
 
-export const DateFieldRenderer: React.FC<FieldRendererProps> = ({
-  field,
-  value,
-  onChange,
-  allValues = {},
-}) => {
+export const DateFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, allValues = {} }) => {
   // Calculate min/max dates based on other fields for components like time gates
   const getDateConstraints = React.useMemo(() => {
     // For endDate field in time gates, prevent selecting dates before startDate

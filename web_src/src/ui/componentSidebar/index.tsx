@@ -538,12 +538,7 @@ export const ComponentSidebar = ({
           }`}
         />
       </div>
-      <div
-        className={
-          "flex items-center justify-between gap-3 px-4 pt-3 relative" +
-          (hideNodeId ? " pb-3" : " pb-8")
-        }
-      >
+      <div className={"flex items-center justify-between gap-3 px-4 pt-3 relative" + (hideNodeId ? " pb-3" : " pb-8")}>
         <div className="flex flex-col items-start gap-3 w-full">
           <div className="flex justify-between gap-3 w-full">
             <div className="flex flex-col gap-0.5">

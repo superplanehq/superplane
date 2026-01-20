@@ -2,12 +2,7 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { FieldRendererProps } from "./types";
 
-export const DateTimeFieldRenderer: React.FC<FieldRendererProps> = ({
-  field,
-  value,
-  onChange,
-  allValues = {},
-}) => {
+export const DateTimeFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, allValues = {} }) => {
   // Calculate min/max datetime based on other fields for components like time gates
   const getDateTimeConstraints = React.useMemo(() => {
     // For endDateTime field in time gates, prevent selecting datetimes before startDateTime
