@@ -11,6 +11,7 @@ blocks:
       jobs:
         - name: "Fix Go and TypeScript Formatting"
           commands:
+            - sem-version go 1.22
             - checkout
             - git fetch origin pull/$PR_NUMBER/head:local-fix-branch
             - git checkout local-fix-branch
