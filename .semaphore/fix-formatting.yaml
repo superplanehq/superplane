@@ -94,6 +94,13 @@ blocks:
               The following formatting changes are suggested for this PR. Please apply them by running:
 
               ```bash
+              gofmt -s -w .
+              cd web_src && npm run format
+              ```
+
+              Or use the Makefile targets (requires Docker):
+
+              ```bash
               make format.go
               make format.js
               ```
