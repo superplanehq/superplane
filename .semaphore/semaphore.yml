@@ -6,9 +6,9 @@ agent:
     os_image: ubuntu2204
 auto_cancel:
   running:
-    when: branch != 'master'
+    when: branch != 'main'
   queued:
-    when: branch != 'master'
+    when: branch != 'main'
 blocks:
   - name: "\U0001F4DC License Check"
     dependencies: []
