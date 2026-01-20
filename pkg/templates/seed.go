@@ -1,14 +1,10 @@
 package templates
 
 import (
-	"embed"
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -21,35 +17,43 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+
+	log "github.com/sirupsen/logrus"
 )
 
-//go:embed templates/*.yaml
-var templateAssets embed.FS
+var seedLockID int64 = 1234567890
 
-var seedTemplatesLock sync.Mutex
+func Setup(registry *registry.Registry) error {
+	log.Info("Setting up templates...")
+
+	if err := SeedTemplates(registry); err != nil {
+		log.Warnf("Failed to seed templates: %v", err)
+	}
+
+	return nil
+}
 
 func SeedTemplates(registry *registry.Registry) error {
-	seedTemplatesLock.Lock()
-	defer seedTemplatesLock.Unlock()
-
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := lockTemplateSeed(tx); err != nil {
+		locked, err := lockTemplateSeed(tx)
+		if err != nil {
 			return err
+		}
+		if !locked {
+			return nil
 		}
 		defer unlockTemplateSeed(tx)
 
-		if os.Getenv("APP_ENV") == "development" {
-			if err := resetTemplateWorkflowsInTransaction(tx); err != nil {
-				return fmt.Errorf("reset template workflows: %w", err)
-			}
+		if err := deleteAllTemplateWorkflows(tx); err != nil {
+			return err
 		}
 
-		templateFS, templatesRoot, err := templateFS()
+		templateDir, err := templateDir()
 		if err != nil {
 			return err
 		}
 
-		entries, err := fs.ReadDir(templateFS, templatesRoot)
+		entries, err := os.ReadDir(templateDir)
 		if err != nil {
 			return fmt.Errorf("read template assets: %w", err)
 		}
@@ -59,7 +63,7 @@ func SeedTemplates(registry *registry.Registry) error {
 				continue
 			}
 
-			data, err := fs.ReadFile(templateFS, path.Join(templatesRoot, entry.Name()))
+			data, err := os.ReadFile(path.Join(templateDir, entry.Name()))
 			if err != nil {
 				return fmt.Errorf("read template %s: %w", entry.Name(), err)
 			}
@@ -84,8 +88,8 @@ func SeedTemplates(registry *registry.Registry) error {
 
 			workflow.Metadata.IsTemplate = true
 
-			if err := ensureTemplateWorkflowInTransaction(tx, registry, &workflow); err != nil {
-				return fmt.Errorf("ensure template %s: %w", workflow.Metadata.Name, err)
+			if err := createTemplateWorkflow(tx, registry, &workflow); err != nil {
+				return fmt.Errorf("create template %s: %w", workflow.Metadata.Name, err)
 			}
 		}
 
@@ -93,50 +97,47 @@ func SeedTemplates(registry *registry.Registry) error {
 	})
 }
 
-func lockTemplateSeed(tx *gorm.DB) error {
-	if err := tx.Exec("SELECT pg_advisory_lock(?)", int64(90710439)).Error; err != nil {
-		return fmt.Errorf("lock template seed: %w", err)
+func deleteAllTemplateWorkflows(tx *gorm.DB) error {
+	var err error
+
+	var workflowIDs []uuid.UUID
+
+	err = tx.
+		Unscoped().
+		Model(&models.Workflow{}).
+		Where("organization_id = ?", models.TemplateOrganizationID).
+		Where("is_template = ?", true).
+		Pluck("id", &workflowIDs).Error
+
+	if err != nil {
+		return err
 	}
+
+	err = tx.
+		Unscoped().
+		Model(&models.WorkflowNode{}).
+		Where("workflow_id IN (?)", workflowIDs).
+		Delete(&models.WorkflowNode{}).Error
+
+	if err != nil {
+		return err
+	}
+
+	err = tx.
+		Unscoped().
+		Model(&models.Workflow{}).
+		Where("organization_id = ?", models.TemplateOrganizationID).
+		Where("is_template = ?", true).
+		Delete(&models.Workflow{}).Error
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func unlockTemplateSeed(tx *gorm.DB) {
-	_ = tx.Exec("SELECT pg_advisory_unlock(?)", int64(90710439)).Error
-}
-
-func resetTemplateWorkflowsInTransaction(tx *gorm.DB) error {
-	var workflowIDs []uuid.UUID
-	if err := tx.Model(&models.Workflow{}).
-		Where("organization_id = ?", models.TemplateOrganizationID).
-		Pluck("id", &workflowIDs).Error; err != nil {
-		return err
-	}
-
-	if len(workflowIDs) == 0 {
-		return nil
-	}
-
-	if err := tx.Where("workflow_id IN ?", workflowIDs).Delete(&models.WorkflowNode{}).Error; err != nil {
-		return err
-	}
-
-	return tx.Where("id IN ?", workflowIDs).Delete(&models.Workflow{}).Error
-}
-
-func ensureTemplateWorkflowInTransaction(tx *gorm.DB, registry *registry.Registry, template *pb.Workflow) error {
-	_, err := models.FindWorkflowTemplateByNameInTransaction(tx, template.Metadata.Name)
-	if err == nil {
-		return nil
-	}
-
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-
-	return createTemplateWorkflowInTransaction(tx, registry, template)
-}
-
-func createTemplateWorkflowInTransaction(tx *gorm.DB, registry *registry.Registry, template *pb.Workflow) error {
+func createTemplateWorkflow(tx *gorm.DB, registry *registry.Registry, template *pb.Workflow) error {
 	organizationID := models.TemplateOrganizationID.String()
 	nodes, edges, err := workflows.ParseWorkflow(registry, organizationID, template)
 	if err != nil {
@@ -192,4 +193,25 @@ func createTemplateWorkflowInTransaction(tx *gorm.DB, registry *registry.Registr
 	}
 
 	return nil
+}
+
+func lockTemplateSeed(tx *gorm.DB) (bool, error) {
+	var locked bool
+	if err := tx.Raw("SELECT pg_try_advisory_lock(?)", seedLockID).Scan(&locked).Error; err != nil {
+		return false, fmt.Errorf("lock template seed: %w", err)
+	}
+	return locked, nil
+}
+
+func unlockTemplateSeed(tx *gorm.DB) {
+	_ = tx.Exec("SELECT pg_advisory_unlock(?)", seedLockID).Error
+}
+
+func templateDir() (string, error) {
+	dir := os.Getenv("TEMPLATE_DIR")
+	if dir == "" {
+		return "", fmt.Errorf("TEMPLATE_DIR is not set")
+	}
+
+	return path.Join(dir, "canvases"), nil
 }
