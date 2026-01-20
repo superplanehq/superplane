@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: example-deployment-canvas
+  description: Example canvas with manual trigger and noop nodes
+spec:
+  nodes:
+    - id: start
+      name: Manual Start
+      type: TYPE_TRIGGER
+      trigger:
+        name: manual
+      position:
+        x: 100
+        y: 100
+    - id: step1
+      name: First Step
+      type: TYPE_COMPONENT
+      component:
+        name: noop
+      position:
+        x: 400
+        y: 100
+    - id: step2
+      name: Second Step
+      type: TYPE_COMPONENT
+      component:
+        name: noop
+      position:
+        x: 700
+        y: 100
+  edges:
+    - sourceId: start
+      targetId: step1
+      channel: default
+    - sourceId: step1
+      targetId: step2
+      channel: default

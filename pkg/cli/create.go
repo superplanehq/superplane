@@ -30,6 +30,79 @@ var createCmd = &cobra.Command{
 		c := DefaultClient()
 
 		switch kind {
+		case "Canvas":
+			// Parse YAML to workflow structure
+			var yamlData map[string]any
+			err = yaml.Unmarshal(data, &yamlData)
+			Check(err)
+
+			// Extract metadata
+			metadata, ok := yamlData["metadata"].(map[string]interface{})
+			if !ok {
+				Fail("Invalid Canvas YAML: metadata section missing")
+			}
+
+			name, ok := metadata["name"].(string)
+			if !ok || name == "" {
+				Fail("Invalid Canvas YAML: name is required in metadata")
+			}
+
+			description := ""
+			if desc, ok := metadata["description"].(string); ok {
+				description = desc
+			}
+
+			// Extract spec (optional for empty workflows)
+			var nodes []openapi_client.ComponentsNode
+			var edges []openapi_client.ComponentsEdge
+
+			if spec, ok := yamlData["spec"].(map[string]interface{}); ok {
+				// Parse nodes
+				if nodesData, ok := spec["nodes"].([]interface{}); ok {
+					nodesBytes, err := yaml.Marshal(nodesData)
+					Check(err)
+					err = yaml.Unmarshal(nodesBytes, &nodes)
+					Check(err)
+				}
+
+				// Parse edges
+				if edgesData, ok := spec["edges"].([]interface{}); ok {
+					edgesBytes, err := yaml.Marshal(edgesData)
+					Check(err)
+					err = yaml.Unmarshal(edgesBytes, &edges)
+					Check(err)
+				}
+			}
+
+			// Create workflow request
+			workflowRequest := openapi_client.WorkflowsWorkflow{
+				Metadata: &openapi_client.WorkflowsWorkflowMetadata{
+					Name:        &name,
+					Description: &description,
+				},
+				Spec: &openapi_client.WorkflowsWorkflowSpec{
+					Nodes: nodes,
+					Edges: edges,
+				},
+			}
+
+			response, httpResponse, err := c.WorkflowAPI.
+				WorkflowsCreateWorkflow(context.Background()).
+				Body(openapi_client.WorkflowsCreateWorkflowRequest{
+					Workflow: &workflowRequest,
+				}).
+				Execute()
+
+			if err != nil {
+				b, _ := io.ReadAll(httpResponse.Body)
+				fmt.Printf("%s\n", string(b))
+				os.Exit(1)
+			}
+
+			out, err := yaml.Marshal(response.Workflow)
+			Check(err)
+			fmt.Printf("Canvas created successfully:\n%s", string(out))
+
 		case "Secret":
 			// Parse YAML to map
 			var yamlData map[string]any
