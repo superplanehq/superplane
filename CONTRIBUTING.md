@@ -84,5 +84,6 @@ When the process completes, you can access the SuperPlane at [http://localhost:8
 - **[Integrations](docs/contributing/applications.md)** — Instructions for adding new third-party integrations to SuperPlane
 - **[Component Implementation](docs/development/component-implementations.md)** — Step-by-step instructions for creating new components or triggers
 - **[Component Customization](docs/development/component-customization.md)** — Guide for customizing existing components or building behaviors
+- **[Templates](docs/contributing/templates.md)** — Guide for creating and adding new workflow templates
 - **[Integrations Board](https://github.com/orgs/superplanehq/projects/2/views/17)** — View all integration-related work on the SuperPlane Board
 - **[Connecting to Third-Party Services during Development](docs/contributing/connecting-to-3rdparty-services-from-development.md)**
