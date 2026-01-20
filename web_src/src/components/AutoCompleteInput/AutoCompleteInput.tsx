@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { twMerge } from "tailwind-merge";
-import { getSuggestions } from "./core";
+import { getSuggestions, Suggestion } from "./core";
 
-export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"input">, "onChange" | "size"> {
+export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"textarea">, "onChange" | "size"> {
   exampleObj: Record<string, unknown> | null;
   value?: string;
   onChange?: (value: string) => void;
@@ -19,7 +19,7 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   quickTip?: string;
 }
 
-export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
+export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInputProps>(
   function AutoCompleteInputRender(props, forwardedRef) {
     const {
       exampleObj,
@@ -43,6 +43,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     const [isFocused, setIsFocused] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const [highlightedValue, setHighlightedValue] = useState<unknown>(undefined);
+    const [highlightedSuggestion, setHighlightedSuggestion] = useState<Suggestion | null>(null);
     const [cursorPosition, setCursorPosition] = useState(0);
     const [dropdownPosition, setDropdownPosition] = useState<{
       top: number;
@@ -54,9 +55,17 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
 
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
     const mirrorRef = useRef<HTMLSpanElement>(null);
-    useImperativeHandle(forwardedRef, () => inputRef.current as HTMLInputElement);
+    useImperativeHandle(forwardedRef, () => inputRef.current as HTMLTextAreaElement);
+
+    // Auto-resize textarea based on content
+    const adjustTextareaHeight = useCallback(() => {
+      const textarea = inputRef.current;
+      if (!textarea) return;
+      textarea.style.height = "auto";
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }, []);
 
     const getWordAtCursor = (text: string, position: number) => {
       const beforeCursor = text.substring(0, position);
@@ -424,6 +433,8 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       [exampleObj],
     );
 
+    const valuePreviewWidth = 200;
+
     const measureCursorPixelPosition = useCallback(() => {
       if (!inputRef.current || !mirrorRef.current) return;
 
@@ -453,19 +464,38 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       const viewportWidth = window.innerWidth;
       const edgePadding = 16; // Padding from screen edge
 
-      // Check if dropdown fits on the right of the cursor
-      const spaceOnRightOfScreen = viewportWidth - cursorScreenX - edgePadding;
-      const shouldFlipLeft = spaceOnRightOfScreen < dropdownWidth;
+      // Space available on each side of cursor
+      const spaceOnRight = viewportWidth - cursorScreenX - edgePadding;
+      const spaceOnLeft = cursorScreenX - edgePadding;
+
+      // Determine if we should flip based on available space
+      // Normal: suggestions start at cursor (need dropdownWidth on right)
+      // Flipped: suggestions end at cursor (need dropdownWidth on left)
+      const shouldFlipLeft = spaceOnRight < dropdownWidth && spaceOnLeft >= dropdownWidth;
 
       // Calculate absolute position for portal
       const dropdownTop = inputRect.bottom + 4; // 4px gap below input
-      const dropdownLeft = shouldFlipLeft ? cursorScreenX - dropdownWidth : cursorScreenX;
+      let dropdownLeft: number;
+
+      if (shouldFlipLeft) {
+        // Flipped: suggestions end at cursor, Value Preview extends further left
+        dropdownLeft = showValuePreview
+          ? cursorScreenX - dropdownWidth - valuePreviewWidth
+          : cursorScreenX - dropdownWidth;
+      } else {
+        // Normal: suggestions start at cursor, Value Preview is to the left of cursor
+        dropdownLeft = showValuePreview ? cursorScreenX - valuePreviewWidth : cursorScreenX;
+      }
+
+      // Clamp to screen edges to prevent overflow
+      const totalWidth = showValuePreview ? dropdownWidth + valuePreviewWidth : dropdownWidth;
+      dropdownLeft = Math.max(edgePadding, Math.min(dropdownLeft, viewportWidth - totalWidth - edgePadding));
 
       setDropdownPosition({
         top: dropdownTop,
         left: dropdownLeft,
       });
-    }, [inputValue, cursorPosition, dropdownWidth]);
+    }, [inputValue, cursorPosition, dropdownWidth, showValuePreview]);
 
     // Measure cursor pixel position when cursor or input changes
     useEffect(() => {
@@ -475,6 +505,11 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     useEffect(() => {
       setInputValue(value);
     }, [value]);
+
+    // Adjust textarea height when value changes
+    useEffect(() => {
+      adjustTextareaHeight();
+    }, [inputValue, adjustTextareaHeight]);
 
     useEffect(() => {
       previousInputValue.current = inputValue;
@@ -503,10 +538,12 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       setHighlightedIndex(nextHighlightedIndex);
       if (nextHighlightedIndex >= 0) {
         const suggestion = newSuggestions[nextHighlightedIndex];
+        setHighlightedSuggestion(suggestion);
         const value = computeHighlightedValue(suggestion, context);
         setHighlightedValue(value);
       } else {
         setHighlightedValue(undefined);
+        setHighlightedSuggestion(null);
       }
     }, [
       inputValue,
@@ -536,7 +573,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newValue = e.target.value;
       const cursorPosition = e.target.selectionStart ?? newValue.length;
       setCursorPosition(cursorPosition);
@@ -608,7 +645,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       setIsOpen(false);
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (!isOpen || suggestions.length === 0) return;
 
       switch (e.key) {
@@ -617,6 +654,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           setHighlightedIndex((prev) => {
             const newIndex = prev < suggestions.length - 1 ? prev + 1 : 0;
             if (suggestions[newIndex]) {
+              setHighlightedSuggestion(suggestions[newIndex]);
               const cursorPosition = inputRef.current?.selectionStart || 0;
               const context = getExpressionContext(inputValue, cursorPosition);
               const value = computeHighlightedValue(suggestions[newIndex], context);
@@ -630,6 +668,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           setHighlightedIndex((prev) => {
             const newIndex = prev > 0 ? prev - 1 : suggestions.length - 1;
             if (suggestions[newIndex]) {
+              setHighlightedSuggestion(suggestions[newIndex]);
               const cursorPosition = inputRef.current?.selectionStart || 0;
               const context = getExpressionContext(inputValue, cursorPosition);
               const value = computeHighlightedValue(suggestions[newIndex], context);
@@ -639,15 +678,17 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           });
           break;
         case "Enter":
-          e.preventDefault();
           if (highlightedIndex >= 0) {
+            e.preventDefault();
             handleSuggestionClick(suggestions[highlightedIndex]);
           }
+          // Allow default behavior (newline) when no suggestion is highlighted
           break;
         case "Escape":
           setIsOpen(false);
           setHighlightedIndex(-1);
           setHighlightedValue(undefined);
+          setHighlightedSuggestion(null);
           break;
       }
     };
@@ -664,11 +705,9 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       }
     }, [highlightedIndex]);
 
-    const shouldShowValuePreview =
-      showValuePreview &&
-      highlightedIndex >= 0 &&
-      highlightedValue !== undefined &&
-      (highlightedValue === null || (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue)));
+    // Always show Value Preview box when enabled and something is highlighted
+    // to prevent position jumping when switching between suggestion types
+    const shouldShowValuePreview = showValuePreview && highlightedIndex >= 0;
 
     return (
       <div ref={containerRef} className={"relative w-full" + (quickTip ? " mb-3" : "")}>
@@ -695,9 +734,9 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             className,
           ])}
         >
-          <input
+          <textarea
             ref={inputRef}
-            type="text"
+            rows={1}
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
@@ -722,17 +761,16 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             placeholder={placeholder}
             disabled={disabled}
             className={twMerge([
-              "font-sm bg-white border-gray-300 shadow-xs file:text-foreground placeholder:text-gray-500 selection:bg-primary selection:text-primary-foreground",
-              "relative block w-full min-w-0 appearance-none rounded-md border px-3 py-1 text-base outline-none",
-              "file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
+              "font-sm bg-white border-gray-300 shadow-xs placeholder:text-gray-500 selection:bg-primary selection:text-primary-foreground",
+              "relative block w-full min-w-0 appearance-none rounded-md border px-3 py-2 text-base outline-none resize-none overflow-hidden",
               "focus-visible:border-gray-500 focus-visible:ring-ring/50",
               "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
               "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
-              // Size variants
-              inputSize === "xs" && "h-7 px-2 text-xs",
-              inputSize === "sm" && "h-8 px-2 text-sm",
-              inputSize === "md" && "h-9 px-3 text-base md:text-sm",
-              inputSize === "lg" && "h-11 px-4 text-lg",
+              // Size variants (min-height instead of fixed height)
+              inputSize === "xs" && "min-h-7 px-2 text-xs",
+              inputSize === "sm" && "min-h-8 px-2 text-sm",
+              inputSize === "md" && "min-h-9 px-3 text-base md:text-sm",
+              inputSize === "lg" && "min-h-11 px-4 text-lg",
             ])}
             {...rest}
           />
@@ -753,16 +791,68 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
               style={{
                 top: `${dropdownPosition.top}px`,
                 left: `${dropdownPosition.left}px`,
-                width: `${dropdownWidth}px`,
               }}
             >
               <div className="flex flex-col sm:flex-row">
-                <div className="flex-1 overflow-auto bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 sm:rounded-lg rounded-t-lg sm:rounded-tr-none max-h-60 shadow-lg">
+                {shouldShowValuePreview && isOpen && (
+                  <div
+                    className="border border-gray-200 dark:border-gray-700 sm:border-r-0 sm:border-t p-3 bg-gray-100 dark:bg-gray-700 sm:rounded-l-lg rounded-t-lg sm:rounded-br-none h-fit self-start shadow-lg"
+                    style={{ width: `${valuePreviewWidth}px` }}
+                  >
+                    {highlightedSuggestion?.nodeName ? (
+                      <>
+                        <div className="mb-2">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Node Name</div>
+                          <div className="text-sm text-gray-950 dark:text-white font-medium">
+                            {highlightedSuggestion.nodeName}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Node ID</div>
+                          <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
+                            {highlightedSuggestion.nodeId}
+                          </div>
+                        </div>
+                      </>
+                    ) : highlightedSuggestion?.kind === "function" ? (
+                      <>
+                        <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Function</div>
+                        <div className="text-sm text-gray-950 dark:text-white font-mono">
+                          {highlightedSuggestion.label}
+                        </div>
+                      </>
+                    ) : highlightedValue !== undefined &&
+                      (highlightedValue === null ||
+                        (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue))) ? (
+                      <>
+                        <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Value Preview</div>
+                        <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
+                          {highlightedValue === null
+                            ? "null"
+                            : typeof highlightedValue === "string"
+                              ? `"${highlightedValue}"`
+                              : String(highlightedValue)}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Type</div>
+                        <div className="text-sm text-gray-950 dark:text-white font-mono">
+                          {highlightedSuggestion?.detail ?? highlightedSuggestion?.kind ?? "unknown"}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+                <div
+                  className="overflow-auto bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 sm:rounded-r-lg rounded-b-lg sm:rounded-tl-none max-h-60 shadow-lg"
+                  style={{ width: `${dropdownWidth}px` }}
+                >
                   {suggestions.map((suggestionItem, index) => (
                     <div
                       key={`${suggestionItem.kind}-${suggestionItem.label}-${index}`}
                       className={twMerge([
-                        "px-3 py-2 cursor-pointer text-sm flex justify-between items-center",
+                        "px-3 py-2 cursor-pointer text-sm flex items-center gap-2",
                         "hover:bg-gray-100 dark:hover:bg-gray-700",
                         "text-gray-950 dark:text-white",
                         highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
@@ -770,6 +860,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
                       onClick={() => handleSuggestionClick(suggestionItem)}
                       onMouseEnter={() => {
                         setHighlightedIndex(index);
+                        setHighlightedSuggestion(suggestionItem);
                         if (exampleObj) {
                           const cursorPosition = inputRef.current?.selectionStart || 0;
                           const context = getExpressionContext(inputValue, cursorPosition);
@@ -778,33 +869,26 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
                         }
                       }}
                     >
-                      <span>
-                        {suggestionItem.label}
-                        {suggestionItem.kind === "function" && (
-                          <span className="ml-2 text-gray-500">{formatFunctionSignature(suggestionItem)}</span>
-                        )}
-                        {suggestionItem.kind !== "function" && suggestionItem.labelDetail && (
-                          <span className="ml-2 text-gray-500">{suggestionItem.labelDetail}</span>
-                        )}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                      <span>{suggestionItem.label}</span>
+                      {suggestionItem.kind === "function" && (
+                        <span className="text-gray-500">{formatFunctionSignature(suggestionItem)}</span>
+                      )}
+                      {suggestionItem.label === "$" && (
+                        <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
+                          event data
+                        </span>
+                      )}
+                      {suggestionItem.kind !== "function" && suggestionItem.labelDetail && (
+                        <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
+                          node
+                        </span>
+                      )}
+                      <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 rounded">
                         {suggestionItem.detail ?? suggestionItem.kind}
                       </span>
                     </div>
                   ))}
                 </div>
-                {shouldShowValuePreview && isOpen && (
-                  <div className="border border-gray-200 dark:border-gray-700 sm:border-l-0 sm:border-t sm:max-w-[240px] sm:min-w-[200px] p-3 bg-gray-100 dark:bg-gray-700 sm:rounded-r-lg rounded-b-lg sm:rounded-bl-none h-fit self-start shadow-lg">
-                    <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Value Preview</div>
-                    <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
-                      {highlightedValue === null
-                        ? "null"
-                        : typeof highlightedValue === "string"
-                          ? `"${highlightedValue}"`
-                          : String(highlightedValue)}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>,
             document.body,

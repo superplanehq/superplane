@@ -162,7 +162,7 @@ export const useMonacoExpressionAutocomplete = ({
   autocompleteExampleObj,
   languageId,
   startWord = "{{",
-  prefix = "{{ $",
+  prefix = "{{ ",
   suffix = " }}",
   allowOutsideExpression = false,
 }: UseMonacoExpressionAutocompleteProps) => {

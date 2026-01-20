@@ -31,6 +31,10 @@ export interface Suggestion {
   insertText?: string;
   detail?: string;
   labelDetail?: string;
+  /** For node suggestions: the node ID (key used to access it) */
+  nodeId?: string;
+  /** For node suggestions: the human-readable node name */
+  nodeName?: string;
 }
 
 export interface GetSuggestionsOptions {
@@ -147,12 +151,15 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     return keys.slice(0, limit).map((k) => {
       const v = (globals as Record<string, unknown>)[k];
       const tailDot = isExpandableValue(v) ? "." : "";
+      const nodeName = getNodeName(globals, k, v);
       return {
-        label: k,
+        label: `["${k}"]`,
         kind: "variable",
         insertText: `$[${quoteKey(k, envTrigger.quote)}]${tailDot}`,
         detail: getValueTypeLabel(v),
-        labelDetail: formatNodeNameLabel(getNodeName(globals, k, v)),
+        labelDetail: formatNodeNameLabel(nodeName),
+        nodeId: nodeName ? k : undefined,
+        nodeName: nodeName,
       };
     });
   }
@@ -166,13 +173,19 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     return keys
       .filter((k) => k.toLowerCase().startsWith(prefix))
       .slice(0, limit)
-      .map((k) => ({
-        label: k,
-        kind: "variable",
-        insertText: quoteKey(k, bracketCtx.quote), // only the key token
-        detail: getValueTypeLabel((globals as Record<string, unknown>)[k]),
-        labelDetail: formatNodeNameLabel(getNodeName(globals, k, (globals as Record<string, unknown>)[k])),
-      }));
+      .map((k) => {
+        const v = (globals as Record<string, unknown>)[k];
+        const nodeName = getNodeName(globals, k, v);
+        return {
+          label: `["${k}"]`,
+          kind: "variable",
+          insertText: quoteKey(k, bracketCtx.quote), // only the key token
+          detail: getValueTypeLabel(v),
+          labelDetail: formatNodeNameLabel(nodeName),
+          nodeId: nodeName ? k : undefined,
+          nodeName: nodeName,
+        };
+      });
   }
 
   // 2) Now it's safe to suppress suggestions inside normal strings
@@ -242,7 +255,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
           label: fn.name,
           kind: "function",
           insertText: fn.snippet ?? `${fn.name}($0)`,
-          detail: "builtin function",
+          detail: "function",
         });
       }
     }
