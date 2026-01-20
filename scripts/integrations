@@ -15,7 +15,7 @@ if [ -z "$integrations" ]; then
   echo ""
   echo "Total integrations: 0"
 else
-  count=$(echo "$integrations" | wc -l)
+  count=$(echo "$integrations" | grep -c '^')
   echo "Integrations:"
   echo "$integrations" | sed 's/^/  - /'
   echo ""
