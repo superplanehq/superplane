@@ -250,7 +250,6 @@ export function BuildingBlocksSidebar({
             iconSlug={hoveredBlock.icon}
             iconColor="text-gray-800"
             collapsedBackground={getBackgroundColorClass("white")}
-            hideActionsButton={true}
             includeEmptyState={true}
             collapsed={false}
           />

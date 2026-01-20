@@ -1,6 +1,5 @@
 import React from "react";
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
-import { CollapsedComponent } from "../collapsedComponent";
 import { ComponentHeader } from "../componentHeader";
 import { SpecsTooltip } from "./SpecsTooltip";
 import { PayloadTooltip } from "./PayloadTooltip";
@@ -218,7 +217,6 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   metadata?: MetadataItem[];
   customField?: React.ReactNode;
   eventStateMap?: EventStateMap;
-  hideActionsButton?: boolean;
   includeEmptyState?: boolean;
   emptyStateProps?: {
     icon?: React.ComponentType<{ size?: number }>;
@@ -254,7 +252,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   metadata,
   customField,
   eventStateMap,
-  hideActionsButton,
   includeEmptyState = false,
   emptyStateProps,
   error,
@@ -262,99 +259,10 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   const hasError = error && error.trim() !== "";
   const RunIcon = React.useMemo(() => resolveIcon("play"), []);
   const DeleteIcon = React.useMemo(() => resolveIcon("trash-2"), []);
-  if (collapsed) {
-    return (
-      <SelectionWrapper selected={selected} fullRounded>
-        <div className={`group relative ${hasError ? "!outline-orange-500 rounded-full" : ""}`}>
-          <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
-          <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
-            {onRun && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onRun();
-                }}
-                disabled={runDisabled}
-                className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RunIcon className="h-4 w-4" />
-                <span>Run</span>
-              </button>
-            )}
-            {onDelete && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onDelete();
-                }}
-                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-              >
-                <DeleteIcon className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <CollapsedComponent
-            iconSrc={iconSrc}
-            iconSlug={iconSlug}
-            iconColor={iconColor}
-            title={title}
-            collapsedBackground={collapsedBackground}
-            shape="circle"
-            onDoubleClick={onToggleCollapse}
-            onRun={onRun}
-            runDisabled={runDisabled}
-            runDisabledTooltip={runDisabledTooltip}
-            onEdit={onEdit}
-            onDuplicate={onDuplicate}
-            onConfigure={onConfigure}
-            onDeactivate={onDeactivate}
-            onToggleView={onToggleView}
-            onDelete={onDelete}
-            isCompactView={isCompactView}
-            hideActionsButton={hideActionsButton}
-          >
-            <div className="flex flex-col items-center gap-1">
-              {metadata?.map((item, index) => (
-                <div key={`metadata-${index}`} className="flex items-center gap-1 text-xs text-gray-500">
-                  {React.createElement(resolveIcon(item.icon), { size: 12 })}
-                  <span className="truncate max-w-[150px]">{item.label}</span>
-                </div>
-              ))}
-              {specs
-                ?.filter((spec) => spec.values)
-                .map((spec, index) => (
-                  <div key={`spec-${index}`} className="flex items-center gap-1 text-xs text-gray-500">
-                    {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 12 })}
-                    <span>
-                      {!hideCount ? spec.values!.length : ""}{" "}
-                      {spec.title + (spec.values!.length > 1 && !hideCount ? "s" : "")}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </CollapsedComponent>
-          {hasError && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="absolute -top-1 -right-1 bg-red-500 rounded-full p-1 cursor-pointer">
-                    <AlertTriangle size={16} className="text-white" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs text-sm">{error}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-        </div>
-      </SelectionWrapper>
-    );
-  }
+  const ToggleViewIcon = React.useMemo(
+    () => resolveIcon(isCompactView ? "chevrons-up-down" : "chevrons-down-up"),
+    [isCompactView],
+  );
 
   return (
     <SelectionWrapper selected={selected}>
@@ -378,6 +286,19 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
               <span>Run</span>
             </button>
           )}
+          {onToggleView && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onToggleView();
+              }}
+              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+            >
+              <ToggleViewIcon className="h-4 w-4" />
+            </button>
+          )}
           {onDelete && (
             <button
               type="button"
@@ -398,19 +319,26 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           iconColor={iconColor}
           title={title}
           onDoubleClick={onToggleCollapse}
-          onRun={onRun}
-          runDisabled={runDisabled}
-          runDisabledTooltip={runDisabledTooltip}
-          onEdit={onEdit}
-          onConfigure={onConfigure}
-          onDuplicate={onDuplicate}
-          onDeactivate={onDeactivate}
-          onToggleView={onToggleView}
-          onDelete={onDelete}
           isCompactView={isCompactView}
-          hideActionsButton={hideActionsButton}
         />
 
+        {hasError && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer">
+                  <AlertTriangle size={16} className="text-white" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="max-w-xs text-sm">{error}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
+        {isCompactView ? null : (
+          <>
         {!hideMetadataList && metadata && metadata.length > 0 && <MetadataList items={metadata} />}
 
         {specs && specs.length > 0 && (
@@ -463,19 +391,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
         {customField || null}
 
-        {hasError && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer">
-                  <AlertTriangle size={16} className="text-white" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs text-sm">{error}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          </>
         )}
       </div>
     </SelectionWrapper>

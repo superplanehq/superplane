@@ -1,7 +1,6 @@
 import { resolveIcon } from "@/lib/utils";
 import React from "react";
 import { toTestId } from "../../utils/testID";
-import { SidebarActionsDropdown } from "../componentSidebar/SidebarActionsDropdown";
 import { ComponentActionsProps } from "../types/componentActions";
 
 export interface ComponentHeaderProps extends ComponentActionsProps {
@@ -10,7 +9,6 @@ export interface ComponentHeaderProps extends ComponentActionsProps {
   iconColor?: string;
   title: string;
   onDoubleClick?: () => void;
-  hideActionsButton?: boolean;
 }
 
 export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
@@ -19,17 +17,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   iconColor,
   title,
   onDoubleClick,
-  onRun,
-  runDisabled,
-  runDisabledTooltip,
-  onDuplicate,
-  onEdit,
-  onConfigure,
-  onDeactivate,
-  onToggleView,
-  onDelete,
   isCompactView = false,
-  hideActionsButton = false,
 }) => {
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
@@ -39,7 +27,8 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
     <div
       data-testid={toTestId(`node-${title}-header`)}
       className={
-        "canvas-node-drag-handle text-left text-lg w-full px-2 py-1.5 flex items-center flex-col border-b border-slate-400 rounded-t-md items-center relative"
+        "canvas-node-drag-handle text-left text-lg w-full px-2 py-1.5 flex items-center flex-col rounded-t-md items-center relative" +
+        (isCompactView ? "" : " border-b border-slate-400")
       }
       onDoubleClick={onDoubleClick}
     >
@@ -52,23 +41,6 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
           )}
         </div>
         <h2 className="font-semibold text-sm">{title}</h2>
-        {!hideActionsButton && (
-          <div className="absolute top-1 right-1 rounded flex items-center justify-center hover:bg-slate-950/5 h-6 w-6 leading-none pt-[1px] nodrag">
-            <SidebarActionsDropdown
-              dataTestId={toTestId(`node-${title}-header-dropdown`)}
-              onRun={onRun}
-              runDisabled={runDisabled}
-              runDisabledTooltip={runDisabledTooltip}
-              onDuplicate={onDuplicate}
-              onEdit={onEdit}
-              onConfigure={onConfigure}
-              onDeactivate={onDeactivate}
-              onToggleView={onToggleView}
-              onDelete={onDelete}
-              isCompactView={isCompactView}
-            />
-          </div>
-        )}
       </div>
     </div>
   );

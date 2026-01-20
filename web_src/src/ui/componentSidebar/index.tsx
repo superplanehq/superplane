@@ -10,7 +10,6 @@ import slackIcon from "@/assets/icons/integrations/slack.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChildEventsState } from "../composite";
-import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
 import { LatestTab } from "./LatestTab";
@@ -564,21 +563,7 @@ export const ComponentSidebar = ({
                 </div>
               )}
             </div>
-            <div className="absolute top-3 right-9 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none pt-0.5">
-              <SidebarActionsDropdown
-                onRun={onRun}
-                runDisabled={runDisabled}
-                runDisabledTooltip={runDisabledTooltip}
-                onDuplicate={onDuplicate}
-                onDocs={onDocs}
-                onEdit={onEdit}
-                onConfigure={onConfigure}
-                onDeactivate={onDeactivate}
-                onToggleView={onToggleView}
-                onDelete={onDelete}
-                isCompactView={isCompactView}
-              />
-            </div>
+            {null}
           </div>
           <div
             onClick={() => onClose?.()}

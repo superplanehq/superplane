@@ -1154,7 +1154,6 @@ export const CustomComponent = () => {
                     iconSlug: block.icon,
                     iconColor: "text-gray-800",
                     collapsedBackground: "bg-white",
-                    hideActionsButton: true,
                     includeEmptyState: true,
                   },
                   isTemplate: true,
