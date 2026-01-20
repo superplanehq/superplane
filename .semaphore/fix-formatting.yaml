@@ -14,8 +14,8 @@ blocks:
             - checkout
             - git fetch origin pull/$PR_NUMBER/head:local-fix-branch
             - git checkout local-fix-branch
-            - make test.setup
-            - make test.start
+            - make dev.setup
+            - make dev.start
             - make format.go
             - make format.js
             - git add .
