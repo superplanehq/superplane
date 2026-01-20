@@ -2018,7 +2018,7 @@ function CanvasContent({
         ...node,
         position: { x: layout.x, y: layout.y },
         draggable: layout.childCount === 0,
-        zIndex: 0,
+        zIndex: -1,
         data,
       };
     });
@@ -2158,6 +2158,7 @@ function CanvasContent({
             edges={styledEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
+            elevateNodesOnSelect={false}
             minZoom={0.4}
             maxZoom={1.5}
             zoomOnScroll={true}

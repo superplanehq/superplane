@@ -48,7 +48,7 @@ export const Loop: React.FC<LoopProps> = ({
 
   if (collapsed) {
     return (
-      <SelectionWrapper selected={selected} fullRounded>
+      <SelectionWrapper selected={selected}>
         <CollapsedComponent
           iconSrc={iconSrc}
           iconSlug={iconSlug}
@@ -72,9 +72,9 @@ export const Loop: React.FC<LoopProps> = ({
   }
 
   return (
-    <SelectionWrapper selected={selected} fullRounded>
+    <SelectionWrapper selected={selected}>
       <div
-        className="relative flex flex-col rounded-xl border border-dashed border-slate-300 bg-slate-50/80 text-left"
+        className="relative flex flex-col rounded-xl border border-dashed border-slate-300 bg-white text-left"
         style={{ width, height }}
       >
         <ComponentHeader
