@@ -852,7 +852,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     <div
                       key={`${suggestionItem.kind}-${suggestionItem.label}-${index}`}
                       className={twMerge([
-                        "px-3 py-2 cursor-pointer text-sm flex justify-between items-center",
+                        "px-3 py-2 cursor-pointer text-sm flex items-center gap-2",
                         "hover:bg-gray-100 dark:hover:bg-gray-700",
                         "text-gray-950 dark:text-white",
                         highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
@@ -869,18 +869,21 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                         }
                       }}
                     >
-                      <span className="flex items-center gap-2">
-                        <span>{suggestionItem.label}</span>
-                        {suggestionItem.kind === "function" && (
-                          <span className="text-gray-500">{formatFunctionSignature(suggestionItem)}</span>
-                        )}
-                        {suggestionItem.kind !== "function" && suggestionItem.labelDetail && (
-                          <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
-                            node
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                      <span>{suggestionItem.label}</span>
+                      {suggestionItem.kind === "function" && (
+                        <span className="text-gray-500">{formatFunctionSignature(suggestionItem)}</span>
+                      )}
+                      {suggestionItem.label === "$" && (
+                        <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
+                          event data
+                        </span>
+                      )}
+                      {suggestionItem.kind !== "function" && suggestionItem.labelDetail && (
+                        <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
+                          node
+                        </span>
+                      )}
+                      <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 rounded">
                         {suggestionItem.detail ?? suggestionItem.kind}
                       </span>
                     </div>

@@ -53,7 +53,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       onChange={(nextValue) => onChange(shouldPreserveEmpty ? nextValue : nextValue || undefined)}
       placeholder={field.placeholder || ""}
       startWord="{{"
-      prefix="{{ $"
+      prefix="{{ "
       suffix=" }}"
       inputSize="md"
       showValuePreview

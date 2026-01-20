@@ -255,7 +255,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
           label: fn.name,
           kind: "function",
           insertText: fn.snippet ?? `${fn.name}($0)`,
-          detail: "builtin function",
+          detail: "function",
         });
       }
     }
