@@ -64,6 +64,8 @@ export interface AnnotationComponentProps extends ComponentActionsProps {
   selected?: boolean;
   hideActionsButton?: boolean;
   onAnnotationUpdate?: (updates: { text?: string; color?: AnnotationColor }) => void;
+  width?: number;
+  height?: number;
 }
 
 const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
@@ -75,6 +77,8 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   onDelete,
   hideActionsButton,
   onAnnotationUpdate,
+  width = 320,
+  height = 170,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
@@ -154,9 +158,10 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
       <div
         ref={containerRef}
         className={cn(
-          "group relative flex w-[20rem] flex-col rounded-md shadow-md outline outline-gray-950/10",
+          "group relative flex flex-col rounded-md shadow-md outline outline-gray-950/10 h-full",
           colorStyles.container,
         )}
+        style={{ width: width, minHeight: height }}
       >
         <div className={cn("canvas-node-drag-handle h-5 w-full rounded-t-md cursor-grab", colorStyles.background)}>
           <div className="flex h-full w-full flex-col items-stretch justify-center gap-0.5 px-2">
@@ -220,7 +225,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
           </div>
         )}
 
-        <div className="px-3 pb-3">
+        <div className="px-3 pb-3 flex-1 flex flex-col">
           <textarea
             ref={textareaRef}
             data-note-id={noteId || undefined}
@@ -254,7 +259,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
               lastPointerDownOutsideRef.current = false;
             }}
             className={cn(
-              "nodrag min-h-[120px] w-full resize-none bg-transparent text-sm leading-normal outline-none",
+              "nodrag flex-1 w-full resize-none bg-transparent text-sm leading-normal outline-none",
               "text-gray-800",
               "placeholder:text-black/50",
             )}
@@ -274,5 +279,7 @@ export const AnnotationComponent = React.memo(
     prev.annotationText === next.annotationText &&
     prev.annotationColor === next.annotationColor &&
     prev.selected === next.selected &&
-    prev.hideActionsButton === next.hideActionsButton,
+    prev.hideActionsButton === next.hideActionsButton &&
+    prev.width === next.width &&
+    prev.height === next.height,
 );

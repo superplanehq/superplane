@@ -1,7 +1,7 @@
 import { Composite, type CompositeProps } from "@/ui/composite";
 import { SwitchComponent, type SwitchComponentProps } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, NodeResizer } from "@xyflow/react";
 import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
 import MergeComponent, { type MergeComponentProps } from "../merge";
@@ -78,9 +78,20 @@ export function Block(props: BlockProps) {
   // Apply opacity to non-highlighted nodes when there are highlighted nodes
   const shouldDim = hasHighlightedNodes && !isHighlighted;
 
+  const isAnnotation = data.type === "annotation";
+
   return (
     <>
       <AiPopup {...ai} />
+      {isAnnotation && props.selected && (
+        <NodeResizer
+          minWidth={200}
+          minHeight={100}
+          isVisible={props.selected}
+          lineClassName="!border-sky-500"
+          handleClassName="!w-3 !h-3 !bg-sky-500"
+        />
+      )}
 
       <div className={`relative w-fit ${shouldDim ? "opacity-30" : ""}`} onClick={props.onClick}>
         <LeftHandle data={data} nodeId={props.nodeId} />
