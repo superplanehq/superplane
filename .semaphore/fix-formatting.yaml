@@ -1,0 +1,24 @@
+version: v1.0
+name: Fix Formatting
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+blocks:
+  - name: "Format Code"
+    task:
+      jobs:
+        - name: "Fix Go and TypeScript Formatting"
+          commands:
+            - sem-version go 1.22
+            - checkout
+            - git fetch origin pull/$PR_NUMBER/head:local-fix-branch
+            - git checkout local-fix-branch
+            - gofmt -s -w .
+            - cd web_src && npm install && cd ..
+            - cd web_src && npx prettier --write . && cd ..
+            - git add .
+            - git commit -m "[skip ci] fix formatting for PR $PR_NUMBER"
+            - git push origin local-fix-branch
+            

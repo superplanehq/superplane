@@ -5,7 +5,7 @@ describe("getSuggestions", () => {
   it("suggests env keys after $ trigger", () => {
     const suggestions = getSuggestions("take($", "take($".length, { foo: 1, bar: 2 });
     const labels = suggestions.map((item) => item.label);
-    expect(labels).toContain("foo");
+    expect(labels).toContain('["foo"]');
     expect(suggestions.some((item) => item.insertText === '$["foo"]')).toBe(true);
   });
 

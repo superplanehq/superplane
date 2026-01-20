@@ -133,7 +133,7 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Click(modeSelector)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Interval")`))
 
-	valueInput := q.Locator("input[data-testid='string-field-waitfor']")
+	valueInput := q.Locator("textarea[data-testid='string-field-waitfor']")
 	s.session.FillIn(valueInput, strconv.Itoa(duration))
 
 	unitTrigger := q.TestID("field-unit-select")
