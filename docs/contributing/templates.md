@@ -45,9 +45,10 @@ There are two ways to create a new template:
    - Connect the nodes with edges to define the workflow flow
 
 2. **Export the workflow**
-   - Once your workflow is complete, use the export menu
-   - Select "Export as YAML" option
-   - Save the exported YAML file
+   - Once your workflow is complete, locate the "Export YAML" dropdown in the top-right of the canvas header (available in development mode only)
+   - Click "Export YAML" and select either:
+     - "Download File" to save the YAML file directly
+     - "Copy to Clipboard" to copy the YAML and manually save it
 
 3. **Prepare the template**
    - Open the exported YAML file in your text editor
@@ -128,7 +129,7 @@ spec:
    - Run `make dev.start` to restart
 
 3. **Verify the template**
-   - Navigate to the SuperPlane UI at http://localhost:8000
+   - Navigate to your local SuperPlane instance (default: http://localhost:8000 after running `make dev.start`)
    - Click "Create Canvas" or similar action
    - Your template should appear in the template selection list
 
