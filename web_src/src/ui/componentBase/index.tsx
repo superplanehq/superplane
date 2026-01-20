@@ -264,10 +264,35 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   error,
 }) => {
   const hasError = error && error.trim() !== "";
+  const RunIcon = React.useMemo(() => resolveIcon("play"), []);
+  const DeleteIcon = React.useMemo(() => resolveIcon("trash-2"), []);
   if (collapsed) {
     return (
       <SelectionWrapper selected={selected} fullRounded>
-        <div className={`relative ${hasError ? "!outline-orange-500 rounded-full" : ""}`}>
+        <div className={`group relative ${hasError ? "!outline-orange-500 rounded-full" : ""}`}>
+          <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
+          <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
+            {onRun && (
+              <button
+                type="button"
+                onClick={onRun}
+                disabled={runDisabled}
+                className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RunIcon className="h-4 w-4" />
+                <span>Run</span>
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+              >
+                <DeleteIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
           <CollapsedComponent
             iconSrc={iconSrc}
             iconSlug={iconSlug}
@@ -331,8 +356,31 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   return (
     <SelectionWrapper selected={selected}>
       <div
-        className={`relative flex flex-col outline-1 outline-slate-400 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""}`}
+        className={`group relative flex flex-col outline-1 outline-slate-400 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""}`}
       >
+        <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
+        <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
+          {onRun && (
+            <button
+              type="button"
+              onClick={onRun}
+              disabled={runDisabled}
+              className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RunIcon className="h-4 w-4" />
+              <span>Run</span>
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+            >
+              <DeleteIcon className="h-4 w-4" />
+            </button>
+          )}
+        </div>
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
@@ -410,7 +458,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="absolute -top-3 -right-3 bg-orange-500 rounded-full p-1 cursor-pointer">
+                <div className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer">
                   <AlertTriangle size={16} className="text-white" />
                 </div>
               </TooltipTrigger>
