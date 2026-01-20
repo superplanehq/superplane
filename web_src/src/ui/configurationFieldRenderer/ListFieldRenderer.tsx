@@ -19,7 +19,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   domainType,
   appInstallationId,
   organizationId,
-  hasError: _hasError,
+  hasError: _,
   validationErrors,
   fieldPath = field.name || "",
   autocompleteExampleObj,

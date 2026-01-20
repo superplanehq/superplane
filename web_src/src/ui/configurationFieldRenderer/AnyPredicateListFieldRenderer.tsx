@@ -10,7 +10,7 @@ interface Predicate {
   value: string;
 }
 
-export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const predicates: Predicate[] = Array.isArray(value) ? value : [];
   const operators = field.typeOptions?.anyPredicateList?.operators ?? [];
 

@@ -8,7 +8,6 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
   onChange,
-  hasError,
   autocompleteExampleObj,
 }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";

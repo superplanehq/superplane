@@ -32,7 +32,7 @@ function buildGitRef(kind: Kind, name: string): string {
   return `refs/heads/${sanitized}`;
 }
 
-export const GitRefFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const GitRefFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const effective = (value as string) ?? (field.defaultValue as string) ?? "";
   const initial = React.useMemo(() => parseGitRef(effective), [effective]);
 

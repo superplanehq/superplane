@@ -41,7 +41,7 @@ const timezoneOptions = [
   { label: "GMT+14 (Kiribati)", value: "14" },
 ];
 
-export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const hasSetDefault = useRef(false);
 
   // Set user's current timezone as default on first render if no value is present

@@ -2,7 +2,7 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { FieldRendererProps } from "./types";
 
-export const CronFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const CronFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

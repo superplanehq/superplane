@@ -10,7 +10,6 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
   onChange,
-  hasError,
   autocompleteExampleObj,
 }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);

@@ -1400,10 +1400,13 @@ function CanvasContent({
           // Regular node click
           stateRef.current.componentSidebar.open(nodeId);
 
+          const nodeData = clickedNode?.data as {
+            component?: { error?: string };
+            composite?: { error?: string };
+            trigger?: { error?: string };
+          } | null;
           const hasConfigurationWarning = Boolean(
-            clickedNode?.data?.component?.error ||
-              clickedNode?.data?.composite?.error ||
-              clickedNode?.data?.trigger?.error,
+            nodeData?.component?.error || nodeData?.composite?.error || nodeData?.trigger?.error,
           );
 
           // Reset to Runs tab when clicking on a regular node

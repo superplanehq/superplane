@@ -15,7 +15,6 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   domainType,
   appInstallationId,
   organizationId,
-  hasError,
   autocompleteExampleObj,
 }) => {
   const [jsonError, setJsonError] = React.useState<string | null>(null);

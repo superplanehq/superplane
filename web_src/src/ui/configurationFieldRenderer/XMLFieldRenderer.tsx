@@ -10,7 +10,6 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
   onChange,
-  hasError,
   autocompleteExampleObj,
 }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);

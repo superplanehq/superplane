@@ -211,7 +211,7 @@ export const ConfigurationFieldRenderer = ({
     }
 
     return hasError;
-  }, [allFieldErrors, isRequired, value, hasError, validationErrors, enableRealtimeValidation]);
+  }, [allFieldErrors, isRequired, value, validationErrors, enableRealtimeValidation]);
 
   if (!isVisible) {
     return null;

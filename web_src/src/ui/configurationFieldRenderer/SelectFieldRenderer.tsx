@@ -3,7 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FieldRendererProps } from "./types";
 import { toTestId } from "@/utils/testID";
 
-export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const selectOptions = field.typeOptions?.select?.options ?? [];
   const hasSetDefault = useRef(false);
 

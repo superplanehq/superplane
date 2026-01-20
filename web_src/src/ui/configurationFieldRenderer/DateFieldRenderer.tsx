@@ -7,7 +7,6 @@ export const DateFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
   onChange,
-  hasError,
   allValues = {},
 }) => {
   // Calculate min/max dates based on other fields for components like time gates

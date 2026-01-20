@@ -7,7 +7,6 @@ export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
   onChange,
-  hasError,
   allValues = {},
 }) => {
   useEffect(() => {
