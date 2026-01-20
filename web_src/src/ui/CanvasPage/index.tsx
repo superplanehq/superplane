@@ -257,6 +257,7 @@ const DEFAULT_COLLAPSED_SIZE = { width: 80, height: 80 };
 const DEFAULT_ANNOTATION_SIZE = { width: 320, height: 160 };
 const LOOP_PADDING = { x: 48, y: 40 };
 const LOOP_HEADER_OFFSET = 40;
+type LoopLayoutEntry = { x: number; y: number; width: number; height: number; childCount: number };
 
 /*
  * nodeTypes must be defined outside of the component to prevent
@@ -1891,7 +1892,9 @@ function CanvasContent({
     return state.edges?.find((e) => e.id === hoveredEdgeId);
   }, [hoveredEdgeId, state.edges]);
 
+  const loopLayoutRef = useRef<Map<string, LoopLayoutEntry>>(new Map());
   const loopLayout = useMemo(() => {
+    const previousLayout = loopLayoutRef.current;
     const estimatedSize = (node: CanvasNode) => {
       const nodeType = (node.data as any)?.type as string;
       const nodeData = (node.data as any)?.[nodeType] as { collapsed?: boolean } | undefined;
@@ -1928,17 +1931,26 @@ function CanvasContent({
       childrenByParent.get(parentNodeId)!.push(node);
     });
 
-    const layout = new Map<
-      string,
-      { x: number; y: number; width: number; height: number; childCount: number }
-    >();
+    const layout = new Map<string, LoopLayoutEntry>();
 
     state.nodes
       .filter((node) => (node.data as any)?.type === "loop")
       .forEach((loopNode) => {
         const loopData = (loopNode.data as any)?.loop || {};
         const children = childrenByParent.get(loopNode.id) || [];
-        if (children.length === 0) {
+        const hasDraggingChild = children.some((child) => child.dragging);
+        const stableChildren = hasDraggingChild ? children.filter((child) => !child.dragging) : children;
+        const previousEntry = previousLayout.get(loopNode.id);
+
+        if (hasDraggingChild && previousEntry) {
+          layout.set(loopNode.id, {
+            ...previousEntry,
+            childCount: children.length,
+          });
+          return;
+        }
+
+        if (stableChildren.length === 0) {
           const width =
             typeof loopData.width === "number" ? loopData.width : loopNode.width ?? DEFAULT_LOOP_SIZE.width;
           const height =
@@ -1948,7 +1960,7 @@ function CanvasContent({
             y: loopNode.position.y,
             width,
             height,
-            childCount: 0,
+            childCount: children.length,
           });
           return;
         }
@@ -1958,7 +1970,7 @@ function CanvasContent({
         let maxX = Number.NEGATIVE_INFINITY;
         let maxY = Number.NEGATIVE_INFINITY;
 
-        children.forEach((child) => {
+        stableChildren.forEach((child) => {
           const { width, height } = estimatedSize(child);
           minX = Math.min(minX, child.position.x);
           minY = Math.min(minY, child.position.y);
@@ -1983,6 +1995,10 @@ function CanvasContent({
 
     return layout;
   }, [state.nodes]);
+
+  useEffect(() => {
+    loopLayoutRef.current = loopLayout;
+  }, [loopLayout]);
 
   const nodesWithCallbacks = useMemo(() => {
     const hasHighlightedNodes = highlightedNodeIds.size > 0;

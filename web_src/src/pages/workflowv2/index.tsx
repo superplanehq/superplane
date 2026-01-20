@@ -1986,9 +1986,11 @@ export function WorkflowPageV2() {
         ) || [];
 
       const targetNode = nodesWithPosition.find((node) => node.id === nodeId);
+      const currentParentNodeId = targetNode ? getParentNodeId(targetNode) : null;
+      const excludeNodeId = currentParentNodeId ? undefined : nodeId;
       const nextParentNodeId =
         targetNode && !isLoopNode(targetNode)
-          ? findLoopParentForPosition(nodesWithPosition, roundedPosition, nodeId)
+          ? findLoopParentForPosition(nodesWithPosition, roundedPosition, excludeNodeId)
           : null;
 
       const updatedNodes = nodesWithPosition.map((node) =>
@@ -2056,10 +2058,12 @@ export function WorkflowPageV2() {
           return node;
         }
 
+        const currentParentNodeId = getParentNodeId(node);
+        const excludeNodeId = currentParentNodeId ? undefined : node.id;
         const nextParentNodeId = findLoopParentForPosition(
           nodesWithPosition,
           positionMap.get(node.id) || { x: 0, y: 0 },
-          node.id,
+          excludeNodeId,
         );
         return updateNodeParentMetadata(node, nextParentNodeId);
       });
