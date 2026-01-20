@@ -4,59 +4,57 @@ agent:
   machine:
     type: f1-standard-2
     os_image: ubuntu2204
+auto_cancel:
+  running:
+    when: branch != 'master'
+  queued:
+    when: branch != 'master'
 blocks:
-  - name: "📜 License Check"
+  - name: "\U0001F4DC License Check"
     dependencies: []
     task:
       prologue:
         commands:
           - checkout
       jobs:
-        - name: "Licence Check"
+        - name: Licence Check
           commands:
             - make test.license.check
-
   - name: "\U0001F9EA QA"
     dependencies: []
     task:
       env_vars:
         - name: DOCKER_BUILDKIT
-          value: "1"
+          value: '1'
       prologue:
         commands:
           - checkout
           - make test.setup
           - make test.start
       jobs:
-        - name: "Lint"
+        - name: Lint
           commands:
             - make lint
-
-        - name: "Unit Tests"
+        - name: Unit Tests
           commands:
             - make test
-
-        - name: "E2E Tests"
+        - name: E2E Tests
           parallelism: 10
           commands:
             - make setup.playwright
             - make test.e2e.autoparallel INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
-
-        - name: "Check: DB structure"
+        - name: 'Check: DB structure'
           commands:
             - make check.db.structure
             - make check.db.migrations
-
-        - name: "Check: Go Format"
+        - name: 'Check: Go Format'
           commands:
             - make format.go.check
-
       epilogue:
         always:
           commands:
-            - "[ -f junit-report.xml ] && test-results publish junit-report.xml"
-
-  - name: "🔨 Frontend Build"
+            - '[ -f junit-report.xml ] && test-results publish junit-report.xml'
+  - name: "\U0001F528 Frontend Build"
     dependencies: []
     task:
       prologue:
@@ -64,35 +62,34 @@ blocks:
           - checkout
           - sem-version node 20
       jobs:
-        - name: "Build Frontend"
+        - name: Build Frontend
           commands:
-            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules
+            - 'cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules'
             - cd web_src
             - npm ci
             - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
             - npm run build
-
-  - name: "🧪 Frontend Tests"
-    dependencies: [🔨 Frontend Build]
+  - name: "\U0001F9EA Frontend Tests"
+    dependencies:
+      - "\U0001F528 Frontend Build"
     task:
       prologue:
         commands:
           - checkout
           - sem-version node 20
       jobs:
-        - name: "UI Tests"
+        - name: UI Tests
           commands:
-            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules
+            - 'cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules'
             - cd web_src
             - npm ci
             - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
-            - npm run test:run
-        - name: "Format Check"
+            - 'npm run test:run'
+        - name: Format Check
           commands:
-            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules
+            - 'cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules'
             - cd web_src && npm ci && cd ..
             - make format.js.check
-
 after_pipeline:
   task:
     jobs:
