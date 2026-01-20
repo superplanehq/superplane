@@ -1,6 +1,6 @@
 # SuperPlane
 
-SuperPlane is an **open source DevOps control plane** for defining and running
+SuperPlane is an **open-source DevOps control plane similar to n8n** but for defining and running
 operational workflows across the tools you already use
 (CI/CD, release management, incident response, notifications, etc.).
 
