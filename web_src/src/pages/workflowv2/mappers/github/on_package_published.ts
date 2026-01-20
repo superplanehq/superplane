@@ -3,7 +3,7 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata } from "./base";
+import { BaseNodeMetadata } from "./types";
 import { Predicate, formatPredicate } from "./utils";
 
 interface OnPackagePublishedConfiguration {

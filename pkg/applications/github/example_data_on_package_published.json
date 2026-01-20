@@ -1,0 +1,29 @@
+{
+  "data": {
+    "action": "published",
+    "package": {
+      "id": 12345,
+      "name": "my-package",
+      "package_type": "npm",
+      "html_url": "https://github.com/acme/widgets/packages/npm/my-package",
+      "package_version": {
+        "id": 67890,
+        "version": "1.0.0",
+        "name": "1.0.0"
+      }
+    },
+    "repository": {
+      "id": 123456,
+      "name": "widgets",
+      "full_name": "acme/widgets",
+      "html_url": "https://github.com/acme/widgets"
+    },
+    "sender": {
+      "login": "octocat",
+      "id": 101,
+      "html_url": "https://github.com/octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.packagePublished"
+}

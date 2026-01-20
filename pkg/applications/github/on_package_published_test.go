@@ -18,8 +18,10 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 	trigger := &OnPackagePublished{}
 
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("X-GitHub-Event", "package")
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Headers: http.Header{},
+			Headers: headers,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -32,8 +34,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:        headers,
-			EventContext:   &contexts.EventContext{},
-			WebhookContext: &contexts.WebhookContext{},
+			Events:  &contexts.EventContext{},
+			Webhook: &contexts.WebhookContext{},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -56,8 +58,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "my-package"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   &contexts.EventContext{},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  &contexts.EventContext{},
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -86,8 +88,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: ".*"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -117,8 +119,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "my-package"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -148,8 +150,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeNotEquals, Value: "my-package"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -179,8 +181,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: "@myorg/.*"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -210,8 +212,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeEquals, Value: "my-package"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -241,8 +243,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: ".*"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -273,8 +275,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 				},
 				PackageTypes: []string{"npm", "docker"},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -305,8 +307,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 				},
 				PackageTypes: []string{"npm", "docker"},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -336,8 +338,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: ".*"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -367,8 +369,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 					{Type: configuration.PredicateTypeMatches, Value: ".*"},
 				},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -399,8 +401,8 @@ func Test__OnPackagePublished__HandleWebhook(t *testing.T) {
 				},
 				PackageTypes: []string{},
 			},
-			WebhookContext: &contexts.WebhookContext{Secret: secret},
-			EventContext:   eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -416,8 +418,8 @@ func Test__OnPackagePublished__Setup(t *testing.T) {
 	t.Run("repository is required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallationContext: appCtx,
-			MetadataContext:        &contexts.MetadataContext{},
+			AppInstallation: appCtx,
+			Metadata:        &contexts.MetadataContext{},
 			Configuration:          map[string]any{"repository": ""},
 		})
 
@@ -431,8 +433,8 @@ func Test__OnPackagePublished__Setup(t *testing.T) {
 			},
 		}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallationContext: appCtx,
-			MetadataContext:        &contexts.MetadataContext{},
+			AppInstallation: appCtx,
+			Metadata:        &contexts.MetadataContext{},
 			Configuration:          map[string]any{"repository": "world"},
 		})
 
@@ -448,8 +450,8 @@ func Test__OnPackagePublished__Setup(t *testing.T) {
 
 		nodeMetadataCtx := contexts.MetadataContext{}
 		require.NoError(t, trigger.Setup(core.TriggerContext{
-			AppInstallationContext: appCtx,
-			MetadataContext:        &nodeMetadataCtx,
+			AppInstallation: appCtx,
+			Metadata:        &nodeMetadataCtx,
 			Configuration:          map[string]any{"repository": "hello"},
 		}))
 

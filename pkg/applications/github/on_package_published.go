@@ -88,8 +88,8 @@ func (p *OnPackagePublished) Configuration() []configuration.Field {
 
 func (p *OnPackagePublished) Setup(ctx core.TriggerContext) error {
 	err := ensureRepoInMetadata(
-		ctx.MetadataContext,
-		ctx.AppInstallationContext,
+		ctx.Metadata,
+		ctx.AppInstallation,
 		ctx.Configuration,
 	)
 
@@ -104,7 +104,7 @@ func (p *OnPackagePublished) Setup(ctx core.TriggerContext) error {
 
 	// Register webhook at organization level (empty repository = org-level)
 	// We still validate the repository in HandleWebhook for filtering
-	return ctx.AppInstallationContext.RequestWebhook(WebhookConfiguration{
+	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
 		EventType:  "package",
 		Repository: "",
 	})
@@ -128,7 +128,16 @@ func (p *OnPackagePublished) HandleWebhook(ctx core.WebhookRequestContext) (int,
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	code, err := verifySignature(ctx, "package")
+	eventType := ctx.Headers.Get("X-GitHub-Event")
+	if eventType == "" {
+		return http.StatusBadRequest, fmt.Errorf("missing X-GitHub-Event header")
+	}
+
+	if eventType != "package" {
+		return http.StatusOK, nil
+	}
+
+	code, err := verifySignature(ctx)
 	if err != nil {
 		log.Printf("[OnPackagePublished] Signature verification failed: %v", err)
 		return code, err
@@ -234,7 +243,7 @@ func (p *OnPackagePublished) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	}
 
 	log.Printf("[OnPackagePublished] Emitting github.packagePublished event")
-	err = ctx.EventContext.Emit("github.packagePublished", data)
+	err = ctx.Events.Emit("github.packagePublished", data)
 
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
