@@ -1,6 +1,6 @@
 import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCompleteSelect";
 import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
-import { Select, SelectTrigger, SelectValue } from "../select";
+import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfigurationField } from "../../api-client";
 import { useApplicationResources } from "@/hooks/useApplications";
 import { toTestId } from "@/utils/testID";

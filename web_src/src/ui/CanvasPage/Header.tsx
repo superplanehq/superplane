@@ -1,11 +1,11 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import { Undo2, ChevronDown, Palette, Home } from "lucide-react";
+import { Undo2, Palette, Home, ChevronDown, Copy, Download } from "lucide-react";
 import { Button } from "../button";
 import { Switch } from "../switch";
 import { useWorkflows } from "@/hooks/useWorkflowData";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 export interface BreadcrumbItem {
   label: string;
@@ -52,6 +52,7 @@ export function Header({
   const navigate = useNavigate();
   const { data: workflows = [], isLoading: workflowsLoading } = useWorkflows(organizationId || "");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [exportAction, setExportAction] = useState<string>("");
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // Get the workflow name from the workflows list if workflowId is available
@@ -183,18 +184,37 @@ export function Header({
           {/* Right side - Auto-save toggle and Save button */}
           <div className="flex items-center gap-3">
             {onExportYamlCopy && onExportYamlDownload && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="outline" className="flex items-center gap-1">
-                    Export YAML
-                    <ChevronDown size={14} className="text-gray-400" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem onClick={onExportYamlCopy}>Copy to Clipboard</DropdownMenuItem>
-                  <DropdownMenuItem onClick={onExportYamlDownload}>Download File</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Select
+                value={exportAction || undefined}
+                onValueChange={(value) => {
+                  setExportAction(value);
+                  if (value === "copy") {
+                    onExportYamlCopy();
+                  }
+                  if (value === "download") {
+                    onExportYamlDownload();
+                  }
+                  setExportAction("");
+                }}
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Export YAML" />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectItem value="copy">
+                    <span className="flex items-center gap-2">
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy to Clipboard
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="download">
+                    <span className="flex items-center gap-2">
+                      <Download className="h-3.5 w-3.5" />
+                      Download File
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             )}
             {unsavedMessage && (
               <span className="text-xs font-medium text-yellow-700 bg-orange-100 px-2 py-1 rounded hidden sm:inline">

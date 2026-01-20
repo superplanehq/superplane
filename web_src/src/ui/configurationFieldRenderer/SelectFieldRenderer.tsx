@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FieldRendererProps } from "./types";
 import { toTestId } from "@/utils/testID";
 

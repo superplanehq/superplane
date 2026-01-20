@@ -731,8 +731,8 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
               // Size variants
               inputSize === "xs" && "h-7 px-2 text-xs",
               inputSize === "sm" && "h-8 px-2 text-sm",
-              inputSize === "md" && "h-9 px-3 text-base md:text-sm",
-              inputSize === "lg" && "h-11 px-4 text-lg",
+              inputSize === "md" && "h-8 px-3 text-base md:text-sm",
+              inputSize === "lg" && "h-10 px-4 text-lg",
             ])}
             {...rest}
           />

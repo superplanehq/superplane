@@ -270,7 +270,7 @@ export function SettingsTab({
     <div className="p-4 overflow-y-auto pb-20" style={{ maxHeight: "80vh" }}>
       <div className="space-y-6">
         {/* Node identification section */}
-        <div className="flex flex-col gap-2 h-[60px]">
+        <div className="flex flex-col gap-2">
           <Label className={`min-w-[100px] text-left ${hasNodeNameError ? "text-red-600 dark:text-red-400" : ""}`}>
             Node Name
             <span className="text-gray-800 ml-1">*</span>
@@ -283,7 +283,7 @@ export function SettingsTab({
             onChange={(e) => setCurrentNodeName(e.target.value)}
             placeholder="Enter a name for this node"
             autoFocus
-            className={`flex-1 shadow-none ${hasNodeNameError ? "border-red-500 border-2" : ""}`}
+            className={`shadow-none ${hasNodeNameError ? "border-red-500 border-2" : ""}`}
           />
         </div>
 

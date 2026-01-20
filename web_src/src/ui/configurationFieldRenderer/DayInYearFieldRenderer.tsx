@@ -1,5 +1,5 @@
 import React from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FieldRendererProps } from "./types";
 
 export const DayInYearFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
