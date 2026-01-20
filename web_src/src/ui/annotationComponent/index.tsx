@@ -177,16 +177,16 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
               </div>
               {onDelete && (
                 <button
-                type="button"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onDelete();
-                }}
-                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                aria-label="Delete note"
-              >
-                <Trash2 size={16} />
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onDelete();
+                  }}
+                  className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                  aria-label="Delete note"
+                >
+                  <Trash2 size={16} />
                 </button>
               )}
             </div>
