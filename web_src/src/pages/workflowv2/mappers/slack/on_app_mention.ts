@@ -3,6 +3,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import { formatRelativeTime } from "@/utils/timezone";
 import { TriggerProps } from "@/ui/trigger";
+import slackIcon from "@/assets/icons/integrations/slack.svg";
 
 interface OnAppMentionConfiguration {
   channel?: string;
@@ -66,10 +67,11 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
 
     const props: TriggerProps = {
       title: node.name!,
+      iconSrc: slackIcon,
       iconSlug: "slack",
       iconBackground: "bg-white",
       iconColor: getColorClass(trigger.color),
-      headerColor: getBackgroundColorClass(trigger.color),
+      headerColor: "bg-transparent",
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,
     };

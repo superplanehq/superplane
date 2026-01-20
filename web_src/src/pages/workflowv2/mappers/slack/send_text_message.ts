@@ -9,6 +9,7 @@ import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/compon
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { MetadataItem } from "@/ui/metadataList";
+import slackIcon from "@/assets/icons/integrations/slack.svg";
 
 interface SendTextMessageConfiguration {
   channel?: string;
@@ -35,10 +36,11 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
 
     return {
       title: node.name!,
+      iconSrc: slackIcon,
       iconSlug: "slack",
       iconBackground: "bg-white",
       iconColor: getColorClass(componentDefinition.color),
-      headerColor: getBackgroundColorClass(componentDefinition.color),
+      headerColor: "bg-transparent",
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
       collapsed: node.isCollapsed,
       eventSections: lastExecution ? sendTextMessageEventSections(nodes, lastExecution, componentName) : undefined,

@@ -10,9 +10,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import openAiIcon from "@/assets/icons/integrations/openai.svg";
+import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import slackIcon from "@/assets/icons/integrations/slack.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 export interface BuildingBlock {
@@ -179,7 +181,7 @@ export function BuildingBlocksSidebar({
         <div className="flex flex-col items-start gap-3 w-full">
           <div className="flex justify-between gap-3 w-full">
             <div className="flex flex-col gap-0.5">
-              <h2 className="text-base font-semibold">New Component</h2>
+              <h2 className="text-base font-medium">New Component</h2>
             </div>
           </div>
           <div
@@ -311,10 +313,13 @@ function CategorySection({
 
           // Use SVG icons for application components/triggers
           const appLogoMap: Record<string, string> = {
-            github: githubIcon,
-            semaphore: SemaphoreLogo,
-            pagerduty: pagerDutyIcon,
             dash0: dash0Icon,
+            github: githubIcon,
+            openai: openAiIcon,
+            "open-ai": openAiIcon,
+            pagerduty: pagerDutyIcon,
+            semaphore: SemaphoreLogo,
+            slack: slackIcon,
           };
           const appIconSrc = block.appName ? appLogoMap[block.appName] : undefined;
           const IconComponent = resolveIcon(iconSlug);
@@ -395,7 +400,7 @@ function CategorySection({
             >
               <ItemMedia>
                 {appIconSrc ? (
-                  <img src={appIconSrc} alt={block.label || block.name} className="w-3.5 h-3.5" />
+                  <img src={appIconSrc} alt={block.label || block.name} className="size-3.5" />
                 ) : (
                   <IconComponent size={14} className="text-gray-500" />
                 )}
