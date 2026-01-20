@@ -769,7 +769,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
               // Size variants (min-height instead of fixed height)
               inputSize === "xs" && "min-h-7 px-2 text-xs",
               inputSize === "sm" && "min-h-8 px-2 text-sm",
-              inputSize === "md" && "min-h-9 px-3 text-base md:text-sm",
+              inputSize === "md" && "min-h-8 px-3 text-base md:text-sm",
               inputSize === "lg" && "min-h-11 px-4 text-lg",
             ])}
             {...rest}

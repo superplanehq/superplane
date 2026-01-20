@@ -2,6 +2,12 @@
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, X } from "lucide-react";
+import dash0Icon from "@/assets/icons/integrations/dash0.svg";
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import openAiIcon from "@/assets/icons/integrations/openai.svg";
+import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import slackIcon from "@/assets/icons/integrations/slack.svg";
+import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChildEventsState } from "../composite";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
@@ -25,6 +31,16 @@ import { EventState, EventStateMap } from "../componentBase";
 import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
+
+const APP_LOGO_MAP: Record<string, string> = {
+  dash0: dash0Icon,
+  github: githubIcon,
+  openai: openAiIcon,
+  "open-ai": openAiIcon,
+  pagerduty: pagerDutyIcon,
+  semaphore: SemaphoreLogo,
+  slack: slackIcon,
+};
 
 interface ComponentSidebarProps {
   isOpen?: boolean;
@@ -498,6 +514,7 @@ export const ComponentSidebar = ({
   }, [onHighlightedNodesChange]);
 
   const isDetailView = page !== "overview";
+  const headerIconSrc = iconSrc ?? (appName ? APP_LOGO_MAP[appName] : undefined);
 
   if (!isOpen) return null;
 
@@ -521,18 +538,17 @@ export const ComponentSidebar = ({
           }`}
         />
       </div>
-      <div
-        className={
-          "flex items-center justify-between gap-3 px-4 pt-3 relative border-b-1 border-border" +
-          (hideNodeId ? " pb-3" : " pb-8")
-        }
-      >
+      <div className={"flex items-center justify-between gap-3 px-4 pt-3 relative" + (hideNodeId ? " pb-3" : " pb-8")}>
         <div className="flex flex-col items-start gap-3 w-full">
           <div className="flex justify-between gap-3 w-full">
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2">
                 <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
-                  {iconSrc ? <img src={iconSrc} alt={nodeName} className="w-6 h-6" /> : <Icon size={16} />}
+                  {headerIconSrc ? (
+                    <img src={headerIconSrc} alt={nodeName} className="w-4 h-4 object-contain" />
+                  ) : (
+                    <Icon size={16} />
+                  )}
                 </div>
                 <h2 className="text-base font-semibold">{nodeName}</h2>
               </div>

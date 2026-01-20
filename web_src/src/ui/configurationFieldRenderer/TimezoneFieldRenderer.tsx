@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FieldRendererProps } from "./types";
 
 // Function to get user's current timezone offset as a string (e.g., "-5", "0", "5.5")
@@ -41,7 +41,7 @@ const timezoneOptions = [
   { label: "GMT+14 (Kiribati)", value: "14" },
 ];
 
-export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const hasSetDefault = useRef(false);
 
   // Set user's current timezone as default on first render if no value is present
@@ -68,7 +68,7 @@ export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, val
 
   return (
     <Select value={displayValue} onValueChange={(val) => onChange(val || undefined)}>
-      <SelectTrigger className={`w-full ${hasError ? "border-red-500 border-2" : ""}`}>
+      <SelectTrigger className="w-full">
         <SelectValue placeholder={`Select ${field.label || field.name}`} />
       </SelectTrigger>
       <SelectContent className="max-h-60">

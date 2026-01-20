@@ -1400,9 +1400,18 @@ function CanvasContent({
           // Regular node click
           stateRef.current.componentSidebar.open(nodeId);
 
+          const nodeData = clickedNode?.data as {
+            component?: { error?: string };
+            composite?: { error?: string };
+            trigger?: { error?: string };
+          } | null;
+          const hasConfigurationWarning = Boolean(
+            nodeData?.component?.error || nodeData?.composite?.error || nodeData?.trigger?.error,
+          );
+
           // Reset to Runs tab when clicking on a regular node
           if (setCurrentTab) {
-            setCurrentTab("latest");
+            setCurrentTab(hasConfigurationWarning ? "settings" : "latest");
           }
 
           // Close building blocks sidebar when clicking on a regular node
@@ -1998,7 +2007,7 @@ function CanvasContent({
             <Panel
               position="bottom-left"
               className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex gap-0.5 rounded-sm p-0.5"
-              style={{ marginLeft: 304 }}
+              style={{ marginLeft: 288 }}
             >
               <Tooltip>
                 <TooltipTrigger asChild>

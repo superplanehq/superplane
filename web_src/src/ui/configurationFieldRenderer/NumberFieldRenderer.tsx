@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { FieldRendererProps } from "./types";
 
-export const NumberFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const NumberFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const numberOptions = field.typeOptions?.number;
 
   // Set initial value on first render if no value is present but there's a default
@@ -26,7 +26,7 @@ export const NumberFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
       placeholder={field.placeholder || ""}
       min={numberOptions?.min}
       max={numberOptions?.max}
-      className={hasError ? "border-red-500 border-2" : ""}
+      className=""
     />
   );
 };

@@ -8,7 +8,6 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
   onChange,
-  hasError,
   autocompleteExampleObj,
 }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
@@ -24,7 +23,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
           onChange(shouldPreserveEmpty ? nextValue : nextValue || undefined);
         }}
         placeholder={field.placeholder || ""}
-        className={hasError ? "border-red-500 border-2" : ""}
+        className=""
         data-testid={toTestId(`string-field-${field.name}`)}
       />
     );
@@ -40,7 +39,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
           onChange(shouldPreserveEmpty ? nextValue : nextValue || undefined);
         }}
         placeholder={field.placeholder || ""}
-        className={hasError ? "border-red-500 border-2" : ""}
+        className=""
         data-testid={toTestId(`string-field-${field.name}`)}
       />
     );
@@ -58,7 +57,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       inputSize="md"
       showValuePreview
       quickTip="Tip: type `{{` to start an expression."
-      className={hasError ? "after:ring-2 after:ring-red-500" : ""}
+      className=""
       data-testid={toTestId(`string-field-${field.name}`)}
     />
   );

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FieldRendererProps } from "./types";
 import { toTestId } from "@/utils/testID";
 
-export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const selectOptions = field.typeOptions?.select?.options ?? [];
   const hasSetDefault = useRef(false);
 
@@ -24,7 +24,7 @@ export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
       value={(value as string) ?? (field.defaultValue as string) ?? ""}
       onValueChange={(val) => onChange(val || undefined)}
     >
-      <SelectTrigger className={`w-full ${hasError ? "border-red-500 border-2" : ""}`} data-testid={testId}>
+      <SelectTrigger className="w-full" data-testid={testId}>
         <SelectValue placeholder={`Select ${field.label || field.name}`} />
       </SelectTrigger>
       <SelectContent className="max-h-60">

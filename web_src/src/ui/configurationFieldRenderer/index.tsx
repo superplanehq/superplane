@@ -211,7 +211,7 @@ export const ConfigurationFieldRenderer = ({
     }
 
     return hasError;
-  }, [allFieldErrors, isRequired, value, hasError, validationErrors, enableRealtimeValidation]);
+  }, [allFieldErrors, isRequired, value, validationErrors, enableRealtimeValidation]);
 
   if (!isVisible) {
     return null;
@@ -359,15 +359,9 @@ export const ConfigurationFieldRenderer = ({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          {isTogglable && (
-            <Switch
-              checked={isEnabled}
-              onCheckedChange={handleToggleChange}
-              className={`${hasFieldError ? "border-red-500 border-2" : ""}`}
-            />
-          )}
+          {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
           {isEnabled && renderField()}
-          <Label className={`text-left cursor-pointer ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
+          <Label className="text-left cursor-pointer">
             {field.label || field.name}
             {isRequired && <span className="text-gray-800 ml-1">*</span>}
             {hasFieldError &&
@@ -376,19 +370,22 @@ export const ConfigurationFieldRenderer = ({
                   validationErrors &&
                   isRequired &&
                   (value === undefined || value === null || value === ""))) && (
-                <span className="text-red-500 text-xs ml-2">- required field</span>
+                <span className="text-red-500 text-xs ml-2">Required</span>
               )}
           </Label>
         </div>
 
         {/* Display validation errors */}
-        {allFieldErrors.length > 0 && (
+        {allFieldErrors.filter((error) => error.message && !error.message.toLowerCase().includes("required")).length >
+          0 && (
           <div className="space-y-1">
-            {allFieldErrors.map((error, index) => (
-              <p key={index} className="text-xs text-red-500 dark:text-red-400 text-left">
-                {error.message}
-              </p>
-            ))}
+            {allFieldErrors
+              .filter((error) => error.message && !error.message.toLowerCase().includes("required"))
+              .map((error, index) => (
+                <p key={index} className="text-xs text-red-500 dark:text-red-400 text-left">
+                  {error.message}
+                </p>
+              ))}
           </div>
         )}
 
@@ -406,14 +403,8 @@ export const ConfigurationFieldRenderer = ({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        {isTogglable && (
-          <Switch
-            checked={isEnabled}
-            onCheckedChange={handleToggleChange}
-            className={`${hasFieldError ? "border-red-500 border-2" : ""}`}
-          />
-        )}
-        <Label className={`block text-left ${hasFieldError ? "text-red-600 dark:text-red-400" : ""}`}>
+        {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
+        <Label className="block text-left">
           {field.label || field.name}
           {isRequired && <span className="text-gray-800 ml-1">*</span>}
           {hasFieldError &&
@@ -422,7 +413,7 @@ export const ConfigurationFieldRenderer = ({
                 validationErrors &&
                 isRequired &&
                 (value === undefined || value === null || value === ""))) && (
-              <span className="text-red-500 text-xs ml-2">- required field</span>
+              <span className="text-red-500 text-xs ml-2">Required</span>
             )}
         </Label>
       </div>
@@ -433,13 +424,16 @@ export const ConfigurationFieldRenderer = ({
       )}
 
       {/* Display validation errors */}
-      {allFieldErrors.length > 0 && (
+      {allFieldErrors.filter((error) => error.message && !error.message.toLowerCase().includes("required")).length >
+        0 && (
         <div className="space-y-1">
-          {allFieldErrors.map((error, index) => (
-            <p key={index} className="text-xs text-red-500 dark:text-red-400 text-left">
-              {error.message}
-            </p>
-          ))}
+          {allFieldErrors
+            .filter((error) => error.message && !error.message.toLowerCase().includes("required"))
+            .map((error, index) => (
+              <p key={index} className="text-xs text-red-500 dark:text-red-400 text-left">
+                {error.message}
+              </p>
+            ))}
         </div>
       )}
 

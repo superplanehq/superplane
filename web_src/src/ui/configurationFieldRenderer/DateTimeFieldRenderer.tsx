@@ -2,13 +2,7 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { FieldRendererProps } from "./types";
 
-export const DateTimeFieldRenderer: React.FC<FieldRendererProps> = ({
-  field,
-  value,
-  onChange,
-  hasError,
-  allValues = {},
-}) => {
+export const DateTimeFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, allValues = {} }) => {
   // Calculate min/max datetime based on other fields for components like time gates
   const getDateTimeConstraints = React.useMemo(() => {
     // For endDateTime field in time gates, prevent selecting datetimes before startDateTime
@@ -30,7 +24,7 @@ export const DateTimeFieldRenderer: React.FC<FieldRendererProps> = ({
       value={(value as string) ?? (field.defaultValue as string) ?? ""}
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder="YYYY-MM-DDTHH:MM"
-      className={hasError ? "border-red-500 border-2" : ""}
+      className=""
       min={getDateTimeConstraints.min}
       max={getDateTimeConstraints.max}
     />

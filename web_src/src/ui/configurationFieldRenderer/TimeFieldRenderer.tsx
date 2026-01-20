@@ -3,13 +3,7 @@ import { Input } from "@/components/ui/input";
 import { FieldRendererProps } from "./types";
 import { toTestId } from "@/utils/testID";
 
-export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({
-  field,
-  value,
-  onChange,
-  hasError,
-  allValues = {},
-}) => {
+export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, allValues = {} }) => {
   useEffect(() => {
     if ((value === undefined || value === null) && field.defaultValue !== undefined) {
       const defaultVal = field.defaultValue as string;
@@ -40,7 +34,7 @@ export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({
       value={(value as string) ?? (field.defaultValue as string) ?? ""}
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder={field.typeOptions?.time?.format || "HH:MM"}
-      className={hasError ? "border-red-500 border-2" : ""}
+      className=""
       min={getTimeConstraints.min}
       max={getTimeConstraints.max}
       data-testid={toTestId(`time-field-${field.name}`)}

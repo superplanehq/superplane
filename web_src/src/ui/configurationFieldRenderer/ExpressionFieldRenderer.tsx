@@ -8,7 +8,6 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
   onChange,
-  hasError,
   autocompleteExampleObj,
 }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
@@ -20,7 +19,7 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
         value={currentValue}
         onChange={(e) => onChange(e.target.value || undefined)}
         placeholder={field.placeholder || ""}
-        className={hasError ? "border-red-500 border-2" : ""}
+        className=""
         data-testid={toTestId(`expression-field-${field.name}`)}
       />
     );
@@ -33,7 +32,7 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
         value={currentValue}
         onChange={(e) => onChange(e.target.value || undefined)}
         placeholder={field.placeholder || ""}
-        className={hasError ? "border-red-500 border-2" : ""}
+        className=""
         data-testid={toTestId(`expression-field-${field.name}`)}
       />
     );
@@ -48,7 +47,7 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
       inputSize="md"
       showValuePreview
       quickTip="Tip: type `$` to browse node outputs."
-      className={hasError ? "after:ring-2 after:ring-red-500" : ""}
+      className=""
       data-testid={toTestId(`expression-field-${field.name}`)}
     />
   );

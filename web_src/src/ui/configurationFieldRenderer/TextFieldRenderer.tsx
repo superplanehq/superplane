@@ -6,13 +6,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
-export const TextFieldRenderer: React.FC<FieldRendererProps> = ({
-  field,
-  value,
-  onChange,
-  hasError,
-  autocompleteExampleObj,
-}) => {
+export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, autocompleteExampleObj }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
@@ -67,7 +61,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({
     <>
       <div className="flex flex-col gap-2 relative">
         <div
-          className={`border rounded-md overflow-hidden ${hasError ? "border-red-500 border-2" : "border-gray-300 dark:border-gray-700"}`}
+          className="border rounded-md overflow-hidden border-gray-300 dark:border-gray-700"
           style={{ height: "200px" }}
         >
           <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">

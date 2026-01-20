@@ -1,8 +1,8 @@
 import React from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FieldRendererProps } from "./types";
 
-export const DayInYearFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const DayInYearFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
 
   // Parse current MM/DD value
@@ -58,7 +58,7 @@ export const DayInYearFieldRenderer: React.FC<FieldRendererProps> = ({ field, va
   return (
     <div className="flex gap-2">
       <Select value={currentMonth ? currentMonth.toString() : ""} onValueChange={handleMonthChange}>
-        <SelectTrigger className={`flex-1 ${hasError ? "border-red-500 border-2" : ""}`}>
+        <SelectTrigger className="flex-1">
           <SelectValue placeholder="Month" />
         </SelectTrigger>
         <SelectContent className="max-h-60">
@@ -71,7 +71,7 @@ export const DayInYearFieldRenderer: React.FC<FieldRendererProps> = ({ field, va
       </Select>
 
       <Select value={currentDay ? currentDay.toString() : ""} onValueChange={handleDayChange} disabled={!currentMonth}>
-        <SelectTrigger className={`flex-1 ${hasError ? "border-red-500 border-2" : ""}`}>
+        <SelectTrigger className="flex-1">
           <SelectValue placeholder="Day" />
         </SelectTrigger>
         <SelectContent className="max-h-60">

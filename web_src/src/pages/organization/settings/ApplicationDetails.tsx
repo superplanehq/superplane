@@ -13,10 +13,11 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { resolveIcon } from "@/lib/utils";
+import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
+import slackIcon from "@/assets/icons/integrations/slack.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface ApplicationDetailsProps {
@@ -34,12 +35,13 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
   const { data: availableApps = [] } = useAvailableApplications();
   const appDefinition = installation ? availableApps.find((app) => app.name === installation.spec?.appName) : undefined;
   const appLogoMap: Record<string, string> = {
+    dash0: dash0Icon,
     github: githubIcon,
     openai: openAiIcon,
     "open-ai": openAiIcon,
-    semaphore: SemaphoreLogo,
     pagerduty: pagerDutyIcon,
-    dash0: dash0Icon,
+    semaphore: SemaphoreLogo,
+    slack: slackIcon,
   };
 
   const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {
