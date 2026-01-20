@@ -2882,7 +2882,7 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
   return {
     id: node.id!,
     position: { x: node.position?.x!, y: node.position?.y! },
-    selectable: false,
+    style: { width: 320, height: 170 },
     data: {
       type: "annotation",
       label: node.name || "Annotation",

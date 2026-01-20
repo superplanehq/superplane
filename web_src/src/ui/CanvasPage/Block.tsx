@@ -87,7 +87,6 @@ export function Block(props: BlockProps) {
         <NodeResizer
           minWidth={200}
           minHeight={100}
-          isVisible={props.selected}
           lineClassName="!border-sky-500"
           handleClassName="!w-3 !h-3 !bg-sky-500"
         />
