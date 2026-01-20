@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { twMerge } from "tailwind-merge";
 import { getSuggestions } from "./core";
 
@@ -43,12 +44,18 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const [highlightedValue, setHighlightedValue] = useState<unknown>(undefined);
     const [cursorPosition, setCursorPosition] = useState(0);
+    const [dropdownPosition, setDropdownPosition] = useState<{
+      top: number;
+      left: number;
+    }>({ top: 0, left: 0 });
+    const dropdownWidth = 350;
     const previousWordLength = useRef<number>(0);
     const previousInputValue = useRef<string>(value);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const mirrorRef = useRef<HTMLSpanElement>(null);
     useImperativeHandle(forwardedRef, () => inputRef.current as HTMLInputElement);
 
     const getWordAtCursor = (text: string, position: number) => {
@@ -417,6 +424,54 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       [exampleObj],
     );
 
+    const measureCursorPixelPosition = useCallback(() => {
+      if (!inputRef.current || !mirrorRef.current) return;
+
+      const input = inputRef.current;
+      const mirror = mirrorRef.current;
+      const computed = getComputedStyle(input);
+
+      // Copy relevant styles to mirror element
+      mirror.style.font = computed.font;
+      mirror.style.fontSize = computed.fontSize;
+      mirror.style.fontFamily = computed.fontFamily;
+      mirror.style.fontWeight = computed.fontWeight;
+      mirror.style.letterSpacing = computed.letterSpacing;
+      mirror.style.textTransform = computed.textTransform;
+
+      // Set content to text before cursor
+      const textBeforeCursor = inputValue.substring(0, cursorPosition);
+      mirror.textContent = textBeforeCursor || "\u200b"; // Use zero-width space if empty
+
+      // Measure the width and account for input's left padding
+      const paddingLeft = parseFloat(computed.paddingLeft) || 0;
+      const cursorOffset = mirror.offsetWidth + paddingLeft;
+
+      // Calculate cursor position relative to viewport
+      const inputRect = input.getBoundingClientRect();
+      const cursorScreenX = inputRect.left + cursorOffset;
+      const viewportWidth = window.innerWidth;
+      const edgePadding = 16; // Padding from screen edge
+
+      // Check if dropdown fits on the right of the cursor
+      const spaceOnRightOfScreen = viewportWidth - cursorScreenX - edgePadding;
+      const shouldFlipLeft = spaceOnRightOfScreen < dropdownWidth;
+
+      // Calculate absolute position for portal
+      const dropdownTop = inputRect.bottom + 4; // 4px gap below input
+      const dropdownLeft = shouldFlipLeft ? cursorScreenX - dropdownWidth : cursorScreenX;
+
+      setDropdownPosition({
+        top: dropdownTop,
+        left: dropdownLeft,
+      });
+    }, [inputValue, cursorPosition, dropdownWidth]);
+
+    // Measure cursor pixel position when cursor or input changes
+    useEffect(() => {
+      measureCursorPixelPosition();
+    }, [measureCursorPixelPosition]);
+
     useEffect(() => {
       setInputValue(value);
     }, [value]);
@@ -617,6 +672,19 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
 
     return (
       <div ref={containerRef} className={"relative w-full" + (quickTip ? " mb-3" : "")}>
+        {/* Hidden mirror element for measuring cursor position */}
+        <span
+          ref={mirrorRef}
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            visibility: "hidden",
+            whiteSpace: "pre",
+            pointerEvents: "none",
+            top: 0,
+            left: 0,
+          }}
+        />
         {/* Input Field */}
         <span
           data-slot="control"
@@ -675,61 +743,72 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           )}
         </span>
 
-        {/* Suggestions Dropdown */}
-        {isOpen && suggestions.length > 0 && (
-          <div ref={suggestionsRef} className={twMerge(["absolute z-50 w-full mt-1 bg-transparent"])}>
-            <div className="flex flex-col sm:flex-row">
-              <div className="flex-1 overflow-auto bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 sm:rounded-lg rounded-t-lg sm:rounded-tr-none max-h-60 shadow-lg">
-                {suggestions.map((suggestionItem, index) => (
-                  <div
-                    key={`${suggestionItem.kind}-${suggestionItem.label}-${index}`}
-                    className={twMerge([
-                      "px-3 py-2 cursor-pointer text-sm flex justify-between items-center",
-                      "hover:bg-gray-100 dark:hover:bg-gray-700",
-                      "text-gray-950 dark:text-white",
-                      highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
-                    ])}
-                    onClick={() => handleSuggestionClick(suggestionItem)}
-                    onMouseEnter={() => {
-                      setHighlightedIndex(index);
-                      if (exampleObj) {
-                        const cursorPosition = inputRef.current?.selectionStart || 0;
-                        const context = getExpressionContext(inputValue, cursorPosition);
-                        const value = computeHighlightedValue(suggestionItem, context);
-                        setHighlightedValue(value);
-                      }
-                    }}
-                  >
-                    <span>
-                      {suggestionItem.label}
-                      {suggestionItem.kind === "function" && (
-                        <span className="ml-2 text-gray-500">{formatFunctionSignature(suggestionItem)}</span>
-                      )}
-                      {suggestionItem.kind !== "function" && suggestionItem.labelDetail && (
-                        <span className="ml-2 text-gray-500">{suggestionItem.labelDetail}</span>
-                      )}
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                      {suggestionItem.detail ?? suggestionItem.kind}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {shouldShowValuePreview && isOpen && (
-                <div className="border border-gray-200 dark:border-gray-700 sm:border-l-0 sm:border-t sm:max-w-[240px] sm:min-w-[200px] p-3 bg-gray-100 dark:bg-gray-700 sm:rounded-r-lg rounded-b-lg sm:rounded-bl-none h-fit self-start shadow-lg">
-                  <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Value Preview</div>
-                  <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
-                    {highlightedValue === null
-                      ? "null"
-                      : typeof highlightedValue === "string"
-                        ? `"${highlightedValue}"`
-                        : String(highlightedValue)}
-                  </div>
+        {/* Suggestions Dropdown - rendered in portal to escape overflow:hidden */}
+        {isOpen &&
+          suggestions.length > 0 &&
+          createPortal(
+            <div
+              ref={suggestionsRef}
+              className="fixed z-[9999] bg-transparent"
+              style={{
+                top: `${dropdownPosition.top}px`,
+                left: `${dropdownPosition.left}px`,
+                width: `${dropdownWidth}px`,
+              }}
+            >
+              <div className="flex flex-col sm:flex-row">
+                <div className="flex-1 overflow-auto bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 sm:rounded-lg rounded-t-lg sm:rounded-tr-none max-h-60 shadow-lg">
+                  {suggestions.map((suggestionItem, index) => (
+                    <div
+                      key={`${suggestionItem.kind}-${suggestionItem.label}-${index}`}
+                      className={twMerge([
+                        "px-3 py-2 cursor-pointer text-sm flex justify-between items-center",
+                        "hover:bg-gray-100 dark:hover:bg-gray-700",
+                        "text-gray-950 dark:text-white",
+                        highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
+                      ])}
+                      onClick={() => handleSuggestionClick(suggestionItem)}
+                      onMouseEnter={() => {
+                        setHighlightedIndex(index);
+                        if (exampleObj) {
+                          const cursorPosition = inputRef.current?.selectionStart || 0;
+                          const context = getExpressionContext(inputValue, cursorPosition);
+                          const value = computeHighlightedValue(suggestionItem, context);
+                          setHighlightedValue(value);
+                        }
+                      }}
+                    >
+                      <span>
+                        {suggestionItem.label}
+                        {suggestionItem.kind === "function" && (
+                          <span className="ml-2 text-gray-500">{formatFunctionSignature(suggestionItem)}</span>
+                        )}
+                        {suggestionItem.kind !== "function" && suggestionItem.labelDetail && (
+                          <span className="ml-2 text-gray-500">{suggestionItem.labelDetail}</span>
+                        )}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                        {suggestionItem.detail ?? suggestionItem.kind}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+                {shouldShowValuePreview && isOpen && (
+                  <div className="border border-gray-200 dark:border-gray-700 sm:border-l-0 sm:border-t sm:max-w-[240px] sm:min-w-[200px] p-3 bg-gray-100 dark:bg-gray-700 sm:rounded-r-lg rounded-b-lg sm:rounded-bl-none h-fit self-start shadow-lg">
+                    <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Value Preview</div>
+                    <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
+                      {highlightedValue === null
+                        ? "null"
+                        : typeof highlightedValue === "string"
+                          ? `"${highlightedValue}"`
+                          : String(highlightedValue)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>,
+            document.body,
+          )}
 
         {/* Empty State */}
         {isOpen && suggestions.length === 0 && inputValue && (
