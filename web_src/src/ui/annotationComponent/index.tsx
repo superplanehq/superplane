@@ -158,10 +158,10 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
       <div
         ref={containerRef}
         className={cn(
-          "group relative flex flex-col rounded-md shadow-md outline outline-gray-950/10 h-full",
+          "group relative flex flex-col rounded-md shadow-md outline outline-gray-950/10",
           colorStyles.container,
         )}
-        style={{ width: width, minHeight: height }}
+        style={{ width: width, height: height }}
       >
         <div className={cn("canvas-node-drag-handle h-5 w-full rounded-t-md cursor-grab", colorStyles.background)}>
           <div className="flex h-full w-full flex-col items-stretch justify-center gap-0.5 px-2">
