@@ -130,8 +130,7 @@ spec:
    - Run `make dev.start` to restart
 
 3. **Verify the template**
-   - Navigate to your local SuperPlane instance
-   - By default, this is http://localhost:8000 when using `make dev.start` (configurable via the `BASE_URL` environment variable)
+   - Navigate to your local SuperPlane instance (typically http://localhost:8000 when using `make dev.start`)
    - Click "Create Canvas" or similar action
    - Your template should appear in the template selection list
 
