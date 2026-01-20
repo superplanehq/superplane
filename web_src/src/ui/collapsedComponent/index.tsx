@@ -8,7 +8,6 @@ export interface CollapsedComponentProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
-  iconBackground?: string;
   title: string;
   collapsedBackground?: string;
   shape?: "rounded" | "circle";
@@ -21,7 +20,6 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   iconSrc,
   iconSlug,
   iconColor,
-  iconBackground,
   title,
   collapsedBackground,
   shape = "rounded",
@@ -50,9 +48,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
         className={`canvas-node-drag-handle flex h-20 w-20 items-center justify-center outline-1 outline-slate-400 ${containerClass} ${collapsedBackground || ""}`}
       >
         {iconSrc ? (
-          <div
-            className={`w-16 h-16 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
-          >
+          <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center">
             <img src={iconSrc} alt={title} className="h-12 w-12 object-contain" />
           </div>
         ) : (

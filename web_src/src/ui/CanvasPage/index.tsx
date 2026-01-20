@@ -50,7 +50,6 @@ export interface SidebarData {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
-  iconBackground?: string;
   totalInQueueCount: number;
   totalInHistoryCount: number;
   hideQueueEvents?: boolean;
@@ -1071,7 +1070,6 @@ function Sidebar({
       iconSrc={sidebarData.iconSrc}
       iconSlug={isAnnotationNode ? "sticky-note" : sidebarData.iconSlug}
       iconColor={isAnnotationNode ? "text-yellow-600" : sidebarData.iconColor}
-      iconBackground={isAnnotationNode ? "bg-yellow-100" : sidebarData.iconBackground}
       totalInQueueCount={sidebarData.totalInQueueCount}
       totalInHistoryCount={sidebarData.totalInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}

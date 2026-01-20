@@ -18,8 +18,6 @@ const createTriggerProps = (
 const GithubProps: TriggerProps = createTriggerProps({
   title: "GitHub",
   iconSrc: githubIcon,
-  iconBackground: "bg-black",
-  headerColor: "bg-white",
   metadata: [
     {
       icon: "book",
@@ -53,7 +51,6 @@ type Story = StoryObj<typeof meta>;
 const DockerHubProps: TriggerProps = createTriggerProps({
   title: "DockerHub",
   iconSrc: dockerIcon,
-  headerColor: "bg-sky-100",
   metadata: [
     {
       icon: "box",

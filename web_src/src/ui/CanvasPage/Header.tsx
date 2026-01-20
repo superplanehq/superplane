@@ -14,7 +14,6 @@ export interface BreadcrumbItem {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
-  iconBackground?: string;
 }
 
 interface HeaderProps {

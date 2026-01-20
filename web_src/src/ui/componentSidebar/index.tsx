@@ -52,7 +52,6 @@ interface ComponentSidebarProps {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
-  iconBackground?: string;
   totalInQueueCount: number;
   totalInHistoryCount: number;
   hideQueueEvents?: boolean;

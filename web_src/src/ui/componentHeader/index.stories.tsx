@@ -18,7 +18,6 @@ const triggerHeader: ComponentHeaderProps = createHeaderProps({
   description: "Deploy your application to the production environment",
   iconSlug: "rocket",
   iconColor: "text-green-700",
-  headerColor: "bg-green-100",
 });
 
 const approvalHeader: ComponentHeaderProps = createHeaderProps({
@@ -26,7 +25,6 @@ const approvalHeader: ComponentHeaderProps = createHeaderProps({
   description: "New releases are deployed to staging for testing and require approvals.",
   iconSlug: "hand",
   iconColor: "text-orange-500",
-  headerColor: "bg-orange-100",
 });
 
 const compositeHeader: ComponentHeaderProps = createHeaderProps({
@@ -34,15 +32,12 @@ const compositeHeader: ComponentHeaderProps = createHeaderProps({
   description: "Build new release of the monarch app and runs all required tests",
   iconSlug: "git-branch",
   iconColor: "text-purple-700",
-  headerColor: "bg-purple-100",
 });
 
 const headerWithImage: ComponentHeaderProps = createHeaderProps({
   title: "Kubernetes Deployment",
   description: "Deploy to Kubernetes cluster",
   iconSrc: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/kubernetes/kubernetes-plain.svg",
-  iconBackground: "bg-blue-500",
-  headerColor: "bg-blue-100",
 });
 
 const meta: Meta<typeof ComponentHeader> = {
@@ -78,7 +73,6 @@ export const WithoutDescription: Story = {
     title: "Simple Header",
     iconSlug: "settings",
     iconColor: "text-gray-700",
-    headerColor: "bg-white",
   }),
 };
 
@@ -88,7 +82,6 @@ export const WithActionsDropdown: Story = {
     description: "This header includes action dropdown functionality",
     iconSlug: "cog",
     iconColor: "text-blue-700",
-    headerColor: "bg-blue-100",
     onRun: () => {
       console.log("Run action triggered");
     },

@@ -116,8 +116,6 @@ function buildCanvasNode(
       composite: {
         iconSlug: comp?.icon || blueprint?.icon || "box",
         iconColor: getColorClass(color),
-        iconBackground: getBackgroundColorClass(color),
-        headerColor: "",
         collapsedBackground: getBackgroundColorClass(color),
         collapsed: node.isCollapsed || false,
         title: label,
@@ -215,7 +213,6 @@ function useBreadcrumbs() {
       label: nodeName,
       iconSlug: iconSlug || "boxes",
       iconColor: getColorClass(color || "indigo"),
-      iconBackground: getBackgroundColorClass(color || "indigo"),
     },
     ...(latestRunTitle ? [{ label: latestRunTitle }] : []),
   ];

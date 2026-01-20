@@ -36,7 +36,6 @@ const sampleNodes: Node[] = [
         description: "",
         iconSlug: "database",
         iconColor: "text-green-700",
-        headerColor: "bg-green-100",
         collapsedBackground: "bg-green-100",
         metadata: [
           { icon: "check-circle", label: "Connection: Healthy" },
@@ -83,7 +82,6 @@ const sampleNodes: Node[] = [
         description: "",
         iconSlug: "cpu",
         iconColor: "text-green-700",
-        headerColor: "bg-green-100",
         collapsedBackground: "bg-green-100",
         metadata: [
           { icon: "cpu", label: "CPU: 45%" },
@@ -125,7 +123,6 @@ const sampleNodes: Node[] = [
         description: "",
         iconSlug: "trending-up",
         iconColor: "text-green-700",
-        headerColor: "bg-green-100",
         collapsedBackground: "bg-green-100",
         metadata: [
           { icon: "activity", label: "Requests/sec: 1,247 req/s" },

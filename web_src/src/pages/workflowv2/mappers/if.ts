@@ -100,7 +100,6 @@ export const ifMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: "split",
-      headerColor: "",
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
       title: node.name!,

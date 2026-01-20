@@ -37,8 +37,6 @@ const ephemeralNodes: Node[] = [
       trigger: {
         title: "GitHub",
         iconSrc: githubIcon,
-        iconBackground: "bg-black",
-        headerColor: "bg-white",
         collapsedBackground: "bg-black",
         metadata: [
           { icon: "book", label: "monarch-app" },
@@ -64,7 +62,6 @@ const ephemeralNodes: Node[] = [
         title: "Provision/Deprovision Environment",
         iconSlug: "play",
         iconColor: "text-purple-700",
-        headerColor: "bg-purple-100",
         collapsedBackground: "bg-purple-100",
         metadata: [
           {
@@ -92,7 +89,6 @@ const ephemeralNodes: Node[] = [
         title: "Provisioner",
         iconSlug: "boxes",
         iconColor: "text-blue-700",
-        headerColor: "bg-blue-100",
         collapsedBackground: "bg-blue-100",
         parameters: [
           { icon: "settings", items: { TTL: "2d 15h" } },
@@ -282,7 +278,6 @@ const ephemeralNodes: Node[] = [
         title: "Deprovisioner",
         iconSlug: "trash-2",
         iconColor: "text-red-700",
-        headerColor: "bg-red-100",
         collapsedBackground: "bg-red-100",
         metadata: [
           { icon: "trash", label: "Cleaned: 127 environments" },

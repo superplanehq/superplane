@@ -19,7 +19,6 @@ const BuildTestDeployStage: CompositeProps = createCompositeProps({
   description: "Build new release of the monarch app and runs all required tests",
   iconSlug: "git-branch",
   iconColor: "text-purple-700",
-  headerColor: "bg-purple-100",
   parameters: [],
   lastRunItem: {
     title: "fix: open rejected events tabs",
@@ -50,8 +49,6 @@ const DeployToEu: CompositeProps = createCompositeProps({
   title: "Deploy to EU",
   description: "Deploy your application to the EU region",
   iconSrc: KubernetesIcon,
-  headerColor: "bg-blue-100",
-  iconBackground: "bg-blue-500",
   parameters: [{ icon: "map", items: { region: "eu-global-1, eu-global-2" } }],
   lastRunItem: {
     title: "fix: open rejected events",
@@ -93,8 +90,6 @@ const DeployToEu: CompositeProps = createCompositeProps({
 const DeployToUS: CompositeProps = createCompositeProps({
   title: "Deploy to US",
   iconSrc: KubernetesIcon,
-  headerColor: "bg-blue-100",
-  iconBackground: "bg-blue-500",
   parameters: [{ icon: "map", items: { region: "us-west-1, us-east-1" } }],
   lastRunItem: {
     title: "FEAT-984: Autocomplete",
@@ -120,8 +115,6 @@ const DeployToUS: CompositeProps = createCompositeProps({
 const DeployToAsia: CompositeProps = createCompositeProps({
   title: "Deploy to Asia",
   iconSrc: KubernetesIcon,
-  headerColor: "bg-blue-100",
-  iconBackground: "bg-blue-500",
   parameters: [{ icon: "map", items: { region: "asia-east-1" } }],
   lastRunItem: {
     title: "fix: open rejected events",
@@ -144,7 +137,6 @@ const NoExecutionsZeroState: CompositeProps = createCompositeProps({
   description: "A freshly created pipeline stage awaiting its first execution",
   iconSlug: "play-circle",
   iconColor: "text-gray-500",
-  headerColor: "bg-white",
   parameters: [{ icon: "settings", items: { environment: "production" } }],
   collapsed: false,
 });

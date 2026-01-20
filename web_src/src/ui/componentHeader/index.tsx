@@ -7,9 +7,7 @@ import { ComponentActionsProps } from "../types/componentActions";
 export interface ComponentHeaderProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
-  iconBackground?: string;
   iconColor?: string;
-  headerColor: string;
   title: string;
   onDoubleClick?: () => void;
   hideActionsButton?: boolean;
@@ -18,9 +16,7 @@ export interface ComponentHeaderProps extends ComponentActionsProps {
 export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   iconSrc,
   iconSlug,
-  iconBackground,
   iconColor,
-  headerColor,
   title,
   onDoubleClick,
   onRun,
@@ -43,13 +39,12 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
     <div
       data-testid={toTestId(`node-${title}-header`)}
       className={
-        "canvas-node-drag-handle text-left text-lg w-full px-2 py-1.5 flex items-center flex-col border-b border-slate-400 rounded-t-md items-center relative " +
-        headerColor
+        "canvas-node-drag-handle text-left text-lg w-full px-2 py-1.5 flex items-center flex-col border-b border-slate-400 rounded-t-md items-center relative"
       }
       onDoubleClick={onDoubleClick}
     >
       <div className="w-full flex items-center">
-        <div className={`w-4 h-4 overflow-hidden flex items-center justify-center mr-2 ${iconBackground || ""}`}>
+        <div className="w-4 h-4 overflow-hidden flex items-center justify-center mr-2">
           {iconSrc ? (
             <img src={iconSrc} alt={title} className="max-w-5 max-h-5 object-contain" />
           ) : (

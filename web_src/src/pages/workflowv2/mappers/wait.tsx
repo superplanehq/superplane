@@ -61,7 +61,6 @@ export const waitMapper: ComponentBaseMapper = {
     return {
       iconSlug: componentDefinition.icon || "circle-off",
       iconColor: "text-gray-800",
-      headerColor: "",
       metadata: getWaitMetadataList(node),
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",

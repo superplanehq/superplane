@@ -49,8 +49,6 @@ export interface CompositeProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
-  iconBackground?: string;
-  headerColor: string;
   title: string;
   metadata?: MetadataItem[];
   parameters?: ParameterGroup[];
@@ -74,8 +72,6 @@ export const Composite: React.FC<CompositeProps> = ({
   iconSrc,
   iconSlug,
   iconColor,
-  iconBackground,
-  headerColor,
   title,
   metadata,
   parameters = [],
@@ -211,8 +207,6 @@ export const Composite: React.FC<CompositeProps> = ({
       iconSrc={iconSrc}
       iconSlug={iconSlug}
       iconColor={iconColor}
-      iconBackground={iconBackground}
-      headerColor={headerColor}
       title={title}
       metadata={metadata}
       specs={specs}

@@ -40,9 +40,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
     const props: TriggerProps = {
       title: node.name!,
       iconSrc: githubIcon,
-      iconBackground: "bg-white",
       iconColor: getColorClass(trigger.color),
-      headerColor: "",
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: createGithubMetadataItems(metadata?.repository?.name, configuration?.refs),
     };

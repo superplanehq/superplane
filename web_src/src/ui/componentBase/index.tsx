@@ -207,8 +207,6 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
-  iconBackground?: string;
-  headerColor?: string;
   title: string;
   specs?: ComponentBaseSpec[];
   hideCount?: boolean;
@@ -234,8 +232,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   iconSrc,
   iconSlug,
   iconColor,
-  iconBackground,
-  headerColor,
   title,
   specs,
   collapsed = false,
@@ -275,7 +271,11 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
             {onRun && (
               <button
                 type="button"
-                onClick={onRun}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onRun();
+                }}
                 disabled={runDisabled}
                 className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -286,7 +286,11 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
             {onDelete && (
               <button
                 type="button"
-                onClick={onDelete}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onDelete();
+                }}
                 className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
               >
                 <DeleteIcon className="h-4 w-4" />
@@ -297,7 +301,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
             iconSrc={iconSrc}
             iconSlug={iconSlug}
             iconColor={iconColor}
-            iconBackground={iconBackground}
             title={title}
             collapsedBackground={collapsedBackground}
             shape="circle"
@@ -363,7 +366,11 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           {onRun && (
             <button
               type="button"
-              onClick={onRun}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onRun();
+              }}
               disabled={runDisabled}
               className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -374,7 +381,11 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           {onDelete && (
             <button
               type="button"
-              onClick={onDelete}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onDelete();
+              }}
               className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
             >
               <DeleteIcon className="h-4 w-4" />
@@ -384,9 +395,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
-          iconBackground={iconBackground}
           iconColor={iconColor}
-          headerColor={headerColor || ""}
           title={title}
           onDoubleClick={onToggleCollapse}
           onRun={onRun}

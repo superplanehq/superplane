@@ -14,7 +14,6 @@ export const mockNodes: Node[] = [
       component: {
         title: "Check Environment",
         iconSlug: "split",
-        headerColor: "bg-white",
         specs: [
           {
             title: "condition",
@@ -52,7 +51,6 @@ export const mockNodes: Node[] = [
         description: "Get approval before deploying to production",
         iconSlug: "hand",
         iconColor: "text-orange-500",
-        headerColor: "bg-orange-100",
         collapsedBackground: "bg-orange-100",
         collapsed: false,
         specs: [
@@ -94,7 +92,6 @@ export const mockNodes: Node[] = [
       component: {
         title: "Filter Services",
         iconSlug: "filter",
-        headerColor: "bg-white",
         specs: [
           {
             title: "filter",
@@ -125,7 +122,6 @@ export const mockNodes: Node[] = [
       component: {
         title: "Skip Approval",
         iconSlug: "circle-off",
-        headerColor: "bg-white",
         collapsed: false,
         eventSections: [
           {
