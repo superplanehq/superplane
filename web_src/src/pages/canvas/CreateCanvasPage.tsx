@@ -11,7 +11,8 @@ import { Button } from "../../components/ui/button";
 import { useCreateWorkflow, useWorkflowTemplates } from "../../hooks/useWorkflowData";
 import { showErrorToast } from "../../utils/toast";
 import type { ComponentsEdge, ComponentsNode } from "@/api-client";
-import { Rainbow } from "lucide-react";
+import { Rainbow, FileUp } from "lucide-react";
+import * as yaml from "js-yaml";
 
 const MAX_CANVAS_NAME_LENGTH = 50;
 const MAX_CANVAS_DESCRIPTION_LENGTH = 200;
@@ -24,13 +25,67 @@ export function CreateCanvasPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [nameError, setNameError] = useState("");
+  const [yamlContent, setYamlContent] = useState("");
+  const [yamlError, setYamlError] = useState("");
+  const [useYamlMode, setUseYamlMode] = useState(false);
 
   const createMutation = useCreateWorkflow(organizationId || "");
   const { data: workflowTemplates = [] } = useWorkflowTemplates(organizationId || "");
 
   const handleSubmit = async () => {
     setNameError("");
+    setYamlError("");
 
+    if (useYamlMode) {
+      // Parse and validate YAML
+      if (!yamlContent.trim()) {
+        setYamlError("YAML content is required");
+        return;
+      }
+
+      try {
+        const parsed = yaml.load(yamlContent) as any;
+
+        if (!parsed) {
+          setYamlError("Invalid YAML format");
+          return;
+        }
+
+        if (parsed.kind !== "Canvas") {
+          setYamlError("YAML must be of kind: Canvas");
+          return;
+        }
+
+        if (!parsed.metadata?.name) {
+          setYamlError("Canvas name is required in metadata");
+          return;
+        }
+
+        if (!organizationId) {
+          showErrorToast("Organization ID is missing");
+          return;
+        }
+
+        const result = await createMutation.mutateAsync({
+          name: parsed.metadata.name,
+          description: parsed.metadata.description || undefined,
+          nodes: parsed.spec?.nodes || [],
+          edges: parsed.spec?.edges || [],
+        });
+
+        if (result?.data?.workflow?.metadata?.id) {
+          navigate(`/${organizationId}/workflows/${result.data.workflow.metadata.id}`);
+        }
+      } catch (error) {
+        console.error("Error creating canvas from YAML:", error);
+        const errorMessage = (error as Error)?.message || error?.toString() || "Failed to parse YAML";
+        setYamlError(errorMessage);
+        showErrorToast(errorMessage);
+      }
+      return;
+    }
+
+    // Regular form submission
     if (!name.trim()) {
       setNameError("Name is required");
       return;
@@ -89,64 +144,147 @@ export function CreateCanvasPage() {
             </div>
 
             <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
-              <Field>
-                <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Canvas name *</Label>
-                <Input
-                  data-testid="canvas-name-input"
-                  type="text"
-                  autoComplete="off"
-                  value={name}
-                  onChange={(e) => {
-                    if (e.target.value.length <= MAX_CANVAS_NAME_LENGTH) {
-                      setName(e.target.value);
-                    }
-                    if (nameError) {
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Creation mode</Label>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={!useYamlMode ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setUseYamlMode(false);
+                      setYamlError("");
+                    }}
+                    type="button"
+                  >
+                    Form
+                  </Button>
+                  <Button
+                    variant={useYamlMode ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setUseYamlMode(true);
                       setNameError("");
-                    }
-                  }}
-                  placeholder=""
-                  className={`w-full ${nameError ? "border-red-500" : ""}`}
-                  autoFocus
-                  maxLength={MAX_CANVAS_NAME_LENGTH}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSubmit();
-                    }
-                  }}
-                />
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {name.length}/{MAX_CANVAS_NAME_LENGTH} characters
+                    }}
+                    type="button"
+                  >
+                    <FileUp className="w-4 h-4 mr-1" />
+                    Import YAML
+                  </Button>
                 </div>
-                {nameError && <div className="text-xs text-red-600 mt-1">{nameError}</div>}
-              </Field>
+              </div>
 
-              <Field>
-                <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</Label>
-                <Textarea
-                  value={description}
-                  onChange={(e) => {
-                    if (e.target.value.length <= MAX_CANVAS_DESCRIPTION_LENGTH) {
-                      setDescription(e.target.value);
-                    }
-                  }}
-                  placeholder="Describe what it does (optional)"
-                  rows={3}
-                  className="w-full"
-                  maxLength={MAX_CANVAS_DESCRIPTION_LENGTH}
-                />
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {description.length}/{MAX_CANVAS_DESCRIPTION_LENGTH} characters
-                </div>
-              </Field>
+              {useYamlMode ? (
+                <Field>
+                  <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Canvas YAML *
+                  </Label>
+                  <Textarea
+                    data-testid="canvas-yaml-input"
+                    value={yamlContent}
+                    onChange={(e) => {
+                      setYamlContent(e.target.value);
+                      if (yamlError) {
+                        setYamlError("");
+                      }
+                    }}
+                    placeholder={`apiVersion: v1
+kind: Canvas
+metadata:
+  name: my-canvas
+  description: Optional description
+spec:
+  nodes: []
+  edges: []`}
+                    rows={15}
+                    className={`w-full font-mono text-sm ${yamlError ? "border-red-500" : ""}`}
+                  />
+                  {yamlError && <div className="text-xs text-red-600 mt-1">{yamlError}</div>}
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    Paste your Canvas YAML definition here.{" "}
+                    <a
+                      href="/docs/examples/canvas-with-nodes.yml"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-gray-700 dark:hover:text-gray-200"
+                    >
+                      See example
+                    </a>
+                  </div>
+                </Field>
+              ) : (
+                <>
+                  <Field>
+                    <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Canvas name *
+                    </Label>
+                    <Input
+                      data-testid="canvas-name-input"
+                      type="text"
+                      autoComplete="off"
+                      value={name}
+                      onChange={(e) => {
+                        if (e.target.value.length <= MAX_CANVAS_NAME_LENGTH) {
+                          setName(e.target.value);
+                        }
+                        if (nameError) {
+                          setNameError("");
+                        }
+                      }}
+                      placeholder=""
+                      className={`w-full ${nameError ? "border-red-500" : ""}`}
+                      autoFocus
+                      maxLength={MAX_CANVAS_NAME_LENGTH}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSubmit();
+                        }
+                      }}
+                    />
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {name.length}/{MAX_CANVAS_NAME_LENGTH} characters
+                    </div>
+                    {nameError && <div className="text-xs text-red-600 mt-1">{nameError}</div>}
+                  </Field>
+
+                  <Field>
+                    <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Description
+                    </Label>
+                    <Textarea
+                      value={description}
+                      onChange={(e) => {
+                        if (e.target.value.length <= MAX_CANVAS_DESCRIPTION_LENGTH) {
+                          setDescription(e.target.value);
+                        }
+                      }}
+                      placeholder="Describe what it does (optional)"
+                      rows={3}
+                      className="w-full"
+                      maxLength={MAX_CANVAS_DESCRIPTION_LENGTH}
+                    />
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {description.length}/{MAX_CANVAS_DESCRIPTION_LENGTH} characters
+                    </div>
+                  </Field>
+                </>
+              )}
 
               <div className="flex justify-start gap-3">
                 <Button
                   onClick={handleSubmit}
-                  disabled={!name.trim() || createMutation.isPending || !!nameError}
+                  disabled={
+                    (useYamlMode && !yamlContent.trim()) ||
+                    (!useYamlMode && !name.trim()) ||
+                    createMutation.isPending ||
+                    !!nameError ||
+                    !!yamlError
+                  }
                   data-testid="create-canvas-button"
                 >
-                  {createMutation.isPending ? "Creating Canvas..." : "Create Canvas"}
+                  {createMutation.isPending ? "Creating Canvas..." : useYamlMode ? "Import Canvas" : "Create Canvas"}
                 </Button>
                 <Button variant="outline" onClick={handleCancel}>
                   Cancel
