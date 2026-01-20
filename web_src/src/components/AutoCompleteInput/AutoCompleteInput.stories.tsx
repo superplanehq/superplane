@@ -45,7 +45,7 @@ export const ExprLanguage: Story = {
     placeholder: "{{ $.data.version }} deployment",
     inputSize: "sm",
     startWord: "{",
-    prefix: "{{ $.",
+    prefix: "{{ ",
     suffix: " }}",
     showValuePreview: true,
   },
