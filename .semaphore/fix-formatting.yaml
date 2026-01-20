@@ -14,10 +14,9 @@ blocks:
             - checkout
             - git fetch origin pull/$PR_NUMBER/head:local-fix-branch
             - git checkout local-fix-branch
-            - make dev.setup
-            - make dev.start
-            - make format.go
-            - make format.js
+            - gofmt -s -w .
+            - cd web_app && npm install && cd ..
+            - cd web_app && npx prettier --write . && cd ..
             - git add .
             - git commit -m "[skip ci] fix formatting for PR $PR_NUMBER"
             - git push origin local-fix-branch
