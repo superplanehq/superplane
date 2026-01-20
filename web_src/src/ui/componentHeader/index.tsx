@@ -9,6 +9,7 @@ export interface ComponentHeaderProps extends ComponentActionsProps {
   iconColor?: string;
   title: string;
   onDoubleClick?: () => void;
+  statusBadgeColor?: string;
 }
 
 export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
@@ -17,6 +18,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   iconColor,
   title,
   onDoubleClick,
+  statusBadgeColor,
   isCompactView = false,
 }) => {
   const Icon = React.useMemo(() => {
@@ -32,15 +34,20 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
       }
       onDoubleClick={onDoubleClick}
     >
-      <div className="w-full flex items-center">
-        <div className="w-4 h-4 overflow-hidden flex items-center justify-center mr-2">
-          {iconSrc ? (
-            <img src={iconSrc} alt={title} className="max-w-5 max-h-5 object-contain" />
-          ) : (
-            <Icon size={16} className={iconColor} />
-          )}
+      <div className="flex w-full items-center justify-between">
+        <div className="flex items-center">
+          <div className="mr-2 flex h-4 w-4 items-center justify-center overflow-hidden">
+            {iconSrc ? (
+              <img src={iconSrc} alt={title} className="max-w-5 max-h-5 object-contain" />
+            ) : (
+              <Icon size={16} className={iconColor} />
+            )}
+          </div>
+          <h2 className="text-sm font-semibold">{title}</h2>
         </div>
-        <h2 className="font-semibold text-sm">{title}</h2>
+        {isCompactView && statusBadgeColor ? (
+          <span className={`h-2.5 w-2.5 rounded-full ${statusBadgeColor}`} aria-hidden="true" />
+        ) : null}
       </div>
     </div>
   );

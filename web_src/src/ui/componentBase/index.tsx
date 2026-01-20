@@ -263,6 +263,12 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
     () => resolveIcon(isCompactView ? "chevrons-up-down" : "chevrons-down-up"),
     [isCompactView],
   );
+  const resolvedEventStateMap = eventStateMap ?? DEFAULT_EVENT_STATE_MAP;
+  const compactEventState = eventSections?.[0]?.eventState || "neutral";
+  const compactStatusBadgeColor =
+    eventSections && eventSections.length > 0
+      ? (resolvedEventStateMap[compactEventState] || resolvedEventStateMap.neutral).badgeColor
+      : undefined;
 
   return (
     <SelectionWrapper selected={selected}>
@@ -320,6 +326,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           title={title}
           onDoubleClick={onToggleCollapse}
           isCompactView={isCompactView}
+          statusBadgeColor={compactStatusBadgeColor}
         />
 
         {hasError && (
