@@ -7,10 +7,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 INTEGRATIONS_DIR="$REPO_ROOT/pkg/applications"
 
-integrations=$(ls -1 "$INTEGRATIONS_DIR")
-count=$(echo "$integrations" | wc -l)
+# Get list of integrations (directories only, excluding . and ..)
+integrations=$(find "$INTEGRATIONS_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
 
-echo "Integrations:"
-echo "$integrations" | sed 's/^/  - /'
-echo ""
-echo "Total integrations: $count"
+if [ -z "$integrations" ]; then
+  echo "No integrations found."
+  echo ""
+  echo "Total integrations: 0"
+else
+  count=$(echo "$integrations" | wc -l)
+  echo "Integrations:"
+  echo "$integrations" | sed 's/^/  - /'
+  echo ""
+  echo "Total integrations: $count"
+fi
