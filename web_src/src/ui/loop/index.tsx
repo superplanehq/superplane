@@ -29,6 +29,7 @@ export const Loop: React.FC<LoopProps> = ({
   iconColor,
   iconBackground,
   headerColor = "bg-slate-100",
+  collapsed = false,
   selected = false,
   childCount = 0,
   onAddChild,
