@@ -1,0 +1,37 @@
+version: v1.0
+name: Fix Formatting
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+global_job_config:
+  prologue:
+    commands:
+      - sudo mkdir -p -m 755 /etc/apt/keyrings
+      - wget -nv -O /etc/apt/keyrings/githubcli-archive-keyring.gpg https://cli.github.com/packages/githubcli-archive-keyring.gpg
+      - cat /etc/apt/keyrings/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+      - sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+      - sudo mkdir -p -m 755 /etc/apt/sources.list.d
+      - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+      - sudo apt update
+      - sudo apt install gh -y
+
+      # Checkout the repository
+      - checkout
+
+      # checkout the PR branch
+      - gh pr checkout $PR_NUMBER
+
+blocks:
+  - name: "Format Code"
+    task:
+      jobs:
+        - name: "Fix Go and TypeScript Formatting"
+          commands:
+            - make format.go
+            - make format.js
+            - git add .
+            - git commit -m "[skip ci] fix formatting for PR #$PR_NUMBER"
+            - git push
+            
