@@ -44,7 +44,7 @@ export function CreateCanvasPage() {
       }
 
       try {
-        const parsed = yaml.load(yamlContent) as any;
+        const parsed = yaml.load(yamlContent, { schema: yaml.CORE_SCHEMA }) as any;
 
         if (!parsed) {
           setYamlError("Invalid YAML format");
@@ -78,7 +78,7 @@ export function CreateCanvasPage() {
         }
       } catch (error) {
         console.error("Error creating canvas from YAML:", error);
-        const errorMessage = (error as Error)?.message || error?.toString() || "Failed to parse YAML";
+        const errorMessage = error instanceof Error ? error.message : String(error);
         setYamlError(errorMessage);
         showErrorToast(errorMessage);
       }
