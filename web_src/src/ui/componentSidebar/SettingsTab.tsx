@@ -271,10 +271,10 @@ export function SettingsTab({
       <div className="space-y-6">
         {/* Node identification section */}
         <div className="flex flex-col gap-2">
-          <Label className={`min-w-[100px] text-left ${hasNodeNameError ? "text-red-600 dark:text-red-400" : ""}`}>
+          <Label className="min-w-[100px] text-left">
             Node Name
             <span className="text-gray-800 ml-1">*</span>
-            {hasNodeNameError && <span className="text-red-500 text-xs ml-2">- required field</span>}
+            {hasNodeNameError && <span className="text-red-500 text-xs ml-2">Required</span>}
           </Label>
           <Input
             data-testid="node-name-input"
@@ -283,7 +283,7 @@ export function SettingsTab({
             onChange={(e) => setCurrentNodeName(e.target.value)}
             placeholder="Enter a name for this node"
             autoFocus
-            className={`shadow-none ${hasNodeNameError ? "border-red-500 border-2" : ""}`}
+            className="shadow-none"
           />
         </div>
 
@@ -311,15 +311,11 @@ export function SettingsTab({
             ) : (
               // Select when installations are available
               <div className="flex flex-col gap-2">
-                <Label
-                  className={`min-w-[100px] text-left ${
-                    showValidation && validationErrors.has("appInstallation") ? "text-red-600 dark:text-red-400" : ""
-                  }`}
-                >
+                <Label className="min-w-[100px] text-left">
                   App Installation
                   <span className="text-gray-800 ml-1">*</span>
                   {showValidation && validationErrors.has("appInstallation") && (
-                    <span className="text-red-500 text-xs ml-2">- required field</span>
+                    <span className="text-red-500 text-xs ml-2">Required</span>
                   )}
                 </Label>
                 <Select
@@ -334,11 +330,7 @@ export function SettingsTab({
                     }
                   }}
                 >
-                  <SelectTrigger
-                    className={`w-full shadow-none ${
-                      showValidation && validationErrors.has("appInstallation") ? "border-red-500 border-2" : ""
-                    }`}
-                  >
+                  <SelectTrigger className="w-full shadow-none">
                     <SelectValue placeholder="Select an installation" />
                   </SelectTrigger>
                   <SelectContent>

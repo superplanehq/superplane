@@ -56,7 +56,7 @@ export const GitRefFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
     <div className="flex gap-2">
       <div className="w-40 min-w-32">
         <Select value={kind} onValueChange={(v) => update((v as Kind) || "branch", name)}>
-          <SelectTrigger className={`w-full ${hasError ? "border-red-500 border-2" : ""}`}>
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Reference type" />
           </SelectTrigger>
           <SelectContent>
@@ -71,7 +71,7 @@ export const GitRefFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
           value={name}
           onChange={(e) => update(kind, e.target.value)}
           placeholder={field.placeholder || (kind === "tag" ? "e.g. v1.0.0" : "e.g. main")}
-          className={hasError ? "border-red-500 border-2" : ""}
+          className=""
         />
       </div>
     </div>

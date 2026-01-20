@@ -68,7 +68,7 @@ export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, val
 
   return (
     <Select value={displayValue} onValueChange={(val) => onChange(val || undefined)}>
-      <SelectTrigger className={`w-full ${hasError ? "border-red-500 border-2" : ""}`}>
+      <SelectTrigger className="w-full">
         <SelectValue placeholder={`Select ${field.label || field.name}`} />
       </SelectTrigger>
       <SelectContent className="max-h-60">

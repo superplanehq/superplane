@@ -31,7 +31,7 @@ export const DateFieldRenderer: React.FC<FieldRendererProps> = ({
       value={(value as string) ?? (field.defaultValue as string) ?? ""}
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder="YYYY-MM-DD"
-      className={hasError ? "border-red-500 border-2" : ""}
+      className=""
       min={getDateConstraints.min}
       max={getDateConstraints.max}
       data-testid={toTestId(`date-field-${field.name}`)}

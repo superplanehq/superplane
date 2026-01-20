@@ -26,7 +26,7 @@ export const NumberFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
       placeholder={field.placeholder || ""}
       min={numberOptions?.min}
       max={numberOptions?.max}
-      className={hasError ? "border-red-500 border-2" : ""}
+      className=""
     />
   );
 };

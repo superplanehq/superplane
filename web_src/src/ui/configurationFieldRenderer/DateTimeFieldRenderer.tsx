@@ -30,7 +30,7 @@ export const DateTimeFieldRenderer: React.FC<FieldRendererProps> = ({
       value={(value as string) ?? (field.defaultValue as string) ?? ""}
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder="YYYY-MM-DDTHH:MM"
-      className={hasError ? "border-red-500 border-2" : ""}
+      className=""
       min={getDateTimeConstraints.min}
       max={getDateTimeConstraints.max}
     />

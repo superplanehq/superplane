@@ -24,7 +24,7 @@ export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
       value={(value as string) ?? (field.defaultValue as string) ?? ""}
       onValueChange={(val) => onChange(val || undefined)}
     >
-      <SelectTrigger className={`w-full ${hasError ? "border-red-500 border-2" : ""}`} data-testid={testId}>
+      <SelectTrigger className="w-full" data-testid={testId}>
         <SelectValue placeholder={`Select ${field.label || field.name}`} />
       </SelectTrigger>
       <SelectContent className="max-h-60">

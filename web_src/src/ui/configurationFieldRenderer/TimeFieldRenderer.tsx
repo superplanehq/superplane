@@ -40,7 +40,7 @@ export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({
       value={(value as string) ?? (field.defaultValue as string) ?? ""}
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder={field.typeOptions?.time?.format || "HH:MM"}
-      className={hasError ? "border-red-500 border-2" : ""}
+      className=""
       min={getTimeConstraints.min}
       max={getTimeConstraints.max}
       data-testid={toTestId(`time-field-${field.name}`)}

@@ -39,7 +39,7 @@ export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({ fi
         <div key={index} className="flex gap-2 items-start">
           <div className="flex-1 grid grid-cols-2 gap-2">
             <Select value={predicate.type} onValueChange={(val) => updatePredicate(index, "type", val)}>
-              <SelectTrigger className={`w-full ${hasError ? "border-red-500 border-2" : ""}`}>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select operator" />
               </SelectTrigger>
               <SelectContent>
@@ -55,7 +55,7 @@ export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({ fi
               value={predicate.value ?? ""}
               onChange={(e) => updatePredicate(index, "value", e.target.value)}
               placeholder="Value"
-              className={hasError ? "border-red-500 border-2" : ""}
+              className=""
             />
           </div>
           <Button variant="ghost" size="icon" onClick={() => removePredicate(index)} className="mt-1">

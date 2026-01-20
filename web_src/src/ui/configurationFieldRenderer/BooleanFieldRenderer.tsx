@@ -7,7 +7,7 @@ export const BooleanFieldRenderer: React.FC<FieldRendererProps> = ({ field, valu
     <Switch
       checked={(value as boolean) ?? field.defaultValue === "true" ?? false}
       onCheckedChange={onChange}
-      className={hasError ? "border-red-500 border-2" : ""}
+      className=""
     />
   );
 };

@@ -17,7 +17,7 @@ export const CronFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
         value={currentValue}
         onChange={handleChange}
         placeholder={field.placeholder || "30 14 * * MON-FRI"}
-        className={hasError ? "border-red-500 border-2" : ""}
+        className=""
         spellCheck={false}
       />
 
