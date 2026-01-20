@@ -73,6 +73,23 @@ Use Canvases to organize workflows by:
 - **Environment** - Separate Canvases for dev/staging/production
 - **Team** - Different Canvases for different team responsibilities
 
+### Creating Canvases from YAML
+
+You can create Canvases from YAML definitions using either the CLI or the web UI:
+
+**Using the CLI:**
+```bash
+./build/cli create -f canvas.yml
+```
+
+**Using the Web UI:**
+1. Navigate to "Create New Canvas"
+2. Click on "Import YAML" button
+3. Paste your Canvas YAML definition
+4. Click "Import Canvas"
+
+See the [CLI reference](../reference/cli.md#canvas-yaml-format) for the complete YAML format and examples.
+
 ---
 
 ## Workflows

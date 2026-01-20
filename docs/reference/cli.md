@@ -34,6 +34,8 @@ To create resources, you use the `create` command:
 
 ```bash
 ./build/cli create -f ./docs/examples/stage.yaml
+./build/cli create -f ./docs/examples/canvas.yml
+./build/cli create -f ./docs/examples/canvas-with-nodes.yml
 ```
 
 To update resources, you use the `update` command:
@@ -41,6 +43,52 @@ To update resources, you use the `update` command:
 ```bash
 ./build/cli update -f ./docs/examples/stage.yaml
 ```
+
+### Canvas YAML Format
+
+Canvas resources can be defined in YAML with the following structure:
+
+**Minimal Canvas:**
+```yaml
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: my-canvas
+  description: Optional description  # optional
+```
+
+**Canvas with Nodes and Edges:**
+```yaml
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: example-deployment-canvas
+  description: Example canvas with manual trigger and noop nodes
+spec:
+  nodes:
+    - id: start
+      name: Manual Start
+      type: TYPE_TRIGGER
+      trigger:
+        name: manual
+      position:
+        x: 100
+        y: 100
+    - id: step1
+      name: First Step
+      type: TYPE_COMPONENT
+      component:
+        name: noop
+      position:
+        x: 400
+        y: 100
+  edges:
+    - sourceId: start
+      targetId: step1
+      channel: default
+```
+
+See [canvas-with-nodes.yml](./examples/canvas-with-nodes.yml) for a complete example.
 
 ### Describe resources
 
