@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Count the number of integrations in SuperPlane
+# Integrations are stored as directories in pkg/applications/
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+INTEGRATIONS_DIR="$REPO_ROOT/pkg/applications"
+
+integrations=$(ls -1 "$INTEGRATIONS_DIR")
+count=$(echo "$integrations" | wc -l)
+
+echo "Integrations:"
+echo "$integrations" | sed 's/^/  - /'
+echo ""
+echo "Total integrations: $count"
