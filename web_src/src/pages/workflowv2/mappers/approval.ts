@@ -144,7 +144,6 @@ export const approvalMapper: ComponentBaseMapper = {
       iconSlug: componentDefinition.icon || "hand",
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass("orange"),
-      headerColor: "",
       collapsed: node.isCollapsed,
       title: node.name || componentDefinition?.label || "Approval",
       eventSections: lastExecution ? getApprovalEventSections(nodes, lastExecution, additionalData) : undefined,

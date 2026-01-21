@@ -3170,7 +3170,6 @@ function prepareSidebarData(
     title: nodeTitle,
     iconSlug,
     iconColor: getColorClass(color),
-    iconBackground: getBackgroundColorClass(color),
     totalInHistoryCount: totalHistoryCount ? totalHistoryCount : 0,
     totalInQueueCount: totalQueueCount ? totalQueueCount : 0,
     hideQueueEvents,

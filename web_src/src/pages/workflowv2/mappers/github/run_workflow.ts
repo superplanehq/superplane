@@ -111,9 +111,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     return {
       title: node.name!,
       iconSrc: githubIcon,
-      headerColor: "",
       iconColor: getColorClass(componentDefinition?.color!),
-      iconBackground: getBackgroundColorClass(componentDefinition?.color!),
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       eventSections: runWorkflowEventSections(nodes, lastExecutions[0], nodeQueueItems),
