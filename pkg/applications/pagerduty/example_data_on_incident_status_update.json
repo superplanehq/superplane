@@ -1,0 +1,32 @@
+{
+    "type": "pagerduty.incident.status_update_published",
+    "data": {
+        "agent": {
+            "html_url": "https://acme.pagerduty.com/users/PLH1HKV",
+            "id": "PLH1HKV",
+            "self": "https://api.pagerduty.com/users/PLH1HKV",
+            "summary": "Tenex Engineer",
+            "type": "user_reference"
+        },
+        "status_update": {
+            "id": "P1234567",
+            "message": "We have identified the issue and are working on a fix.",
+            "created_at": "2026-01-19T12:30:00Z",
+            "sender": {
+                "html_url": "https://acme.pagerduty.com/users/PLH1HKV",
+                "id": "PLH1HKV",
+                "self": "https://api.pagerduty.com/users/PLH1HKV",
+                "summary": "Tenex Engineer",
+                "type": "user_reference"
+            }
+        },
+        "incident": {
+            "id": "PGR0VU2",
+            "type": "incident_reference",
+            "self": "https://api.pagerduty.com/incidents/PGR0VU2",
+            "html_url": "https://acme.pagerduty.com/incidents/PGR0VU2",
+            "summary": "A little bump in the road"
+        }
+    },
+    "timestamp": "2026-01-19T12:30:00Z"
+}
