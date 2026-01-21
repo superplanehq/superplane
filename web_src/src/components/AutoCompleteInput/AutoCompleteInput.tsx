@@ -57,6 +57,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const suggestionsRef = useRef<HTMLDivElement>(null);
     const suggestionsListRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const backdropRef = useRef<HTMLDivElement>(null);
     const mirrorRef = useRef<HTMLSpanElement>(null);
     useImperativeHandle(forwardedRef, () => inputRef.current as HTMLTextAreaElement);
 
@@ -66,6 +67,235 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       if (!textarea) return;
       textarea.style.height = "auto";
       textarea.style.height = `${textarea.scrollHeight}px`;
+    }, []);
+
+    // Tokenize expression content for syntax highlighting
+    const tokenizeExpression = (expr: string): React.ReactNode[] => {
+      const tokens: React.ReactNode[] = [];
+      let i = 0;
+      let key = 0;
+
+      while (i < expr.length) {
+        // Skip whitespace
+        if (/\s/.test(expr[i])) {
+          let ws = "";
+          while (i < expr.length && /\s/.test(expr[i])) {
+            ws += expr[i++];
+          }
+          tokens.push(<span key={key++}>{ws}</span>);
+          continue;
+        }
+
+        // $ selector (root)
+        if (expr[i] === "$") {
+          tokens.push(
+            <span key={key++} className="text-violet-600 dark:text-violet-400 font-semibold">
+              $
+            </span>,
+          );
+          i++;
+          continue;
+        }
+
+        // Property access with dot notation
+        if (expr[i] === ".") {
+          tokens.push(
+            <span key={key++} className="text-gray-500">
+              .
+            </span>,
+          );
+          i++;
+          // Capture the property name
+          let prop = "";
+          while (i < expr.length && /[a-zA-Z0-9_]/.test(expr[i])) {
+            prop += expr[i++];
+          }
+          if (prop) {
+            tokens.push(
+              <span key={key++} className="text-sky-600 dark:text-sky-400">
+                {prop}
+              </span>,
+            );
+          }
+          continue;
+        }
+
+        // Strings (single or double quoted)
+        if (expr[i] === '"' || expr[i] === "'") {
+          const quote = expr[i];
+          let str = quote;
+          i++;
+          while (i < expr.length && expr[i] !== quote) {
+            if (expr[i] === "\\" && i + 1 < expr.length) {
+              str += expr[i++];
+            }
+            str += expr[i++];
+          }
+          if (i < expr.length) str += expr[i++]; // closing quote
+          tokens.push(
+            <span key={key++} className="text-amber-600 dark:text-amber-400">
+              {str}
+            </span>,
+          );
+          continue;
+        }
+
+        // Numbers
+        if (/[0-9]/.test(expr[i])) {
+          let num = "";
+          while (i < expr.length && /[0-9.]/.test(expr[i])) {
+            num += expr[i++];
+          }
+          tokens.push(
+            <span key={key++} className="text-orange-600 dark:text-orange-400">
+              {num}
+            </span>,
+          );
+          continue;
+        }
+
+        // Identifiers (could be functions, keywords, or node names)
+        if (/[a-zA-Z_]/.test(expr[i])) {
+          let ident = "";
+          while (i < expr.length && /[a-zA-Z0-9_]/.test(expr[i])) {
+            ident += expr[i++];
+          }
+          // Check if it's a function call (followed by parenthesis)
+          const isFunction = i < expr.length && expr[i] === "(";
+          // Check if it's a keyword
+          const keywords = [
+            "true",
+            "false",
+            "nil",
+            "null",
+            "in",
+            "not",
+            "and",
+            "or",
+            "matches",
+            "contains",
+            "startsWith",
+            "endsWith",
+          ];
+          const isKeyword = keywords.includes(ident);
+
+          if (isFunction) {
+            tokens.push(
+              <span key={key++} className="text-emerald-600 dark:text-emerald-400">
+                {ident}
+              </span>,
+            );
+          } else if (isKeyword) {
+            tokens.push(
+              <span key={key++} className="text-pink-600 dark:text-pink-400 font-medium">
+                {ident}
+              </span>,
+            );
+          } else {
+            // Regular identifier (likely a node name or variable)
+            tokens.push(
+              <span key={key++} className="text-sky-600 dark:text-sky-400">
+                {ident}
+              </span>,
+            );
+          }
+          continue;
+        }
+
+        // Operators and punctuation
+        const operators = [
+          "==",
+          "!=",
+          ">=",
+          "<=",
+          "&&",
+          "||",
+          "??",
+          "?:",
+          "->",
+          "..",
+          ">",
+          "<",
+          "+",
+          "-",
+          "*",
+          "/",
+          "%",
+          "!",
+          "?",
+          ":",
+          "[",
+          "]",
+          "(",
+          ")",
+          ",",
+          "|",
+        ];
+        let foundOp = false;
+        for (const op of operators) {
+          if (expr.slice(i, i + op.length) === op) {
+            tokens.push(
+              <span key={key++} className="text-gray-500 dark:text-gray-400">
+                {op}
+              </span>,
+            );
+            i += op.length;
+            foundOp = true;
+            break;
+          }
+        }
+        if (foundOp) continue;
+
+        // Fallback: single character
+        tokens.push(<span key={key++}>{expr[i++]}</span>);
+      }
+
+      return tokens;
+    };
+
+    // Render content with highlighted expressions
+    const renderHighlightedContent = (text: string) => {
+      const parts: React.ReactNode[] = [];
+      const regex = /(\{\{)(.*?)(\}\})/g;
+      let lastIndex = 0;
+      let match;
+      let key = 0;
+
+      while ((match = regex.exec(text)) !== null) {
+        // Add text before the match
+        if (match.index > lastIndex) {
+          parts.push(<span key={key++}>{text.slice(lastIndex, match.index)}</span>);
+        }
+        // Add the highlighted expression with syntax coloring
+        parts.push(
+          <span key={key++} className="bg-gray-100 dark:bg-gray-800 rounded-sm">
+            <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+            {tokenizeExpression(match[2])}
+            <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+          </span>,
+        );
+        lastIndex = regex.lastIndex;
+      }
+
+      // Add remaining text
+      if (lastIndex < text.length) {
+        parts.push(<span key={key++}>{text.slice(lastIndex)}</span>);
+      }
+
+      // Handle empty text - add a zero-width space to maintain height
+      if (parts.length === 0) {
+        parts.push(<span key={0}>{"\u200B"}</span>);
+      }
+
+      return parts;
+    };
+
+    // Sync scroll between textarea and backdrop
+    const handleScroll = useCallback(() => {
+      if (inputRef.current && backdropRef.current) {
+        backdropRef.current.scrollTop = inputRef.current.scrollTop;
+        backdropRef.current.scrollLeft = inputRef.current.scrollLeft;
+      }
     }, []);
 
     const getWordAtCursor = (text: string, position: number) => {
@@ -734,7 +964,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             left: 0,
           }}
         />
-        {/* Input Field */}
+        {/* Input Field with Syntax Highlighting */}
         <span
           data-slot="control"
           className={twMerge([
@@ -744,6 +974,24 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             className,
           ])}
         >
+          {/* Backdrop for syntax highlighting */}
+          <div
+            ref={backdropRef}
+            aria-hidden="true"
+            className={twMerge([
+              "font-sm pointer-events-none absolute inset-0 whitespace-pre-wrap break-words overflow-hidden",
+              "rounded-md border border-transparent px-3 py-2 text-base",
+              "text-gray-950 dark:text-white",
+              // Size variants (must match textarea)
+              inputSize === "xs" && "min-h-7 px-2 text-xs",
+              inputSize === "sm" && "min-h-8 px-2 text-sm",
+              inputSize === "md" && "min-h-8 px-3 text-base md:text-sm",
+              inputSize === "lg" && "min-h-11 px-4 text-lg",
+            ])}
+          >
+            {renderHighlightedContent(inputValue)}
+          </div>
+          {/* Textarea with transparent text */}
           <textarea
             ref={inputRef}
             rows={1}
@@ -754,6 +1002,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             onKeyDownCapture={handleCursorChange}
             onClick={handleCursorChange}
             onSelect={handleCursorChange}
+            onScroll={handleScroll}
             onFocus={() => {
               setIsFocused(true);
               if (suggestions.length > 0) {
@@ -771,11 +1020,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             placeholder={placeholder}
             disabled={disabled}
             className={twMerge([
-              "font-sm bg-white border-gray-300 shadow-xs placeholder:text-gray-500 selection:bg-primary selection:text-primary-foreground",
+              "font-sm bg-transparent border-gray-300 shadow-xs placeholder:text-gray-500 selection:bg-primary/30",
               "relative block w-full min-w-0 appearance-none rounded-md border px-3 py-2 text-base outline-none resize-none overflow-hidden",
               "focus-visible:border-gray-500 focus-visible:ring-ring/50",
               "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
               "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+              // Make text transparent but keep caret visible
+              "text-transparent caret-gray-950 dark:caret-white",
               // Size variants (min-height instead of fixed height)
               inputSize === "xs" && "min-h-7 px-2 text-xs",
               inputSize === "sm" && "min-h-8 px-2 text-sm",
