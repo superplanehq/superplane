@@ -37,8 +37,6 @@ const incidentResponseNodes: Node[] = [
       trigger: {
         title: "Datadog Alert",
         iconSrc: datadogIcon,
-        iconBackground: "bg-purple-600",
-        headerColor: "bg-purple-100",
         collapsedBackground: "bg-purple-600",
         metadata: [
           {
@@ -71,8 +69,6 @@ const incidentResponseNodes: Node[] = [
       trigger: {
         title: "PagerDuty",
         iconSrc: pagerdutyIcon,
-        iconBackground: "bg-green-600",
-        headerColor: "bg-green-100",
         collapsedBackground: "bg-green-600",
         metadata: [
           {
@@ -107,7 +103,6 @@ const incidentResponseNodes: Node[] = [
         title: "Sentry",
         iconSlug: "bug",
         iconColor: "text-blue-700",
-        headerColor: "bg-blue-100",
         collapsedBackground: "bg-blue-100",
         metadata: [
           { icon: "folder", label: "Project: checkout-service" },
@@ -138,7 +133,6 @@ const incidentResponseNodes: Node[] = [
         title: "Prometheus",
         iconSlug: "activity",
         iconColor: "text-red-700",
-        headerColor: "bg-red-100",
         collapsedBackground: "bg-red-100",
         metadata: [
           {
@@ -174,7 +168,6 @@ const incidentResponseNodes: Node[] = [
         description: "Normalize vendor alerts, suppress duplicates, classify root cause",
         iconSlug: "git-merge",
         iconColor: "text-slate-700",
-        headerColor: "bg-slate-200",
         collapsedBackground: "bg-slate-200",
         parameters: [{ icon: "clock", items: { "Dedupe TTL": "10m" } }],
         metadata: [
@@ -278,7 +271,6 @@ const incidentResponseNodes: Node[] = [
         description: "Rollback to previous stable release",
         iconSlug: "rotate-ccw",
         iconColor: "text-blue-700",
-        headerColor: "bg-blue-100",
         collapsedBackground: "bg-blue-100",
         metadata: [
           { icon: "package", label: "Service: checkout-service" },
@@ -318,7 +310,6 @@ const incidentResponseNodes: Node[] = [
         description: "Force restart pods and verify health",
         iconSlug: "refresh-cw",
         iconColor: "text-blue-700",
-        headerColor: "bg-blue-100",
         collapsedBackground: "bg-blue-100",
         metadata: [
           { icon: "box", label: "Pod: payments-service-7d9f8b-xk2mn" },
@@ -355,7 +346,6 @@ const incidentResponseNodes: Node[] = [
         description: "Scale up replicas and invalidate cache",
         iconSlug: "zap",
         iconColor: "text-blue-700",
-        headerColor: "bg-blue-100",
         collapsedBackground: "bg-blue-100",
         metadata: [
           { icon: "package", label: "Service: checkout-service" },
@@ -392,7 +382,6 @@ const incidentResponseNodes: Node[] = [
         description: "Escalate alerts to on-call engineer",
         iconSlug: "megaphone",
         iconColor: "text-green-700",
-        headerColor: "bg-green-100",
         collapsedBackground: "bg-green-600",
         metadata: [
           { icon: "alert-circle", label: "Service: Platform Operations" },

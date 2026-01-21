@@ -122,7 +122,6 @@ export const webhookTriggerRenderer: TriggerRenderer = {
       title: node.name!,
       iconSlug: trigger.icon || "webhook",
       iconColor: getColorClass("black"),
-      headerColor: "",
       collapsedBackground: "bg-white",
       metadata: [
         {

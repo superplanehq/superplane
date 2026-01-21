@@ -1,39 +1,25 @@
 import { resolveIcon } from "@/lib/utils";
 import React from "react";
 import { toTestId } from "../../utils/testID";
-import { SidebarActionsDropdown } from "../componentSidebar/SidebarActionsDropdown";
 import { ComponentActionsProps } from "../types/componentActions";
 
 export interface ComponentHeaderProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
-  iconBackground?: string;
   iconColor?: string;
-  headerColor: string;
   title: string;
   onDoubleClick?: () => void;
-  hideActionsButton?: boolean;
+  statusBadgeColor?: string;
 }
 
 export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   iconSrc,
   iconSlug,
-  iconBackground,
   iconColor,
-  headerColor,
   title,
   onDoubleClick,
-  onRun,
-  runDisabled,
-  runDisabledTooltip,
-  onDuplicate,
-  onEdit,
-  onConfigure,
-  onDeactivate,
-  onToggleView,
-  onDelete,
+  statusBadgeColor,
   isCompactView = false,
-  hideActionsButton = false,
 }) => {
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
@@ -42,38 +28,27 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   return (
     <div
       data-testid={toTestId(`node-${title}-header`)}
+      data-view-mode={isCompactView ? "compact" : "expanded"}
       className={
-        "canvas-node-drag-handle text-left text-lg w-full px-2 py-1.5 flex items-center flex-col border-b border-slate-400 rounded-t-md items-center relative " +
-        headerColor
+        "canvas-node-drag-handle text-left text-lg w-full px-2 py-1.5 flex items-center flex-col rounded-t-md items-center relative" +
+        (isCompactView ? "" : " border-b border-slate-400")
       }
       onDoubleClick={onDoubleClick}
     >
-      <div className="w-full flex items-center">
-        <div className={`w-4 h-4 overflow-hidden flex items-center justify-center mr-2 ${iconBackground || ""}`}>
-          {iconSrc ? (
-            <img src={iconSrc} alt={title} className="max-w-5 max-h-5 object-contain" />
-          ) : (
-            <Icon size={16} className={iconColor} />
-          )}
-        </div>
-        <h2 className="font-semibold text-sm">{title}</h2>
-        {!hideActionsButton && (
-          <div className="absolute top-1 right-1 rounded flex items-center justify-center hover:bg-slate-950/5 h-6 w-6 leading-none pt-[1px] nodrag">
-            <SidebarActionsDropdown
-              dataTestId={toTestId(`node-${title}-header-dropdown`)}
-              onRun={onRun}
-              runDisabled={runDisabled}
-              runDisabledTooltip={runDisabledTooltip}
-              onDuplicate={onDuplicate}
-              onEdit={onEdit}
-              onConfigure={onConfigure}
-              onDeactivate={onDeactivate}
-              onToggleView={onToggleView}
-              onDelete={onDelete}
-              isCompactView={isCompactView}
-            />
+      <div className="flex w-full items-center justify-between">
+        <div className="flex items-center">
+          <div className="mr-2 flex h-4 w-4 items-center justify-center overflow-hidden">
+            {iconSrc ? (
+              <img src={iconSrc} alt={title} className="max-w-5 max-h-5 object-contain" />
+            ) : (
+              <Icon size={16} className={iconColor} />
+            )}
           </div>
-        )}
+          <h2 className="text-sm font-semibold">{title}</h2>
+        </div>
+        {isCompactView && statusBadgeColor ? (
+          <span className={`h-2.5 w-2.5 rounded-full ${statusBadgeColor}`} aria-hidden="true" />
+        ) : null}
       </div>
     </div>
   );

@@ -68,8 +68,6 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     const props: TriggerProps = {
       title: node.name!,
       iconSrc: pdIcon,
-      iconBackground: "bg-green-500",
-      headerColor: "",
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,
     };

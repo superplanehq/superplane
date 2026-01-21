@@ -211,16 +211,17 @@ func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {
 }
 
 func (s *CanvasSteps) StartEditingNode(name string) {
-	s.session.Click(q.TestID("node", name, "header-dropdown"))
-	s.session.Click(q.TestID("node-action-edit"))
+	// Click on the node header to open the sidebar where settings can be accessed
+	nodeHeader := q.TestID("node", name, "header")
+	s.session.Click(nodeHeader)
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) RunManualTrigger(name string) {
-	dropdown := q.TestID("node", name, "header-dropdown")
-	runOption := q.TestID("node-action-run")
-
-	s.session.Click(dropdown)
-	s.session.Click(runOption)
+	nodeHeader := q.TestID("node", name, "header")
+	s.session.HoverOver(nodeHeader)
+	s.session.Sleep(100)
+	s.session.Click(q.TestID("node-action-run"))
 	s.session.Click(q.TestID("emit-event-submit-button"))
 }
 
