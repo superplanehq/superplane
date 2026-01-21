@@ -14,11 +14,6 @@ import (
 
 const defaultBeaconURL = "https://analytics.superplane.com/beacon"
 
-type beaconConfig struct {
-	url     string
-	payload beaconPayload
-}
-
 type beaconPayload struct {
 	InstallationType string `json:"installation_type"`
 	InstallationID   string `json:"installation_id"`
