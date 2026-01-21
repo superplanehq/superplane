@@ -1,6 +1,5 @@
 import React from "react";
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
-import { CollapsedComponent } from "../collapsedComponent";
 import { ComponentHeader } from "../componentHeader";
 import { SpecsTooltip } from "./SpecsTooltip";
 import { PayloadTooltip } from "./PayloadTooltip";
@@ -207,8 +206,6 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
-  iconBackground?: string;
-  headerColor?: string;
   title: string;
   specs?: ComponentBaseSpec[];
   hideCount?: boolean;
@@ -220,7 +217,6 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   metadata?: MetadataItem[];
   customField?: React.ReactNode;
   eventStateMap?: EventStateMap;
-  hideActionsButton?: boolean;
   includeEmptyState?: boolean;
   emptyStateProps?: {
     icon?: React.ComponentType<{ size?: number }>;
@@ -234,22 +230,20 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   iconSrc,
   iconSlug,
   iconColor,
-  iconBackground,
-  headerColor,
   title,
   specs,
-  collapsed = false,
-  collapsedBackground,
+  collapsed: _collapsed = false,
+  collapsedBackground: _collapsedBackground,
   eventSections,
   selected = false,
   onToggleCollapse,
   onRun,
   runDisabled,
-  runDisabledTooltip,
-  onEdit,
-  onConfigure,
-  onDuplicate,
-  onDeactivate,
+  runDisabledTooltip: _runDisabledTooltip,
+  onEdit: _onEdit,
+  onConfigure: _onConfigure,
+  onDuplicate: _onDuplicate,
+  onDeactivate: _onDeactivate,
   onToggleView,
   onDelete,
   isCompactView,
@@ -258,159 +252,92 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   metadata,
   customField,
   eventStateMap,
-  hideActionsButton,
   includeEmptyState = false,
   emptyStateProps,
   error,
 }) => {
   const hasError = error && error.trim() !== "";
-  if (collapsed) {
-    return (
-      <SelectionWrapper selected={selected} fullRounded>
-        <div className={`relative ${hasError ? "!outline-orange-500 rounded-full" : ""}`}>
-          <CollapsedComponent
-            iconSrc={iconSrc}
-            iconSlug={iconSlug}
-            iconColor={iconColor}
-            iconBackground={iconBackground}
-            title={title}
-            collapsedBackground={collapsedBackground}
-            shape="circle"
-            onDoubleClick={onToggleCollapse}
-            onRun={onRun}
-            runDisabled={runDisabled}
-            runDisabledTooltip={runDisabledTooltip}
-            onEdit={onEdit}
-            onDuplicate={onDuplicate}
-            onConfigure={onConfigure}
-            onDeactivate={onDeactivate}
-            onToggleView={onToggleView}
-            onDelete={onDelete}
-            isCompactView={isCompactView}
-            hideActionsButton={hideActionsButton}
-          >
-            <div className="flex flex-col items-center gap-1">
-              {metadata?.map((item, index) => (
-                <div key={`metadata-${index}`} className="flex items-center gap-1 text-xs text-gray-500">
-                  {React.createElement(resolveIcon(item.icon), { size: 12 })}
-                  <span className="truncate max-w-[150px]">{item.label}</span>
-                </div>
-              ))}
-              {specs
-                ?.filter((spec) => spec.values)
-                .map((spec, index) => (
-                  <div key={`spec-${index}`} className="flex items-center gap-1 text-xs text-gray-500">
-                    {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 12 })}
-                    <span>
-                      {!hideCount ? spec.values!.length : ""}{" "}
-                      {spec.title + (spec.values!.length > 1 && !hideCount ? "s" : "")}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </CollapsedComponent>
-          {hasError && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="absolute -top-1 -right-1 bg-red-500 rounded-full p-1 cursor-pointer">
-                    <AlertTriangle size={16} className="text-white" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs text-sm">{error}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-        </div>
-      </SelectionWrapper>
-    );
-  }
+  const RunIcon = React.useMemo(() => resolveIcon("play"), []);
+  const DeleteIcon = React.useMemo(() => resolveIcon("trash-2"), []);
+  const ToggleViewIcon = React.useMemo(
+    () => resolveIcon(isCompactView ? "chevrons-up-down" : "chevrons-down-up"),
+    [isCompactView],
+  );
+  const resolvedEventStateMap = eventStateMap ?? DEFAULT_EVENT_STATE_MAP;
+  const compactEventState = eventSections?.[0]?.eventState || "neutral";
+  const compactStatusBadgeColor =
+    eventSections && eventSections.length > 0
+      ? (resolvedEventStateMap[compactEventState] || resolvedEventStateMap.neutral).badgeColor
+      : undefined;
 
   return (
     <SelectionWrapper selected={selected}>
       <div
-        className={`relative flex flex-col outline-1 outline-slate-400 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""}`}
+        className={`group relative flex flex-col outline-1 outline-slate-400 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""}`}
+        data-view-mode={isCompactView ? "compact" : "expanded"}
       >
+        <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
+        <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
+          {onRun && (
+            <button
+              type="button"
+              data-testid="node-action-run"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onRun();
+              }}
+              disabled={runDisabled}
+              className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RunIcon className="h-4 w-4" />
+              <span>Run</span>
+            </button>
+          )}
+          {onToggleView && (
+            <button
+              type="button"
+              data-testid="node-action-toggle-view"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onToggleView();
+              }}
+              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+            >
+              <ToggleViewIcon className="h-4 w-4" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              data-testid="node-action-delete"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onDelete();
+              }}
+              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+            >
+              <DeleteIcon className="h-4 w-4" />
+            </button>
+          )}
+        </div>
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
-          iconBackground={iconBackground}
           iconColor={iconColor}
-          headerColor={headerColor || ""}
           title={title}
           onDoubleClick={onToggleCollapse}
-          onRun={onRun}
-          runDisabled={runDisabled}
-          runDisabledTooltip={runDisabledTooltip}
-          onEdit={onEdit}
-          onConfigure={onConfigure}
-          onDuplicate={onDuplicate}
-          onDeactivate={onDeactivate}
-          onToggleView={onToggleView}
-          onDelete={onDelete}
           isCompactView={isCompactView}
-          hideActionsButton={hideActionsButton}
+          statusBadgeColor={compactStatusBadgeColor}
         />
-
-        {!hideMetadataList && metadata && metadata.length > 0 && <MetadataList items={metadata} />}
-
-        {specs && specs.length > 0 && (
-          <div className="px-2 py-1.5 border-b border-slate-400 text-gray-500 flex flex-col gap-1.5">
-            {specs.map((spec, index) => (
-              <div key={index} className="flex items-center text-md text-gray-500">
-                <div className="w-4 h-4 mr-2">
-                  {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 16 })}
-                </div>
-                {spec.values ? (
-                  <SpecsTooltip
-                    specTitle={spec.tooltipTitle || spec.title}
-                    specValues={spec.values}
-                    hideCount={hideCount}
-                  >
-                    <span className="text-[13px] underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 rounded-md font-inter font-medium cursor-help">
-                      {hideCount ? "" : spec.values.length}{" "}
-                      {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
-                    </span>
-                  </SpecsTooltip>
-                ) : spec.value !== undefined ? (
-                  <PayloadTooltip
-                    title={spec.tooltipTitle || spec.title}
-                    value={spec.value}
-                    contentType={spec.contentType || "json"}
-                  >
-                    <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
-                      {spec.title}
-                    </span>
-                  </PayloadTooltip>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {eventSections?.map((section, index) => (
-          <EventSectionDisplay
-            className={"pb-3" + (!!includeEmptyState || !!customField ? " border-b border-slate-400" : "")}
-            key={index}
-            section={section}
-            index={index}
-            totalSections={eventSections.length}
-            stateMap={eventStateMap}
-            lastSection={index === eventSections.length - 1 && !includeEmptyState && !customField}
-          />
-        ))}
-
-        {includeEmptyState && <EmptyState {...emptyStateProps} />}
-
-        {customField || null}
 
         {hasError && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="absolute -top-3 -right-3 bg-orange-500 rounded-full p-1 cursor-pointer">
+                <div className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer">
                   <AlertTriangle size={16} className="text-white" />
                 </div>
               </TooltipTrigger>
@@ -419,6 +346,62 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+        )}
+
+        {isCompactView ? null : (
+          <>
+            {!hideMetadataList && metadata && metadata.length > 0 && <MetadataList items={metadata} />}
+
+            {specs && specs.length > 0 && (
+              <div className="px-2 py-1.5 border-b border-slate-400 text-gray-500 flex flex-col gap-1.5">
+                {specs.map((spec, index) => (
+                  <div key={index} className="flex items-center text-md text-gray-500">
+                    <div className="w-4 h-4 mr-2">
+                      {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 16 })}
+                    </div>
+                    {spec.values ? (
+                      <SpecsTooltip
+                        specTitle={spec.tooltipTitle || spec.title}
+                        specValues={spec.values}
+                        hideCount={hideCount}
+                      >
+                        <span className="text-[13px] underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 rounded-md font-inter font-medium cursor-help">
+                          {hideCount ? "" : spec.values.length}{" "}
+                          {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
+                        </span>
+                      </SpecsTooltip>
+                    ) : spec.value !== undefined ? (
+                      <PayloadTooltip
+                        title={spec.tooltipTitle || spec.title}
+                        value={spec.value}
+                        contentType={spec.contentType || "json"}
+                      >
+                        <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
+                          {spec.title}
+                        </span>
+                      </PayloadTooltip>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {eventSections?.map((section, index) => (
+              <EventSectionDisplay
+                className={"pb-3" + (!!includeEmptyState || !!customField ? " border-b border-slate-400" : "")}
+                key={index}
+                section={section}
+                index={index}
+                totalSections={eventSections.length}
+                stateMap={eventStateMap}
+                lastSection={index === eventSections.length - 1 && !includeEmptyState && !customField}
+              />
+            ))}
+
+            {includeEmptyState && <EmptyState {...emptyStateProps} />}
+
+            {customField || null}
+          </>
         )}
       </div>
     </SelectionWrapper>

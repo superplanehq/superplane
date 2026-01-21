@@ -121,9 +121,7 @@ export const httpMapper: ComponentBaseMapper = {
   ): ComponentBaseProps {
     return {
       iconSlug: componentDefinition.icon || "globe",
-      headerColor: "",
       iconColor: getColorClass("black"),
-      iconBackground: "bg-white",
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
       title: node.name!,

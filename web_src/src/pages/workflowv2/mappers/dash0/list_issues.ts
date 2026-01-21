@@ -35,8 +35,6 @@ export const listIssuesMapper: ComponentBaseMapper = {
 
     return {
       iconSrc: dash0Icon,
-      iconBackground: "bg-white",
-      headerColor: "bg-white",
       collapsedBackground: "bg-white",
       collapsed: node.isCollapsed,
       title: node.name!,

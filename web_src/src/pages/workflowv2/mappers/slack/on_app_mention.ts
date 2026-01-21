@@ -69,9 +69,7 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
       title: node.name!,
       iconSrc: slackIcon,
       iconSlug: "slack",
-      iconBackground: "bg-white",
       iconColor: getColorClass(trigger.color),
-      headerColor: "bg-transparent",
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,
     };

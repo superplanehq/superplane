@@ -87,7 +87,6 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
     <ComponentBase
       title={title}
       iconSlug="git-branch"
-      headerColor=""
       specs={specs}
       eventSections={eventSections}
       collapsed={collapsed}

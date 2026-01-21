@@ -1,42 +1,36 @@
 import React from "react";
 import { resolveIcon } from "@/lib/utils";
-import { SidebarActionsDropdown } from "../componentSidebar/SidebarActionsDropdown";
 import { ComponentActionsProps } from "../types/componentActions";
-import { toTestId } from "@/utils/testID";
 
 export interface CollapsedComponentProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
-  iconBackground?: string;
   title: string;
   collapsedBackground?: string;
   shape?: "rounded" | "circle";
   children?: React.ReactNode;
   onDoubleClick?: () => void;
-  hideActionsButton?: boolean;
 }
 
 export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   iconSrc,
   iconSlug,
   iconColor,
-  iconBackground,
   title,
   collapsedBackground,
   shape = "rounded",
   children,
   onDoubleClick,
-  onRun,
-  runDisabled,
-  runDisabledTooltip,
-  onDuplicate,
-  onEdit,
-  onConfigure,
-  onDeactivate,
-  onToggleView,
-  onDelete,
-  hideActionsButton,
+  onRun: _onRun,
+  runDisabled: _runDisabled,
+  runDisabledTooltip: _runDisabledTooltip,
+  onDuplicate: _onDuplicate,
+  onEdit: _onEdit,
+  onConfigure: _onConfigure,
+  onDeactivate: _onDeactivate,
+  onToggleView: _onToggleView,
+  onDelete: _onDelete,
 }) => {
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
@@ -50,32 +44,13 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
         className={`canvas-node-drag-handle flex h-20 w-20 items-center justify-center outline-1 outline-slate-400 ${containerClass} ${collapsedBackground || ""}`}
       >
         {iconSrc ? (
-          <div
-            className={`w-16 h-16 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
-          >
+          <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center">
             <img src={iconSrc} alt={title} className="h-12 w-12 object-contain" />
           </div>
         ) : (
           <Icon size={30} className={iconColor} />
         )}
       </div>
-      {!hideActionsButton && (
-        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 -translate-y-2 z-10 nodrag">
-          <SidebarActionsDropdown
-            onRun={onRun}
-            runDisabled={runDisabled}
-            runDisabledTooltip={runDisabledTooltip}
-            onDuplicate={onDuplicate}
-            onEdit={onEdit}
-            onConfigure={onConfigure}
-            onDeactivate={onDeactivate}
-            onToggleView={onToggleView}
-            onDelete={onDelete}
-            isCompactView={true}
-            dataTestId={toTestId(`node-${title}-header-dropdown`)}
-          />
-        </div>
-      )}
       <h2 className="absolute top-full left-1/2 transform -translate-x-1/2 text-base font-semibold text-neutral-900 pt-1 whitespace-nowrap">
         {title}
       </h2>

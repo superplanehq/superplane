@@ -874,7 +874,6 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             iconColor="text-gray-800"
             latestEvents={[]}
             nextInQueueEvents={[]}
-            iconBackground=""
             totalInQueueCount={0}
             totalInHistoryCount={0}
             hideQueueEvents={true}

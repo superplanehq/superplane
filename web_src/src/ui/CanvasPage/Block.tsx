@@ -106,19 +106,6 @@ const HANDLE_STYLE = {
 function LeftHandle({ data, nodeId }: BlockProps) {
   if (data.type === "trigger" || data.type === "annotation") return null;
 
-  const isCollapsed = (() => {
-    switch (data.type) {
-      case "composite":
-        return data.composite?.collapsed;
-      case "switch":
-        return data.switch?.collapsed;
-      case "component":
-        return data.component?.collapsed;
-      default:
-        return false;
-    }
-  })();
-
   // Check if this handle is part of the hovered edge (this is the target)
   const hoveredEdge = (data as any)._hoveredEdge;
   const connectingFrom = (data as any)._connectingFrom;
@@ -142,7 +129,7 @@ function LeftHandle({ data, nodeId }: BlockProps) {
       connectingFrom.handleType === "source" &&
       !isAlreadyConnected);
 
-  const horizontalOffset = isCollapsed ? -21 : -15; // keep compact circles from hugging handles
+  const horizontalOffset = -15;
 
   return (
     <Handle
@@ -151,8 +138,7 @@ function LeftHandle({ data, nodeId }: BlockProps) {
       style={{
         ...HANDLE_STYLE,
         left: horizontalOffset,
-        top: isCollapsed ? "50%" : 30,
-        transform: isCollapsed ? "translateY(-50%)" : undefined,
+        top: 18,
       }}
       className={isHighlighted ? "highlighted" : undefined}
     />
@@ -164,21 +150,6 @@ function RightHandle({ data, nodeId }: BlockProps) {
   const isTemplate = (data as any).isTemplate;
   const isPendingConnection = (data as any).isPendingConnection;
   if (isTemplate || isPendingConnection || data.type === "annotation") return null;
-
-  const isCollapsed = (() => {
-    switch (data.type) {
-      case "composite":
-        return data.composite?.collapsed;
-      case "trigger":
-        return data.trigger?.collapsed;
-      case "switch":
-        return data.switch?.collapsed;
-      case "component":
-        return data.component?.collapsed;
-      default:
-        return false;
-    }
-  })();
 
   const channels = data.outputChannels || ["default"];
 
@@ -205,7 +176,7 @@ function RightHandle({ data, nodeId }: BlockProps) {
         connectingFrom.handleType === "target" &&
         !isAlreadyConnected);
 
-    const horizontalOffset = isCollapsed ? -21 : -15;
+    const horizontalOffset = -15;
 
     return (
       <Handle
@@ -215,15 +186,14 @@ function RightHandle({ data, nodeId }: BlockProps) {
         style={{
           ...HANDLE_STYLE,
           right: horizontalOffset,
-          top: isCollapsed ? "50%" : 30,
-          transform: isCollapsed ? "translateY(-50%)" : undefined,
+          top: 18,
         }}
         className={isHighlighted ? "highlighted" : undefined}
       />
     );
   }
 
-  const baseTop = isCollapsed ? 30 : 80; // Adjust starting position based on collapsed state
+  const baseTop = 48;
   const spacing = 40; // Space between handles
 
   return (
@@ -253,7 +223,7 @@ function RightHandle({ data, nodeId }: BlockProps) {
               left: "100%",
               top: baseTop + index * spacing,
               transform: "translateY(-50%)",
-              paddingLeft: isCollapsed ? 10 : 4,
+              paddingLeft: 4,
             }}
           >
             <div className="relative flex items-center">
@@ -371,6 +341,24 @@ function BlockContent({
   onDelete,
   isCompactView,
 }: BlockProps) {
+  const compactView =
+    isCompactView ??
+    (() => {
+      switch (data.type) {
+        case "composite":
+          return !!data.composite?.collapsed;
+        case "trigger":
+          return !!data.trigger?.collapsed;
+        case "switch":
+          return !!data.switch?.collapsed;
+        case "component":
+          return !!data.component?.collapsed;
+        case "merge":
+          return !!data.merge?.collapsed;
+        default:
+          return false;
+      }
+    })();
   const handleExpand = () => {
     if (onExpand && nodeId) {
       onExpand(nodeId, data);
@@ -387,7 +375,7 @@ function BlockContent({
     onToggleCollapse,
     onToggleView,
     onDelete,
-    isCompactView,
+    isCompactView: compactView,
     onConfigure: data.type === "composite" ? onConfigure : undefined,
   };
 

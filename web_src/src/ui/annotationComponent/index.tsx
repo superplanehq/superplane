@@ -1,56 +1,36 @@
-import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { EllipsisVertical, Trash2 } from "lucide-react";
+import React, { useEffect, useLayoutEffect, useMemo } from "react";
+import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
 import { SelectionWrapper } from "../selectionWrapper";
 import { setActiveNoteId } from "./noteFocus";
 import { ComponentActionsProps } from "../types/componentActions";
 
 type AnnotationColor = "yellow" | "blue" | "green" | "purple";
 
-const NOTE_COLORS: Record<
-  AnnotationColor,
-  { label: string; container: string; background: string; dot: string; text: string; placeholder: string }
-> = {
+const NOTE_COLORS: Record<AnnotationColor, { label: string; container: string; background: string; dot: string }> = {
   yellow: {
     label: "Yellow",
     container: "bg-yellow-100",
     background: "bg-yellow-100",
-    dot: "bg-yellow-200 border-yellow-300",
-    text: "text-yellow-900",
-    placeholder: "placeholder:text-yellow-700/60",
+    dot: "bg-yellow-200 border-yellow-500",
   },
   blue: {
     label: "Sky",
     container: "bg-sky-100",
     background: "bg-sky-100",
-    dot: "bg-sky-200 border-sky-300",
-    text: "text-sky-900",
-    placeholder: "placeholder:text-sky-700/60",
+    dot: "bg-sky-200 border-sky-500",
   },
   green: {
     label: "Green",
     container: "bg-green-100",
     background: "bg-green-100",
-    dot: "bg-green-200 border-green-300",
-    text: "text-green-900",
-    placeholder: "placeholder:text-green-700/60",
+    dot: "bg-green-200 border-green-500",
   },
   purple: {
     label: "Purple",
     container: "bg-purple-100",
     background: "bg-purple-100",
-    dot: "bg-purple-200 border-purple-300",
-    text: "text-purple-900",
-    placeholder: "placeholder:text-purple-700/60",
+    dot: "bg-purple-200 border-purple-500",
   },
 };
 
@@ -76,7 +56,6 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   hideActionsButton,
   onAnnotationUpdate,
 }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const lastPointerDownOutsideRef = React.useRef(false);
@@ -167,57 +146,51 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
         </div>
 
         {!hideActionsButton && (
-          <div className="absolute top-0 -right-7 nodrag">
-            <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-              <DropdownMenuTrigger asChild>
+          <>
+            <div className="absolute -top-12 right-0 z-10 h-12 w-44 opacity-0" />
+            <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
+              <div className="group/swatch relative flex items-center px-0.5 py-0.5">
                 <button
                   type="button"
-                  className={cn(
-                    "flex h-6 w-6 items-center justify-center rounded border border-transparent text-slate-600 opacity-0 transition group-hover:opacity-100 hover:bg-gray-950/10 hover:text-slate-800",
-                    isMenuOpen && "opacity-100",
-                  )}
-                  aria-label="Note actions"
-                >
-                  <EllipsisVertical size={16} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" sideOffset={6} className="w-44">
-                <DropdownMenuRadioGroup
-                  value={activeColor}
-                  onValueChange={(value) => onAnnotationUpdate?.({ color: value as AnnotationColor })}
-                  className="flex items-center gap-3 px-2 py-2"
-                >
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  className={cn("h-4 w-4 rounded-full border transition", NOTE_COLORS[activeColor].dot)}
+                  aria-label={`Current note color: ${NOTE_COLORS[activeColor].label}`}
+                />
+                <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 items-center gap-2 pr-0.5 group-hover/swatch:flex">
                   {colorOptions.map((option) => (
-                    <DropdownMenuRadioItem
+                    <button
                       key={option.value}
-                      value={option.value}
-                      className="h-6 w-6 justify-center p-0 data-[state=checked]:ring-2 data-[state=checked]:ring-sky-500 data-[state=checked]:ring-offset-4 data-[state=checked]:ring-offset-white [&>span:first-child]:hidden rounded-full"
-                      onSelect={(event) => {
+                      type="button"
+                      onClick={(event) => {
                         event.preventDefault();
+                        event.stopPropagation();
+                        onAnnotationUpdate?.({ color: option.value });
                       }}
-                    >
-                      <span className={cn("h-6 w-6 rounded-full border", option.dot)} />
-                    </DropdownMenuRadioItem>
+                      className={cn("h-4 w-4 rounded-full border transition", option.dot)}
+                      aria-label={`Set note color to ${NOTE_COLORS[option.value].label}`}
+                    />
                   ))}
-                </DropdownMenuRadioGroup>
-                {onDelete && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onSelect={(event) => {
-                        event.preventDefault();
-                        onDelete?.();
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <Trash2 size={16} />
-                      Delete Note
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                </div>
+              </div>
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onDelete();
+                  }}
+                  className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                  aria-label="Delete note"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </div>
+          </>
         )}
 
         <div className="px-3 pb-3">

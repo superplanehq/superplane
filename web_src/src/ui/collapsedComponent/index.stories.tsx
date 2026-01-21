@@ -40,7 +40,6 @@ const compositeCollapsed: CollapsedComponentProps = createCollapsedProps({
 const withImageIcon: CollapsedComponentProps = createCollapsedProps({
   title: "Kubernetes",
   iconSrc: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/kubernetes/kubernetes-plain.svg",
-  iconBackground: "bg-blue-500",
   collapsedBackground: "bg-blue-100",
 });
 

@@ -41,8 +41,6 @@ const sampleNodes: CanvasNode[] = [
       trigger: {
         title: "GitHub",
         iconSrc: githubIcon,
-        iconBackground: "bg-black",
-        headerColor: "bg-white",
         collapsedBackground: "bg-black",
         metadata: [
           { icon: "book", label: "monarch-app" },
@@ -82,7 +80,6 @@ const sampleNodes: CanvasNode[] = [
       trigger: {
         title: "DockerHub",
         iconSrc: dockerIcon,
-        headerColor: "bg-sky-100",
         collapsedBackground: "bg-sky-100",
         metadata: [
           { icon: "box", label: "monarch-app-base-image" },
@@ -124,7 +121,6 @@ const sampleNodes: CanvasNode[] = [
         description: "Build new release of the monarch app and runs all required tests",
         iconSlug: "git-branch",
         iconColor: "text-purple-700",
-        headerColor: "bg-purple-100",
         collapsedBackground: "bg-purple-100",
         parameters: [],
         lastRunItem: {
@@ -186,7 +182,6 @@ const sampleNodes: CanvasNode[] = [
         description: "New releases are deployed to staging for testing and require approvals.",
         iconSlug: "hand",
         iconColor: "text-orange-500",
-        headerColor: "bg-orange-100",
         collapsedBackground: "bg-orange-100",
         collapsed: false,
         specs: [
@@ -241,8 +236,6 @@ const sampleNodes: CanvasNode[] = [
       composite: {
         title: "Deploy to US",
         iconSrc: KubernetesIcon,
-        headerColor: "bg-blue-100",
-        iconBackground: "bg-blue-500",
         collapsedBackground: "bg-blue-500",
         metadata: [
           { icon: "user", label: "Author: Bart Willems" },
@@ -316,8 +309,6 @@ const sampleNodes: CanvasNode[] = [
         title: "Deploy to EU",
         description: "Deploy your application to the EU region",
         iconSrc: KubernetesIcon,
-        headerColor: "bg-blue-100",
-        iconBackground: "bg-blue-500",
         collapsedBackground: "bg-blue-500",
         metadata: [
           { icon: "user", label: "Author: Bart Willems" },
@@ -401,8 +392,6 @@ const sampleNodes: CanvasNode[] = [
       composite: {
         title: "Deploy to Asia",
         iconSrc: KubernetesIcon,
-        headerColor: "bg-blue-100",
-        iconBackground: "bg-blue-500",
         collapsedBackground: "bg-blue-500",
         metadata: [
           { icon: "user", label: "Author: Bart Willems" },

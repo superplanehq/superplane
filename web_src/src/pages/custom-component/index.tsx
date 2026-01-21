@@ -1151,11 +1151,9 @@ export const CustomComponent = () => {
                   state: "neutral",
                   component: {
                     title: block.label || block.name || "New Component",
-                    headerColor: "#e5e7eb",
                     iconSlug: block.icon,
                     iconColor: "text-gray-800",
                     collapsedBackground: "bg-white",
-                    hideActionsButton: true,
                     includeEmptyState: true,
                   },
                   isTemplate: true,

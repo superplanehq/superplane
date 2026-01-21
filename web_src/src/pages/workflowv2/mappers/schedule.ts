@@ -338,7 +338,6 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
       title: node.name!,
       iconSlug: trigger.icon,
       iconColor: getColorClass("black"),
-      headerColor: "",
       collapsedBackground: "bg-white",
       metadata: [
         {

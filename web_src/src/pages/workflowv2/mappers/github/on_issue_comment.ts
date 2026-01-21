@@ -62,9 +62,7 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
     const props: TriggerProps = {
       title: node.name!,
       iconSrc: githubIcon,
-      iconBackground: "bg-white",
       iconColor: getColorClass(trigger.color),
-      headerColor: "",
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,
     };
