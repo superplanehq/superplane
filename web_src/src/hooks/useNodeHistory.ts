@@ -4,16 +4,14 @@ import { SidebarEvent } from "@/ui/componentSidebar/types";
 import {
   ComponentsComponent,
   ComponentsNode,
-  groupsListGroupUsers,
   WorkflowsListNodeEventsResponse,
   WorkflowsListNodeExecutionsResponse,
 } from "@/api-client";
 import { mapTriggerEventsToSidebarEvents, mapExecutionsToSidebarEvents } from "@/pages/workflowv2/utils";
-import { QueryClient, useQueries } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
 import { getComponentAdditionalDataBuilder } from "@/pages/workflowv2/mappers";
 import { useAccount } from "@/contexts/AccountContext";
-import { organizationKeys } from "@/hooks/useOrganizationData";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 
 interface UseNodeHistoryProps {
   workflowId: string;
@@ -74,22 +72,10 @@ export const useNodeHistory = ({
     return Array.from(groupNames);
   }, [enabled, isTriggerNode, componentDef?.name, allExecutions]);
 
-  useQueries({
-    queries: approvalGroupNames.map((groupName) => ({
-      queryKey: organizationKeys.groupUsers(organizationId, groupName),
-      queryFn: async () => {
-        const response = await groupsListGroupUsers(
-          withOrganizationHeader({
-            path: { groupName },
-            query: { domainId: organizationId, domainType: "DOMAIN_TYPE_ORGANIZATION" },
-          }),
-        );
-        return response.data?.users || [];
-      },
-      staleTime: 5 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
-      enabled: !!organizationId && !!groupName,
-    })),
+  useApprovalGroupUsersPrefetch({
+    organizationId,
+    groupNames: approvalGroupNames,
+    enabled: enabled && !isTriggerNode && componentDef?.name === "approval",
   });
 
   const getAllHistoryEvents = useCallback((): SidebarEvent[] => {

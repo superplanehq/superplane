@@ -1,6 +1,6 @@
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { Loader2, Puzzle } from "lucide-react";
 import * as yaml from "js-yaml";
@@ -19,15 +19,9 @@ import {
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
-  groupsListGroupUsers,
   workflowsEmitNodeEvent,
 } from "@/api-client";
-import {
-  organizationKeys,
-  useOrganizationGroups,
-  useOrganizationRoles,
-  useOrganizationUsers,
-} from "@/hooks/useOrganizationData";
+import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -76,6 +70,7 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useAccount } from "@/contexts/AccountContext";
+import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 import {
   buildRunEntryFromEvent,
   buildRunItemFromExecution,
@@ -312,25 +307,10 @@ export function WorkflowPageV2() {
     return Array.from(groupNames);
   }, [organizationId, nodeExecutionsMap]);
 
-  const organizationIdValue = organizationId || "";
-  const groupUsersQueries = useQueries({
-    queries: approvalGroupNames.map((groupName) => ({
-      queryKey: organizationKeys.groupUsers(organizationIdValue, groupName),
-      queryFn: async () => {
-        const response = await groupsListGroupUsers(
-          withOrganizationHeader({
-            path: { groupName },
-            query: { domainId: organizationIdValue, domainType: "DOMAIN_TYPE_ORGANIZATION" },
-          }),
-        );
-        return response.data?.users || [];
-      },
-      staleTime: 5 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
-      enabled: !!organizationIdValue && !!groupName,
-    })),
-  });
-  const groupUsersUpdatedAt = groupUsersQueries.map((query) => query.dataUpdatedAt).join("|");
+  const groupUsersUpdatedAt = useApprovalGroupUsersPrefetch({
+    organizationId,
+    groupNames: approvalGroupNames,
+  }).updatedAt;
 
   // Execution chain data utilities for lazy loading
   const { loadExecutionChain } = useExecutionChainData(workflowId!, queryClient, workflow);
