@@ -51,7 +51,7 @@ export function DialogTitle({ className, ...props }: React.ComponentPropsWithout
   return (
     <h2
       {...props}
-      className={clsx(className, "text-lg/6 font-semibold text-balance text-gray-950 sm:text-base/6 dark:text-white")}
+      className={clsx(className, "text-lg/6 font-semibold text-balance text-gray-800sm:text-base/6 dark:text-white")}
     />
   );
 }

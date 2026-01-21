@@ -62,7 +62,7 @@ export function AddMembersSection({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-6 text-left">
+    <div className="bg-white dark:bg-gray-800rounded-lg border border-gray-200 dark:border-gray-800 p-6 text-left">
       <div className="flex items-center justify-between mb-4">
         <div>
           <Text className="font-semibold text-gray-800 dark:text-white mb-1">Add Members</Text>

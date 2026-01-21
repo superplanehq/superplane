@@ -182,7 +182,7 @@ export function OrganizationSettings() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
-      <Sidebar className="w-60 bg-white dark:bg-gray-950 border-r border-gray-300 dark:border-gray-800">
+      <Sidebar className="w-60 bg-white dark:bg-gray-800border-r border-gray-300 dark:border-gray-800">
         <SidebarBody>
           <SidebarSection className="px-4 py-2.5">
             <button

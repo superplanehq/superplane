@@ -2004,7 +2004,7 @@ function CanvasContent({
             </ZoomSlider>
             <Panel
               position="bottom-left"
-              className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex gap-0.5 rounded-sm p-0.5"
+              className="bg-white text-gray-800 outline-1 outline-slate-950/25 flex gap-0.5 rounded-md p-0.5"
               style={{ marginLeft: 288 }}
             >
               <Tooltip>

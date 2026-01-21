@@ -12,7 +12,7 @@ export function Legend({ className, ...props }: { className?: string } & React.C
       {...props}
       className={clsx(
         className,
-        "text-base/6 font-semibold text-gray-950 data-disabled:opacity-50 sm:text-sm/6 dark:text-white",
+        "text-base/6 font-semibold text-gray-800data-disabled:opacity-50 sm:text-sm/6 dark:text-white",
       )}
     />
   );

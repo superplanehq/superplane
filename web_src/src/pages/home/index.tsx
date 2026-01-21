@@ -442,7 +442,7 @@ function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCa
           handleNavigate();
         }
       }}
-      className="min-h-48 bg-white dark:bg-gray-950 rounded-md outline outline-gray-950/10 hover:shadow-md transition-shadow cursor-pointer"
+      className="min-h-48 bg-white dark:bg-gray-800rounded-md outline outline-gray-950/10 hover:shadow-md transition-shadow cursor-pointer"
     >
       <div className="flex flex-col h-full">
         <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
@@ -808,7 +808,7 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
                 handleNavigate();
               }
             }}
-            className="min-h-48 bg-white dark:bg-gray-950 rounded-md outline outline-slate-950/10 dark:border-gray-800 hover:shadow-md transition-shadow cursor-pointer"
+            className="min-h-48 bg-white dark:bg-gray-800rounded-md outline outline-slate-950/10 dark:border-gray-800 hover:shadow-md transition-shadow cursor-pointer"
           >
             <div className="p-6 flex flex-col justify-between h-full">
               <div>

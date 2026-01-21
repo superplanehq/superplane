@@ -88,7 +88,7 @@ export function CreateCanvasPage() {
               </Text>
             </div>
 
-            <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
+            <div className="bg-white dark:bg-gray-800rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
               <Field>
                 <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Canvas name *</Label>
                 <Input
@@ -215,7 +215,7 @@ function TemplateCard({ template, organizationId, navigate }: TemplateCardProps)
           handleNavigate();
         }
       }}
-      className="min-h-48 bg-white dark:bg-gray-950 rounded-md outline outline-slate-950/10 hover:shadow-md transition-shadow cursor-pointer group"
+      className="min-h-48 bg-white dark:bg-gray-800rounded-md outline outline-slate-950/10 hover:shadow-md transition-shadow cursor-pointer group"
     >
       <div className="flex flex-col h-full">
         <div className="relative">

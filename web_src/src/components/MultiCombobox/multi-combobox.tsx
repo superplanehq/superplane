@@ -195,7 +195,7 @@ export function MultiCombobox<T extends { id: string }>({
             className={clsx([
               "relative flex flex-wrap items-center gap-1 w-full appearance-none rounded-lg py-[calc(--spacing(2.5)-1px)] sm:py-[calc(--spacing(1.5)-1px)]",
               "pr-[calc(--spacing(10)-1px)] pl-[calc(--spacing(3.5)-1px)] sm:pr-[calc(--spacing(9)-1px)] sm:pl-[calc(--spacing(3)-1px)]",
-              "text-base/6 text-gray-950 sm:text-sm/6 dark:text-white",
+              "text-base/6 text-gray-800sm:text-sm/6 dark:text-white",
               "border border-gray-950/10 hover:border-gray-950/20 dark:border-white/10 dark:hover:border-white/20",
               "bg-transparent dark:bg-white/5",
               "focus-within:border-blue-500 dark:focus-within:border-blue-400",
@@ -257,7 +257,7 @@ export function MultiCombobox<T extends { id: string }>({
               placeholder={value.length === 0 ? placeholder : ""}
               className={clsx([
                 "flex-grow-1 min-w-[120px] border-none outline-none bg-transparent",
-                "text-base/6 text-gray-950 placeholder:text-gray-500 sm:text-sm/6 dark:text-white dark:placeholder:text-gray-400",
+                "text-base/6 text-gray-800placeholder:text-gray-500 sm:text-sm/6 dark:text-white dark:placeholder:text-gray-400",
               ])}
             />
           </div>
@@ -316,7 +316,7 @@ export function MultiComboboxOption<T>({
       {...props}
       className={clsx(
         "group/option grid w-full cursor-default grid-cols-[1fr_--spacing(5)] items-baseline gap-x-2 rounded-lg py-2.5 pr-2 pl-3.5 sm:grid-cols-[1fr_--spacing(4)] sm:py-1.5 sm:pr-2 sm:pl-3",
-        "text-base/6 text-gray-950 sm:text-sm/6 dark:text-white forced-colors:text-[CanvasText]",
+        "text-base/6 text-gray-800sm:text-sm/6 dark:text-white forced-colors:text-[CanvasText]",
         "outline-hidden data-focus:bg-sky-500 data-focus:text-white",
         "forced-color-adjust-none forced-colors:data-focus:bg-[Highlight] forced-colors:data-focus:text-[HighlightText]",
         "data-disabled:opacity-50",

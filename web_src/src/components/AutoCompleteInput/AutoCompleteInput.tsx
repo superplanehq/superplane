@@ -775,7 +775,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             {...rest}
           />
           {quickTip && (
-            <span className="pointer-events-none absolute -bottom-4 right-1 text-[10px] font-medium text-gray-400 bg-gray-100 rounded-b-md px-2">
+            <span className="pointer-events-none absolute -bottom-[21px] right-1 text-[11px] text-gray-500 bg-gray-100 rounded-b-md px-1.5 py-0.5">
               {quickTip}
             </span>
           )}
@@ -803,13 +803,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                       <>
                         <div className="mb-2">
                           <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Node Name</div>
-                          <div className="text-sm text-gray-950 dark:text-white font-medium">
+                          <div className="text-sm text-gray-800 dark:text-white font-medium">
                             {highlightedSuggestion.nodeName}
                           </div>
                         </div>
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Node ID</div>
-                          <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
+                          <div className="text-sm text-gray-800dark:text-white font-mono break-all">
                             {highlightedSuggestion.nodeId}
                           </div>
                         </div>
@@ -817,7 +817,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     ) : highlightedSuggestion?.kind === "function" ? (
                       <>
                         <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Function</div>
-                        <div className="text-sm text-gray-950 dark:text-white font-mono">
+                        <div className="text-sm text-gray-800dark:text-white font-mono">
                           {highlightedSuggestion.label}
                         </div>
                       </>
@@ -826,7 +826,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                         (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue))) ? (
                       <>
                         <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Value Preview</div>
-                        <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
+                        <div className="text-sm text-gray-800dark:text-white font-mono break-all">
                           {highlightedValue === null
                             ? "null"
                             : typeof highlightedValue === "string"
@@ -837,7 +837,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     ) : (
                       <>
                         <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Type</div>
-                        <div className="text-sm text-gray-950 dark:text-white font-mono">
+                        <div className="text-sm text-gray-800dark:text-white font-mono">
                           {highlightedSuggestion?.detail ?? highlightedSuggestion?.kind ?? "unknown"}
                         </div>
                       </>
@@ -854,7 +854,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                       className={twMerge([
                         "px-3 py-2 cursor-pointer text-sm flex items-center gap-2",
                         "hover:bg-gray-100 dark:hover:bg-gray-700",
-                        "text-gray-950 dark:text-white",
+                        "text-gray-800dark:text-white",
                         highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
                       ])}
                       onClick={() => handleSuggestionClick(suggestionItem)}

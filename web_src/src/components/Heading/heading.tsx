@@ -21,7 +21,7 @@ export function Subheading({ className, level = 2, ...props }: HeadingProps) {
   return (
     <Element
       {...props}
-      className={twMerge("text-base/7 font-semibold text-gray-950 sm:text-sm/6 dark:text-white", className)}
+      className={twMerge("text-base/7 font-semibold text-gray-800sm:text-sm/6 dark:text-white", className)}
     />
   );
 }
