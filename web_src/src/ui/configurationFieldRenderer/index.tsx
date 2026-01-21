@@ -391,9 +391,7 @@ export const ConfigurationFieldRenderer = ({
 
         {/* Display field description */}
         {field.description && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">
-            {field.description}
-          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
         )}
       </div>
     );
@@ -439,9 +437,7 @@ export const ConfigurationFieldRenderer = ({
 
       {/* Display field description */}
       {field.description && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">
-          {field.description}
-        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
       )}
     </div>
   );
