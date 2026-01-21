@@ -23,15 +23,7 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertNodeIsAdded("Hello")
 	})
 
-	t.Run("duplicating a node on canvas", func(t *testing.T) {
-		steps := &CanvasPageSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists()
-		steps.addNoop("Hello")
-		steps.duplicateNodeOnCanvas("Hello")
-		steps.canvas.RenameNode("Hello", "Hello previous")
-		steps.assertNodeDuplicatedInDB("Hello previous", "Hello")
-	})
+	// Note: "duplicating a node on canvas" test removed - duplicate action no longer available in UI
 
 	t.Run("collapsing and expanding a node on canvas", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
@@ -131,25 +123,17 @@ func (s *CanvasPageSteps) deleteConnectionBetweenNodes(sourceName, targetName st
 }
 
 func (s *CanvasPageSteps) assertIsNodeCollapsed(nodeName string) {
-	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
-	s.session.Sleep(100)
-
-	s.session.AssertVisible(q.TestID("node", nodeName, "header-dropdown"))
-	s.session.AssertText("Detailed view")
-
-	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
-	s.session.Sleep(100)
+	safe := strings.ToLower(nodeName)
+	safe = strings.ReplaceAll(safe, " ", "-")
+	selector := q.Locator(`[data-testid="node-` + safe + `-header"][data-view-mode="compact"]`)
+	s.session.AssertVisible(selector)
 }
 
 func (s *CanvasPageSteps) assertIsNodeExpanded(nodeName string) {
-	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
-	s.session.Sleep(100)
-
-	s.session.AssertVisible(q.TestID("node", nodeName, "header-dropdown"))
-	s.session.AssertText("Compact view")
-
-	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
-	s.session.Sleep(100)
+	safe := strings.ToLower(nodeName)
+	safe = strings.ReplaceAll(safe, " ", "-")
+	selector := q.Locator(`[data-testid="node-` + safe + `-header"][data-view-mode="expanded"]`)
+	s.session.AssertVisible(selector)
 }
 
 func (s *CanvasPageSteps) assertNodeIsAdded(nodeName string) {
@@ -164,25 +148,19 @@ func (s *CanvasPageSteps) givenACanvasExistsWithANoopNode() {
 	s.canvas.AddNoop("DeleteMe", models.Position{X: 500, Y: 200})
 }
 
-func (s *CanvasPageSteps) duplicateNodeOnCanvas(nodeName string) {
-	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
-	s.session.Click(q.TestID("node-action-duplicate"))
-}
-
 func (s *CanvasPageSteps) toggleNodeViewOnCanvas(nodeName string) {
-	s.session.Click(q.TestID("node", nodeName, "header-dropdown"))
+	nodeHeader := q.TestID("node", nodeName, "header")
+	s.session.HoverOver(nodeHeader)
+	s.session.Sleep(100)
 	s.session.Click(q.TestID("node-action-toggle-view"))
 	s.session.Sleep(300)
 }
 
 func (s *CanvasPageSteps) deleteNodeFromCanvas(nodeName string) {
-	safe := strings.ToLower(nodeName)
-	safe = strings.ReplaceAll(safe, " ", "-")
-	dropdown := q.TestID("node-" + safe + "-header-dropdown")
-	deleteButton := q.Locator("button:has-text('Delete')")
-
-	s.session.Click(dropdown)
-	s.session.Click(deleteButton)
+	nodeHeader := q.TestID("node", nodeName, "header")
+	s.session.HoverOver(nodeHeader)
+	s.session.Sleep(100)
+	s.session.Click(q.TestID("node-action-delete"))
 	s.session.Sleep(300)
 }
 
@@ -216,20 +194,6 @@ func (s *CanvasPageSteps) assertNodeDeletedInDB(nodeName string) {
 	}
 }
 
-func (s *CanvasPageSteps) assertNodeDuplicatedInDB(originalName, duplicateName string) {
-	originalNode := s.canvas.GetNodeFromDB(originalName)
-	duplicateNode := s.canvas.GetNodeFromDB(duplicateName)
-
-	require.NotNil(s.t, originalNode, "original node %q not found in DB", originalName)
-	require.NotNil(s.t, duplicateNode, "duplicate node %q not found in DB", duplicateName)
-
-	originalPos := originalNode.Position.Data()
-	duplicatePos := duplicateNode.Position.Data()
-
-	require.Equal(s.t, originalPos.X+50, duplicatePos.X, "duplicate node X position should be offset by 50")
-	require.Equal(s.t, originalPos.Y+50, duplicatePos.Y, "duplicate node Y position should be offset by 50")
-}
-
 func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(itemsAmount int) {
 	s.canvas = shared.NewCanvasSteps("E2E Canvas With Queue", s.t, s.session)
 
@@ -240,13 +204,13 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 	s.canvas.Connect("Start", "Wait")
 	s.canvas.Save()
 
-	dropdown := q.TestID("node", "start", "header-dropdown")
-	runButton := q.Locator("button:has-text('Run')")
+	nodeHeader := q.TestID("node", "start", "header")
 	emitEvent := q.Locator("button:has-text('Emit Event')")
 
 	for i := 0; i < itemsAmount; i++ {
-		s.session.Click(dropdown)
-		s.session.Click(runButton)
+		s.session.HoverOver(nodeHeader)
+		s.session.Sleep(100)
+		s.session.Click(q.TestID("node-action-run"))
 		s.session.Click(emitEvent)
 		s.session.Sleep(100)
 	}

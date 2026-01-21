@@ -232,18 +232,18 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   iconColor,
   title,
   specs,
-  collapsed = false,
-  collapsedBackground,
+  collapsed: _collapsed = false,
+  collapsedBackground: _collapsedBackground,
   eventSections,
   selected = false,
   onToggleCollapse,
   onRun,
   runDisabled,
-  runDisabledTooltip,
-  onEdit,
-  onConfigure,
-  onDuplicate,
-  onDeactivate,
+  runDisabledTooltip: _runDisabledTooltip,
+  onEdit: _onEdit,
+  onConfigure: _onConfigure,
+  onDuplicate: _onDuplicate,
+  onDeactivate: _onDeactivate,
   onToggleView,
   onDelete,
   isCompactView,
@@ -274,12 +274,14 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
     <SelectionWrapper selected={selected}>
       <div
         className={`group relative flex flex-col outline-1 outline-slate-400 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""}`}
+        data-view-mode={isCompactView ? "compact" : "expanded"}
       >
         <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
         <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
           {onRun && (
             <button
               type="button"
+              data-testid="node-action-run"
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -295,6 +297,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           {onToggleView && (
             <button
               type="button"
+              data-testid="node-action-toggle-view"
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -308,6 +311,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           {onDelete && (
             <button
               type="button"
+              data-testid="node-action-delete"
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
