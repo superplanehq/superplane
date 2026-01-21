@@ -4,13 +4,16 @@ import { SidebarEvent } from "@/ui/componentSidebar/types";
 import {
   ComponentsComponent,
   ComponentsNode,
+  groupsListGroupUsers,
   WorkflowsListNodeEventsResponse,
   WorkflowsListNodeExecutionsResponse,
 } from "@/api-client";
 import { mapTriggerEventsToSidebarEvents, mapExecutionsToSidebarEvents } from "@/pages/workflowv2/utils";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, useQueries } from "@tanstack/react-query";
 import { getComponentAdditionalDataBuilder } from "@/pages/workflowv2/mappers";
 import { useAccount } from "@/contexts/AccountContext";
+import { organizationKeys } from "@/hooks/useOrganizationData";
+import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 
 interface UseNodeHistoryProps {
   workflowId: string;
@@ -40,10 +43,58 @@ export const useNodeHistory = ({
   const eventsQuery = useInfiniteNodeEvents(workflowId, nodeId, enabled && isTriggerNode);
   const executionsQuery = useInfiniteNodeExecutions(workflowId, nodeId, enabled && !isTriggerNode);
 
+  const node = useMemo(() => allNodes.find((n) => n.id === nodeId), [allNodes, nodeId]);
+  const componentDef = useMemo(
+    () => components.find((c) => c.name === node?.component?.name),
+    [components, node?.component?.name],
+  );
+  const allExecutions = useMemo(() => {
+    if (!enabled || isTriggerNode) return [];
+    return (
+      executionsQuery.data?.pages.flatMap((page) => (page as WorkflowsListNodeExecutionsResponse)?.executions || []) ||
+      []
+    );
+  }, [enabled, isTriggerNode, executionsQuery.data]);
+  const approvalGroupNames = useMemo(() => {
+    if (!enabled || isTriggerNode || componentDef?.name !== "approval") return [];
+
+    const groupNames = new Set<string>();
+    allExecutions.forEach((execution) => {
+      const metadata = execution.metadata as { records?: Array<{ type?: string; group?: string }> } | undefined;
+      const records = metadata?.records;
+      if (!Array.isArray(records)) return;
+
+      records.forEach((record) => {
+        if (record.type === "group" && record.group) {
+          groupNames.add(record.group);
+        }
+      });
+    });
+
+    return Array.from(groupNames);
+  }, [enabled, isTriggerNode, componentDef?.name, allExecutions]);
+
+  useQueries({
+    queries: approvalGroupNames.map((groupName) => ({
+      queryKey: organizationKeys.groupUsers(organizationId, groupName),
+      queryFn: async () => {
+        const response = await groupsListGroupUsers(
+          withOrganizationHeader({
+            path: { groupName },
+            query: { domainId: organizationId, domainType: "DOMAIN_TYPE_ORGANIZATION" },
+          }),
+        );
+        return response.data?.users || [];
+      },
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      enabled: !!organizationId && !!groupName,
+    })),
+  });
+
   const getAllHistoryEvents = useCallback((): SidebarEvent[] => {
     if (!enabled) return [];
 
-    const node = allNodes.find((n) => n.id === nodeId);
     if (!node) return [];
 
     if (isTriggerNode) {
@@ -51,13 +102,6 @@ export const useNodeHistory = ({
         eventsQuery.data?.pages.flatMap((page) => (page as WorkflowsListNodeEventsResponse)?.events || []) || [];
       return mapTriggerEventsToSidebarEvents(allEvents, node);
     } else {
-      const allExecutions =
-        executionsQuery.data?.pages.flatMap(
-          (page) => (page as WorkflowsListNodeExecutionsResponse)?.executions || [],
-        ) || [];
-
-      const componentDef = components.find((c) => c.name === node.component?.name);
-
       const additionalData = getComponentAdditionalDataBuilder(componentDef?.name || "")?.buildAdditionalData(
         allNodes,
         node,
@@ -73,12 +117,12 @@ export const useNodeHistory = ({
     }
   }, [
     enabled,
+    node,
     allNodes,
-    nodeId,
     isTriggerNode,
     eventsQuery.data,
-    executionsQuery.data,
-    components,
+    allExecutions,
+    componentDef,
     organizationId,
     queryClient,
     workflowId,

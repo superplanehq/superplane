@@ -1,6 +1,6 @@
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { QueryClient, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { Loader2, Puzzle } from "lucide-react";
 import * as yaml from "js-yaml";
@@ -19,9 +19,15 @@ import {
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
+  groupsListGroupUsers,
   workflowsEmitNodeEvent,
 } from "@/api-client";
-import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import {
+  organizationKeys,
+  useOrganizationGroups,
+  useOrganizationRoles,
+  useOrganizationUsers,
+} from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -284,6 +290,47 @@ export function WorkflowPageV2() {
 
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
   }, [storeVersion]);
+
+  const approvalGroupNames = useMemo(() => {
+    if (!organizationId) return [];
+
+    const groupNames = new Set<string>();
+    Object.values(nodeExecutionsMap).forEach((executions) => {
+      executions.forEach((execution) => {
+        const metadata = execution.metadata as { records?: Array<{ type?: string; group?: string }> } | undefined;
+        const records = metadata?.records;
+        if (!Array.isArray(records)) return;
+
+        records.forEach((record) => {
+          if (record.type === "group" && record.group) {
+            groupNames.add(record.group);
+          }
+        });
+      });
+    });
+
+    return Array.from(groupNames);
+  }, [organizationId, nodeExecutionsMap]);
+
+  const organizationIdValue = organizationId || "";
+  const groupUsersQueries = useQueries({
+    queries: approvalGroupNames.map((groupName) => ({
+      queryKey: organizationKeys.groupUsers(organizationIdValue, groupName),
+      queryFn: async () => {
+        const response = await groupsListGroupUsers(
+          withOrganizationHeader({
+            path: { groupName },
+            query: { domainId: organizationIdValue, domainType: "DOMAIN_TYPE_ORGANIZATION" },
+          }),
+        );
+        return response.data?.users || [];
+      },
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      enabled: !!organizationIdValue && !!groupName,
+    })),
+  });
+  const groupUsersUpdatedAt = groupUsersQueries.map((query) => query.dataUpdatedAt).join("|");
 
   // Execution chain data utilities for lazy loading
   const { loadExecutionChain } = useExecutionChainData(workflowId!, queryClient, workflow);
@@ -584,6 +631,7 @@ export function WorkflowPageV2() {
     nodeEventsMap,
     nodeExecutionsMap,
     nodeQueueItemsMap,
+    groupUsersUpdatedAt,
     workflowId,
     queryClient,
     workflowLoading,
