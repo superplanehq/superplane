@@ -232,6 +232,65 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, eventContext.Count(), 1)
 	})
+
+	t.Run("PR comment (issue with pull_request) -> event is NOT emitted", func(t *testing.T) {
+		// When a comment is made on a PR's conversation tab, GitHub sends an issue_comment
+		// event with a pull_request field in the issue object. These should be handled
+		// by OnPRComment, not OnIssueComment.
+		body := []byte(`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"}},"comment":{"body":"comment on PR"}}`)
+
+		secret := "test-secret"
+		h := hmac.New(sha256.New, []byte(secret))
+		h.Write(body)
+		signature := fmt.Sprintf("%x", h.Sum(nil))
+
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256="+signature)
+		headers.Set("X-GitHub-Event", eventType)
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("regular issue comment (no pull_request) -> event IS emitted", func(t *testing.T) {
+		body := []byte(`{"action":"created","issue":{"id":123},"comment":{"body":"comment on issue"}}`)
+
+		secret := "test-secret"
+		h := hmac.New(sha256.New, []byte(secret))
+		h.Write(body)
+		signature := fmt.Sprintf("%x", h.Sum(nil))
+
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256="+signature)
+		headers.Set("X-GitHub-Event", eventType)
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
+	})
 }
 
 func Test__OnIssueComment__Setup(t *testing.T) {

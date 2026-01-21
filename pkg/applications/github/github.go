@@ -108,7 +108,7 @@ func (g *GitHub) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnPush{},
 		&OnPullRequest{},
-		&OnPullRequestReviewComment{},
+		&OnPRComment{},
 		&OnIssue{},
 		&OnIssueComment{},
 		&OnRelease{},
@@ -307,8 +307,9 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 }
 
 type WebhookConfiguration struct {
-	EventType  string `json:"eventType"`
-	Repository string `json:"repository"`
+	EventType  string   `json:"eventType"`
+	EventTypes []string `json:"eventTypes"` // Multiple event types (takes precedence over EventType if set)
+	Repository string   `json:"repository"`
 }
 
 func (g *GitHub) CompareWebhookConfig(a, b any) (bool, error) {
@@ -325,7 +326,37 @@ func (g *GitHub) CompareWebhookConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	return configA.Repository == configB.Repository && configA.EventType == configB.EventType, nil
+	if configA.Repository != configB.Repository {
+		return false, nil
+	}
+
+	// Compare event types - normalize to slices for comparison
+	eventsA := configA.EventTypes
+	if len(eventsA) == 0 && configA.EventType != "" {
+		eventsA = []string{configA.EventType}
+	}
+
+	eventsB := configB.EventTypes
+	if len(eventsB) == 0 && configB.EventType != "" {
+		eventsB = []string{configB.EventType}
+	}
+
+	if len(eventsA) != len(eventsB) {
+		return false, nil
+	}
+
+	// Create a map to compare events regardless of order
+	eventMap := make(map[string]bool)
+	for _, e := range eventsA {
+		eventMap[e] = true
+	}
+	for _, e := range eventsB {
+		if !eventMap[e] {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 type Webhook struct {
@@ -356,9 +387,15 @@ func (g *GitHub) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		return nil, fmt.Errorf("error getting webhook secret: %v", err)
 	}
 
+	// Use EventTypes if set, otherwise fall back to single EventType
+	events := config.EventTypes
+	if len(events) == 0 && config.EventType != "" {
+		events = []string{config.EventType}
+	}
+
 	hook := &github.Hook{
 		Active: github.Ptr(true),
-		Events: []string{config.EventType},
+		Events: events,
 		Config: &github.HookConfig{
 			URL:         github.Ptr(ctx.Webhook.GetURL()),
 			Secret:      github.Ptr(string(secret)),
