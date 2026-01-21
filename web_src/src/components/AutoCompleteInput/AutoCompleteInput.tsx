@@ -802,11 +802,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     {/* $ selector */}
                     {highlightedSuggestion?.label === "$" ? (
                       <>
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-2">$ (Event Data)</div>
-                        <div className="text-xs text-gray-600 dark:text-gray-300 mb-2">
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">$ (Event Data)</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                           Root selector for accessing payload data from all connected components.
                         </div>
-                        <div className="text-xs font-mono bg-gray-200 dark:bg-gray-600 rounded px-2 py-1 text-gray-800 dark:text-gray-100">
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 text-sky-400">
                           {highlightedSuggestion.nodeCount ?? 0} node
                           {highlightedSuggestion.nodeCount !== 1 ? "s" : ""} available
                         </div>
@@ -814,19 +814,14 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     ) : /* Node suggestions */
                     highlightedSuggestion?.nodeName ? (
                       <>
-                        {/* Component type as title */}
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-2">
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">
                           {highlightedSuggestion.componentType || "Component"}
                         </div>
-
-                        {/* Component description */}
                         {highlightedSuggestion.description && (
-                          <div className="text-xs text-gray-600 dark:text-gray-300 mb-3">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                             {highlightedSuggestion.description}
                           </div>
                         )}
-
-                        {/* Node name and ID at bottom */}
                         <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2 space-y-1">
                           <div className="flex justify-between text-xs">
                             <span className="text-gray-500 dark:text-gray-400">Name</span>
@@ -845,39 +840,118 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     ) : /* Function suggestions */
                     highlightedSuggestion?.kind === "function" ? (
                       <>
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-2">
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">
                           {highlightedSuggestion.label}()
                         </div>
                         {highlightedSuggestion.description && (
-                          <div className="text-xs text-gray-600 dark:text-gray-300 mb-2">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                             {highlightedSuggestion.description}
                           </div>
                         )}
                         {highlightedSuggestion.example && (
-                          <div className="text-xs font-mono bg-gray-200 dark:bg-gray-600 rounded px-2 py-1 text-gray-800 dark:text-gray-100 break-all">
+                          <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 text-emerald-400 break-all">
                             {highlightedSuggestion.example}
                           </div>
                         )}
                       </>
-                    ) : /* Value preview for primitives */
-                    highlightedValue !== undefined &&
-                      (highlightedValue === null ||
-                        (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue))) ? (
+                    ) : /* Object values */
+                    highlightedValue !== null &&
+                      typeof highlightedValue === "object" &&
+                      !Array.isArray(highlightedValue) ? (
                       <>
-                        <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Value Preview</div>
-                        <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
-                          {highlightedValue === null
-                            ? "null"
-                            : typeof highlightedValue === "string"
-                              ? `"${highlightedValue}"`
-                              : String(highlightedValue)}
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Object</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          {
+                            Object.keys(highlightedValue as Record<string, unknown>).filter((k) => !k.startsWith("__"))
+                              .length
+                          }{" "}
+                          properties
+                        </div>
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 space-y-0.5">
+                          {Object.keys(highlightedValue as Record<string, unknown>)
+                            .filter((k) => !k.startsWith("__"))
+                            .slice(0, 5)
+                            .map((key) => (
+                              <div key={key} className="truncate">
+                                <span className="text-gray-400">.</span>
+                                <span className="text-sky-400">{key}</span>
+                              </div>
+                            ))}
+                          {Object.keys(highlightedValue as Record<string, unknown>).filter((k) => !k.startsWith("__"))
+                            .length > 5 && (
+                            <div className="text-gray-500 mt-1">
+                              +
+                              {Object.keys(highlightedValue as Record<string, unknown>).filter(
+                                (k) => !k.startsWith("__"),
+                              ).length - 5}{" "}
+                              more...
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : /* Array values */
+                    Array.isArray(highlightedValue) ? (
+                      <>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Array</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          {highlightedValue.length} item{highlightedValue.length !== 1 ? "s" : ""}
+                        </div>
+                        {highlightedValue.length > 0 && (
+                          <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2">
+                            <span className="text-gray-400">[</span>
+                            <span className="text-purple-400">{typeof highlightedValue[0]}</span>
+                            <span className="text-gray-400">, ...]</span>
+                          </div>
+                        )}
+                      </>
+                    ) : /* String values */
+                    typeof highlightedValue === "string" ? (
+                      <>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">String</div>
+                        {highlightedValue.length > 50 && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                            {highlightedValue.length} characters
+                          </div>
+                        )}
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 break-all">
+                          <span className="text-amber-400">"</span>
+                          <span className="text-amber-300">
+                            {highlightedValue.length > 100 ? highlightedValue.slice(0, 100) + "..." : highlightedValue}
+                          </span>
+                          <span className="text-amber-400">"</span>
+                        </div>
+                      </>
+                    ) : /* Number values */
+                    typeof highlightedValue === "number" ? (
+                      <>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Number</div>
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 text-orange-400">
+                          {highlightedValue}
+                        </div>
+                      </>
+                    ) : /* Boolean values */
+                    typeof highlightedValue === "boolean" ? (
+                      <>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Boolean</div>
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2">
+                          <span className={highlightedValue ? "text-green-400" : "text-red-400"}>
+                            {String(highlightedValue)}
+                          </span>
+                        </div>
+                      </>
+                    ) : /* Null values */
+                    highlightedValue === null ? (
+                      <>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Null</div>
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 text-gray-500 italic">
+                          null
                         </div>
                       </>
                     ) : (
                       /* Fallback: show type */
                       <>
-                        <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Type</div>
-                        <div className="text-sm text-gray-950 dark:text-white font-mono">
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Type</div>
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 text-gray-300">
                           {highlightedSuggestion?.detail ?? highlightedSuggestion?.kind ?? "unknown"}
                         </div>
                       </>
