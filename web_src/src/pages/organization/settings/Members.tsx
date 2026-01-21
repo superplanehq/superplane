@@ -258,7 +258,7 @@ export function Members({ organizationId }: MembersProps) {
                     You can also{" "}
                     <button
                       type="button"
-                      className="text-blue-600 hover:underline disabled:text-gray-400"
+                      className="text-sky-600 hover:underline disabled:text-gray-400"
                       onClick={handleInviteLinkReset}
                       disabled={loadingInviteLink || inviteLinkBusy}
                     >

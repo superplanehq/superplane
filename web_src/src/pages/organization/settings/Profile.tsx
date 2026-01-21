@@ -139,14 +139,12 @@ export function Profile() {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 p-6">
           <div className="space-y-4">
             {/* Token Status */}
-            <div className="flex items-center gap-2">
-              {!user.hasToken && (
-                <>
-                  <Icon name="key-round" className="text-gray-500 dark:text-gray-400 text-lg" />
-                  <Text className="text-sm font-medium text-gray-500 dark:text-gray-400">No API token generated</Text>
-                </>
-              )}
-            </div>
+            {!user.hasToken && (
+              <div className="flex items-center gap-2">
+                <Icon name="key-round" className="text-gray-500 dark:text-gray-400 text-lg" />
+                <Text className="text-sm font-medium text-gray-500 dark:text-gray-400">No API token generated</Text>
+              </div>
+            )}
 
             <div className="flex items-center gap-4">
               <Button onClick={handleRegenerateToken} disabled={regeneratingToken} className="flex items-center gap-2">
