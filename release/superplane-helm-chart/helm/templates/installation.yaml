@@ -1,0 +1,22 @@
+{{- if eq .Values.installation.secretName "" }}
+{{- $secretName := include "secrets.installation.name" . -}}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace $secretName -}}
+{{- $installationID := "" -}}
+{{- if $existing }}
+{{- $installationID = index $existing.data "SUPERPLANE_INSTALLATION_ID" -}}
+{{- end }}
+{{- if and (eq $installationID "") (ne .Values.installation.id "") }}
+{{- $installationID = .Values.installation.id | b64enc -}}
+{{- end }}
+{{- if eq $installationID "" }}
+{{- $installationID = randAlphaNum 32 | b64enc -}}
+{{- end }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  SUPERPLANE_INSTALLATION_ID: {{ $installationID }}
+{{- end }}

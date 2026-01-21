@@ -60,6 +60,8 @@ spec:
             - secretRef:
                 name: {{ include "secrets.telemetry.name" . }}
             - secretRef:
+                name: {{ include "secrets.installation.name" . }}
+            - secretRef:
                 name: {{ include "secrets.encryption.name" . }}
             - secretRef:
                 name: {{ include "secrets.jwt.name" . }}

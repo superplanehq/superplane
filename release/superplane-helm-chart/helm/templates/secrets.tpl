@@ -22,6 +22,14 @@
 {{- end }}
 {{- end }}
 
+{{- define "secrets.installation.name" }}
+{{- if eq .Values.installation.secretName "" }}
+{{- printf "%s-installation" .Release.Name }}
+{{- else }}
+{{- .Values.installation.secretName }}
+{{- end }}
+{{- end }}
+
 {{- define "secrets.sentry.name" }}
 {{- if eq .Values.sentry.secretName "" }}
 {{- printf "%s-sentry" .Release.Name }}
