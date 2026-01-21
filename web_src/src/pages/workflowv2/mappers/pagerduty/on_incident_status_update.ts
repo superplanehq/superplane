@@ -68,8 +68,8 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     if (statusUpdate?.message) {
       values["Status Update Message"] = statusUpdate.message;
     }
-    if (eventData?.agent?.name) {
-      values["Agent"] = eventData.agent.name;
+    if (eventData?.agent?.summary) {
+      values["Agent"] = eventData.agent.summary;
     }
 
     return values;
@@ -89,8 +89,6 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     const props: TriggerProps = {
       title: node.name!,
       iconSrc: pdIcon,
-      iconBackground: "bg-green-500",
-      headerColor: "",
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,
     };
