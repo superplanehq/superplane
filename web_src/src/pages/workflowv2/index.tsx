@@ -1013,16 +1013,24 @@ export function WorkflowPageV2() {
       }
 
       const exampleObj: Record<string, unknown> = {};
-      const nodeNames: Record<string, string> = {};
+      const nodeMetadata: Record<string, { name: string; componentType: string; description?: string }> = {};
 
       chainNodeIds.forEach((chainNodeId) => {
         const chainNode = workflowNodes.find((node) => node.id === chainNodeId);
         if (!chainNode) return;
-        if (chainNode.name) {
-          nodeNames[chainNodeId] = chainNode.name;
-        }
 
         if (chainNode.type === "TYPE_TRIGGER") {
+          const triggerMetadata = allTriggers.find((trigger) => trigger.name === chainNode.trigger?.name);
+
+          // Store node metadata with trigger info
+          if (chainNode.name || triggerMetadata) {
+            nodeMetadata[chainNodeId] = {
+              name: chainNode.name || chainNodeId,
+              componentType: triggerMetadata?.label || "Trigger",
+              description: triggerMetadata?.description,
+            };
+          }
+
           const latestEvent = nodeEventsMap[chainNodeId]?.[0];
           if (latestEvent?.data && Object.keys(latestEvent.data).length > 0) {
             exampleObj[chainNodeId] = { ...(latestEvent.data || {}) } as Record<string, unknown>;
@@ -1031,7 +1039,6 @@ export function WorkflowPageV2() {
             return;
           }
 
-          const triggerMetadata = allTriggers.find((trigger) => trigger.name === chainNode.trigger?.name);
           const exampleData = triggerMetadata?.exampleData;
           if (exampleData && typeof exampleData === "object" && Object.keys(exampleData).length > 0) {
             exampleObj[chainNodeId] = exampleData as Record<string, unknown>;
@@ -1039,11 +1046,22 @@ export function WorkflowPageV2() {
           return;
         }
 
+        // For components (non-triggers)
+        const componentMetadata = allComponents.find((component) => component.name === chainNode.component?.name);
+
+        // Store node metadata with component info
+        if (chainNode.name || componentMetadata) {
+          nodeMetadata[chainNodeId] = {
+            name: chainNode.name || chainNodeId,
+            componentType: componentMetadata?.label || "Component",
+            description: componentMetadata?.description,
+          };
+        }
+
         const latestExecution = nodeExecutionsMap[chainNodeId]?.find(
           (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
         );
         if (!latestExecution?.outputs) {
-          const componentMetadata = allComponents.find((component) => component.name === chainNode.component?.name);
           const exampleOutput = componentMetadata?.exampleOutput;
           if (exampleOutput && typeof exampleOutput === "object" && Object.keys(exampleOutput).length > 0) {
             exampleObj[chainNodeId] = exampleOutput as Record<string, unknown>;
@@ -1060,7 +1078,6 @@ export function WorkflowPageV2() {
           return;
         }
 
-        const componentMetadata = allComponents.find((component) => component.name === chainNode.component?.name);
         const exampleOutput = componentMetadata?.exampleOutput;
         if (exampleOutput && typeof exampleOutput === "object" && Object.keys(exampleOutput).length > 0) {
           exampleObj[chainNodeId] = { ...exampleOutput } as Record<string, unknown>;
@@ -1071,12 +1088,12 @@ export function WorkflowPageV2() {
         return null;
       }
 
-      if (Object.keys(nodeNames).length > 0) {
-        exampleObj.__nodeNames = nodeNames;
-        Object.entries(nodeNames).forEach(([nodeId, nodeName]) => {
+      if (Object.keys(nodeMetadata).length > 0) {
+        exampleObj.__nodeNames = nodeMetadata;
+        Object.entries(nodeMetadata).forEach(([nodeId, metadata]) => {
           const value = exampleObj[nodeId];
           if (value && typeof value === "object" && !Array.isArray(value)) {
-            (value as Record<string, unknown>).__nodeName = nodeName;
+            (value as Record<string, unknown>).__nodeName = metadata.name;
           }
         });
       }
