@@ -109,7 +109,7 @@ export function Header({
 
   return (
     <>
-      <header className="bg-white border-b border-border">
+      <header className="bg-white border-b border-slate-950/15">
         <div className="relative flex items-center justify-between h-12 px-4">
           <div className="flex items-center gap-3">
             <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />

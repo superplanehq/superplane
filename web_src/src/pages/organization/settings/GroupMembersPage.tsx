@@ -160,7 +160,7 @@ export function GroupMembersPage() {
         />
       </div>
 
-      <div className="bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
+      <div className="bg-slate-50 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
         {/* Group header */}
         <div className="flex items-center justify-between">
           <div className="group">

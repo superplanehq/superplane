@@ -316,7 +316,7 @@ export function CreateRolePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-left">
+    <div className="min-h-screen text-left">
       <div className="max-w-8xl mx-auto py-8">
         {/* Header */}
         <div className="mb-6">
