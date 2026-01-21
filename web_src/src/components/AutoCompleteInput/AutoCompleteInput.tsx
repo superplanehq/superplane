@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { twMerge } from "tailwind-merge";
 import { getSuggestions, Suggestion } from "./core";
 import { Eye, EyeOff } from "lucide-react";
+import { evaluateExpr, formatExprResult } from "@/lib/exprEvaluator";
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"textarea">, "onChange" | "size"> {
   exampleObj: Record<string, unknown> | null;
@@ -57,6 +58,21 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
     // Check if input contains any expressions
     const hasExpressions = useMemo(() => /\{\{.*?\}\}/.test(inputValue), [inputValue]);
+
+    // Check if all expressions are valid
+    const allExpressionsValid = useMemo(() => {
+      if (!exampleObj) return true;
+      const regex = /\{\{(.*?)\}\}/g;
+      let match;
+      while ((match = regex.exec(inputValue)) !== null) {
+        try {
+          evaluateExpr(match[1].trim(), exampleObj);
+        } catch {
+          return false;
+        }
+      }
+      return true;
+    }, [inputValue, exampleObj]);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -258,72 +274,16 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       return tokens;
     };
 
-    // Evaluate an expression against the exampleObj
+    // Evaluate an expression against the exampleObj using the expr evaluator
     const evaluateExpression = useCallback(
-      (expr: string): string => {
-        if (!exampleObj) return "?";
+      (expr: string): { value: string; error?: string } => {
+        if (!exampleObj) return { value: "?", error: "No context available" };
         try {
-          // Simple path resolution for $["key"].path.path expressions
-          const trimmed = expr.trim();
-
-          // Helper to resolve a value path
-          const resolvePath = (obj: unknown, path: string[]): unknown => {
-            let current = obj;
-            for (const segment of path) {
-              if (current == null) return undefined;
-              if (typeof current === "object") {
-                current = (current as Record<string, unknown>)[segment];
-              } else {
-                return undefined;
-              }
-            }
-            return current;
-          };
-
-          // Parse simple $ expressions like $["key"].prop.prop or $.key.prop
-          if (trimmed.startsWith("$")) {
-            const pathParts: string[] = [];
-            let remaining = trimmed.slice(1); // Remove $
-
-            // Parse bracket and dot notation
-            while (remaining.length > 0) {
-              // Match ["key"] or ['key']
-              const bracketMatch = remaining.match(/^\s*\[\s*(['"])([^'"]*)\1\s*\]/);
-              if (bracketMatch) {
-                pathParts.push(bracketMatch[2]);
-                remaining = remaining.slice(bracketMatch[0].length);
-                continue;
-              }
-              // Match [0] (numeric index)
-              const numMatch = remaining.match(/^\s*\[\s*(\d+)\s*\]/);
-              if (numMatch) {
-                pathParts.push(numMatch[1]);
-                remaining = remaining.slice(numMatch[0].length);
-                continue;
-              }
-              // Match .property
-              const dotMatch = remaining.match(/^\s*\.?\s*([a-zA-Z_][a-zA-Z0-9_]*)/);
-              if (dotMatch) {
-                pathParts.push(dotMatch[1]);
-                remaining = remaining.slice(dotMatch[0].length);
-                continue;
-              }
-              // Can't parse further
-              break;
-            }
-
-            const result = resolvePath(exampleObj, pathParts);
-            if (result === undefined) return "?";
-            if (result === null) return "null";
-            if (typeof result === "string") return result;
-            if (typeof result === "number" || typeof result === "boolean") return String(result);
-            if (Array.isArray(result)) return `[${result.length} items]`;
-            if (typeof result === "object") return `{${Object.keys(result).length} keys}`;
-            return String(result);
-          }
-          return "?";
-        } catch {
-          return "?";
+          const result = evaluateExpr(expr.trim(), exampleObj);
+          return { value: formatExprResult(result) };
+        } catch (e) {
+          const errorMsg = e instanceof Error ? e.message : "Evaluation failed";
+          return { value: "error", error: errorMsg };
         }
       },
       [exampleObj],
@@ -344,15 +304,27 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         }
         // Add the highlighted expression with syntax coloring
         if (previewMode) {
-          // In preview mode, show evaluated value
-          const evaluatedValue = evaluateExpression(match[2]);
-          parts.push(
-            <span key={key++} className="bg-emerald-100 dark:bg-emerald-900/50 rounded-sm">
-              <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
-              <span className="text-emerald-700 dark:text-emerald-300 font-medium">{` ${evaluatedValue} `}</span>
-              <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
-            </span>,
-          );
+          // In preview mode, show evaluated value or error
+          const result = evaluateExpression(match[2]);
+          if (result.error) {
+            // Error state - show in red with error message
+            parts.push(
+              <span key={key++} className="bg-red-100 dark:bg-red-900/50 rounded-sm">
+                <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+                <span className="text-red-600 dark:text-red-400 font-medium">{` error (${result.error}) `}</span>
+                <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+              </span>,
+            );
+          } else {
+            // Success state - show in green
+            parts.push(
+              <span key={key++} className="bg-emerald-100 dark:bg-emerald-900/50 rounded-sm">
+                <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+                <span className="text-emerald-700 dark:text-emerald-300 font-medium">{` ${result.value} `}</span>
+                <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+              </span>,
+            );
+          }
         } else {
           parts.push(
             <span key={key++} className="bg-gray-100 dark:bg-gray-800 rounded-sm">
@@ -1134,8 +1106,12 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                   className={twMerge([
                     "flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors",
                     previewMode
-                      ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
-                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800",
+                      ? allExpressionsValid
+                        ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                        : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                      : allExpressionsValid
+                        ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                        : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30",
                   ])}
                 >
                   {previewMode ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
