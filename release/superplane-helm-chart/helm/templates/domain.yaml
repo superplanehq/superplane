@@ -9,4 +9,3 @@ data:
   SUPERPLANE_BEACON_ENABLED: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
   SUPERPLANE_BEACON_URL: {{ .Values.installation.beaconURL | quote }}
   SUPERPLANE_INSTALLATION_TYPE: {{ .Values.installation.type | quote }}
-  SUPERPLANE_PLATFORM: {{ .Values.installation.platform | quote }}

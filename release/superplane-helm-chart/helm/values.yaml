@@ -64,10 +64,7 @@ telemetry:
     serviceName: ""
 
 installation:
-  secretName: ""
-  id: ""
   type: "kubernetes"
-  platform: "kubernetes"
   beaconEnabled: true
   beaconURL: "https://analytics.superplane.com/beacon"
 

@@ -176,7 +176,7 @@ CREATE TABLE public.blueprints (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100) NOT NULL,
+    ptype character varying(100),
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -238,6 +238,18 @@ CREATE TABLE public.group_metadata (
     description text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: installation_metadata; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_metadata (
+    id integer NOT NULL,
+    installation_id character varying(64) NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -649,6 +661,22 @@ ALTER TABLE ONLY public.group_metadata
 
 
 --
+-- Name: installation_metadata installation_metadata_singleton; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_metadata
+    ADD CONSTRAINT installation_metadata_singleton CHECK ((id = 1));
+
+
+--
+-- Name: installation_metadata installation_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_metadata
+    ADD CONSTRAINT installation_metadata_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_invitations organization_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -928,6 +956,13 @@ CREATE INDEX idx_app_installations_organization_id ON public.app_installations U
 --
 
 CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (organization_id);
+
+
+--
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --
@@ -1475,7 +1510,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260116164255	f
+20260121233727	f
 \.
 
 
@@ -1484,4 +1519,3 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 --
 
 \unrestrict abcdef123
-

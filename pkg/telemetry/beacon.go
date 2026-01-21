@@ -9,6 +9,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const defaultBeaconURL = "https://analytics.superplane.com/beacon"
@@ -29,7 +30,6 @@ func StartBeacon() {
 	}
 
 	go beaconSender()
-
 }
 
 func beaconSender() {
@@ -51,9 +51,17 @@ func isBeaconEnabled() bool {
 func sendBeacon() {
 	client := &http.Client{Timeout: 5 * time.Second}
 
-	url := defaultBeaconURL
-	installationID := os.Getenv("SUPERPLANE_INSTALLATION_ID")
 	installationType := os.Getenv("SUPERPLANE_INSTALLATION_TYPE")
+	if installationType == "" {
+		log.Warn("Beacon not started - missing SUPERPLANE_INSTALLATION_TYPE")
+		return
+	}
+
+	installationID, err := models.GetInstallationID()
+	if err != nil {
+		log.WithError(err).Warn("Failed to load installation ID")
+		return
+	}
 
 	payload := beaconPayload{
 		InstallationType: installationType,
@@ -66,7 +74,7 @@ func sendBeacon() {
 		return
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, defaultBeaconURL, bytes.NewReader(body))
 	if err != nil {
 		log.WithError(err).Warn("Failed to create beacon request")
 		return

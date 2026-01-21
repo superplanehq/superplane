@@ -43,31 +43,13 @@ if command -v openssl >/dev/null 2>&1; then
   JWT_SECRET="$(openssl rand -hex 32)"
   SESSION_SECRET="$(openssl rand -hex 32)"
   DB_PASSWORD="$(openssl rand -hex 16)"
-  INSTALLATION_ID="$(openssl rand -hex 16)"
 else
   echo "openssl not found, using /dev/urandom for secrets."
   ENCRYPTION_KEY="$(head -c 32 /dev/urandom | tr -dc 'a-f0-9' | head -c 32)"
   JWT_SECRET="$(head -c 64 /dev/urandom | tr -dc 'a-f0-9' | head -c 64)"
   SESSION_SECRET="$(head -c 64 /dev/urandom | tr -dc 'a-f0-9' | head -c 64)"
   DB_PASSWORD="$(head -c 32 /dev/urandom | tr -dc 'a-f0-9' | head -c 32)"
-  INSTALLATION_ID="$(head -c 32 /dev/urandom | tr -dc 'a-f0-9' | head -c 32)"
 fi
-
-OS_NAME="$(uname -s)"
-case "${OS_NAME}" in
-  Darwin)
-    PLATFORM="mac"
-    ;;
-  Linux)
-    PLATFORM="linux"
-    ;;
-  MINGW*|MSYS*|CYGWIN*)
-    PLATFORM="windows"
-    ;;
-  *)
-    PLATFORM="linux"
-    ;;
-esac
 
 echo ""
 echo "Writing ${ENV_FILE}..."
@@ -128,9 +110,6 @@ SENTRY_ENVIRONMENT=single-host
 SUPERPLANE_BEACON_ENABLED=yes
 SUPERPLANE_BEACON_URL=https://analytics.superplane.com/beacon
 SUPERPLANE_INSTALLATION_TYPE=single-host
-SUPERPLANE_PLATFORM=${PLATFORM}
-SUPERPLANE_INSTALLATION_ID=${INSTALLATION_ID}
-
 OTEL_ENABLED=no
 EOF
 
