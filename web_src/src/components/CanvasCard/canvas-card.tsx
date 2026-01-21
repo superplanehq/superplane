@@ -25,7 +25,7 @@ export interface CanvasCardProps {
 export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasCardProps) => {
   if (variant === "grid") {
     return (
-      <div className="max-h-45 bg-white dark:bg-gray-950 rounded-md outline outline-slate-950/10 dark:border-gray-800 hover:shadow-md transition-shadow group">
+      <div className="max-h-45 bg-white dark:bg-gray-800 rounded-md outline outline-slate-950/10 dark:border-gray-800 hover:shadow-md transition-shadow group">
         <div className="p-6 flex flex-col justify-between h-full">
           <div>
             <div className="flex items-start mb-4">
@@ -72,7 +72,7 @@ export const CanvasCard = ({ canvas, organizationId, variant = "grid" }: CanvasC
   }
 
   return (
-    <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 hover:shadow-sm transition-shadow group">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 hover:shadow-sm transition-shadow group">
       <div className="p-4 pl-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4 flex-1">

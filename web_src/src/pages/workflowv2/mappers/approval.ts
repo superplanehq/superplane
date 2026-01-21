@@ -72,7 +72,7 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
     icon: "clock",
     textColor: "text-gray-800",
     backgroundColor: "bg-amber-100",
-    badgeColor: "bg-amber-500",
+    badgeColor: "bg-orange-500",
   },
 };
 

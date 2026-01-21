@@ -120,7 +120,7 @@ const OrganizationSelect: React.FC = () => {
             {organizations.map((org) => (
               <div
                 key={org.id}
-                className="h-48 bg-white dark:bg-gray-900 rounded-md shadow-sm p-6 outline outline-slate-950/10 hover:outline-slate-950/15 hover:shadow-md transition-colors cursor-pointer"
+                className="h-48 bg-white dark:bg-gray-900 rounded-md shadow-sm p-6 outline outline-slate-950/10 hover:outline-slate-950/20 hover:shadow-md transition-colors cursor-pointer"
                 onClick={() => handleOrganizationSelect(org)}
               >
                 <div className="flex flex-col h-full justify-between">

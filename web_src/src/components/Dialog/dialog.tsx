@@ -31,7 +31,7 @@ export function Dialog({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center">
-      <div className="fixed inset-0 bg-gray-950/25 dark:bg-gray-950/50" onClick={onClose} />
+      <div className="fixed inset-0 bg-gray-950/20 dark:bg-gray-950/50" onClick={onClose} />
       <div
         className={clsx(
           className,
@@ -51,7 +51,7 @@ export function DialogTitle({ className, ...props }: React.ComponentPropsWithout
   return (
     <h2
       {...props}
-      className={clsx(className, "text-lg/6 font-semibold text-balance text-gray-950 sm:text-base/6 dark:text-white")}
+      className={clsx(className, "text-lg/6 font-semibold text-balance text-gray-800 sm:text-base/6 dark:text-white")}
     />
   );
 }

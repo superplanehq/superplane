@@ -109,7 +109,7 @@ export function Header({
 
   return (
     <>
-      <header className="bg-white border-b border-border">
+      <header className="bg-white border-b border-slate-950/15">
         <div className="relative flex items-center justify-between h-12 px-4">
           <div className="flex items-center gap-3">
             <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
@@ -133,7 +133,7 @@ export function Header({
                   />
                 </button>
                 {isMenuOpen && !workflowsLoading && (
-                  <div className="absolute left-0 top-13 z-50 w-60 rounded-md outline outline-slate-950/15 bg-white shadow-lg">
+                  <div className="absolute left-0 top-13 z-50 min-w-[15rem] w-max rounded-md outline outline-slate-950/20 bg-white shadow-lg">
                     <div className="px-4 pt-3 pb-4">
                       {/* All Canvases Link */}
                       <div className="mb-2">
@@ -196,8 +196,8 @@ export function Header({
                   setExportAction("");
                 }}
               >
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Export YAML" />
+                <SelectTrigger className="w-20">
+                  <SelectValue placeholder="YAML" />
                 </SelectTrigger>
                 <SelectContent align="end">
                   <SelectItem value="copy">

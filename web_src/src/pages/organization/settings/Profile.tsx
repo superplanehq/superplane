@@ -183,7 +183,7 @@ export function Profile() {
                     Copy
                   </Button>
                 </div>
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                <div className="bg-orange-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
                   <div className="flex items-start gap-2">
                     <Icon name="warning" className="text-amber-600 dark:text-amber-400 text-sm mt-0.5" />
                     <Text className="text-amber-800 dark:text-amber-200 text-sm">

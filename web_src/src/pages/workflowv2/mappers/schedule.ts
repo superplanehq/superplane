@@ -387,7 +387,7 @@ export const scheduleCustomFieldRenderer: CustomFieldRenderer = {
 
     return React.createElement(
       "div",
-      { className: "border-t-1 border-gray-200" },
+      { className: "border-t-1 border-gray-200 pt-4" },
       React.createElement(
         "div",
         { className: "space-y-3" },
@@ -401,7 +401,10 @@ export const scheduleCustomFieldRenderer: CustomFieldRenderer = {
           ),
           React.createElement(
             "div",
-            { className: "text-sm text-gray-800 dark:text-gray-100 mt-1 border-1 p-2 bg-gray-100" },
+            {
+              className:
+                "text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono whitespace-pre-line",
+            },
             scheduleDescription || "Schedule not configured",
           ),
         ),
@@ -415,7 +418,10 @@ export const scheduleCustomFieldRenderer: CustomFieldRenderer = {
           ),
           React.createElement(
             "div",
-            { className: "text-sm text-gray-800 dark:text-gray-100 mt-1 border-1 p-2 bg-gray-100" },
+            {
+              className:
+                "text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono whitespace-pre-line",
+            },
             nextTrigger,
           ),
         ),

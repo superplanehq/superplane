@@ -240,7 +240,7 @@ Example expressions:
     }
 
     return (
-      <div className="border-t-1 border-gray-200">
+      <div className="border-t-1 border-gray-200 pt-4">
         <div className="space-y-3">
           <div>
             <span className="text-sm font-medium text-gray-700">{title}:</span>

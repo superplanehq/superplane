@@ -391,9 +391,7 @@ export const ConfigurationFieldRenderer = ({
 
         {/* Display field description */}
         {field.description && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-left bg-gray-50 dark:bg-gray-800 p-2 rounded">
-            {field.description}
-          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
         )}
       </div>
     );
@@ -413,7 +411,7 @@ export const ConfigurationFieldRenderer = ({
                 validationErrors &&
                 isRequired &&
                 (value === undefined || value === null || value === ""))) && (
-              <span className="text-red-500 text-xs ml-2">Required</span>
+              <span className="text-red-500 text-xs ml-2 leading-0">Required</span>
             )}
         </Label>
       </div>
@@ -439,9 +437,7 @@ export const ConfigurationFieldRenderer = ({
 
       {/* Display field description */}
       {field.description && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 text-left bg-gray-50 dark:bg-gray-800 p-2 rounded">
-          {field.description}
-        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
       )}
     </div>
   );

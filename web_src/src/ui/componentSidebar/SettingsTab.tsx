@@ -272,7 +272,7 @@ export function SettingsTab({
         {/* Node identification section */}
         <div className="flex flex-col gap-2">
           <Label className="min-w-[100px] text-left">
-            Node Name
+            Name
             <span className="text-gray-800 ml-1">*</span>
             {hasNodeNameError && <span className="text-red-500 text-xs ml-2">Required</span>}
           </Label>

@@ -61,16 +61,16 @@ export function ZoomSlider({
     <TooltipProvider delayDuration={300}>
       <Panel
         className={cn(
-          "bg-white text-gray-800 outline-1 outline-slate-950/15 flex gap-0.5 rounded-sm p-0.5",
+          "bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8",
           orientation === "horizontal" ? "flex-row" : "flex-col",
           className,
         )}
         {...props}
       >
-        <div className={cn("flex gap-0.5", orientation === "horizontal" ? "flex-row" : "flex-col-reverse")}>
+        <div className={cn("flex items-center gap-1", orientation === "horizontal" ? "flex-row" : "flex-col-reverse")}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" onClick={() => zoomOut({ duration: 300 })}>
+              <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => zoomOut({ duration: 300 })}>
                 <Minus className="h-3 w-3" />
               </Button>
             </TooltipTrigger>
@@ -94,7 +94,7 @@ export function ZoomSlider({
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" onClick={() => zoomIn({ duration: 300 })}>
+              <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => zoomIn({ duration: 300 })}>
                 <Plus className="h-3 w-3" />
               </Button>
             </TooltipTrigger>
@@ -118,7 +118,7 @@ export function ZoomSlider({
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" onClick={() => fitView({ duration: 300 })}>
+            <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => fitView({ duration: 300 })}>
               <Maximize className="h-3 w-3" />
             </Button>
           </TooltipTrigger>
@@ -130,6 +130,7 @@ export function ZoomSlider({
               <Button
                 variant={isSelectionModeEnabled ? "default" : "ghost"}
                 size="icon-sm"
+                className="h-8 w-8"
                 onClick={onSelectionModeToggle}
               >
                 <MousePointer2 className="h-3 w-3" />

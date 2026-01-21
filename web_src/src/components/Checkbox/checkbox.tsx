@@ -60,7 +60,7 @@ export function Checkbox({
           "before:absolute before:inset-0 before:-z-10 before:rounded-[calc(0.3125rem-1px)] before:bg-white before:shadow-sm",
           "dark:before:hidden",
           "dark:bg-white/5",
-          "border border-gray-950/15",
+          "border border-gray-950/20",
           !disabled && "hover:border-gray-950/30",
           "dark:border-white/15",
           !disabled && "dark:hover:border-white/30",

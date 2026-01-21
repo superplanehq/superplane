@@ -61,7 +61,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
       key={index}
       className={
         `px-2 pt-2 relative ${lastSection ? "rounded-b-md" : ""} ${LastEventBackground}` +
-        (index < totalSections - 1 ? " border-b border-slate-400" : "") +
+        (index < totalSections - 1 ? " border-b border-slate-950/20" : "") +
         ` ${className}`
       }
     >
@@ -273,7 +273,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   return (
     <SelectionWrapper selected={selected}>
       <div
-        className={`group relative flex flex-col outline-1 outline-slate-400 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""}`}
+        className={`group relative flex flex-col outline-1 outline-slate-950/20 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""}`}
         data-view-mode={isCompactView ? "compact" : "expanded"}
       >
         <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
@@ -353,7 +353,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
             {!hideMetadataList && metadata && metadata.length > 0 && <MetadataList items={metadata} />}
 
             {specs && specs.length > 0 && (
-              <div className="px-2 py-1.5 border-b border-slate-400 text-gray-500 flex flex-col gap-1.5">
+              <div className="px-2 py-1.5 border-b border-slate-950/20 text-gray-500 flex flex-col gap-1.5">
                 {specs.map((spec, index) => (
                   <div key={index} className="flex items-center text-md text-gray-500">
                     <div className="w-4 h-4 mr-2">
@@ -388,7 +388,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
             {eventSections?.map((section, index) => (
               <EventSectionDisplay
-                className={"pb-3" + (!!includeEmptyState || !!customField ? " border-b border-slate-400" : "")}
+                className={"pb-3" + (!!includeEmptyState || !!customField ? " border-b border-slate-950/20" : "")}
                 key={index}
                 section={section}
                 index={index}

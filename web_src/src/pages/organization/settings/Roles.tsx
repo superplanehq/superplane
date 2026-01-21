@@ -131,7 +131,7 @@ export function Roles({ organizationId }: RolesProps) {
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
         <div className="px-6 pt-6 pb-4 flex items-center justify-start">
           <Button className="flex items-center" onClick={handleCreateRole}>
             <Icon name="plus" />

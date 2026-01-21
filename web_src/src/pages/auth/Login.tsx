@@ -297,7 +297,7 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4 py-10">
       <div className="max-w-sm w-full bg-white dark:bg-gray-900 rounded-lg outline outline-gray-950/10 shadow-sm p-8">
         <div className="text-center">
           <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto h-8 w-8" />

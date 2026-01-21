@@ -185,7 +185,7 @@ export const Composite: React.FC<CompositeProps> = ({
 
   // Handle missing state with custom component
   const customField = isMissing ? (
-    <div className="px-3 py-2 bg-amber-50 border-t border-amber-200 flex items-center gap-2">
+    <div className="px-3 py-2 bg-orange-50 border-t border-amber-200 flex items-center gap-2">
       <div className="flex-shrink-0">
         <svg className="h-4 w-4 text-amber-700" fill="currentColor" viewBox="0 0 20 20">
           <path
