@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { twMerge } from "tailwind-merge";
 import { getSuggestions, Suggestion } from "./core";
+import { Eye, EyeOff } from "lucide-react";
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"textarea">, "onChange" | "size"> {
   exampleObj: Record<string, unknown> | null;
@@ -49,9 +50,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       top: number;
       left: number;
     }>({ top: 0, left: 0 });
+    const [previewMode, setPreviewMode] = useState(false);
     const dropdownWidth = 350;
     const previousWordLength = useRef<number>(0);
     const previousInputValue = useRef<string>(value);
+
+    // Check if input contains any expressions
+    const hasExpressions = useMemo(() => /\{\{.*?\}\}/.test(inputValue), [inputValue]);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -253,6 +258,77 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       return tokens;
     };
 
+    // Evaluate an expression against the exampleObj
+    const evaluateExpression = useCallback(
+      (expr: string): string => {
+        if (!exampleObj) return "?";
+        try {
+          // Simple path resolution for $["key"].path.path expressions
+          const trimmed = expr.trim();
+
+          // Helper to resolve a value path
+          const resolvePath = (obj: unknown, path: string[]): unknown => {
+            let current = obj;
+            for (const segment of path) {
+              if (current == null) return undefined;
+              if (typeof current === "object") {
+                current = (current as Record<string, unknown>)[segment];
+              } else {
+                return undefined;
+              }
+            }
+            return current;
+          };
+
+          // Parse simple $ expressions like $["key"].prop.prop or $.key.prop
+          if (trimmed.startsWith("$")) {
+            const pathParts: string[] = [];
+            let remaining = trimmed.slice(1); // Remove $
+
+            // Parse bracket and dot notation
+            while (remaining.length > 0) {
+              // Match ["key"] or ['key']
+              const bracketMatch = remaining.match(/^\s*\[\s*(['"])([^'"]*)\1\s*\]/);
+              if (bracketMatch) {
+                pathParts.push(bracketMatch[2]);
+                remaining = remaining.slice(bracketMatch[0].length);
+                continue;
+              }
+              // Match [0] (numeric index)
+              const numMatch = remaining.match(/^\s*\[\s*(\d+)\s*\]/);
+              if (numMatch) {
+                pathParts.push(numMatch[1]);
+                remaining = remaining.slice(numMatch[0].length);
+                continue;
+              }
+              // Match .property
+              const dotMatch = remaining.match(/^\s*\.?\s*([a-zA-Z_][a-zA-Z0-9_]*)/);
+              if (dotMatch) {
+                pathParts.push(dotMatch[1]);
+                remaining = remaining.slice(dotMatch[0].length);
+                continue;
+              }
+              // Can't parse further
+              break;
+            }
+
+            const result = resolvePath(exampleObj, pathParts);
+            if (result === undefined) return "?";
+            if (result === null) return "null";
+            if (typeof result === "string") return result;
+            if (typeof result === "number" || typeof result === "boolean") return String(result);
+            if (Array.isArray(result)) return `[${result.length} items]`;
+            if (typeof result === "object") return `{${Object.keys(result).length} keys}`;
+            return String(result);
+          }
+          return "?";
+        } catch {
+          return "?";
+        }
+      },
+      [exampleObj],
+    );
+
     // Render content with highlighted expressions
     const renderHighlightedContent = (text: string) => {
       const parts: React.ReactNode[] = [];
@@ -267,13 +343,25 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           parts.push(<span key={key++}>{text.slice(lastIndex, match.index)}</span>);
         }
         // Add the highlighted expression with syntax coloring
-        parts.push(
-          <span key={key++} className="bg-gray-100 dark:bg-gray-800 rounded-sm">
-            <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
-            {tokenizeExpression(match[2])}
-            <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
-          </span>,
-        );
+        if (previewMode) {
+          // In preview mode, show evaluated value
+          const evaluatedValue = evaluateExpression(match[2]);
+          parts.push(
+            <span key={key++} className="bg-emerald-100 dark:bg-emerald-900/50 rounded-sm">
+              <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+              <span className="text-emerald-700 dark:text-emerald-300 font-medium">{` ${evaluatedValue} `}</span>
+              <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+            </span>,
+          );
+        } else {
+          parts.push(
+            <span key={key++} className="bg-gray-100 dark:bg-gray-800 rounded-sm">
+              <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+              {tokenizeExpression(match[2])}
+              <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+            </span>,
+          );
+        }
         lastIndex = regex.lastIndex;
       }
 
@@ -950,7 +1038,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const shouldShowValuePreview = showValuePreview && highlightedIndex >= 0;
 
     return (
-      <div ref={containerRef} className={"relative w-full" + (quickTip ? " mb-6" : "")}>
+      <div ref={containerRef} className={"relative w-full" + (quickTip || hasExpressions ? " mb-6" : "")}>
         {/* Hidden mirror element for measuring cursor position */}
         <span
           ref={mirrorRef}
@@ -1018,7 +1106,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
               }, 150);
             }}
             placeholder={placeholder}
-            disabled={disabled}
+            disabled={disabled || previewMode}
             className={twMerge([
               "font-sm bg-transparent border-gray-300 shadow-xs placeholder:text-gray-500 selection:bg-primary/30",
               "relative block w-full min-w-0 appearance-none rounded-md border px-3 py-2 text-base outline-none resize-none overflow-hidden",
@@ -1035,25 +1123,47 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             ])}
             {...rest}
           />
-          {quickTip && (
-            <span className="absolute -bottom-5 right-0 flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
-              <span>
-                Use{" "}
-                <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300">
-                  {"{{"}
-                </code>{" "}
-                to write{" "}
-                <a
-                  href="https://expr-lang.org/docs/language-definition"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 dark:text-blue-400 hover:underline"
+          {/* Bottom bar with preview toggle and quickTip */}
+          {(hasExpressions || quickTip) && (
+            <div className="absolute -bottom-5 left-0 right-0 flex items-center justify-between">
+              {/* Preview toggle - left side */}
+              {hasExpressions ? (
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode(!previewMode)}
+                  className={twMerge([
+                    "flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors",
+                    previewMode
+                      ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800",
+                  ])}
                 >
-                  expr
-                </a>{" "}
-                expressions
-              </span>
-            </span>
+                  {previewMode ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  <span>Preview</span>
+                </button>
+              ) : (
+                <span />
+              )}
+              {/* QuickTip - right side */}
+              {quickTip && (
+                <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                  Use{" "}
+                  <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300">
+                    {"{{"}
+                  </code>{" "}
+                  to write{" "}
+                  <a
+                    href="https://expr-lang.org/docs/language-definition"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    expr
+                  </a>{" "}
+                  expressions
+                </span>
+              )}
+            </div>
           )}
         </span>
 
