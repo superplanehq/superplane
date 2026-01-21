@@ -165,10 +165,7 @@ export function mapQueueItemsToSidebarEvents(
 }
 
 export function mapExecutionStateToLogType(state?: string): "success" | "error" {
-  if (state === "failed" || state === "error" || state === "cancelled") {
-    return "error";
-  }
-  return "success";
+  return state === "error" ? "error" : "success";
 }
 
 export function buildRunItemFromExecution(options: {
