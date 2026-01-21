@@ -19,7 +19,7 @@ echo "Running SuperPlane single-host installation."
 echo ""
 
 while :; do
-  read -rp "1) Domain for SuperPlane (e.g. superplane.example.com): " DOMAIN
+  read -rp "Domain for SuperPlane (e.g. superplane.example.com): " DOMAIN
   if [[ -n "${DOMAIN}" ]]; then
     break
   fi
@@ -30,33 +30,10 @@ SANITIZED_DOMAIN="$(echo "${DOMAIN}" | sed -E 's#^https?://##' | cut -d'/' -f1)"
 BASE_URL="https://${SANITIZED_DOMAIN}"
 
 echo ""
-read -rp "2) Configure email invitations via Resend now? (y/N): " CONFIGURE_EMAIL
-CONFIGURE_EMAIL="${CONFIGURE_EMAIL:-n}"
-
 RESEND_API_KEY=""
 EMAIL_FROM_NAME="SuperPlane"
 EMAIL_FROM_ADDRESS=""
-
-if [[ "${CONFIGURE_EMAIL}" =~ ^[Yy]$ ]]; then
-  echo ""
-  read -rp "Resend API key: " RESEND_API_KEY
-  read -rp "Sender name [${EMAIL_FROM_NAME}]: " EMAIL_FROM_NAME_INPUT
-  EMAIL_FROM_NAME="${EMAIL_FROM_NAME_INPUT:-$EMAIL_FROM_NAME}"
-
-  default_sender="noreply@notifications.${SANITIZED_DOMAIN}"
-  read -rp "Sender email [${default_sender}]: " EMAIL_FROM_ADDRESS_INPUT
-  EMAIL_FROM_ADDRESS="${EMAIL_FROM_ADDRESS_INPUT:-$default_sender}"
-fi
-
-echo ""
-read -rp "3) Allow open signups (anyone can create an account)? (y/N): " ALLOW_SIGNUP_INPUT
-ALLOW_SIGNUP_INPUT="${ALLOW_SIGNUP_INPUT:-n}"
-
-if [[ "${ALLOW_SIGNUP_INPUT}" =~ ^[Yy]$ ]]; then
-  BLOCK_SIGNUP="no"
-else
-  BLOCK_SIGNUP="yes"
-fi
+BLOCK_SIGNUP="yes"
 
 echo ""
 echo "Generating secrets..."
