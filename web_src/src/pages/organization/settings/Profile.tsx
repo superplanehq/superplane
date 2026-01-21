@@ -139,14 +139,12 @@ export function Profile() {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 p-6">
           <div className="space-y-4">
             {/* Token Status */}
-            <div className="flex items-center gap-2">
-              {!user.hasToken && (
-                <>
-                  <Icon name="error" className="text-gray-500 dark:text-gray-400 text-lg" />
-                  <Text className="text-sm font-medium text-gray-500 dark:text-gray-400">No API token generated</Text>
-                </>
-              )}
-            </div>
+            {!user.hasToken && (
+              <div className="flex items-center gap-2">
+                <Icon name="key-round" className="text-gray-500 dark:text-gray-400 text-lg" />
+                <Text className="text-sm font-medium text-gray-500 dark:text-gray-400">No API token generated</Text>
+              </div>
+            )}
 
             <div className="flex items-center gap-4">
               <Button onClick={handleRegenerateToken} disabled={regeneratingToken} className="flex items-center gap-2">
@@ -172,20 +170,20 @@ export function Profile() {
                     className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-900"
                   />
                   <Button
-                    variant="secondary"
+                    variant="outline"
                     onClick={() => setTokenVisible(!tokenVisible)}
                     className="flex items-center gap-1"
                   >
-                    <Icon name={tokenVisible ? "visibility_off" : "visibility"} />
+                    <Icon name={tokenVisible ? "eye-closed" : "eye"} />
                   </Button>
-                  <Button variant="secondary" onClick={copyToken} className="flex items-center gap-1">
+                  <Button variant="outline" onClick={copyToken} className="flex items-center gap-1">
                     <Icon name="copy" />
                     Copy
                   </Button>
                 </div>
-                <div className="bg-orange-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                <div className="bg-orange-50 dark:bg-amber-900/20 border border-amber-950/15 dark:border-amber-100/15 rounded-lg p-3">
                   <div className="flex items-start gap-2">
-                    <Icon name="warning" className="text-amber-600 dark:text-amber-400 text-sm mt-0.5" />
+                    <Icon name="key-round" className="text-amber-800 dark:text-amber-400 text-sm mt-0.5" />
                     <Text className="text-amber-800 dark:text-amber-200 text-sm">
                       <strong>Important:</strong> This token will only be shown once. Make sure to copy and store it
                       securely. If you lose this token, you'll need to generate a new one.

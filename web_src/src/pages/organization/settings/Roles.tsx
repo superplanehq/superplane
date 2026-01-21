@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { RolesRole } from "../../../api-client/types.gen";
 import { Icon } from "../../../components/Icon";
@@ -13,14 +13,6 @@ interface RolesProps {
 
 export function Roles({ organizationId }: RolesProps) {
   const navigate = useNavigate();
-  const [sortConfig, setSortConfig] = useState<{
-    key: string | null;
-    direction: "asc" | "desc";
-  }>({
-    key: null,
-    direction: "asc",
-  });
-
   // Use React Query hooks for data fetching
   const { data: roles = [], isLoading: loadingRoles, error } = useOrganizationRoles(organizationId);
 
@@ -55,13 +47,6 @@ export function Roles({ organizationId }: RolesProps) {
     }
   };
 
-  const handleSort = (key: string) => {
-    setSortConfig((prevConfig) => ({
-      key,
-      direction: prevConfig.key === key && prevConfig.direction === "asc" ? "desc" : "asc",
-    }));
-  };
-
   const getSortedData = (data: RolesRole[]) => {
     const defaultOrder = ["org_admin", "org_owner", "org_viewer"];
     const defaultOrderIndex = new Map(defaultOrder.map((role, index) => [role, index]));
@@ -77,24 +62,9 @@ export function Roles({ organizationId }: RolesProps) {
     });
 
     const sortedCustomRoles = [...customRoles].sort((a, b) => {
-      let aValue: string | number;
-      let bValue: string | number;
-
-      if (sortConfig.key === "permissions") {
-        aValue = a.spec?.permissions?.length || 0;
-        bValue = b.spec?.permissions?.length || 0;
-      } else {
-        aValue = (a.spec?.displayName || a.metadata?.name || "").toLowerCase();
-        bValue = (b.spec?.displayName || b.metadata?.name || "").toLowerCase();
-      }
-
-      if (aValue < bValue) {
-        return sortConfig.direction === "desc" && sortConfig.key ? 1 : -1;
-      }
-      if (aValue > bValue) {
-        return sortConfig.direction === "desc" && sortConfig.key ? -1 : 1;
-      }
-      return 0;
+      const aValue = (a.spec?.displayName || a.metadata?.name || "").toLowerCase();
+      const bValue = (b.spec?.displayName || b.metadata?.name || "").toLowerCase();
+      return aValue.localeCompare(bValue);
     });
 
     const sortedDefaultRoles = [...defaultRoles].sort((a, b) => {
@@ -112,16 +82,9 @@ export function Roles({ organizationId }: RolesProps) {
     return defaultRoles.includes(roleName);
   };
 
-  const getSortIcon = (columnKey: string) => {
-    if (sortConfig.key !== columnKey) {
-      return "chevrons-up-down";
-    }
-    return sortConfig.direction === "asc" ? "chevron-up" : "chevron-down";
-  };
-
   const filteredAndSortedRoles = useMemo(() => {
     return getSortedData(roles);
-  }, [roles, sortConfig]);
+  }, [roles]);
 
   return (
     <div className="space-y-6 pt-6">
@@ -147,24 +110,8 @@ export function Roles({ organizationId }: RolesProps) {
             <Table dense>
               <TableHead>
                 <TableRow>
-                  <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                    onClick={() => handleSort("name")}
-                  >
-                    <div className="flex items-center gap-2">
-                      Role name
-                      <Icon name={getSortIcon("name")} size="sm" className="text-gray-400" />
-                    </div>
-                  </TableHeader>
-                  <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                    onClick={() => handleSort("permissions")}
-                  >
-                    <div className="flex items-center gap-2">
-                      Permissions
-                      <Icon name={getSortIcon("permissions")} size="sm" className="text-gray-400" />
-                    </div>
-                  </TableHeader>
+                  <TableHeader>Role name</TableHeader>
+                  <TableHeader>Permissions</TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
