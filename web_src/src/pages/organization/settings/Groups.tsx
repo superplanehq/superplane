@@ -1,14 +1,6 @@
 import { formatRelativeTime } from "@/utils/timezone";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Dropdown,
-  DropdownButton,
-  DropdownDescription,
-  DropdownItem,
-  DropdownLabel,
-  DropdownMenu,
-} from "../../../components/Dropdown/dropdown";
 import { Icon } from "../../../components/Icon";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "../../../components/Link/link";
@@ -21,6 +13,7 @@ import {
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { isRBACEnabled } from "@/lib/env";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
 interface GroupsProps {
   organizationId: string;
@@ -241,29 +234,38 @@ export function Groups({ organizationId }: GroupsProps) {
                     </TableCell>
                     {isRBACEnabled() && (
                       <TableCell>
-                        <Dropdown>
-                          <DropdownButton
-                            className="flex items-center gap-2 text-sm justify-between"
-                            disabled={updateGroupMutation.isPending}
-                          >
-                            {updateGroupMutation.isPending
-                              ? "Updating..."
-                              : roles.find((r) => r?.metadata?.name === group.spec?.role)?.spec?.displayName ||
-                                "Select Role"}
-                            <Icon name="chevron-down" />
-                          </DropdownButton>
-                          <DropdownMenu>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              className="flex items-center gap-2 text-sm justify-between"
+                              disabled={updateGroupMutation.isPending}
+                            >
+                              {updateGroupMutation.isPending
+                                ? "Updating..."
+                                : roles.find((r) => r?.metadata?.name === group.spec?.role)?.spec?.displayName ||
+                                  "Select Role"}
+                              <Icon name="chevron-down" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
                             {roles.map((role) => (
-                              <DropdownItem
+                              <DropdownMenuItem
                                 key={role.metadata?.name}
                                 onClick={() => handleRoleUpdate(group.metadata!.name!, role.metadata!.name!)}
+                                className="flex flex-col items-start gap-1"
                               >
-                                <DropdownLabel>{role.spec?.displayName || role.metadata!.name}</DropdownLabel>
-                                <DropdownDescription>{role.spec?.description || ""}</DropdownDescription>
-                              </DropdownItem>
+                                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                  {role.spec?.displayName || role.metadata!.name}
+                                </span>
+                                {role.spec?.description && (
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {role.spec?.description}
+                                  </span>
+                                )}
+                              </DropdownMenuItem>
                             ))}
-                          </DropdownMenu>
-                        </Dropdown>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     )}
                     <TableCell>

@@ -2,14 +2,6 @@ import { useMemo, useState } from "react";
 import { useAccount } from "@/contexts/AccountContext";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Badge } from "../../../components/Badge/badge";
-import {
-  Dropdown,
-  DropdownButton,
-  DropdownDescription,
-  DropdownItem,
-  DropdownLabel,
-  DropdownMenu,
-} from "../../../components/Dropdown/dropdown";
 import { Icon } from "../../../components/Icon";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { Text } from "../../../components/Text/text";
@@ -28,6 +20,7 @@ import { isRBACEnabled } from "@/lib/env";
 import { Switch } from "@/ui/switch";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
 interface Member {
   id: string;
@@ -393,31 +386,38 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell>{member.email}</TableCell>
                     {isRBACEnabled() && (
                       <TableCell>
-                        <Dropdown>
-                          <DropdownButton className="flex items-center gap-2 text-sm">
-                            {member.role}
-                            <Icon name="chevron-down" />
-                          </DropdownButton>
-                          <DropdownMenu>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="flex items-center gap-2 text-sm">
+                              {member.role}
+                              <Icon name="chevron-down" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
                             {organizationRoles.map((role) => (
-                              <DropdownItem
+                              <DropdownMenuItem
                                 key={role.metadata?.name}
                                 onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
                                 disabled={loadingRoles}
+                                className="flex flex-col items-start gap-1"
                               >
-                                <DropdownLabel>{role.spec?.displayName || role.metadata?.name}</DropdownLabel>
+                                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                  {role.spec?.displayName || role.metadata?.name}
+                                </span>
                                 {role.spec?.description && (
-                                  <DropdownDescription>{role.spec?.description}</DropdownDescription>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {role.spec?.description}
+                                  </span>
                                 )}
-                              </DropdownItem>
+                              </DropdownMenuItem>
                             ))}
                             {loadingRoles && (
-                              <DropdownItem disabled>
-                                <DropdownLabel>Loading roles...</DropdownLabel>
-                              </DropdownItem>
+                              <DropdownMenuItem disabled>
+                                <span className="text-sm text-gray-500 dark:text-gray-400">Loading roles...</span>
+                              </DropdownMenuItem>
                             )}
-                          </DropdownMenu>
-                        </Dropdown>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     )}
                     <TableCell>
@@ -426,32 +426,36 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell>
                       <div className="flex justify-end">
                         {ownerIds.has(member.id) && ownerIds.size <= 1 ? (
-                          <Dropdown>
-                            <DropdownButton className="flex items-center gap-2 text-sm">
-                              <Icon name="ellipsis-vertical" size="sm" />
-                            </DropdownButton>
-                            <DropdownMenu>
-                              <DropdownItem disabled>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="flex items-center gap-2 text-sm">
+                                <Icon name="ellipsis-vertical" size="sm" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem disabled>
                                 <Icon name="x" size="sm" />
                                 <span className="ml-1">Cannot remove last owner</span>
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         ) : (
-                          <Dropdown>
-                            <DropdownButton className="flex items-center gap-2 text-sm">
-                              <Icon name="ellipsis-vertical" size="sm" />
-                            </DropdownButton>
-                            <DropdownMenu>
-                              <DropdownItem
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="flex items-center gap-2 text-sm">
+                                <Icon name="ellipsis-vertical" size="sm" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem
                                 className="flex items-center gap-1"
                                 onClick={() => handleMemberRemove(member)}
                               >
                                 <Icon name="x" size="sm" />
                                 Remove
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                       </div>
                     </TableCell>
