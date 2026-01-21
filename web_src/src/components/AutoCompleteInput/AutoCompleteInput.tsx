@@ -816,10 +816,19 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                       </>
                     ) : highlightedSuggestion?.kind === "function" ? (
                       <>
-                        <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Function</div>
-                        <div className="text-sm text-gray-950 dark:text-white font-mono">
-                          {highlightedSuggestion.label}
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-2">
+                          {highlightedSuggestion.label}()
                         </div>
+                        {highlightedSuggestion.description && (
+                          <div className="text-xs text-gray-600 dark:text-gray-300 mb-2">
+                            {highlightedSuggestion.description}
+                          </div>
+                        )}
+                        {highlightedSuggestion.example && (
+                          <div className="text-xs font-mono bg-gray-200 dark:bg-gray-600 rounded px-2 py-1 text-gray-800 dark:text-gray-100 break-all">
+                            {highlightedSuggestion.example}
+                          </div>
+                        )}
                       </>
                     ) : highlightedValue !== undefined &&
                       (highlightedValue === null ||
