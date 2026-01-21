@@ -822,16 +822,16 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                             {highlightedSuggestion.description}
                           </div>
                         )}
-                        <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2 space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-gray-500 dark:text-gray-400">Name</span>
-                            <span className="text-gray-950 dark:text-white font-medium truncate ml-2 max-w-[120px]">
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Name</span>
+                            <span className="text-sky-400 truncate ml-2 max-w-[120px]">
                               {highlightedSuggestion.nodeName}
                             </span>
                           </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-gray-500 dark:text-gray-400">ID</span>
-                            <span className="text-gray-950 dark:text-white font-mono truncate ml-2 max-w-[120px]">
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">ID</span>
+                            <span className="text-gray-400 truncate ml-2 max-w-[120px]">
                               {highlightedSuggestion.nodeId}
                             </span>
                           </div>
