@@ -1,0 +1,15 @@
+{
+  "data": {
+    "id": "1234567890123456789",
+    "channel_id": "9876543210987654321",
+    "content": "Hello from SuperPlane",
+    "timestamp": "2026-01-16T12:00:00.000Z",
+    "author": {
+      "id": "1111111111111111111",
+      "username": "Webhook",
+      "bot": true
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "discord.message.sent"
+}
