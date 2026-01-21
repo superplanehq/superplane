@@ -809,7 +809,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                         </div>
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Node ID</div>
-                          <div className="text-sm text-gray-800dark:text-white font-mono break-all">
+                          <div className="text-sm text-gray-800 dark:text-white font-mono break-all">
                             {highlightedSuggestion.nodeId}
                           </div>
                         </div>
@@ -817,7 +817,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     ) : highlightedSuggestion?.kind === "function" ? (
                       <>
                         <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Function</div>
-                        <div className="text-sm text-gray-800dark:text-white font-mono">
+                        <div className="text-sm text-gray-800 dark:text-white font-mono">
                           {highlightedSuggestion.label}
                         </div>
                       </>
@@ -826,7 +826,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                         (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue))) ? (
                       <>
                         <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Value Preview</div>
-                        <div className="text-sm text-gray-800dark:text-white font-mono break-all">
+                        <div className="text-sm text-gray-800 dark:text-white font-mono break-all">
                           {highlightedValue === null
                             ? "null"
                             : typeof highlightedValue === "string"
@@ -837,7 +837,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     ) : (
                       <>
                         <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Type</div>
-                        <div className="text-sm text-gray-800dark:text-white font-mono">
+                        <div className="text-sm text-gray-800 dark:text-white font-mono">
                           {highlightedSuggestion?.detail ?? highlightedSuggestion?.kind ?? "unknown"}
                         </div>
                       </>
@@ -854,7 +854,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                       className={twMerge([
                         "px-3 py-2 cursor-pointer text-sm flex items-center gap-2",
                         "hover:bg-gray-100 dark:hover:bg-gray-700",
-                        "text-gray-800dark:text-white",
+                        "text-gray-800 dark:text-white",
                         highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
                       ])}
                       onClick={() => handleSuggestionClick(suggestionItem)}

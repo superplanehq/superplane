@@ -31,7 +31,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
       data-view-mode={isCompactView ? "compact" : "expanded"}
       className={
         "canvas-node-drag-handle text-left text-lg w-full px-2 py-1.5 flex items-center flex-col rounded-t-md items-center relative" +
-        (isCompactView ? "" : " border-b border-slate-950/25")
+        (isCompactView ? "" : " border-b border-slate-950/20")
       }
       onDoubleClick={onDoubleClick}
     >

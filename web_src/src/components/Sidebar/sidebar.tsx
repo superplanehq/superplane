@@ -66,18 +66,18 @@ export function SidebarItem({
   onClick?: () => void;
 } & React.ComponentPropsWithoutRef<"button">) {
   const classes = clsx(
-    "flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-base/6 font-medium text-gray-800sm:py-2 sm:text-sm/5",
+    "flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-base/6 font-medium text-gray-800 sm:py-2 sm:text-sm/5",
     "hover:bg-gray-950/5 hover:text-gray-950",
     "active:bg-gray-950/5 active:text-gray-950",
     "dark:text-white",
     "dark:hover:bg-white/5 dark:hover:text-white",
     "dark:active:bg-white/5 dark:active:text-white",
-    current && "bg-gray-950/5 text-gray-800dark:bg-white/5 dark:text-white",
+    current && "bg-gray-950/5 text-gray-800 dark:bg-white/5 dark:text-white",
   );
 
   return (
     <span className={clsx(className, "relative")}>
-      {current && <span className="absolute inset-y-2 -left-4 w-0.5 rounded-full bg-gray-800dark:bg-white" />}
+      {current && <span className="absolute inset-y-2 -left-4 w-0.5 rounded-full bg-gray-800 dark:bg-white" />}
       <button
         {...props}
         onClick={onClick}

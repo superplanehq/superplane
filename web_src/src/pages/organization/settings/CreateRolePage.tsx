@@ -332,13 +332,13 @@ export function CreateRolePage() {
         {/* Role Form */}
         <div className="space-y-6">
           {isLoading ? (
-            <div className="bg-white dark:bg-gray-800rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
               <div className="flex justify-center items-center h-32">
                 <p className="text-gray-500 dark:text-gray-400">Loading role data...</p>
               </div>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
               {error && (
                 <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mb-6">
                   <p className="text-sm">{error instanceof Error ? error.message : "Failed to load role data"}</p>

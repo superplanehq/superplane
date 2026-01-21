@@ -133,7 +133,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
       <div
         ref={containerRef}
         className={cn(
-          "group relative flex w-[20rem] flex-col rounded-md outline outline-slate-950/25",
+          "group relative flex w-[20rem] flex-col rounded-md outline outline-slate-950/20",
           colorStyles.container,
         )}
       >

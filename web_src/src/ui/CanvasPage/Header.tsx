@@ -133,7 +133,7 @@ export function Header({
                   />
                 </button>
                 {isMenuOpen && !workflowsLoading && (
-                  <div className="absolute left-0 top-13 z-50 min-w-[15rem] w-max rounded-md outline outline-slate-950/15 bg-white shadow-lg">
+                  <div className="absolute left-0 top-13 z-50 min-w-[15rem] w-max rounded-md outline outline-slate-950/20 bg-white shadow-lg">
                     <div className="px-4 pt-3 pb-4">
                       {/* All Canvases Link */}
                       <div className="mb-2">

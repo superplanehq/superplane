@@ -149,7 +149,7 @@ const HomePage = () => {
         <OrganizationMenuButton organizationId={organizationId} />
       </header>
       <main className="w-full h-full flex flex-column flex-grow-1">
-        <div className="bg-gray-100 w-full flex-grow-1">
+        <div className="bg-slate-100 w-full flex-grow-1">
           <div className="p-8">
             {!(activeTab === "canvases" && workflows.length === 0 && !searchQuery) && (
               <PageHeader activeTab={activeTab} onNewClick={onNewClick} />
@@ -442,7 +442,7 @@ function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCa
           handleNavigate();
         }
       }}
-      className="min-h-48 bg-white dark:bg-gray-800rounded-md outline outline-gray-950/10 hover:shadow-md transition-shadow cursor-pointer"
+      className="min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-gray-950/10 hover:shadow-md transition-shadow cursor-pointer"
     >
       <div className="flex flex-col h-full">
         <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
@@ -808,7 +808,7 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
                 handleNavigate();
               }
             }}
-            className="min-h-48 bg-white dark:bg-gray-800rounded-md outline outline-slate-950/10 dark:border-gray-800 hover:shadow-md transition-shadow cursor-pointer"
+            className="min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-slate-950/10 dark:border-gray-800 hover:shadow-md transition-shadow cursor-pointer"
           >
             <div className="p-6 flex flex-col justify-between h-full">
               <div>

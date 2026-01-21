@@ -182,7 +182,7 @@ export function OrganizationSettings() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
-      <Sidebar className="w-60 bg-white dark:bg-gray-800border-r border-gray-300 dark:border-gray-800">
+      <Sidebar className="w-60 bg-white dark:bg-gray-800 border-r border-gray-300 dark:border-gray-800">
         <SidebarBody>
           <SidebarSection className="px-4 py-2.5">
             <button
@@ -265,7 +265,7 @@ export function OrganizationSettings() {
         </SidebarBody>
       </Sidebar>
 
-      <div className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-900">
+      <div className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-900">
         <div className="px-8 pb-8 w-full max-w-3xl mx-auto">
           <div className="pt-10 pb-8">
             <h1 className="!text-2xl font-medium text-gray-900 dark:text-white">{activeMeta.title}</h1>

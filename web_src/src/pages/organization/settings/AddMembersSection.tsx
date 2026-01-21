@@ -114,7 +114,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
     return (
       <div
-        className={`bg-white dark:bg-gray-800rounded-lg border border-gray-300 dark:border-gray-800 p-6 ${className}`}
+        className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 ${className}`}
       >
         {error && (
           <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mb-4">

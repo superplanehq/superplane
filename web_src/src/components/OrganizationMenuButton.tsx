@@ -118,7 +118,7 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
         )}
       </button>
       {organizationId && isMenuOpen && (
-        <div className="absolute left-0 top-13 z-50 w-60 rounded-md outline outline-slate-950/15 bg-white shadow-lg">
+        <div className="absolute left-0 top-13 z-50 w-60 rounded-md outline outline-slate-950/20 bg-white shadow-lg">
           <div className="px-4 pt-3 pb-4 border-b border-gray-300">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-100 bg-gray-800 inline px-1 py-0.5 rounded">
               Org
