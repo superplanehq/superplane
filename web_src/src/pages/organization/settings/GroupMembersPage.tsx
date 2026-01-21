@@ -170,7 +170,7 @@ export function GroupMembersPage() {
                   type="text"
                   value={editedGroupName}
                   onChange={(e) => setEditedGroupName(e.target.value)}
-                  className="text-2xl font-semibold bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                  className="text-sm font-normal bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleSaveGroupName();
                     if (e.key === "Escape") handleCancelGroupName();
@@ -260,8 +260,11 @@ export function GroupMembersPage() {
                 ))}
                 {members.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-gray-500 h-[200px] py-6">
-                      No group members yet
+                    <TableCell colSpan={4} className="text-center text-gray-800 h-[200px] py-6 border-b-0">
+                      <div className="flex flex-col items-center gap-2">
+                        <Icon name="user" size="xl" className="text-gray-800" />
+                        <span className="text-sm">No group members yet</span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )}
