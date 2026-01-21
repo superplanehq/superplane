@@ -35,10 +35,14 @@ export interface Suggestion {
   nodeId?: string;
   /** For node suggestions: the human-readable node name */
   nodeName?: string;
-  /** For function suggestions: short description of what the function does */
+  /** For function/node suggestions: short description */
   description?: string;
   /** For function suggestions: example usage of the function */
   example?: string;
+  /** For node suggestions: component/trigger type label */
+  componentType?: string;
+  /** For $ selector: number of available nodes */
+  nodeCount?: number;
 }
 
 export interface GetSuggestionsOptions {
@@ -515,15 +519,17 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     return keys.slice(0, limit).map((k) => {
       const v = (globals as Record<string, unknown>)[k];
       const tailDot = isExpandableValue(v) ? "." : "";
-      const nodeName = getNodeName(globals, k, v);
+      const metadata = getNodeMetadata(globals, k, v);
       return {
         label: `["${k}"]`,
         kind: "variable",
         insertText: `$[${quoteKey(k, envTrigger.quote)}]${tailDot}`,
         detail: getValueTypeLabel(v),
-        labelDetail: formatNodeNameLabel(nodeName),
-        nodeId: nodeName ? k : undefined,
-        nodeName: nodeName,
+        labelDetail: formatNodeNameLabel(metadata.nodeName),
+        nodeId: metadata.nodeName ? k : undefined,
+        nodeName: metadata.nodeName,
+        componentType: metadata.componentType,
+        description: metadata.description,
       };
     });
   }
@@ -539,15 +545,17 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
       .slice(0, limit)
       .map((k) => {
         const v = (globals as Record<string, unknown>)[k];
-        const nodeName = getNodeName(globals, k, v);
+        const metadata = getNodeMetadata(globals, k, v);
         return {
           label: `["${k}"]`,
           kind: "variable",
           insertText: quoteKey(k, bracketCtx.quote), // only the key token
           detail: getValueTypeLabel(v),
-          labelDetail: formatNodeNameLabel(nodeName),
-          nodeId: nodeName ? k : undefined,
-          nodeName: nodeName,
+          labelDetail: formatNodeNameLabel(metadata.nodeName),
+          nodeId: metadata.nodeName ? k : undefined,
+          nodeName: metadata.nodeName,
+          componentType: metadata.componentType,
+          description: metadata.description,
         };
       });
   }
@@ -603,11 +611,14 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
 
   if (includeGlobals) {
     if (!prefix || "$".startsWith(prefix)) {
+      const nodeCount = listGlobalKeys(globals).length;
       out.push({
         label: "$",
         kind: "variable",
         insertText: "$",
         detail: getValueTypeLabel(globals),
+        description: "Root selector for accessing payload data from all connected components.",
+        nodeCount,
       });
     }
   }
@@ -655,23 +666,45 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function getNodeName(globals: Record<string, unknown>, key: string, value: unknown): string | undefined {
+type NodeMetadata = {
+  nodeName?: string;
+  componentType?: string;
+  description?: string;
+};
+
+function getNodeMetadata(globals: Record<string, unknown>, key: string, value: unknown): NodeMetadata {
+  const metadata: NodeMetadata = {};
+
+  // Try to get nodeName from the value itself
   if (isRecord(value)) {
     const nodeName = value.__nodeName;
-    if (typeof nodeName === "string" && nodeName.trim()) return nodeName;
-  }
-
-  const nodeNames = isRecord(globals) ? (globals as Record<string, unknown>).__nodeNames : undefined;
-  if (isRecord(nodeNames)) {
-    const entry = nodeNames[key];
-    if (typeof entry === "string" && entry.trim()) return entry;
-    if (isRecord(entry)) {
-      const name = entry.nodeName ?? entry.name ?? entry.label;
-      if (typeof name === "string" && name.trim()) return name;
+    if (typeof nodeName === "string" && nodeName.trim()) {
+      metadata.nodeName = nodeName;
     }
   }
 
-  return undefined;
+  // Get full metadata from __nodeNames
+  const nodeNames = isRecord(globals) ? (globals as Record<string, unknown>).__nodeNames : undefined;
+  if (isRecord(nodeNames)) {
+    const entry = nodeNames[key];
+    if (typeof entry === "string" && entry.trim()) {
+      metadata.nodeName = metadata.nodeName || entry;
+    } else if (isRecord(entry)) {
+      // New format: { name, componentType, description }
+      const name = entry.name ?? entry.nodeName ?? entry.label;
+      if (typeof name === "string" && name.trim()) {
+        metadata.nodeName = metadata.nodeName || name;
+      }
+      if (typeof entry.componentType === "string" && entry.componentType.trim()) {
+        metadata.componentType = entry.componentType;
+      }
+      if (typeof entry.description === "string" && entry.description.trim()) {
+        metadata.description = entry.description;
+      }
+    }
+  }
+
+  return metadata;
 }
 
 function formatNodeNameLabel(nodeName?: string): string | undefined {

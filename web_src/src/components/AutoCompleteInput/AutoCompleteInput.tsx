@@ -799,22 +799,51 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     className="border border-gray-200 dark:border-gray-700 sm:border-r-0 sm:border-t p-3 bg-gray-100 dark:bg-gray-700 sm:rounded-l-lg rounded-t-lg sm:rounded-br-none h-fit self-start shadow-lg"
                     style={{ width: `${valuePreviewWidth}px` }}
                   >
-                    {highlightedSuggestion?.nodeName ? (
+                    {/* $ selector */}
+                    {highlightedSuggestion?.label === "$" ? (
                       <>
-                        <div className="mb-2">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Node Name</div>
-                          <div className="text-sm text-gray-950 dark:text-white font-medium">
-                            {highlightedSuggestion.nodeName}
-                          </div>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-2">$ (Event Data)</div>
+                        <div className="text-xs text-gray-600 dark:text-gray-300 mb-2">
+                          Root selector for accessing payload data from all connected components.
                         </div>
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Node ID</div>
-                          <div className="text-sm text-gray-950 dark:text-white font-mono break-all">
-                            {highlightedSuggestion.nodeId}
+                        <div className="text-xs font-mono bg-gray-200 dark:bg-gray-600 rounded px-2 py-1 text-gray-800 dark:text-gray-100">
+                          {highlightedSuggestion.nodeCount ?? 0} node
+                          {highlightedSuggestion.nodeCount !== 1 ? "s" : ""} available
+                        </div>
+                      </>
+                    ) : /* Node suggestions */
+                    highlightedSuggestion?.nodeName ? (
+                      <>
+                        {/* Component type as title */}
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-2">
+                          {highlightedSuggestion.componentType || "Component"}
+                        </div>
+
+                        {/* Component description */}
+                        {highlightedSuggestion.description && (
+                          <div className="text-xs text-gray-600 dark:text-gray-300 mb-3">
+                            {highlightedSuggestion.description}
+                          </div>
+                        )}
+
+                        {/* Node name and ID at bottom */}
+                        <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2 space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-500 dark:text-gray-400">Name</span>
+                            <span className="text-gray-950 dark:text-white font-medium truncate ml-2 max-w-[120px]">
+                              {highlightedSuggestion.nodeName}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-500 dark:text-gray-400">ID</span>
+                            <span className="text-gray-950 dark:text-white font-mono truncate ml-2 max-w-[120px]">
+                              {highlightedSuggestion.nodeId}
+                            </span>
                           </div>
                         </div>
                       </>
-                    ) : highlightedSuggestion?.kind === "function" ? (
+                    ) : /* Function suggestions */
+                    highlightedSuggestion?.kind === "function" ? (
                       <>
                         <div className="text-sm font-medium text-gray-950 dark:text-white mb-2">
                           {highlightedSuggestion.label}()
@@ -830,7 +859,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           </div>
                         )}
                       </>
-                    ) : highlightedValue !== undefined &&
+                    ) : /* Value preview for primitives */
+                    highlightedValue !== undefined &&
                       (highlightedValue === null ||
                         (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue))) ? (
                       <>
@@ -844,6 +874,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                         </div>
                       </>
                     ) : (
+                      /* Fallback: show type */
                       <>
                         <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Type</div>
                         <div className="text-sm text-gray-950 dark:text-white font-mono">
